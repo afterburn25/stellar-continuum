@@ -66,3 +66,5 @@ DTO values; the native test mutates a deep copy and verifies the original remain
 unchanged.
 
 The maintained focused CTest invocation passed 1/1 after integration (`work/native-052-starting-focused.log`). Its target is `stellar_research_start_tests`: the longer original target exceeded Windows object/module-map path limits in this checkout. The short target changes build output paths only. The combined suite will run after the following authority/recovery integration.
+
+The exact committed engine 0.1.24 export (`febf1d7cb42ecd52b017c861376737ed9c0ea183`) subsequently passed the combined 61/61 CTest and 20/20 Python suite with `sourceDirty: false`, seven sealed runtime files and relocated launch/campaign validation. See `work/native-024-clean.log` and HANDOFF.md for the exact package.

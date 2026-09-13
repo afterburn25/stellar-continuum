@@ -21,3 +21,5 @@ ctest --test-dir build-native/testing -R "^adaptive_research_readiness_parity$" 
 
 
 The maintained Windows testing build passed 60/60 CTest and 20/20 Python checks after integration. The retained transcript is `work/native-051-readiness-testing.log`. This is development integration evidence; the latest separately verified clean package is still engine 0.1.23.
+
+The exact committed engine 0.1.24 export (`febf1d7cb42ecd52b017c861376737ed9c0ea183`) subsequently passed the combined 61/61 CTest and 20/20 Python suite with `sourceDirty: false`, seven sealed runtime files and relocated launch/campaign validation. See `work/native-024-clean.log` and HANDOFF.md for the exact package.

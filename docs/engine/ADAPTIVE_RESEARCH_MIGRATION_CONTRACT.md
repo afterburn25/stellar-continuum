@@ -1,6 +1,6 @@
 # Adaptive Research and integrated campaign migration boundary
 
-Status: implementation pending. The native legacy research port and campaign step (038) do not establish Adaptive Research parity. Preserve the C# authority and `data/research/v1` unchanged while building the native implementation.
+Status: foundations and calculated authority are implemented through gate 053; research recovery and retained strategic support are being migrated. The native legacy campaign step (038) does not establish integrated Adaptive Research parity. Preserve the C# authority and `data/research/v1` unchanged while building the native implementation.
 
 ## Actual player composition
 
@@ -74,6 +74,16 @@ A shared internal weak-table helper may own stable support values behind weak id
 Before adopting this infrastructure, compare actual-source independence of two runtimes on one state and two states with the same ID. Native ownership probes must cover state moves, copy independence, assignment, destruction/address reuse, runtime moves and expired-entry cleanup. Support-map enumeration order is not simulation order; only each support state's source collections may drive outcomes. Keep the existing sparse-slot ordering within those collections.
 
 The strategic composition must construct dependencies in source order: authority; pressure catalog/runtime borrowing the kernel; agenda catalog/runtime borrowing authority; foreign-technology catalog/runtime; foreign-discovery catalog/runtime sharing that foreign-technology runtime; outcome catalog/runtime sharing pressure. The pressure runtime deliberately forwards to the kernel, while agenda/foreign/outcome flows use the calculated authority. Do not replace those dependencies with a convenient common facade.
+
+## Agenda visibility and cache boundary
+
+The agenda runtime owns separate weakly keyed support and candidate-cache tables. Its cache key is exactly civilization `MaterializedViewRevision`, expertise revision and agenda revision. Cache invalidation must not increment simulation revisions. Return owned candidate values, or retain an immutable result allocation for the full documented borrow lifetime; callers must not retain a span into a vector overwritten by the next review.
+
+Generate candidates only from materialized `Investigable` node states that have no active project. Score those candidates before sorting by descending utility and then UTF-16 ordinal node ID, and only then apply the shortlist limit. Do not enumerate unknown catalog nodes, discard blocked candidates, or truncate before scoring. Requested labs can fall back to the node minimum even when there is no free capacity, so blocked candidates still receive useful estimates and blockers. Readiness is calculated before start eligibility, without inventing a target context.
+
+Preserve component order, optional components, stable ties among the three strongest explanation factors, source floating-point behavior and `0.#` formatting. Perceived adequacy is a recommendation, not an automatic priority mutation. Applying it sets priority, records the review, then invalidates the cache. The recognized domain-pressure query walks materialized state as the source does; it is not a second scan over the hidden research catalog.
+
+Evidence must include unchanged cached results, each revision source independently forcing a rebuild, runtime/state identity independence, priority changes and default removal, active/paused exclusion, nonempty allowed and blocked shortlists, all recommendation branches, and complete ordered utility components and explanations. A native shortcut that invalidates a known state key directly is acceptable instead of searching the weak table for the corresponding support object; no simulation outcome may depend on weak-table enumeration.
 
 ## State and recovery details
 

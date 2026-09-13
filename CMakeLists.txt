@@ -53,7 +53,8 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/adaptive_research_runtime.cpp core/src/adaptive_research_expertise.cpp
   core/src/adaptive_research_expertise_state.cpp
   core/src/adaptive_research_readiness.cpp core/src/adaptive_research_expertise_service.cpp
-  core/src/adaptive_research_starting_profiles.cpp)
+  core/src/adaptive_research_starting_profiles.cpp
+  core/src/adaptive_research_authority.cpp core/src/adaptive_research_expertise_snapshot.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp app/fresh_campaign_output.cpp)
@@ -332,6 +333,20 @@ if(BUILD_TESTING)
       "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-starting-profiles.json"
       "${CMAKE_SOURCE_DIR}/data/research/v1")
     set_tests_properties(adaptive_research_starting_profiles_parity PROPERTIES TIMEOUT 180)
+  endif()
+  add_executable(stellar_research_authority_tests native-tests/adaptive_research_authority_tests.cpp)
+  target_link_libraries(stellar_research_authority_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_authority_parity COMMAND stellar_research_authority_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-authority.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_authority_parity PROPERTIES TIMEOUT 180)
+  if(WIN32)
+    add_executable(stellar_research_v2_tests native-tests/adaptive_research_expertise_snapshot_tests.cpp)
+    target_link_libraries(stellar_research_v2_tests PRIVATE stellar_core stellar_json bcrypt)
+    add_test(NAME adaptive_research_expertise_snapshot_parity COMMAND stellar_research_v2_tests
+      "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-expertise-snapshot.json"
+      "${CMAKE_SOURCE_DIR}/data/research/v1")
+    set_tests_properties(adaptive_research_expertise_snapshot_parity PROPERTIES TIMEOUT 180)
   endif()
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
