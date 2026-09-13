@@ -1,6 +1,8 @@
 #include <stellar/core/adaptive_research_expertise_snapshot.hpp>
 
+#include <stellar/core/detail/adaptive_research_expertise_snapshot_json.hpp>
 #include <stellar/core/detail/adaptive_research_expertise_state_writer.hpp>
+#include <stellar/core/detail/adaptive_research_snapshot_json.hpp>
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
 #include <stellar/core/detail/legacy_number_format.hpp>
 
@@ -459,6 +461,69 @@ void validate_vector(const ResearchCompetenceVector &value,
 
 } // namespace
 
+std::string detail::encode_adaptive_research_snapshot_v2_dto(
+    const AdaptiveResearchStateSnapshotV2 &snapshot) {
+  try {
+    Json result;
+    result["schemaVersion"] = snapshot.schema_version;
+    result["catalogId"] = snapshot.catalog_id;
+    result["core"] = snapshot.core_present
+                         ? Json::parse(detail::encode_adaptive_research_snapshot_dto(
+                               snapshot.core))
+                         : Json(nullptr);
+    result["expertise"] = snapshot.expertise_present
+                              ? expertise_json(snapshot.expertise)
+                              : Json(nullptr);
+    return result.dump();
+  } catch (const AdaptiveResearchSnapshotJsonError &) {
+    throw;
+  } catch (const Json::exception &error) {
+    throw AdaptiveResearchSnapshotJsonError(error.what());
+  }
+}
+
+AdaptiveResearchStateSnapshotV2
+detail::decode_adaptive_research_snapshot_v2_dto(std::string_view text) {
+  try {
+    const auto document = Json::parse(text);
+    if (!document.is_object())
+      json_fail("Adaptive Research v2 snapshot root must be an object.");
+    AdaptiveResearchStateSnapshotV2 snapshot;
+    const auto schema = document.find("schemaVersion");
+    if (schema == document.end()) {
+      snapshot.schema_version = 0;
+    } else if (schema->is_number_unsigned()) {
+      const auto raw = schema->get<std::uint64_t>();
+      if (raw > static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
+        json_fail("Adaptive Research snapshot schemaVersion is outside Int32 range.");
+      snapshot.schema_version = static_cast<int>(raw);
+    } else if (schema->is_number_integer()) {
+      const auto raw = schema->get<std::int64_t>();
+      if (raw < std::numeric_limits<int>::min() ||
+          raw > std::numeric_limits<int>::max())
+        json_fail("Adaptive Research snapshot schemaVersion is outside Int32 range.");
+      snapshot.schema_version = static_cast<int>(raw);
+    } else {
+      json_fail("Adaptive Research snapshot schemaVersion must be an Int32 number.");
+    }
+    snapshot.catalog_id = nullable_string_default(document, "catalogId");
+    const auto core = document.find("core");
+    snapshot.core_present = core != document.end() && !core->is_null();
+    if (snapshot.core_present)
+      snapshot.core = detail::decode_adaptive_research_snapshot_dto(core->dump());
+    const auto expertise = document.find("expertise");
+    snapshot.expertise_present =
+        expertise != document.end() && !expertise->is_null();
+    if (snapshot.expertise_present)
+      snapshot.expertise = parse_expertise(*expertise);
+    return snapshot;
+  } catch (const AdaptiveResearchSnapshotJsonError &) {
+    throw;
+  } catch (const Json::exception &error) {
+    throw AdaptiveResearchSnapshotJsonError(error.what());
+  }
+}
+
 struct AdaptiveResearchSnapshotV2Codec::Storage {
   const AdaptiveResearchAuthority *authority;
   AdaptiveResearchSnapshotCodec v1;
@@ -686,8 +751,13 @@ AdaptiveResearchCivilizationState AdaptiveResearchSnapshotV2Codec::restore(
     fail("Adaptive Research snapshot catalog '" + snapshot.catalog_id +
          "' does not match runtime catalog '" +
          storage_->authority->catalog().metadata().catalog_id + "'.");
-  return storage_->apply_expertise(storage_->v1.restore(snapshot.core),
-                                   snapshot.core, snapshot.expertise);
+  if (!snapshot.core_present)
+    json_fail("Adaptive Research v2 snapshot core is null.");
+  auto state = storage_->v1.restore(snapshot.core);
+  if (!snapshot.expertise_present)
+    json_fail("Adaptive Research v2 snapshot expertise is null.");
+  return storage_->apply_expertise(std::move(state), snapshot.core,
+                                   snapshot.expertise);
 }
 
 } // namespace stellar::core

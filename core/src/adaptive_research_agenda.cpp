@@ -1,4 +1,5 @@
 #include <stellar/core/adaptive_research_agenda.hpp>
+#include <stellar/core/detail/adaptive_research_agenda_support_access.hpp>
 
 #include <stellar/core/detail/adaptive_research_weak_state_table.hpp>
 #include <stellar/core/detail/legacy_number_format.hpp>
@@ -504,6 +505,12 @@ void detail::AdaptiveResearchAgendaStateWriter::mark_reviewed(
   state.storage_->revision = increment(state.storage_->revision);
 }
 
+void detail::AdaptiveResearchAgendaSupportAccess::set_review_metadata_unchecked(
+    AdaptiveResearchAgendaState &state, double year, std::string provenance) {
+  state.storage_->last_major_review_year = year;
+  state.storage_->policy_provenance = std::move(provenance);
+}
+
 namespace {
 
 using AgendaWriter = detail::AdaptiveResearchAgendaStateWriter;
@@ -919,5 +926,11 @@ std::uint64_t detail::AdaptiveResearchAgendaRuntimeTestAccess::shortlist_rebuild
 void detail::AdaptiveResearchAgendaRuntimeTestAccess::maintain(AdaptiveResearchAgendaRuntime &runtime, std::size_t limit) { runtime.storage_->states.maintain(limit); runtime.storage_->caches.maintain(limit); }
 std::size_t detail::AdaptiveResearchAgendaRuntimeTestAccess::state_count(const AdaptiveResearchAgendaRuntime &runtime) noexcept { return runtime.storage_->states.entry_count_for_testing(); }
 std::size_t detail::AdaptiveResearchAgendaRuntimeTestAccess::cache_count(const AdaptiveResearchAgendaRuntime &runtime) noexcept { return runtime.storage_->caches.entry_count_for_testing(); }
+
+AdaptiveResearchAgendaState &detail::AdaptiveResearchAgendaSupportAccess::state(
+    const AdaptiveResearchAgendaRuntime &runtime,
+    const AdaptiveResearchCivilizationState &civilization) {
+  return runtime.storage_->agenda(civilization);
+}
 
 } // namespace stellar::core

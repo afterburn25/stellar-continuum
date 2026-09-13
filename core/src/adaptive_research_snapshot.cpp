@@ -1,4 +1,5 @@
 #include <stellar/core/adaptive_research_snapshot.hpp>
+#include <stellar/core/detail/adaptive_research_snapshot_json.hpp>
 
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
 
@@ -368,6 +369,28 @@ AdaptiveResearchStateSnapshot from_json(const Json &j) {
   return s;
 }
 } // namespace
+
+std::string detail::encode_adaptive_research_snapshot_dto(
+    const AdaptiveResearchStateSnapshot &snapshot) {
+  try {
+    return to_json(snapshot).dump();
+  } catch (const AdaptiveResearchSnapshotJsonError &) {
+    throw;
+  } catch (const Json::exception &error) {
+    throw AdaptiveResearchSnapshotJsonError(error.what());
+  }
+}
+
+AdaptiveResearchStateSnapshot detail::decode_adaptive_research_snapshot_dto(
+    std::string_view text) {
+  try {
+    return from_json(Json::parse(text));
+  } catch (const AdaptiveResearchSnapshotJsonError &) {
+    throw;
+  } catch (const Json::exception &error) {
+    throw AdaptiveResearchSnapshotJsonError(error.what());
+  }
+}
 
 AdaptiveResearchSnapshotError::AdaptiveResearchSnapshotError(std::string value)
     : std::runtime_error(std::move(value)) {}

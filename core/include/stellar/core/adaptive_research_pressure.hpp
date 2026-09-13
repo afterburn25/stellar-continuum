@@ -16,6 +16,7 @@ namespace stellar::core {
 
 namespace detail {
 class AdaptiveResearchPressureStateWriter;
+class AdaptiveResearchPressureSupportAccess;
 }
 
 struct ResearchPressureRuleDefinition {
@@ -164,6 +165,7 @@ public:
 private:
   struct Storage;
   std::unique_ptr<Storage> storage_;
+  friend class detail::AdaptiveResearchPressureSupportAccess;
 };
 
 } // namespace stellar::core

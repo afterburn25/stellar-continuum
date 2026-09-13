@@ -17,6 +17,7 @@ namespace stellar::core {
 namespace detail {
 class AdaptiveResearchAgendaStateWriter;
 class AdaptiveResearchAgendaRuntimeTestAccess;
+class AdaptiveResearchAgendaSupportAccess;
 }
 
 struct ResearchAgendaPriorityDefinition {
@@ -154,6 +155,7 @@ private:
   std::unique_ptr<Storage> storage_;
   friend class AdaptiveResearchAgendaRuntime;
   friend class detail::AdaptiveResearchAgendaStateWriter;
+  friend class detail::AdaptiveResearchAgendaSupportAccess;
 };
 
 struct ResearchPerceivedAdequacyAssessment {
@@ -248,6 +250,7 @@ private:
   struct Storage;
   std::unique_ptr<Storage> storage_;
   friend class detail::AdaptiveResearchAgendaRuntimeTestAccess;
+  friend class detail::AdaptiveResearchAgendaSupportAccess;
 };
 
 namespace detail {

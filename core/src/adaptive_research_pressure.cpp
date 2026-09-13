@@ -1,6 +1,7 @@
 #include <stellar/core/adaptive_research_pressure.hpp>
 
 #include <stellar/core/detail/adaptive_research_pressure_state_writer.hpp>
+#include <stellar/core/detail/adaptive_research_pressure_support_access.hpp>
 #include <stellar/core/detail/adaptive_research_weak_state_table.hpp>
 
 #include <nlohmann/json.hpp>
@@ -757,6 +758,12 @@ double AdaptiveResearchPressureRuntime::get_metric_target(
                                 "'. (Parameter 'pressureId')");
   }
   return storage_->metric_target(storage_->states.get_or_create(state), *rule);
+}
+
+AdaptiveResearchPressureState &detail::AdaptiveResearchPressureSupportAccess::state(
+    const AdaptiveResearchPressureRuntime &runtime,
+    const AdaptiveResearchCivilizationState &civilization) {
+  return runtime.storage_->states.get_or_create(civilization);
 }
 
 } // namespace stellar::core

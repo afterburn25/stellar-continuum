@@ -53,6 +53,10 @@ struct AdaptiveResearchStateSnapshotV2 {
   std::string catalog_id;
   AdaptiveResearchStateSnapshot core;
   AdaptiveResearchExpertiseSnapshot expertise;
+  // DTO decoder metadata for source nullable reference records. Existing
+  // typed callers keep both present by default.
+  bool core_present{true};
+  bool expertise_present{true};
 };
 
 // Borrows one stable AdaptiveResearchAuthority. The authority must outlive the

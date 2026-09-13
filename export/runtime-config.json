@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.27",
+  "engineVersion": "0.1.28",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "Headless diagnostic host with fresh campaign initialization and retained ordered legacy campaign simulation benchmarks. Core includes campaign commands and Adaptive Research catalogs, state, eligibility, research views, timed runtime commands, expertise, calculated authority, starting profiles and standalone schema-2 research recovery, weak state support, pressure signals and visible-only research agendas. Timing and state outputs are diagnostics, not FPS or player saves. Integrated Adaptive Research/diplomacy, save-v16 and graphical parity remain open."
+  "description": "Headless diagnostic host with fresh campaign initialization and retained ordered legacy campaign simulation benchmarks. Core includes campaign commands and Adaptive Research catalogs, state, eligibility, research views, timed runtime commands, expertise, calculated authority, starting profiles and standalone schema-3 research recovery, weak state support, pressure signals, visible-only research agendas, foreign discovery and deterministic outcomes behind a stable owning research runtime. Timing and state outputs are diagnostics, not FPS or player saves. Integrated Adaptive Research/diplomacy, player wrapper17 / galaxy16 persistence and graphical parity remain open."
 }
