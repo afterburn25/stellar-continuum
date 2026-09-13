@@ -46,3 +46,5 @@ exception. Normalizing only that GUID makes both JSON documents identical. Raw
 byte-for-byte regeneration is therefore not claimed for this fixture; the exact
 original exception and regenerated exception are retained, and input contents and
 all semantic messages remain unchanged.
+
+Exact committed engine 0.1.26 export `84d7370225a6b6b234707890ad8e1cb3c078d047` passed 65/65 CTest and 20/20 Python checks. Package `Builds/Windows/StellarContinuum-windows-benchmark-84d73702-20260913T125937489845Z` has `sourceDirty=false`, seven hashed runtime files, and all nine relocation/recovery validation flags true. Evidence: `work/native-026-clean.log`. All six GitHub workflows for this commit passed, including native CI 34758146962 and screenshot CI 34758146958. This remains a headless foundation, not a native playable release or clean-machine certification.
