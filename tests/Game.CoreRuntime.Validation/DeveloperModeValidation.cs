@@ -237,7 +237,7 @@ internal static class DeveloperModeValidation
         var envelope = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         Require(envelope.Count == 4 && envelope["DeveloperFormatVersion"]!.GetValue<int>() == 1 &&
             envelope["Mode"]!.GetValue<string>() == "Developer" && !envelope["ToolsUsed"]!.GetValue<bool>() &&
-            envelope["Campaign"]!["FormatVersion"]!.GetValue<int>() == 17,
+            envelope["Campaign"]!["FormatVersion"]!.GetValue<int>() == CampaignStatePersistenceService.CurrentFormatVersion,
             "Developer save is not the explicit versioned envelope around the canonical surface campaign");
         var loaded = persistence.Load(path);
         Require(loaded.Galaxy.DeveloperSession is { ToolsUsed: false } && loaded.SimulationDays == 17.125 &&

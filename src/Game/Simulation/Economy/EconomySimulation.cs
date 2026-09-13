@@ -144,33 +144,12 @@ public sealed class EconomySimulation
         double populationServices = 0.0;
         double habitatSupport = 0.0;
         double surfaceMaintenance = 0.0;
-        var habitatBurden = new CurrentColonyHabitatSupportBurdenView();
-        var construction = galaxy.ConstructionStates.First(state => state.CivilizationId == civilizationId);
-        var industrialAutomation = construction.CompletedProjectIds.Contains("industrial_automation");
-
         foreach (var colony in galaxy.Colonies.Where(item => item.CivilizationId == civilizationId))
         {
-            var populationFactor = Math.Max(0.01, colony.PopulationMillions / 1000.0);
-            var infrastructure = Math.Clamp(colony.Infrastructure, 0.1, 5.0);
-            var stability = Math.Clamp(colony.Stability, 0.1, 1.2);
-            var surface = SurfaceConstruction.GetOutput(colony, powerIntervalDays);
-            if (colony.Kind == SettlementKind.Colony)
-            {
-                var labor = ColonyLaborEconomy.GetSnapshot(colony, industrialAutomation,
-                    Math.Min(surface.WorkforceAvailableMillions, surface.WorkforceDemandMillions));
-                colonyRevenue += labor.EmployedPopulationMillions / 1000.0 *
-                    EmploymentTaxCreditsPerBillionWorkersPerDay * infrastructure * stability;
-            }
-            if (colony.Kind == SettlementKind.Colony)
-                tradeRevenue += surface.CreditsPerDay;
-            surfaceMaintenance += surface.UpkeepCreditsPerDay;
-            // A tiny dependent outpost has real overhead without being charged as though it
-            // were a self-governing world of hundreds of millions. Administration reaches the
-            // established full-colony rate at 250 million inhabitants.
-            administration += GetAdministrationCost(colony.PopulationMillions);
-            populationServices += populationFactor * PopulationServicesCreditsPerBillionPerDay * infrastructure;
-            var burden = habitatBurden.Build(galaxy, colony.Id);
-            habitatSupport += GetHabitatSupportCost(burden) * (1 - surface.HabitatSupportReduction);
+            var flow = GetColonyCreditFlow(galaxy, colony, powerIntervalDays);
+            colonyRevenue += flow.ColonyRevenuePerDay; tradeRevenue += flow.TradeRevenuePerDay;
+            surfaceMaintenance += flow.SurfaceMaintenancePerDay; administration += flow.ColonyAdministrationPerDay;
+            populationServices += flow.PopulationServicesPerDay; habitatSupport += flow.HabitatSupportPerDay;
         }
 
         var fleetOperations = galaxy.Fleets
@@ -187,6 +166,34 @@ public sealed class EconomySimulation
             : 0.0;
         return new(colonyRevenue, tradeRevenue, administration, populationServices, habitatSupport,
             fleetOperations, orbitalMaintenance, surfaceMaintenance, researchOperations);
+    }
+
+    /// <summary>Planetary contribution before empire-wide fleet, orbital and research obligations.</summary>
+    public static CreditFlowSnapshot GetColonyCreditFlow(GalaxyState galaxy, ColonyState colony, double powerIntervalDays = 1)
+    {
+        var population = Math.Max(.01, colony.PopulationMillions / 1000.0);
+        var infrastructure = Math.Clamp(colony.Infrastructure, .1, 5);
+        var surface = SurfaceConstruction.GetOutput(colony, powerIntervalDays);
+        var automation = galaxy.ConstructionStates.First(item => item.CivilizationId == colony.CivilizationId)
+            .CompletedProjectIds.Contains("industrial_automation");
+        var labor = ColonyLaborEconomy.GetSnapshot(colony, automation,
+            Math.Min(surface.WorkforceAvailableMillions, surface.WorkforceDemandMillions));
+        var tax = colony.Kind == SettlementKind.Colony ? labor.EmployedPopulationMillions / 1000.0 *
+            EmploymentTaxCreditsPerBillionWorkersPerDay * infrastructure * Math.Clamp(colony.Stability, .1, 1.2) : 0;
+        var support = new CurrentColonyHabitatSupportBurdenView().Build(galaxy, colony.Id);
+        return new(tax, colony.Kind == SettlementKind.Colony ? surface.CreditsPerDay : 0,
+            GetAdministrationCost(colony.PopulationMillions), population * PopulationServicesCreditsPerBillionPerDay * infrastructure,
+            GetHabitatSupportCost(support) * (1 - surface.HabitatSupportReduction), 0, 0, surface.UpkeepCreditsPerDay, 0);
+    }
+
+    public static double GetColonyIndustryPerDay(GalaxyState galaxy, ColonyState colony)
+    {
+        if (colony.Kind != SettlementKind.Colony) return 0;
+        var surface = SurfaceConstruction.GetOutput(colony);
+        var output = Math.Max(.01, colony.PopulationMillions / 1000) * .42 *
+            Math.Clamp(colony.Infrastructure, .1, 5) * Math.Clamp(colony.Stability, .1, 1.2) + surface.IndustryPerDay;
+        if (galaxy.ConstructionStates.First(item => item.CivilizationId == colony.CivilizationId).CompletedProjectIds.Contains("industrial_automation")) output *= 1.35;
+        return output * galaxy.Economies.First(item => item.CivilizationId == colony.CivilizationId).LastBaseOperationsFundingFraction;
     }
 
     public static double GetIndustryStorageCapacity(GalaxyState galaxy, int civilizationId)

@@ -36,11 +36,6 @@ public partial class ScreenshotCapture
             if (c is TextureRect || c.Name == "SystemScene3D") GD.Print($"SCENE_LAYOUT {c.Name} {c.Size} visible={c.IsVisibleInTree()}");
         Require(count > 8, "Sol must render planets and their moons as real 3D bodies.");
         await SaveViewportAsync("immersive-03-system.png", 0, 0);
-        if (System.Environment.GetEnvironmentVariable("STELLAR_IMMERSIVE_SKY_ONLY") == "1")
-        {
-            await VerifySurfaceSkyCompanionsAsync();
-            return;
-        }
         if (System.Environment.GetEnvironmentVariable("STELLAR_IMMERSIVE_SATURN_ONLY") == "1")
         {
             await ClickPositionAsync(BodyPoint(6), MouseButton.Left, doubleClick: true);
@@ -60,57 +55,16 @@ public partial class ScreenshotCapture
             "Middle drag did not rotate the focused perspective camera.");
         await SaveViewportAsync("immersive-04-rotated-system.png", 0, 0);
         await SaveViewportAsync("immersive-05-earth-orbit.png", 0, 0);
-        for (var i = 0; !_main.UiIsSurfaceOpen && i < 18; i++)
-        {
-            await ClickPositionAsync(new(600, 440), MouseButton.WheelUp);
-            await WaitFramesAsync(65);
-        }
-        Require(_main.UiIsSurfaceOpen, "Wheel descent never entered Earth's atmosphere.");
-        var surface = _main.GetNode<PlanetSurfaceView>("PlanetSurfaceLayer/PlanetSurfaceView");
-        Require(surface.IsOrbitalFlight && surface.AltitudeMeters > 500000,
-            "Surface transition skipped the continuous globe and upper atmosphere.");
-        await SaveViewportAsync("immersive-06-upper-orbit.png", 0, 0);
-        var capturedAtmosphere = false;
-        for (var i = 0; surface.IsOrbitalFlight && i < 30; i++)
-        {
-            await ClickPositionAsync(new(600, 440), MouseButton.WheelUp);
-            await WaitFramesAsync(70);
-            if (!capturedAtmosphere && surface.AltitudeMeters < 30000)
-            {
-                await SaveViewportAsync("immersive-07-atmosphere.png", 0, 0);
-                capturedAtmosphere = true;
-            }
-        }
-        Require(!surface.IsOrbitalFlight && surface.AltitudeMeters < 1500, "Descent did not reach the colony terrain.");
-        Require(surface.EnvironmentDetailCount >= 20,
-            $"Surface infrastructure dressing is unexpectedly sparse ({surface.EnvironmentDetailCount} root parts).");
-        Require(surface.SurfaceTrafficCount >= 1,
-            "The active colony has no bounded point-to-point ground traffic.");
-        Require(surface.HighRiseCount >= 6 && surface.DistrictRingRoadCount == 2,
-            "The established capital skyline or its district road network is missing.");
-        VerifySurfaceBuildingTiers();
-        await DragAsync(new(620, 420), new(620, 335), MouseButton.Middle);
-        for (var i = 0; i < 14; i++) await ClickPositionAsync(new(600, 440), MouseButton.WheelUp);
-        await SaveViewportAsync("immersive-08-colony.png", 0, 0);
-        // Walk the view out onto an avenue before descending to eye level. This uses
-        // ordinary pan/look gestures and avoids photographing the hub's front wall.
-        await DragAsync(new(620, 420), new(360, 420), MouseButton.Left);
-        await DragAsync(new(620, 420), new(305, 350), MouseButton.Middle);
-        for (var i = 0; i < 12; i++) await ClickPositionAsync(new(600, 440), MouseButton.WheelUp);
-        await SaveViewportAsync("immersive-09-street.png", 0, 0);
-        Require(surface.CameraPosition.Y >= SurfaceConstruction.TerrainHeight(
-                surface.CameraPosition.X, surface.CameraPosition.Z) + 2.19f,
-            "Street camera passed below its local terrain clearance.");
-        Check(true, "premium-surface-city-has-skyline-infrastructure-and-traffic");
-        if (System.Environment.GetEnvironmentVariable("STELLAR_IMMERSIVE_SURFACE_ONLY") == "1") return;
-        await ClickNamedButtonAsync(surface, "SurfaceBack");
-        await WaitForCameraAsync();
-        Require(!_main.UiIsSurfaceOpen && _main.UiFocusedPlanetBodyId == 3, "Returning from ground lost focused Earth.");
+        await ClickNamedButtonAsync(_main, "SpatialSurface"); await WaitForRefreshAsync();
+        var planetary = _main.GetNode<PlanetaryWindow>("PlanetSurfaceLayer/PlanetaryWindow");
+        Require(planetary.IsOpen && _main.UiCurrentSurface?.PlanetName == "Earth", "Planetary management did not open from focused Earth.");
+        await SaveViewportAsync("immersive-06-planetary-management.png", 0, 0);
+        Check(true, "planetary-window-replaces-free-surface-construction");
+        await ClickNamedButtonAsync(planetary, "PlanetaryBack"); await WaitForCameraAsync();
+        Require(!_main.UiIsSurfaceOpen && _main.UiFocusedPlanetBodyId == 3, "Returning from planetary management lost focused Earth.");
         await WaitFramesAsync(80);
-        Require(!_main.UiIsSurfaceOpen, "Return to orbit immediately retriggered descent.");
-        GD.Print($"IMMERSIVE_REVIEW_PASS: {count} bodies, perspective rotation, wheel descent, atmosphere, ground, recovery.");
+        Require(!_main.UiIsSurfaceOpen, "Return to orbit immediately reopened planetary management.");
     }
-
     private void VerifySurfaceBuildingTiers()
     {
         foreach (var family in new[] { "power_generator", "science_lab", "fabricator", "trade_hub", "habitat_complex" })

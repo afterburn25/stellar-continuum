@@ -109,7 +109,8 @@ public sealed class CampaignStatePersistenceService
     public const int PresetFormatVersion = 11;
     public const int SurfaceFormatVersion = 13;
     public const int AdaptiveFormatVersion = 15;
-    public const int CurrentFormatVersion = 17;
+    public const int PlanetaryCatalogFormatVersion = 17;
+    public const int CurrentFormatVersion = 19;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -294,7 +295,7 @@ public sealed class CampaignStatePersistenceService
         }
 
         if (formatVersion <= CampaignSaveService.LegacyFormatVersion ||
-            formatVersion is CampaignSaveService.PresetFormatVersion or CampaignSaveService.SurfaceFormatVersion or CampaignSaveService.CurrentFormatVersion)
+            formatVersion is CampaignSaveService.PresetFormatVersion or CampaignSaveService.SurfaceFormatVersion or CampaignSaveService.PlanetaryCatalogFormatVersion or CampaignSaveService.CurrentFormatVersion)
         {
             // Legacy saves did not persist political state. Do not infer contacts, trust, claims,
             // treaties or wars from omniscient galaxy data during migration.
@@ -314,7 +315,7 @@ public sealed class CampaignStatePersistenceService
 
         if (formatVersion != LegacyFormatVersion && formatVersion != PresetFormatVersion &&
             formatVersion != SurfaceFormatVersion && formatVersion != AdaptiveFormatVersion &&
-            formatVersion != CurrentFormatVersion)
+            formatVersion != PlanetaryCatalogFormatVersion && formatVersion != CurrentFormatVersion)
             throw new InvalidDataException($"No migration path is defined for campaign save format {formatVersion}.");
 
         Report(.25, "Restoring diplomacy");
@@ -338,12 +339,12 @@ public sealed class CampaignStatePersistenceService
         }
 
         // v9 wraps procedural v8; v11 wraps preset-aware v10; v13 wraps surface-construction v12.
-        // v15 records its historical inner galaxy version; v17 always records v16.
+        // v15 records its historical inner version; v17 wraps v16, and v19 wraps v18.
         // Normalize to the matching galaxy version so neither path silently reinterprets the
         // other catalog. Species/body/Combat validation remains in CampaignSaveService.
         Report(.42, "Restoring galaxy state");
         var normalized = (JsonObject)root.DeepClone();
-        normalized["FormatVersion"] = formatVersion is AdaptiveFormatVersion or CurrentFormatVersion
+        normalized["FormatVersion"] = formatVersion is AdaptiveFormatVersion or PlanetaryCatalogFormatVersion or CurrentFormatVersion
             ? ReadGalaxyFormatVersion(root, formatVersion)
             : formatVersion - 1;
         normalized.Remove("Diplomacy");
@@ -358,7 +359,7 @@ public sealed class CampaignStatePersistenceService
             Report(.72, "Validating campaign references");
             DiplomacyCampaignReferenceValidator.Validate(galaxy.Galaxy, snapshot);
             Report(.82, "Restoring research progress");
-            var adaptiveResearch = formatVersion is AdaptiveFormatVersion or CurrentFormatVersion
+            var adaptiveResearch = formatVersion is AdaptiveFormatVersion or PlanetaryCatalogFormatVersion or CurrentFormatVersion
                 ? RestoreAdaptiveResearch(root, galaxy.Galaxy, formatVersion)
                 : _adaptiveResearchFactory.Create(galaxy.Galaxy);
             Report(.97, "Finalizing restored campaign");
@@ -384,6 +385,7 @@ public sealed class CampaignStatePersistenceService
             ?? throw new InvalidDataException($"Format v{campaignFormatVersion} save is missing GalaxyFormatVersion.");
         var supported = campaignFormatVersion == CurrentFormatVersion
             ? version == CampaignSaveService.CurrentFormatVersion
+            : campaignFormatVersion == PlanetaryCatalogFormatVersion ? version == CampaignSaveService.PlanetaryCatalogFormatVersion
             : version is CampaignSaveService.LegacyFormatVersion or CampaignSaveService.PresetFormatVersion or CampaignSaveService.SurfaceFormatVersion;
         if (!supported)
             throw new InvalidDataException($"Format v{campaignFormatVersion} save references unsupported galaxy format {version}.");

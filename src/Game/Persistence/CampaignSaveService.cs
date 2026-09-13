@@ -34,7 +34,8 @@ public sealed class CampaignSaveService
     public const int LegacyFormatVersion = 8;
     public const int PresetFormatVersion = 10;
     public const int SurfaceFormatVersion = 12;
-    public const int CurrentFormatVersion = 16; // Odd versions belong to the campaign Diplomacy wrapper.
+    public const int PlanetaryCatalogFormatVersion = 16;
+    public const int CurrentFormatVersion = 18; // Planetary slots and unbuilt Command Centers; odd versions wrap Diplomacy.
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -215,7 +216,7 @@ public sealed class CampaignSaveService
 
         if (envelope.FormatVersion < 1 ||
             envelope.FormatVersion > LegacyFormatVersion && envelope.FormatVersion is not
-                (PresetFormatVersion or SurfaceFormatVersion or CurrentFormatVersion))
+                (PresetFormatVersion or SurfaceFormatVersion or PlanetaryCatalogFormatVersion or CurrentFormatVersion))
         {
             throw new InvalidDataException(
                 $"Unsupported save format {envelope.FormatVersion}; maximum supported is {CurrentFormatVersion}.");
@@ -226,7 +227,7 @@ public sealed class CampaignSaveService
             : envelope.SimulationSeconds;
         var systems = ToSystems(envelope.Galaxy.Systems);
         ValidateStellarCatalog(systems);
-        IReadOnlyList<PlanetaryBodyState> planetaryBodies = envelope.FormatVersion == CurrentFormatVersion
+        IReadOnlyList<PlanetaryBodyState> planetaryBodies = envelope.FormatVersion >= PlanetaryCatalogFormatVersion
             ? ToPlanetaryBodies(envelope.Galaxy.PlanetaryBodies, systems)
             : new PlanetaryBodyGenerator().Generate(envelope.Galaxy.Seed, systems);
         try { planetaryBodies = SolCatalogPreset.UpgradeSavedCatalog(planetaryBodies, systems); }
@@ -1170,7 +1171,7 @@ public sealed class CampaignSaveService
             if (colony.RemainingExtractableMaterials is double remainingDeposit &&
                 (!double.IsFinite(remainingDeposit) || remainingDeposit < 0.0))
                 throw new InvalidDataException($"Settlement {colony.Id} has an invalid remaining resource deposit.");
-            if (colony.SurfaceHubLevel is < 1 or > 3)
+            if (colony.SurfaceHubLevel is < 0 or > 3)
                 throw new InvalidDataException($"Settlement {colony.Id} has an invalid surface hub level.");
             if (!double.IsFinite(colony.StoredFoodPopulationDaysMillions) || colony.StoredFoodPopulationDaysMillions < 0.0 ||
                 !double.IsFinite(colony.StoredWaterPopulationDaysMillions) || colony.StoredWaterPopulationDaysMillions < 0.0)

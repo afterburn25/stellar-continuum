@@ -81,7 +81,7 @@ public partial class PlanetInspectorPanel : PanelContainer
         Section("ACTIONS");
         var focus = VisualUi.Button("Focus planet", "Move the camera toward this world.", () => FocusRequested?.Invoke(), VisualIconLibrary.NavZoomIn);
         focus.Name = "InspectorFocus"; _body.AddChild(focus);
-        var surface = VisualUi.Button("Colony surface", _canLand ? "Visit your colony on this world." : "A surface view requires an owned colony on a solid world.",
+        var surface = VisualUi.Button("Manage planet", _canLand ? "Open the Command Center, building slots and planetary economy." : "Planetary management requires an owned colony on a solid world.",
             () => SurfaceRequested?.Invoke(body.BodyId), VisualIconLibrary.Colony);
         surface.Name = "InspectorSurface"; surface.Disabled = !_canLand; _body.AddChild(surface);
     }

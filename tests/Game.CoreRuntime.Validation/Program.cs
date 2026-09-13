@@ -17,6 +17,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Contains("--planetary", StringComparer.Ordinal))
+        {
+            try { PlanetaryWindowValidation.Run(); SurfaceConstructionValidation.ValidateHubCapacityAndUpgrade(); SurfaceConstructionValidation.ValidateSaveContinuity(); PlanetaryCatalogPersistenceValidation.Run(); return 0; }
+            catch (Exception ex) { Game.Validation.RegressionRunner.Report("planetary window", ex); return 1; }
+        }
         if (args.Contains("--full-galaxy", StringComparer.Ordinal))
         {
             try { FullGalaxyPopulationValidation.Run(); return 0; }

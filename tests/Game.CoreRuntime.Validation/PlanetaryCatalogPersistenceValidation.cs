@@ -61,8 +61,8 @@ internal static class PlanetaryCatalogPersistenceValidation
         Require(Knowledge(first.Galaxy, player.Id) == expectedKnowledge && Knowledge(second.Galaxy, player.Id) == expectedKnowledge,
             "planetary catalog persistence changed survey knowledge");
         using var document = JsonDocument.Parse(File.ReadAllText(secondPath));
-        Require(document.RootElement.GetProperty("FormatVersion").GetInt32() == 17 &&
-                document.RootElement.GetProperty("GalaxyFormatVersion").GetInt32() == 16 &&
+        Require(document.RootElement.GetProperty("FormatVersion").GetInt32() == CampaignStatePersistenceService.CurrentFormatVersion &&
+                document.RootElement.GetProperty("GalaxyFormatVersion").GetInt32() == CampaignSaveService.CurrentFormatVersion &&
                 document.RootElement.GetProperty("Galaxy").GetProperty("PlanetaryBodies").GetArrayLength() == expectedBodies.Length,
             "new campaign did not declare and contain the complete v17/v16 catalog");
         var earth = second.Galaxy.PlanetaryBodies.Single(body => body.Id == SolCatalogPreset.EarthBodyId);

@@ -778,23 +778,23 @@ internal static class SurfaceConstructionValidation
         var plain = new CampaignSaveService();
         var oldPath = Path.Combine(directory, "empty-sol.json");
         plain.Save(oldPath, galaxy, 17);
-        Require(Version(oldPath) == 16, "new save omitted its authoritative planetary catalog format");
+        Require(Version(oldPath) == CampaignSaveService.CurrentFormatVersion, "new save omitted its authoritative planetary catalog format");
         var oldCampaign = Path.Combine(directory, "empty-sol-campaign.json");
         sessions.Save(oldCampaign, galaxy, session.Diplomacy, 17);
-        Require(Version(oldCampaign) == 17, "current campaign omitted its authoritative catalog wrapper");
+        Require(Version(oldCampaign) == CampaignStatePersistenceService.CurrentFormatVersion, "current campaign omitted its authoritative catalog wrapper");
         Place(galaxy, "science_lab", 113.125f, -87.375f, 32.5f);
         SurfaceConstruction.Advance(galaxy, galaxy.PlayerCivilizationId, 7.25, 0.5);
         var expected = JsonSerializer.Serialize(Home(galaxy).SurfaceBuildings);
         var surfacePath = Path.Combine(directory, "surface.json");
         plain.Save(surfacePath, galaxy, 17.5);
         var restored = plain.Load(surfacePath);
-        Require(Version(surfacePath) == 16 && restored.SimulationDays == 17.5 &&
+        Require(Version(surfacePath) == CampaignSaveService.CurrentFormatVersion && restored.SimulationDays == 17.5 &&
             JsonSerializer.Serialize(Home(restored.Galaxy).SurfaceBuildings) == expected,
             "standalone save lost exact placement, yaw, partial progress, or clock");
         var campaignPath = Path.Combine(directory, "surface-campaign.json");
         sessions.Save(campaignPath, galaxy, session.Diplomacy, 17.5);
         var campaign = new CampaignStatePersistenceService().Load(campaignPath);
-        Require(Version(campaignPath) == 17 && campaign.SimulationDays == 17.5 &&
+        Require(Version(campaignPath) == CampaignStatePersistenceService.CurrentFormatVersion && campaign.SimulationDays == 17.5 &&
             JsonSerializer.Serialize(Home(campaign.Galaxy).SurfaceBuildings) == expected &&
             campaign.Galaxy.PlanetaryBodies.SequenceEqual(galaxy.PlanetaryBodies),
             "campaign wrapper lost surface placement or reconstructed a different body catalog");
