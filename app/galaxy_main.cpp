@@ -1,4 +1,5 @@
 #include "galaxy_main.hpp"
+#include "adaptive_campaign_host.hpp"
 #include "fresh_campaign_output.hpp"
 #include "stellar/build_version.hpp"
 #include <charconv>
@@ -478,8 +479,8 @@ int run_galaxy_catalog(int argc, char **argv) {
        founding_options = false, constrained_fallback = false,
        seed_settlements = false;
   bool generate_galaxy = false, seed_campaign = false,
-       simulate_campaign = false, preview_mode_requested = false,
-       simulation_options = false;
+       simulate_campaign = false, simulate_adaptive_campaign = false,
+       preview_mode_requested = false, simulation_options = false;
   std::string player_species = "terran_baseline";
   auto asset_root = stellar::engine::executable_directory();
   std::filesystem::path output;
@@ -519,6 +520,12 @@ int run_galaxy_catalog(int argc, char **argv) {
       seed_settlements = true;
       continue;
     }
+    if (arg == "--simulate-adaptive-campaign") {
+      simulate_adaptive_campaign = true;
+      found_civilizations = true;
+      seed_settlements = true;
+      continue;
+    }
     if (i + 1 == argc)
       throw std::invalid_argument("Missing value for " + arg);
     const std::string value = argv[++i];
@@ -554,11 +561,11 @@ int run_galaxy_catalog(int argc, char **argv) {
       repeats < 1 || repeats > 100)
     throw std::invalid_argument(
         "Galaxy size must be 250, 500, 1000 or 2500; repeat must be 1..100");
-  if (simulate_campaign &&
+  if ((simulate_campaign || simulate_adaptive_campaign) &&
       (simulation_ticks < 1 || simulation_ticks > 10000 || repeats > 10))
     throw std::invalid_argument(
         "Campaign simulation ticks must be 1..10000 and repeat must be 1..10");
-  if (simulate_campaign &&
+  if ((simulate_campaign || simulate_adaptive_campaign) &&
       (!std::isfinite(step_days * static_cast<double>(simulation_ticks)) ||
        !std::isfinite(step_days * static_cast<double>(simulation_ticks) *
                       static_cast<double>(repeats))))
@@ -568,17 +575,24 @@ int run_galaxy_catalog(int argc, char **argv) {
       ancient_count > 3)
     throw std::invalid_argument(
         "Ordinary civilizations must be 1..13 and ancient civilizations 0..3");
-  if ((seed_campaign || simulate_campaign) && preview_mode_requested)
+  if ((seed_campaign || simulate_campaign || simulate_adaptive_campaign) &&
+      preview_mode_requested)
     throw std::invalid_argument("Choose one campaign or catalog preview mode");
   if (seed_campaign && simulate_campaign)
     throw std::invalid_argument(
         "Choose --seed-campaign or --simulate-campaign, not both");
-  if (generate_galaxy && simulate_campaign)
+  if (simulate_campaign && simulate_adaptive_campaign)
     throw std::invalid_argument(
-        "Choose --generate-galaxy or --simulate-campaign, not both");
-  if (simulation_options && !simulate_campaign)
+        "Choose --simulate-campaign or --simulate-adaptive-campaign, not both");
+  if (seed_campaign && simulate_adaptive_campaign)
     throw std::invalid_argument(
-        "--ticks and --step-days require --simulate-campaign");
+        "Choose --seed-campaign or --simulate-adaptive-campaign, not both");
+  if (generate_galaxy && (simulate_campaign || simulate_adaptive_campaign))
+    throw std::invalid_argument(
+        "Choose --generate-galaxy or a campaign simulation, not both");
+  if (simulation_options && !simulate_campaign && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--ticks and --step-days require a campaign simulation");
   if (founding_options && !found_civilizations)
     throw std::invalid_argument(
         "Civilization options require --found-civilizations");
@@ -590,6 +604,23 @@ int run_galaxy_catalog(int argc, char **argv) {
   const auto input = std::filesystem::absolute(
       asset_root / "Data/astronomy/hyg-nearby-500-v1.json");
   const auto catalog = load_nearby_catalog(input);
+  if (simulate_adaptive_campaign) {
+    return run_adaptive_campaign_host(
+        {.seed = seed,
+         .systems = static_cast<int>(count),
+         .repeats = static_cast<int>(repeats),
+         .simulation_ticks = static_cast<int>(simulation_ticks),
+         .step_days = step_days,
+         .pre_warp_civilizations = static_cast<int>(pre_warp_count),
+         .ancient_civilizations = static_cast<int>(ancient_count),
+         .player_species = player_species,
+         .asset_root = asset_root,
+         .output = output},
+        catalog,
+        [](const FreshCampaignState &campaign) {
+          return campaign_diagnostic_json(campaign);
+        });
+  }
   if (simulate_campaign) {
     std::vector<double> step_times;
     double initialization_total = 0.0, step_total = 0.0;

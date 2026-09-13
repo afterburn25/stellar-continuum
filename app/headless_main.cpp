@@ -94,7 +94,11 @@ int run(int argc, char **argv) {
              "[--repeat N] [--catalog-output new-file]\n  --headless "
              "--simulate-campaign [--systems N] [--seed N] [--civilizations N] "
              "[--ancients N] [--player-species ID] [--ticks N] [--step-days "
-             "DAYS] [--repeat N] [--catalog-output new-file]\nCampaign "
+             "DAYS] [--repeat N] [--catalog-output new-file]\n  --headless "
+             "--simulate-adaptive-campaign [--systems N] [--seed N] "
+             "[--civilizations N] [--ancients N] [--player-species ID] "
+             "[--ticks N] [--step-days DAYS] [--repeat N] "
+             "[--catalog-output new-file]\nCampaign "
              "simulation output is deterministic diagnostic data, not a player "
              "save.\n";
       return 0;
@@ -106,7 +110,8 @@ int run(int argc, char **argv) {
       return 0;
     }
     if (arg == "--generate-galaxy" || arg == "--seed-campaign" ||
-        arg == "--simulate-campaign")
+        arg == "--simulate-campaign" ||
+        arg == "--simulate-adaptive-campaign")
       catalog_mode = true;
     if (arg == "--systems" || arg == "--ticks" || arg == "--workers" ||
         arg == "--seed" || arg == "--load" || arg == "--save" ||
@@ -150,6 +155,9 @@ int run(int argc, char **argv) {
              "terran_baseline] [--repeat 1] [--catalog-output "
              "new-file]\nCampaign simulation: --headless --simulate-campaign "
              "[--systems 500] [--seed 8374837] [--ticks 40] [--step-days 0.25] "
+             "[--repeat 1] [--catalog-output new-file]\nAdaptive campaign "
+             "simulation: --headless --simulate-adaptive-campaign [--systems "
+             "500] [--seed 8374837] [--ticks 40] [--step-days 0.25] "
              "[--repeat 1] [--catalog-output new-file]\nCampaign simulation "
              "output is deterministic diagnostic data, not a player save.\n";
       return 0;

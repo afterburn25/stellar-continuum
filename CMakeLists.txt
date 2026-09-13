@@ -76,15 +76,132 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/diplomacy_lifecycle.cpp
   core/src/diplomacy_observer_commands.cpp
   core/src/diplomacy_runtime.cpp
-  core/src/fleet_combat_intelligence.cpp)
+  core/src/fleet_combat_intelligence.cpp
+  core/src/integrated_adaptive_campaign.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
-add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp app/fresh_campaign_output.cpp)
+add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp
+  app/fresh_campaign_output.cpp app/adaptive_campaign_host.cpp)
 target_include_directories(stellar-continuum PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(stellar-continuum PRIVATE stellar_core stellar_json)
+set(STELLAR_RESEARCH_RUNTIME_DECLARATION
+  "${CMAKE_SOURCE_DIR}/export/research-runtime-files.json")
+file(READ "${STELLAR_RESEARCH_RUNTIME_DECLARATION}"
+  STELLAR_RESEARCH_RUNTIME_DOCUMENT)
+string(JSON STELLAR_RESEARCH_RUNTIME_SCHEMA_TYPE ERROR_VARIABLE STELLAR_RESEARCH_JSON_ERROR
+  TYPE "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" schemaVersion)
+string(JSON STELLAR_RESEARCH_RUNTIME_SCHEMA ERROR_VARIABLE STELLAR_RESEARCH_JSON_ERROR
+  GET "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" schemaVersion)
+if(STELLAR_RESEARCH_JSON_ERROR OR NOT STELLAR_RESEARCH_RUNTIME_SCHEMA_TYPE STREQUAL "NUMBER" OR
+   NOT STELLAR_RESEARCH_RUNTIME_SCHEMA MATCHES "^[0-9]+$" OR
+   NOT STELLAR_RESEARCH_RUNTIME_SCHEMA EQUAL 1)
+  message(FATAL_ERROR "Invalid Adaptive Research runtime-data declaration schema")
+endif()
+string(JSON STELLAR_RESEARCH_SOURCE_ROOT_TYPE TYPE
+  "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" root)
+string(JSON STELLAR_RESEARCH_DESTINATION_ROOT_TYPE TYPE
+  "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" destination)
+if(NOT STELLAR_RESEARCH_SOURCE_ROOT_TYPE STREQUAL "STRING" OR
+   NOT STELLAR_RESEARCH_DESTINATION_ROOT_TYPE STREQUAL "STRING")
+  message(FATAL_ERROR "Adaptive Research runtime-data roots must be strings")
+endif()
+string(JSON STELLAR_RESEARCH_SOURCE_ROOT GET
+  "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" root)
+string(JSON STELLAR_RESEARCH_DESTINATION_ROOT GET
+  "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" destination)
+if(NOT STELLAR_RESEARCH_SOURCE_ROOT STREQUAL "data/research/v1" OR
+   NOT STELLAR_RESEARCH_DESTINATION_ROOT STREQUAL "Data/research/v1")
+  message(FATAL_ERROR "Adaptive Research runtime-data roots do not match the reviewed layout")
+endif()
+string(JSON STELLAR_RESEARCH_RUNTIME_FILES_TYPE ERROR_VARIABLE STELLAR_RESEARCH_JSON_ERROR
+  TYPE "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" files)
+if(STELLAR_RESEARCH_JSON_ERROR OR NOT STELLAR_RESEARCH_RUNTIME_FILES_TYPE STREQUAL "ARRAY")
+  message(FATAL_ERROR "Adaptive Research runtime-data files must be an array")
+endif()
+string(JSON STELLAR_RESEARCH_RUNTIME_COUNT LENGTH
+  "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" files)
+if(STELLAR_RESEARCH_RUNTIME_COUNT EQUAL 0)
+  message(FATAL_ERROR "Adaptive Research runtime-data files must be nonempty")
+endif()
+set(STELLAR_RESEARCH_RUNTIME_FILES)
+set(STELLAR_RESEARCH_RUNTIME_FILES_LOWER)
+set(STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS)
+set(STELLAR_RESEARCH_PREVIOUS_FILE "")
+math(EXPR STELLAR_RESEARCH_RUNTIME_LAST "${STELLAR_RESEARCH_RUNTIME_COUNT} - 1")
+foreach(STELLAR_RESEARCH_INDEX RANGE 0 ${STELLAR_RESEARCH_RUNTIME_LAST})
+  string(JSON STELLAR_RESEARCH_FILE TYPE
+    "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" files ${STELLAR_RESEARCH_INDEX})
+  if(NOT STELLAR_RESEARCH_FILE STREQUAL "STRING")
+    message(FATAL_ERROR "Adaptive Research runtime-data files must be strings")
+  endif()
+  string(JSON STELLAR_RESEARCH_FILE GET
+    "${STELLAR_RESEARCH_RUNTIME_DOCUMENT}" files ${STELLAR_RESEARCH_INDEX})
+  cmake_path(IS_ABSOLUTE STELLAR_RESEARCH_FILE STELLAR_RESEARCH_FILE_ABSOLUTE)
+  if(STELLAR_RESEARCH_FILE_ABSOLUTE OR STELLAR_RESEARCH_FILE MATCHES "^/|/$|//" OR
+     STELLAR_RESEARCH_FILE MATCHES "(^|/)\\.\\.?(/|$)" OR
+     STELLAR_RESEARCH_FILE MATCHES "[\\\\:;$<>]" OR
+     NOT STELLAR_RESEARCH_FILE MATCHES "^[^/].*\\.json$")
+    message(FATAL_ERROR "Unsafe Adaptive Research runtime-data path: ${STELLAR_RESEARCH_FILE}")
+  endif()
+  foreach(STELLAR_RESEARCH_CONTROL RANGE 1 31)
+    string(ASCII ${STELLAR_RESEARCH_CONTROL} STELLAR_RESEARCH_CONTROL_CHARACTER)
+    string(FIND "${STELLAR_RESEARCH_FILE}" "${STELLAR_RESEARCH_CONTROL_CHARACTER}"
+      STELLAR_RESEARCH_CONTROL_POSITION)
+    if(NOT STELLAR_RESEARCH_CONTROL_POSITION EQUAL -1)
+      message(FATAL_ERROR "Control character in Adaptive Research runtime-data path")
+    endif()
+  endforeach()
+  string(ASCII 127 STELLAR_RESEARCH_CONTROL_CHARACTER)
+  string(FIND "${STELLAR_RESEARCH_FILE}" "${STELLAR_RESEARCH_CONTROL_CHARACTER}"
+    STELLAR_RESEARCH_CONTROL_POSITION)
+  if(NOT STELLAR_RESEARCH_CONTROL_POSITION EQUAL -1)
+    message(FATAL_ERROR "Control character in Adaptive Research runtime-data path")
+  endif()
+  if(STELLAR_RESEARCH_PREVIOUS_FILE STRGREATER STELLAR_RESEARCH_FILE)
+    message(FATAL_ERROR "Adaptive Research runtime-data paths must be sorted")
+  endif()
+  string(TOLOWER "${STELLAR_RESEARCH_FILE}" STELLAR_RESEARCH_FILE_LOWER)
+  if(STELLAR_RESEARCH_FILE_LOWER IN_LIST STELLAR_RESEARCH_RUNTIME_FILES_LOWER)
+    message(FATAL_ERROR "Duplicate Adaptive Research runtime-data path: ${STELLAR_RESEARCH_FILE}")
+  endif()
+  set(STELLAR_RESEARCH_SOURCE_FILE
+    "${CMAKE_SOURCE_DIR}/data/research/v1/${STELLAR_RESEARCH_FILE}")
+  if(NOT EXISTS "${STELLAR_RESEARCH_SOURCE_FILE}" OR
+     IS_DIRECTORY "${STELLAR_RESEARCH_SOURCE_FILE}")
+    message(FATAL_ERROR "Missing Adaptive Research runtime data: ${STELLAR_RESEARCH_FILE}")
+  endif()
+  cmake_path(ABSOLUTE_PATH STELLAR_RESEARCH_SOURCE_FILE NORMALIZE
+    OUTPUT_VARIABLE STELLAR_RESEARCH_SOURCE_NORMALIZED)
+  file(REAL_PATH "${STELLAR_RESEARCH_SOURCE_FILE}" STELLAR_RESEARCH_SOURCE_REAL)
+  if(WIN32)
+    string(TOLOWER "${STELLAR_RESEARCH_SOURCE_NORMALIZED}" STELLAR_RESEARCH_SOURCE_NORMALIZED)
+    string(TOLOWER "${STELLAR_RESEARCH_SOURCE_REAL}" STELLAR_RESEARCH_SOURCE_REAL)
+  endif()
+  if(NOT STELLAR_RESEARCH_SOURCE_NORMALIZED STREQUAL STELLAR_RESEARCH_SOURCE_REAL)
+    message(FATAL_ERROR "Linked Adaptive Research runtime data is not allowed: ${STELLAR_RESEARCH_FILE}")
+  endif()
+  list(APPEND STELLAR_RESEARCH_RUNTIME_FILES "${STELLAR_RESEARCH_FILE}")
+  list(APPEND STELLAR_RESEARCH_RUNTIME_FILES_LOWER "${STELLAR_RESEARCH_FILE_LOWER}")
+  list(APPEND STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      "$<TARGET_FILE_DIR:stellar-continuum>/Data/research/v1/$<PATH:GET_PARENT_PATH,${STELLAR_RESEARCH_FILE}>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/data/research/v1/${STELLAR_RESEARCH_FILE}"
+      "$<TARGET_FILE_DIR:stellar-continuum>/Data/research/v1/${STELLAR_RESEARCH_FILE}")
+  set(STELLAR_RESEARCH_PREVIOUS_FILE "${STELLAR_RESEARCH_FILE}")
+endforeach()
+file(GLOB_RECURSE STELLAR_RESEARCH_CANONICAL_FILES
+  RELATIVE "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/research/v1/*.json")
+list(SORT STELLAR_RESEARCH_CANONICAL_FILES)
+if(NOT STELLAR_RESEARCH_RUNTIME_FILES STREQUAL STELLAR_RESEARCH_CANONICAL_FILES)
+  message(FATAL_ERROR "Adaptive Research runtime-data declaration differs from canonical JSON inventory")
+endif()
+
 add_custom_target(stellar_runtime_data ALL
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy/hyg-nearby-500-v1.json"
+  ${STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS}
   COMMENT "Synchronizing runtime stellar catalog" VERBATIM)
 add_dependencies(stellar-continuum stellar_runtime_data)
 if(WIN32)
@@ -95,6 +212,11 @@ endif()
 install(TARGETS stellar-continuum RUNTIME DESTINATION .)
 install(FILES export/runtime-config.json DESTINATION Configuration)
 install(FILES data/astronomy/hyg-nearby-500-v1.json data/astronomy/README.md DESTINATION Data/astronomy)
+foreach(STELLAR_RESEARCH_FILE IN LISTS STELLAR_RESEARCH_RUNTIME_FILES)
+  cmake_path(GET STELLAR_RESEARCH_FILE PARENT_PATH STELLAR_RESEARCH_PARENT)
+  install(FILES "data/research/v1/${STELLAR_RESEARCH_FILE}"
+    DESTINATION "Data/research/v1/${STELLAR_RESEARCH_PARENT}")
+endforeach()
 install(FILES third_party/nlohmann/LICENSE.MIT DESTINATION Licenses RENAME nlohmann-JSON-MIT.txt)
 install(FILES third_party/dotnet/LICENSE.TXT DESTINATION Licenses RENAME dotnet-MIT.txt)
 if(BUILD_TESTING)
@@ -496,6 +618,14 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/fleet-combat-intelligence.json")
   set_tests_properties(fleet_combat_intelligence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_integrated_adaptive_campaign_tests native-tests/integrated_adaptive_campaign_tests.cpp)
+  target_link_libraries(stellar_integrated_adaptive_campaign_tests PRIVATE stellar_core stellar_json)
+  target_include_directories(stellar_integrated_adaptive_campaign_tests PRIVATE "${CMAKE_SOURCE_DIR}/native-tests")
+  add_test(NAME integrated_adaptive_campaign_parity COMMAND stellar_integrated_adaptive_campaign_tests
+    "${CMAKE_SOURCE_DIR}/data/research/v1"
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/integrated-adaptive-campaign.json")
+  set_tests_properties(integrated_adaptive_campaign_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_planning_parity COMMAND stellar_strategic_planning_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-planning.json")

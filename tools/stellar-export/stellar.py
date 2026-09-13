@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tempfile
 
+from research_runtime_files import copy_research_runtime_files
+
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
 
@@ -98,7 +100,11 @@ def validate_manifest(folder):
         path = folder / relative
         if relative.is_absolute() or ".." in relative.parts or not path.resolve().is_relative_to(folder):
             raise RuntimeError("Unsafe manifest path")
-        if any(parent.is_symlink() or parent.is_junction() for parent in [path, *path.parents] if parent != folder and parent.is_relative_to(folder)):
+        if any(parent.is_symlink() or
+               (getattr(parent, "is_junction", None) is not None and
+                parent.is_junction())
+               for parent in [path, *path.parents]
+               if parent != folder and parent.is_relative_to(folder)):
             raise RuntimeError("Linked files are not allowed in runtime exports")
     if hashes(folder) != expected: raise RuntimeError("Export files do not match the manifest")
     for row in expected:
@@ -289,9 +295,62 @@ def relocated_smoke(folder):
                 diagnostic.get("playerSaveCompatible") is not False or
                 diagnostic.get("simulation",{}).get("stateHash") != simulation.get("finalStateHash")):
             raise RuntimeError("Relocated campaign simulation diagnostic mismatch")
+        adaptive_path = root / "adaptive-campaign-simulation.json"
+        adaptive = json.loads(run([
+            exe, "--headless", "--simulate-adaptive-campaign", "--systems", "250",
+            "--ticks", "2", "--step-days", "0.25", "--repeat", "2",
+            "--asset-root", copy,
+            "--catalog-output", adaptive_path], cwd=root, env=env,
+            capture=True, timeout=60))
+        adaptive_diagnostic = json.loads(adaptive_path.read_text(encoding="utf-8"))
+        research_root = copy / "Data/research/v1"
+        if (adaptive.get("mode") != "adaptive-campaign-simulation-benchmark" or
+                Path(adaptive["assetPath"]).resolve() !=
+                    (copy / "Data/astronomy/hyg-nearby-500-v1.json").resolve() or
+                Path(adaptive["researchAssetPath"]).resolve() != research_root.resolve() or
+                adaptive.get("repeatFinalStatesDeterministic") is not True or
+                adaptive_diagnostic.get("format") != "stellar-adaptive-campaign-simulation-diagnostic-v1" or
+                not all(name in adaptive_diagnostic
+                        for name in ("research", "diplomacy", "combatIntelligence"))):
+            raise RuntimeError("Relocated Adaptive Research campaign diagnostic mismatch")
+        repeated_adaptive_path = root / "adaptive-campaign-simulation-repeat.json"
+        run([exe, "--headless", "--simulate-adaptive-campaign", "--systems", "250",
+             "--ticks", "2", "--step-days", "0.25", "--repeat", "2",
+             "--asset-root", copy,
+             "--catalog-output", repeated_adaptive_path], cwd=root, env=env,
+            capture=True, timeout=60)
+        if adaptive_path.read_bytes() != repeated_adaptive_path.read_bytes():
+            raise RuntimeError("Relocated Adaptive Research campaign output is not deterministic")
+
+        required_research_file = research_root / "index.json"
+        original_research_bytes = required_research_file.read_bytes()
+        unavailable_research_root = copy / "Data/research-v1-unavailable"
+        try:
+            research_root.rename(unavailable_research_root)
+            failed = subprocess.run(
+                [str(exe), "--headless", "--simulate-adaptive-campaign",
+                 "--systems", "250", "--ticks", "1", "--step-days", "0.25"],
+                cwd=root, env=env, capture_output=True, text=True, timeout=60)
+            if (failed.returncode != 1 or str(research_root) not in failed.stderr or
+                    "error [" not in failed.stderr):
+                raise RuntimeError("Missing relocated Adaptive Research tree did not fail cleanly")
+            unavailable_research_root.rename(research_root)
+            required_research_file.write_bytes(b"{corrupt")
+            failed = subprocess.run(
+                [str(exe), "--headless", "--simulate-adaptive-campaign",
+                 "--systems", "250", "--ticks", "1", "--step-days", "0.25"],
+                cwd=root, env=env, capture_output=True, text=True, timeout=60)
+            if (failed.returncode != 1 or str(required_research_file) not in failed.stderr or
+                    "error [" not in failed.stderr):
+                raise RuntimeError("Corrupt relocated Adaptive Research data did not fail cleanly")
+        finally:
+            if unavailable_research_root.exists() and not research_root.exists():
+                unavailable_research_root.rename(research_root)
+            required_research_file.write_bytes(original_research_bytes)
         return {"relocatedLaunch": True, "restrictedPath": True, "checkpointRoundtrip": True,"relocatedGalaxyGeneration":True,
                 "relocatedCivilizationFounding":True,"relocatedColonySeeding":True,"surfaceSupportPreview":True,
                 "relocatedFreshCampaign":True,"relocatedCampaignSimulation":True,
+                "relocatedAdaptiveCampaignSimulation":True,
                 "cleanMachineTest": "Separate machine/VM still required; restricted-PATH test is not full clean-machine certification"}
 
 def export(preset_name):
@@ -317,6 +376,8 @@ def export(preset_name):
             "Licenses/nlohmann-JSON-MIT.txt":"third_party/nlohmann/LICENSE.MIT",
             "Licenses/dotnet-MIT.txt":"third_party/dotnet/LICENSE.TXT",
         }
+        research_files = copy_research_runtime_files(
+            ROOT, output, ROOT / "export/research-runtime-files.json")
         for relative,source in runtime_files.items():
             destination=output/relative; destination.parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(ROOT/source,destination)
@@ -326,8 +387,9 @@ def export(preset_name):
             "Run stellar-continuum.exe --headless for the foundation check. This is not the graphical game.\n"
             "Fresh initialization: stellar-continuum.exe --headless --seed-campaign --systems 500 --catalog-output fresh.json\n"
             "Campaign simulation diagnostics: stellar-continuum.exe --headless --simulate-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output simulated.json\n"
+            "Adaptive campaign diagnostics: stellar-continuum.exe --headless --simulate-adaptive-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output adaptive.json\n"
             "Supported sizes: 250, 500, 1000, 2500. Use --help for seed, species and civilization options.\n"
-            "Fresh and simulated outputs are diagnostics, not player saves. Simulation covers the ordered legacy coordinator and does not claim complete gameplay, Adaptive Research, diplomacy or rendering parity. Existing output files are preserved.\n"
+            "Fresh and simulated outputs are diagnostics, not player saves. The Adaptive command uses the packaged research data and integrated research, diplomacy and intelligence runtime; it does not claim complete gameplay or rendering parity. Existing output files are preserved.\n"
             "Windows 10/11 x64 required. No Godot, .NET, compiler, CMake, Ninja, Vulkan SDK or Python required at runtime.\n",
             encoding="utf-8")
         if preset["includeSymbols"]:
@@ -336,7 +398,8 @@ def export(preset_name):
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
                     "configuration": preset["configurePreset"], "architecture": "x86_64", "mode": preset["mode"],
                     "includeSymbols": preset["includeSymbols"], "builtAtUtc": stamp, "windowsSystemDependencies": dependencies,
-                    "gameplayParity": False, "shadersRequired": False, "graphicalAssetsRequired": False,"requiredRuntimeFiles":list(runtime_files),
+                    "gameplayParity": False, "shadersRequired": False, "graphicalAssetsRequired": False,
+                    "requiredRuntimeFiles":[*runtime_files, *research_files],
                     "files": hashes(output)}
         (output / "build-manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
         validate_manifest(output)

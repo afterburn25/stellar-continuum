@@ -5,10 +5,13 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+
+from research_runtime_files import copy_research_runtime_files, load_research_runtime_files
 
 spec = importlib.util.spec_from_file_location("stellar_export", Path(__file__).with_name("stellar.py"))
 exporter = importlib.util.module_from_spec(spec)
@@ -70,6 +73,102 @@ class PackageIntegrity(unittest.TestCase):
     def test_graphical_release_cannot_be_exported_before_parity(self):
         with self.assertRaisesRegex(RuntimeError, "(?i)graphical"):
             exporter.export("windows-release")
+
+class ResearchRuntimePackaging(unittest.TestCase):
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory(
+            prefix="stellar-research-package-test-")
+        self.addCleanup(self.scratch.cleanup)
+        self.repository = Path(self.scratch.name)
+        self.source = self.repository / "data/research/v1"
+        (self.source / "nested").mkdir(parents=True)
+        (self.source / "alpha.json").write_bytes(b'{"id":"alpha"}\n')
+        (self.source / "nested/beta.json").write_bytes(b'{"id":"beta"}\n')
+        (self.source / "README.md").write_text(
+            "source documentation", encoding="utf-8")
+        self.declaration = self.repository / "export/research-runtime-files.json"
+        self.declaration.parent.mkdir()
+        self.write_declaration(["alpha.json", "nested/beta.json"])
+
+    def write_declaration(self, files, **overrides):
+        document = {
+            "schemaVersion": 1,
+            "root": "data/research/v1",
+            "destination": "Data/research/v1",
+            "files": files,
+        }
+        document.update(overrides)
+        self.declaration.write_text(json.dumps(document), encoding="utf-8")
+
+    def package(self):
+        output = self.repository / "package"
+        (output / "Configuration").mkdir(parents=True)
+        (output / "stellar-continuum.exe").write_bytes(b"test executable")
+        (output / "Configuration/runtime-config.json").write_text(
+            "{}", encoding="utf-8")
+        required = copy_research_runtime_files(
+            self.repository, output, self.declaration)
+        manifest = {
+            "files": exporter.hashes(output),
+            "includeSymbols": False,
+            "requiredRuntimeFiles": required,
+        }
+        (output / "build-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8")
+        return output, required
+
+    def test_only_declared_json_is_copied_and_sealed(self):
+        output, required = self.package()
+        self.assertEqual(required, ["Data/research/v1/alpha.json",
+                                    "Data/research/v1/nested/beta.json"])
+        self.assertFalse((output / "Data/research/v1/README.md").exists())
+        exporter.validate_manifest(output)
+        (output / required[1]).write_text("corrupt", encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "manifest"):
+            exporter.validate_manifest(output)
+
+    def test_declaration_must_match_canonical_inventory(self):
+        self.write_declaration(["alpha.json"])
+        with self.assertRaisesRegex(RuntimeError, "undeclared"):
+            load_research_runtime_files(self.repository, self.declaration)
+
+    def test_paths_are_sorted_unique_safe_and_case_unique(self):
+        for files, message in (
+                (["nested/beta.json", "alpha.json"], "sorted"),
+                (["alpha.json", "alpha.json", "nested/beta.json"], "unique"),
+                (["ALPHA.json", "alpha.json", "nested/beta.json"], "unique"),
+                (["C:/escape.json", "alpha.json", "nested/beta.json"], "Unsafe"),
+                (["$<CONFIG>.json", "alpha.json", "nested/beta.json"], "Unsafe"),
+                (["alpha.json", "nested/beta.json", "nested;beta.json"], "Unsafe"),
+                (["alpha.json", "nested//beta.json", "nested/beta.json"], "Unsafe"),
+                (["../escape.json", "alpha.json", "nested/beta.json"], "Unsafe")):
+            with self.subTest(files=files):
+                self.write_declaration(files)
+                with self.assertRaisesRegex(RuntimeError,message):
+                    load_research_runtime_files(self.repository, self.declaration)
+
+    def test_schema_and_files_require_exact_json_kinds(self):
+        for schema, files in ((True, ["alpha.json", "nested/beta.json"]),
+                              (1.0, ["alpha.json", "nested/beta.json"]),
+                              (1, "alpha.json"), (1, [])):
+            with self.subTest(schema=schema, files=files):
+                self.write_declaration(files, schemaVersion=schema)
+                with self.assertRaisesRegex(
+                        RuntimeError, "schema|nonempty string array"):
+                    load_research_runtime_files(
+                        self.repository, self.declaration)
+
+    def test_linked_runtime_file_is_rejected(self):
+        linked = self.source / "nested/beta.json"
+        external = self.repository / "external.json"
+        external.write_bytes(linked.read_bytes())
+        linked.unlink()
+        try:
+            linked.symlink_to(external)
+        except OSError as error:
+            self.skipTest(f"Creating a file symlink is unavailable: {error}")
+        with self.assertRaisesRegex(RuntimeError, "linked"):
+            load_research_runtime_files(self.repository, self.declaration)
 
 @unittest.skipUnless(os.environ.get("STELLAR_NATIVE_EXE"), "Set STELLAR_NATIVE_EXE to run native integration checks")
 class NativeRecovery(unittest.TestCase):
@@ -412,6 +511,138 @@ class NativeRecovery(unittest.TestCase):
             with self.subTest(options=options):
                 failed=self.invoke(*options)
                 self.assertEqual(failed.returncode,1,failed.stderr)
+
+    def test_adaptive_campaign_reports_complete_deterministic_state(self):
+        first = self.root / "adaptive-first.json"
+        second = self.root / "adaptive-second.json"
+        arguments = ("--simulate-adaptive-campaign", "--systems", 250,
+                     "--ticks", 1, "--step-days", .25, "--repeat", 2)
+        initial = self.invoke(*arguments, "--catalog-output", first)
+        repeated = self.invoke(*arguments, "--catalog-output", second)
+        self.assertEqual(initial.returncode, 0, initial.stderr)
+        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+
+        report = json.loads(initial.stdout)
+        again = json.loads(repeated.stdout)
+        diagnostic = json.loads(first.read_text(encoding="utf-8"))
+        self.assertEqual(report["mode"],
+                         "adaptive-campaign-simulation-benchmark")
+        self.assertTrue(report["legacyResearchDisabled"])
+        self.assertTrue(report["repeatFinalStatesDeterministic"])
+        self.assertTrue(report["stateAdvancedBeyondSeed"])
+        self.assertGreater(report["finalStateCounts"]["researchCivilizations"], 0)
+        self.assertEqual(report["finalStateHash"], again["finalStateHash"])
+        self.assertEqual(report["finalStateHash"],
+                         diagnostic["simulation"]["stateHash"])
+        self.assertEqual(first.read_bytes(), second.read_bytes())
+
+        self.assertEqual(
+            diagnostic["format"],
+            "stellar-adaptive-campaign-simulation-diagnostic-v1")
+        research = diagnostic["research"]
+        self.assertEqual(research["schemaVersion"], 2)
+        self.assertEqual(len(research["civilizations"]),
+                         report["finalStateCounts"]["researchCivilizations"])
+        self.assertTrue(research["civilizations"])
+        for civilization in research["civilizations"]:
+            self.assertEqual(civilization["research"]["schemaVersion"], 5)
+        diplomacy = diagnostic["diplomacy"]
+        for key in ("contacts", "relationships", "claims", "agreements",
+                    "proposals", "recentHistory", "lastProcessedTick",
+                    "nextMaintenanceReviewTick"):
+            self.assertIn(key, diplomacy)
+        self.assertIsInstance(diagnostic["combatIntelligence"], list)
+
+    def test_adaptive_campaign_uses_resolved_assets_and_fails_cleanly(self):
+        default_output = self.root / "adaptive-default-assets.json"
+        default = self.invoke("--simulate-adaptive-campaign", "--systems", 250,
+                              "--ticks", 1, "--catalog-output", default_output)
+        self.assertEqual(default.returncode, 0, default.stderr)
+        report = json.loads(default.stdout)
+        self.assertEqual(
+            Path(report["assetPath"]).resolve(),
+            (self.exe.parent / "Data/astronomy/hyg-nearby-500-v1.json").resolve())
+        self.assertEqual(Path(report["researchAssetPath"]).resolve(),
+                         (self.exe.parent / "Data/research/v1").resolve())
+
+        assets = self.root / "explicit-assets"
+        shutil.copytree(self.exe.parent / "Data/astronomy",
+                        assets / "Data/astronomy")
+        shutil.copytree(self.exe.parent / "Data/research",
+                        assets / "Data/research")
+        explicit_output = self.root / "adaptive-explicit-assets.json"
+        explicit = self.invoke("--simulate-adaptive-campaign", "--systems", 250,
+                               "--ticks", 1, "--asset-root", assets,
+                               "--catalog-output", explicit_output)
+        self.assertEqual(explicit.returncode, 0, explicit.stderr)
+        explicit_report = json.loads(explicit.stdout)
+        self.assertEqual(
+            Path(explicit_report["assetPath"]).resolve(),
+            (assets / "Data/astronomy/hyg-nearby-500-v1.json").resolve())
+        research_root = (assets / "Data/research/v1").resolve()
+        self.assertEqual(Path(explicit_report["researchAssetPath"]).resolve(),
+                         research_root)
+
+        unavailable = assets / "Data/research-v1-unavailable"
+        research_root.rename(unavailable)
+        try:
+            missing = self.invoke("--simulate-adaptive-campaign", "--systems", 250,
+                                  "--ticks", 1, "--asset-root", assets)
+            self.assertEqual(missing.returncode, 1, missing.stderr)
+            self.assertIn(str(research_root), missing.stderr)
+            self.assertIn("Cannot initialize Adaptive Research", missing.stderr)
+            self.assertIn("Working directory:", missing.stderr)
+        finally:
+            unavailable.rename(research_root)
+
+        index = research_root / "index.json"
+        original = index.read_bytes()
+        try:
+            index.write_bytes(b"{corrupt")
+            corrupt = self.invoke("--simulate-adaptive-campaign", "--systems", 250,
+                                  "--ticks", 1, "--asset-root", assets)
+            self.assertEqual(corrupt.returncode, 1, corrupt.stderr)
+            self.assertIn(str(research_root), corrupt.stderr)
+            self.assertIn(str(index), corrupt.stderr)
+            self.assertIn("Cannot initialize Adaptive Research", corrupt.stderr)
+            self.assertIn("Working directory:", corrupt.stderr)
+        finally:
+            index.write_bytes(original)
+
+    def test_adaptive_campaign_rejects_modes_bounds_and_output_collisions(self):
+        output = self.root / "adaptive-preserved.json"
+        output.write_bytes(b"existing adaptive diagnostic")
+        collision = self.invoke("--simulate-adaptive-campaign", "--systems", 250,
+                                "--ticks", 1, "--catalog-output", output)
+        self.assertEqual(collision.returncode, 1, collision.stderr)
+        self.assertIn("Refusing to overwrite", collision.stderr)
+        self.assertEqual(output.read_bytes(), b"existing adaptive diagnostic")
+        self.assertFalse(Path(str(output) + ".pending").exists())
+
+        pending_output = self.root / "adaptive-pending.json"
+        pending = Path(str(pending_output) + ".pending")
+        pending.write_bytes(b"owned by another writer")
+        pending_collision = self.invoke(
+            "--simulate-adaptive-campaign", "--systems", 250, "--ticks", 1,
+            "--catalog-output", pending_output)
+        self.assertEqual(pending_collision.returncode, 1,
+                         pending_collision.stderr)
+        self.assertEqual(pending.read_bytes(), b"owned by another writer")
+        self.assertFalse(pending_output.exists())
+
+        failures = (("--simulate-campaign", "--simulate-adaptive-campaign",
+                     "--systems", 250),
+                    ("--simulate-adaptive-campaign", "--ticks", 0),
+                    ("--simulate-adaptive-campaign", "--ticks", -1),
+                    ("--simulate-adaptive-campaign", "--repeat", 0),
+                    ("--simulate-adaptive-campaign", "--step-days", 0),
+                    ("--simulate-adaptive-campaign", "--step-days", -1))
+        for options in failures:
+            with self.subTest(options=options):
+                failed = self.invoke(*options)
+                self.assertEqual(failed.returncode, 1, failed.stderr)
+                self.assertIn("error [", failed.stderr)
+                self.assertIn("Working directory:", failed.stderr)
 
     def test_global_campaign_help_and_option_values_do_not_change_modes(self):
         for mode in ("--seed-campaign", "--generate-galaxy"):
