@@ -60,7 +60,9 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/adaptive_research_outcomes.cpp core/src/adaptive_research_sha256.cpp
   core/src/adaptive_research_foreign_discovery.cpp
   core/src/adaptive_research_strategic_runtime.cpp
-  core/src/adaptive_research_strategic_snapshot.cpp)
+  core/src/adaptive_research_strategic_snapshot.cpp
+  core/src/adaptive_research_foreign_technology_snapshot.cpp
+  core/src/adaptive_research_outcome_snapshot.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp app/fresh_campaign_output.cpp)
@@ -402,6 +404,18 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-strategic-snapshot.json"
     "${CMAKE_SOURCE_DIR}/data/research/v1")
   set_tests_properties(adaptive_research_strategic_snapshot_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_research_v4_tests native-tests/adaptive_research_foreign_technology_snapshot_tests.cpp)
+  target_link_libraries(stellar_research_v4_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_foreign_snapshot_parity COMMAND stellar_research_v4_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-foreign-snapshot.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_foreign_snapshot_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_research_v5_tests native-tests/adaptive_research_outcome_snapshot_tests.cpp)
+  target_link_libraries(stellar_research_v5_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_outcome_snapshot_parity COMMAND stellar_research_v5_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-outcome-snapshot.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_outcome_snapshot_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_planning_parity COMMAND stellar_strategic_planning_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-planning.json")

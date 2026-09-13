@@ -28,6 +28,6 @@ python work/060-research-strategic-owner/build_strict.py release
 
 ## Maintained integration
 
-Promoted into the root CMake build for Engine 0.1.28. The combined maintained build passed 70/70 CTest and 20/20 Python checks (`work/native-028-testing.log`). Exact committed export is pending.
+Promoted into the root CMake build for Engine 0.1.28. The combined maintained build passed 70/70 CTest and 20/20 Python checks (`work/native-028-testing.log`). Exact committed export `a9610c7426d8fdf5c6f493a2b28b154fe7081b6f` passed all 70/70 CTest and 20/20 Python checks. Package `Builds/Windows/StellarContinuum-windows-benchmark-a9610c74-20260913T144010986128Z` has `sourceDirty=false`, seven hashed runtime files and all nine relocation/recovery flags true (`work/native-028-clean.log`). Separate-machine certification remains open.
 
 The maintained oracle is `tests/Stellar.AdaptiveResearchStrategicOwner.ParityGenerator`. Final native copy-isolation checks save the original revision before mutating the copied state.

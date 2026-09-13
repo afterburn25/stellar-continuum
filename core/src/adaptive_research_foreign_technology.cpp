@@ -1,4 +1,5 @@
 #include <stellar/core/adaptive_research_foreign_technology.hpp>
+#include <stellar/core/detail/adaptive_research_foreign_technology_support_access.hpp>
 
 #include <stellar/core/detail/adaptive_research_foreign_technology_state_writer.hpp>
 #include <stellar/core/detail/adaptive_research_weak_state_table.hpp>
@@ -783,6 +784,13 @@ const AdaptiveResearchForeignTechnologyState &
 AdaptiveResearchForeignTechnologyRuntime::state(
     const AdaptiveResearchCivilizationState &civilization) const {
   return storage_->states.get_or_create(civilization);
+}
+
+AdaptiveResearchForeignTechnologyState &
+detail::AdaptiveResearchForeignTechnologySupportAccess::get_or_create(
+    const AdaptiveResearchForeignTechnologyRuntime &runtime,
+    const AdaptiveResearchCivilizationState &civilization) {
+  return runtime.storage_->states.get_or_create(civilization);
 }
 
 ForeignTechnologyAssessmentRuntimeState

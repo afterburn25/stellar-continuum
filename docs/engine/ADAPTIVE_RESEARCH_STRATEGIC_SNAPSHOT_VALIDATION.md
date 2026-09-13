@@ -18,6 +18,6 @@ Native JSON syntax and shape failures use `AdaptiveResearchSnapshotJsonError`; n
 
 ## Maintained integration
 
-The initial combined Engine 0.1.28 build passed 70/70 CTest and 20/20 Python checks. After the final fixture/assertion and nullable V2 DTO corrections, all five affected maintained checks passed (`work/native-028-final-focused.log`): schema1, schema2, discovery, owning facade and schema3. Exact committed export is pending. The console oracle is maintained in `tests/Stellar.AdaptiveResearchStrategicSnapshot.ParityGenerator`.
+The initial combined Engine 0.1.28 build passed 70/70 CTest and 20/20 Python checks. After the final fixture/assertion and nullable V2 DTO corrections, all five affected maintained checks passed (`work/native-028-final-focused.log`): schema1, schema2, discovery, owning facade and schema3. Exact committed export `a9610c7426d8fdf5c6f493a2b28b154fe7081b6f` passed all 70/70 CTest and 20/20 Python checks. Package `Builds/Windows/StellarContinuum-windows-benchmark-a9610c74-20260913T144010986128Z` has `sourceDirty=false`, seven hashed runtime files and all nine relocation/recovery flags true (`work/native-028-clean.log`). Separate-machine certification remains open. The console oracle is maintained in `tests/Stellar.AdaptiveResearchStrategicSnapshot.ParityGenerator`.
 
 The nonfinite Capture boundary uses an internal fixture-only metadata setter corresponding to the retained C# reflection probe. Public gameplay and Restore continue through the validated agenda writer.

@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <set>
 #include <stellar/core/adaptive_research_outcomes.hpp>
+#include <stellar/core/detail/adaptive_research_outcome_support_access.hpp>
 #include <stellar/core/detail/adaptive_research_expertise_state_writer.hpp>
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
@@ -814,6 +815,11 @@ AdaptiveResearchOutcomeRuntime::catalog() const noexcept {
 const AdaptiveResearchOutcomeState &AdaptiveResearchOutcomeRuntime::state(
     const AdaptiveResearchCivilizationState &s) const {
   return storage_->states.get_or_create(s);
+}
+AdaptiveResearchOutcomeState &detail::AdaptiveResearchOutcomeSupportAccess::state(
+    const AdaptiveResearchOutcomeRuntime &runtime,
+    const AdaptiveResearchCivilizationState &civilization) {
+  return runtime.storage_->states.get_or_create(civilization);
 }
 namespace {
 double deterministic(std::string key) {

@@ -36,6 +36,7 @@ public:
 
 namespace detail {
 class AdaptiveResearchForeignTechnologyStateWriter;
+class AdaptiveResearchForeignTechnologySupportAccess;
 }
 
 enum class ForeignUnderstandingState {
@@ -344,6 +345,7 @@ public:
 private:
   struct Storage;
   std::unique_ptr<Storage> storage_;
+  friend class detail::AdaptiveResearchForeignTechnologySupportAccess;
 };
 
 } // namespace stellar::core

@@ -19,6 +19,7 @@ namespace stellar::core {
 namespace detail {
 class AdaptiveResearchOutcomeStateWriter;
 class AdaptiveResearchOutcomeRuntimeTestAccess;
+class AdaptiveResearchOutcomeSupportAccess;
 } // namespace detail
 
 enum class ResearchUncertaintyProfile {
@@ -330,6 +331,7 @@ private:
   struct Storage;
   std::unique_ptr<Storage> storage_;
   friend class detail::AdaptiveResearchOutcomeRuntimeTestAccess;
+  friend class detail::AdaptiveResearchOutcomeSupportAccess;
 };
 
 namespace detail {
