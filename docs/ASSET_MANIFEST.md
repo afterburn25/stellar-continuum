@@ -35,10 +35,12 @@ models or default loadouts. Full prompts, reference roles and image hashes are i
 
 | Asset | Purpose | Status |
 | --- | --- | --- |
-| `assets/visual/stations/human-station-bare-cores-v1.png` | Empty hull and mounting-frame progression at all four tiers | Concept candidate |
+| `assets/visual/stations/human-station-bare-cores-v1.png` | Empty hull and mounting-frame progression at the first four tiers | Concept candidate |
 | `assets/visual/stations/human-modular-station-tiers-v1.png` | Equipped examples after researched modules are built | Concept candidate |
 | `assets/visual/stations/human-station-module-upgrades-v1.png` | Three visible levels for defense, shipyard, habitat and power modules | Concept candidate |
 | `assets/visual/stations/human-station-vertical-expansion-v1.png` | Tier 5 and Tier 6 stack empty upper decks above the retained Tier 4 base | Concept candidate |
+| `assets/visual/stations/human-station-tier7-starbase-v1.png` | Tier 7 encloses the existing stack into a solid starbase while retaining empty module interfaces | Concept candidate |
+| `assets/visual/stations/human-station-built-in-docking-v1.png` | Core-integrated docking clamps and telescoping personnel tunnel; available without optional modules | Concept candidate |
 | `docs/content/HUMAN_STATION_DESIGN.json` | Proposed slots, module levels, empty starting state and unbound research prerequisites | Concept candidate; gameplay not implemented |
 
 ## Runtime visual system

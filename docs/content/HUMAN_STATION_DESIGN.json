@@ -23,7 +23,8 @@
     "constructionUsesAuthoritativeProgress": true,
     "bareCoreValidAtEveryTier": true,
     "researchCompletionDoesNotAlterGeometry": true,
-    "tierFiveAndLaterGrowVertically": true
+    "tiersFiveAndSixGrowVertically": true,
+    "tierSevenEnclosesExistingStack": true
   },
   "socketClasses": {
     "service": {
@@ -71,7 +72,12 @@
       "minimumPreviousCoreTier": null,
       "installedModulesGranted": [],
       "upperDecks": 0,
-      "totalDeckLevels": 1
+      "totalDeckLevels": 1,
+      "builtInDockingBayCount": 2,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02"
+      ]
     },
     {
       "tier": 2,
@@ -117,7 +123,14 @@
       "minimumPreviousCoreTier": 1,
       "installedModulesGranted": [],
       "upperDecks": 0,
-      "totalDeckLevels": 1
+      "totalDeckLevels": 1,
+      "builtInDockingBayCount": 4,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04"
+      ]
     },
     {
       "tier": 3,
@@ -174,7 +187,16 @@
       "minimumPreviousCoreTier": 2,
       "installedModulesGranted": [],
       "upperDecks": 0,
-      "totalDeckLevels": 1
+      "totalDeckLevels": 1,
+      "builtInDockingBayCount": 6,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06"
+      ]
     },
     {
       "tier": 4,
@@ -245,7 +267,18 @@
       "minimumPreviousCoreTier": 3,
       "installedModulesGranted": [],
       "upperDecks": 0,
-      "totalDeckLevels": 1
+      "totalDeckLevels": 1,
+      "builtInDockingBayCount": 8,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08"
+      ]
     },
     {
       "tier": 5,
@@ -338,7 +371,22 @@
       "service": 24,
       "light": 24,
       "medium": 12,
-      "heavy": 6
+      "heavy": 6,
+      "builtInDockingBayCount": 12,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10",
+        "B11",
+        "B12"
+      ]
     },
     {
       "tier": 6,
@@ -453,19 +501,180 @@
       "service": 32,
       "light": 32,
       "medium": 16,
-      "heavy": 8
+      "heavy": 8,
+      "builtInDockingBayCount": 16,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10",
+        "B11",
+        "B12",
+        "B13",
+        "B14",
+        "B15",
+        "B16"
+      ]
+    },
+    {
+      "tier": 7,
+      "name": "Orbital Starbase",
+      "appearance": "Retained Tier 6 base and two upper decks enclosed by a broad central hull, solid deck rims, connecting sections and stepped shoulders; former gaps become structural hull volume while module interfaces remain empty and accessible",
+      "upperDecks": 2,
+      "totalDeckLevels": 3,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08",
+          "U09",
+          "U10",
+          "U11",
+          "U12",
+          "U13",
+          "U14",
+          "U15",
+          "U16",
+          "U17",
+          "U18",
+          "U19",
+          "U20",
+          "U21",
+          "U22",
+          "U23",
+          "U24",
+          "U25",
+          "U26",
+          "U27",
+          "U28",
+          "U29",
+          "U30",
+          "U31",
+          "U32"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12",
+          "L13",
+          "L14",
+          "L15",
+          "L16",
+          "L17",
+          "L18",
+          "L19",
+          "L20",
+          "L21",
+          "L22",
+          "L23",
+          "L24",
+          "L25",
+          "L26",
+          "L27",
+          "L28",
+          "L29",
+          "L30",
+          "L31",
+          "L32"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04",
+          "M05",
+          "M06",
+          "M07",
+          "M08",
+          "M09",
+          "M10",
+          "M11",
+          "M12",
+          "M13",
+          "M14",
+          "M15",
+          "M16"
+        ],
+        "heavy": [
+          "H01",
+          "H02",
+          "H03",
+          "H04",
+          "H05",
+          "H06",
+          "H07",
+          "H08"
+        ]
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t7"
+      ],
+      "minimumPreviousCoreTier": 6,
+      "installedModulesGranted": [],
+      "service": 32,
+      "light": 32,
+      "medium": 16,
+      "heavy": 8,
+      "upgradeForm": "structural_enclosure",
+      "newUpperDecks": 0,
+      "additionalSockets": {
+        "service": 0,
+        "light": 0,
+        "medium": 0,
+        "heavy": 0
+      },
+      "builtInDockingBayCount": 16,
+      "builtInDockingBayIds": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10",
+        "B11",
+        "B12",
+        "B13",
+        "B14",
+        "B15",
+        "B16"
+      ]
     }
   ],
   "modules": [
     {
       "id": "human_station_docking",
-      "name": "Docking and traffic",
+      "name": "Docking expansion and traffic",
       "socketClass": "service",
       "levels": [
         {
           "level": 1,
           "minimumCoreTier": 1,
-          "appearance": "Single collar and approach mast",
+          "appearance": "Additional docking collar and traffic mast",
           "modelAsset": null,
           "cost": null,
           "powerDemand": null,
@@ -501,7 +710,8 @@
             "sc.station.human_station_docking.l3"
           ]
         }
-      ]
+      ],
+      "role": "Optional capacity beyond the fixed core docking bays"
     },
     {
       "id": "human_station_habitat",
@@ -1056,7 +1266,15 @@
     "ownerCompletedResearchReference",
     "constructionResearchAuthorization",
     "deckIds",
-    "socketParentDeckIds"
+    "socketParentDeckIds",
+    "structuralEnclosureConstructionState",
+    "builtInDockingBayIds",
+    "dockingBayReservations",
+    "dockedShipIds",
+    "clampStates",
+    "tunnelExtensionAndSealStates",
+    "airlockStates",
+    "personnelTransferProgress"
   ],
   "requiredValidation": [
     "socket_class_compatibility",
@@ -1082,7 +1300,20 @@
     "research_gate_save_restore",
     "vertical_core_expansion_preserves_base_and_existing_decks",
     "each_new_deck_starts_empty",
-    "vertical_interdeck_clearances"
+    "vertical_interdeck_clearances",
+    "tier_seven_retains_three_deck_levels",
+    "tier_seven_fills_gaps_without_free_modules",
+    "tier_seven_enclosure_preserves_socket_access",
+    "tier_seven_enclosure_conflicts_block_construction",
+    "save_restore_structural_enclosure_state",
+    "zero_module_station_can_use_fixed_docking",
+    "built_in_bays_do_not_consume_module_slots",
+    "fixed_bay_ids_survive_core_upgrade",
+    "one_ship_per_reserved_bay",
+    "clamps_tunnel_and_airlock_state_order",
+    "no_transfer_without_secure_sealed_connection",
+    "undocking_requires_tunnel_retraction",
+    "save_restore_docked_ship_and_transfer_state"
   ],
   "assets": {
     "tierConcept": "assets/visual/stations/human-modular-station-tiers-v1.png",
@@ -1091,7 +1322,9 @@
     "productionStatus": "Concept images only; model and runtime production remain open",
     "bareCoreConcept": "assets/visual/stations/human-station-bare-cores-v1.png",
     "tierConceptRepresents": "Illustrative equipped layouts after research and paid construction; not starting equipment",
-    "verticalExpansionConcept": "assets/visual/stations/human-station-vertical-expansion-v1.png"
+    "verticalExpansionConcept": "assets/visual/stations/human-station-vertical-expansion-v1.png",
+    "solidStarbaseConcept": "assets/visual/stations/human-station-tier7-starbase-v1.png",
+    "builtInDockingConcept": "assets/visual/stations/human-station-built-in-docking-v1.png"
   },
   "startingConfiguration": {
     "coreTier": 1,
@@ -1106,9 +1339,15 @@
       "command",
       "maintenance_power",
       "basic_communications",
-      "station_keeping"
+      "station_keeping",
+      "fixed_docking_bays",
+      "docking_clamps",
+      "station_airlocks",
+      "telescoping_personnel_tunnels"
     ],
-    "externalConstructionSupportAllowed": true
+    "externalConstructionSupportAllowed": true,
+    "dockedShips": [],
+    "dockingReservations": []
   },
   "research": {
     "status": "draft_unbound_content_ids",
@@ -1726,6 +1965,18 @@
         ],
         "cost": null,
         "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t7",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 7
+        },
+        "prerequisites": [
+          "sc.station.human.core.t6"
+        ],
+        "cost": null,
+        "duration": null
       }
     ]
   },
@@ -1733,13 +1984,12 @@
     "beginsAtTier": 5,
     "baseRetainedFromTier": 4,
     "axis": "local_positive_Z",
-    "upperDecksPerCoreUpgrade": 1,
     "plannedMaximumTier": null,
     "explicitConceptTiers": [
       5,
       6
     ],
-    "laterTiers": "Continue the vertical stacking pattern; each additional tier needs an authored research entry, validated structure, support limits and construction costs before runtime enablement",
+    "laterTiers": "Tier 7 encloses the retained stack instead of adding a deck. Tiers beyond 7 remain to be designed and require their own research, structure and balance.",
     "additionalSocketsPerUpperDeck": {
       "service": 8,
       "light": 8,
@@ -1759,6 +2009,139 @@
       "weapon_firing_arcs_between_decks",
       "radiator_exposure",
       "construction_access"
+    ],
+    "upperDecksPerStackingUpgrade": 1,
+    "stackingUpgradeTiers": [
+      5,
+      6
+    ]
+  },
+  "structuralEnclosure": {
+    "tier": 7,
+    "retainsTier": 6,
+    "upperDecks": 2,
+    "totalDeckLevels": 3,
+    "newUpperDecks": 0,
+    "addedSocketCounts": {
+      "service": 0,
+      "light": 0,
+      "medium": 0,
+      "heavy": 0
+    },
+    "shape": "Broad central hull, enclosed radial connectors, solid stepped deck rims and continuous walls joining the existing elevations",
+    "visualReference": "Starfleet-style starbase solidity and broad engineered silhouette, adapted to the existing human station family",
+    "existingSocketIdsAndTransformsPreserved": true,
+    "existingModulesPreserved": true,
+    "emptyLayoutStillValid": true,
+    "grantsFunctionalModules": false,
+    "grantsModuleResearch": false,
+    "integralVolume": "Structural hull, access passages, permanent docking bays and unassigned enclosed space; fixed docking is inherited from the core, while optional habitat, cargo, shipyard and weapon modules remain separate",
+    "researchRequired": [
+      "sc.station.human.core.t7"
+    ],
+    "constructionRequired": true,
+    "structuralStats": null,
+    "moduleClearanceRule": "Preserve open interfaces and access envelopes around all fitted modules and empty sockets; block the enclosure order if geometry conflicts cannot be resolved without moving or hiding existing equipment",
+    "constructionStages": [
+      "exposed_existing_stack",
+      "reinforced_connectors",
+      "partial_enclosure_panels",
+      "commissioned_solid_hull"
+    ],
+    "laterTierDesigns": "not specified",
+    "fixedDockingBaysPreserved": true
+  },
+  "builtInDocking": {
+    "status": "design_only",
+    "partOfStationCore": true,
+    "availableFromTier": 1,
+    "requiresModuleSlot": false,
+    "requiresSeparateModuleResearch": false,
+    "includedInCoreConstructionAndResearch": true,
+    "initialBerthsEmpty": true,
+    "countsAreProvisional": true,
+    "berthIdPrefix": "B",
+    "geometryAssets": null,
+    "berthTransforms": null,
+    "berthCapacityAndShipClasses": null,
+    "shipStaysOutsideMainHull": true,
+    "bayForm": "Permanent recessed outer-hull berth with fixed docking clamp assemblies and a station airlock",
+    "purpose": [
+      "ship_docking",
+      "personnel_boarding_and_disembarkation"
+    ],
+    "mechanisms": [
+      "rigid docking clamps engaging supported ship fixtures",
+      "telescoping enclosed boarding tunnel",
+      "alignment collar sealing to the ship side hatch",
+      "station and ship airlocks"
+    ],
+    "shipCompatibilityRequired": [
+      "supported docking fixture locations",
+      "compatible hatch and collar interface",
+      "ship size and clearance envelope",
+      "tunnel reach and alignment envelope",
+      "compatible transfer environment"
+    ],
+    "operationStates": [
+      "available",
+      "reserved",
+      "approach",
+      "aligned",
+      "clamps_locked",
+      "tunnel_extending",
+      "sealed_and_equalizing",
+      "boarding_ready",
+      "personnel_transfer",
+      "hatches_closed",
+      "tunnel_retracting",
+      "clamps_released",
+      "departure",
+      "available"
+    ],
+    "personnelTransferRequires": [
+      "valid ship and station access permission",
+      "ship secured by clamps",
+      "tunnel connected and sealed",
+      "airlock environment compatible and equalized",
+      "transfer route operational"
+    ],
+    "clampReleaseRequires": [
+      "personnel transfer stopped",
+      "both hatches closed",
+      "tunnel retracted and disconnected"
+    ],
+    "failureBehavior": "Stop transfer and show blocked state when support, seal, docking authorization or route conditions fail; never animate personnel through an unconnected tunnel",
+    "oneShipPerBay": true,
+    "bayReservationsPersist": true,
+    "newBaysStartUnoccupied": true,
+    "existingDockingIdsPersistAcrossCoreUpgrades": true,
+    "noAutomaticResearchOrShipyardCapability": true,
+    "optionalDockingModules": "Separately researched expansions add more berths or specialized traffic, cargo or service capability. Baseline docking and personnel access remain part of the core.",
+    "tier7Rule": "Preserve open recessed bay entrances, clamp sweep and telescope clearances through the enclosure. Block construction that conflicts with a docked ship or active boarding route.",
+    "upperDeckBayIds": {
+      "upper_01": [
+        "B09",
+        "B10",
+        "B11",
+        "B12"
+      ],
+      "upper_02": [
+        "B13",
+        "B14",
+        "B15",
+        "B16"
+      ]
+    },
+    "baseDeckBayIdsAtTier4": [
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B06",
+      "B07",
+      "B08"
     ]
   }
 }

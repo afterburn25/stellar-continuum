@@ -112,8 +112,8 @@ Tool: built-in OpenAI image generation, reference-image mode; the bare-core shee
 was supplied as the station identity reference. Original generated PNG copied
 without editing. Status: **Concept candidate**. The user requested upward stacking
 after Tier 4. The three panels retain the Tier 4 base, add the first upper deck
-at Tier 5, then a second at Tier 6. Later tiers continue this pattern; Tier 6 is
-not a promised maximum. Each deck is empty until researched modules are built.
+at Tier 5, then a second at Tier 6. The later Tier 7 companion encloses this stack;
+the vertical sheet covers the two stacking upgrades. Each deck is empty until researched modules are built.
 All attachment counts and geometric tolerances remain illustrative.
 
 ### Exact generation prompt
@@ -130,4 +130,85 @@ Middle panel TIER 5: preserve that entire Tier 4 base below. Add a substantial V
 Right panel TIER 6: preserve the identical Tier 4 base and Tier 5 first upper deck. Extend the central support spine upward and add a SECOND clearly separate upper structural deck, vertically above the first. Three distinct stacked deck elevations total: BASE plus TWO UPPER decks, with generous visible vertical separation between all decks, repeated empty radial attachment frames and open truss rings. Make the station noticeably taller than Tier 5, like a layered orbital tower.
 All three stations are EMPTY station hulls. No installed weapons, habitat pods, cargo modules, shipyards, solar panels, radiator modules, dishes or docked ships. Empty capped standard interfaces and exposed structural trusses are the key subject. Only the permanent central command hull has tiny recessed windows and integral control systems.
 Style: precise premium hard-surface original sci-fi 3D concept render useful as a modeler's reference. Neutral cool studio lighting and clear metal detail. No fantasy energy, no planets, nebulae, characters, UI overlays, watermark or logos. Exactly three panels. The upper decks stack along the vertical Z axis; do NOT draw the added tiers as additional rings all on the same plane.
+```
+
+## Tier 7 solid starbase concept
+
+Asset: `assets/visual/stations/human-station-tier7-starbase-v1.png`
+
+SHA-256: `b03232f77e31d26f78bc2240b691d3bab8f9184f66299e7cd1bf0da1e86f2642`
+
+Tool: built-in OpenAI image generation. First generated a comparison from the
+vertical-expansion reference, then used the built-in image edit mode to correct
+the deck continuity. The edit target was that initial comparison; the structural
+reference was the rightmost Tier 6 in the vertical-expansion sheet. The selected
+final PNG is copied without further editing. Status: **Concept candidate**.
+
+Tier 7 encloses the retained base and two upper decks with structural hull, as
+requested by the user. The Starfleet-style starbase reference describes the solid
+silhouette; the materials and frame identity follow this project's human station.
+The fixed docking sheet adds the user's subsequent clamp-and-tunnel requirement;
+this overview does not resolve every integral docking mechanism or socket.
+
+### Initial generation prompt
+
+```text
+Use case: stylized-concept.
+Asset type: Tier 7 human station progression concept for Stellar Continuum.
+Input image: the supplied vertical-expansion sheet is a design identity and Tier 6 structure reference. Create a NEW companion comparison, preserving the existing station family.
+User request: at TIER 7, FILL THE GAPS between the stacked decks to create a much more SOLID, cohesive starbase structure, with the broad engineered silhouette and substantial hull mass of a Starfleet-style starbase.
+Composition: landscape professional sci-fi game concept sheet with TWO panels. Left panel takes 35 percent of width and is labeled exactly "TIER 6"; right panel is a larger hero view labeled exactly "TIER 7". Top title exactly "SOLID STARBASE UPGRADE". No other text. Consistent elevated three-quarter camera, same overall station height and base diameter for comparison; full objects visible against dark navy studio background.
+TIER 6: reproduce the rightmost station from the reference: retained large lower base with two concentric open truss rings, and two smaller upper decks stacked above it on a tall central spine. Large empty vertical gaps and exposed trusses.
+TIER 7: KEEP THAT SAME BASE, TWO UPPER DECK LEVELS, CENTRAL AXIS AND OVERALL HEIGHT. Do not add another upper deck. Enclose the stacked framework with broad permanent armored hull sections that fill most of the vertical gaps. Build a substantial central cylindrical/tapered hull joining all three elevations, broad stepped shoulders, solid saucer-like deck rims, enclosed radial connecting sections and smooth but visibly paneled outer walls. The earlier deck elevations remain readable as structural bands within one unified massive starbase. Give it the imposing, orderly, cohesive feeling of a Starfleet orbital starbase, interpreted in this project's original titanium/slate industrial human design language. Preserve the former four radial directions as visible seams or structural ribs. It should be immediately obvious that skeletal gaps have been enclosed and the station has become solid, rather than merely acquiring more rings.
+Keep some deliberate recessed openings, empty docking/module recesses and outward-facing empty weapon hardpoint plates at the same deck levels. Maintain believable open approach paths; do not cover equipment mounts with blind plating. Minimal restrained windows and warm service lights, cool navigation beacons, large metal panel seams and access covers, no bright energy.
+All module bays and weapon mounts remain UNFITTED. The new mass is structural hull, empty enclosed service volume and permanent connecting structure. NO installed turrets, barrels, habitat pods, cargo containers, shipyard cranes, active weapons, ships, people, external logos or insignia. No station name, faction marks, nebulae, planets or UI.
+Style: premium crisp hard-surface 3D concept render with clear titanium and graphite materials, neutral cool studio lighting, readable geometry. The exact visual goal is a clear transformation from an open stacked station into a solid starbase at Tier 7, retaining the earlier station inside its new hull.
+```
+
+### Final correction prompt
+
+```text
+Use case: precise-object-edit.
+Input image 1 is the EDIT TARGET: the two-panel SOLID STARBASE UPGRADE comparison.
+Input image 2 is a STRUCTURAL REFERENCE ONLY: the three-panel vertical expansion sheet. Its rightmost TIER 6 station has the correct three deck elevations.
+Keep the edit target's two-panel composition, dark backdrop, title and TIER 6 / TIER 7 labels, materials, lighting, titanium hull language, clean rendering and the Tier 7 solid starbase design.
+Correct the deck continuity only:
+1. LEFT TIER 6 currently appears to have only a base and one upper deck. Replace it with the correct Tier 6 arrangement from the RIGHTMOST panel of input image 2: a large base deck, a distinct MIDDLE upper deck, and a TOP upper deck. Three deck elevations total. Each is joined by an exposed central vertical spine with large clear gaps. Keep all mounts empty.
+2. RIGHT TIER 7 must enclose those SAME THREE elevations at matching heights: broad lower base, clearly readable middle saucer/deck band, and top saucer/deck band, joined by the solid central hull and connecting panels already established. Fill the vertical gaps but keep the middle level visible as a substantial structural band. Preserve the existing broad solid base and top; do not add a fourth level. Empty external hardpoint plates and recessed service openings remain accessible.
+Use the same overall height for left and right and align the three deck elevations across the comparison as closely as the perspective allows. All three deck levels fully visible; no cropped or hidden deck.
+Do not alter the exact title or labels. No added text, arrows, weapons, habitat modules, ships, logos or effects. The single correction is preserving BASE + TWO UPPER DECKS in both the open Tier 6 and enclosed Tier 7.
+```
+
+## Built-in docking and personnel transfer concept
+
+Asset: `assets/visual/stations/human-station-built-in-docking-v1.png`
+
+SHA-256: `1dd1e4a93043da3bd7ac19cf31b968fb6102a3f5ef814fe8b542414ddd27b9d5`
+
+Tool: built-in OpenAI image generation, reference-image mode. The final solid
+Tier 7 comparison was supplied for station hull style only. The selected generated
+PNG is copied without editing. Status: **Concept candidate**.
+
+The user requested docking bays that come with the core, permanent docking clamps
+and an extending tunnel to the ship hatch for personnel transfer. The three panels
+show approach, secured docking and an enclosed boarding connection. The visiting
+craft is illustrative, not a new registered player ship. Bay geometry, compatible
+ship fixtures, tunnel-to-hatch alignment and animations still require modeling
+and runtime validation. Basic docking is integral to all core tiers; it consumes
+no optional module slots and needs no separate module research.
+
+### Exact generation prompt
+
+```text
+Use case: stylized-concept.
+Asset type: permanent station docking-bay and personnel-transfer concept sheet for Stellar Continuum.
+Reference image: use the supplied solid-starbase sheet ONLY for human station hull style, titanium/slate materials, panel seams, structural ribs, warm service lights and cool navigation beacons.
+Primary request: show a docking bay BUILT INTO THE STATION HULL, not a removable module. A ship docks outside the recessed berth, permanent mechanical clamps secure it, and a telescoping ENCLOSED BOARDING TUNNEL extends from the station's airlock to the ship's SIDE HATCH so personnel can board the station.
+Composition: landscape professional three-panel game-art sequence with identical side/elevated camera and same ship and bay in all panels. Top title exactly "BUILT-IN DOCKING BAY". Panel labels exactly "APPROACH", "CLAMPED", "BOARDING". No other text. Close enough to clearly read clamps, tunnel and the hatch connection, generous margins, no cropped mechanism.
+Station hull is at the LEFT of each panel and the same compact titanium human spacecraft is at the RIGHT, side-on parallel to the station wall. The spacecraft has one clearly identifiable round side airlock hatch facing the station. The docking berth is a deep permanent recess with armored perimeter walls integral to a substantial curved section of station hull. It must not look like a small detachable pod bolted onto a socket.
+APPROACH: ship aligned near the recessed bay but not touching it; two substantial docking clamp arms are open, recessed boarding tunnel fully retracted inside the station's airlock housing, both hatches closed.
+CLAMPED: the same ship is now secured by the two rigid clamp arms gripping dedicated docking fixtures on its near-side structural frame. The clamps hold the ship with a short controlled standoff from the hull. Boarding tunnel remains retracted, ship hatch stays closed. Make the clamp contact visible, not arms floating near the ship.
+BOARDING: keep the same two clamps firmly locked in their same positions. Extend a clearly visible sealed telescoping cylindrical corridor from the station airlock all the way to the ship's facing side hatch. Show nested metal tunnel sections, a short flexible alignment collar and a flush sealed end connection at the ship hatch. The corridor must physically connect BOTH station and ship, with no gap. A restrained cutaway strip in the corridor can reveal two tiny suited crew silhouettes walking INSIDE the enclosed passage toward the station, never exposed to open space.
+The load-bearing clamps and the boarding tunnel are visually distinct mechanisms. Keep the bay structural frame, hull and vessel consistent across all three panels. The last panel shows successful personnel transfer; it does not show cargo cranes, repair machinery or a shipyard.
+Style: original polished hard-surface 3D concept rendering, readable engineering, neutral studio lighting, dark navy space backdrop. No planets, nebulae, weapons, logos, insignia, arrows, extra labels or game UI. Match the supplied human station family. This is fictional game art, not a dimensioned real-world engineering drawing.
 ```

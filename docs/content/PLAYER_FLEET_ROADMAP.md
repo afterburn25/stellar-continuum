@@ -6,7 +6,7 @@ first content priority while Stellar Engine conversion continues.
 The user's next instruction puts the **Human Modular Orbital Station first**,
 covering hub, defense and shipyard/industry roles through modules and visible
 upgrades, a bare-core start, modules unlocked by completed research and upward
-stacking after Tier 4.
+stacking at Tiers 5 and 6 followed by a solid starbase enclosure at Tier 7.
 See [the station design](HUMAN_MODULAR_STATION.md). The player-fleet
 tasks below remain queued and will reuse compatible station materials and docking
 interfaces after that first station asset.

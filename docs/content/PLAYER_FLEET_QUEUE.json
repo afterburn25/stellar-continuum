@@ -160,13 +160,13 @@
   "supportTasks": [
     {
       "id": "HS-001",
-      "name": "Bare-core, equipped-tier, module and vertical expansion concepts",
+      "name": "Station progression, solid Tier 7 and permanent docking concepts",
       "state": "concept_candidate",
       "dependsOn": []
     },
     {
       "id": "HS-002",
-      "name": "Empty station cores, reusable upper decks and vertical spine",
+      "name": "Station cores, upper decks, Tier 7 enclosure and fixed docking mechanisms",
       "state": "queued",
       "dependsOn": [
         "HS-001"
@@ -236,7 +236,12 @@
         "New slots stay empty after a core upgrade",
         "Allow compatible researched modules at every tier",
         "Preserve research and loadout through save/reload",
-        "From Tier 5 add empty upper decks while preserving the Tier 4 base"
+        "Tiers 5 and 6 add empty upper decks while preserving the Tier 4 base",
+        "Tier 7 fills the gaps around the retained stack without granting modules",
+        "Reject enclosure that blocks existing modules or required clearances",
+        "Zero-module cores support permanent docking and personnel transfer",
+        "Save and restore clamps, tunnel, docked ship and personnel state",
+        "Transfer requires secure clamps and a sealed compatible tunnel; undocking requires tunnel retraction"
       ]
     },
     {

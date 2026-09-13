@@ -12,9 +12,14 @@ one station family supporting orbital-hub, military-defense and shipyard/industr
 roles, with weapon hardpoints, upgradeable modules and a visible structural change
 at every upgrade. Stations begin as bare cores with zero modules. Core expansion
 adds empty slots; modules and their upgrades require completed research and paid
-construction at every tier. After Tier 4, expansions stack new decks upward above
-the retained base. Initial assets cover bare cores, equipped examples, module and
-vertical upgrades plus attachment/research rules. The player-ship queue follows.
+construction at every tier. Tiers 5 and 6 stack decks upward; Tier 7 fills the gaps
+with a solid starbase hull around the retained structure. Initial assets cover
+bare cores, equipped examples, module upgrades, stacked decks and the solid Tier 7
+form plus attachment/research rules. The player-ship queue follows.
+
+Every station core also includes permanent docking bays with clamps and extending
+boarding tunnels. Basic ship docking and personnel access use no module slots;
+optional docking modules add capacity and specialized services.
 
 Priority updated 2026-09-13 at the user's request: begin **player ships and matching
 assets while Stellar Engine conversion continues**. Content briefs, concepts,

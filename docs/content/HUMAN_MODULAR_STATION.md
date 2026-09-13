@@ -24,9 +24,10 @@ structure; any future rotating habitat is an independently supported component.
 
 A new station starts as **Tier 1 with zero installed modules and zero weapons**.
 All four general bays and four light hardpoints are empty. The permanent hull
-contains only the basic command, maintenance power, communications and station-keeping
-needed to exist as a station. These are integral core systems, not free upgradeable
-modules, and do not provide a shipyard, research lab, commercial dock or weapon.
+contains basic command, maintenance power, communications, station-keeping and
+**built-in docking bays with clamps and boarding tunnels**. These are integral
+core systems. A zero-module station can dock compatible ships and transfer
+personnel, but has no optional shipyard, research lab, freight terminal or weapon.
 Initial assembly and module delivery can use external construction support; a
 station must not require its own unbuilt shipyard or research lab to get started.
 
@@ -71,8 +72,15 @@ simulation design and validation. Every tier supports a completely empty layout.
 | 4 — Orbital Complex | Second structural ring around the retained core | Expanded empty radial platforms and structural capacity around the retained station | 16 | 16 light + 8 medium + 4 heavy |
 | 5 — Stacked Orbital Hub | Retained Tier 4 base plus one upper deck | Reinforced vertical spine, separated upper truss ring, new empty bays and hardpoints | 24 | 24 light + 12 medium + 6 heavy |
 | 6 — Orbital Tower | Retained base and first upper deck plus a second upper deck | Taller central spine and another visibly separate structural deck | 32 | 32 light + 16 medium + 8 heavy |
+| 7 — Orbital Starbase | Existing three deck levels enclosed into a solid hull | Broad central body, solid deck rims and connecting hull sections fill the gaps | 32, retained | 32 light + 16 medium + 8 heavy, retained |
 
 ![Four empty station core tiers](../../assets/visual/stations/human-station-bare-cores-v1.png)
+
+Fixed docking bays are separate from every module count above. The initial
+proposal is **2 / 4 / 6 / 8 / 12 / 16 / 16 built-in bays at Tiers 1–7**. Their
+counts, ship classes and sizes remain provisional. Existing bays retain their
+identities through upgrades; additional bays begin unoccupied. Tier 7 encloses the
+station around the retained docking openings.
 
 New capacity begins as **empty sockets**, not free installed weapons or buildings.
 These core tiers are available shapes. What is actually installed determines the
@@ -82,7 +90,7 @@ may emphasize docks and habitats. Mixed stations support all three together.
 
 ## Vertical growth after Tier 4
 
-From **Tier 5 onward, expand upward by stacking new decks on top of the Tier 4
+At **Tiers 5 and 6, expand upward by stacking new decks on top of the Tier 4
 base**. Tier 5 adds the first upper deck; Tier 6 adds a second. These are separate
 elevations along a reinforced central service spine, not more rings on the same
 plane. Preserve the entire base, earlier decks and their installed modules.
@@ -92,11 +100,11 @@ requires completed research and construction; adding a deck grants no modules or
 module technology. The player equips each deck with compatible researched modules.
 The station may still remain completely empty at every supported tier.
 
-Further tiers continue this vertical pattern; **Tier 6 is an example, not a final
-cap**. Each later tier needs its own authored research entry, supported structure
-and balanced limits before it can be offered in gameplay. The initial capacity
-proposal is eight general bays, eight light, four medium and two heavy mounts per
-upper deck. All counts remain provisional.
+Tier 7 then fills the gaps and encloses this stack, as described below. Tiers after
+7 remain to be designed rather than automatically adding more decks. Every later
+tier requires its own research, supported structure and balance. The initial
+capacity proposal is eight general bays, eight light, four medium and two heavy
+mounts per added upper deck at Tiers 5 and 6. All counts remain provisional.
 
 Keep deck and socket identities stable. Validate vertical room for large modules,
 docking approaches, firing arcs between decks, radiator exposure and construction
@@ -104,6 +112,77 @@ access. Power, workers and logistics reach upper decks through the central spine
 and structural trunks. Save/reload retains the whole stack and module placement.
 
 ![Vertical station expansion after Tier 4](../../assets/visual/stations/human-station-vertical-expansion-v1.png)
+
+## Tier 7 — a solid starbase
+
+Tier 7 **fills the gaps between the existing stacked decks**, turning the open
+framework into a much more solid station with the broad, substantial silhouette
+of a Starfleet-style starbase. Retain the Tier 4 base, central axis and both upper
+decks. A broad central hull, enclosed radial connections, solid deck rims and
+stepped shoulders join the three elevations into one coherent structure. The old
+deck levels remain recognizable as bands in the new hull. No extra upper deck is
+added at this tier.
+
+The enclosure is a researched and constructed **core upgrade**. Its new volume is
+structural hull, access passages and unassigned space around the inherited fixed
+docking bays. Zero-module stations remain valid, and the enclosure grants no
+optional habitat, shipyard, weapon, production or module
+research automatically. Functional modules still need their own completed research,
+support and construction. The initial slot proposal retains Tier 6's capacity;
+this upgrade changes the structural form rather than inventing free equipment.
+
+Preserve all fitted modules and durable socket positions. Keep recessed module
+openings, outward-facing weapon hardpoints, docking approaches, firing arcs and
+radiator clearance open. Hull panels must fit around their access envelopes. If
+a proposed enclosure collides with a fitted module or blocks a required approach,
+reject that construction order with a clear reason; never bury, move or delete
+equipment silently. Core structural benefits and costs remain to be balanced.
+
+Construction moves from the exposed stack through reinforced connections and
+partial hull panels to the completed solid enclosure. Save/reload must retain
+the actual enclosure progress and the station's existing loadout.
+
+![Tier 6 framework becomes a solid Tier 7 starbase](../../assets/visual/stations/human-station-tier7-starbase-v1.png)
+
+## Permanent docking bays and boarding tunnels
+
+Every core tier includes **fixed docking bays built into the station hull**.
+They have permanent clamp assemblies, a station airlock and an enclosed telescoping
+boarding tunnel. They use no module slots and need no separate module research:
+their construction and technology are included in that core tier. An otherwise
+bare starting station can receive compatible ships and personnel immediately
+after the core is commissioned.
+
+A bay is a recessed berth open to space. The ship stays outside the main hull,
+secured to the station by clamps engaging its supported docking fixtures. The
+tunnel extends from the station airlock to the ship's facing hatch, aligns its
+collar and forms an enclosed connection. Bay size, clamp locations, tunnel reach
+and hatch compatibility must match the actual ship; author those interfaces before
+enabling the ship/bay pairing in gameplay.
+
+The proposed docking sequence is:
+
+1. Reserve a free bay, verify access and ship compatibility, then align the ship.
+2. Lock the docking clamps onto the ship's docking fixtures.
+3. Extend the boarding tunnel and seal its collar to the ship's hatch.
+4. Confirm the connection and compatible airlock environment before opening the
+   transfer route. Personnel can then walk through the enclosed tunnel.
+5. To depart, stop transfer, close the hatches and retract the tunnel before
+   releasing the clamps.
+
+The tunnel carries personnel; the clamps secure the ship. A blocked, damaged,
+unsealed or unsupported connection stops transfer and shows its actual state.
+Only one ship can occupy a reserved bay. Save/reload retains the ship, bay
+reservation, clamps, tunnel, airlock and transfer progress without duplicating
+personnel or advancing a stopped sequence.
+
+Optional **docking expansion / traffic modules** remain available for additional
+berths or specialized freight and service facilities. Removing one never removes
+the core's permanent personnel docking capability. Tier 7 hull panels must preserve
+bay openings, clamp movement and tunnel clearance, including during construction.
+Do not start enclosure work that conflicts with a docked ship or active route.
+
+![Built-in docking clamps and extending boarding tunnel](../../assets/visual/stations/human-station-built-in-docking-v1.png)
 
 ## Weapon hardpoints
 
@@ -133,7 +212,7 @@ its overall tier to upgrade a compatible installed module.
 
 | Module | Level 1 appearance | Level 2 appearance | Level 3 appearance |
 | --- | --- | --- | --- |
-| Docking / traffic | Single collar and approach mast | Branching pier with added collars and control booth | Large traffic arm with separated approach lanes and substantial docking structures |
+| Docking expansion / traffic | Additional collar and approach mast | Branching pier with added collars and control booth | Large traffic arm with separated approach lanes and substantial docking structures |
 | Habitat / life support | Compact sealed pressure pod | Multi-pod block with visible service plant | Large habitat cluster with expanded environmental-control hardware |
 | Power | Compact generator/service pod and solar surfaces | Larger power housing and expanded collector/radiator banks | Reinforced power complex with additional cooling and distribution trunks |
 | Thermal control | Fold-out radiator pair | Larger segmented radiator wing | Multiple independently supported radiator banks |
@@ -177,6 +256,10 @@ provide this persistent modular station system.
 
 - Four base core-tier models plus reusable upper-deck and vertical-spine models,
   retaining the central core, original coordinate frame and existing deck identities.
+- Tier 7 enclosure kit: central hull, deck rims, connecting sections and staged
+  hull panels with preserved module access and clearance envelopes.
+- Built-in docking bay kit for every core tier: recessed berth, clamp animations,
+  telescoping boarding tunnel, sealed hatch/collar variants and personnel route.
 - Empty mount frames for light, medium, heavy and general-service connections.
 - Independently exported weapon modules, with three visible levels per initial family.
 - The ten service-module families above, each with three visibly distinct levels.
@@ -186,18 +269,21 @@ provide this persistent modular station system.
 - A station assembly manifest and a preview showing core upgrades and module swaps.
 
 The bare-core sheet defines the first four empty hulls; a companion sheet shows
-the Tier 4 base growing upward at Tiers 5 and 6. The original
+the Tier 4 base growing upward at Tiers 5 and 6. The Tier 7 comparison shows that
+stack becoming a solid starbase. The original
 tier sheet shows illustrative **equipped configurations after research and paid
 construction**, not default loadouts. The module sheet shows separate equipment
 levels. All are concept art, not production meshes, balanced slot specifications
-or proof of game integration. Detailed models and gameplay adapters follow.
+or proof of game integration. A dedicated docking sheet specifies the integral
+bays, clamps and tunnels added to the core design; earlier silhouette sheets do
+not show every docking mechanism. Detailed models and gameplay adapters follow.
 
 ## Immediate tasks
 
 | Task | Work |
 | --- | --- |
-| HS-001 | Bare-core, equipped-tier, module and vertical expansion concepts |
-| HS-002 | Empty core models, reusable upper decks and vertical spine with stable attachment frames |
+| HS-001 | Station progression, solid Tier 7 and built-in docking concepts |
+| HS-002 | Core models, upper decks, Tier 7 enclosure and fixed docking mechanisms |
 | HS-003 | Weapon mount and upgrade-module kit |
 | HS-004 | Docking, habitat, cargo, power and thermal modules |
 | HS-005 | Shipyard, industry, research, sensor and protection modules |
@@ -225,5 +311,12 @@ after both requirements are met, including lower-level modules on a higher-tier
 core. Core upgrades preserve installed equipment and add only empty sockets.
 Save/reload must preserve an empty station, completed owner research and pending
 paid construction without granting equipment or skipping research.
-Tier 5 and later must gain visible height through new upper decks; preserve the
-Tier 4 base, previous decks, socket IDs and installed loadout during expansion.
+Tiers 5 and 6 must gain visible height through new upper decks; Tier 7 must fill
+the gaps without adding a fourth elevation. Preserve the Tier 4 base, previous
+decks, socket IDs and installed loadout throughout. Reject enclosure work that
+would obstruct fitted modules or their required access.
+Verify ships can use built-in docking on a station with zero optional modules.
+Preserve fixed bay IDs through upgrades. Require compatible ship fixtures/hatches,
+clamp lock and a connected sealed tunnel before personnel transfer. Require tunnel
+retraction before unclamping. Verify interrupted docking and transfer save/restore
+without duplicated occupants, ships, reservations or progress.
