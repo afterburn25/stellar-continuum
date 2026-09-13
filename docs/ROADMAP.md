@@ -21,6 +21,11 @@ Every station core also includes permanent docking bays with clamps and extendin
 boarding tunnels. Basic ship docking and personnel access use no module slots;
 optional docking modules add capacity and specialized services.
 
+Custom station loadouts select weapons, shields, armor and other modules within
+tier-specific allocation points and compatible slots. Both capacities increase
+at every core upgrade, including Tier 7. Research and construction still apply;
+see [station outfitting](content/STATION_OUTFITTING.md) for provisional budgets.
+
 Priority updated 2026-09-13 at the user's request: begin **player ships and matching
 assets while Stellar Engine conversion continues**. Content briefs, concepts,
 models, textures, icons, effects and audio can advance now. Connect finished packs

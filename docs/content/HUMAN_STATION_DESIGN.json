@@ -28,7 +28,7 @@
   },
   "socketClasses": {
     "service": {
-      "purpose": "Docking, habitat, power, thermal, cargo, sensors, research, shipyard, industry or protection"
+      "purpose": "Docking expansions, habitat, power, thermal, cargo, sensors, research, shipyard, industry, armor or shield generators"
     },
     "light": {
       "purpose": "Light defensive weapons"
@@ -77,7 +77,9 @@
       "builtInDockingBayIds": [
         "B01",
         "B02"
-      ]
+      ],
+      "allocationPoints": 20,
+      "totalEquipmentSlots": 8
     },
     {
       "tier": 2,
@@ -130,7 +132,9 @@
         "B02",
         "B03",
         "B04"
-      ]
+      ],
+      "allocationPoints": 40,
+      "totalEquipmentSlots": 20
     },
     {
       "tier": 3,
@@ -196,7 +200,9 @@
         "B04",
         "B05",
         "B06"
-      ]
+      ],
+      "allocationPoints": 65,
+      "totalEquipmentSlots": 30
     },
     {
       "tier": 4,
@@ -278,7 +284,9 @@
         "B06",
         "B07",
         "B08"
-      ]
+      ],
+      "allocationPoints": 100,
+      "totalEquipmentSlots": 44
     },
     {
       "tier": 5,
@@ -386,7 +394,9 @@
         "B10",
         "B11",
         "B12"
-      ]
+      ],
+      "allocationPoints": 150,
+      "totalEquipmentSlots": 66
     },
     {
       "tier": 6,
@@ -520,12 +530,14 @@
         "B14",
         "B15",
         "B16"
-      ]
+      ],
+      "allocationPoints": 210,
+      "totalEquipmentSlots": 88
     },
     {
       "tier": 7,
       "name": "Orbital Starbase",
-      "appearance": "Retained Tier 6 base and two upper decks enclosed by a broad central hull, solid deck rims, connecting sections and stepped shoulders; former gaps become structural hull volume while module interfaces remain empty and accessible",
+      "appearance": "Retained Tier 6 base and two upper decks enclosed by a broad central hull, solid deck rims, connecting sections and stepped shoulders; former gaps become structural hull volume while module interfaces remain empty and accessible; new empty equipment recesses and external hardpoint frames are added to the enclosing hull",
       "upperDecks": 2,
       "totalDeckLevels": 3,
       "sockets": {
@@ -561,7 +573,15 @@
           "U29",
           "U30",
           "U31",
-          "U32"
+          "U32",
+          "U33",
+          "U34",
+          "U35",
+          "U36",
+          "U37",
+          "U38",
+          "U39",
+          "U40"
         ],
         "light": [
           "L01",
@@ -595,7 +615,15 @@
           "L29",
           "L30",
           "L31",
-          "L32"
+          "L32",
+          "L33",
+          "L34",
+          "L35",
+          "L36",
+          "L37",
+          "L38",
+          "L39",
+          "L40"
         ],
         "medium": [
           "M01",
@@ -613,7 +641,11 @@
           "M13",
           "M14",
           "M15",
-          "M16"
+          "M16",
+          "M17",
+          "M18",
+          "M19",
+          "M20"
         ],
         "heavy": [
           "H01",
@@ -623,7 +655,9 @@
           "H05",
           "H06",
           "H07",
-          "H08"
+          "H08",
+          "H09",
+          "H10"
         ]
       },
       "modelAsset": null,
@@ -632,17 +666,17 @@
       ],
       "minimumPreviousCoreTier": 6,
       "installedModulesGranted": [],
-      "service": 32,
-      "light": 32,
-      "medium": 16,
-      "heavy": 8,
+      "service": 40,
+      "light": 40,
+      "medium": 20,
+      "heavy": 10,
       "upgradeForm": "structural_enclosure",
       "newUpperDecks": 0,
       "additionalSockets": {
-        "service": 0,
-        "light": 0,
-        "medium": 0,
-        "heavy": 0
+        "service": 8,
+        "light": 8,
+        "medium": 4,
+        "heavy": 2
       },
       "builtInDockingBayCount": 16,
       "builtInDockingBayIds": [
@@ -662,7 +696,9 @@
         "B14",
         "B15",
         "B16"
-      ]
+      ],
+      "allocationPoints": 280,
+      "totalEquipmentSlots": 110
     }
   ],
   "modules": [
@@ -682,7 +718,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_docking.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -695,7 +733,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_docking.l2"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -708,7 +748,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_docking.l3"
-          ]
+          ],
+          "allocationPoints": 6,
+          "slotsRequired": 1
         }
       ],
       "role": "Optional capacity beyond the fixed core docking bays"
@@ -729,7 +771,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_habitat.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -742,7 +786,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_habitat.l2"
-          ]
+          ],
+          "allocationPoints": 3,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -755,7 +801,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_habitat.l3"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         }
       ]
     },
@@ -775,7 +823,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_power.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -788,7 +838,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_power.l2"
-          ]
+          ],
+          "allocationPoints": 3,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -801,7 +853,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_power.l3"
-          ]
+          ],
+          "allocationPoints": 5,
+          "slotsRequired": 1
         }
       ]
     },
@@ -821,7 +875,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_thermal.l1"
-          ]
+          ],
+          "allocationPoints": 1,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -834,7 +890,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_thermal.l2"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -847,7 +905,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_thermal.l3"
-          ]
+          ],
+          "allocationPoints": 3,
+          "slotsRequired": 1
         }
       ]
     },
@@ -867,7 +927,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_cargo.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -880,7 +942,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_cargo.l2"
-          ]
+          ],
+          "allocationPoints": 3,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -893,7 +957,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_cargo.l3"
-          ]
+          ],
+          "allocationPoints": 5,
+          "slotsRequired": 1
         }
       ]
     },
@@ -913,7 +979,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_sensors.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -926,7 +994,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_sensors.l2"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -939,7 +1009,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_sensors.l3"
-          ]
+          ],
+          "allocationPoints": 6,
+          "slotsRequired": 1
         }
       ]
     },
@@ -959,7 +1031,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_research.l1"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -972,7 +1046,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_research.l2"
-          ]
+          ],
+          "allocationPoints": 6,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -985,7 +1061,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_research.l3"
-          ]
+          ],
+          "allocationPoints": 9,
+          "slotsRequired": 1
         }
       ]
     },
@@ -1005,7 +1083,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_shipyard.l1"
-          ]
+          ],
+          "allocationPoints": 5,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1018,7 +1098,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_shipyard.l2"
-          ]
+          ],
+          "allocationPoints": 8,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1031,7 +1113,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_shipyard.l3"
-          ]
+          ],
+          "allocationPoints": 12,
+          "slotsRequired": 1
         }
       ]
     },
@@ -1051,7 +1135,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_industry.l1"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1064,7 +1150,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_industry.l2"
-          ]
+          ],
+          "allocationPoints": 7,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1077,7 +1165,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_industry.l3"
-          ]
+          ],
+          "allocationPoints": 10,
+          "slotsRequired": 1
         }
       ]
     },
@@ -1097,7 +1187,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_protection.l1"
-          ]
+          ],
+          "allocationPoints": 3,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1110,7 +1202,9 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_protection.l2"
-          ]
+          ],
+          "allocationPoints": 5,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1123,6 +1217,64 @@
           "crewDemand": null,
           "requiredResearch": [
             "sc.station.human_station_protection.l3"
+          ],
+          "allocationPoints": 8,
+          "slotsRequired": 1
+        }
+      ]
+    },
+    {
+      "id": "human_station_shields",
+      "name": "Shield generators",
+      "socketClass": "service",
+      "role": "Optional researched shield generation; runtime station combat integration pending",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Compact shield projector and visible emitter housing",
+          "allocationPoints": 5,
+          "slotsRequired": 1,
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "shieldStats": null,
+          "requiredResearch": [
+            "sc.station.human_station_shields.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Paired projector assembly with additional cooling and emitter heads",
+          "allocationPoints": 8,
+          "slotsRequired": 1,
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "shieldStats": null,
+          "requiredResearch": [
+            "sc.station.human_station_shields.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Large distributed projector assembly with reinforced emitters and service hardware",
+          "allocationPoints": 12,
+          "slotsRequired": 1,
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "shieldStats": null,
+          "requiredResearch": [
+            "sc.station.human_station_shields.l3"
           ]
         }
       ]
@@ -1141,7 +1293,9 @@
           "minimumCoreTier": 1,
           "requiredResearch": [
             "sc.station.human_station_point_defense.l1"
-          ]
+          ],
+          "allocationPoints": 2,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1150,7 +1304,9 @@
           "minimumCoreTier": 2,
           "requiredResearch": [
             "sc.station.human_station_point_defense.l2"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1159,7 +1315,9 @@
           "minimumCoreTier": 3,
           "requiredResearch": [
             "sc.station.human_station_point_defense.l3"
-          ]
+          ],
+          "allocationPoints": 6,
+          "slotsRequired": 1
         }
       ],
       "weaponTechnologyId": null,
@@ -1178,7 +1336,9 @@
           "minimumCoreTier": 2,
           "requiredResearch": [
             "sc.station.human_station_defense_turret.l1"
-          ]
+          ],
+          "allocationPoints": 4,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1187,7 +1347,9 @@
           "minimumCoreTier": 2,
           "requiredResearch": [
             "sc.station.human_station_defense_turret.l2"
-          ]
+          ],
+          "allocationPoints": 7,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1196,7 +1358,9 @@
           "minimumCoreTier": 3,
           "requiredResearch": [
             "sc.station.human_station_defense_turret.l3"
-          ]
+          ],
+          "allocationPoints": 10,
+          "slotsRequired": 1
         }
       ],
       "weaponTechnologyId": null,
@@ -1215,7 +1379,9 @@
           "minimumCoreTier": 3,
           "requiredResearch": [
             "sc.station.human_station_heavy_battery.l1"
-          ]
+          ],
+          "allocationPoints": 8,
+          "slotsRequired": 1
         },
         {
           "level": 2,
@@ -1224,7 +1390,9 @@
           "minimumCoreTier": 3,
           "requiredResearch": [
             "sc.station.human_station_heavy_battery.l2"
-          ]
+          ],
+          "allocationPoints": 12,
+          "slotsRequired": 1
         },
         {
           "level": 3,
@@ -1233,7 +1401,9 @@
           "minimumCoreTier": 3,
           "requiredResearch": [
             "sc.station.human_station_heavy_battery.l3"
-          ]
+          ],
+          "allocationPoints": 18,
+          "slotsRequired": 1
         }
       ],
       "weaponTechnologyId": null,
@@ -1274,7 +1444,10 @@
     "clampStates",
     "tunnelExtensionAndSealStates",
     "airlockStates",
-    "personnelTransferProgress"
+    "personnelTransferProgress",
+    "equipmentCatalogRevision",
+    "stationLoadoutBlueprintReference",
+    "allocationPointReservations"
   ],
   "requiredValidation": [
     "socket_class_compatibility",
@@ -1313,13 +1486,22 @@
     "clamps_tunnel_and_airlock_state_order",
     "no_transfer_without_secure_sealed_connection",
     "undocking_requires_tunnel_retraction",
-    "save_restore_docked_ship_and_transfer_state"
+    "save_restore_docked_ship_and_transfer_state",
+    "allocation_and_slot_caps_increase_each_tier",
+    "sum_equipment_and_reserved_allocation_within_budget",
+    "all_optional_equipment_costs_positive_points",
+    "no_research_bypass_using_points",
+    "disabled_equipment_still_uses_allocation",
+    "reserved_refit_delta_prevents_overbooking",
+    "lower_cost_refit_returns_capacity_after_commissioning",
+    "built_in_docking_excluded_from_equipment_budget",
+    "blueprint_apply_revalidates_research_and_capacity"
   ],
   "assets": {
     "tierConcept": "assets/visual/stations/human-modular-station-tiers-v1.png",
     "moduleConcept": "assets/visual/stations/human-station-module-upgrades-v1.png",
     "editableModels": null,
-    "productionStatus": "Concept images only; model and runtime production remain open",
+    "productionStatus": "Concept images and allocation preview; production models and runtime station integration remain open",
     "bareCoreConcept": "assets/visual/stations/human-station-bare-cores-v1.png",
     "tierConceptRepresents": "Illustrative equipped layouts after research and paid construction; not starting equipment",
     "verticalExpansionConcept": "assets/visual/stations/human-station-vertical-expansion-v1.png",
@@ -1347,7 +1529,8 @@
     ],
     "externalConstructionSupportAllowed": true,
     "dockedShips": [],
-    "dockingReservations": []
+    "dockingReservations": [],
+    "allocationPointsUsed": 0
   },
   "research": {
     "status": "draft_unbound_content_ids",
@@ -1977,6 +2160,47 @@
         ],
         "cost": null,
         "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shields.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shields",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shields.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shields",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_shields.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shields.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shields",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_shields.l2"
+        ],
+        "cost": null,
+        "duration": null
       }
     ]
   },
@@ -2023,10 +2247,10 @@
     "totalDeckLevels": 3,
     "newUpperDecks": 0,
     "addedSocketCounts": {
-      "service": 0,
-      "light": 0,
-      "medium": 0,
-      "heavy": 0
+      "service": 8,
+      "light": 8,
+      "medium": 4,
+      "heavy": 2
     },
     "shape": "Broad central hull, enclosed radial connectors, solid stepped deck rims and continuous walls joining the existing elevations",
     "visualReference": "Starfleet-style starbase solidity and broad engineered silhouette, adapted to the existing human station family",
@@ -2049,7 +2273,9 @@
       "commissioned_solid_hull"
     ],
     "laterTierDesigns": "not specified",
-    "fixedDockingBaysPreserved": true
+    "fixedDockingBaysPreserved": true,
+    "newSocketPlacement": "New empty recessed bays and external frames on the enclosing hull; retained sockets remain in their original positions",
+    "retainsAllocationOfInstalledEquipment": true
   },
   "builtInDocking": {
     "status": "design_only",
@@ -2142,6 +2368,66 @@
       "B06",
       "B07",
       "B08"
+    ]
+  },
+  "outfitting": {
+    "status": "proposed_rules_with_interactive_allocation_preview",
+    "gameplayImplemented": false,
+    "allocationPointsAreProvisional": true,
+    "equipmentCostsAreProvisional": true,
+    "pointsAreCapacityNotCurrency": true,
+    "oneSharedBudgetPerStation": true,
+    "allocationUsedFormula": "Sum of allocationPoints for every installed equipment instance, including disabled or damaged equipment, plus active refit reservations",
+    "allOptionalModulesConsumePointsAndCompatibleSlots": true,
+    "startingAllocationUsed": 0,
+    "unspentPointsAllowed": true,
+    "pointsCannotUnlockResearch": true,
+    "pointsDoNotReplaceConstructionResourcesPowerHeatStaffingOrClearance": true,
+    "coreIntegralSystemsConsumePoints": false,
+    "builtInDockingConsumesPoints": false,
+    "builtInDockingConsumesEquipmentSlots": false,
+    "slotCountsStrictlyIncreaseEachTier": true,
+    "budgetStrictlyIncreasesEachTier": true,
+    "newPointsAndSlotsBecomeAvailableAfterCoreCommissioning": true,
+    "moduleResearchAndMinimumCoreTierStillRequired": true,
+    "slotIdentityAndInstalledAllocationPersist": true,
+    "refit": {
+      "previewEditableWithoutChangingPhysicalStation": true,
+      "replaceWithinSameCompatibleSlot": true,
+      "reserveAdditionalPointsFormula": "max(0, target allocation cost - current installed allocation cost)",
+      "replacementOccupiesOneReservedSocket": true,
+      "releasePointsAfterRemovalOrLowerCostRefitCompletes": true,
+      "cancelReleasesUnspentReservationAndKeepsExistingModule": true,
+      "disabledOrDamagedModulesStillConsumePoints": true,
+      "resourceRefundPolicy": "Separate from allocation capacity; decommissioning does not promise a full material or credit refund",
+      "existingEquipmentSurvivesCoreUpgrade": true
+    },
+    "blueprints": {
+      "saveAndNameLoadouts": true,
+      "fields": [
+        "designId",
+        "coreTier",
+        "catalogRevision",
+        "socketId",
+        "moduleId",
+        "moduleLevel"
+      ],
+      "revalidateOnApply": true,
+      "cannotApplyBeyondResearchOrCapacity": true,
+      "blueprintIsNotInstantConstruction": true
+    },
+    "availabilityStates": [
+      "Research required",
+      "Larger core required",
+      "Not enough allocation points",
+      "No compatible slot",
+      "Insufficient resources or support",
+      "Clearance conflict"
+    ],
+    "previewLimitations": [
+      "Allocation and slot exploration only",
+      "All listed technology levels assumed researched for the preview",
+      "No live station, construction, power, heat or combat simulation"
     ]
   }
 }

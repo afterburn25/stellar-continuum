@@ -227,7 +227,8 @@
         "HS-002",
         "HS-003",
         "HS-004",
-        "HS-005"
+        "HS-005",
+        "HS-009"
       ],
       "acceptance": [
         "Start with zero installed modules",
@@ -241,7 +242,10 @@
         "Reject enclosure that blocks existing modules or required clearances",
         "Zero-module cores support permanent docking and personnel transfer",
         "Save and restore clamps, tunnel, docked ship and personnel state",
-        "Transfer requires secure clamps and a sealed compatible tunnel; undocking requires tunnel retraction"
+        "Transfer requires secure clamps and a sealed compatible tunnel; undocking requires tunnel retraction",
+        "Every tier increases allocation points and total equipment slots",
+        "Reject equipment over point, slot or research limits",
+        "Keep fixed docking outside the equipment budget"
       ]
     },
     {
@@ -296,6 +300,24 @@
       "dependsOn": [
         "PF-012"
       ]
+    },
+    {
+      "id": "HS-009",
+      "name": "Station outfitting, allocation points, shields, refits and loadout blueprints",
+      "state": "in_progress",
+      "dependsOn": [
+        "HS-001"
+      ],
+      "completed": [
+        "allocation_and_slot_design",
+        "equipment_cost_and_shield_definitions",
+        "interactive_allocation_preview_in_conversation"
+      ],
+      "remaining": [
+        "native_outfitting_interface",
+        "authoritative_refits_and_blueprints",
+        "gameplay_balancing"
+      ]
     }
   ],
   "boundaries": {
@@ -320,5 +342,6 @@
     "in_progress",
     "waiting_for_native_adapters"
   ],
-  "stationResearchRules": "docs/content/HUMAN_STATION_DESIGN.json#/research"
+  "stationResearchRules": "docs/content/HUMAN_STATION_DESIGN.json#/research",
+  "stationOutfittingRules": "docs/content/STATION_OUTFITTING.md"
 }

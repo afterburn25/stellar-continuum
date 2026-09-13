@@ -60,6 +60,14 @@ placement remain to be designed and connected to authoritative research state.
 
 ## Initial station tiers
 
+The player outfits a station like a custom ship: choose weapons, shield generators,
+armor plating and service equipment within a shared **allocation-point budget**
+and the compatible slots at the current core tier. Every tier increases both
+limits. Points are capacity, not credits or materials. Built-in docking and basic
+core systems use no equipment points or slots. Full proposed budgets, equipment
+costs, refit rules and blueprint behavior are in
+[Station Outfitting](STATION_OUTFITTING.md).
+
 These are initial design targets. Slot counts and costs are not balanced gameplay
 values; module pricing, support requirements and research balancing still need
 simulation design and validation. Every tier supports a completely empty layout.
@@ -72,7 +80,7 @@ simulation design and validation. Every tier supports a completely empty layout.
 | 4 — Orbital Complex | Second structural ring around the retained core | Expanded empty radial platforms and structural capacity around the retained station | 16 | 16 light + 8 medium + 4 heavy |
 | 5 — Stacked Orbital Hub | Retained Tier 4 base plus one upper deck | Reinforced vertical spine, separated upper truss ring, new empty bays and hardpoints | 24 | 24 light + 12 medium + 6 heavy |
 | 6 — Orbital Tower | Retained base and first upper deck plus a second upper deck | Taller central spine and another visibly separate structural deck | 32 | 32 light + 16 medium + 8 heavy |
-| 7 — Orbital Starbase | Existing three deck levels enclosed into a solid hull | Broad central body, solid deck rims and connecting hull sections fill the gaps | 32, retained | 32 light + 16 medium + 8 heavy, retained |
+| 7 — Orbital Starbase | Existing three deck levels enclosed into a solid hull | Connecting hull sections fill the gaps and add empty bays and mounting frames | 40 | 40 light + 20 medium + 10 heavy |
 
 ![Four empty station core tiers](../../assets/visual/stations/human-station-bare-cores-v1.png)
 
@@ -128,8 +136,10 @@ structural hull, access passages and unassigned space around the inherited fixed
 docking bays. Zero-module stations remain valid, and the enclosure grants no
 optional habitat, shipyard, weapon, production or module
 research automatically. Functional modules still need their own completed research,
-support and construction. The initial slot proposal retains Tier 6's capacity;
-this upgrade changes the structural form rather than inventing free equipment.
+support, allocation capacity and construction. Tier 7 adds eight service bays,
+eight light, four medium and two heavy mounts on its enclosing hull, preserving
+every existing socket. Its allocation budget rises from 210 to 280 points.
+The added slots start empty and the extra points grant no equipment automatically.
 
 Preserve all fitted modules and durable socket positions. Keep recessed module
 openings, outward-facing weapon hardpoints, docking approaches, firing arcs and
@@ -222,10 +232,13 @@ its overall tier to upgrade a compatible installed module.
 | Shipyard / repair | Service cradle and repair arms | Open fabrication gantry with additional tooling | Larger multi-section construction dock with expanded cranes and fabrication hardware |
 | Industry / fabrication | Compact machinery enclosure | Expanded production block and material-handling fixtures | Large manufacturing cluster with additional logistics and thermal hardware |
 | Protection / armor | Local reinforcement and covers | Deeper armor sections and protected service routes | Reinforced outer structural protection with visible independent plating assemblies |
+| Shield generators | Compact projector and visible emitter housing | Paired projectors with additional cooling and emitter heads | Distributed projector assembly with reinforced emitters and service hardware |
 
-Shield equipment, if introduced by the game's technology rules, would be its own
-supported module family and visible emitter hardware. Cosmetic glow does not
-create an unimplemented shield capability.
+Shield generators are now a requested module family with three research-gated
+levels. Shields and armor consume both allocation points and service bays;
+weapons use their matching hardpoint class. Their combat behavior, final balancing
+and station adapters still need implementation. Visible shield equipment does
+not imply an already-working shield system.
 
 ![Representative module upgrades](../../assets/visual/stations/human-station-module-upgrades-v1.png)
 
@@ -236,7 +249,8 @@ from the current core mesh, unlocked socket frames, installed module meshes,
 module levels, damage and actual construction state. No single generic station
 portrait is stretched or recolored to stand for every upgrade.
 
-1. Check completed owner research for the target core tier or module level, then
+1. Check completed owner research, free allocation points and compatible slots
+   for the target core tier or module level, then
    preview the added structure, support demand, costs and affected facilities.
 2. Authorize the upgrade at this physical station, reserving the real bay/socket
    and paid work. Deliver materials, workers and equipment through its logistics.
@@ -262,7 +276,7 @@ provide this persistent modular station system.
   telescoping boarding tunnel, sealed hatch/collar variants and personnel route.
 - Empty mount frames for light, medium, heavy and general-service connections.
 - Independently exported weapon modules, with three visible levels per initial family.
-- The ten service-module families above, each with three visibly distinct levels.
+- The eleven service-module families above, each with three visibly distinct levels.
 - Shared hull materials, decals, attachment helpers and reduced-detail variants.
 - Construction, damaged and empty-slot presentation; icons and inspector renders.
 - Named module, docking, muzzle, service and effect attachments in the model sources.
@@ -290,6 +304,7 @@ not show every docking mechanism. Detailed models and gameplay adapters follow.
 | HS-006 | Construction / damage states, icons, audio and reusable material kit |
 | HS-007 | Station assembly preview, Engine Assets registration and dependency checks |
 | HS-008 | Native research gates, bare start, construction/combat/logistics/saves and player controls |
+| HS-009 | Station outfitting, allocation budgets, shields, refits and saved loadout blueprints |
 
 The station precedes the player ships in the immediate content roadmap. Shared
 materials and docking interfaces flow into the later Pathfinder Scout and fleet packs.
@@ -320,3 +335,8 @@ Preserve fixed bay IDs through upgrades. Require compatible ship fixtures/hatche
 clamp lock and a connected sealed tunnel before personnel transfer. Require tunnel
 retraction before unclamping. Verify interrupted docking and transfer save/restore
 without duplicated occupants, ships, reservations or progress.
+Each tier must strictly increase total equipment slots and allocation capacity,
+including Tier 7. Reject fits that exceed either limit even when research is
+complete. Disabled and damaged equipment still consumes its allocation. Refits
+reserve added capacity and release capacity only when removal or replacement
+finishes. A saved loadout must be revalidated before construction.

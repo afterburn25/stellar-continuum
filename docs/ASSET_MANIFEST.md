@@ -42,6 +42,7 @@ models or default loadouts. Full prompts, reference roles and image hashes are i
 | `assets/visual/stations/human-station-tier7-starbase-v1.png` | Tier 7 encloses the existing stack into a solid starbase while retaining empty module interfaces | Concept candidate |
 | `assets/visual/stations/human-station-built-in-docking-v1.png` | Core-integrated docking clamps and telescoping personnel tunnel; available without optional modules | Concept candidate |
 | `docs/content/HUMAN_STATION_DESIGN.json` | Proposed slots, module levels, empty starting state and unbound research prerequisites | Concept candidate; gameplay not implemented |
+| `docs/content/STATION_OUTFITTING.md` | Provisional allocation points, equipment costs, shield/armor options, slot growth and refit rules | Design specification; runtime outfitting not implemented |
 
 ## Runtime visual system
 
