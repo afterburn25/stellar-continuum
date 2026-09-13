@@ -1,0 +1,1189 @@
+{
+  "Source": [
+    "src/Game/Simulation/Construction/ConstructionCapabilities.cs",
+    "src/Game/Simulation/Shipbuilding/ShipbuildingCapabilities.cs"
+  ],
+  "CanonicalFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+  "FinalFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+  "RowCount": 33,
+  "Rows": [
+    {
+      "Name": "construction-orbital-direct",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "orbital_industry",
+      "GrantedCapability": "orbital_industry",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-orbital-context-does-not-match",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "orbital_industry",
+      "GrantedCapability": "orbital_industry",
+      "CapabilityContext": "species:test",
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": "species:test"
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": "species:test"
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-orbital-mature-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "orbital_industry",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "orbital_manufacturing",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "orbital_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "orbital_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-warp-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "warp_field_control",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "warp_field_control",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "warp_field_control",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "warp_field_control",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-warp-flag-is-not-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "warp_field_control",
+      "GrantedCapability": "warp_field_control",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "warp_field_control",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "warp_field_control",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-fusion-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "fusion_power",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "fusion_power",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-fusion-flag-is-not-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "fusion_power",
+      "GrantedCapability": "fusion_power",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fusion_power",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fusion_power",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-additive-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "additive_manufacturing",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "additive_manufacturing",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "additive_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "additive_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-additive-flag-is-not-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "additive_manufacturing",
+      "GrantedCapability": "additive_manufacturing",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "additive_manufacturing",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "additive_manufacturing",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-trade-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "interplanetary_trade_standards",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "interplanetary_trade_standards",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "interplanetary_trade_standards",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "interplanetary_trade_standards",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-trade-flag-is-not-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "interplanetary_trade_standards",
+      "GrantedCapability": "interplanetary_trade_standards",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "interplanetary_trade_standards",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "interplanetary_trade_standards",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-recycling-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "closed_loop_recycling",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "closed_loop_recycling",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "closed_loop_recycling",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "closed_loop_recycling",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-recycling-flag-is-not-knowledge",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "closed_loop_recycling",
+      "GrantedCapability": "closed_loop_recycling",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "closed_loop_recycling",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "closed_loop_recycling",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-archived-mature-history",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "warp_field_control",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "warp_field_control",
+      "Maturity": 8,
+      "Resolution": "MATURE_HISTORY",
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "warp_field_control",
+            "Maturity": 8,
+            "Resolution": "MATURE_HISTORY",
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "warp_field_control",
+            "Maturity": 8,
+            "Resolution": "MATURE_HISTORY",
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-archived-superseded",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "fusion_power",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "fusion_power",
+      "Maturity": 8,
+      "Resolution": "Superseded",
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 8,
+            "Resolution": "Superseded",
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 8,
+            "Resolution": "Superseded",
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-archived-other",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "additive_manufacturing",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "additive_manufacturing",
+      "Maturity": 8,
+      "Resolution": "abandoned",
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "additive_manufacturing",
+            "Maturity": 8,
+            "Resolution": "abandoned",
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "additive_manufacturing",
+            "Maturity": 8,
+            "Resolution": "abandoned",
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-fallback-direct",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "fixture_capability",
+      "GrantedCapability": "fixture_capability",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_capability",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_capability",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "construction-fallback-absent",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "fixture_capability",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-case-sensitive",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "FUSION_POWER",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "fusion_power",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "fusion_power",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-empty",
+      "Kind": "construction",
+      "CivilizationId": 1,
+      "CapabilityId": "",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "construction-missing-civilization",
+      "Kind": "construction",
+      "CivilizationId": 9,
+      "CapabilityId": "fusion_power",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": {
+        "Type": "KeyNotFoundException",
+        "Message": "Campaign has no Adaptive Research state for civilization 9."
+      },
+      "Result": null
+    },
+    {
+      "Name": "ship-spacecraft-direct",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "spacecraft_construction",
+      "GrantedCapability": "spacecraft_construction",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "spacecraft_construction",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "spacecraft_construction",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-spacecraft-orbital-capability",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "spacecraft_construction",
+      "GrantedCapability": "orbital_industry",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "orbital_industry",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-spacecraft-orbital-knowledge",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "spacecraft_construction",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": "orbital_manufacturing",
+      "Maturity": 7,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "orbital_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [],
+        "Nodes": [
+          {
+            "NodeId": "orbital_manufacturing",
+            "Maturity": 7,
+            "Resolution": null,
+            "Revision": 1
+          }
+        ]
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-experimental-direct",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "experimental_interstellar_transit",
+      "GrantedCapability": "experimental_interstellar_transit",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "experimental_interstellar_transit",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "experimental_interstellar_transit",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-reliable-fallback",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "reliable_ftl",
+      "GrantedCapability": "reliable_ftl",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "reliable_ftl",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "reliable_ftl",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-extended-fallback",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "extended_ftl_range",
+      "GrantedCapability": "extended_ftl_range",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "extended_ftl_range",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "extended_ftl_range",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-custom-fallback",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "fixture_ship_capability",
+      "GrantedCapability": "fixture_ship_capability",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_ship_capability",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_ship_capability",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": true
+    },
+    {
+      "Name": "ship-context-does-not-match",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "fixture_ship_capability",
+      "GrantedCapability": "fixture_ship_capability",
+      "CapabilityContext": "species:test",
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_ship_capability",
+            "ContextId": "species:test"
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "fixture_ship_capability",
+            "ContextId": "species:test"
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "ship-absent",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "fixture_ship_capability",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "ship-case-sensitive",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "SPACECRAFT_CONSTRUCTION",
+      "GrantedCapability": "spacecraft_construction",
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "spacecraft_construction",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 1,
+        "Capabilities": [
+          {
+            "CapabilityId": "spacecraft_construction",
+            "ContextId": null
+          }
+        ],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "ship-empty",
+      "Kind": "shipbuilding",
+      "CivilizationId": 1,
+      "CapabilityId": "",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": null,
+      "Result": false
+    },
+    {
+      "Name": "ship-missing-civilization",
+      "Kind": "shipbuilding",
+      "CivilizationId": 9,
+      "CapabilityId": "spacecraft_construction",
+      "GrantedCapability": null,
+      "CapabilityContext": null,
+      "EstablishedNode": null,
+      "Maturity": 1,
+      "Resolution": null,
+      "GalaxyWasNull": true,
+      "BeforeFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "AfterFingerprint": "2E76D70C9E270E69DF4BFC66B4135419720A0BA5CCA0B2D61DD5906FA22975B1",
+      "BeforeState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "AfterState": {
+        "Revision": 0,
+        "Capabilities": [],
+        "Nodes": []
+      },
+      "Error": {
+        "Type": "KeyNotFoundException",
+        "Message": "Campaign has no Adaptive Research state for civilization 9."
+      },
+      "Result": null
+    }
+  ]
+}

@@ -45,3 +45,5 @@ python work/062-research-foreign-snapshot/build_strict.py release
 Maintained CTest integration is added in engine 0.1.29. These are standalone
 research codecs; the exported campaign host still advances legacy research.
 Campaign schema2/player wrapper17 compatibility is not established by this gate.
+
+Exact committed export `de6c750c366d1bbf2fb4423ddf1f9db18da6dcf5` passed all72/72 CTest and20/20 Python checks. Package `Builds/Windows/StellarContinuum-windows-benchmark-de6c750c-20260913T151850838371Z` has `sourceDirty=false`, seven hashed runtime files and all nine relocation/recovery flags true (`work/native-029-clean.log`). Separate-machine certification remains open.
