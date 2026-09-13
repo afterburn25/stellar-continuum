@@ -1,0 +1,1764 @@
+{
+  "schemaVersion": 1,
+  "format": "stellar-station-design-v1",
+  "designId": "human_modular_orbital_station",
+  "displayName": "Human Modular Orbital Station",
+  "species": "terran_baseline",
+  "status": "concept_candidate",
+  "roles": [
+    "orbital_hub",
+    "military_defense",
+    "shipyard_industry"
+  ],
+  "gameplayImplemented": false,
+  "slotCountsAreProvisional": true,
+  "visualRules": {
+    "persistentCentralCore": true,
+    "persistentFourRadialSpines": true,
+    "newSocketsStartEmpty": true,
+    "coreTierAndModuleLevelIndependent": true,
+    "everyUpgradeChangesGeometry": true,
+    "installedLoadoutChangesSilhouette": true,
+    "weaponFramesNonRotating": true,
+    "constructionUsesAuthoritativeProgress": true,
+    "bareCoreValidAtEveryTier": true,
+    "researchCompletionDoesNotAlterGeometry": true,
+    "tierFiveAndLaterGrowVertically": true
+  },
+  "socketClasses": {
+    "service": {
+      "purpose": "Docking, habitat, power, thermal, cargo, sensors, research, shipyard, industry or protection"
+    },
+    "light": {
+      "purpose": "Light defensive weapons"
+    },
+    "medium": {
+      "purpose": "Medium weapon assemblies"
+    },
+    "heavy": {
+      "purpose": "Reinforced heavy weapon assemblies"
+    }
+  },
+  "coreTiers": [
+    {
+      "tier": 1,
+      "name": "Core Outpost",
+      "appearance": "Bare central command core and four short exposed structural arms with empty service connectors and weapon plates",
+      "service": 4,
+      "light": 4,
+      "medium": 0,
+      "heavy": 0,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04"
+        ],
+        "medium": [],
+        "heavy": []
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t1"
+      ],
+      "minimumPreviousCoreTier": null,
+      "installedModulesGranted": [],
+      "upperDecks": 0,
+      "totalDeckLevels": 1
+    },
+    {
+      "tier": 2,
+      "name": "Orbital Station",
+      "appearance": "Extended retained arms and light structural service ring with additional empty platforms",
+      "service": 8,
+      "light": 8,
+      "medium": 4,
+      "heavy": 0,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04"
+        ],
+        "heavy": []
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t2"
+      ],
+      "minimumPreviousCoreTier": 1,
+      "installedModulesGranted": [],
+      "upperDecks": 0,
+      "totalDeckLevels": 1
+    },
+    {
+      "tier": 3,
+      "name": "Orbital Hub",
+      "appearance": "Complete ring and reinforced outer attachment nodes",
+      "service": 12,
+      "light": 12,
+      "medium": 4,
+      "heavy": 2,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08",
+          "U09",
+          "U10",
+          "U11",
+          "U12"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04"
+        ],
+        "heavy": [
+          "H01",
+          "H02"
+        ]
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t3"
+      ],
+      "minimumPreviousCoreTier": 2,
+      "installedModulesGranted": [],
+      "upperDecks": 0,
+      "totalDeckLevels": 1
+    },
+    {
+      "tier": 4,
+      "name": "Orbital Complex",
+      "appearance": "A second outer structural ring and expanded clusters around the retained inner station",
+      "service": 16,
+      "light": 16,
+      "medium": 8,
+      "heavy": 4,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08",
+          "U09",
+          "U10",
+          "U11",
+          "U12",
+          "U13",
+          "U14",
+          "U15",
+          "U16"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12",
+          "L13",
+          "L14",
+          "L15",
+          "L16"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04",
+          "M05",
+          "M06",
+          "M07",
+          "M08"
+        ],
+        "heavy": [
+          "H01",
+          "H02",
+          "H03",
+          "H04"
+        ]
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t4"
+      ],
+      "minimumPreviousCoreTier": 3,
+      "installedModulesGranted": [],
+      "upperDecks": 0,
+      "totalDeckLevels": 1
+    },
+    {
+      "tier": 5,
+      "name": "Stacked Orbital Hub",
+      "appearance": "Retained Tier 4 base with 1 upper structural deck, separated vertically along a reinforced central spine; all added frames empty",
+      "upperDecks": 1,
+      "totalDeckLevels": 2,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08",
+          "U09",
+          "U10",
+          "U11",
+          "U12",
+          "U13",
+          "U14",
+          "U15",
+          "U16",
+          "U17",
+          "U18",
+          "U19",
+          "U20",
+          "U21",
+          "U22",
+          "U23",
+          "U24"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12",
+          "L13",
+          "L14",
+          "L15",
+          "L16",
+          "L17",
+          "L18",
+          "L19",
+          "L20",
+          "L21",
+          "L22",
+          "L23",
+          "L24"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04",
+          "M05",
+          "M06",
+          "M07",
+          "M08",
+          "M09",
+          "M10",
+          "M11",
+          "M12"
+        ],
+        "heavy": [
+          "H01",
+          "H02",
+          "H03",
+          "H04",
+          "H05",
+          "H06"
+        ]
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t5"
+      ],
+      "minimumPreviousCoreTier": 4,
+      "installedModulesGranted": [],
+      "service": 24,
+      "light": 24,
+      "medium": 12,
+      "heavy": 6
+    },
+    {
+      "tier": 6,
+      "name": "Orbital Tower",
+      "appearance": "Retained Tier 4 base with 2 upper structural decks, separated vertically along a reinforced central spine; all added frames empty",
+      "upperDecks": 2,
+      "totalDeckLevels": 3,
+      "sockets": {
+        "service": [
+          "U01",
+          "U02",
+          "U03",
+          "U04",
+          "U05",
+          "U06",
+          "U07",
+          "U08",
+          "U09",
+          "U10",
+          "U11",
+          "U12",
+          "U13",
+          "U14",
+          "U15",
+          "U16",
+          "U17",
+          "U18",
+          "U19",
+          "U20",
+          "U21",
+          "U22",
+          "U23",
+          "U24",
+          "U25",
+          "U26",
+          "U27",
+          "U28",
+          "U29",
+          "U30",
+          "U31",
+          "U32"
+        ],
+        "light": [
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12",
+          "L13",
+          "L14",
+          "L15",
+          "L16",
+          "L17",
+          "L18",
+          "L19",
+          "L20",
+          "L21",
+          "L22",
+          "L23",
+          "L24",
+          "L25",
+          "L26",
+          "L27",
+          "L28",
+          "L29",
+          "L30",
+          "L31",
+          "L32"
+        ],
+        "medium": [
+          "M01",
+          "M02",
+          "M03",
+          "M04",
+          "M05",
+          "M06",
+          "M07",
+          "M08",
+          "M09",
+          "M10",
+          "M11",
+          "M12",
+          "M13",
+          "M14",
+          "M15",
+          "M16"
+        ],
+        "heavy": [
+          "H01",
+          "H02",
+          "H03",
+          "H04",
+          "H05",
+          "H06",
+          "H07",
+          "H08"
+        ]
+      },
+      "modelAsset": null,
+      "requiredResearch": [
+        "sc.station.human.core.t6"
+      ],
+      "minimumPreviousCoreTier": 5,
+      "installedModulesGranted": [],
+      "service": 32,
+      "light": 32,
+      "medium": 16,
+      "heavy": 8
+    }
+  ],
+  "modules": [
+    {
+      "id": "human_station_docking",
+      "name": "Docking and traffic",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Single collar and approach mast",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_docking.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Branching dock pier and control booth",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_docking.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Large traffic arm with separated docking structures",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_docking.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_habitat",
+      "name": "Habitat and life support",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Single sealed pressure pod",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_habitat.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Multi-pod habitat block and service plant",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_habitat.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Large habitat cluster and environmental-control hardware",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_habitat.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_power",
+      "name": "Power plant",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Compact power housing and collectors",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_power.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Larger generator housing and collector/radiator surfaces",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_power.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Reinforced power complex and distribution trunks",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_power.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_thermal",
+      "name": "Thermal control",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Fold-out radiator pair",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_thermal.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Segmented radiator wing",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_thermal.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Multiple independently supported radiator banks",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_thermal.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_cargo",
+      "name": "Cargo and logistics",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Container rack",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_cargo.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Expanded racks and transfer equipment",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_cargo.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Large cargo cluster and freight-transfer docks",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_cargo.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_sensors",
+      "name": "Sensors and communications",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Small mast and dish",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_sensors.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Dish cluster and separated sensor booms",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_sensors.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Distributed instrument array",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_sensors.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_research",
+      "name": "Research facilities",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 2,
+          "appearance": "Sealed laboratory pod",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_research.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Larger laboratory block and instruments",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_research.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Multi-lab complex with dedicated service connections",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_research.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_shipyard",
+      "name": "Shipyard and repair",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 2,
+          "appearance": "Open service cradle and repair arms",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_shipyard.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Fabrication gantry with additional tooling",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_shipyard.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Large multi-section construction dock and cranes",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_shipyard.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_industry",
+      "name": "Industry and fabrication",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 2,
+          "appearance": "Compact machinery enclosure",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_industry.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Expanded production block and handling fixtures",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_industry.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Manufacturing cluster with expanded thermal and logistics hardware",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_industry.l3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "human_station_protection",
+      "name": "Protection and armor",
+      "socketClass": "service",
+      "levels": [
+        {
+          "level": 1,
+          "minimumCoreTier": 1,
+          "appearance": "Local reinforcement and covers",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_protection.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "minimumCoreTier": 2,
+          "appearance": "Deeper armor sections and protected services",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_protection.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "minimumCoreTier": 3,
+          "appearance": "Reinforced external structural plating",
+          "modelAsset": null,
+          "cost": null,
+          "powerDemand": null,
+          "heatLoad": null,
+          "crewDemand": null,
+          "requiredResearch": [
+            "sc.station.human_station_protection.l3"
+          ]
+        }
+      ]
+    }
+  ],
+  "weaponModules": [
+    {
+      "id": "human_station_point_defense",
+      "name": "Point defense",
+      "socketClass": "light",
+      "levels": [
+        {
+          "level": 1,
+          "appearance": "Compact single assembly on a standardized mount",
+          "modelAsset": null,
+          "minimumCoreTier": 1,
+          "requiredResearch": [
+            "sc.station.human_station_point_defense.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "appearance": "Larger protected assembly with visible side cooling",
+          "modelAsset": null,
+          "minimumCoreTier": 2,
+          "requiredResearch": [
+            "sc.station.human_station_point_defense.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "appearance": "Reinforced weapon assembly with additional cooling and protection",
+          "modelAsset": null,
+          "minimumCoreTier": 3,
+          "requiredResearch": [
+            "sc.station.human_station_point_defense.l3"
+          ]
+        }
+      ],
+      "weaponTechnologyId": null,
+      "cost": null,
+      "combatStats": null
+    },
+    {
+      "id": "human_station_defense_turret",
+      "name": "Defense turret",
+      "socketClass": "medium",
+      "levels": [
+        {
+          "level": 1,
+          "appearance": "Compact single assembly on a standardized mount",
+          "modelAsset": null,
+          "minimumCoreTier": 2,
+          "requiredResearch": [
+            "sc.station.human_station_defense_turret.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "appearance": "Larger protected assembly with visible side cooling",
+          "modelAsset": null,
+          "minimumCoreTier": 2,
+          "requiredResearch": [
+            "sc.station.human_station_defense_turret.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "appearance": "Reinforced weapon assembly with additional cooling and protection",
+          "modelAsset": null,
+          "minimumCoreTier": 3,
+          "requiredResearch": [
+            "sc.station.human_station_defense_turret.l3"
+          ]
+        }
+      ],
+      "weaponTechnologyId": null,
+      "cost": null,
+      "combatStats": null
+    },
+    {
+      "id": "human_station_heavy_battery",
+      "name": "Heavy battery",
+      "socketClass": "heavy",
+      "levels": [
+        {
+          "level": 1,
+          "appearance": "Compact single assembly on a standardized mount",
+          "modelAsset": null,
+          "minimumCoreTier": 3,
+          "requiredResearch": [
+            "sc.station.human_station_heavy_battery.l1"
+          ]
+        },
+        {
+          "level": 2,
+          "appearance": "Larger protected assembly with visible side cooling",
+          "modelAsset": null,
+          "minimumCoreTier": 3,
+          "requiredResearch": [
+            "sc.station.human_station_heavy_battery.l2"
+          ]
+        },
+        {
+          "level": 3,
+          "appearance": "Reinforced weapon assembly with additional cooling and protection",
+          "modelAsset": null,
+          "minimumCoreTier": 3,
+          "requiredResearch": [
+            "sc.station.human_station_heavy_battery.l3"
+          ]
+        }
+      ],
+      "weaponTechnologyId": null,
+      "cost": null,
+      "combatStats": null
+    }
+  ],
+  "upgradeStages": [
+    "authorized",
+    "frame_work",
+    "installation",
+    "commissioning",
+    "complete"
+  ],
+  "persistedStateRequired": [
+    "stationId",
+    "ownerId",
+    "hostBodyId",
+    "orbit",
+    "coreTier",
+    "socketIds",
+    "installedModuleIds",
+    "moduleLevels",
+    "moduleOrientation",
+    "damage",
+    "constructionOrders",
+    "paidProgress",
+    "reservedMaterials",
+    "pendingUpgrades",
+    "ownerCompletedResearchReference",
+    "constructionResearchAuthorization",
+    "deckIds",
+    "socketParentDeckIds"
+  ],
+  "requiredValidation": [
+    "socket_class_compatibility",
+    "core_tier_requirement",
+    "power_and_heat",
+    "staffing_and_logistics",
+    "paid_authorization",
+    "firing_arc_clearance",
+    "docking_clearance",
+    "module_collision",
+    "stable_ids_after_upgrade",
+    "save_restore",
+    "observer_visibility",
+    "pause_and_progress",
+    "zero_module_start",
+    "empty_layout_at_every_core_tier",
+    "completed_owner_research_for_core_and_each_module_level",
+    "partial_research_rejected",
+    "research_completion_does_not_construct",
+    "higher_core_does_not_grant_research",
+    "lower_module_level_on_higher_core",
+    "research_independent_of_station_lab",
+    "research_gate_save_restore",
+    "vertical_core_expansion_preserves_base_and_existing_decks",
+    "each_new_deck_starts_empty",
+    "vertical_interdeck_clearances"
+  ],
+  "assets": {
+    "tierConcept": "assets/visual/stations/human-modular-station-tiers-v1.png",
+    "moduleConcept": "assets/visual/stations/human-station-module-upgrades-v1.png",
+    "editableModels": null,
+    "productionStatus": "Concept images only; model and runtime production remain open",
+    "bareCoreConcept": "assets/visual/stations/human-station-bare-cores-v1.png",
+    "tierConceptRepresents": "Illustrative equipped layouts after research and paid construction; not starting equipment",
+    "verticalExpansionConcept": "assets/visual/stations/human-station-vertical-expansion-v1.png"
+  },
+  "startingConfiguration": {
+    "coreTier": 1,
+    "installedModules": [],
+    "installedWeapons": [],
+    "allSocketsEmpty": true,
+    "completedResearch": [
+      "sc.station.human.core.t1"
+    ],
+    "moduleResearchGranted": [],
+    "integralCoreSystems": [
+      "command",
+      "maintenance_power",
+      "basic_communications",
+      "station_keeping"
+    ],
+    "externalConstructionSupportAllowed": true
+  },
+  "research": {
+    "status": "draft_unbound_content_ids",
+    "runtimeCatalogBinding": null,
+    "scope": "owning_civilization",
+    "requiredState": "completed",
+    "partialResearchQualifies": false,
+    "completionAutomaticallyBuildsEquipment": false,
+    "coreTierAutomaticallyUnlocksModules": false,
+    "coreUpgradesRequireResearch": true,
+    "eachModuleLevelRequiresResearch": true,
+    "compatibleLowerLevelsRemainBuildable": true,
+    "researchedHigherLevelCanBeBuiltInEmptySocket": true,
+    "initialConstructionDoesNotRequireStationResearchLabOrShipyard": true,
+    "nodes": [
+      {
+        "id": "sc.station.human.core.t1",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 1
+        },
+        "prerequisites": [],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t2",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t3",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t4",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 4
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_docking.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_docking",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_docking.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_docking",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_docking.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_docking.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_docking",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_docking.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_habitat.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_habitat",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_habitat.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_habitat",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_habitat.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_habitat.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_habitat",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_habitat.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_power.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_power",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_power.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_power",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_power.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_power.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_power",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_power.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_thermal.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_thermal",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_thermal.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_thermal",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_thermal.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_thermal.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_thermal",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_thermal.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_cargo.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_cargo",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_cargo.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_cargo",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_cargo.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_cargo.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_cargo",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_cargo.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_sensors.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_sensors",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_sensors.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_sensors",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_sensors.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_sensors.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_sensors",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_sensors.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_research.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_research",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_research.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_research",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_research.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_research.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_research",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_research.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shipyard.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shipyard",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shipyard.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shipyard",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_shipyard.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_shipyard.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_shipyard",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_shipyard.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_industry.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_industry",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_industry.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_industry",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_industry.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_industry.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_industry",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_industry.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_protection.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_protection",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_protection.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_protection",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_protection.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_protection.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_protection",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_protection.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_point_defense.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_point_defense",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_point_defense.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_point_defense",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_point_defense.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_point_defense.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_point_defense",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_point_defense.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_defense_turret.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_defense_turret",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_defense_turret.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_defense_turret",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t2",
+          "sc.station.human_station_defense_turret.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_defense_turret.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_defense_turret",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_defense_turret.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_heavy_battery.l1",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_heavy_battery",
+          "level": 1
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_heavy_battery.l2",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_heavy_battery",
+          "level": 2
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_heavy_battery.l1"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human_station_heavy_battery.l3",
+        "unlocks": {
+          "kind": "module_level",
+          "moduleId": "human_station_heavy_battery",
+          "level": 3
+        },
+        "prerequisites": [
+          "sc.station.human.core.t3",
+          "sc.station.human_station_heavy_battery.l2"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t5",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 5
+        },
+        "prerequisites": [
+          "sc.station.human.core.t4"
+        ],
+        "cost": null,
+        "duration": null
+      },
+      {
+        "id": "sc.station.human.core.t6",
+        "unlocks": {
+          "kind": "core_tier",
+          "tier": 6
+        },
+        "prerequisites": [
+          "sc.station.human.core.t5"
+        ],
+        "cost": null,
+        "duration": null
+      }
+    ]
+  },
+  "verticalExpansion": {
+    "beginsAtTier": 5,
+    "baseRetainedFromTier": 4,
+    "axis": "local_positive_Z",
+    "upperDecksPerCoreUpgrade": 1,
+    "plannedMaximumTier": null,
+    "explicitConceptTiers": [
+      5,
+      6
+    ],
+    "laterTiers": "Continue the vertical stacking pattern; each additional tier needs an authored research entry, validated structure, support limits and construction costs before runtime enablement",
+    "additionalSocketsPerUpperDeck": {
+      "service": 8,
+      "light": 8,
+      "medium": 4,
+      "heavy": 2
+    },
+    "socketCountsAreProvisional": true,
+    "upperDecksStartEmpty": true,
+    "existingDeckAndSocketIdsPersist": true,
+    "deckIdPattern": "upper_01, upper_02, ...",
+    "eachSocketStoresParentDeckId": true,
+    "attachmentTransforms": null,
+    "powerAndLogisticsTravelVia": "reinforced central service spine and structural trunks",
+    "requiredClearances": [
+      "vertical_module_envelope",
+      "docking_approach_between_decks",
+      "weapon_firing_arcs_between_decks",
+      "radiator_exposure",
+      "construction_access"
+    ]
+  }
+}

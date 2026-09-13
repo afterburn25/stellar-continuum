@@ -3,16 +3,25 @@
 Updated 2026-09-13. The user selected **player ships and matching assets** as the
 first content priority while Stellar Engine conversion continues.
 
+The user's next instruction puts the **Human Modular Orbital Station first**,
+covering hub, defense and shipyard/industry roles through modules and visible
+upgrades, a bare-core start, modules unlocked by completed research and upward
+stacking after Tier 4.
+See [the station design](HUMAN_MODULAR_STATION.md). The player-fleet
+tasks below remain queued and will reuse compatible station materials and docking
+interfaces after that first station asset.
+
 ## Starting point
 
-The six current designs all have dedicated presentation images and procedural
+At the initial fleet audit, the six current designs all have dedicated presentation images and procedural
 3D geometry in the game. Three dedicated ship SVGs are present: science, corvette
-and colony. The installed editor library contains 174 entries: 130 images, 35
+and colony. Before the station concept import, the editor library contained 174 entries: 130 images, 35
 audio files and nine data files. It has no imported model files at this audit.
 Procedural game geometry and an imported reusable model are separate assets.
 
-This roadmap schedules production work. New concepts, models, textures and effects
-listed below have **not** been created by this roadmap update.
+This roadmap schedules ship production work. New ship concepts, models, textures
+and effects listed below remain queued; the separate station concept pack is the
+first authored content delivered under the updated priority.
 
 ## Production queue
 
@@ -32,7 +41,7 @@ listed below have **not** been created by this roadmap update.
 | PF-012 | Each pack | Library registration, project packaging and preview checks | Required for every completed pack |
 | PF-013 | Integration | Shipyard card, fleet inspector and system-view hookup | Follows the relevant native renderer and game adapters |
 
-The first concrete batch is **PF-001 + PF-002 + PF-008**: establish the Terran
+After the station, the first ship batch is **PF-001 + PF-002 + PF-008**: establish the Terran
 fleet's shared design and complete the Pathfinder Scout from reference to a
 reusable asset pack. Fleet icons can progress alongside that batch.
 

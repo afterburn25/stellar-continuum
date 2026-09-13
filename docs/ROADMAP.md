@@ -4,7 +4,17 @@ This is the public roadmap for **Stellar Continuum**, the working title for the 
 
 For durable design rules, current baseline status, and engineering constraints, also read the continuity records linked from the repository README.
 
-## Immediate content production — Player ships and matching assets
+## Immediate content production — Human station, then player ships
+
+**First content priority, updated 2026-09-13:** create the
+[Human Modular Orbital Station](content/HUMAN_MODULAR_STATION.md). The user wants
+one station family supporting orbital-hub, military-defense and shipyard/industrial
+roles, with weapon hardpoints, upgradeable modules and a visible structural change
+at every upgrade. Stations begin as bare cores with zero modules. Core expansion
+adds empty slots; modules and their upgrades require completed research and paid
+construction at every tier. After Tier 4, expansions stack new decks upward above
+the retained base. Initial assets cover bare cores, equipped examples, module and
+vertical upgrades plus attachment/research rules. The player-ship queue follows.
 
 Priority updated 2026-09-13 at the user's request: begin **player ships and matching
 assets while Stellar Engine conversion continues**. Content briefs, concepts,
