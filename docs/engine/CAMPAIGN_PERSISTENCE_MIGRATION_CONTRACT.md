@@ -30,6 +30,18 @@ Developer load progress .03 read, .14 validated, nested player progress mapped t
 
 Use actual-source current and historical fixtures with complete restored state and a subsequent deterministic campaign advance. Exercise truncated JSON, unknown/missing/duplicate identities, inconsistent reference graphs, wrong wrapper/inner versions, research funding and outcome continuation, Developer-to-Player rejection, interrupted writes and known-good backup recovery. Prove stable runtime/support ownership throughout restoration. Performance or native FPS claims require later actual player/renderer testing; headless timing and clean package relocation are insufficient.
 
+## Composition and durable-write boundaries
+
+Engine 0.1.38 integrates the remaining typed planetary, knowledge and cross-reference adapters and the legacy recovery helpers. The next gate composes current galaxy16 capture/restore before adding historical version dispatch and the Player17/Developer envelopes. This keeps complete current-state recovery reviewable without claiming that a typed adapter is already a compatible JSON save reader.
+
+`CampaignSimulationState::campaign()` retains the owned `FreshCampaignState`, including generation metadata. Append the owned active encounter and explicit optional Developer provenance to that existing state; do not introduce a second world that can diverge. Capture borrows this world mutably because source validation can materialize legacy encounter counts and fleet combat state. The prepared result must own its nested data before asynchronous writing begins. Only the validated Developer wrapper attaches Developer provenance on restoration.
+
+The generic Engine writer receives bytes and filesystem paths, with no Core or JSON dependency. It owns an exclusive sibling temporary file, writes all bytes, flushes to disk, then replaces or moves it. Backup preservation is a per-write option; the caller resumes normal rotation after repairing a primary from its known-good backup. Serialization and save-mode validation precede this byte writer.
+
+Windows replacement has documented partial-failure outcomes; a failed call does not always mean the original path is intact. Retain surviving recovery data and report primary, backup and temporary paths for ambiguous failures. Do not claim power-loss certification from ordinary write tests. `ReplaceFileW` does not support its write-through flag; use an explicit file flush. Sources: [ReplaceFileW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew), [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers).
+
+Test process-local serialization separately from cross-process races and path aliases. The same physical file can have case, short-name or hard-link aliases; lexical path normalization alone does not establish file identity. Before claiming concurrency coverage, specify and test the identities actually serialized. Failure injection supplements real filesystem tests and must not replace locked-file, backup and relocation checks.
+
 ## Current galaxy payload: further source review
 
 Source review on 2026-09-13 covered CampaignSaveService capture/clone (88–203), top-level restore (204–420), planetary/reference validation (1145–1331), and envelope/galaxy DTO fields (1756–1792), plus the metadata record and CampaignMassiveEncounter validation. Further review covered fleet restoration (675–797), shipyard restoration (943–1092), knowledge restoration (1093–1144), and shipyard save invariants (1634–1719). This remains a partial review of the 2,045-line service; other individual historical conversions remain open.

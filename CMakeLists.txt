@@ -84,7 +84,11 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/shipyard_persistence.cpp
   core/src/galaxy_economy_persistence.cpp
   core/src/campaign_foundation_persistence.cpp
-  core/src/civilization_founding_roster.cpp)
+  core/src/civilization_founding_roster.cpp
+  core/src/planetary_body_persistence.cpp
+  core/src/galaxy_reference_validation.cpp
+  core/src/knowledge_persistence.cpp
+  core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp
@@ -669,6 +673,30 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/campaign-foundation-persistence.json"
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(campaign_foundation_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_planetary_body_persistence_tests native-tests/planetary_body_persistence_tests.cpp)
+  target_link_libraries(stellar_planetary_body_persistence_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME planetary_body_persistence_parity COMMAND stellar_planetary_body_persistence_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/planetary-body-persistence.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(planetary_body_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_galaxy_reference_validation_tests native-tests/galaxy_reference_validation_tests.cpp)
+  target_link_libraries(stellar_galaxy_reference_validation_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME galaxy_reference_validation_parity COMMAND stellar_galaxy_reference_validation_tests
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/galaxy-reference-validation.json")
+  set_tests_properties(galaxy_reference_validation_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_knowledge_persistence_tests native-tests/knowledge_persistence_tests.cpp)
+  target_link_libraries(stellar_knowledge_persistence_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME knowledge_persistence_parity COMMAND stellar_knowledge_persistence_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/knowledge-persistence.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(knowledge_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_legacy_campaign_recovery_tests native-tests/legacy_campaign_recovery_tests.cpp)
+  target_link_libraries(stellar_legacy_campaign_recovery_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME legacy_campaign_recovery_parity COMMAND stellar_legacy_campaign_recovery_tests
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/legacy-campaign-recovery.json")
+  set_tests_properties(legacy_campaign_recovery_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_planning_parity COMMAND stellar_strategic_planning_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-planning.json")

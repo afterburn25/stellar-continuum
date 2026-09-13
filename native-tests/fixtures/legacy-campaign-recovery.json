@@ -1,0 +1,6282 @@
+{
+  "Schema": "stellar.legacy-campaign-recovery.actual-source.v1",
+  "SourceHashesBefore": {
+    "src/Game/Persistence/CampaignSaveService.cs": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E",
+    "src/Game/Simulation/Knowledge/CivilizationKnowledgeState.cs": "C0B6961609938A86571416215955F4B4B8FCCEC4E20C0F9234B5056541FFD4DE",
+    "src/Game/Simulation/Generation/TechnologySeeder.cs": "E94D211F63C09A5F126311B5D079EADEBF1C9C5454441F42778C5ED79F824A10",
+    "src/Game/Simulation/Research/TechnologyRegistry.cs": "4A45A8DB32B773CDDF87B9EA2C4376B89FAFFC411684745C13AE2CCB49898BA2",
+    "src/Game/Simulation/Generation/ConstructionSeeder.cs": "6F379A5922CEFDA86AAF6D2A52BBDD16F532D79EBB8D1EF4E2F73A3CF1CA8A28",
+    "src/Game/Simulation/Construction/ConstructionRegistry.cs": "E48216C70FAC941E9890C6C0B93EABEA579D9A0AE8EC07F6077C988D1FA6C0FE",
+    "src/Game/Simulation/Shipbuilding/ShipDesignDefinition.cs": "E5514273ADBEBE2D6B5EBE2FFC3B7636354F0A99E9C6FF0D62CA6F69570F6486",
+    "src/Game/Simulation/Combat/CombatProfiles.cs": "48A2732D19CAE8D0D1DDAB4A52E1DBFFBDB6DC94014180A2734877D6EF6FCB92",
+    "src/Game/Simulation/Species/SpeciesCatalog.cs": "077626054A9CDAA68C104AD6BF9405A73BB21D9F0CBC1CDBE3E6A9C55D3F5AC7",
+    "src/Game/Simulation/Models/FleetState.cs": "0DC7867FA41C35FD7E61AC0DAA004652198B49E856E3D7E654270560E2163AE0"
+  },
+  "SourceHashesAfter": {
+    "src/Game/Persistence/CampaignSaveService.cs": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E",
+    "src/Game/Simulation/Knowledge/CivilizationKnowledgeState.cs": "C0B6961609938A86571416215955F4B4B8FCCEC4E20C0F9234B5056541FFD4DE",
+    "src/Game/Simulation/Generation/TechnologySeeder.cs": "E94D211F63C09A5F126311B5D079EADEBF1C9C5454441F42778C5ED79F824A10",
+    "src/Game/Simulation/Research/TechnologyRegistry.cs": "4A45A8DB32B773CDDF87B9EA2C4376B89FAFFC411684745C13AE2CCB49898BA2",
+    "src/Game/Simulation/Generation/ConstructionSeeder.cs": "6F379A5922CEFDA86AAF6D2A52BBDD16F532D79EBB8D1EF4E2F73A3CF1CA8A28",
+    "src/Game/Simulation/Construction/ConstructionRegistry.cs": "E48216C70FAC941E9890C6C0B93EABEA579D9A0AE8EC07F6077C988D1FA6C0FE",
+    "src/Game/Simulation/Shipbuilding/ShipDesignDefinition.cs": "E5514273ADBEBE2D6B5EBE2FFC3B7636354F0A99E9C6FF0D62CA6F69570F6486",
+    "src/Game/Simulation/Combat/CombatProfiles.cs": "48A2732D19CAE8D0D1DDAB4A52E1DBFFBDB6DC94014180A2734877D6EF6FCB92",
+    "src/Game/Simulation/Species/SpeciesCatalog.cs": "077626054A9CDAA68C104AD6BF9405A73BB21D9F0CBC1CDBE3E6A9C55D3F5AC7",
+    "src/Game/Simulation/Models/FleetState.cs": "0DC7867FA41C35FD7E61AC0DAA004652198B49E856E3D7E654270560E2163AE0"
+  },
+  "RowCount": 28,
+  "Rows": [
+    {
+      "Name": "knowledge-empty",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [],
+      "SystemsAfter": [],
+      "CivilizationsBefore": [],
+      "CivilizationsAfter": [],
+      "Result": [],
+      "Error": null
+    },
+    {
+      "Name": "knowledge-ordinary-95-boundary",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 94.999,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 95,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 4,
+          "Name": "S4",
+          "Position": {
+            "X": 95.001,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 94.999,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 95,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 4,
+          "Name": "S4",
+          "Position": {
+            "X": 95.001,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "KnownSystems": [
+            1,
+            2,
+            3
+          ],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            },
+            {
+              "SystemId": 3,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "knowledge-ancient-420-boundary",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 419.999,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 420,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 4,
+          "Name": "S4",
+          "Position": {
+            "X": 420.001,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 419.999,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 420,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 4,
+          "Name": "S4",
+          "Position": {
+            "X": 420.001,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "KnownSystems": [
+            1,
+            2,
+            3
+          ],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            },
+            {
+              "SystemId": 3,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "knowledge-seeded-ancient-flag-controls-range",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 200,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 200,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "KnownSystems": [
+            1,
+            2
+          ],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "knowledge-duplicate-civilization-id-merges",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 50,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 400,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 50,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 3,
+          "Name": "S3",
+          "Position": {
+            "X": 400,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 7,
+          "Name": "C7",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 7,
+          "Name": "C7",
+          "HomeSystemId": 3,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 7,
+          "Name": "C7",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 7,
+          "Name": "C7",
+          "HomeSystemId": 3,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 7,
+          "KnownSystems": [
+            1,
+            2,
+            3
+          ],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            },
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        },
+        {
+          "CivilizationId": 7,
+          "KnownSystems": [
+            1,
+            2,
+            3
+          ],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            },
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "knowledge-unknown-home-operation",
+      "Operation": "InitialKnowledge",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 99,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 99,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Unknown sensor origin system 99."
+      }
+    },
+    {
+      "Name": "technology-empty",
+      "Operation": "MigratedTechnology",
+      "CivilizationsBefore": [],
+      "CivilizationsAfter": [],
+      "Result": [],
+      "Error": null
+    },
+    {
+      "Name": "technology-stage-and-duplicate-id-matrix",
+      "Operation": "MigratedTechnology",
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 3,
+          "Name": "C3",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "C4",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 3,
+          "Name": "C3",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "C4",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 3,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 4,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-empty",
+      "Operation": "MigratedConstruction",
+      "CivilizationsBefore": [],
+      "CivilizationsAfter": [],
+      "Result": [],
+      "Error": null
+    },
+    {
+      "Name": "construction-stage-flag-and-duplicate-id-matrix",
+      "Operation": "MigratedConstruction",
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 3,
+          "Name": "C3",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "C4",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 3,
+          "Name": "C3",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "C4",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": []
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "research_network",
+            "industrial_automation",
+            "orbital_launch_complex",
+            "orbital_shipyard",
+            "asteroid_resource_network",
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": []
+        },
+        {
+          "CivilizationId": 3,
+          "CompletedProjectIds": [
+            "research_network",
+            "industrial_automation",
+            "orbital_launch_complex",
+            "orbital_shipyard",
+            "asteroid_resource_network",
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": []
+        },
+        {
+          "CivilizationId": 4,
+          "CompletedProjectIds": [
+            "research_network",
+            "industrial_automation",
+            "orbital_launch_complex",
+            "orbital_shipyard",
+            "asteroid_resource_network",
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": []
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": []
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-player-new-defaults",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-ai-name",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "Aurora",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "Aurora",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Aurora Pioneer",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-prewarp-noop",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": null
+    },
+    {
+      "Name": "expansion-disabled-noop",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": null
+    },
+    {
+      "Name": "expansion-existing-populated-noop",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 5,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "FleetsAfter": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 5,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-existing-zero-repaired-and-combat-normalized",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 0,
+          "EmbarkedPopulationSpeciesId": null,
+          "Combat": {
+            "ProfileId": "missing",
+            "Shields": -2,
+            "Armor": 999,
+            "Hull": "NaN",
+            "WeaponCooldownRemainingDays": -3,
+            "Order": 999,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": -4,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "FleetsAfter": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-inactive-existing-does-not-block",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": false,
+          "EmbarkedPopulationMillions": 0,
+          "EmbarkedPopulationSpeciesId": null,
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "FleetsAfter": [
+        {
+          "Id": 7,
+          "CivilizationId": 1,
+          "Name": "Fleet 7",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": false,
+          "EmbarkedPopulationMillions": 0,
+          "EmbarkedPopulationSpeciesId": null,
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        },
+        {
+          "Id": 8,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-no-source-noop",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [],
+      "ColoniesAfter": [],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": null
+    },
+    {
+      "Name": "expansion-below-threshold-noop",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 749.999,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 749.999,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": null
+    },
+    {
+      "Name": "expansion-exact-threshold",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 750,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-largest-stable-tie",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-finite-precedes-nan",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-all-nan-selects-first",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 11",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": "NaN",
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-unknown-species-data",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "unknown",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "unknown",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "source colony 10 references unknown population species ID \u0027unknown\u0027."
+      }
+    },
+    {
+      "Name": "expansion-unicode-blank-species-data",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "\u202F",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "\u202F",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "source colony 10 references unknown population species ID \u0027\u202F\u0027."
+      }
+    },
+    {
+      "Name": "expansion-population-deducted-before-missing-home",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [],
+      "SystemsAfter": [],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 99,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 99,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [],
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "expansion-int32-wrap-two-additions",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "Second",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "Second",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 20,
+          "CivilizationId": 2,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 20,
+          "CivilizationId": 2,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [
+        {
+          "Id": 2147483647,
+          "CivilizationId": 99,
+          "Name": "Fleet 2147483647",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": false,
+          "EmbarkedPopulationMillions": 0,
+          "EmbarkedPopulationSpeciesId": null,
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "FleetsAfter": [
+        {
+          "Id": 2147483647,
+          "CivilizationId": 99,
+          "Name": "Fleet 2147483647",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 0,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 22,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 135,
+          "IsActive": false,
+          "EmbarkedPopulationMillions": 0,
+          "EmbarkedPopulationSpeciesId": null,
+          "Combat": null,
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        },
+        {
+          "Id": -2147483648,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        },
+        {
+          "Id": -2147483647,
+          "CivilizationId": 2,
+          "Name": "Second Pioneer",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "CurrentSystemId": 2,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "expansion-nonwarp-before-warp-preserves-next-id",
+      "Operation": "ExpansionFleets",
+      "SystemsBefore": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "SystemsAfter": [
+        {
+          "Id": 1,
+          "Name": "S1",
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "S2",
+          "Position": {
+            "X": 24,
+            "Y": 0
+          },
+          "Archetype": 0,
+          "HasHabitableWorld": false,
+          "HasAnomaly": false,
+          "HasRareResource": false,
+          "HasPreWarpCivilization": false,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "CivilizationsBefore": [
+        {
+          "Id": 8,
+          "Name": "C8",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "CivilizationsAfter": [
+        {
+          "Id": 8,
+          "Name": "C8",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "ColoniesBefore": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 80,
+          "CivilizationId": 8,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 80",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "ColoniesAfter": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2250,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        },
+        {
+          "Id": 80,
+          "CivilizationId": 8,
+          "SystemId": 1,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 80",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 2500,
+          "Infrastructure": 1,
+          "Stability": 1,
+          "StoredFoodPopulationDaysMillions": 0,
+          "StoredWaterPopulationDaysMillions": 0,
+          "StoredExtractedMaterials": 0,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 1,
+          "SurfaceHubUpgradeDaysRemaining": 0,
+          "SurfaceBuildings": []
+        }
+      ],
+      "FleetsBefore": [],
+      "FleetsAfter": [
+        {
+          "Id": 0,
+          "CivilizationId": 1,
+          "Name": "Pioneer One",
+          "Role": 2,
+          "DesignId": null,
+          "Position": {
+            "X": 12,
+            "Y": 0
+          },
+          "CurrentSystemId": 1,
+          "DestinationSystemId": null,
+          "TransitPhase": 0,
+          "TransitOriginSystemId": null,
+          "TransitTargetSystemId": null,
+          "TransitProgress": 0,
+          "LocalTransitStart": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitPosition": {
+            "X": 0,
+            "Y": 0
+          },
+          "LocalTransitTarget": {
+            "X": 0,
+            "Y": 0
+          },
+          "PlannedRouteSystemIds": [],
+          "HoldRequested": false,
+          "ReturnToBaseRequested": false,
+          "ReturnToBaseFailureReason": null,
+          "MissionOrderRevision": 0,
+          "DestinationPlanetaryBodyId": null,
+          "PreventAutomaticSettlement": false,
+          "SettlementBodyId": null,
+          "SettlementDaysCompleted": 0,
+          "ReconnaissanceSystemId": null,
+          "ReconnaissanceDaysCompleted": 0,
+          "FreightTargetOutpostId": null,
+          "FreightHomeColonyId": null,
+          "CargoMaterialCapacity": 0,
+          "CargoMaterials": 0,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 360,
+          "FuelCapacityLightYears": 1000,
+          "FuelRemainingLightYears": 1000,
+          "SensorRange": 80,
+          "IsActive": true,
+          "EmbarkedPopulationMillions": 250,
+          "EmbarkedPopulationSpeciesId": "terran_baseline",
+          "Combat": {
+            "ProfileId": "civilian_heavy_v1",
+            "Shields": 0,
+            "Armor": 24,
+            "Hull": 105,
+            "WeaponCooldownRemainingDays": 0,
+            "Order": 0,
+            "TargetFleetId": null,
+            "DefendSystemId": null,
+            "RetreatProgressDays": 0,
+            "RetreatStarted": false,
+            "IsDisengaged": false,
+            "DisengagedSystemId": null
+          },
+          "TacticalLoadout": null,
+          "TacticalVessel": null
+        }
+      ],
+      "Error": null
+    }
+  ]
+}

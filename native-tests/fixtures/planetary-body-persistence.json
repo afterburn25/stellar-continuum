@@ -1,0 +1,5649 @@
+{
+  "SchemaVersion": 1,
+  "Authority": "actual private CampaignSaveService planetary-body adapters",
+  "SourceFiles": [
+    {
+      "Path": "Persistence/CampaignSaveService.cs",
+      "Sha256": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E"
+    },
+    {
+      "Path": "Simulation/Models/PlanetaryBodyState.cs",
+      "Sha256": "90766D35CF45825D4F0C35E21DF21021C45B64CAC7E0A18800F2746DA6BE50E9"
+    },
+    {
+      "Path": "Simulation/Models/StarSystemState.cs",
+      "Sha256": "4611F3B2EC2EBE4DEA1C1E666A75ECDF30E129F10F688459EE699EE5082A48BD"
+    }
+  ],
+  "RowCount": 32,
+  "Rows": [
+    {
+      "Name": "restore-missing-list",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": false,
+        "Bodies": null,
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": false,
+        "Bodies": null,
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": false,
+        "Bodies": null,
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Format v16 save is missing its authoritative planetary catalog.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-empty-list",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Format v16 save is missing its authoritative planetary catalog.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-null-item",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          null
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          null
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          null
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Format v16 planetary catalog contains a null body entry.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-valid-ordered",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 9,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 11,
+            "Name": "Body 9",
+            "Kind": 2,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 9,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 11,
+            "Name": "Body 9",
+            "Kind": 2,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 9,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 11,
+            "Name": "Body 9",
+            "Kind": 2,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 7,
+          "SystemId": 1,
+          "ParentBodyId": null,
+          "OrbitIndex": 9,
+          "Name": "Body 7",
+          "Kind": 0,
+          "RadiusEarth": 1.25,
+          "MassEarth": 2.5,
+          "Environment": {
+            "GravityG": 1.1,
+            "TemperatureKelvin": 280.25,
+            "PressureKPa": 101.5,
+            "Atmosphere": 1,
+            "AvailableSolvent": 1,
+            "RadiationHazard": 0.125,
+            "IsImmersedEnvironment": false,
+            "HasSolidSurface": true
+          },
+          "LegacyColonizationCandidate": true,
+          "HasRareResource": true,
+          "HasAnomaly": true,
+          "HasPreWarpCivilization": false,
+          "OrbitalEccentricity": 0.25,
+          "OrbitalInclinationDegrees": 17.5
+        },
+        {
+          "Id": 8,
+          "SystemId": 1,
+          "ParentBodyId": 7,
+          "OrbitIndex": 10,
+          "Name": "Body 8",
+          "Kind": 1,
+          "RadiusEarth": 1.25,
+          "MassEarth": 2.5,
+          "Environment": {
+            "GravityG": 1.1,
+            "TemperatureKelvin": 280.25,
+            "PressureKPa": 101.5,
+            "Atmosphere": 1,
+            "AvailableSolvent": 1,
+            "RadiationHazard": 0.125,
+            "IsImmersedEnvironment": false,
+            "HasSolidSurface": true
+          },
+          "LegacyColonizationCandidate": true,
+          "HasRareResource": true,
+          "HasAnomaly": true,
+          "HasPreWarpCivilization": false,
+          "OrbitalEccentricity": 0.25,
+          "OrbitalInclinationDegrees": 17.5
+        },
+        {
+          "Id": 9,
+          "SystemId": 1,
+          "ParentBodyId": null,
+          "OrbitIndex": 11,
+          "Name": "Body 9",
+          "Kind": 2,
+          "RadiusEarth": 1.25,
+          "MassEarth": 2.5,
+          "Environment": {
+            "GravityG": 1.1,
+            "TemperatureKelvin": 280.25,
+            "PressureKPa": 101.5,
+            "Atmosphere": 1,
+            "AvailableSolvent": 1,
+            "RadiationHazard": 0.125,
+            "IsImmersedEnvironment": false,
+            "HasSolidSurface": true
+          },
+          "LegacyColonizationCandidate": true,
+          "HasRareResource": true,
+          "HasAnomaly": true,
+          "HasPreWarpCivilization": false,
+          "OrbitalEccentricity": 0.25,
+          "OrbitalInclinationDegrees": 17.5
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null,
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-duplicate-id",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "The authoritative planetary catalog contains duplicate body IDs.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-unknown-kind",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 99,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 99,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 99,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an unknown body kind.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-null-environment",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": null,
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": null,
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": null,
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid environment.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-unknown-atmosphere",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 99,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 99,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 99,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid environment.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-unknown-solvent",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": -1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": -1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": -1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid environment.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-negative-id",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": -1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": -1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": -1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body -1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body IDs must be non-negative."
+    },
+    {
+      "Name": "restore-negative-system-id",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": -1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": -1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": -1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body system IDs must be non-negative."
+    },
+    {
+      "Name": "restore-negative-orbit",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": -1,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": -1,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": -1,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body orbit indices must be non-negative."
+    },
+    {
+      "Name": "restore-null-name",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": null,
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": null,
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": null,
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary bodies require a name."
+    },
+    {
+      "Name": "restore-unicode-blank-name",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "\u2003",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "\u2003",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "\u2003",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary bodies require a name."
+    },
+    {
+      "Name": "restore-radius-zero",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 0,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 0,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 0,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body radius must be finite and positive."
+    },
+    {
+      "Name": "restore-mass-nan",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": "NaN",
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": "NaN",
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": "NaN",
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body mass must be finite and positive."
+    },
+    {
+      "Name": "restore-gravity-negative",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": -1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": -1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": -1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary gravity must be finite and non-negative."
+    },
+    {
+      "Name": "restore-temperature-infinity",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": "Infinity",
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": "Infinity",
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": "Infinity",
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary temperature must be finite and above absolute zero."
+    },
+    {
+      "Name": "restore-pressure-negative",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": -1,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": -1,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": -1,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary pressure must be finite and non-negative."
+    },
+    {
+      "Name": "restore-radiation-over-one",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 1.01,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 1.01,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 1.01,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary radiation hazard must be between 0 and 1."
+    },
+    {
+      "Name": "restore-eccentricity-one",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 1,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 1,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 1,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body orbital eccentricity must be finite and in [0, 1)."
+    },
+    {
+      "Name": "restore-inclination-over-180",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 180.01
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 180.01
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 180.01
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary body orbital inclination must be finite and between 0 and 180 degrees."
+    },
+    {
+      "Name": "restore-unknown-system",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 4,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 4,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 4,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 references unknown system 4.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-parent-cycle",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 1,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 1,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 1,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 belongs to a cyclic parent chain.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-primary-with-parent",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Primary planetary bodies cannot have a parent body."
+    },
+    {
+      "Name": "restore-moon-without-parent",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Moons require a parent body."
+    },
+    {
+      "Name": "restore-missing-parent",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 99,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 99,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 99,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid or cross-system parent.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-parent-is-moon",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 3,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 3,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 5,
+            "Name": "Body 3",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 3,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 3,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 5,
+            "Name": "Body 3",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 1,
+            "ParentBodyId": 3,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 3,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 5,
+            "Name": "Body 3",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid or cross-system parent.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "restore-cross-system-parent",
+      "Operation": "Restore",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 2,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          },
+          {
+            "Id": 2,
+            "Name": "System 2",
+            "X": 2,
+            "Y": -2,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 2,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          },
+          {
+            "Id": 2,
+            "Name": "System 2",
+            "X": 2,
+            "Y": -2,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": 2,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 2,
+            "SystemId": 2,
+            "ParentBodyId": null,
+            "OrbitIndex": 4,
+            "Name": "Body 2",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          },
+          {
+            "Id": 2,
+            "Name": "System 2",
+            "X": 2,
+            "Y": -2,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has an invalid or cross-system parent.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "capture-valid-ordered",
+      "Operation": "Capture",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 8,
+            "SystemId": 1,
+            "ParentBodyId": 7,
+            "OrbitIndex": 10,
+            "Name": "Body 8",
+            "Kind": 1,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          },
+          {
+            "Id": 7,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 9,
+            "Name": "Body 7",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": 0.125,
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 8,
+          "SystemId": 1,
+          "ParentBodyId": 7,
+          "OrbitIndex": 10,
+          "Name": "Body 8",
+          "Kind": 1,
+          "RadiusEarth": 1.25,
+          "MassEarth": 2.5,
+          "Environment": {
+            "GravityG": 1.1,
+            "TemperatureKelvin": 280.25,
+            "PressureKPa": 101.5,
+            "Atmosphere": 1,
+            "AvailableSolvent": 1,
+            "RadiationHazard": 0.125,
+            "IsImmersedEnvironment": false,
+            "HasSolidSurface": true
+          },
+          "LegacyColonizationCandidate": true,
+          "HasRareResource": true,
+          "HasAnomaly": true,
+          "HasPreWarpCivilization": false,
+          "OrbitalEccentricity": 0.25,
+          "OrbitalInclinationDegrees": 17.5
+        },
+        {
+          "Id": 7,
+          "SystemId": 1,
+          "ParentBodyId": null,
+          "OrbitIndex": 9,
+          "Name": "Body 7",
+          "Kind": 0,
+          "RadiusEarth": 1.25,
+          "MassEarth": 2.5,
+          "Environment": {
+            "GravityG": 1.1,
+            "TemperatureKelvin": 280.25,
+            "PressureKPa": 101.5,
+            "Atmosphere": 1,
+            "AvailableSolvent": 1,
+            "RadiationHazard": 0.125,
+            "IsImmersedEnvironment": false,
+            "HasSolidSurface": true
+          },
+          "LegacyColonizationCandidate": true,
+          "HasRareResource": true,
+          "HasAnomaly": true,
+          "HasPreWarpCivilization": false,
+          "OrbitalEccentricity": 0.25,
+          "OrbitalInclinationDegrees": 17.5
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null,
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "capture-empty",
+      "Operation": "Capture",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "The authoritative planetary catalog is missing or empty.",
+      "ErrorInnerType": null,
+      "ErrorInnerMessage": null
+    },
+    {
+      "Name": "capture-invalid-before-projection",
+      "Operation": "Capture",
+      "Input": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": "NaN",
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Before": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": "NaN",
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "After": {
+        "BodiesPresent": true,
+        "Bodies": [
+          {
+            "Id": 1,
+            "SystemId": 1,
+            "ParentBodyId": null,
+            "OrbitIndex": 3,
+            "Name": "Body 1",
+            "Kind": 0,
+            "RadiusEarth": 1.25,
+            "MassEarth": 2.5,
+            "Environment": {
+              "GravityG": 1.1,
+              "TemperatureKelvin": 280.25,
+              "PressureKPa": 101.5,
+              "Atmosphere": 1,
+              "AvailableSolvent": 1,
+              "RadiationHazard": "NaN",
+              "IsImmersedEnvironment": false,
+              "HasSolidSurface": true
+            },
+            "LegacyColonizationCandidate": true,
+            "HasRareResource": true,
+            "HasAnomaly": true,
+            "HasPreWarpCivilization": false,
+            "OrbitalEccentricity": 0.25,
+            "OrbitalInclinationDegrees": 17.5
+          }
+        ],
+        "Systems": [
+          {
+            "Id": 1,
+            "Name": "System 1",
+            "X": 1,
+            "Y": -1,
+            "Archetype": 0,
+            "HasHabitableWorld": false,
+            "HasAnomaly": false,
+            "HasRareResource": false,
+            "HasPreWarpCivilization": false,
+            "CatalogPresetId": null,
+            "StellarClass": null,
+            "SecondaryStellarClass": null,
+            "TertiaryStellarClass": null,
+            "GalacticDepthLightYears": null,
+            "StellarCatalogId": null
+          }
+        ]
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Planetary body 1 has invalid physical values.",
+      "ErrorInnerType": "InvalidOperationException",
+      "ErrorInnerMessage": "Planetary radiation hazard must be between 0 and 1."
+    }
+  ]
+}

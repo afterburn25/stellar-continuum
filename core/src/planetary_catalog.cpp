@@ -1,17 +1,50 @@
 #include <stellar/core/planetary_catalog.hpp>
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
+#include <string_view>
 
 namespace stellar::core {
 namespace {
 
 [[noreturn]] void invalid(const char* message) { throw std::invalid_argument{message}; }
 
-bool is_blank(const std::string& value) {
-    return value.empty() || std::all_of(value.begin(), value.end(), [](unsigned char c) { return std::isspace(c) != 0; });
+bool whitespace(std::uint32_t value) noexcept {
+    return (value >= 0x09 && value <= 0x0d) || value == 0x20 || value == 0x85 || value == 0xa0 ||
+        value == 0x1680 || (value >= 0x2000 && value <= 0x200a) || value == 0x2028 || value == 0x2029 ||
+        value == 0x202f || value == 0x205f || value == 0x3000;
+}
+
+bool is_blank(std::string_view value) {
+    if (value.empty()) return true;
+    while (!value.empty()) {
+        const auto first = static_cast<unsigned char>(value.front());
+        std::uint32_t code_point = first;
+        std::size_t length = 1;
+        if ((first & 0xe0) == 0xc0) {
+            code_point = first & 0x1f;
+            length = 2;
+        } else if ((first & 0xf0) == 0xe0) {
+            code_point = first & 0x0f;
+            length = 3;
+        } else if ((first & 0xf8) == 0xf0) {
+            code_point = first & 0x07;
+            length = 4;
+        } else if (first >= 0x80) {
+            return false;
+        }
+        if (value.size() < length) return false;
+        for (std::size_t index = 1; index < length; ++index) {
+            const auto continuation = static_cast<unsigned char>(value[index]);
+            if ((continuation & 0xc0) != 0x80) return false;
+            code_point = (code_point << 6) | (continuation & 0x3f);
+        }
+        if (!whitespace(code_point)) return false;
+        value.remove_prefix(length);
+    }
+    return true;
 }
 
 bool valid(PlanetaryBodyKind value) {
