@@ -81,3 +81,5 @@ documented malformed-input limitations remain unchanged, and fallback does not
 reconstruct expertise or recalculate project readiness.
 
 The combined maintained engine 0.1.25 build passed 63/63 CTest and 20/20 Python checks in `work/native-054-recovery-testing.log`. The snapshot replay target is Windows-only because its retained fixture hashing uses BCrypt; production snapshot code has no Windows dependency. Exact committed package verification follows separately.
+
+The exact clean 0.1.25 export of `aa3eaa834bd9c8570bde4d70b4265f47da1a5d2a` passed the combined 63/20 checks and all retained relocated checks. Package `StellarContinuum-windows-benchmark-aa3eaa83-20260913T120628476660Z` records `sourceDirty: false` and seven sealed runtime files; see `work/native-025-clean.log`.

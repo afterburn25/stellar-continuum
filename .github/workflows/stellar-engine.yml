@@ -66,6 +66,8 @@ on:
       - "tests/Stellar.AdaptiveResearchStartingProfiles.ParityGenerator/**"
       - "tests/Stellar.AdaptiveResearchAuthority.ParityGenerator/**"
       - "tests/Stellar.AdaptiveResearchExpertiseSnapshot.ParityGenerator/**"
+      - "tests/Stellar.AdaptiveResearchPressure.ParityGenerator/**"
+      - "tests/Stellar.AdaptiveResearchAgenda.ParityGenerator/**"
       - "data/astronomy/**"
       - "data/research/**"
       - "third_party/**"

@@ -1,6 +1,7 @@
 #include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/adaptive_research_state.hpp>
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
+#include <stellar/core/detail/adaptive_research_weak_state_table.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -289,6 +290,8 @@ std::int64_t checked_next_research_state_revision(std::int64_t value) {
 } // namespace detail
 
 struct AdaptiveResearchCivilizationState::Storage {
+  std::shared_ptr<const detail::AdaptiveResearchStateIdentityToken> identity =
+      std::make_shared<const detail::AdaptiveResearchStateIdentityToken>();
   std::string civilization_id, directed_stage;
   std::int64_t revision{}, view_revision{};
   double labs{};
@@ -336,6 +339,11 @@ struct AdaptiveResearchCivilizationState::Storage {
   }
 };
 
+const std::shared_ptr<const detail::AdaptiveResearchStateIdentityToken> &
+detail::AdaptiveResearchStateIdentityAccess::token(
+    const AdaptiveResearchCivilizationState &state) noexcept {
+  return state.storage_->identity;
+}
 bool ResearchNodeRuntimeState::counts_as_established_knowledge()
     const noexcept {
   return maturity == ResearchMaturity::mature ||
@@ -365,11 +373,18 @@ AdaptiveResearchCivilizationState &AdaptiveResearchCivilizationState::operator=(
     AdaptiveResearchCivilizationState &&) noexcept = default;
 AdaptiveResearchCivilizationState::AdaptiveResearchCivilizationState(
     const AdaptiveResearchCivilizationState &o)
-    : storage_(std::make_unique<Storage>(*o.storage_)) {}
+    : storage_(std::make_unique<Storage>(*o.storage_)) {
+  storage_->identity =
+      std::make_shared<const detail::AdaptiveResearchStateIdentityToken>();
+}
 AdaptiveResearchCivilizationState &AdaptiveResearchCivilizationState::operator=(
     const AdaptiveResearchCivilizationState &o) {
-  if (this != &o)
-    storage_ = std::make_unique<Storage>(*o.storage_);
+  if (this != &o) {
+    auto replacement = std::make_unique<Storage>(*o.storage_);
+    replacement->identity =
+        std::make_shared<const detail::AdaptiveResearchStateIdentityToken>();
+    storage_ = std::move(replacement);
+  }
   return *this;
 }
 const std::string &

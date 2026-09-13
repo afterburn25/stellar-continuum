@@ -2,6 +2,7 @@
 
 #include <stellar/core/detail/adaptive_research_expertise_state_writer.hpp>
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
+#include <stellar/core/detail/legacy_number_format.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -365,55 +366,6 @@ Enum enum_value(const Json &value,
   json_fail("Unknown Adaptive Research v2 snapshot enum value.");
 }
 
-std::string dotnet_general(double value) {
-  char buffer[64]{};
-  const auto converted = std::to_chars(
-      buffer, buffer + sizeof(buffer), value, std::chars_format::general);
-  std::string result(buffer, converted.ptr);
-  const auto exponent_position = result.find_first_of("eE");
-  if (exponent_position == std::string::npos) return result;
-  int exponent{};
-  const auto raw_exponent = std::string_view(result).substr(exponent_position + 1);
-  const auto exponent_text = raw_exponent.starts_with('+')
-                                 ? raw_exponent.substr(1)
-                                 : raw_exponent;
-  const auto parsed = std::from_chars(exponent_text.data(),
-                                      exponent_text.data() + exponent_text.size(),
-                                      exponent);
-  if (parsed.ec != std::errc{}) return result;
-  if (raw_exponent.starts_with('-')) exponent = -std::abs(exponent);
-  if (exponent >= -4 && exponent < 17) {
-    const bool negative = result.front() == '-';
-    auto mantissa = result.substr(negative ? 1 : 0,
-                                  exponent_position - (negative ? 1 : 0));
-    mantissa.erase(std::remove(mantissa.begin(), mantissa.end(), '.'),
-                   mantissa.end());
-    const auto decimal = exponent + 1;
-    std::string fixed = negative ? "-" : "";
-    if (decimal <= 0) {
-      fixed += "0." + std::string(static_cast<std::size_t>(-decimal), '0') +
-               mantissa;
-    } else if (static_cast<std::size_t>(decimal) >= mantissa.size()) {
-      fixed += mantissa +
-               std::string(static_cast<std::size_t>(decimal) - mantissa.size(),
-                           '0');
-    } else {
-      fixed += mantissa.substr(0, static_cast<std::size_t>(decimal)) + "." +
-               mantissa.substr(static_cast<std::size_t>(decimal));
-    }
-    return fixed;
-  }
-  result[exponent_position] = 'E';
-  const auto sign_position = exponent_position + 1;
-  const auto digits_position = sign_position < result.size() &&
-                                       (result[sign_position] == '+' ||
-                                        result[sign_position] == '-')
-                                   ? sign_position + 1
-                                   : sign_position;
-  if (result.size() - digits_position == 1)
-    result.insert(digits_position, 1, '0');
-  return result;
-}
 
 AdaptiveResearchExpertiseSnapshot parse_expertise(const Json &value) {
   if (!value.is_object())
@@ -490,7 +442,7 @@ void validate_competence(double value, std::string_view field_id,
     } else if (value == -std::numeric_limits<double>::infinity()) {
       formatted = "-Infinity";
     } else {
-      formatted = dotnet_general(value);
+      formatted = detail::legacy_general(value);
     }
     fail("Invalid " + std::string(label) + " " + std::string(component) +
          " competence " + formatted + " for field '" +

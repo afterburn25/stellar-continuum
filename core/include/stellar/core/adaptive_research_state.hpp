@@ -67,7 +67,8 @@ struct ResearchApplicabilityContextSnapshot {
 
 namespace detail {
 class AdaptiveResearchStateWriter;
-}
+class AdaptiveResearchStateIdentityAccess;
+} // namespace detail
 
 class AdaptiveResearchCivilizationState {
 public:
@@ -153,6 +154,7 @@ private:
   struct Storage;
   std::unique_ptr<Storage> storage_;
   friend class detail::AdaptiveResearchStateWriter;
+  friend class detail::AdaptiveResearchStateIdentityAccess;
 };
 
 } // namespace stellar::core

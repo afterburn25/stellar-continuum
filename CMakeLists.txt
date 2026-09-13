@@ -54,7 +54,8 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/adaptive_research_expertise_state.cpp
   core/src/adaptive_research_readiness.cpp core/src/adaptive_research_expertise_service.cpp
   core/src/adaptive_research_starting_profiles.cpp
-  core/src/adaptive_research_authority.cpp core/src/adaptive_research_expertise_snapshot.cpp)
+  core/src/adaptive_research_authority.cpp core/src/adaptive_research_expertise_snapshot.cpp
+  core/src/adaptive_research_pressure.cpp core/src/adaptive_research_agenda.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp app/fresh_campaign_output.cpp)
@@ -347,6 +348,20 @@ if(BUILD_TESTING)
       "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-expertise-snapshot.json"
       "${CMAKE_SOURCE_DIR}/data/research/v1")
     set_tests_properties(adaptive_research_expertise_snapshot_parity PROPERTIES TIMEOUT 180)
+  endif()
+  add_executable(stellar_research_pressure_tests native-tests/adaptive_research_pressure_tests.cpp)
+  target_link_libraries(stellar_research_pressure_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_pressure_parity COMMAND stellar_research_pressure_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-pressure.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_pressure_parity PROPERTIES TIMEOUT 180)
+  if(WIN32)
+    add_executable(stellar_research_agenda_tests native-tests/adaptive_research_agenda_tests.cpp)
+    target_link_libraries(stellar_research_agenda_tests PRIVATE stellar_core stellar_json bcrypt)
+    add_test(NAME adaptive_research_agenda_parity COMMAND stellar_research_agenda_tests
+      "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-agenda.json"
+      "${CMAKE_SOURCE_DIR}/data/research/v1")
+    set_tests_properties(adaptive_research_agenda_parity PROPERTIES TIMEOUT 180)
   endif()
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)

@@ -1,6 +1,6 @@
 # Adaptive Research and integrated campaign migration boundary
 
-Status: foundations and calculated authority are implemented through gate 053; research recovery and retained strategic support are being migrated. The native legacy campaign step (038) does not establish integrated Adaptive Research parity. Preserve the C# authority and `data/research/v1` unchanged while building the native implementation.
+Status: foundations, calculated authority, standalone schema-2 research recovery, pressure support and visible research agendas are implemented through gate 056. Foreign intake and outcomes are being migrated in gates 057/058. The native legacy campaign step (038) does not establish integrated Adaptive Research parity. Preserve the C# authority and `data/research/v1` unchanged while building the native implementation.
 
 ## Actual player composition
 
@@ -85,6 +85,16 @@ Preserve component order, optional components, stable ties among the three stron
 
 Evidence must include unchanged cached results, each revision source independently forcing a rebuild, runtime/state identity independence, priority changes and default removal, active/paused exclusion, nonempty allowed and blocked shortlists, all recommendation branches, and complete ordered utility components and explanations. A native shortcut that invalidates a known state key directly is acceptable instead of searching the weak table for the corresponding support object; no simulation outcome may depend on weak-table enumeration.
 
+## Foreign-technology intake and retained assessments
+
+The foreign-technology runtime borrows the calculated authority and its immutable foreign catalog, and owns a weakly keyed sparse support table. An unknown assessment is an owned default result, not a newly inserted record. Low-level writes validate confidence/integrity, preserve dictionary order and increment support revisions; embedded reference lists are distinct and UTF-16 ordinal sorted. Do not materialize unseen assets or change an existing assessment's source lineage.
+
+Package intake validates references, integrity, translation/training, component IDs, rights, fields, constraints and evidence in the source order before checking whether the package is already held. It then forwards each evidence item through the authority, creates component/asset-type/field tacit assets in input order with source deduplication points, adds the package, and updates the retained assessment. Preserve earlier evidence, tacit and package writes if a later operation fails; do not add transaction rollback or silently replace the original forwarding sequence. Acquired packages do not directly grant native technology maturity or deployment capability.
+
+Understanding and native adaptation cannot regress through the corresponding assessment commands. Operability and reproduction can regress when factual dependencies change. Preserve the distinct confidence gates and exact comparison boundaries; unknown enum values and unvalidated assessment years must not acquire new rules during this port. Advancing package tacit knowledge walks stored asset references, skips missing assets, validates adjacent stages/translation/training for each present asset, then forwards that asset through the authority. Copy each asset before mutation and retain partial progress if a later asset fails.
+
+Recipient value is a pure assessment of the provided context and package integrity. It produces separate research, operational and brokerage values, not a universal currency price. Test nonempty intake, repeated evidence, duplicate packages, existing lineage behavior, confidence boundaries, regression rules, constraint changes, partial assimilation, full core/expertise/support revisions, input aliases and independent state/runtime identities against the actual source. Full foreign snapshot and strategic recovery remain later gates.
+
 ## State and recovery details
 
 `AdaptiveResearchState.cs` keeps sparse node/project/evidence state and increments both state and materialized-view revisions on mutation. Duplicate evidence is rejected without a revision change; replacing node/project records writes the next revision even when other values match. No-op pressure, facility, trait and applicability operations have different revision rules. Keep mutation behind the research authority rather than exposing mutable maps to presentation.
@@ -102,3 +112,25 @@ Catalog coverage includes required-file absence, malformed JSON/types, duplicate
 The export manifest must explicitly include the research data needed by the configured native runtime. Relocated execution must resolve those assets from the package, not the repository working directory. Missing or corrupt data must report the concrete path and a nonzero terminal exit through the maintained executable; no scratch executable retry loop or uncaught crash dialog.
 
 Do not claim player-save compatibility until Adaptive Research state, pending outcomes, escrow, once-only grants and diplomacy state round-trip with the original save schema. Do not remove the Godot/C# path or merge the migration into integration before the broader gameplay and presentation parity gates pass.
+
+
+## Outcome resolution: source contract for gate 058
+
+Outcome resolution borrows the stable authority, outcome catalog and optional pressure runtime. Each runtime keeps independent weak state support using the civilization storage identity introduced in gate 055. The outcome catalog retains a borrowed research catalog and owns its policy and precomputed side-discovery indexes. All temporary constructor dependencies must be rejected, including all three slots of the optional-pressure overload. Outcome recovery will be verified separately.
+
+Planning validates campaign seed and checkpoint, resolves node/profile, then creates support and reads the attempt index. It adjusts only the three risky outcome weights when a project is active; removed weight goes to the first available Progress, PartialSuccess or HypothesisRefined entry, with the source enum-default behavior preserved. Selection sorts outcome enum keys and uses target <= cumulative weight. The UTF-8 key is catalogId|campaignSeed|civilizationId|nodeId|checkpointId|attemptIndex|stream; SHA-256's first eight bytes are interpreted big-endian and divided by 2^64 as a double. This deterministic behavior must be proved against actual C# rolls and standard SHA vectors.
+
+Side-discovery candidates are indexed at catalog load: direct children, alternative solutions, same-family/depth neighbors, then shared-field neighbors, each source-sorted and bounded in that order. Already materialized nodes are skipped by a deterministic circular scan. Discovery creates Investigable or Hypothesized state using normal scientific eligibility; it does not skip requirements or grant Mature technology. The policy's max-materialized setting is preserved even though this source resolves at most one candidate.
+
+Setback/partial success modify stage progress while preserving total work. Refined and anomalous results return the project to Experimental, clear pause and retain the configured progress fraction. Anomaly reports pressure only after those mutations. Accepted outcomes then apply competence, record history and append OutcomeResolved; failures after early changes retain source partial mutations. Current year is not given new validation. A side-discovery event precedes OutcomeResolved; hazard reports do not invent damage or casualties.
+
+History updates the per-node summary before appending its monotonic sequence record, trims global history before per-node history, then increments support revision. Summaries remain after detailed records are trimmed. RestoreSummary and RestoreRecord preserve source replacement/appending behavior. Integer overflow must never become C++ undefined behavior; any bounded native safety difference must be identified separately from matching source cases.
+
+
+## Foreign discovery: coordinator contract for the next gate
+
+Discovery borrows the stable authority, foreign-technology runtime and immutable discovery catalog. It owns no extra per-civilization state. Observe/acquire/analysis/adaptation first complete the factual foreign-runtime call, then reevaluate awareness; retain factual mutations if reevaluation fails. Copy caller-owned reference/context/package data before that first mutation so C++ references cannot dangle across the second call.
+
+Reevaluation first creates/reads foreign support and requires an existing assessment. Evidence candidates use only the authoritative evidence index and nodes accepting foreign_contact or observation awareness. Method candidates come only from the validated policy. Desired states merge at the higher rank, retaining the first reason on ties. Process desired entries by graph depth then UTF-16 ordinal node ID, checking scientific eligibility against the state produced by earlier entries in that same pass.
+
+Normal scientific requirements can promote awareness to Investigable, never Experimental or above. Preserve existing Experimental, Demonstrated, Engineering, Mature and established/archive history. A disproven archive can reopen when the source allows; other archived records remain unchanged. New awareness clears stage work, retains existing total work, and records foreign_awareness provenance only below Investigable. Returned events own previous/new state and reasons. Catalog evidence states remain exactly Rumored/Hypothesized; per-rule node IDs are distinct in input order and must name public canonical nodes.

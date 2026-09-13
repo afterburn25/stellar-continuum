@@ -11,6 +11,60 @@
 
 namespace stellar::core {
 namespace detail {
+std::string legacy_general(double value) {
+  if (std::isnan(value)) return "NaN";
+  if (std::isinf(value)) return std::signbit(value) ? "-Infinity" : "Infinity";
+  char buffer[64]{};
+  const auto converted = std::to_chars(
+      buffer, buffer + sizeof(buffer), value, std::chars_format::general);
+  if (converted.ec != std::errc{})
+    throw std::runtime_error("Legacy general number could not be formatted.");
+  std::string result(buffer, converted.ptr);
+  const auto exponent_position = result.find_first_of("eE");
+  if (exponent_position == std::string::npos) return result;
+  int exponent{};
+  const auto raw_exponent = std::string_view(result).substr(exponent_position + 1);
+  const auto exponent_text = raw_exponent.starts_with('+')
+                                 ? raw_exponent.substr(1)
+                                 : raw_exponent;
+  const auto parsed = std::from_chars(exponent_text.data(),
+                                      exponent_text.data() + exponent_text.size(),
+                                      exponent);
+  if (parsed.ec != std::errc{}) return result;
+  if (raw_exponent.starts_with('-')) exponent = -std::abs(exponent);
+  if (exponent >= -4 && exponent < 17) {
+    const bool negative = result.front() == '-';
+    auto mantissa = result.substr(negative ? 1 : 0,
+                                  exponent_position - (negative ? 1 : 0));
+    mantissa.erase(std::remove(mantissa.begin(), mantissa.end(), '.'),
+                   mantissa.end());
+    const auto decimal = exponent + 1;
+    std::string fixed = negative ? "-" : "";
+    if (decimal <= 0) {
+      fixed += "0." + std::string(static_cast<std::size_t>(-decimal), '0') +
+               mantissa;
+    } else if (static_cast<std::size_t>(decimal) >= mantissa.size()) {
+      fixed += mantissa +
+               std::string(static_cast<std::size_t>(decimal) - mantissa.size(),
+                           '0');
+    } else {
+      fixed += mantissa.substr(0, static_cast<std::size_t>(decimal)) + "." +
+               mantissa.substr(static_cast<std::size_t>(decimal));
+    }
+    return fixed;
+  }
+  result[exponent_position] = 'E';
+  const auto sign_position = exponent_position + 1;
+  const auto digits_position = sign_position < result.size() &&
+                                       (result[sign_position] == '+' ||
+                                        result[sign_position] == '-')
+                                   ? sign_position + 1
+                                   : sign_position;
+  if (result.size() - digits_position == 1)
+    result.insert(digits_position, 1, '0');
+  return result;
+}
+
 std::string legacy_custom_fixed(double value, int minimum_fraction_digits, int maximum_fraction_digits) {
     if (minimum_fraction_digits < 0 || maximum_fraction_digits < minimum_fraction_digits || maximum_fraction_digits > 9)
         throw std::invalid_argument("Custom fixed fraction digits are invalid.");
