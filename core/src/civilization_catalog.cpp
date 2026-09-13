@@ -1,4 +1,5 @@
 #include <stellar/core/civilization_catalog.hpp>
+#include <stellar/core/detail/civilization_founding_roster.hpp>
 #include <stellar/core/legacy_random.hpp>
 
 #include <algorithm>
@@ -63,25 +64,6 @@ std::vector<const Template*> randomized_deck(const Template (&templates)[N], int
     return result;
 }
 
-std::vector<CivilizationOffice> founding_roster(int civilization_id, bool human) {
-    struct Office { const char* office; const char* human_name; const char* other_name; };
-    static constexpr Office offices[] = {
-        {"FleetCommander", "Commander Elena Voss", "Fleet Commander"},
-        {"ChiefScientist", "Dr. Amara Chen", "Chief Scientist"},
-        {"Diplomat", "Ambassador Mara Okafor", "Diplomatic Envoy"},
-        {"Governor", "Governor Elias Ward", "Governor"},
-        {"EconomicAdvisor", "Economic Advisor", "Economic Advisor"},
-        {"OperationsOfficer", "Operations Officer", "Operations Officer"},
-        {"ExpeditionCommander", "Expedition Commander", "Expedition Commander"},
-    };
-    std::vector<CivilizationOffice> result;
-    result.reserve(std::size(offices));
-    for (const auto& entry : offices) {
-        const std::string id = "civ-" + std::to_string(civilization_id) + ":" + entry.office + ":founder";
-        result.push_back({entry.office, {id, human ? entry.human_name : entry.other_name, {}, {}}});
-    }
-    return result;
-}
 } // namespace
 
 std::vector<Civilization> seed_civilizations(std::span<const StellarSystem> systems,
@@ -117,7 +99,7 @@ std::vector<Civilization> seed_civilizations(std::span<const StellarSystem> syst
         const bool human = species_ids[static_cast<std::size_t>(index)] == terran;
         result.push_back({index, canonical_starts && human && index == 0 ? "Human Commonwealth" : item.name,
             home.system_id, item.archetype, item.traits, index == player_id, CivilizationDevelopmentStage::PreWarp,
-            false, true, false, species_ids[static_cast<std::size_t>(index)], founding_roster(index, human)});
+            false, true, false, species_ids[static_cast<std::size_t>(index)], detail::civilization_founding_roster(index, human)});
     }
     for (int index = 0; index < ancient_count; ++index) {
         const int id = pre_warp_count + index;
@@ -125,7 +107,7 @@ std::vector<Civilization> seed_civilizations(std::span<const StellarSystem> syst
         const bool human = species_ids[static_cast<std::size_t>(id)] == terran;
         result.push_back({id, item.name, homes[static_cast<std::size_t>(id)].system_id, item.archetype, item.traits,
             false, CivilizationDevelopmentStage::AncientSpacefaring, true, false, true,
-            species_ids[static_cast<std::size_t>(id)], founding_roster(id, human)});
+            species_ids[static_cast<std::size_t>(id)], detail::civilization_founding_roster(id, human)});
     }
     return result;
 }
