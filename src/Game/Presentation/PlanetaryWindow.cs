@@ -32,7 +32,7 @@ public sealed partial class PlanetaryWindow : Control
     public Func<string>? ReadTimeLabel { get; set; }
     public Func<PlaybackState>? ReadPlaybackState { get; set; }
     public event Action? ReturnToOrbit, SaveRequested, PlaybackCycleRequested, PlaybackPauseRequested;
-    private static readonly Color Muted = new("91a9bc"), Teal = new("75dfcc"), Bad = new("ff9a86"), White = new("e9f1f6");
+    private static readonly Color Muted = new("a0b8c8"), Teal = new("6ce5d2"), Bad = new("ff9c89"), White = new("ecf4fa");
     private bool Blocked => !IsOpen || IsInputBlocked?.Invoke() == true;
 
     public void Configure(Func<UiSurfaceSnapshot?> read, Func<int, string, UiSurfaceOrderResult> build,
@@ -44,27 +44,19 @@ public sealed partial class PlanetaryWindow : Control
     public override void _Ready()
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); MouseFilter = MouseFilterEnum.Stop; FocusMode = FocusModeEnum.All;
-        var background = new ColorRect { Color = new("080f19"), MouseFilter = MouseFilterEnum.Ignore };
+        var background = new ColorRect { Color = new("07121c"), MouseFilter = MouseFilterEnum.Ignore };
         background.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(background);
         var margin = new MarginContainer(); margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(margin);
-        foreach (var side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 20);
-        var root = new VBoxContainer(); root.AddThemeConstantOverride("separation", 14); margin.AddChild(root);
-        var header = new HBoxContainer(); root.AddChild(header);
-        var titleBox = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; header.AddChild(titleBox);
-        titleBox.AddChild(Text("PLANETARY OPERATIONS", 12, Teal));
-        titleBox.AddChild(_title = Text("Planet", 30)); titleBox.AddChild(_subtitle = Text("", 12, Muted));
-        var actions = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End, SizeFlagsVertical = SizeFlags.ShrinkCenter };
-        header.AddChild(actions);
-        actions.AddChild(new PlaybackControl("PlanetaryPlayback", () => ReadPlaybackState?.Invoke() ?? new(true, SimulationClock.SpeedLevel.Normal, SimulationClock.SpeedLevel.Normal, false),
-            () => { if (!Blocked) PlaybackCycleRequested?.Invoke(); }, () => { if (!Blocked) PlaybackPauseRequested?.Invoke(); }));
-        actions.AddChild(ActionButton("Save", "PlanetarySave", () => SaveRequested?.Invoke()));
-        actions.AddChild(ActionButton("Return to orbit", "PlanetaryBack", () => ReturnToOrbit?.Invoke()));
+        foreach (var side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 16);
+        var root = new VBoxContainer(); root.AddThemeConstantOverride("separation", 10); margin.AddChild(root);
+        BuildHeader(root);
         var kpis = new HBoxContainer(); kpis.AddThemeConstantOverride("separation", 12); root.AddChild(kpis);
         Kpi(kpis, "population", "POPULATION"); Kpi(kpis, "power", "POWER BALANCE");
-        Kpi(kpis, "income", "LOCAL CREDIT BALANCE / DAY"); Kpi(kpis, "materials", "LOCAL MATERIALS / DAY");
-        var columns = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; columns.AddThemeConstantOverride("separation", 14); root.AddChild(columns);
-        var overview = ScrollPanel(columns, "PlanetOverview", 242);
-        overview.AddChild(Text("COMMAND CENTER", 13, Teal));
+        Kpi(kpis, "income", "LOCAL CREDITS / DAY"); Kpi(kpis, "materials", "MATERIALS / DAY"); Kpi(kpis, "research", "RESEARCH LAB CAPACITY");
+        var columns = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; columns.AddThemeConstantOverride("separation", 10); root.AddChild(columns);
+        var overviewPanel = new PanelContainer { CustomMinimumSize = new(224, 0) }; overviewPanel.AddThemeStyleboxOverride("panel", PanelStyle("102330")); columns.AddChild(overviewPanel);
+        var overview = ScrollPanel(overviewPanel, "PlanetOverview", 0);
+        overview.AddChild(Text("COMMAND CENTER", 15, Gold));
         overview.AddChild(_commandStatus = Text("", 13));
         overview.AddChild(_commandButton = ActionButton("Build Command Center", "PlanetaryCommand", () => Run(_command)));
         overview.AddChild(Text("Command Center occupies its own site. All other buildings use one slot each.", 12, Muted));
@@ -73,15 +65,25 @@ public sealed partial class PlanetaryWindow : Control
             ("gravity", "Surface gravity"), ("temperature", "Temperature"), ("pressure", "Pressure"), ("atmosphere", "Atmosphere"), ("solvent", "Surface solvent"),
             ("radius", "Radius / mass"), ("radiation", "Radiation hazard"), ("discoveries", "Survey features"), ("specialization", "Specialization"), ("wear", "Environmental wear"), ("construction", "Construction cost") }) Fact(overview, key, label);
         var centerPanel = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; centerPanel.AddThemeStyleboxOverride("panel", PanelStyle()); columns.AddChild(centerPanel);
-        var center = new VBoxContainer(); center.AddThemeConstantOverride("separation", 12); centerPanel.AddChild(center);
+        var center = new VBoxContainer(); center.AddThemeConstantOverride("separation", 8); centerPanel.AddChild(center);
         center.AddChild(_slotCount = Text("SURFACE BUILDING SLOTS", 17, White));
-        center.AddChild(Text("Choose an empty slot to construct a building. Select a building to manage it.", 12, Muted));
+        center.AddChild(Text("Develop your colony · Select a slot to build or manage", 12, Muted));
         var slotScroll = new ScrollContainer { Name = "PlanetarySlotScroll", SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         center.AddChild(slotScroll); _grid = new GridContainer { Columns = 3, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _grid.AddThemeConstantOverride("h_separation", 10); _grid.AddThemeConstantOverride("v_separation", 10); slotScroll.AddChild(_grid);
-        slotScroll.Resized += () => _grid.Columns = Math.Clamp((int)(slotScroll.Size.X / 155), 2, 5);
-        center.AddChild(_alerts = Text("", 12, Muted));
-        _tabs = new TabContainer { Name = "PlanetaryTabs", CustomMinimumSize = new(330, 0) }; columns.AddChild(_tabs);
+        slotScroll.Resized += () => _grid.Columns = Math.Clamp((int)(slotScroll.Size.X / 150), 2, 6);
+        var alertsScroll = new ScrollContainer { CustomMinimumSize = new(0, 48), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; center.AddChild(alertsScroll);
+        _alerts = Text("", 12, Muted); _alerts.SizeFlagsHorizontal = SizeFlags.ExpandFill; alertsScroll.AddChild(_alerts);
+        var right = new VBoxContainer { CustomMinimumSize = new(304, 0) }; right.AddThemeConstantOverride("separation", 8); columns.AddChild(right);
+        var queuePanel = new PanelContainer { CustomMinimumSize = new(0, 106) }; queuePanel.AddThemeStyleboxOverride("panel", PanelStyle("102830")); right.AddChild(queuePanel);
+        var queueBox = new VBoxContainer(); queuePanel.AddChild(queueBox); queueBox.AddChild(_queueTitle = Text("CONSTRUCTION QUEUE", 13, Gold));
+        var queueScroll = new ScrollContainer { Name = "PlanetaryBuildQueue", CustomMinimumSize = new(0, 58), SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; queueBox.AddChild(queueScroll);
+        _queue = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; queueScroll.AddChild(_queue);
+        _tabs = new TabContainer { Name = "PlanetaryTabs", SizeFlagsVertical = SizeFlags.ExpandFill }; right.AddChild(_tabs);
+        _tabs.AddThemeStyleboxOverride("panel", PanelStyle("102330"));
+        _tabs.AddThemeStyleboxOverride("tab_selected", CardStyle("1a3b44", Teal, 2));
+        _tabs.AddThemeStyleboxOverride("tab_unselected", PanelStyle("0c1c28"));
+        _tabs.AddThemeColorOverride("font_selected_color", Teal);
         var economy = ScrollPanel(_tabs, "Economy", 0); economy.GetParent().Name = "Economy";
         economy.AddChild(Text("PRODUCTION & REQUIREMENTS", 13, Teal));
         economy.AddChild(Text("Daily rates use game days. Food, water and housing are population-support capacities.", 12, Muted));
@@ -93,7 +95,7 @@ public sealed partial class PlanetaryWindow : Control
             ("deposit", "Resource deposit"), ("extraction", "Extraction / local storage"), ("funding", "Operations funded"), ("empire", "EMPIRE SHARED STORES"), ("empireFlow", "Empire cash flow / material production"), ("arrears", "Empire unpaid operations") }) Fact(economy, key, label);
         economy.AddChild(Text("Local credits show income minus required local costs. Fleet, orbital and research costs belong to the empire. Shared materials fund all construction.", 12, Muted));
         _details = ScrollPanel(_tabs, "Building", 0); _details.GetParent().Name = "Building";
-        root.AddChild(_status = Text("Select a building slot to begin.", 13, Teal)); _status.Name = "PlanetaryStatus";
+        root.AddChild(_status = Text("Select a building slot to begin.", 12, Teal)); _status.MaxLinesVisible = 2; _status.Name = "PlanetaryStatus";
         _demolition = new ConfirmationDialog { Title = "Remove planetary building", OkButtonText = "Remove building" }; AddChild(_demolition);
         _demolition.Confirmed += () => { if (_pendingRemoval is int id) Run(() => _remove(id)); _pendingRemoval = null; };
         Visible = false; SetProcess(false);
@@ -122,7 +124,7 @@ public sealed partial class PlanetaryWindow : Control
         _subtitle.Text = $"{s.ColonyName}  ·  {(s.IsResourceOutpost ? "Resource outpost" : "Planetary colony")}  ·  {ReadTimeLabel?.Invoke()}";
         Set("population", Population(s.PopulationMillions)); Set("power", Signed(s.PowerSupply + s.StorageDischargePerDay - s.PowerDemand), s.PowerSupply + s.StorageDischargePerDay < s.PowerDemand);
         Set("income", p is null ? "—" : s.Currency.FormatRate(p.CreditFlow.NetCreditsPerDay), p?.CreditFlow.NetCreditsPerDay < 0);
-        Set("materials", $"+{p?.IndustryPerDay ?? s.IndustryPerDay:0.00}");
+        Set("materials", $"+{p?.IndustryPerDay ?? s.IndustryPerDay:0.00}"); Set("research", $"{s.SciencePerDay:0.##}");
         _commandStatus.Text = s.HubLevel == 0 ? "Not constructed\nBuild the Command Center to unlock the first surface building slots." : $"{s.HubName}\nLevel {s.HubLevel} · {s.BuildingCapacity} slots unlocked";
         if (s.HubUpgradeDaysRemaining > 0) _commandStatus.Text += $"\nConstruction: {s.HubUpgradeDaysRemaining:0.0} days remaining at full funding";
         else if (s.CanUpgradeHub) _commandStatus.Text += $"\n{s.Currency.Format(s.HubUpgradeCreditCost)} + {s.HubUpgradeIndustryCost:0} materials\n{s.HubUpgradeLockReason}";
@@ -134,23 +136,19 @@ public sealed partial class PlanetaryWindow : Control
         var structural = $"{s.ColonyId}:{s.BuildingCapacity}:" + string.Join(",", s.Buildings.Select(b => $"{b.Id}:{b.SlotIndex}:{b.TypeId}:{b.Complete}:{b.UpgradeDaysRemaining > 0}"));
         if (_structure != structural || force)
         {
-            _structure = structural; Clear(_grid); _slots.Clear();
+            _structure = structural; Clear(_grid); _slots.Clear(); _slotCards.Clear();
             var shown = s.HubLevel == 0 ? (s.IsResourceOutpost ? 8 : 16) : s.BuildingCapacity;
             for (var slot = 0; slot < shown; slot++)
             {
-                var index = slot;
-                var button = ActionButton("", "PlanetarySlot_" + slot, () => { _selectedSlot = index; _tabs.CurrentTab = 1; Refresh(true); });
-                button.CustomMinimumSize = new(138, 116); button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                var button = CreateSlot(slot);
                 _grid.AddChild(button); _slots[slot] = button;
             }
         }
         foreach (var (slot, button) in _slots)
         {
             var b = s.Buildings.FirstOrDefault(item => item.SlotIndex == slot);
-            var state = b is null ? (slot >= s.BuildingCapacity ? "LOCKED\nCommand Center required" : "EMPTY\n+ Construct building") :
-                Wrap(b.Name) + "\n" + BuildingState(b);
-            button.Text = $"SLOT {slot + 1:00}\n\n{state}"; button.Disabled = Blocked || slot >= s.BuildingCapacity;
-            button.Modulate = slot == _selectedSlot ? Teal : Colors.White;
+            button.Disabled = Blocked || slot >= s.BuildingCapacity;
+            RefreshSlot(slot, button, b, slot >= s.BuildingCapacity);
             button.TooltipText = b is null ? "This slot can hold one planetary building." : $"{b.Name}\n{b.ConstructionStatus}\nCondition {b.Condition:P0}";
         }
         var messages = new List<string>();
@@ -187,6 +185,7 @@ public sealed partial class PlanetaryWindow : Control
         Set("funding", $"{s.BaseOperationsFundingFraction:P0}", s.BaseOperationsFundingFraction < .999);
         Set("empire", $"{s.Currency.Format(s.Credits)}\n{s.Industry:0.0} construction materials"); Set("empireFlow", $"{s.Currency.FormatRate(p?.EmpireCreditsPerDay ?? 0)}\n{Signed(p?.EmpireIndustryPerDay ?? 0)} materials/day");
         Set("arrears", s.Currency.Format(p?.OperatingArrears ?? 0), p?.OperatingArrears > 0);
+        RefreshVisuals(s);
         var detailState = structural + ":" + _selectedSlot;
         if (force || detailState != _detailState) { _detailState = detailState; Details(s); }
         foreach (var update in _detailRefresh) update(s);
@@ -197,6 +196,7 @@ public sealed partial class PlanetaryWindow : Control
     private void Details(UiSurfaceSnapshot s)
     {
         Clear(_details); _detailRefresh.Clear();
+        if (_details.GetParent() is ScrollContainer detailScroll) detailScroll.ScrollVertical = 0;
         if (_selectedSlot is not int slot) { _details.AddChild(Text("BUILDING MANAGEMENT", 15, Teal)); _details.AddChild(Text("Select a surface slot to choose a building or manage an existing one.", 14)); return; }
         _details.AddChild(Text($"SURFACE SLOT {slot + 1:00}", 14, Teal));
         var b = s.Buildings.FirstOrDefault(item => item.SlotIndex == slot);
@@ -204,16 +204,11 @@ public sealed partial class PlanetaryWindow : Control
         {
             _details.AddChild(Text("Construct a building", 20));
             _details.AddChild(Text("Credits authorize the site now. Materials are consumed during construction from the shared empire pool. The slot is reserved immediately.", 12, Muted));
-            foreach (var option in s.BuildOptions)
-            {
-                var button = ActionButton(option.Name + $"\n{s.Currency.Format(option.CreditCost)} · {option.IndustryCost:0} materials", "PlanetaryBuild_" + option.Id,
-                    () => Run(() => _build(slot, option.Id)));
-                button.TooltipText = option.Description; button.Disabled = !option.CanAfford || Blocked; button.SetMeta("type", option.Id); _details.AddChild(button);
-                _details.AddChild(Text(option.Description, 11, Muted));
-            }
+            foreach (var option in s.BuildOptions) AddBuildOption(s, slot, option);
             return;
         }
-        _details.AddChild(Text(b.Name, 21));
+        var buildingPicture = Picture(BuildingArt(b.TypeId)); buildingPicture.CustomMinimumSize = new(0, 110); buildingPicture.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered; _details.AddChild(buildingPicture);
+        _details.AddChild(Text(b.Name, 21, BuildingColor(b.TypeId)));
         var stateLabel = Text("", 14, Teal); _details.AddChild(stateLabel);
         var conditionLabel = Text("", 13); _details.AddChild(conditionLabel);
         var progressLabel = Text("", 13, Muted); _details.AddChild(progressLabel);
@@ -257,14 +252,16 @@ public sealed partial class PlanetaryWindow : Control
     {
         var button = new Button { Text = text, Name = name, CustomMinimumSize = new(0, 38) };
         button.AddThemeFontSizeOverride("font_size", 13); button.AddThemeStyleboxOverride("normal", PanelStyle());
-        button.AddThemeStyleboxOverride("hover", PanelStyle("223b49")); button.AddThemeStyleboxOverride("focus", PanelStyle("284752"));
+        button.AddThemeStyleboxOverride("hover", PanelStyle("223b49")); button.AddThemeStyleboxOverride("focus", CardStyle("183642", Teal));
+        button.AddThemeStyleboxOverride("pressed", PanelStyle("235364")); button.AddThemeStyleboxOverride("disabled", PanelStyle("0c1a25"));
+        button.AddThemeColorOverride("font_color", White); button.AddThemeColorOverride("font_disabled_color", Muted);
         button.Pressed += () => { if (!Blocked) action(); }; return button;
     }
-    private static StyleBoxFlat PanelStyle(string color = "121f2c") => new()
+    private static StyleBoxFlat PanelStyle(string color = "112532") => new()
     {
         BgColor = new(color), BorderColor = new("29404d"), BorderWidthBottom = 1, BorderWidthLeft = 1, BorderWidthRight = 1, BorderWidthTop = 1,
-        CornerRadiusBottomLeft = 7, CornerRadiusBottomRight = 7, CornerRadiusTopLeft = 7, CornerRadiusTopRight = 7,
-        ContentMarginLeft = 12, ContentMarginRight = 12, ContentMarginTop = 12, ContentMarginBottom = 12
+        CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5, CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5,
+        ContentMarginLeft = 10, ContentMarginRight = 10, ContentMarginTop = 8, ContentMarginBottom = 8
     };
     private static VBoxContainer ScrollPanel(Node parent, string name, int width)
     {
@@ -282,12 +279,15 @@ public sealed partial class PlanetaryWindow : Control
         var block = new VBoxContainer(); block.AddThemeConstantOverride("separation", 2); parent.AddChild(block);
         block.AddChild(Text(title, 11, Muted)); var value = Text("—", 13); value.Name = "PlanetaryFact_" + key; block.AddChild(value); _facts[key] = value;
     }
+    private static Color ResourceColor(string key) => key switch { "power" or "income" => Gold, "materials" => Orange, "research" => Purple, _ => Blue };
     private void Kpi(HBoxContainer parent, string key, string title)
     {
-        var card = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; card.AddThemeStyleboxOverride("panel", PanelStyle()); parent.AddChild(card);
-        var box = new VBoxContainer(); card.AddChild(box); box.AddChild(Text(title, 11, Muted)); var label = Text("—", 23, Teal); box.AddChild(label); _facts[key] = label;
+        var accent = ResourceColor(key);
+        var card = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(0, 67) }; card.AddThemeStyleboxOverride("panel", CardStyle("142934", accent.Darkened(.3f), 3)); parent.AddChild(card);
+        var box = new VBoxContainer(); box.AddThemeConstantOverride("separation", 2); card.AddChild(box); box.AddChild(Text(title, 10, accent));
+        var label = Text("—", key == "income" ? 19 : 24, accent); label.Name = "PlanetaryMetric_" + key; box.AddChild(label); _facts[key] = label;
     }
-    private void Set(string key, string value, bool? warning = false) { _facts[key].Text = value; _facts[key].AddThemeColorOverride("font_color", warning == true ? Bad : key is "population" or "power" or "income" or "materials" ? Teal : White); }
+    private void Set(string key, string value, bool? warning = false) { _facts[key].Text = value; _facts[key].AddThemeColorOverride("font_color", warning == true ? Bad : key is "population" or "power" or "income" or "materials" or "research" ? ResourceColor(key) : White); }
     private static string Signed(double value) => value.ToString("+0.##;-0.##;0");
     private static string Population(double millions) => Math.Abs(millions) >= 1000 ? $"{millions / 1000:0.00} B" : Math.Abs(millions) >= 1 ? $"{millions:0.00} M" : $"{millions * 1000000:0} people";
     private static string PopulationBalance(double value) => $"{(value < 0 ? "Deficit" : "Surplus")} {Population(Math.Abs(value))}";

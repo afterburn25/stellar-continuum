@@ -24,12 +24,17 @@ public partial class ScreenshotCapture
         await ClickNamedButtonAsync(_main, "SpatialSurface"); await WaitForRefreshAsync();
         var panel = _main.GetNode<PlanetaryWindow>("PlanetSurfaceLayer/PlanetaryWindow");
         Check(panel.IsOpen && _main.UiCurrentSurface?.PlanetName == "Earth", "planetary-window-opens-from-planet-navigation");
+        var portrait = Descendants(panel).OfType<TextureRect>().Single(t => t.Name == "PlanetaryPortrait");
+        Check(portrait.Visible && portrait.Material is ShaderMaterial earthMaterial && earthMaterial.GetShaderParameter("surface_texture").AsGodotObject() is Texture2D earth && earth.ResourcePath.EndsWith("sol/earth.jpg"), "planetary-portrait-uses-the-selected-earth-imagery");
+        Check(Descendants(panel).OfType<TextureRect>().Single(t => t.Name == "PlanetaryPanorama").Texture.ResourcePath.EndsWith("colony-panorama-v1.png"), "developed-temperate-world-shows-colony-panorama");
         Check(!_main.UiPlaceSurfaceBuilding("power_generator", 100, 100, 0).Accepted, "retired-free-placement-ui-rejects-orders");
         Check(Descendants(panel).OfType<Button>().Count(b => b.Name.ToString().StartsWith("PlanetarySlot_")) == 32, "established-homeworld-has-32-visible-slots");
         await ClickNamedButtonAsync(panel, "PlanetarySlot_3");
         await ClickNamedButtonAsync(panel, "PlanetaryBuild_power_generator"); await WaitForRefreshAsync();
         var building = _main.UiCurrentSurface!.Buildings.Single();
         Check(building.SlotIndex == 3 && !building.Complete, "real-slot-and-palette-clicks-reserve-a-construction-slot");
+        Check(Descendants(panel).OfType<Label>().Any(l => l.Text == "CONSTRUCTION QUEUE   1"), "construction-queue-tracks-reserved-slot");
+        Check(Descendants(panel).OfType<TextureRect>().Any(t => t.Name == "PlanetaryBuildingArt" && t.Visible && t.Texture is AtlasTexture), "occupied-slot-shows-illustrated-building-card");
         Check(!_main.UiBuildPlanetarySlot(3, "science_lab").Accepted, "duplicate-slot-order-is-rejected");
         await ClickNamedButtonAsync(panel, "PlanetaryRemove");
         var confirm = Descendants(panel).OfType<ConfirmationDialog>().Single();
@@ -44,9 +49,11 @@ public partial class ScreenshotCapture
         economy.Credits = 2000; economy.Industry = 3000; colony.SurfaceHubLevel = 0;
         panel.Close(); panel.Open(); await WaitForRefreshAsync();
         Check(_main.UiCurrentSurface!.BuildingCapacity == 0 && Descendants(panel).OfType<Button>().Where(b => b.Name.ToString().StartsWith("PlanetarySlot_")).All(b => b.Disabled), "unfinished-command-center-locks-all-building-slots");
+        Check(Descendants(panel).OfType<TextureRect>().Single(t => t.Name == "PlanetaryPanorama").Texture.ResourcePath.EndsWith("deep-field-v2.png"), "unbuilt-foundation-does-not-show-a-developed-city");
         await SaveViewportAsync("planetary-command-required-1280x720.png", 1280, 720);
         await ClickNamedButtonAsync(panel, "PlanetaryCommand"); await WaitForRefreshAsync();
         Check(colony.SurfaceHubLevel == 0 && colony.SurfaceHubUpgradeDaysRemaining > 0, "command-center-button-starts-timed-construction");
+        Check(Descendants(panel).OfType<Label>().Any(l => l.Text.StartsWith("Command Center  ·")), "construction-queue-includes-command-center-foundation");
         SurfaceConstruction.Advance(galaxy, galaxy.PlayerCivilizationId, 0, colony.SurfaceHubUpgradeDaysRemaining);
         await WaitForRefreshAsync();
         Check(_main.UiCurrentSurface!.BuildingCapacity == 16, "completing-command-center-unlocks-first-tier");
@@ -55,9 +62,12 @@ public partial class ScreenshotCapture
             await ClickNamedButtonAsync(panel, "PlanetarySlot_" + slot);
             await ClickNamedButtonAsync(panel, "PlanetaryBuild_" + type); await WaitForRefreshAsync();
         }
+        Check(Descendants(panel).OfType<Label>().Any(l => l.Text == "CONSTRUCTION QUEUE   4"), "construction-queue-displays-all-four-orders");
+        await SaveViewportAsync("planetary-window-queue-1280x720.png", 1280, 720);
         SurfaceConstruction.Advance(galaxy, galaxy.PlayerCivilizationId, 2000, 30);
         await WaitForRefreshAsync();
         Check(colony.SurfaceBuildings.All(b => b.IsComplete), "surface-buildings-complete-through-authoritative-construction");
+        Check(Descendants(panel).OfType<Label>().Any(l => l.Text == "CONSTRUCTION QUEUE   0"), "completed-orders-leave-construction-queue");
         await ClickNamedButtonAsync(panel, "PlanetarySlot_0"); await ClickNamedButtonAsync(panel, "PlanetaryEnable"); await WaitForRefreshAsync();
         Check(_main.UiCurrentSurface!.PowerDemand > _main.UiCurrentSurface.PowerSupply, "disabling-generator-exposes-real-power-deficit");
         colony.Stability = .45; await WaitForRefreshAsync();
@@ -72,6 +82,12 @@ public partial class ScreenshotCapture
         Check(_main.UiCurrentSurface.Buildings.Select(b => b.SlotIndex).SequenceEqual(beforeSlots), "saving-preserves-planetary-slots");
         await ClickNamedButtonAsync(panel, "PlanetaryBack"); await WaitForRefreshAsync();
         Check(!_main.UiIsSurfaceOpen, "return-to-orbit-closes-planetary-window");
+        var mars = _main.UiOwnedColonies.Single(c => c.PlanetName == "Mars");
+        _main.UiOpenOwnedColony(mars.ColonyId, true); await WaitForRefreshAsync();
+        Check(_main.UiCurrentSurface?.PlanetName == "Mars" && portrait.Material is ShaderMaterial marsMaterial && marsMaterial.GetShaderParameter("surface_texture").AsGodotObject() is Texture2D marsTexture && marsTexture.ResourcePath.EndsWith("sol/mars.jpg"), "switching-colonies-replaces-earth-portrait-with-mars");
+        Check(Descendants(panel).OfType<TextureRect>().Single(t => t.Name == "PlanetaryPanorama").Texture.ResourcePath.EndsWith("deep-field-v2.png"), "mars-does-not-show-temperate-city-art");
+        await SaveViewportAsync("planetary-window-mars-1920x1080.png", 1920, 1080);
+        await ClickNamedButtonAsync(panel, "PlanetaryBack");
         File.WriteAllText(Path.Combine(_outputDirectory, "planetary-window-verification.json"), JsonSerializer.Serialize(new { checks = _checks, mouseActions = _mouseActions, userDirectory = OS.GetUserDataDir(), captures = _captures }, new JsonSerializerOptions { WriteIndented = true }));
     }
 }

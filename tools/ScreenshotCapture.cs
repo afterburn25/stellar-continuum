@@ -1555,6 +1555,12 @@ public partial class ScreenshotCapture : Node
     private async Task SaveViewportAsync(string fileName, int width = 1280, int height = 720)
     {
         await WaitFramesAsync(3);
+        if (System.Environment.GetEnvironmentVariable("STELLAR_CAPTURE_FOCUS") == "planetary-window")
+        {
+            // Windows can minimize an off-screen acceptance window. Explicitly draw
+            // its real viewport so evidence cannot be stale or a blank resized buffer.
+            RenderingServer.ForceDraw(false);
+        }
         using var image = GetViewport().GetTexture().GetImage();
         if (width == 0 && image is not null) { width = image.GetWidth(); height = image.GetHeight(); }
         var window = GetWindow();
@@ -1564,6 +1570,17 @@ public partial class ScreenshotCapture : Node
             $"window={window.Size}, content-scale-size={window.ContentScaleSize}, content-scale-mode={window.ContentScaleMode}, " +
             $"visible={GetViewport().GetVisibleRect().Size}.");
         var path = Path.Combine(_outputDirectory, fileName);
+        if (System.Environment.GetEnvironmentVariable("STELLAR_CAPTURE_FOCUS") == "planetary-window")
+        {
+            var litSamples = 0;
+            for (var y = 16; y < height; y += 24)
+                for (var x = 16; x < width; x += 24)
+                {
+                    var pixel = image!.GetPixel(x, y);
+                    if (Math.Max(pixel.R, Math.Max(pixel.G, pixel.B)) > .12f) litSamples++;
+                }
+            Require(litSamples > 80, $"{fileName} has no usable rendered planetary content.");
+        }
         if (image!.SavePng(path) != Error.Ok) throw new IOException($"Could not save {fileName}.");
         var bytes = new FileInfo(path).Length;
         Require(bytes >= 4096, $"{fileName} is unexpectedly small.");

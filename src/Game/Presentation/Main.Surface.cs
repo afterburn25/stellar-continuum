@@ -125,6 +125,7 @@ public partial class Main
         _planetSurfaceView.Configure(BuildSurfaceSnapshot, UiBuildPlanetarySlot, UiRemoveSurfaceBuilding,
             UiUpgradeSurfaceBuilding, UiRepairSurfaceBuilding, UiSetSurfaceBuildingEnabled,
             UiSetSurfaceBuildingPriority, UiUpgradeSurfaceHub);
+        _planetSurfaceView.ReadPlanetAppearance = () => UiSystemBodies.FirstOrDefault(body => body.BodyId == _surfaceBodyId);
         _planetSurfaceView.IsInputBlocked = () => (UiIsMenuOpen || UiIsDeveloperToolsOpen);
         _planetSurfaceView.SaveRequested += UiSave;
         _planetSurfaceView.PlaybackCycleRequested += UiCyclePlayback;

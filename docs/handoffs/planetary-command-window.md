@@ -32,8 +32,8 @@ Currency is displayed in each civilization's denomination, not raw budget units.
 
 ## Window contents
 
-The top shows population, signed power balance, signed local credit flow and local
-industrial production. The overview includes Command Center state/cost/research,
+The top shows population, signed power balance, signed local credit flow, local
+industrial production and operational lab capacity. The overview includes Command Center state/cost/research,
 system, species, stability, infrastructure, radius, mass, gravity, temperature,
 pressure, atmosphere, solvent, radiation, discoveries, specialization and environment
 cost/wear multipliers. Scrollable slots remain usable at 1280×720 and 1920×1080.
@@ -52,6 +52,25 @@ local credits, operating funding and stalled material supply. Existing reserve-a
 shortage feedback distinguishes a buffered deficit from population decline.
 Building management supports timed upgrades, repairs, on/off, priority and confirmed
 cancellation/demolition. Inspecting the window does not mutate the world.
+
+The visual revision adds a wide illustrated colony panorama, a selected-planet
+portrait using the existing observer-filtered orbital appearance, and original
+building portraits for all nine placement families. Gold, violet, orange, green
+and blue distinguish resource and building categories. Visible text labels still
+identify values and shortages without relying on color. The permanent scrollable
+construction queue includes Command Center foundation/upgrades and building work;
+timed estimates explicitly assume full funding. Selecting another building resets
+its detail scroll to the top. Both slot cards and construction choices have
+accessible control names.
+
+The developed-city panorama is shown only for temperate worlds with a completed
+Command Center and is labeled as an illustration. Other environments and unbuilt
+foundations use the existing orbital backdrop. Planet portraits switch with the
+selected colony. Each portrait owns its material so lighting changes do not alter
+the system map. The original artwork, atlas mapping and full generation prompts
+are retained under `assets/visual/planetary/ARTWORK.md` for future asset-library and
+native-engine reuse. These are presentation assets; no economic rules or save
+formats changed in the visual revision.
 
 ## Persistence and native conversion
 
