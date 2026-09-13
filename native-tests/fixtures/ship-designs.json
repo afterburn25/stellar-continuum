@@ -1,0 +1,3088 @@
+{
+  "Format": "stellar-ship-designs-oracle-v1",
+  "Cases": [
+    {
+      "Name": "catalog-all-authored-fields",
+      "Kind": "Catalog",
+      "Catalog": [
+        {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "science_vessel",
+          "Name": "Deep-Space Science Vessel",
+          "Description": "Long-range research platform with enhanced sensors for anomalies and unusual systems.",
+          "Role": 1,
+          "IndustryCost": 850,
+          "StrategicSpeed": 18,
+          "MaximumLegRangeLightYears": 400,
+          "FuelEnduranceLightYears": 1100,
+          "SensorRange": 185,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 72,
+          "CreditCost": 100,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "patrol_corvette",
+          "Name": "Patrol Corvette",
+          "Description": "First-generation armed patrol and escort vessel for local defense and early fleet combat.",
+          "Role": 3,
+          "IndustryCost": 1000,
+          "StrategicSpeed": 21,
+          "MaximumLegRangeLightYears": 340,
+          "FuelEnduranceLightYears": 800,
+          "SensorRange": 125,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": "patrol_corvette_mk1",
+          "CrewComplementIndividuals": 85,
+          "CreditCost": 120,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "colony_ship",
+          "Name": "Interstellar Colony Ship",
+          "Description": "Large settlement vessel carrying industrial seed equipment and a founding population.",
+          "Role": 2,
+          "IndustryCost": 1500,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 300,
+          "FuelEnduranceLightYears": 750,
+          "SensorRange": 80,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 250,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 320,
+          "CreditCost": 180,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "resource_outpost_ship",
+          "Name": "Sealed Resource Outpost Vessel",
+          "Description": "Carries a compact pressure-sealed habitat, extraction equipment, and a permanent specialist crew for valuable harsh worlds.",
+          "Role": 2,
+          "IndustryCost": 950,
+          "StrategicSpeed": 16,
+          "MaximumLegRangeLightYears": 330,
+          "FuelEnduranceLightYears": 900,
+          "SensorRange": 95,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 8,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 180,
+          "CreditCost": 130,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "bulk_freighter",
+          "Name": "Interstellar Bulk Freighter",
+          "Description": "Early freight vessel that collects processed outpost material and returns it to a developed colony.",
+          "Role": 4,
+          "IndustryCost": 800,
+          "StrategicSpeed": 17,
+          "MaximumLegRangeLightYears": 350,
+          "FuelEnduranceLightYears": 1000,
+          "SensorRange": 85,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 60,
+          "CreditCost": 90,
+          "CargoMaterialCapacity": 100,
+          "CargoTransferRatePerDay": 20
+        }
+      ]
+    },
+    {
+      "Name": "resolver-null-scout",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 0
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "warp_scout",
+        "Name": "Pathfinder Scout",
+        "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+        "Role": 0,
+        "IndustryCost": 650,
+        "StrategicSpeed": 24,
+        "MaximumLegRangeLightYears": 420,
+        "FuelEnduranceLightYears": 1200,
+        "SensorRange": 140,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 24,
+        "CreditCost": 70,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-empty-science",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": "",
+        "Role": 1
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "science_vessel",
+        "Name": "Deep-Space Science Vessel",
+        "Description": "Long-range research platform with enhanced sensors for anomalies and unusual systems.",
+        "Role": 1,
+        "IndustryCost": 850,
+        "StrategicSpeed": 18,
+        "MaximumLegRangeLightYears": 400,
+        "FuelEnduranceLightYears": 1100,
+        "SensorRange": 185,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 72,
+        "CreditCost": 100,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-invalid-colony",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": "missing",
+        "Role": 2
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "colony_ship",
+        "Name": "Interstellar Colony Ship",
+        "Description": "Large settlement vessel carrying industrial seed equipment and a founding population.",
+        "Role": 2,
+        "IndustryCost": 1500,
+        "StrategicSpeed": 13.5,
+        "MaximumLegRangeLightYears": 300,
+        "FuelEnduranceLightYears": 750,
+        "SensorRange": 80,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 250,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 320,
+        "CreditCost": 180,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-case-mismatch-military",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": "PATROL_CORVETTE",
+        "Role": 3
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "patrol_corvette",
+        "Name": "Patrol Corvette",
+        "Description": "First-generation armed patrol and escort vessel for local defense and early fleet combat.",
+        "Role": 3,
+        "IndustryCost": 1000,
+        "StrategicSpeed": 21,
+        "MaximumLegRangeLightYears": 340,
+        "FuelEnduranceLightYears": 800,
+        "SensorRange": 125,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": "patrol_corvette_mk1",
+        "CrewComplementIndividuals": 85,
+        "CreditCost": 120,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-persisted-role-mismatch",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": "resource_outpost_ship",
+        "Role": 4
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "bulk_freighter",
+        "Name": "Interstellar Bulk Freighter",
+        "Description": "Early freight vessel that collects processed outpost material and returns it to a developed colony.",
+        "Role": 4,
+        "IndustryCost": 800,
+        "StrategicSpeed": 17,
+        "MaximumLegRangeLightYears": 350,
+        "FuelEnduranceLightYears": 1000,
+        "SensorRange": 85,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 60,
+        "CreditCost": 90,
+        "CargoMaterialCapacity": 100,
+        "CargoTransferRatePerDay": 20
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-persisted-outpost",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": "resource_outpost_ship",
+        "Role": 2
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "resource_outpost_ship",
+        "Name": "Sealed Resource Outpost Vessel",
+        "Description": "Carries a compact pressure-sealed habitat, extraction equipment, and a permanent specialist crew for valuable harsh worlds.",
+        "Role": 2,
+        "IndustryCost": 950,
+        "StrategicSpeed": 16,
+        "MaximumLegRangeLightYears": 330,
+        "FuelEnduranceLightYears": 900,
+        "SensorRange": 95,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 8,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 180,
+        "CreditCost": 130,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-baseline-scout",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 0
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "warp_scout",
+        "Name": "Pathfinder Scout",
+        "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+        "Role": 0,
+        "IndustryCost": 650,
+        "StrategicSpeed": 24,
+        "MaximumLegRangeLightYears": 420,
+        "FuelEnduranceLightYears": 1200,
+        "SensorRange": 140,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 24,
+        "CreditCost": 70,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-baseline-science",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 1
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "science_vessel",
+        "Name": "Deep-Space Science Vessel",
+        "Description": "Long-range research platform with enhanced sensors for anomalies and unusual systems.",
+        "Role": 1,
+        "IndustryCost": 850,
+        "StrategicSpeed": 18,
+        "MaximumLegRangeLightYears": 400,
+        "FuelEnduranceLightYears": 1100,
+        "SensorRange": 185,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 72,
+        "CreditCost": 100,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-baseline-colony",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 2
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "colony_ship",
+        "Name": "Interstellar Colony Ship",
+        "Description": "Large settlement vessel carrying industrial seed equipment and a founding population.",
+        "Role": 2,
+        "IndustryCost": 1500,
+        "StrategicSpeed": 13.5,
+        "MaximumLegRangeLightYears": 300,
+        "FuelEnduranceLightYears": 750,
+        "SensorRange": 80,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 250,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 320,
+        "CreditCost": 180,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-baseline-military",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 3
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "patrol_corvette",
+        "Name": "Patrol Corvette",
+        "Description": "First-generation armed patrol and escort vessel for local defense and early fleet combat.",
+        "Role": 3,
+        "IndustryCost": 1000,
+        "StrategicSpeed": 21,
+        "MaximumLegRangeLightYears": 340,
+        "FuelEnduranceLightYears": 800,
+        "SensorRange": 125,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": "patrol_corvette_mk1",
+        "CrewComplementIndividuals": 85,
+        "CreditCost": 120,
+        "CargoMaterialCapacity": 0,
+        "CargoTransferRatePerDay": 0
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-baseline-logistics",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 4
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": {
+        "Id": "bulk_freighter",
+        "Name": "Interstellar Bulk Freighter",
+        "Description": "Early freight vessel that collects processed outpost material and returns it to a developed colony.",
+        "Role": 4,
+        "IndustryCost": 800,
+        "StrategicSpeed": 17,
+        "MaximumLegRangeLightYears": 350,
+        "FuelEnduranceLightYears": 1000,
+        "SensorRange": 85,
+        "Prerequisites": {
+          "AllCivilizationCapabilities": [
+            "spacecraft_construction",
+            "experimental_interstellar_transit"
+          ],
+          "AnyCivilizationCapabilities": [],
+          "RequiredConstructionProjects": [
+            "orbital_shipyard"
+          ]
+        },
+        "PopulationCostMillions": 0,
+        "CombatProfileId": null,
+        "CrewComplementIndividuals": 60,
+        "CreditCost": 90,
+        "CargoMaterialCapacity": 100,
+        "CargoTransferRatePerDay": 20
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "resolver-invalid-role",
+      "Kind": "Resolve",
+      "Arguments": {
+        "DesignId": null,
+        "Role": 99
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "No baseline ship design is registered for fleet role 99."
+      },
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "lock-all-baseline-requirements",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      },
+      "Result": "requires Spacecraft Construction, Experimental Interstellar Transit, Orbital Shipyard",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "lock-missing-construction-state",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [],
+        "Capabilities": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      },
+      "After": {
+        "ConstructionStates": [],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "available-missing-construction-state",
+      "Kind": "Available",
+      "Arguments": {
+        "CivilizationId": 1
+      },
+      "Before": {
+        "ConstructionStates": [],
+        "Capabilities": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      },
+      "After": {
+        "ConstructionStates": [],
+        "Capabilities": []
+      }
+    },
+    {
+      "Name": "lock-project-after-capabilities",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      },
+      "Result": "requires Orbital Shipyard",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-unlocked",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-all-project-any",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "alpha",
+              "beta"
+            ],
+            "AnyCivilizationCapabilities": [
+              "gamma",
+              "delta"
+            ],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      },
+      "Result": "requires alpha, beta, Orbital Shipyard, one of gamma or delta",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-project-any",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "alpha",
+              "beta"
+            ],
+            "AnyCivilizationCapabilities": [
+              "gamma",
+              "delta"
+            ],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta"
+            ]
+          }
+        ]
+      },
+      "Result": "requires Orbital Shipyard, one of gamma or delta",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-any",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "alpha",
+              "beta"
+            ],
+            "AnyCivilizationCapabilities": [
+              "gamma",
+              "delta"
+            ],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta"
+            ]
+          }
+        ]
+      },
+      "Result": "requires one of gamma or delta",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-unlocked",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "alpha",
+              "beta"
+            ],
+            "AnyCivilizationCapabilities": [
+              "gamma",
+              "delta"
+            ],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-other-project",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "industrial_automation"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      },
+      "Result": "requires Industrial Automation Program",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-custom-unknown-project",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "unknown_project"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      },
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "lock-empty-custom-prerequisites",
+      "Kind": "Lock",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Design": {
+          "Id": "custom",
+          "Name": "Custom",
+          "Description": "Custom prerequisites",
+          "Role": 0,
+          "IndustryCost": 1,
+          "StrategicSpeed": 1,
+          "MaximumLegRangeLightYears": 1,
+          "FuelEnduranceLightYears": 1,
+          "SensorRange": 1,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": []
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 0,
+          "CreditCost": 0,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        }
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-locked",
+      "Kind": "Available",
+      "Arguments": {
+        "CivilizationId": 1
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      },
+      "Result": [],
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "alpha",
+              "beta",
+              "delta"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-registry-order",
+      "Kind": "Available",
+      "Arguments": {
+        "CivilizationId": 1
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "warp_scout",
+          "Name": "Pathfinder Scout",
+          "Description": "Fast first-generation interstellar survey ship optimized for rapid reconnaissance.",
+          "Role": 0,
+          "IndustryCost": 650,
+          "StrategicSpeed": 24,
+          "MaximumLegRangeLightYears": 420,
+          "FuelEnduranceLightYears": 1200,
+          "SensorRange": 140,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 24,
+          "CreditCost": 70,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "science_vessel",
+          "Name": "Deep-Space Science Vessel",
+          "Description": "Long-range research platform with enhanced sensors for anomalies and unusual systems.",
+          "Role": 1,
+          "IndustryCost": 850,
+          "StrategicSpeed": 18,
+          "MaximumLegRangeLightYears": 400,
+          "FuelEnduranceLightYears": 1100,
+          "SensorRange": 185,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 72,
+          "CreditCost": 100,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "patrol_corvette",
+          "Name": "Patrol Corvette",
+          "Description": "First-generation armed patrol and escort vessel for local defense and early fleet combat.",
+          "Role": 3,
+          "IndustryCost": 1000,
+          "StrategicSpeed": 21,
+          "MaximumLegRangeLightYears": 340,
+          "FuelEnduranceLightYears": 800,
+          "SensorRange": 125,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": "patrol_corvette_mk1",
+          "CrewComplementIndividuals": 85,
+          "CreditCost": 120,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "colony_ship",
+          "Name": "Interstellar Colony Ship",
+          "Description": "Large settlement vessel carrying industrial seed equipment and a founding population.",
+          "Role": 2,
+          "IndustryCost": 1500,
+          "StrategicSpeed": 13.5,
+          "MaximumLegRangeLightYears": 300,
+          "FuelEnduranceLightYears": 750,
+          "SensorRange": 80,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 250,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 320,
+          "CreditCost": 180,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "resource_outpost_ship",
+          "Name": "Sealed Resource Outpost Vessel",
+          "Description": "Carries a compact pressure-sealed habitat, extraction equipment, and a permanent specialist crew for valuable harsh worlds.",
+          "Role": 2,
+          "IndustryCost": 950,
+          "StrategicSpeed": 16,
+          "MaximumLegRangeLightYears": 330,
+          "FuelEnduranceLightYears": 900,
+          "SensorRange": 95,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 8,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 180,
+          "CreditCost": 130,
+          "CargoMaterialCapacity": 0,
+          "CargoTransferRatePerDay": 0
+        },
+        {
+          "Id": "bulk_freighter",
+          "Name": "Interstellar Bulk Freighter",
+          "Description": "Early freight vessel that collects processed outpost material and returns it to a developed colony.",
+          "Role": 4,
+          "IndustryCost": 800,
+          "StrategicSpeed": 17,
+          "MaximumLegRangeLightYears": 350,
+          "FuelEnduranceLightYears": 1000,
+          "SensorRange": 85,
+          "Prerequisites": {
+            "AllCivilizationCapabilities": [
+              "spacecraft_construction",
+              "experimental_interstellar_transit"
+            ],
+            "AnyCivilizationCapabilities": [],
+            "RequiredConstructionProjects": [
+              "orbital_shipyard"
+            ]
+          },
+          "PopulationCostMillions": 0,
+          "CombatProfileId": null,
+          "CrewComplementIndividuals": 60,
+          "CreditCost": 90,
+          "CargoMaterialCapacity": 100,
+          "CargoTransferRatePerDay": 20
+        }
+      ],
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [
+              "orbital_shipyard"
+            ],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "propulsion-prototype",
+      "Kind": "Propulsion",
+      "Arguments": {
+        "CivilizationId": 1,
+        "DesignId": "warp_scout"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      },
+      "Result": {
+        "StrategicSpeed": 24,
+        "MaximumLegRangeLightYears": 420,
+        "FuelEnduranceLightYears": 1200,
+        "PropulsionGeneration": "Prototype warp drive"
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "experimental_interstellar_transit",
+              "spacecraft_construction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "propulsion-reliable",
+      "Kind": "Propulsion",
+      "Arguments": {
+        "CivilizationId": 1,
+        "DesignId": "warp_scout"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "reliable_ftl"
+            ]
+          }
+        ]
+      },
+      "Result": {
+        "StrategicSpeed": 28.32,
+        "MaximumLegRangeLightYears": 546,
+        "FuelEnduranceLightYears": 1620,
+        "PropulsionGeneration": "Stable warp drive"
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "reliable_ftl"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "propulsion-extended",
+      "Kind": "Propulsion",
+      "Arguments": {
+        "CivilizationId": 1,
+        "DesignId": "warp_scout"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": {
+        "StrategicSpeed": 32.400000000000006,
+        "MaximumLegRangeLightYears": 735,
+        "FuelEnduranceLightYears": 2100,
+        "PropulsionGeneration": "Long-range warp architecture"
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "propulsion-extended-precedes-reliable",
+      "Kind": "Propulsion",
+      "Arguments": {
+        "CivilizationId": 1,
+        "DesignId": "warp_scout"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "extended_ftl_range",
+              "reliable_ftl"
+            ]
+          }
+        ]
+      },
+      "Result": {
+        "StrategicSpeed": 32.400000000000006,
+        "MaximumLegRangeLightYears": 735,
+        "FuelEnduranceLightYears": 2100,
+        "PropulsionGeneration": "Long-range warp architecture"
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 1,
+            "CapabilityIds": [
+              "extended_ftl_range",
+              "reliable_ftl"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "propulsion-cross-civilization",
+      "Kind": "Propulsion",
+      "Arguments": {
+        "CivilizationId": 1,
+        "DesignId": "warp_scout"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": {
+        "StrategicSpeed": 24,
+        "MaximumLegRangeLightYears": 420,
+        "FuelEnduranceLightYears": 1200,
+        "PropulsionGeneration": "Prototype warp drive"
+      },
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "display-spacecraft_construction",
+      "Kind": "Display",
+      "Arguments": {
+        "CapabilityId": "spacecraft_construction"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": "Spacecraft Construction",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "display-experimental_interstellar_transit",
+      "Kind": "Display",
+      "Arguments": {
+        "CapabilityId": "experimental_interstellar_transit"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": "Experimental Interstellar Transit",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "display-reliable_ftl",
+      "Kind": "Display",
+      "Arguments": {
+        "CapabilityId": "reliable_ftl"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": "Reliable Interstellar Transit",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "display-extended_ftl_range",
+      "Kind": "Display",
+      "Arguments": {
+        "CapabilityId": "extended_ftl_range"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": "Extended Interstellar Transit",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Name": "display-unknown_capability_value",
+      "Kind": "Display",
+      "Arguments": {
+        "CapabilityId": "unknown_capability_value"
+      },
+      "Before": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      },
+      "Result": "unknown capability value",
+      "Error": null,
+      "After": {
+        "ConstructionStates": [
+          {
+            "CivilizationId": 1,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          },
+          {
+            "CivilizationId": 2,
+            "CompletedProjectIds": [],
+            "ActiveProjectId": null,
+            "ActiveProjectProgress": 0,
+            "ActiveProjectAuthorizationCredits": 0,
+            "QueuedProjects": []
+          }
+        ],
+        "Capabilities": [
+          {
+            "CivilizationId": 2,
+            "CapabilityIds": [
+              "extended_ftl_range"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

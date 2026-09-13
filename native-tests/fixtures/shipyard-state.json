@@ -1,0 +1,3732 @@
+{
+  "Format": "stellar-shipyard-state-oracle-v2",
+  "Cases": [
+    {
+      "Name": "format-1-1",
+      "Kind": "Format",
+      "Arguments": {
+        "CivilizationId": 1,
+        "Sequence": 1
+      },
+      "Result": "shipyard-1-1",
+      "Error": null
+    },
+    {
+      "Name": "format--2-0",
+      "Kind": "Format",
+      "Arguments": {
+        "CivilizationId": -2,
+        "Sequence": 0
+      },
+      "Result": "shipyard--2-0",
+      "Error": null
+    },
+    {
+      "Name": "format-2147483647-9223372036854775807",
+      "Kind": "Format",
+      "Arguments": {
+        "CivilizationId": 2147483647,
+        "Sequence": 9223372036854775807
+      },
+      "Result": "shipyard-2147483647-9223372036854775807",
+      "Error": null
+    },
+    {
+      "Name": "format--2147483648--9223372036854775808",
+      "Kind": "Format",
+      "Arguments": {
+        "CivilizationId": -2147483648,
+        "Sequence": -9223372036854775808
+      },
+      "Result": "shipyard--2147483648--9223372036854775808",
+      "Error": null
+    },
+    {
+      "Name": "parse-4",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": null,
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-5",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-6",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-7",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "wrong-1-1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-8",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard--1-1",
+        "CivilizationId": -1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-9",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-9223372036854775807",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 9223372036854775807
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-10",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-9223372036854775808",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-11",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1--9223372036854775808",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": -9223372036854775808
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-12",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-0",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-13",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1--1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": -1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-14",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-15",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B9223372036854775807",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 9223372036854775807
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-16",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B9223372036854775808",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-17",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B-1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-18",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B-9223372036854775808",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-19",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u002B\u002B1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-20",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1--\u002B1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-21",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-0001",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-22",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1- 1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-23",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1 ",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-24",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\t\u002B1\r\n",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-25",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1x",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-26",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1 2",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-27",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1\u0000",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-28",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1\u0000\u0000",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-29",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1 \u0000",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": true,
+        "Sequence": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-30",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-1\u0000 ",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-31",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u00001",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-32",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-1-\u00A01",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "parse-33",
+      "Kind": "Parse",
+      "Arguments": {
+        "OrderId": "shipyard-2-1",
+        "CivilizationId": 1
+      },
+      "Result": {
+        "Ok": false,
+        "Sequence": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "valid-id-34",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": null
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-35",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": ""
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-36",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": " "
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-37",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "\u00A0"
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-38",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "abc"
+      },
+      "Result": true,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-39",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "a_b-9"
+      },
+      "Result": true,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-40",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "\u00E9"
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-41",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "Result": true,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-42",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "Result": false,
+      "Error": null
+    },
+    {
+      "Name": "valid-id-43",
+      "Kind": "ValidId",
+      "Arguments": {
+        "OrderId": "A-Z_09-"
+      },
+      "Result": true,
+      "Error": null
+    },
+    {
+      "Name": "state-default",
+      "Kind": "State",
+      "Arguments": {
+        "CivilizationId": 1,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 1,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": {
+        "CivilizationId": 1,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [],
+        "PendingBuildCount": 0
+      },
+      "Error": null,
+      "After": {
+        "CivilizationId": 1,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "state-full-nondefault",
+      "Kind": "State",
+      "Arguments": {
+        "CivilizationId": -7,
+        "NextOrderSequence": 9223372036854775807,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": "custom_active",
+        "ActiveBuildProgress": -3.25,
+        "ActiveAuthorizationCredits": 44.5,
+        "ReservedPopulationMillions": -2.75,
+        "ReservedPopulationSpeciesId": "species-active",
+        "ReservedPopulationSourceColonyId": -9,
+        "QueuedBuilds": [
+          {
+            "OrderId": "queued_one",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 12.5,
+            "ReservedPopulationMillions": 0.125,
+            "ReservedPopulationSpeciesId": "species-queue",
+            "ReservedPopulationSourceColonyId": 17
+          },
+          {
+            "OrderId": "",
+            "DesignId": "science_vessel",
+            "AuthorizationCredits": -4,
+            "ReservedPopulationMillions": -8,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": -7,
+        "NextOrderSequence": 9223372036854775807,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": "custom_active",
+        "ActiveBuildProgress": -3.25,
+        "ActiveAuthorizationCredits": 44.5,
+        "ReservedPopulationMillions": -2.75,
+        "ReservedPopulationSpeciesId": "species-active",
+        "ReservedPopulationSourceColonyId": -9,
+        "QueuedBuilds": [
+          {
+            "OrderId": "queued_one",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 12.5,
+            "ReservedPopulationMillions": 0.125,
+            "ReservedPopulationSpeciesId": "species-queue",
+            "ReservedPopulationSourceColonyId": 17
+          },
+          {
+            "OrderId": "",
+            "DesignId": "science_vessel",
+            "AuthorizationCredits": -4,
+            "ReservedPopulationMillions": -8,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": {
+        "CivilizationId": -7,
+        "NextOrderSequence": 9223372036854775807,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": "custom_active",
+        "ActiveBuildProgress": -3.25,
+        "ActiveAuthorizationCredits": 44.5,
+        "ReservedPopulationMillions": -2.75,
+        "ReservedPopulationSpeciesId": "species-active",
+        "ReservedPopulationSourceColonyId": -9,
+        "QueuedBuilds": [
+          {
+            "OrderId": "queued_one",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 12.5,
+            "ReservedPopulationMillions": 0.125,
+            "ReservedPopulationSpeciesId": "species-queue",
+            "ReservedPopulationSourceColonyId": 17
+          },
+          {
+            "OrderId": "",
+            "DesignId": "science_vessel",
+            "AuthorizationCredits": -4,
+            "ReservedPopulationMillions": -8,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ],
+        "PendingBuildCount": 3
+      },
+      "Error": null,
+      "After": {
+        "CivilizationId": -7,
+        "NextOrderSequence": 9223372036854775807,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": "custom_active",
+        "ActiveBuildProgress": -3.25,
+        "ActiveAuthorizationCredits": 44.5,
+        "ReservedPopulationMillions": -2.75,
+        "ReservedPopulationSpeciesId": "species-active",
+        "ReservedPopulationSourceColonyId": -9,
+        "QueuedBuilds": [
+          {
+            "OrderId": "queued_one",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 12.5,
+            "ReservedPopulationMillions": 0.125,
+            "ReservedPopulationSpeciesId": "species-queue",
+            "ReservedPopulationSourceColonyId": 17
+          },
+          {
+            "OrderId": "",
+            "DesignId": "science_vessel",
+            "AuthorizationCredits": -4,
+            "ReservedPopulationMillions": -8,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "active-unknown-formatted-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 1.23456,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 1.23456,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has 1.235 million reserved population without a valid active design; refusing a state transition that could discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 1.23456,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-whitespace-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": " ",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": " ",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has 2 million reserved population without a valid active design; refusing a state transition that could discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": " ",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-nbsp-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "\u00A0",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "\u00A0",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has 2 million reserved population without a valid active design; refusing a state transition that could discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "\u00A0",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-unknown-zero",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-unknown-negative",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": -2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": -2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "unknown",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": -2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-live-catalog-design",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "bulk_freighter",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 2,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-nonfinite-NaN",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "NaN",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "NaN",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has non-finite active reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "NaN",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-nonfinite-Infinity",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has non-finite active reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "active-nonfinite--Infinity",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "-Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "-Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has non-finite active reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": "-Infinity",
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": []
+      }
+    },
+    {
+      "Name": "queue-unknown-2",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has 2 million reserved population but no valid design; refusing to discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown-1.23456",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1.23456,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1.23456,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has 1.235 million reserved population but no valid design; refusing to discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1.23456,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown-0",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown--2",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": -2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": -2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": -2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown-NaN",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has non-finite reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown-Infinity",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has non-finite reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-unknown--Infinity",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "-Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "-Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has non-finite reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "-Infinity",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "queue-whitespace-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "\u2003",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "\u2003",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027\u2003\u0027 has 2 million reserved population but no valid design; refusing to discard reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "\u2003",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 2,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "active-valid-seven-known",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 7,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "active-valid-eighth-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queue exceeds its bounded capacity while overflow build \u0027warp_scout\u0027 retains 1 million reserved population; refusing to truncate reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "active-valid-eighth-zero",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 8,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "unknown-zero-does-not-consume-capacity",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 8,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": "warp_scout",
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "index-eight-positive",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has an unserialized overflow build \u0027warp_scout\u0027 retaining 1 million reserved population; refusing to truncate reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "index-eight-zero",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": 9,
+      "Error": null,
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "index-eight-unknown-positive-uses-physical-cap",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 has an unserialized overflow build \u0027unknown\u0027 retaining 1 million reserved population; refusing to truncate reserved colonists."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 1,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "index-eight-nonfinite-precedes-physical-cap",
+      "Kind": "Guard",
+      "Arguments": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Before": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Shipyard 2 queued build \u0027unknown\u0027 has non-finite reserved population; refusing to persist ambiguous colonist state."
+      },
+      "After": {
+        "CivilizationId": 2,
+        "NextOrderSequence": 1,
+        "ActiveDesignId": null,
+        "ActiveOrderId": null,
+        "ActiveBuildProgress": 0,
+        "ActiveAuthorizationCredits": 0,
+        "ReservedPopulationMillions": 0,
+        "ReservedPopulationSpeciesId": null,
+        "ReservedPopulationSourceColonyId": null,
+        "QueuedBuilds": [
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "warp_scout",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": 0,
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          },
+          {
+            "OrderId": "",
+            "DesignId": "unknown",
+            "AuthorizationCredits": 0,
+            "ReservedPopulationMillions": "NaN",
+            "ReservedPopulationSpeciesId": null,
+            "ReservedPopulationSourceColonyId": null
+          }
+        ]
+      }
+    },
+    {
+      "Name": "seed-source-order",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": [
+          {
+            "Id": 7,
+            "Name": "Seven",
+            "HomeSystemId": 2,
+            "Archetype": 2,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": true
+            },
+            "IsPlayer": true,
+            "DevelopmentStage": 1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": true,
+            "SpeciesId": "species-seven",
+            "Leadership": {
+              "Offices": {}
+            }
+          },
+          {
+            "Id": -2,
+            "Name": "Negative",
+            "HomeSystemId": 3,
+            "Archetype": 8,
+            "Traits": {
+              "Aggression": 0.6,
+              "Territoriality": 0.5,
+              "Greed": 0.4,
+              "ScientificCuriosity": 0.3,
+              "RiskTolerance": 0.2,
+              "SurvivalPriority": 0.1,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species-negative",
+            "Leadership": {
+              "Offices": {}
+            }
+          }
+        ]
+      },
+      "Result": [
+        {
+          "CivilizationId": 7,
+          "NextOrderSequence": 1,
+          "ActiveDesignId": null,
+          "ActiveOrderId": null,
+          "ActiveBuildProgress": 0,
+          "ActiveAuthorizationCredits": 0,
+          "ReservedPopulationMillions": 0,
+          "ReservedPopulationSpeciesId": null,
+          "ReservedPopulationSourceColonyId": null,
+          "QueuedBuilds": [],
+          "PendingBuildCount": 0
+        },
+        {
+          "CivilizationId": -2,
+          "NextOrderSequence": 1,
+          "ActiveDesignId": null,
+          "ActiveOrderId": null,
+          "ActiveBuildProgress": 0,
+          "ActiveAuthorizationCredits": 0,
+          "ReservedPopulationMillions": 0,
+          "ReservedPopulationSpeciesId": null,
+          "ReservedPopulationSourceColonyId": null,
+          "QueuedBuilds": [],
+          "PendingBuildCount": 0
+        }
+      ],
+      "Error": null
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    { "name": "windows-testing", "generator": "Ninja", "binaryDir": "${sourceDir}/build-native/testing", "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BUILD_TESTING": "ON" } },
+    { "name": "windows-development", "inherits": "windows-testing", "binaryDir": "${sourceDir}/build-native/development", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "windows-headless", "inherits": "windows-testing", "binaryDir": "${sourceDir}/build-native/headless", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "BUILD_TESTING": "ON" } }
+  ],
+  "buildPresets": [
+    { "name": "windows-testing", "configurePreset": "windows-testing" },
+    { "name": "windows-development", "configurePreset": "windows-development" },
+    { "name": "windows-headless", "configurePreset": "windows-headless" }
+  ],
+  "testPresets": [
+    { "name": "windows-testing", "configurePreset": "windows-testing", "output": { "outputOnFailure": true } },
+    { "name": "windows-development", "configurePreset": "windows-development", "output": { "outputOnFailure": true } },
+    { "name": "windows-headless", "configurePreset": "windows-headless", "output": { "outputOnFailure": true } }
+  ]
+}

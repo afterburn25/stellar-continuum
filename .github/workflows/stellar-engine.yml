@@ -1,0 +1,70 @@
+name: Stellar Engine native foundation
+on:
+  push:
+    branches: ["engine/**"]
+  pull_request:
+    branches: [integration, main]
+    paths:
+      - "engine/**"
+      - "core/**"
+      - "app/**"
+      - "native-tests/**"
+      - "tests/Stellar.Galaxy.ParityGenerator/**"
+      - "tests/Stellar.Species.ParityGenerator/**"
+      - "tests/Stellar.Civilization.ParityGenerator/**"
+      - "tests/Stellar.Colony.ParityGenerator/**"
+      - "tests/Stellar.Surface.ParityGenerator/**"
+      - "tests/Stellar.ColonyBiology.ParityGenerator/**"
+      - "tests/Stellar.ColonyOperations.ParityGenerator/**"
+      - "tests/Stellar.FundedEconomy.ParityGenerator/**"
+      - "tests/Stellar.LogisticsRouting.ParityGenerator/**"
+      - "tests/Stellar.LogisticsViews.ParityGenerator/**"
+      - "tests/Stellar.IndustryAllocation.ParityGenerator/**"
+      - "tests/Stellar.ConstructionCurrency.ParityGenerator/**"
+      - "tests/Stellar.SurfaceConstruction.ParityGenerator/**"
+      - "tests/Stellar.ConstructionProjects.ParityGenerator/**"
+      - "tests/Stellar.ShipDesigns.ParityGenerator/**"
+      - "tests/Stellar.FleetState.ParityGenerator/**"
+      - "tests/Stellar.ShipyardState.ParityGenerator/**"
+      - "tests/Stellar.FleetSeeding.ParityGenerator/**"
+      - "tests/Stellar.Shipbuilding.ParityGenerator/**"
+      - "tests/Stellar.FleetTransit.ParityGenerator/**"
+      - "tests/Stellar.LaneNetwork.ParityGenerator/**"
+      - "tests/Stellar.OperationalReach.ParityGenerator/**"
+      - "tests/Stellar.Knowledge.ParityGenerator/**"
+      - "tests/Stellar.LegacyTechnology.ParityGenerator/**"
+      - "tests/Stellar.FreshCampaign.ParityGenerator/**"
+      - "data/astronomy/**"
+      - "third_party/**"
+      - "tools/stellar-export/**"
+      - "export/**"
+      - "CMake*"
+      - ".github/workflows/stellar-engine.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-export:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned development build tools
+        shell: pwsh
+        run: |
+          python -m venv .tools/build-tools
+          .tools/build-tools/Scripts/python.exe -m pip install cmake==4.4.3 ninja==1.13.2
+      - name: Build, test and export native foundation
+        shell: pwsh
+        run: python tools/stellar-export/stellar.py export windows-benchmark
+      - name: Preserve standalone package and validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-engine-windows-x64-foundation
+          if-no-files-found: error
+          path: |
+            Builds/Windows/*.zip
+            Builds/Windows/*-validation.json

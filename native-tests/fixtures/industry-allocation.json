@@ -1,0 +1,825 @@
+{
+  "Format": "stellar-industry-allocation-parity-v1",
+  "Cases": [
+    {
+      "Name": "balanced-scarcity",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 40,
+        "ShipbuildingDemand": 40
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 40,
+        "ShipbuildingDemand": 40,
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 20,
+        "ShipbuildingAllocated": 20,
+        "TotalAllocated": 40
+      }
+    },
+    {
+      "Name": "oversupply",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 100,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 30
+      },
+      "Weights": {
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 100,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 30,
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 20,
+        "ShipbuildingAllocated": 30,
+        "TotalAllocated": 50
+      }
+    },
+    {
+      "Name": "construction-reflow",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 5,
+        "ShipbuildingDemand": 40
+      },
+      "Weights": {
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 5,
+        "ShipbuildingDemand": 40,
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 5,
+        "ShipbuildingAllocated": 35,
+        "TotalAllocated": 40
+      }
+    },
+    {
+      "Name": "shipbuilding-reflow",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 40,
+        "ShipbuildingDemand": 5
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 3
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 40,
+        "ConstructionDemand": 40,
+        "ShipbuildingDemand": 5,
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 3,
+        "ConstructionAllocated": 35,
+        "ShipbuildingAllocated": 5,
+        "TotalAllocated": 40
+      }
+    },
+    {
+      "Name": "construction-only",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 12,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 0
+      },
+      "Weights": {
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 12,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 0,
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 12,
+        "ShipbuildingAllocated": 0,
+        "TotalAllocated": 12
+      }
+    },
+    {
+      "Name": "zero-consumers",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 12,
+        "ConstructionDemand": 0,
+        "ShipbuildingDemand": 0
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 12,
+        "ConstructionDemand": 0,
+        "ShipbuildingDemand": 0,
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 0,
+        "ShipbuildingAllocated": 0,
+        "TotalAllocated": 0
+      }
+    },
+    {
+      "Name": "zero-available",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 0,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 20
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 0,
+        "ConstructionDemand": 20,
+        "ShipbuildingDemand": 20,
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1,
+        "ConstructionAllocated": 0,
+        "ShipbuildingAllocated": 0,
+        "TotalAllocated": 0
+      }
+    },
+    {
+      "Name": "invalid-negative",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": -1,
+        "ConstructionDemand": 1,
+        "ShipbuildingDemand": 1
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "ExpectedError": "Industry values must be finite and non-negative. (Parameter \u0027AvailableIndustry\u0027)"
+    },
+    {
+      "Name": "invalid-nan",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": "NaN",
+        "ConstructionDemand": 1,
+        "ShipbuildingDemand": 1
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "ExpectedError": "Industry values must be finite and non-negative. (Parameter \u0027AvailableIndustry\u0027)"
+    },
+    {
+      "Name": "invalid-construction-weight",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 1,
+        "ConstructionDemand": 1,
+        "ShipbuildingDemand": 1
+      },
+      "Weights": {
+        "ConstructionWeight": 0,
+        "ShipbuildingWeight": 1
+      },
+      "ExpectedError": "Construction weight must be finite and greater than zero. (Parameter \u0027weights\u0027)"
+    },
+    {
+      "Name": "invalid-shipbuilding-weight",
+      "Kind": "Allocation",
+      "Context": {
+        "CivilizationId": 7,
+        "AvailableIndustry": 1,
+        "ConstructionDemand": 1,
+        "ShipbuildingDemand": 1
+      },
+      "Weights": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": "Infinity"
+      },
+      "ExpectedError": "Shipbuilding weight must be finite and greater than zero. (Parameter \u0027weights\u0027)"
+    },
+    {
+      "Name": "persisted-infrastructure",
+      "Kind": "Weights",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": 1
+        }
+      ],
+      "CivilizationId": 1,
+      "Fallback": {
+        "ConstructionWeight": 2,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "ConstructionWeight": 3,
+        "ShipbuildingWeight": 1
+      }
+    },
+    {
+      "Name": "persisted-shipbuilding",
+      "Kind": "Weights",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": 2
+        }
+      ],
+      "CivilizationId": 1,
+      "Fallback": {
+        "ConstructionWeight": 2,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 3
+      }
+    },
+    {
+      "Name": "fallback-first-economy",
+      "Kind": "Weights",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        },
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": 2
+        }
+      ],
+      "CivilizationId": 1,
+      "Fallback": {
+        "ConstructionWeight": 2,
+        "ShipbuildingWeight": 1
+      },
+      "Expected": {
+        "ConstructionWeight": 2,
+        "ShipbuildingWeight": 1
+      }
+    },
+    {
+      "Name": "invalid-persisted",
+      "Kind": "Weights",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": 99
+        }
+      ],
+      "CivilizationId": 1,
+      "Fallback": {
+        "ConstructionWeight": 1,
+        "ShipbuildingWeight": 1
+      },
+      "ExpectedError": "Unknown persisted industry priority."
+    },
+    {
+      "Name": "command-accepted",
+      "Kind": "Command",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ],
+      "Actor": 1,
+      "Target": 1,
+      "Priority": 1,
+      "Before": {
+        "DeveloperSession": null,
+        "GenerationMetadata": null,
+        "GalacticCore": null,
+        "ActiveCombatEncounter": null,
+        "CombatIntelligence": [],
+        "Seed": 1,
+        "Systems": [],
+        "PlanetaryBodies": [],
+        "Civilizations": [],
+        "Fleets": [],
+        "Colonies": [],
+        "Economies": [
+          {
+            "CivilizationId": 1,
+            "Credits": 500,
+            "Industry": 200,
+            "Science": 0,
+            "LastCreditsPerSecond": 0,
+            "LastIndustryPerSecond": 0,
+            "LastSciencePerSecond": 0,
+            "LastResearchSpendingPerDay": 0,
+            "LastResearchFundingFraction": 1,
+            "OperatingArrears": 0,
+            "LastBaseOperationsFundingFraction": 1,
+            "IndustryPriority": null
+          }
+        ],
+        "Technologies": [],
+        "ConstructionStates": [],
+        "ShipyardStates": [],
+        "PlayerCivilizationId": 1,
+        "Knowledge": {}
+      },
+      "Expected": {
+        "Accepted": true,
+        "Message": "Industry priority set to Infrastructure first."
+      },
+      "After": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": 1
+        }
+      ]
+    },
+    {
+      "Name": "command-unknown-enum",
+      "Kind": "Command",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ],
+      "Actor": 1,
+      "Target": 1,
+      "Priority": 99,
+      "Before": {
+        "DeveloperSession": null,
+        "GenerationMetadata": null,
+        "GalacticCore": null,
+        "ActiveCombatEncounter": null,
+        "CombatIntelligence": [],
+        "Seed": 1,
+        "Systems": [],
+        "PlanetaryBodies": [],
+        "Civilizations": [],
+        "Fleets": [],
+        "Colonies": [],
+        "Economies": [
+          {
+            "CivilizationId": 1,
+            "Credits": 500,
+            "Industry": 200,
+            "Science": 0,
+            "LastCreditsPerSecond": 0,
+            "LastIndustryPerSecond": 0,
+            "LastSciencePerSecond": 0,
+            "LastResearchSpendingPerDay": 0,
+            "LastResearchFundingFraction": 1,
+            "OperatingArrears": 0,
+            "LastBaseOperationsFundingFraction": 1,
+            "IndustryPriority": null
+          }
+        ],
+        "Technologies": [],
+        "ConstructionStates": [],
+        "ShipyardStates": [],
+        "PlayerCivilizationId": 1,
+        "Knowledge": {}
+      },
+      "Expected": {
+        "Accepted": false,
+        "Message": "Unknown industry priority."
+      },
+      "After": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ]
+    },
+    {
+      "Name": "command-foreign",
+      "Kind": "Command",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ],
+      "Actor": 2,
+      "Target": 1,
+      "Priority": 0,
+      "Before": {
+        "DeveloperSession": null,
+        "GenerationMetadata": null,
+        "GalacticCore": null,
+        "ActiveCombatEncounter": null,
+        "CombatIntelligence": [],
+        "Seed": 1,
+        "Systems": [],
+        "PlanetaryBodies": [],
+        "Civilizations": [],
+        "Fleets": [],
+        "Colonies": [],
+        "Economies": [
+          {
+            "CivilizationId": 1,
+            "Credits": 500,
+            "Industry": 200,
+            "Science": 0,
+            "LastCreditsPerSecond": 0,
+            "LastIndustryPerSecond": 0,
+            "LastSciencePerSecond": 0,
+            "LastResearchSpendingPerDay": 0,
+            "LastResearchFundingFraction": 1,
+            "OperatingArrears": 0,
+            "LastBaseOperationsFundingFraction": 1,
+            "IndustryPriority": null
+          }
+        ],
+        "Technologies": [],
+        "ConstructionStates": [],
+        "ShipyardStates": [],
+        "PlayerCivilizationId": 1,
+        "Knowledge": {}
+      },
+      "Expected": {
+        "Accepted": false,
+        "Message": "Only the owning civilization can set its industry priority."
+      },
+      "After": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ]
+    },
+    {
+      "Name": "command-missing",
+      "Kind": "Command",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ],
+      "Actor": 2,
+      "Target": 2,
+      "Priority": 0,
+      "Before": {
+        "DeveloperSession": null,
+        "GenerationMetadata": null,
+        "GalacticCore": null,
+        "ActiveCombatEncounter": null,
+        "CombatIntelligence": [],
+        "Seed": 1,
+        "Systems": [],
+        "PlanetaryBodies": [],
+        "Civilizations": [],
+        "Fleets": [],
+        "Colonies": [],
+        "Economies": [
+          {
+            "CivilizationId": 1,
+            "Credits": 500,
+            "Industry": 200,
+            "Science": 0,
+            "LastCreditsPerSecond": 0,
+            "LastIndustryPerSecond": 0,
+            "LastSciencePerSecond": 0,
+            "LastResearchSpendingPerDay": 0,
+            "LastResearchFundingFraction": 1,
+            "OperatingArrears": 0,
+            "LastBaseOperationsFundingFraction": 1,
+            "IndustryPriority": null
+          }
+        ],
+        "Technologies": [],
+        "ConstructionStates": [],
+        "ShipyardStates": [],
+        "PlayerCivilizationId": 1,
+        "Knowledge": {}
+      },
+      "Expected": {
+        "Accepted": false,
+        "Message": "Unknown civilization economy."
+      },
+      "After": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ]
+    },
+    {
+      "Name": "command-unknown-first",
+      "Kind": "Command",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ],
+      "Actor": 2,
+      "Target": 1,
+      "Priority": 99,
+      "Before": {
+        "DeveloperSession": null,
+        "GenerationMetadata": null,
+        "GalacticCore": null,
+        "ActiveCombatEncounter": null,
+        "CombatIntelligence": [],
+        "Seed": 1,
+        "Systems": [],
+        "PlanetaryBodies": [],
+        "Civilizations": [],
+        "Fleets": [],
+        "Colonies": [],
+        "Economies": [
+          {
+            "CivilizationId": 1,
+            "Credits": 500,
+            "Industry": 200,
+            "Science": 0,
+            "LastCreditsPerSecond": 0,
+            "LastIndustryPerSecond": 0,
+            "LastSciencePerSecond": 0,
+            "LastResearchSpendingPerDay": 0,
+            "LastResearchFundingFraction": 1,
+            "OperatingArrears": 0,
+            "LastBaseOperationsFundingFraction": 1,
+            "IndustryPriority": null
+          }
+        ],
+        "Technologies": [],
+        "ConstructionStates": [],
+        "ShipyardStates": [],
+        "PlayerCivilizationId": 1,
+        "Knowledge": {}
+      },
+      "Expected": {
+        "Accepted": false,
+        "Message": "Unknown industry priority."
+      },
+      "After": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 1,
+          "IndustryPriority": null
+        }
+      ]
+    },
+    {
+      "Name": "funding-default",
+      "Kind": "Funding",
+      "Economies": [],
+      "CivilizationId": 1,
+      "Expected": 1
+    },
+    {
+      "Name": "funding-clamp-low",
+      "Kind": "Funding",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": -0.2,
+          "IndustryPriority": null
+        }
+      ],
+      "CivilizationId": 1,
+      "Expected": 0
+    },
+    {
+      "Name": "funding-clamp-high",
+      "Kind": "Funding",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": 2,
+          "IndustryPriority": null
+        }
+      ],
+      "CivilizationId": 1,
+      "Expected": 1
+    },
+    {
+      "Name": "funding-nonfinite",
+      "Kind": "Funding",
+      "Economies": [
+        {
+          "CivilizationId": 1,
+          "Credits": 500,
+          "Industry": 200,
+          "Science": 0,
+          "LastCreditsPerSecond": 0,
+          "LastIndustryPerSecond": 0,
+          "LastSciencePerSecond": 0,
+          "LastResearchSpendingPerDay": 0,
+          "LastResearchFundingFraction": 1,
+          "OperatingArrears": 0,
+          "LastBaseOperationsFundingFraction": "NaN",
+          "IndustryPriority": null
+        }
+      ],
+      "CivilizationId": 1,
+      "Expected": 0
+    }
+  ]
+}

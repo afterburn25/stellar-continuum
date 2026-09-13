@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "platform": "windows-x64",
+  "presets": {
+    "windows-development": { "configurePreset": "windows-development", "includeSymbols": true, "mode": "headless-foundation" },
+    "windows-testing": { "configurePreset": "windows-testing", "includeSymbols": false, "mode": "headless-foundation" },
+    "windows-headless": { "configurePreset": "windows-headless", "includeSymbols": false, "mode": "headless-foundation" },
+    "windows-benchmark": { "configurePreset": "windows-headless", "includeSymbols": false, "mode": "headless-foundation", "benchmark": true },
+    "windows-release": { "blocked": "Graphical game parity is not implemented. Use windows-headless for the native foundation; use the preserved Godot export for the existing playable game." },
+    "windows-steam": { "blocked": "Steam publishing is deferred until graphical Windows release parity and Steam configuration are validated." }
+  }
+}

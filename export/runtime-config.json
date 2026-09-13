@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "application": "Stellar Continuum",
+  "engineVersion": "0.1.12",
+  "gameVersion": "0.1.7-alpha",
+  "mode": "headless-foundation",
+  "graphicalParity": false,
+  "description": "Completed fresh campaign initialization and travel libraries. Full simulation ticks, research progression, save-v16, and graphical parity remain open."
+}

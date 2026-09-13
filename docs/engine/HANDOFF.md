@@ -1,0 +1,5 @@
+# Stellar Engine migration handoff
+
+0.1.11 is committed as `4763cba2810e5c109d5834a26ea0072b5fd6bf32`; its clean benchmark package is `Builds/Windows/StellarContinuum-windows-benchmark-4763cba2-20260913T035032571557Z`, engine 0.1.11, `sourceDirty: false`, 27/27 CTest and 16/16 Python. All six CI workflows are green: native, build, Windows, research, voice, and screenshots.
+
+Current engine 0.1.12 fresh-campaign/knowledge/legacy work is pre-commit evidence: 30/30 CTest and 19/19 Python. See FRESH_CAMPAIGN_VALIDATION.md for the reviewed packages. The next implementation gates are 023 civilian recovery (75 native cases plus five source-only observations), 024 survey profiling/planning, and 025 exploration advancement. Gate numbers are work identifiers, not engine versions. Their implementations remain ignored drafts; their migration contracts are retained as planned architecture. Territorial PR #323 remains paused with enclosed pockets unresolved. No full campaign tick, player save, graphics, playable native runtime, or FPS claim applies.

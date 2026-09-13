@@ -8,3 +8,8 @@ bin/
 obj/
 exports/
 dist/
+.tools/
+build-native/
+Builds/
+work/
+__pycache__/

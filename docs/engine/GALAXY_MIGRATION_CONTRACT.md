@@ -1,0 +1,11 @@
+# Native stellar/planetary data slice
+
+The native 0.1.1 slice ports physical stellar/body data without changing the game. Preserved C# files and fixture helpers remain authoritative. This ends before civilizations, homeworlds, economy, and campaign state.
+
+Frozen shared C++ interface: `core/include/stellar/core/galaxy_catalog.hpp`. Enum ordinal values match `StarSystemState.cs`. `StarPosition` retains float XY and optional double depth as in existing distance parity. Catalog IDs, null companion fields, Sol preset `sol-v1`, known XYZ and recorded spectral strings retain their semantics. Full-galaxy counts are exactly 250/500/1000/2500. Ninety-six nearest classified HYG records retain measured identity; generated stars have no fabricated HYG identity. The hidden center is metadata with no routable star ID; presentation/discovery must continue filtering it.
+
+`LegacyRandom` preserves the explicitly seeded .NET 8 compatibility stream (`next()`, bounded `next(max)`, `next_double()`). Signed 64-bit seed folding is bitwise identical to C# unchecked `seed ^ (seed >> 32) ^ salt`. Do not use Engine SplitMix64 for this port. Existing geometry preserves float vector steps; coordinate parity uses tight tolerances for platform libm, but rejection/acceptance order and star identity may never drift.
+
+Population/placement ownership: `core/src/stellar_population.cpp` implements radius/core, quotas, seeded class deck, layout and generated positions. Names/companions and catalog parsing/composition remain coordinator-owned. Sol body port owns `core/include/stellar/core/planetary_catalog.hpp`, `core/src/planetary_catalog.cpp` and its tests. Changes to shared interfaces require coordinator agreement; no agent edits CMake/app/export owned by coordinator.
+
+Reference fixtures call actual existing public C# helpers (population, layout, namer, companions, catalog application, Sol creation/upgrade and seeded System.Random), including nine-planet scenarios. Local native validation is green: 6/6 CTest plus 13 Python checks, with 5500-system/33717-body oracle coverage and 768 RNG triplets. Runtime astronomy JSON/README and dependency licenses are included and validated from a relocated folder. Full campaign/new-game and save-v16 parity stay open.

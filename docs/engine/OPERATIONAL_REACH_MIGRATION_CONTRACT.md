@@ -1,0 +1,25 @@
+# Operational reach and route orders
+
+Source `Exploration/InterstellarOperationalReach.cs` and `Units/InterstellarDistanceUnits.cs`. Native dependencies are the reviewed full FleetState, local-transit functions, lane graph and real colonies. This boundary can be completed without inventing research/knowledge state: the current authoritative lane-reach implementation does not consult those systems. Keep its five mission-kind values, but do not add role-specific reach policy that the source does not implement. The prototype compatibility adapter must remain explicitly provisional if retained; never use it as a successful authoritative route fallback.
+
+## Borrowed state and graph
+
+Define a read view borrowing const systems and colonies plus the campaign-owned lane graph for exactly those system geometries. The campaign owner is responsible for rebuilding the immutable graph after geometry replacement, consistent with the graph contract. Reach assessment is read-only; route assignment mutates only the supplied full FleetState. Do not create a second fleet representation or debit fuel during assessment. Return all assessment fields including authoritative/supported flags, reason, optional ordered route and total physical distance. Absent route differs from empty route.
+
+## Authoritative reach
+
+Preserve validation order: fleet ownership, target existence, fleet current system, shortest route using the fleet maximum leg range, then fuel/refueling. Invalid origin may throw from route lookup. A zero-leg route is valid even with zero fuel if source routing accepts the range. Build the colony refueling service by owned system: any Colony provides full capacity, otherwise an outpost provides half capacity; multiple outposts do not add up. At an owned origin, forecast fuel is capacity times service, replacing rather than maximizing current fuel. At each accepted leg, compare required separation to remaining+1e-9, deduct the leg, then refill at its destination if serviced. Do not search for a longer fuel-feasible route when the shortest geometric route fails: that would change baseline mission acceptance. Sum physical route lengths in double, preserving order. Reasons use the source metric-primary formatter.
+
+## Route mutation
+
+Assignment first rejects unsupported reach. If its route is absent and the fleet has a current system, ask the lane graph; absent/empty result falls back to the explicitly requested final destination. Preserve this source fallback separately from reach approval, never as a general movement shortcut. Set final destination, increment mission revision, clear hold/return flags/failure, and store route IDs excluding every occurrence of the current system. When rerouting during local departure/arrival and both current and next system records exist, preserve the ship's actual local position, set transit origin/target and begin local departure toward the correct gate. Do not reset other mission/cargo/settlement/reconnaissance fields.
+
+Clear removes destination and planned route, increments revision, and clears hold/return/failure. With a current system and a non-None phase, begin local arrival from the current local position to center and clear target, retaining the source origin. Otherwise, if not interstellar warp, reset phase/origin/target/progress; a warping ship remains in warp. No teleportation or fuel change. Source Int32 mission revision increments are unchecked; native must reject exhaustion before any mutation with an explicitly documented native identity boundary rather than invoking signed overflow.
+
+## Metric display compatibility
+
+Simulation lengths stay in light years; display km and km/day using 9.4607304725808e12 km/light-year, with the authored secondary ly value. Negative/nonfinite inputs return the exact unconfirmed strings. Below 1e6 km use invariant N0; otherwise format coefficient with invariant 0.### and a Unicode superscript base10 exponent. Reuse reviewed custom-fixed formatting for source 0.# / 0.### rather than std::to_string or locale-sensitive output. The source formatter can overflow when a finite length multiplied by the conversion becomes infinity: capture this separately and reject cleanly without an undefined float-to-int conversion. This formatter is a compatibility helper, not the eventual localization architecture.
+
+## Validation
+
+Actual C# fixtures cover assessment factories, metric formats, controlled/missing/warping fleets, empty/unreachable/permitted graph behavior, zero/exact/short fuel, origin/destination/intermediate refueling, outpost half-service, foreign colonies ignored, mixed depth and route-distance messages. Include all route assign/clear branches and source failure order, full before/after fleet and unchanged colonies/systems. Invalid fixtures must fail outside operation catches; assert exact result messages, optional routes and full state. Include revision-exhaustion native rejection without treating C# wrapped IDs as safe parity. This layer neither advances time nor reveals systems, surveys worlds or colonizes them.
