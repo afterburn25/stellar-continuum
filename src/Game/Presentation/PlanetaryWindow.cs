@@ -104,6 +104,7 @@ public sealed partial class PlanetaryWindow : Control
     public void Open()
     {
         IsOpen = true; Visible = true; SetProcess(true); _selectedSlot = null; _structure = ""; _detailState = "";
+        _status.Text = "Select a building slot to begin."; _status.AddThemeColorOverride("font_color", Teal); _tabs.CurrentTab = 0;
         Refresh(true); GrabFocus();
     }
     public void Close() { IsOpen = false; Visible = false; SetProcess(false); _demolition.Hide(); _pendingRemoval = null; }
