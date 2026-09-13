@@ -22,6 +22,9 @@ public static class EditorVerification
             window.InitializeVerification(Path.Combine(output, "test-library"));
             window.UpdateLayout();
             await window.GenerateAsync(false);
+            await window.Viewport.ArtworkReady;
+            Check(window.Viewport.Detailed && window.Viewport.ArtworkResolution == 2048, "Detailed galaxy starts with a completed 2048-pixel background");
+            var artworkBuilds = window.Viewport.ArtworkBuildCount;
             Check(window.Project.Catalog?["systems"]?.AsArray().Count == 500, "Real native engine generates 500 systems");
             Check(window.Project.Catalog?["colonies"]?.AsArray().Count == 9, "Real native engine seeds nine starting colonies");
             Check(window.Project.Catalog?["phase"]?.GetValue<string>() == "colonies-before-fleets", "Preview retains truthful migration boundary");
@@ -35,6 +38,7 @@ public static class EditorVerification
             Check(window.Project.Annotations[0].Bookmarked && window.Project.Annotations[0].Notes.Contains("officer"), "Notes and bookmark are authored together");
             Check(window.Project.Catalog!["systems"]![0]!["name"]!.GetValue<string>() != "Sol — First Light", "Annotations preserve authoritative generated data");
             window.Undo(); Check(!window.Project.Annotations.ContainsKey(0), "Undo restores previous project state");
+            Check(window.Viewport.ArtworkBuildCount == artworkBuilds, "Annotation edits and undo reuse cached galaxy artwork");
             window.DisplayNameBox.Text = "Sol — First Light"; window.ObjectNotesBox.Text = "Player arrival and officer introduction."; window.BookmarkBox.IsChecked = true; window.ApplyAnnotation();
             window.CategoryBox.SelectedIndex = 4; Check(window.ObjectList.Items.Count == 1, "Bookmark filter lists only bookmarked systems");
             window.CategoryBox.SelectedIndex = 0; window.SearchBox.Text = "First Light"; Check(window.ObjectList.Items.Count == 1, "Search includes authored display names");
@@ -61,6 +65,9 @@ public static class EditorVerification
             var corrupt = window.Project.Copy(); corrupt.SchemaVersion = 99; Reject(corrupt.Validate, "Unsupported project versions are rejected");
             corrupt = window.Project.Copy(); corrupt.Seed++; Reject(corrupt.Validate, "Mismatched generation settings are rejected");
             corrupt = window.Project.Copy(); corrupt.Catalog!["systems"]![1]!["id"] = 0; Reject(corrupt.Validate, "Duplicate world object IDs are rejected");
+            corrupt = window.Project.Copy(); corrupt.Catalog!["systems"]![1]!["depthLightYears"] = double.PositiveInfinity; Reject(corrupt.Validate, "Nonfinite system depth is rejected before entering the viewport");
+            corrupt = window.Project.Copy(); corrupt.Catalog!["core"]!["x"] = "invalid"; Reject(corrupt.Validate, "Invalid galaxy center is rejected before entering the viewport");
+            corrupt = window.Project.Copy(); corrupt.Catalog!["radiusLightYears"] = 0.0; Reject(corrupt.Validate, "Nonpositive galaxy radius is rejected before entering the viewport");
             var before = window.Project.Catalog!.ToJsonString(); window.SeedBox.Text = "not-a-seed";
             bool failed = false; try { await window.GenerateAsync(false); } catch (InvalidDataException) { failed = true; }
             Check(failed && window.Project.Catalog.ToJsonString() == before, "Invalid generation request preserves the current world");
@@ -69,10 +76,37 @@ public static class EditorVerification
             var exported = JsonNode.Parse(File.ReadAllText(export))!;
             Check(exported["editor"]!["gameplayParity"]!.GetValue<bool>() == false && exported["systems"]!.AsArray().Count == 500, "Snapshot export carries real native data and explicit preview status");
             window.ProjectNameBox.Text = "Stellar Continuum — First Light"; window.SaveTo(path);
+            var authoritative = window.Project.Catalog!.ToJsonString();
+            window.Viewport.SetOrientation(37, 53); window.Viewport.Fit();
+            var anchor = window.Viewport.ScreenFor(0); window.Viewport.ZoomAt(2, anchor);
+            Check((window.Viewport.ScreenFor(0) - anchor).Length < .0001, "Zoom keeps the catalog system under the cursor at an oblique angle");
+            window.Viewport.PanBy(new Vector(27, -19));
+            Check((window.Viewport.ScreenFor(0) - anchor - new Vector(27, -19)).Length < .0001, "Pan moves projected systems by the requested screen distance");
+            Check(window.Viewport.SelectAt(window.Viewport.ScreenFor(0)) && window.Viewport.SelectedSystem == 0, "Tilted and rotated galaxy retains accurate system hit testing");
+            window.Viewport.FocusSystem(0);
+            Check((window.Viewport.ScreenFor(0) - new Point(window.Viewport.ActualWidth / 2, window.Viewport.ActualHeight / 2)).Length < .0001, "Focus centers a system including its native depth");
+            window.ViewModeBox.SelectedIndex = 1;
+            Check(!window.Viewport.Detailed && !window.TiltSlider.IsEnabled && window.Viewport.SelectAt(window.Viewport.ScreenFor(0)), "Map mode offers selectable systems and disables galaxy tilt");
+            Capture(window, Path.Combine(output, "editor-map.png"));
+            window.ViewModeBox.SelectedIndex = 0; window.TiltSlider.Value = 24; window.Viewport.SetOrientation(-15, 24);
+            Check(window.Viewport.Detailed && window.Viewport.ArtworkBuildCount == artworkBuilds, "Switching views and moving the camera reuse existing artwork");
+            Check(window.Project.Catalog.ToJsonString() == authoritative && !window.IsDirty, "View controls do not change world data or dirty the saved project");
             window.Width = 1480; window.Height = 940; await Layout(window); Capture(window, Path.Combine(output, "editor-1480.png"));
             Check(window.Viewport.ActualWidth > 500 && window.ObjectList.ActualHeight > 250, "Large layout keeps viewport and object list usable");
             window.Width = 1180; window.Height = 800; await Layout(window); Capture(window, Path.Combine(output, "editor-1180.png"));
             Check(window.Viewport.ActualWidth >= 350 && window.GenerateButton.ActualWidth > 150, "Compact layout retains usable viewport and generation controls");
+            window.ExpandButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(window.IsViewportExpanded && window.Viewport.ActualWidth > 1100 && window.ObjectList.IsVisible == false, "Expand gives the galaxy the full workspace");
+            window.ExpandButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(!window.IsViewportExpanded && window.ObjectList.IsVisible, "Restore returns the editing panels");
+            window.Width = 1480; window.Height = 940; window.SetExpanded(true); await Layout(window);
+            Capture(window, Path.Combine(output, "editor-galaxy-expanded.png"));
+            CaptureElement(window.Viewport, Path.Combine(output, "galaxy-view.png"));
+            window.CountBox.SelectedIndex = 3; window.SeedBox.Text = "932017";
+            await window.GenerateAsync(false); await window.Viewport.ArtworkReady; await Layout(window);
+            Check(window.Project.Catalog!["systems"]!.AsArray().Count == 2500 && window.Viewport.ArtworkResolution == 2048, "Largest supported 2500-system world builds detailed galaxy artwork");
+            Check(window.Viewport.SelectAt(window.Viewport.ScreenFor(2499)) && window.Viewport.SelectedSystem == 2499, "Largest supported world keeps its last catalog system selectable");
+            Capture(window, Path.Combine(output, "editor-galaxy-2500.png"));
             await File.WriteAllTextAsync(Path.Combine(output, "verification.json"), JsonSerializer.Serialize(new { passed = checks.Count, checks, engineVersion = window.Project.EngineVersion, engineCommit = window.Project.EngineCommit, standaloneCleanMachine = false }, WorldProject.JsonOptions));
             window.CloseVerification(); Application.Current.Shutdown(0);
         }
@@ -93,9 +127,14 @@ public static class EditorVerification
     }
     public static void Capture(MainWindow window, string path)
     {
-        var target = window.RootGrid;
+        CaptureElement(window.RootGrid, path);
+    }
+    private static void CaptureElement(FrameworkElement target, string path)
+    {
         var bitmap = new RenderTargetBitmap((int)target.ActualWidth, (int)target.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(target); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var stream = File.Create(path); encoder.Save(stream);
+        var drawing = new DrawingVisual();
+        using (var context = drawing.RenderOpen()) context.DrawRectangle(new VisualBrush(target) { Stretch = Stretch.Fill }, null, new Rect(0, 0, target.ActualWidth, target.ActualHeight));
+        bitmap.Render(drawing); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var stream = File.Create(path); encoder.Save(stream);
     }
     private static void WriteWave(string path)
     {

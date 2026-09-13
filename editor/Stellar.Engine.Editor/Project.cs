@@ -50,11 +50,15 @@ public sealed class WorldProject
         if (Catalog["phase"]?.GetValue<string>() != "colonies-before-fleets") throw new InvalidDataException("This catalog is not a supported colony preview.");
         var systems = Catalog["systems"] as JsonArray ?? throw new InvalidDataException("Missing world systems.");
         if (systems.Count != SystemCount || Catalog["count"]?.GetValue<int>() != SystemCount || Catalog["seed"]?.GetValue<long>() != Seed) throw new InvalidDataException("Project settings do not match the generated world.");
+        static bool OptionalCoordinate(JsonNode? node) => node is null || node is JsonValue value && value.TryGetValue<double>(out var number) && double.IsFinite(number);
+        if (Catalog["core"] is JsonNode core && (core is not JsonObject || !OptionalCoordinate(core["x"]) || !OptionalCoordinate(core["y"]))) throw new InvalidDataException("Invalid galaxy center.");
+        if (!OptionalCoordinate(Catalog["radiusLightYears"]) || Catalog["radiusLightYears"] is JsonNode radius && radius.GetValue<double>() <= 0) throw new InvalidDataException("Invalid galaxy radius.");
         var ids = new HashSet<int>();
         foreach (var item in systems)
         {
             var s = item as JsonObject ?? throw new InvalidDataException("Invalid system record.");
             if (!ids.Add(s["id"]!.GetValue<int>()) || string.IsNullOrWhiteSpace(s["name"]?.GetValue<string>()) || !double.IsFinite(s["xLightYears"]!.GetValue<double>()) || !double.IsFinite(s["yLightYears"]!.GetValue<double>())) throw new InvalidDataException("Invalid or duplicate star system.");
+            if (!OptionalCoordinate(s["depthLightYears"])) throw new InvalidDataException("Invalid star system depth.");
         }
         if (Catalog["planetaryBodies"] is not JsonArray || Catalog["civilizations"] is not JsonArray || Catalog["colonies"] is not JsonArray) throw new InvalidDataException("The generated world is incomplete.");
     }

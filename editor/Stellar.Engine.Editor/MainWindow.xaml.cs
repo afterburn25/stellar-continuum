@@ -23,6 +23,9 @@ public partial class MainWindow : Window
     private List<WorldItem> objects = [];
     private WorldItem? selected;
     private bool ready, refreshing, verifiedClose;
+    private bool updatingCamera;
+    private readonly Dictionary<UIElement, Visibility> panelVisibility = [];
+    public bool IsViewportExpanded { get; private set; }
     private CancellationTokenSource? generation;
     private readonly Stack<WorldProject> undo = new(), redo = new();
     private readonly MediaPlayer audio = new();
@@ -30,6 +33,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Viewport.SystemSelected += id => SelectSystem(id);
+        Viewport.CameraChanged += UpdateCameraControls;
         PreviewKeyDown += Shortcuts;
         audio.MediaFailed += (_, e) => Report("This audio could not be played: " + e.ErrorException.Message);
     }
@@ -59,7 +63,7 @@ public partial class MainWindow : Window
         ProjectNameBox.Text = Project.Name; SeedBox.Text = Project.Seed.ToString(CultureInfo.InvariantCulture);
         CountBox.SelectedIndex = Array.IndexOf(new[] { 250, 500, 1000, 2500 }, Project.SystemCount);
         objects = WorldData.Items(Project); EmptyHint.Visibility = objects.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        Viewport.SetWorld(objects, Project.Annotations); refreshing = false; RefreshFilter();
+        Viewport.SetWorld(objects, Project.Annotations, Project.Catalog, Project.Seed); refreshing = false; RefreshFilter();
         if (fit) { Viewport.Fit(); if (objects.Count > 0) SelectSystem(0); }
         UpdateTitle(); RefreshAssets();
     }
@@ -285,10 +289,41 @@ public partial class MainWindow : Window
     });
     private void StopAudioClick(object sender, RoutedEventArgs e) { audio.Stop(); Log("Audio stopped."); }
     private void FitClick(object sender, RoutedEventArgs e) => Viewport.Fit();
+    private void ViewModeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Viewport is not null && !updatingCamera) Viewport.SetDetailed(ViewModeBox.SelectedIndex == 0);
+    }
+    private void TiltChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Viewport is not null && !updatingCamera) Viewport.SetOrientation(Viewport.RotationDegrees, e.NewValue);
+    }
+    private void UpdateCameraControls()
+    {
+        updatingCamera = true;
+        ViewModeBox.SelectedIndex = Viewport.Detailed ? 0 : 1;
+        TiltSlider.IsEnabled = Viewport.Detailed; TiltSlider.Value = Viewport.TiltDegrees;
+        TiltLabel.Text = $"{Viewport.TiltDegrees:0}°";
+        updatingCamera = false;
+    }
+    public void SetExpanded(bool expanded)
+    {
+        if (IsViewportExpanded == expanded) return;
+        IsViewportExpanded = expanded;
+        if (expanded)
+        {
+            foreach (UIElement panel in WorkspaceGrid.Children)
+                if (panel != GalaxyPanel) { panelVisibility[panel] = panel.Visibility; panel.Visibility = Visibility.Collapsed; }
+        }
+        else { foreach (var pair in panelVisibility) pair.Key.Visibility = pair.Value; panelVisibility.Clear(); }
+        Grid.SetColumn(GalaxyPanel, expanded ? 0 : 2); Grid.SetColumnSpan(GalaxyPanel, expanded ? 5 : 1); Grid.SetRowSpan(GalaxyPanel, expanded ? 3 : 1);
+        ExpandButton.Content = expanded ? "Restore" : "Expand";
+        UpdateLayout(); Viewport.Fit();
+    }
+    private void ExpandClick(object sender, RoutedEventArgs e) => SetExpanded(!IsViewportExpanded);
     private void FocusClick(object sender, RoutedEventArgs e) { if (selected is not null) Viewport.FocusSystem(selected.SystemId); }
     private void LabelsChanged(object sender, RoutedEventArgs e) { if (Viewport is not null) { Viewport.ShowNames = LabelsBox.IsChecked == true; Viewport.InvalidateVisual(); } }
     private void HelpClick(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        "STELLAR ENGINE EDITOR 0.1\n\n1. Generate a world with the converted native engine.\n2. Select objects in the outliner or click stars. Scroll to zoom; drag to pan.\n3. Give systems editor names, design notes and bookmarks; click Apply.\n4. Import art, voices, models and data into Engine Assets. Add selected assets to your project to include a portable copy.\n5. Save a .stellar-project or export a world snapshot.\n\nCtrl+S saves. Ctrl+Z / Ctrl+Y undo and redo project changes outside text fields. F focuses the selected system.\n\nThis build supports world generation and authoring annotations. Full campaign play, a native game renderer, a scene/model editor and playable game export are still being developed. The current viewport is an editor map.\n\nEngine Assets: " + Library.Root, "Using Stellar Engine Editor");
+        "STELLAR ENGINE EDITOR 0.1.1\n\n1. Generate a world with the converted native engine.\n2. Explore the detailed Galaxy view: scroll to zoom, drag to pan, right-drag to orbit, or adjust Viewing angle. Expand fills the workspace. Map shows clear editing markers.\n3. Click a system to inspect it, add names, notes and bookmarks, then click Apply.\n4. Import art, voices, models and data into Engine Assets. Add selected assets to your project to include a portable copy.\n5. Save a .stellar-project or export a world snapshot.\n\nCtrl+S saves. Ctrl+Z / Ctrl+Y undo and redo project changes outside text fields. F focuses the selected system.\n\nGalaxy light and dust are illustrative; selectable systems use the generated world data. Full campaign play, a native game renderer, a scene/model editor and playable game export are still being developed.\n\nEngine Assets: " + Library.Root, "Using Stellar Engine Editor");
     public void Log(string text) { LogBox.AppendText(text + "\n\n"); LogBox.ScrollToEnd(); }
     private void Report(string text) { Log(text); StatusText.Text = text; MessageBox.Show(this, text, "Stellar Engine Editor", MessageBoxButton.OK, MessageBoxImage.Information); }
     private void Try(Action work) { try { work(); } catch (Exception error) { Report(error.Message); } }

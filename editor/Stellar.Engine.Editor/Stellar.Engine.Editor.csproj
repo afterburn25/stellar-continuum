@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>StellarEngineEditor</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>Stellar Engine Editor</Product>
     <Description>Stellar Continuum world authoring and native engine preview</Description>
   </PropertyGroup>

@@ -1,4 +1,4 @@
-# Stellar Engine Editor 0.1
+# Stellar Engine Editor 0.1.1
 
 The user requested a launchable engine program, chose **Stellar Continuum first**,
 and requested reusable Engine Assets. This adds an editor application to the
@@ -16,7 +16,9 @@ choose a different executable. Runtime failures keep the last valid world.
 ## Working features
 
 - Native galaxy/founding/colony generation, 250/500/1000/2500 systems and signed seeds.
-- Interactive map with pan, zoom, hit selection, focus and labels; class-based markers.
+- Detailed galaxy with a central bulge, spiral arms, dust lanes and unresolved stellar
+  light; tilt, orbit, pan, zoom, selectable systems and an expanded workspace view.
+- Map mode with class-based markers, focus and optional names.
 - Searchable systems, bodies, civilizations and colonies with a property inspector.
 - System display-name overrides, notes and bookmarks; bounded undo/redo.
 - Atomic project saving with a previous-file backup, reopening and snapshot export.
@@ -51,6 +53,12 @@ A developer-machine relocated launch is not separate clean-machine certification
 The first packaged build passed 32 checks, including WAV decoding through the
 Windows audio backend and restoration of portable project assets. The original
 Godot project also built with zero warnings/errors after the editor exclusion.
+
+Editor 0.1.1 passes 48 checks, including camera transforms, cursor-anchored zoom,
+selection with depth, cached artwork across annotation edits, immutable world data,
+view switching, panel expansion/restoration and generation at 2500 systems.
+Rendered proofs cover the normal, compact, expanded and map views. See
+[Galaxy view](GALAXY_VIEW.md) for rendering details and remaining limitations.
 
 ## Follow-up editor work
 

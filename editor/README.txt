@@ -1,4 +1,4 @@
-STELLAR ENGINE EDITOR 0.1
+STELLAR ENGINE EDITOR 0.1.1
 
 Double-click StellarEngineEditor.exe. Keep the folders beside it.
 This Windows x64 package includes its desktop runtime and the native Stellar Engine 0.1.9.
@@ -7,7 +7,9 @@ GETTING STARTED
 The First Light example opens automatically. Use Save project to save your own copy.
 Generate world runs the converted native engine and creates actual stars, planets,
 civilizations and starting colonies. Scroll to zoom, drag to pan, and click a star
-to inspect it. The outliner also lists bodies, civilizations and colonies.
+to inspect it. Right-drag to orbit; Viewing angle changes the tilt. Expand fills
+the workspace with the galaxy. Switch Galaxy to Map for clear editing markers.
+The outliner also lists bodies, civilizations and colonies.
 Edit a star's display name, design notes and bookmark, then click Apply to project.
 Ctrl+S saves. Ctrl+Z and Ctrl+Y undo/redo project changes outside text fields.
 
@@ -35,7 +37,10 @@ The undo history keeps 12 project changes. Projects are separate from game saves
 
 CURRENT SCOPE
 This is a working first world editor, not the finished editor suite.
-The map is a desktop editor viewport; it is not the game's future native renderer.
+Galaxy view adds procedural stellar light, a central bulge, spiral arms and dust
+lanes. These are illustrative; selectable systems use the native catalog. The
+compact world scale is a gameplay layout, not a measured full-size Milky Way.
+The view is a desktop editor feature; the game's native renderer is still planned.
 Full campaign play, a scene/model editor, simulation-property editing and playable
 game export require later migration/editor work. Display names and notes are
 authoring annotations; they do not alter physical simulation rules.

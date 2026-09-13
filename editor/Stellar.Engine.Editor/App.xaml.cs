@@ -26,6 +26,7 @@ public partial class App : Application
             window.Loaded += async (_, _) =>
             {
                 await window.StartAsync(null);
+                await window.Viewport.ArtworkReady;
                 await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 window.Viewport.Fit(); window.UpdateLayout();
                 EditorVerification.Capture(window, e.Args[1]);
