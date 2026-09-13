@@ -1,0 +1,103 @@
+{
+  "Schema": "stellar.atomic-file-write.actual-source.v1",
+  "SourceFile": "src/Game/Persistence/CampaignStatePersistenceService.cs",
+  "SourceHashBefore": "9F8D76175B56CA01D77A06D5FDDDA0B18ADBE9761D2BBEFFCBEC4A432198921F",
+  "SourceHashAfter": "9F8D76175B56CA01D77A06D5FDDDA0B18ADBE9761D2BBEFFCBEC4A432198921F",
+  "RowCount": 5,
+  "Rows": [
+    {
+      "Name": "new-nested-unicode-no-bom",
+      "RelativePath": "nested/\u661F/save.json",
+      "Text": "{\u0022name\u0022:\u0022\u03A9\u96EA\u0022,\u0022zero\u0022:\u0022\\u0000\u0022}",
+      "PreserveExistingBackup": false,
+      "Before": {
+        "Primary": null,
+        "Backup": null,
+        "Unrelated": "CQAI",
+        "Temps": [
+          "save.json.unrelated.tmp"
+        ]
+      },
+      "After": {
+        "Primary": "eyJuYW1lIjoizqnpm6oiLCJ6ZXJvIjoiXHUwMDAwIn0=",
+        "Backup": null,
+        "Unrelated": "CQAI",
+        "Temps": [
+          "save.json.unrelated.tmp"
+        ]
+      }
+    },
+    {
+      "Name": "replace-rotates-primary",
+      "RelativePath": "replace/save.json",
+      "Text": "new-value",
+      "PreserveExistingBackup": false,
+      "Before": {
+        "Primary": "b2xkLXZhbHVl",
+        "Backup": null,
+        "Unrelated": null,
+        "Temps": []
+      },
+      "After": {
+        "Primary": "bmV3LXZhbHVl",
+        "Backup": "b2xkLXZhbHVl",
+        "Unrelated": null,
+        "Temps": []
+      }
+    },
+    {
+      "Name": "preserve-known-backup-once",
+      "RelativePath": "preserve/save.json",
+      "Text": "repaired",
+      "PreserveExistingBackup": true,
+      "Before": {
+        "Primary": "Y29ycnVwdA==",
+        "Backup": "a25vd24tZ29vZA==",
+        "Unrelated": null,
+        "Temps": []
+      },
+      "After": {
+        "Primary": "cmVwYWlyZWQ=",
+        "Backup": "a25vd24tZ29vZA==",
+        "Unrelated": null,
+        "Temps": []
+      }
+    },
+    {
+      "Name": "normal-rotation-resumes",
+      "RelativePath": "preserve/save.json",
+      "Text": "ordinary",
+      "PreserveExistingBackup": false,
+      "Before": {
+        "Primary": "cmVwYWlyZWQ=",
+        "Backup": "a25vd24tZ29vZA==",
+        "Unrelated": null,
+        "Temps": []
+      },
+      "After": {
+        "Primary": "b3JkaW5hcnk=",
+        "Backup": "cmVwYWlyZWQ=",
+        "Unrelated": null,
+        "Temps": []
+      }
+    },
+    {
+      "Name": "empty-bytes-through-empty-string",
+      "RelativePath": "empty/save.json",
+      "Text": "",
+      "PreserveExistingBackup": false,
+      "Before": {
+        "Primary": null,
+        "Backup": null,
+        "Unrelated": null,
+        "Temps": []
+      },
+      "After": {
+        "Primary": "",
+        "Backup": null,
+        "Unrelated": null,
+        "Temps": []
+      }
+    }
+  ]
+}

@@ -24,9 +24,12 @@ if(NOT STELLAR_SOURCE_COMMIT)
   set(STELLAR_SOURCE_COMMIT "unknown")
 endif()
 configure_file(app/build_version.hpp.in generated/stellar/build_version.hpp @ONLY)
-add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp)
+add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp)
 target_include_directories(stellar_engine PUBLIC engine/include)
 target_link_libraries(stellar_engine PUBLIC Threads::Threads)
+if(WIN32)
+  target_link_libraries(stellar_engine PRIVATE Ole32)
+endif()
 add_library(stellar_json INTERFACE)
 target_include_directories(stellar_json SYSTEM INTERFACE third_party)
 file(SHA256 "${CMAKE_SOURCE_DIR}/third_party/nlohmann/json.hpp" STELLAR_JSON_SHA256)
@@ -44,7 +47,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/construction_projects.cpp core/src/ship_designs.cpp
   core/src/fleet_state.cpp core/src/combat_state.cpp core/src/shipyard_state.cpp
   core/src/fleet_seeding.cpp core/src/shipbuilding.cpp core/src/fleet_transit.cpp
-  core/src/lane_network.cpp core/src/fleet_reach.cpp core/src/knowledge.cpp core/src/legacy_technology.cpp core/src/fresh_campaign.cpp core/src/legacy_research.cpp core/src/freight.cpp core/src/settlement_knowledge.cpp core/src/settlement_planning.cpp
+  core/src/lane_network.cpp core/src/fleet_reach.cpp core/src/knowledge.cpp core/src/legacy_technology.cpp core/src/fresh_campaign.cpp core/src/persistable_fresh_campaign.cpp core/src/legacy_research.cpp core/src/freight.cpp core/src/settlement_knowledge.cpp core/src/settlement_planning.cpp
   core/src/civilian_recovery.cpp core/src/colonization_runtime.cpp core/src/survey_operations.cpp core/src/exploration_planning.cpp core/src/exploration_advance.cpp
   core/src/combat_simulation.cpp core/src/combat_command_runtime.cpp
   core/src/combat_readiness_detail.cpp core/src/own_combat_fleet_status.cpp
@@ -88,6 +91,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/planetary_body_persistence.cpp
   core/src/galaxy_reference_validation.cpp
   core/src/knowledge_persistence.cpp
+  core/src/galaxy_payload_persistence.cpp
   core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
@@ -231,6 +235,18 @@ endforeach()
 install(FILES third_party/nlohmann/LICENSE.MIT DESTINATION Licenses RENAME nlohmann-JSON-MIT.txt)
 install(FILES third_party/dotnet/LICENSE.TXT DESTINATION Licenses RENAME dotnet-MIT.txt)
 if(BUILD_TESTING)
+  if(WIN32)
+    # Compile the isolated fault-injection variant separately; no hooks enter
+    # the normal stellar_engine library or exported application.
+    add_executable(stellar_atomic_file_write_tests
+      native-tests/atomic_file_write_tests.cpp engine/src/atomic_file_write.cpp)
+    target_include_directories(stellar_atomic_file_write_tests PRIVATE engine/include)
+    target_compile_definitions(stellar_atomic_file_write_tests PRIVATE STELLAR_ATOMIC_FILE_WRITE_TESTING)
+    target_link_libraries(stellar_atomic_file_write_tests PRIVATE stellar_json Threads::Threads Ole32 Bcrypt)
+    add_test(NAME atomic_file_write_parity COMMAND stellar_atomic_file_write_tests
+      "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/native-tests/fixtures/atomic-file-write.json")
+    set_tests_properties(atomic_file_write_parity PROPERTIES TIMEOUT 180)
+  endif()
   add_executable(stellar_own_combat_fleet_status_tests native-tests/own_combat_fleet_status_tests.cpp)
   target_link_libraries(stellar_own_combat_fleet_status_tests PRIVATE stellar_core stellar_json)
   add_test(NAME own_combat_fleet_status_parity COMMAND stellar_own_combat_fleet_status_tests
@@ -307,6 +323,12 @@ if(BUILD_TESTING)
   target_link_libraries(stellar_fresh_campaign_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fresh_campaign_parity COMMAND stellar_fresh_campaign_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/fresh-campaign.json" "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
   set_tests_properties(fresh_campaign_parity PROPERTIES TIMEOUT 120)
+  add_executable(stellar_persistable_fresh_campaign_tests native-tests/persistable_fresh_campaign_tests.cpp)
+  target_link_libraries(stellar_persistable_fresh_campaign_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME persistable_fresh_campaign_parity COMMAND stellar_persistable_fresh_campaign_tests
+    "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/native-tests/fixtures/persistable-fresh-campaign.json"
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(persistable_fresh_campaign_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_freight_tests native-tests/freight_tests.cpp)
   target_link_libraries(stellar_freight_tests PRIVATE stellar_core stellar_json)
   add_test(NAME freight_parity COMMAND stellar_freight_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/freight.json")
@@ -691,6 +713,13 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/knowledge-persistence.json"
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(knowledge_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_galaxy_payload_persistence_tests native-tests/galaxy_payload_persistence_tests.cpp)
+  target_link_libraries(stellar_galaxy_payload_persistence_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME galaxy_payload_persistence_parity COMMAND stellar_galaxy_payload_persistence_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/galaxy-payload-persistence.json"
+    "${CMAKE_SOURCE_DIR}/src/Game"
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(galaxy_payload_persistence_parity PROPERTIES TIMEOUT 300)
   add_executable(stellar_legacy_campaign_recovery_tests native-tests/legacy_campaign_recovery_tests.cpp)
   target_link_libraries(stellar_legacy_campaign_recovery_tests PRIVATE stellar_core stellar_json)
   add_test(NAME legacy_campaign_recovery_parity COMMAND stellar_legacy_campaign_recovery_tests

@@ -1,13 +1,15 @@
 #pragma once
 
+#include <stellar/core/campaign_payload_provenance.hpp>
 #include <stellar/core/colony_economy.hpp>
 #include <stellar/core/construction_state.hpp>
-#include <stellar/core/fleet_seeding.hpp>
 #include <stellar/core/fleet_power_observation.hpp>
+#include <stellar/core/fleet_seeding.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/galaxy_generation_metadata.hpp>
 #include <stellar/core/knowledge.hpp>
 #include <stellar/core/legacy_technology.hpp>
+#include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/planetary_catalog.hpp>
 #include <stellar/core/shipyard_state.hpp>
 
@@ -37,6 +39,8 @@ struct FreshCampaignState {
   std::vector<FleetPowerObservation> combat_intelligence;
   std::optional<GalaxyGenerationMetadata> generation_metadata;
   std::optional<GalacticCoreMetadata> galactic_core;
+  std::optional<CampaignMassiveEncounter> active_combat_encounter;
+  std::optional<CampaignDeveloperProvenance> developer_provenance;
 };
 
 FreshCampaignState
