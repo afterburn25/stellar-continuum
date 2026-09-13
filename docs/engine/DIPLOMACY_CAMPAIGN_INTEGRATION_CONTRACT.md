@@ -49,3 +49,10 @@ This validator verifies structure and contact knowledge, not existence in the cu
 ## Command sequencing for the next port
 
 Source reviewed: `DiplomacySimulation` in `DiplomacySystem.cs` lines387-553. Preserve tick/argument/knowledge validation order and source partial mutation. Contact observations create directional awareness; established contact can create a shared relationship but must not identify the other observer automatically. Accepted agreement/access effects and their history occur before proposal status/resolution history. War terminates active agreements in retained enumeration order, denies access both ways, and exposes the final war event to the target only if it already identifies the declarer. Political access remains a legal state, not a movement barrier. These details must survive a shared-state composition with combat and AI.
+
+
+## Fleet sensor dependency of the integrated host
+
+The actual `Main.CoreIntegration.AdvanceIntegratedStep` runs `FleetCombatPower.RecordSensorContacts` for civilizations in numeric ID order after positive-time core simulation and before Adaptive Research. `Main.MassiveCombat.HasCombatScanner` checks the exact Adaptive capability flags `tech:quantum_sensors` or `tech:distributed_sensor_network`; missing research is false. A technology flag alone never reveals distant fleets. Active observer and foreign fleets need authoritative same-system presence, and observations retain dated power instead of fetching live hidden enemy state.
+
+Native `FleetState` already owns tactical loadout and vessel fields, with source-compatible legacy conversion in `combat_state`; `FreshCampaignState` does not yet own the CombatIntelligence records. Gate074 must add this bounded owned collection and source power/observation behavior before the combined host can claim the actual player substep composition. Retain target object-membership validation, stable ID order, per-observer/global bounds, value-equality eviction, float accumulation semantics and partial failures. Existing legacy headless snapshots do not become player-save-compatible merely by adding this in-memory field.

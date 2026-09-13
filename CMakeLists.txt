@@ -72,7 +72,9 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/adaptive_research_campaign_simulation.cpp
   core/src/diplomacy_state.cpp
   core/src/diplomacy_simulation.cpp
-  core/src/diplomacy_snapshot_invariants.cpp)
+  core/src/diplomacy_snapshot_invariants.cpp
+  core/src/diplomacy_lifecycle.cpp
+  core/src/diplomacy_observer_commands.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp app/fresh_campaign_output.cpp)
@@ -468,6 +470,18 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/diplomacy-snapshot-invariants.json")
   set_tests_properties(diplomacy_snapshot_invariants_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_diplomacy_lifecycle_tests native-tests/diplomacy_lifecycle_tests.cpp)
+  target_link_libraries(stellar_diplomacy_lifecycle_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME diplomacy_lifecycle_parity COMMAND stellar_diplomacy_lifecycle_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/diplomacy-lifecycle.json"
+    "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(diplomacy_lifecycle_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_diplomacy_observer_commands_tests native-tests/diplomacy_observer_commands_tests.cpp)
+  target_link_libraries(stellar_diplomacy_observer_commands_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME diplomacy_observer_commands_parity COMMAND stellar_diplomacy_observer_commands_tests
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/diplomacy-observer-commands.json")
+  set_tests_properties(diplomacy_observer_commands_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_planning_parity COMMAND stellar_strategic_planning_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-planning.json")
