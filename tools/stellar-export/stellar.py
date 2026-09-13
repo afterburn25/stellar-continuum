@@ -212,7 +212,10 @@ def validate_fresh_campaign(data, report):
 def relocated_smoke(folder):
     # Run an independent copy with only Windows system paths, no repository/toolchain cwd.
     with tempfile.TemporaryDirectory(prefix="stellar-export-smoke-") as temporary:
-        root = Path(temporary); copy = root / "runtime"; shutil.copytree(folder, copy)
+        root = Path(temporary).resolve()
+        copy = root / "runtime"
+        shutil.copytree(folder, copy)
+        copy = copy.resolve()
         env = {key: value for key, value in os.environ.items() if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA"}}
         windows = env.get("SystemRoot", env.get("SYSTEMROOT", r"C:\Windows"))
         env["PATH"] = str(Path(windows) / "System32")

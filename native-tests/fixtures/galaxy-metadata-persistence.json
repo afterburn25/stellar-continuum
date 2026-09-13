@@ -1,0 +1,2378 @@
+{
+  "Schema": "stellar-galaxy-metadata-persistence-v1",
+  "SourceHashes": {
+    "src/Game/Persistence/CampaignSaveService.cs": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E",
+    "src/Game/Simulation/Generation/GalaxyGenerationSettings.cs": "DD9BD48D0614FB92ECC09DB92C8CB8F1D28F3136A9B27350FB10C2F556AB4111"
+  },
+  "RowCount": 22,
+  "Rows": [
+    {
+      "Name": "legacy-absence",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": null
+      },
+      "Result": {
+        "GenerationMetadata": null,
+        "GalacticCore": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "all-fields-and-matching-core",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": {
+        "GenerationMetadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "GalacticCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Error": null
+    },
+    {
+      "Name": "metadata-core-only",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": {
+        "GenerationMetadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "GalacticCore": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "state-core-only",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": null
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": {
+        "GenerationMetadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": null
+        },
+        "GalacticCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Error": null
+    },
+    {
+      "Name": "exact-radius-is-accepted",
+      "Operation": "Core",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": {
+        "LandmarkKey": "galactic-core-smbh-v1",
+        "X": 0,
+        "Y": 0,
+        "ExclusionRadius": 10
+      },
+      "Error": null
+    },
+    {
+      "Name": "strict-overlap-rejected",
+      "Operation": "Core",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 9.999,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign galactic-core metadata overlaps a saved system."
+      }
+    },
+    {
+      "Name": "wrong-landmark-key",
+      "Operation": "Core",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": {
+          "LandmarkKey": "other",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign galactic-core metadata is invalid."
+      }
+    },
+    {
+      "Name": "zero-radius",
+      "Operation": "Core",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 0
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign galactic-core metadata is invalid."
+      }
+    },
+    {
+      "Name": "nonfinite-coordinate",
+      "Operation": "Core",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": null,
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": "Infinity",
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign galactic-core metadata is invalid."
+      }
+    },
+    {
+      "Name": "blank-entered-seed",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": " \t",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "unicode-blank-entered-seed",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "\u00A0\u2007\u3000",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "vertical-blank-generator-version",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "\u000B\f",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "blank-generator-version",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "seed-mismatch",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 41,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "system-count-mismatch",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 3,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "negative-other-civilizations",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": -1,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "negative-nearby-worlds",
+      "Operation": "Metadata",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": -1,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": null
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "core-disagreement",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 1,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign galactic-core metadata disagrees with the saved galaxy landmark."
+      }
+    },
+    {
+      "Name": "metadata-error-precedes-state-core",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 9,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": 0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "bad",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Campaign generation metadata is invalid or does not match the saved galaxy."
+      }
+    },
+    {
+      "Name": "agreement-dotnet-nan-equality",
+      "Operation": "Agreement",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": "NaN",
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": "NaN",
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "agreement-signed-zero-equality",
+      "Operation": "Agreement",
+      "Input": {
+        "Seed": 42,
+        "Systems": [
+          {
+            "Id": 1,
+            "X": 10,
+            "Y": 0
+          },
+          {
+            "Id": 2,
+            "X": 30,
+            "Y": 0
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "entered seed",
+          "InternalSeed": 42,
+          "GeneratorVersion": "generator-v",
+          "CreatedAtUtc": "2030-04-05T06:07:08.1234567+02:30",
+          "SystemCount": 2,
+          "GalaxyShape": "Shape",
+          "StellarVariety": "Variety",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Rare",
+          "GuaranteedNearbyHabitableWorlds": 3,
+          "OtherCivilizations": 4,
+          "AncientCivilizations": "Ancient",
+          "SpaceHazards": "Hazards",
+          "StartingDevelopment": "Development",
+          "Difficulty": "Difficulty",
+          "ArtProfileVersion": "art-v",
+          "PlayerSpeciesId": "species-v",
+          "AnomalyFrequency": "High",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": -0,
+            "Y": 0,
+            "ExclusionRadius": 10
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": 0,
+          "Y": 0,
+          "ExclusionRadius": 10
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "actual-detached-capture",
+      "Operation": "Capture",
+      "Input": {
+        "Seed": 4242,
+        "Systems": [
+          {
+            "Id": 0,
+            "X": 0,
+            "Y": 0
+          },
+          {
+            "Id": 1,
+            "X": -1.5404878,
+            "Y": -1.1790246
+          },
+          {
+            "Id": 2,
+            "X": -1.6154206,
+            "Y": -1.3507992
+          },
+          {
+            "Id": 3,
+            "X": -0.056693975,
+            "Y": -5.9282227
+          },
+          {
+            "Id": 4,
+            "X": -7.443448,
+            "Y": 2.1172512
+          },
+          {
+            "Id": 5,
+            "X": -6.5185266,
+            "Y": 1.645308
+          },
+          {
+            "Id": 6,
+            "X": 7.401187,
+            "Y": 3.4128273
+          },
+          {
+            "Id": 7,
+            "X": -1.6123158,
+            "Y": 8.078265
+          },
+          {
+            "Id": 8,
+            "X": 1.9109625,
+            "Y": -8.651455
+          },
+          {
+            "Id": 9,
+            "X": 7.389031,
+            "Y": -0.58462405
+          },
+          {
+            "Id": 10,
+            "X": 6.193314,
+            "Y": 8.288625
+          },
+          {
+            "Id": 11,
+            "X": 8.419603,
+            "Y": -2.0265276
+          },
+          {
+            "Id": 12,
+            "X": -10.926781,
+            "Y": 0.5850811
+          },
+          {
+            "Id": 13,
+            "X": 10.021687,
+            "Y": -3.719135
+          },
+          {
+            "Id": 14,
+            "X": 6.4568615,
+            "Y": -6.079371
+          },
+          {
+            "Id": 15,
+            "X": -4.7922983,
+            "Y": 10.359375
+          },
+          {
+            "Id": 16,
+            "X": 1.0921553,
+            "Y": -5.7831006
+          },
+          {
+            "Id": 17,
+            "X": 8.386114,
+            "Y": 0.6740462
+          },
+          {
+            "Id": 18,
+            "X": 5.651507,
+            "Y": -3.1533136
+          },
+          {
+            "Id": 19,
+            "X": -6.4206767,
+            "Y": 8.380683
+          },
+          {
+            "Id": 20,
+            "X": 10.28766,
+            "Y": 5.021407
+          },
+          {
+            "Id": 21,
+            "X": 10.937784,
+            "Y": 3.5808678
+          },
+          {
+            "Id": 22,
+            "X": -1.5738789,
+            "Y": -5.359233
+          },
+          {
+            "Id": 23,
+            "X": -4.5971317,
+            "Y": 11.463423
+          },
+          {
+            "Id": 24,
+            "X": 1.8873731,
+            "Y": 8.818133
+          },
+          {
+            "Id": 25,
+            "X": 7.598961,
+            "Y": -6.5329947
+          },
+          {
+            "Id": 26,
+            "X": 6.419337,
+            "Y": -2.725139
+          },
+          {
+            "Id": 27,
+            "X": -1.7192563,
+            "Y": 13.333187
+          },
+          {
+            "Id": 28,
+            "X": 13.524016,
+            "Y": 2.9465475
+          },
+          {
+            "Id": 29,
+            "X": 5.8673368,
+            "Y": 8.075583
+          },
+          {
+            "Id": 30,
+            "X": -5.2104087,
+            "Y": -12.625917
+          },
+          {
+            "Id": 31,
+            "X": -13.726456,
+            "Y": -2.007699
+          },
+          {
+            "Id": 32,
+            "X": 11.24808,
+            "Y": 0.26542625
+          },
+          {
+            "Id": 33,
+            "X": 12.2883415,
+            "Y": 7.1100883
+          },
+          {
+            "Id": 34,
+            "X": -13.766127,
+            "Y": 4.459016
+          },
+          {
+            "Id": 35,
+            "X": -0.55961806,
+            "Y": -5.4226117
+          },
+          {
+            "Id": 36,
+            "X": -1.3792565,
+            "Y": -10.025153
+          },
+          {
+            "Id": 37,
+            "X": -6.3770256,
+            "Y": 0.39798537
+          },
+          {
+            "Id": 38,
+            "X": 14.1973915,
+            "Y": -4.2540936
+          },
+          {
+            "Id": 39,
+            "X": 15.187676,
+            "Y": 0.44604605
+          },
+          {
+            "Id": 40,
+            "X": 5.2395396,
+            "Y": -9.659779
+          },
+          {
+            "Id": 41,
+            "X": -11.14165,
+            "Y": 2.701814
+          },
+          {
+            "Id": 42,
+            "X": -9.192859,
+            "Y": 4.7159204
+          },
+          {
+            "Id": 43,
+            "X": -13.6233225,
+            "Y": 6.380988
+          },
+          {
+            "Id": 44,
+            "X": 8.507241,
+            "Y": -6.3199797
+          },
+          {
+            "Id": 45,
+            "X": 7.1091943,
+            "Y": 14.45926
+          },
+          {
+            "Id": 46,
+            "X": 15.588593,
+            "Y": 1.0537344
+          },
+          {
+            "Id": 47,
+            "X": -1.1842085,
+            "Y": -11.791888
+          },
+          {
+            "Id": 48,
+            "X": 0.3942034,
+            "Y": -16.559341
+          },
+          {
+            "Id": 49,
+            "X": 11.346265,
+            "Y": -3.7508304
+          },
+          {
+            "Id": 50,
+            "X": 7.68285,
+            "Y": -14.636265
+          },
+          {
+            "Id": 51,
+            "X": -3.417859,
+            "Y": 0.18376468
+          },
+          {
+            "Id": 52,
+            "X": -0.0045368304,
+            "Y": 17.487537
+          },
+          {
+            "Id": 53,
+            "X": -15.216414,
+            "Y": -7.5642214
+          },
+          {
+            "Id": 54,
+            "X": -8.445033,
+            "Y": -0.17740276
+          },
+          {
+            "Id": 55,
+            "X": -3.6090245,
+            "Y": 14.800338
+          },
+          {
+            "Id": 56,
+            "X": -3.5965383,
+            "Y": -14.794644
+          },
+          {
+            "Id": 57,
+            "X": 2.2873046,
+            "Y": 18.270365
+          },
+          {
+            "Id": 58,
+            "X": 4.4880886,
+            "Y": -12.197847
+          },
+          {
+            "Id": 59,
+            "X": -0.8034364,
+            "Y": 17.396675
+          },
+          {
+            "Id": 60,
+            "X": 2.558425,
+            "Y": -6.001059
+          },
+          {
+            "Id": 61,
+            "X": -3.7208762,
+            "Y": 15.261276
+          },
+          {
+            "Id": 62,
+            "X": -8.617636,
+            "Y": 7.598811
+          },
+          {
+            "Id": 63,
+            "X": 1.4439193,
+            "Y": 18.50614
+          },
+          {
+            "Id": 64,
+            "X": -0.6014595,
+            "Y": -10.252484
+          },
+          {
+            "Id": 65,
+            "X": -12.677413,
+            "Y": -12.400199
+          },
+          {
+            "Id": 66,
+            "X": 6.280061,
+            "Y": -18.003279
+          },
+          {
+            "Id": 67,
+            "X": -9.763073,
+            "Y": 14.936802
+          },
+          {
+            "Id": 68,
+            "X": -8.735541,
+            "Y": -11.615165
+          },
+          {
+            "Id": 69,
+            "X": -3.349767,
+            "Y": -16.975735
+          },
+          {
+            "Id": 70,
+            "X": 10.105694,
+            "Y": 2.1990044
+          },
+          {
+            "Id": 71,
+            "X": -8.551104,
+            "Y": 17.40314
+          },
+          {
+            "Id": 72,
+            "X": -3.3073103,
+            "Y": -17.103346
+          },
+          {
+            "Id": 73,
+            "X": -2.8251076,
+            "Y": -13.328687
+          },
+          {
+            "Id": 74,
+            "X": 19.457592,
+            "Y": -0.9168474
+          },
+          {
+            "Id": 75,
+            "X": 8.586627,
+            "Y": -13.32397
+          },
+          {
+            "Id": 76,
+            "X": 9.259157,
+            "Y": 11.027547
+          },
+          {
+            "Id": 77,
+            "X": -15.088284,
+            "Y": -12.031907
+          },
+          {
+            "Id": 78,
+            "X": 4.285082,
+            "Y": -6.809417
+          },
+          {
+            "Id": 79,
+            "X": -0.34039596,
+            "Y": -6.554966
+          },
+          {
+            "Id": 80,
+            "X": 18.811928,
+            "Y": -2.3206775
+          },
+          {
+            "Id": 81,
+            "X": -5.5545197,
+            "Y": -19.206093
+          },
+          {
+            "Id": 82,
+            "X": 7.861336,
+            "Y": -11.889586
+          },
+          {
+            "Id": 83,
+            "X": -12.812468,
+            "Y": -12.441824
+          },
+          {
+            "Id": 84,
+            "X": -12.947981,
+            "Y": -15.355417
+          },
+          {
+            "Id": 85,
+            "X": -4.83146,
+            "Y": 15.316324
+          },
+          {
+            "Id": 86,
+            "X": 0.44367316,
+            "Y": 21.008896
+          },
+          {
+            "Id": 87,
+            "X": -4.974183,
+            "Y": -11.359824
+          },
+          {
+            "Id": 88,
+            "X": -20.858469,
+            "Y": -1.7336918
+          },
+          {
+            "Id": 89,
+            "X": 11.336163,
+            "Y": -2.3433292
+          },
+          {
+            "Id": 90,
+            "X": -19.345686,
+            "Y": 5.1772428
+          },
+          {
+            "Id": 91,
+            "X": 16.511404,
+            "Y": -12.713939
+          },
+          {
+            "Id": 92,
+            "X": -15.167256,
+            "Y": -14.068361
+          },
+          {
+            "Id": 93,
+            "X": -6.0259237,
+            "Y": -20.816069
+          },
+          {
+            "Id": 94,
+            "X": -11.858783,
+            "Y": 18.26815
+          },
+          {
+            "Id": 95,
+            "X": -20.90543,
+            "Y": 6.5045366
+          },
+          {
+            "Id": 96,
+            "X": -42.364857,
+            "Y": -61.004105
+          },
+          {
+            "Id": 97,
+            "X": -37.259865,
+            "Y": -58.370567
+          },
+          {
+            "Id": 98,
+            "X": -45.06907,
+            "Y": -56.792274
+          },
+          {
+            "Id": 99,
+            "X": -46.32225,
+            "Y": -63.335514
+          },
+          {
+            "Id": 100,
+            "X": -38.552734,
+            "Y": -67.36264
+          },
+          {
+            "Id": 101,
+            "X": -79.31518,
+            "Y": 7.3509693
+          },
+          {
+            "Id": 102,
+            "X": -79.43523,
+            "Y": 12.298485
+          },
+          {
+            "Id": 103,
+            "X": -87.480774,
+            "Y": 8.248259
+          },
+          {
+            "Id": 104,
+            "X": -79.65893,
+            "Y": 2.3963852
+          },
+          {
+            "Id": 105,
+            "X": -73.85223,
+            "Y": 7.11817
+          },
+          {
+            "Id": 106,
+            "X": -20.584858,
+            "Y": -22.596922
+          },
+          {
+            "Id": 107,
+            "X": -19.510698,
+            "Y": -28.253853
+          },
+          {
+            "Id": 108,
+            "X": -17.159508,
+            "Y": -19.545715
+          },
+          {
+            "Id": 109,
+            "X": -27.97368,
+            "Y": -20.181679
+          },
+          {
+            "Id": 110,
+            "X": 1.5433807,
+            "Y": -68.34679
+          },
+          {
+            "Id": 111,
+            "X": -2.513708,
+            "Y": -70.60824
+          },
+          {
+            "Id": 112,
+            "X": 6.1461086,
+            "Y": -71.68878
+          },
+          {
+            "Id": 113,
+            "X": 1.6165005,
+            "Y": -63.26948
+          },
+          {
+            "Id": 114,
+            "X": -71.73111,
+            "Y": -10.8384285
+          },
+          {
+            "Id": 115,
+            "X": -73.770996,
+            "Y": -3.9444528
+          },
+          {
+            "Id": 116,
+            "X": -75.32237,
+            "Y": -14.4171
+          },
+          {
+            "Id": 117,
+            "X": -64.191605,
+            "Y": -12.754572
+          },
+          {
+            "Id": 118,
+            "X": 34.585194,
+            "Y": -9.27372
+          },
+          {
+            "Id": 119,
+            "X": 28.226028,
+            "Y": -5.1158605
+          },
+          {
+            "Id": 120,
+            "X": 34.465412,
+            "Y": -15.018212
+          },
+          {
+            "Id": 121,
+            "X": 38.71575,
+            "Y": -7.1260242
+          },
+          {
+            "Id": 122,
+            "X": -117.61528,
+            "Y": -13.34687
+          },
+          {
+            "Id": 123,
+            "X": -113.32641,
+            "Y": -6.152279
+          },
+          {
+            "Id": 124,
+            "X": -124.39676,
+            "Y": -12.666935
+          },
+          {
+            "Id": 125,
+            "X": -115.07941,
+            "Y": -18.832958
+          },
+          {
+            "Id": 126,
+            "X": -58.084377,
+            "Y": -52.91024
+          },
+          {
+            "Id": 127,
+            "X": -52.30742,
+            "Y": -52.083447
+          },
+          {
+            "Id": 128,
+            "X": -61.562668,
+            "Y": -49.130615
+          },
+          {
+            "Id": 129,
+            "X": -59.683266,
+            "Y": -57.348373
+          },
+          {
+            "Id": 130,
+            "X": -78.53986,
+            "Y": -19.071201
+          },
+          {
+            "Id": 131,
+            "X": -71.754776,
+            "Y": -18.252083
+          },
+          {
+            "Id": 132,
+            "X": -82.81363,
+            "Y": -12.243831
+          },
+          {
+            "Id": 133,
+            "X": -81.73644,
+            "Y": -25.964481
+          },
+          {
+            "Id": 134,
+            "X": -72.85082,
+            "Y": 22.929094
+          },
+          {
+            "Id": 135,
+            "X": -70.21039,
+            "Y": 18.540728
+          },
+          {
+            "Id": 136,
+            "X": -69.46183,
+            "Y": 28.837309
+          },
+          {
+            "Id": 137,
+            "X": -77.52615,
+            "Y": 22.84084
+          },
+          {
+            "Id": 138,
+            "X": -96.254715,
+            "Y": 10.636396
+          },
+          {
+            "Id": 139,
+            "X": -97.23822,
+            "Y": 16.432644
+          },
+          {
+            "Id": 140,
+            "X": -103.125046,
+            "Y": 5.8159394
+          },
+          {
+            "Id": 141,
+            "X": -92.01989,
+            "Y": 8.748824
+          },
+          {
+            "Id": 142,
+            "X": -48.72206,
+            "Y": -46.532867
+          },
+          {
+            "Id": 143,
+            "X": -46.32304,
+            "Y": -42.20234
+          },
+          {
+            "Id": 144,
+            "X": -55.40047,
+            "Y": -46.992943
+          },
+          {
+            "Id": 145,
+            "X": -46.39915,
+            "Y": -50.414448
+          },
+          {
+            "Id": 146,
+            "X": -61.342407,
+            "Y": -34.76007
+          },
+          {
+            "Id": 147,
+            "X": -58.15266,
+            "Y": -30.226595
+          },
+          {
+            "Id": 148,
+            "X": -66.72356,
+            "Y": -34.018707
+          },
+          {
+            "Id": 149,
+            "X": -58.49738,
+            "Y": -41.528553
+          },
+          {
+            "Id": 150,
+            "X": -19.660805,
+            "Y": -60.63565
+          },
+          {
+            "Id": 151,
+            "X": -16.455301,
+            "Y": -66.15536
+          },
+          {
+            "Id": 152,
+            "X": -16.151949,
+            "Y": -56.28351
+          },
+          {
+            "Id": 153,
+            "X": -24.92937,
+            "Y": -59.817646
+          },
+          {
+            "Id": 154,
+            "X": -23.307919,
+            "Y": -26.3571
+          },
+          {
+            "Id": 155,
+            "X": -23.838923,
+            "Y": -18.28365
+          },
+          {
+            "Id": 156,
+            "X": -28.895817,
+            "Y": -29.642467
+          },
+          {
+            "Id": 157,
+            "X": -16.757519,
+            "Y": -30.804277
+          },
+          {
+            "Id": 158,
+            "X": -43.522343,
+            "Y": 35.13926
+          },
+          {
+            "Id": 159,
+            "X": -36.62227,
+            "Y": 33.556522
+          },
+          {
+            "Id": 160,
+            "X": -45.24942,
+            "Y": 41.65987
+          },
+          {
+            "Id": 161,
+            "X": -49.247856,
+            "Y": 29.076801
+          },
+          {
+            "Id": 162,
+            "X": -48.322273,
+            "Y": -0.18279648
+          },
+          {
+            "Id": 163,
+            "X": -48.188633,
+            "Y": 7.871271
+          },
+          {
+            "Id": 164,
+            "X": -55.54682,
+            "Y": -3.2485254
+          },
+          {
+            "Id": 165,
+            "X": -42.623093,
+            "Y": -3.45442
+          },
+          {
+            "Id": 166,
+            "X": -98.536865,
+            "Y": -47.25712
+          },
+          {
+            "Id": 167,
+            "X": -101.35808,
+            "Y": -51.80565
+          },
+          {
+            "Id": 168,
+            "X": -92.879555,
+            "Y": -48.20311
+          },
+          {
+            "Id": 169,
+            "X": -100.28825,
+            "Y": -41.952293
+          },
+          {
+            "Id": 170,
+            "X": -77.21292,
+            "Y": 35.11841
+          },
+          {
+            "Id": 171,
+            "X": -69.85371,
+            "Y": 38.759674
+          },
+          {
+            "Id": 172,
+            "X": -84.07734,
+            "Y": 38.41499
+          },
+          {
+            "Id": 173,
+            "X": -77.05507,
+            "Y": 30.35453
+          },
+          {
+            "Id": 174,
+            "X": -73.357796,
+            "Y": -63.598648
+          },
+          {
+            "Id": 175,
+            "X": -81.53592,
+            "Y": -64.980804
+          },
+          {
+            "Id": 176,
+            "X": -70.15522,
+            "Y": -67.52196
+          },
+          {
+            "Id": 177,
+            "X": -70.94249,
+            "Y": -57.9511
+          },
+          {
+            "Id": 178,
+            "X": -40.292133,
+            "Y": -76.914276
+          },
+          {
+            "Id": 179,
+            "X": -45.94477,
+            "Y": -76.962814
+          },
+          {
+            "Id": 180,
+            "X": -37.124943,
+            "Y": -84.36895
+          },
+          {
+            "Id": 181,
+            "X": -36.814655,
+            "Y": -70.65751
+          },
+          {
+            "Id": 182,
+            "X": -92.06999,
+            "Y": -52.108566
+          },
+          {
+            "Id": 183,
+            "X": -90.81628,
+            "Y": -45.020546
+          },
+          {
+            "Id": 184,
+            "X": -98.45577,
+            "Y": -54.624493
+          },
+          {
+            "Id": 185,
+            "X": -85.713745,
+            "Y": -57.59063
+          },
+          {
+            "Id": 186,
+            "X": -115.853165,
+            "Y": 10.226395
+          },
+          {
+            "Id": 187,
+            "X": -120.62318,
+            "Y": 11.752198
+          },
+          {
+            "Id": 188,
+            "X": -115.345436,
+            "Y": 3.991562
+          },
+          {
+            "Id": 189,
+            "X": -110.66382,
+            "Y": 13.996082
+          },
+          {
+            "Id": 190,
+            "X": -42.003773,
+            "Y": 24.572962
+          },
+          {
+            "Id": 191,
+            "X": -34.697803,
+            "Y": 22.317778
+          },
+          {
+            "Id": 192,
+            "X": -44.874435,
+            "Y": 31.729445
+          },
+          {
+            "Id": 193,
+            "X": -46.25193,
+            "Y": 19.04763
+          },
+          {
+            "Id": 194,
+            "X": -97.77284,
+            "Y": -13.253572
+          },
+          {
+            "Id": 195,
+            "X": -93.45464,
+            "Y": -19.954412
+          },
+          {
+            "Id": 196,
+            "X": -94.66294,
+            "Y": -6.9204926
+          },
+          {
+            "Id": 197,
+            "X": -105.291374,
+            "Y": -13.474025
+          },
+          {
+            "Id": 198,
+            "X": -108.83574,
+            "Y": 3.1345615
+          },
+          {
+            "Id": 199,
+            "X": -112.42241,
+            "Y": 0.17080617
+          },
+          {
+            "Id": 200,
+            "X": -101.76785,
+            "Y": -0.19463372
+          },
+          {
+            "Id": 201,
+            "X": -109.40637,
+            "Y": 8.480559
+          },
+          {
+            "Id": 202,
+            "X": -4.678837,
+            "Y": -39.916924
+          },
+          {
+            "Id": 203,
+            "X": 1.1805558,
+            "Y": -38.416035
+          },
+          {
+            "Id": 204,
+            "X": -10.377068,
+            "Y": -34.755684
+          },
+          {
+            "Id": 205,
+            "X": -6.579913,
+            "Y": -46.703556
+          },
+          {
+            "Id": 206,
+            "X": 29.17004,
+            "Y": -31.46823
+          },
+          {
+            "Id": 207,
+            "X": 25.174015,
+            "Y": -37.83525
+          },
+          {
+            "Id": 208,
+            "X": 35.830696,
+            "Y": -32.05384
+          },
+          {
+            "Id": 209,
+            "X": 25.829563,
+            "Y": -26.066303
+          },
+          {
+            "Id": 210,
+            "X": 16.69131,
+            "Y": -44.774452
+          },
+          {
+            "Id": 211,
+            "X": 10.650845,
+            "Y": -50.616707
+          },
+          {
+            "Id": 212,
+            "X": 22.344019,
+            "Y": -46.189693
+          },
+          {
+            "Id": 213,
+            "X": 15.75972,
+            "Y": -39.74679
+          },
+          {
+            "Id": 214,
+            "X": -115.99597,
+            "Y": -37.24491
+          },
+          {
+            "Id": 215,
+            "X": -111.158714,
+            "Y": -30.60673
+          },
+          {
+            "Id": 216,
+            "X": -122.214,
+            "Y": -37.03069
+          },
+          {
+            "Id": 217,
+            "X": -113.738266,
+            "Y": -42.296497
+          },
+          {
+            "Id": 218,
+            "X": -81.65493,
+            "Y": 18.647364
+          },
+          {
+            "Id": 219,
+            "X": -88.47234,
+            "Y": 15.546495
+          },
+          {
+            "Id": 220,
+            "X": -75.832565,
+            "Y": 14.458
+          },
+          {
+            "Id": 221,
+            "X": -81.36315,
+            "Y": 25.25254
+          },
+          {
+            "Id": 222,
+            "X": -49.53412,
+            "Y": -74.54512
+          },
+          {
+            "Id": 223,
+            "X": -50.579174,
+            "Y": -82.06123
+          },
+          {
+            "Id": 224,
+            "X": -44.6324,
+            "Y": -72.66905
+          },
+          {
+            "Id": 225,
+            "X": -54.3964,
+            "Y": -69.757935
+          },
+          {
+            "Id": 226,
+            "X": -20.09177,
+            "Y": 34.045937
+          },
+          {
+            "Id": 227,
+            "X": -25.135773,
+            "Y": 32.30181
+          },
+          {
+            "Id": 228,
+            "X": -15.2965355,
+            "Y": 30.315626
+          },
+          {
+            "Id": 229,
+            "X": -18.820515,
+            "Y": 40.201096
+          },
+          {
+            "Id": 230,
+            "X": -56.66723,
+            "Y": 12.765888
+          },
+          {
+            "Id": 231,
+            "X": -55.251347,
+            "Y": 18.511877
+          },
+          {
+            "Id": 232,
+            "X": -63.238346,
+            "Y": 10.694525
+          },
+          {
+            "Id": 233,
+            "X": -52.637825,
+            "Y": 7.895356
+          },
+          {
+            "Id": 234,
+            "X": 30.265324,
+            "Y": 5.5207367
+          },
+          {
+            "Id": 235,
+            "X": 25.32315,
+            "Y": 3.2806427
+          },
+          {
+            "Id": 236,
+            "X": 35.456116,
+            "Y": 2.1703045
+          },
+          {
+            "Id": 237,
+            "X": 30.313995,
+            "Y": 10.799753
+          },
+          {
+            "Id": 238,
+            "X": 35.736233,
+            "Y": 8.05484
+          },
+          {
+            "Id": 239,
+            "X": 43.0521,
+            "Y": 7.8329177
+          },
+          {
+            "Id": 240,
+            "X": 32.713535,
+            "Y": 13.994447
+          },
+          {
+            "Id": 241,
+            "X": 31.474642,
+            "Y": 0.7257042
+          },
+          {
+            "Id": 242,
+            "X": -79.09953,
+            "Y": -39.236404
+          },
+          {
+            "Id": 243,
+            "X": -82.20865,
+            "Y": -46.66317
+          },
+          {
+            "Id": 244,
+            "X": -72.87356,
+            "Y": -38.451138
+          },
+          {
+            "Id": 245,
+            "X": -83.15757,
+            "Y": -32.12475
+          },
+          {
+            "Id": 246,
+            "X": 37.179356,
+            "Y": -11.785772
+          },
+          {
+            "Id": 247,
+            "X": 42.26605,
+            "Y": -16.708445
+          },
+          {
+            "Id": 248,
+            "X": 38.003002,
+            "Y": -3.4583626
+          },
+          {
+            "Id": 249,
+            "X": 29.481636,
+            "Y": -14.566556
+          }
+        ],
+        "Metadata": {
+          "EnteredSeed": "actual capture",
+          "InternalSeed": 4242,
+          "GeneratorVersion": "full-galaxy-compact-v1",
+          "CreatedAtUtc": "2031-01-02T03:04:05.1234567+00:00",
+          "SystemCount": 250,
+          "GalaxyShape": "Full galaxy",
+          "StellarVariety": "Dwarf-heavy",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Uncommon",
+          "GuaranteedNearbyHabitableWorlds": 2,
+          "OtherCivilizations": 5,
+          "AncientCivilizations": "Rare",
+          "SpaceHazards": "Standard",
+          "StartingDevelopment": "Early Space Age",
+          "Difficulty": "Standard",
+          "ArtProfileVersion": "milky-way-full-500-v1",
+          "PlayerSpeciesId": "terran_baseline",
+          "AnomalyFrequency": "Standard",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": -43.444637,
+            "Y": -18.101934,
+            "ExclusionRadius": 12.671353
+          }
+        },
+        "StateCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": -43.444637,
+          "Y": -18.101934,
+          "ExclusionRadius": 12.671353
+        }
+      },
+      "Result": {
+        "GenerationMetadata": {
+          "EnteredSeed": "actual capture",
+          "InternalSeed": 4242,
+          "GeneratorVersion": "full-galaxy-compact-v1",
+          "CreatedAtUtc": "2031-01-02T03:04:05.1234567+00:00",
+          "SystemCount": 250,
+          "GalaxyShape": "Full galaxy",
+          "StellarVariety": "Dwarf-heavy",
+          "PlanetBearingSystems": "Common",
+          "HabitableWorlds": "Uncommon",
+          "GuaranteedNearbyHabitableWorlds": 2,
+          "OtherCivilizations": 5,
+          "AncientCivilizations": "Rare",
+          "SpaceHazards": "Standard",
+          "StartingDevelopment": "Early Space Age",
+          "Difficulty": "Standard",
+          "ArtProfileVersion": "milky-way-full-500-v1",
+          "PlayerSpeciesId": "terran_baseline",
+          "AnomalyFrequency": "Standard",
+          "GalacticCore": {
+            "LandmarkKey": "galactic-core-smbh-v1",
+            "X": -43.444637,
+            "Y": -18.101934,
+            "ExclusionRadius": 12.671353
+          }
+        },
+        "GalacticCore": {
+          "LandmarkKey": "galactic-core-smbh-v1",
+          "X": -43.444637,
+          "Y": -18.101934,
+          "ExclusionRadius": 12.671353
+        }
+      },
+      "Error": null
+    }
+  ]
+}

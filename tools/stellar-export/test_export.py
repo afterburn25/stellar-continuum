@@ -565,7 +565,9 @@ class NativeRecovery(unittest.TestCase):
         self.assertEqual(Path(report["researchAssetPath"]).resolve(),
                          (self.exe.parent / "Data/research/v1").resolve())
 
-        assets = self.root / "explicit-assets"
+        # Normalize the existing ancestors before the native invocation. A
+        # missing child cannot reliably resolve Windows 8.3 aliases afterward.
+        assets = (self.root / "explicit-assets").resolve()
         shutil.copytree(self.exe.parent / "Data/astronomy",
                         assets / "Data/astronomy")
         shutil.copytree(self.exe.parent / "Data/research",
@@ -608,6 +610,32 @@ class NativeRecovery(unittest.TestCase):
             self.assertIn("Working directory:", corrupt.stderr)
         finally:
             index.write_bytes(original)
+
+    @unittest.skipUnless(os.name == "nt", "Windows short paths are required")
+    def test_adaptive_campaign_resolved_assets_with_real_short_root(self):
+        import ctypes
+
+        get_short_path = ctypes.windll.kernel32.GetShortPathNameW
+        get_short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p,
+                                   ctypes.c_uint32]
+        get_short_path.restype = ctypes.c_uint32
+        required = get_short_path(str(self.root), None, 0)
+        if required == 0:
+            self.skipTest("GetShortPathNameW is unavailable for the scratch root")
+        buffer = ctypes.create_unicode_buffer(required)
+        written = get_short_path(str(self.root), buffer, required)
+        if written == 0 or written >= required:
+            self.skipTest("GetShortPathNameW could not return the scratch root")
+        short_root = Path(buffer.value)
+        if os.path.normcase(str(short_root)) == os.path.normcase(str(self.root)):
+            self.skipTest("The scratch root has no distinct Windows short alias")
+
+        original_root = self.root
+        self.root = short_root
+        try:
+            self.test_adaptive_campaign_uses_resolved_assets_and_fails_cleanly()
+        finally:
+            self.root = original_root
 
     def test_adaptive_campaign_rejects_modes_bounds_and_output_collisions(self):
         output = self.root / "adaptive-preserved.json"

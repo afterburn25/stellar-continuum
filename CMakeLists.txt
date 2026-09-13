@@ -77,7 +77,10 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/diplomacy_observer_commands.cpp
   core/src/diplomacy_runtime.cpp
   core/src/fleet_combat_intelligence.cpp
-  core/src/integrated_adaptive_campaign.cpp)
+  core/src/integrated_adaptive_campaign.cpp
+  core/src/galaxy_generation_metadata.cpp
+  core/src/massive_combat_persistence.cpp
+  core/src/fleet_persistence.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp
@@ -626,6 +629,24 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/integrated-adaptive-campaign.json")
   set_tests_properties(integrated_adaptive_campaign_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_galaxy_generation_metadata_tests native-tests/galaxy_generation_metadata_tests.cpp)
+  target_link_libraries(stellar_galaxy_generation_metadata_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME galaxy_generation_metadata_parity COMMAND stellar_galaxy_generation_metadata_tests
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/galaxy-metadata-persistence.json")
+  set_tests_properties(galaxy_generation_metadata_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_massive_combat_persistence_tests native-tests/massive_combat_persistence_tests.cpp)
+  target_link_libraries(stellar_massive_combat_persistence_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME massive_combat_persistence_parity COMMAND stellar_massive_combat_persistence_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/massive-encounter.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(massive_combat_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_fleet_persistence_tests native-tests/fleet_persistence_tests.cpp)
+  target_link_libraries(stellar_fleet_persistence_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME fleet_persistence_parity COMMAND stellar_fleet_persistence_tests
+    "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/fleet-persistence.json")
+  set_tests_properties(fleet_persistence_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_strategic_planning_tests native-tests/strategic_planning_tests.cpp)
   target_link_libraries(stellar_strategic_planning_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_planning_parity COMMAND stellar_strategic_planning_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-planning.json")

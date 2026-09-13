@@ -5,6 +5,7 @@
 #include <stellar/core/fleet_seeding.hpp>
 #include <stellar/core/fleet_power_observation.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/galaxy_generation_metadata.hpp>
 #include <stellar/core/knowledge.hpp>
 #include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/planetary_catalog.hpp>
@@ -34,6 +35,8 @@ struct FreshCampaignState {
   std::optional<GalacticCore> core;
   bool used_constrained_home_fallback{};
   std::vector<FleetPowerObservation> combat_intelligence;
+  std::optional<GalaxyGenerationMetadata> generation_metadata;
+  std::optional<GalacticCoreMetadata> galactic_core;
 };
 
 FreshCampaignState
