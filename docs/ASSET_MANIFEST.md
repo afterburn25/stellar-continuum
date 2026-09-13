@@ -5,6 +5,17 @@ Owner: `work/visual-style-assets`
 
 This registry prevents duplicate visual concepts, records provenance/status, and maps production-candidate visuals to the gameplay concepts that currently exist in shared integration.
 
+## Immediate player-fleet production — 2026-09-13
+
+The user prioritized player ships and matching assets while the engine migration
+continues. The [production queue](content/PLAYER_FLEET_ROADMAP.md) starts with the
+Pathfinder Scout, then completes the other five existing Terran designs and shared
+parts, icons, effects/audio and shipyard assets. Existing portraits and procedural
+geometry are references. New source/model/material packs remain queued; their
+presence in the roadmap does not promote them to production-candidate or ready.
+Register completed files here and in Engine Assets with their existing design IDs,
+source/provenance, dependency list, version and actual validation state.
+
 ## Status vocabulary
 
 - **Production candidate** — intended for the playable build; import/runtime validation has passed, but final integrated-context review may still be pending.

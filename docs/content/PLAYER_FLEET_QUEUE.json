@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "kind": "stellar-continuum-content-production-queue",
+  "updated": "2026-09-13",
+  "priority": "Player ships and matching assets alongside Stellar Engine conversion",
+  "scope": "Terran player fleet first",
+  "productionStarted": false,
+  "baseline": {
+    "gameCommit": "97091aee84b782bdc917185307cd42b97b8fd7d0",
+    "shipRegistry": "src/Game/Simulation/Shipbuilding/ShipDesignRegistry.cs",
+    "proceduralModels": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+    "libraryAudit": {
+      "assets": 174,
+      "images": 130,
+      "audio": 35,
+      "data": 9,
+      "importedModels": 0
+    }
+  },
+  "firstBatch": [
+    "PF-001",
+    "PF-002",
+    "PF-008"
+  ],
+  "stageVocabulary": [
+    "brief_ready",
+    "concept",
+    "model_materials",
+    "library_candidate",
+    "integrated_candidate",
+    "release_ready"
+  ],
+  "assetPackDeliverables": [
+    "design_views",
+    "editable_model_source",
+    "portable_model_export",
+    "materials_and_textures",
+    "reduced_detail_models",
+    "portrait_and_thumbnail",
+    "strategic_icon",
+    "attachment_points",
+    "supported_presentation_states",
+    "source_and_dependency_record"
+  ],
+  "ships": [
+    {
+      "taskId": "PF-002",
+      "designId": "warp_scout",
+      "name": "Pathfinder Scout",
+      "shipProductionOrder": 1,
+      "contentFamilyId": "sc.ships.terran.warp_scout",
+      "stage": "brief_ready",
+      "focus": "First complete production pack and shared fleet conventions.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/pathfinder-scout.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-001"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-003",
+      "designId": "science_vessel",
+      "name": "Deep-Space Science Vessel",
+      "shipProductionOrder": 2,
+      "contentFamilyId": "sc.ships.terran.science_vessel",
+      "stage": "brief_ready",
+      "focus": "Laboratory spine, habitat structure, sensing equipment and radiators.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/deep-space-science-vessel.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_science_vessel.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-004",
+      "designId": "patrol_corvette",
+      "name": "Patrol Corvette",
+      "shipProductionOrder": 3,
+      "contentFamilyId": "sc.ships.terran.patrol_corvette",
+      "stage": "brief_ready",
+      "focus": "Compact protected escort with supported weapon and effect locations.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/patrol-corvette.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_patrol_corvette.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-005",
+      "designId": "bulk_freighter",
+      "name": "Interstellar Bulk Freighter",
+      "shipProductionOrder": 4,
+      "contentFamilyId": "sc.ships.terran.bulk_freighter",
+      "stage": "brief_ready",
+      "focus": "Cargo modules, loading and transfer points, working logistics silhouette.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/interstellar-bulk-freighter.png",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-006",
+      "designId": "resource_outpost_ship",
+      "name": "Sealed Resource Outpost Vessel",
+      "shipProductionOrder": 5,
+      "contentFamilyId": "sc.ships.terran.resource_outpost_ship",
+      "stage": "brief_ready",
+      "focus": "Sealed habitat and industrial deployment payload; represented capacity review.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/resource-outpost-ship.png",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-007",
+      "designId": "colony_ship",
+      "name": "Interstellar Colony Ship",
+      "shipProductionOrder": 6,
+      "contentFamilyId": "sc.ships.terran.colony_ship",
+      "stage": "brief_ready",
+      "focus": "Settlement carrier; represented population and scale review before final modeling.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/interstellar-colony-ship.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_colony_ship.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    }
+  ],
+  "supportTasks": [
+    {
+      "id": "PF-001",
+      "name": "Fleet reference sheet and scale plan",
+      "state": "ready_to_start",
+      "dependsOn": []
+    },
+    {
+      "id": "PF-008",
+      "name": "Shared parts and materials",
+      "state": "queued",
+      "dependsOn": [
+        "PF-001"
+      ]
+    },
+    {
+      "id": "PF-009",
+      "name": "Six matching fleet icons and thumbnails",
+      "state": "queued",
+      "dependsOn": [
+        "PF-001"
+      ]
+    },
+    {
+      "id": "PF-010",
+      "name": "Shared effects and event audio",
+      "state": "queued",
+      "dependsOn": [
+        "PF-002"
+      ]
+    },
+    {
+      "id": "PF-011",
+      "name": "Matching orbital shipyard and assembly assets",
+      "state": "queued",
+      "dependsOn": [
+        "PF-002"
+      ]
+    },
+    {
+      "id": "PF-012",
+      "name": "Asset library registration and portable packaging per pack",
+      "state": "queued",
+      "dependsOn": []
+    },
+    {
+      "id": "PF-013",
+      "name": "Native game integration and view validation",
+      "state": "waiting_for_native_adapters",
+      "dependsOn": [
+        "PF-012"
+      ]
+    }
+  ],
+  "boundaries": {
+    "authoringCanProceedDuringMigration": true,
+    "changesGameplayRules": false,
+    "changesSaveFormat": false,
+    "marksEngineComplete": false,
+    "nativePlayIntegrationRequired": true,
+    "sourceMastersRetained": true,
+    "preserveExistingShipDesignIds": true
+  },
+  "sourceDocs": [
+    "docs/ASSET_MANIFEST.md",
+    "docs/PREMIUM_ART_VISUAL_IDENTITY.md",
+    "docs/VISUAL_STYLE_GUIDE.md"
+  ]
+}

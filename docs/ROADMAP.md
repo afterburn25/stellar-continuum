@@ -4,6 +4,41 @@ This is the public roadmap for **Stellar Continuum**, the working title for the 
 
 For durable design rules, current baseline status, and engineering constraints, also read the continuity records linked from the repository README.
 
+## Immediate content production — Player ships and matching assets
+
+Priority updated 2026-09-13 at the user's request: begin **player ships and matching
+assets while Stellar Engine conversion continues**. Content briefs, concepts,
+models, textures, icons, effects and audio can advance now. Connect finished packs
+to playable builds as their native rendering and gameplay support becomes ready.
+
+Start with the six existing Terran ship designs. Each already has presentation
+art and a procedural game model; build a coherent production asset pack from those
+references and preserve its existing design identity.
+
+| Order | Ship / content | Immediate deliverable |
+| --- | --- | --- |
+| 1 | Shared player-fleet reference and parts kit | Consistent silhouettes, scale plan, hull materials, drives, radiators, docking parts and asset records |
+| 2 | Pathfinder Scout | First complete ship pack: design views, reusable model, textures, portrait, icon and preview |
+| 3 | Deep-Space Science Vessel | Matching science ship pack with distinct instruments, laboratory spine and habitat features |
+| 4 | Patrol Corvette | Matching escort pack with readable protection and weapon locations |
+| 5 | Interstellar Bulk Freighter | Cargo modules, transfer points and a distinct working-vessel silhouette |
+| 6 | Sealed Resource Outpost Vessel | Sealed habitat and deployable industrial payload visuals |
+| 7 | Interstellar Colony Ship | Settlement-carrier pack following a review of its represented capacity and scale |
+| Alongside | Fleet icons, drive/survey effects, launch/docking audio | Reusable support assets for the six ships, retaining the established officers and existing useful cues |
+| Following | Orbital shipyard and assembly assets | A matching gantry, construction stages and docking context for the player fleet |
+
+Every new asset should enter **Engine Assets** with its ship/role mapping, version,
+source, dependencies, preview and production status. Preserve editable masters
+and ship a complete copy of the assets a project uses. Existing art remains a
+reference until its replacement is checked in the intended view.
+
+The detailed queue and first production briefs are in
+[Player fleet production](content/PLAYER_FLEET_ROADMAP.md). The
+[structured queue](content/PLAYER_FLEET_QUEUE.json) uses existing ship IDs and records
+the remaining deliverables. This authoring track can proceed alongside conversion;
+gameplay balance, research unlocks, save compatibility and release acceptance stay
+with their owning game/engine work.
+
 ## Local interplanetary travel — open simulation gap
 
 The expanded orbital map and free zoom in 0.1.2 Alpha use schematic display distances.
