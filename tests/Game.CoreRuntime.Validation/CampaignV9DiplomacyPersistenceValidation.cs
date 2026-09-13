@@ -72,7 +72,7 @@ internal static class CampaignV9DiplomacyPersistenceValidation
             session.Save(v9Path, fresh.Galaxy, fresh.Diplomacy, savedDays);
 
             var json = File.ReadAllText(v9Path);
-            Require(json.Contains("\"FormatVersion\": 17", StringComparison.Ordinal), "campaign session did not write authoritative-catalog format v17");
+            Require(json.Contains($"\"FormatVersion\": {CampaignStatePersistenceService.CurrentFormatVersion}", StringComparison.Ordinal), "campaign session did not write the current authoritative campaign format");
             Require(json.Contains("\"Diplomacy\"", StringComparison.Ordinal), "format v9 save omitted Diplomacy");
 
             var loaded = session.LoadOrCreate(v9Path, fallbackSeed: 1L, fallbackSettings: settings);

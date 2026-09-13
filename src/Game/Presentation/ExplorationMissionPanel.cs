@@ -337,7 +337,7 @@ public partial class ExplorationMissionPanel : CanvasLayer
                 header.AddChild(title);
                 header.AddChild(VisualUi.Button("View", "Open this colony's orbital system and focus its world.",
                     () => _main.UiOpenOwnedColony(colony.ColonyId, false), VisualIconLibrary.NavSystem));
-                var land = VisualUi.Button("Land", "Open the freely navigable colony surface and construction palette.",
+                var land = VisualUi.Button("Manage planet", "Open the Command Center, planetary building slots and resource balances.",
                     () => _main.UiOpenOwnedColony(colony.ColonyId, true), VisualIconLibrary.Colony);
                 header.AddChild(land);
                 var freight = VisualUi.Button("Collect", "Dispatch an idle bulk freighter from a developed colony.",

@@ -4,6 +4,15 @@ This is the public roadmap for **Stellar Continuum**, the working title for the 
 
 For durable design rules, current baseline status, and engineering constraints, also read the continuity records linked from the repository README.
 
+## Planetary management — feature branch
+
+The immediate planetary-management feature is implemented on the separate
+`work/planetary-command-window` branch: a Command Center must be built before new
+settlements can construct buildings, upgrades unlock 16/32/64 slots, and a planetary
+window replaces free surface placement with slots and live economy/deficit displays.
+Existing worlds and saves retain their buildings. Integration review and a native
+engine port remain open. See [planetary management](handoffs/planetary-command-window.md).
+
 ## Local interplanetary travel — open simulation gap
 
 The expanded orbital map and free zoom in 0.1.2 Alpha use schematic display distances.

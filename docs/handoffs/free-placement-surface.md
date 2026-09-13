@@ -1,5 +1,9 @@
 # Free-placement colony surface
 
+Historical implementation notes. The player building workflow is superseded by
+[planetary Command Center management](planetary-command-window.md). Free camera
+placement is no longer the active construction interface on that feature branch.
+
 `PlanetSurfaceView` is a full-screen Control with a separate 3D SubViewport, terrain mesh, sun,
 sky, camera, colony hub and building models. It is presentation only. `Configure` accepts the
 root-owned read snapshot and place-order callbacks; `Open`, `Close`, `IsOpen`, and

@@ -29,7 +29,13 @@ public sealed record UiSurfaceSnapshot(int ColonyId, int BodyId, string PlanetNa
     string SustenanceStatus, string SustenanceRecoveryAction,
     double WorkforceAvailableMillions, double WorkforceDemandMillions,
     double WorkingAgePopulationMillions, double EmployedPopulationMillions, double EmploymentRate,
-    double FoodReserveDays, double WaterReserveDays, double HubUpgradeDaysRemaining = 0);
+    double FoodReserveDays, double WaterReserveDays, double HubUpgradeDaysRemaining = 0,
+    UiPlanetaryOverview? Planet = null);
+public sealed record UiPlanetaryOverview(string SystemName, string SpeciesName, double Stability, double Infrastructure,
+    double RadiusEarth, double MassEarth, double GravityG, double TemperatureKelvin, double PressureKPa,
+    string Atmosphere, string Solvent, double RadiationHazard, bool RareResource, bool Anomaly,
+    CreditFlowSnapshot CreditFlow, double IndustryPerDay, double EmpireIndustryPerDay,
+    double EmpireCreditsPerDay, double OperatingArrears);
 public sealed record UiSurfaceBuilding(int Id, string TypeId, string Name, float X, float Z,
     float RotationDegrees, double Progress, double Cost, bool Complete, bool Powered,
     bool CanUpgrade = false, string? UpgradeName = null, double UpgradeCreditCost = 0,
@@ -40,7 +46,7 @@ public sealed record UiSurfaceBuilding(int Id, string TypeId, string Name, float
     double ConstructionStageProgress = 1.0, double RemainingConstructionMaterials = 0.0,
     bool EssentialService = false, double UpgradeDaysRemaining = 0,
     double StoredMaterials = 0, double SharedConstructionDemand = 0, double MinimumConstructionDays = 0,
-    string ConstructionStatus = "Operational", string ConstructionRecoveryAction = "");
+    string ConstructionStatus = "Operational", string ConstructionRecoveryAction = "", int SlotIndex = -1);
 public sealed record UiSurfaceBuildOption(string Id, string Name, string Description, double IndustryCost,
     double CreditCost, float FootprintRadius, bool CanAfford, double StoredMaterials = 0,
     double PendingConstructionDemand = 0);

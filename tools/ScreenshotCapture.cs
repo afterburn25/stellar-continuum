@@ -127,6 +127,12 @@ public partial class ScreenshotCapture : Node
             GD.Print("STELLAR_FOCUSED_LOADING_SPLASH_COMPLETE");
             return;
         }
+        if (focus == "planetary-window")
+        {
+            await VerifyPlanetaryWindowAsync(menu);
+            GD.Print("STELLAR_PLANETARY_WINDOW_COMPLETE");
+            return;
+        }
         if (focus == "loading-contexts")
         {
             await VerifyLoadingContextsAsync(menu, dialog);

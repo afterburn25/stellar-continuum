@@ -104,7 +104,7 @@ public partial class Main
         _regionCrumb = Crumb("SpatialRegion", "Stellar region", UiShowStellarRegion);
         _systemCrumb = Crumb("SpatialSystem", "System", UiOpenSelectedSystem);
         _planetCrumb = Crumb("SpatialPlanet", "Planet", () => _systemSpatialCanvas?.FocusSelectedBody());
-        _surfaceCrumb = Crumb("SpatialSurface", "Surface", () =>
+        _surfaceCrumb = Crumb("SpatialSurface", "Manage planet", () =>
         {
             if (UiFocusedPlanetBodyId is int bodyId && PlanetSurfaceAvailable?.Invoke(bodyId) == true)
                 PlanetSurfaceRequested?.Invoke(bodyId);

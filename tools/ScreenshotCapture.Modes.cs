@@ -48,7 +48,7 @@ public partial class ScreenshotCapture
         Require(_main.UiIsDeveloperMode && !_main.UiDeveloperToolsUsed,
             "Ordinary camera, research, construction, and surface acceptance used a Developer grant.");
         if (_main.UiIsSurfaceOpen)
-            await ClickNamedButtonAsync(_main.GetNode("PlanetSurfaceLayer/PlanetSurfaceView"), "SurfaceBack");
+            await ClickNamedButtonAsync(_main.GetNode("PlanetSurfaceLayer/PlanetaryWindow"), "PlanetaryBack");
         await ClickButtonAsync(_dock, "Back to Region");
         await WaitForCameraAsync();
         await OpenCampaignMenuAsync();

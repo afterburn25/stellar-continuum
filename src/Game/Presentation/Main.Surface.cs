@@ -31,7 +31,7 @@ public sealed record UiOwnedColonySnapshot(int ColonyId, int BodyId, string Colo
 
 public partial class Main
 {
-    private PlanetSurfaceView? _planetSurfaceView;
+    private PlanetaryWindow? _planetSurfaceView;
     private GalaxyState? _surfaceGalaxy;
     private int? _surfaceColonyId;
     private int? _surfaceBodyId;
@@ -121,13 +121,10 @@ public partial class Main
     {
         if (_planetSurfaceView is not null) return;
         var layer = new CanvasLayer { Name = "PlanetSurfaceLayer", Layer = 20 };
-        _planetSurfaceView = new PlanetSurfaceView { Name = "PlanetSurfaceView" };
-        _planetSurfaceView.Configure(BuildSurfaceSnapshot, UiPlaceSurfaceBuilding, UiRemoveSurfaceBuilding,
+        _planetSurfaceView = new PlanetaryWindow { Name = "PlanetaryWindow" };
+        _planetSurfaceView.Configure(BuildSurfaceSnapshot, UiBuildPlanetarySlot, UiRemoveSurfaceBuilding,
             UiUpgradeSurfaceBuilding, UiRepairSurfaceBuilding, UiSetSurfaceBuildingEnabled,
             UiSetSurfaceBuildingPriority, UiUpgradeSurfaceHub);
-        _planetSurfaceView.ReadSkyCompanions = () => _systemSpatialCanvas?.VisibleBodies
-            .Where(body => body.Kind == PlanetaryBodyKind.Moon && body.ParentBodyId == _surfaceBodyId).ToArray()
-            ?? Array.Empty<SystemSpatialBodyMarker>();
         _planetSurfaceView.IsInputBlocked = () => (UiIsMenuOpen || UiIsDeveloperToolsOpen);
         _planetSurfaceView.SaveRequested += UiSave;
         _planetSurfaceView.PlaybackCycleRequested += UiCyclePlayback;
@@ -143,7 +140,6 @@ public partial class Main
 
     protected void RefreshSurfacePresentation()
     {
-        if (_planetSurfaceView is not null) _planetSurfaceView.VisualStyle = UiVisualStyle;
         if (UiIsSurfaceOpen && BuildSurfaceSnapshot() is null) UiReturnToOrbit();
     }
 
@@ -156,7 +152,7 @@ public partial class Main
     {
         if ((UiIsMenuOpen || UiIsDeveloperToolsOpen) || UiFocusedPlanetBodyId != bodyId || !CanOpenPlanetSurface(bodyId))
         {
-            SetStatus("Focus a planet with one of your surface colonies to land.", 5);
+            SetStatus("Focus one of your settled planets to open planetary management.", 5);
             return;
         }
         InitializeSurfacePresentation();
@@ -183,10 +179,7 @@ public partial class Main
         var scene = _systemSpatialCanvas?.Scene;
         var marker = _systemSpatialCanvas?.GetBodyMarker(bodyId);
         if (scene is null || marker is null || !CanOpenPlanetSurface(bodyId)) return;
-        var basis = scene.GetBodyBasis(bodyId) ?? Basis.Identity;
-        var altitude = scene.FocusAltitudeRatio;
         UiOpenPlanetSurface(bodyId);
-        if (UiIsSurfaceOpen) _planetSurfaceView!.OpenFromOrbit(marker, scene.CameraBasis, basis, altitude);
     }
 
     public void UiOpenOwnedColony(int colonyId, bool land)
@@ -238,8 +231,8 @@ public partial class Main
             colony.Id == _galaxy.Colonies.Where(item => item.CivilizationId == player.Id &&
                 item.Kind == SettlementKind.Colony && item.SystemId == player.HomeSystemId)
                 .MaxBy(item => item.PopulationMillions)?.Id;
-        var hubName = colony.Kind == SettlementKind.ResourceOutpost ? "Sealed outpost hub" :
-            isCapitalHub ? "Planetary hub" : "Command center";
+        var hubName = colony.Kind == SettlementKind.ResourceOutpost ? "Outpost Command Center" : "Planetary Command Center";
+        var slots = SurfaceConstruction.GetBuildingSlots(colony);
         var hubUpgrade = SurfaceConstruction.GetHubUpgradeCost(_galaxy, colony);
         var surfaceCapabilities = new AdaptiveResearchConstructionCapabilityView(_adaptiveResearch!);
         var hubUpgradeLock = hubUpgrade is null ? null : SurfaceConstruction.GetHubUpgradeLockReason(
@@ -272,7 +265,7 @@ public partial class Main
                     SurfaceConstruction.GetEssentialServicePriority(item.TypeId) > 0, item.UpgradeDaysRemaining,
                     siteConstructionFeedback?.StoredMaterials ?? PlayerEconomy.Industry,
                     siteConstructionFeedback?.SharedSiteDemand ?? 0, siteConstructionFeedback?.MinimumDaysRemaining ?? 0,
-                    siteConstructionFeedback?.Status ?? "Operational", siteConstructionFeedback?.RecoveryAction ?? string.Empty);
+                    siteConstructionFeedback?.Status ?? "Operational", siteConstructionFeedback?.RecoveryAction ?? string.Empty, slots[item.Id]);
             }).ToArray(),
             SurfaceBuildingCatalog.All.Where(item => SurfaceConstruction.IsAvailableForSettlement(colony, item)).Select(item =>
             {
@@ -310,7 +303,14 @@ public partial class Main
             output.WorkforceAvailableMillions, output.WorkforceDemandMillions,
             labor.WorkingAgePopulationMillions, labor.EmployedPopulationMillions, labor.EmploymentRate,
             colony.StoredFoodPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions),
-            colony.StoredWaterPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions), colony.SurfaceHubUpgradeDaysRemaining);
+            colony.StoredWaterPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions), colony.SurfaceHubUpgradeDaysRemaining,
+            new UiPlanetaryOverview(_galaxy.Systems.First(item => item.Id == colony.SystemId).Name,
+                SpeciesCatalog.Get(colony.PopulationSpeciesId).DisplayName, colony.Stability, colony.Infrastructure,
+                body.RadiusEarth, body.MassEarth, body.Environment.GravityG, body.Environment.TemperatureKelvin,
+                body.Environment.PressureKPa, body.Environment.Atmosphere.ToString(), body.Environment.AvailableSolvent.ToString(),
+                body.Environment.RadiationHazard, body.HasRareResource, body.HasAnomaly,
+                EconomySimulation.GetColonyCreditFlow(_galaxy, colony), EconomySimulation.GetColonyIndustryPerDay(_galaxy, colony),
+                PlayerEconomy.LastIndustryPerSecond, PlayerEconomy.LastCreditsPerSecond, PlayerEconomy.OperatingArrears));
     }
 
     private static string SurfaceVisualClass(PlanetaryBodyState body)
@@ -328,11 +328,14 @@ public partial class Main
     }
 
     public UiSurfaceOrderResult UiPlaceSurfaceBuilding(string typeId, float x, float z, float rotationDegrees)
+        => new(false, "Surface free placement has been replaced. Choose a building slot in the planetary window.");
+
+    public UiSurfaceOrderResult UiBuildPlanetarySlot(int slot, string typeId)
     {
         var snapshot = BuildSurfaceSnapshot();
         if (!UiIsSurfaceOpen || (UiIsMenuOpen || UiIsDeveloperToolsOpen) || snapshot is null)
             return new(false, "Open an owned colony surface before placing a building.");
-        var result = SurfaceConstruction.Place(_galaxy, _galaxy.PlayerCivilizationId, snapshot.ColonyId, typeId, x, z, rotationDegrees);
+        var result = SurfaceConstruction.BuildInSlot(_galaxy, _galaxy.PlayerCivilizationId, snapshot.ColonyId, slot, typeId);
         SetStatus(result.Message, 5);
         return new(result.Accepted, result.Message);
     }

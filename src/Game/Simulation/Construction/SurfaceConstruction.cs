@@ -24,6 +24,8 @@ public sealed class SurfaceBuildingState
     public double Condition { get; set; } = 1.0;
     /// <summary>Energy retained by this complex, measured in local grid-power days.</summary>
     public double StoredPowerDays { get; set; }
+    /// <summary>Stable zero-based planetary slot. Null identifies a legacy free-placed building.</summary>
+    public int? SlotIndex { get; set; }
 }
 
 public sealed record SurfaceBuildingDefinition(string Id, string Name, string Description,
@@ -91,9 +93,8 @@ public sealed record SurfaceColonySpecialization(string Id, string Name, string 
 public sealed record SurfaceConstructionStage(string Id, string Name, double PhaseProgress,
     double OverallProgress, double RemainingMaterials);
 
-/// <summary>Authoritative free placement and local power. Terrain coordinates are metres within
-/// a bounded colony area, independent of stellar coordinates and orbital presentation.</summary>
-public static class SurfaceConstruction
+/// <summary>Authoritative planetary construction, command capacity and local operations.</summary>
+public static partial class SurfaceConstruction
 {
     public const float AreaHalfSize = 512;
     public const int MaximumBuildings = 64;
@@ -137,7 +138,7 @@ public static class SurfaceConstruction
     }
 
     public static int GetBuildingCapacity(ColonyState colony) =>
-        colony.Kind == SettlementKind.ResourceOutpost ? 8 : colony.SurfaceHubLevel switch
+        colony.SurfaceHubLevel <= 0 ? 0 : colony.Kind == SettlementKind.ResourceOutpost ? 8 : colony.SurfaceHubLevel switch
         {
             1 => 16,
             2 => 32,
@@ -147,9 +148,9 @@ public static class SurfaceConstruction
     public static (double CreditCost, double IndustryCost)? GetHubUpgradeCost(
         GalaxyState galaxy, ColonyState colony)
     {
-        if (colony.Kind == SettlementKind.ResourceOutpost || colony.SurfaceHubLevel >= 3) return null;
-        (double CreditCost, double IndustryCost) baseCost = colony.SurfaceHubLevel == 1
-            ? (60.0, 250.0) : (140.0, 600.0);
+        if (colony.SurfaceHubLevel > 0 && colony.Kind == SettlementKind.ResourceOutpost || colony.SurfaceHubLevel >= 3) return null;
+        (double CreditCost, double IndustryCost) baseCost = colony.SurfaceHubLevel switch
+        { 0 => (25.0, 120.0), 1 => (60.0, 250.0), _ => (140.0, 600.0) };
         var multiplier = GetConstructionCostMultiplier(galaxy, colony);
         return (Math.Round(baseCost.CreditCost * multiplier, 2, MidpointRounding.AwayFromZero),
             Math.Ceiling(baseCost.IndustryCost * multiplier));
@@ -218,6 +219,8 @@ public static class SurfaceConstruction
         ArgumentNullException.ThrowIfNull(galaxy);
         var colony = galaxy.Colonies.FirstOrDefault(item => item.Id == colonyId && item.CivilizationId == civilizationId);
         if (colony is null) return new(false, "You can upgrade only a colony you own.");
+        var body = galaxy.PlanetaryBodies.FirstOrDefault(item => item.Id == colony.PlanetaryBodyId && item.SystemId == colony.SystemId);
+        if (body is null || !body.Environment.HasSolidSurface) return new(false, "A Command Center requires an owned settlement on a solid surface.");
         if (colony.SurfaceHubUpgradeDaysRemaining > 0) return new(false, "The hub expansion is already under construction.");
         var cost = GetHubUpgradeCost(galaxy, colony);
         if (cost is null)
@@ -235,7 +238,7 @@ public static class SurfaceConstruction
         economy.Credits -= cost.Value.CreditCost;
         economy.Industry -= cost.Value.IndustryCost;
         colony.SurfaceHubUpgradeDaysRemaining = cost.Value.IndustryCost / IndustryPerSitePerDay;
-        return new(true, $"Hub expansion authorized: {colony.SurfaceHubUpgradeDaysRemaining:0.0} game days. Capacity increases when construction completes.");
+        return new(true, $"Command Center {(colony.SurfaceHubLevel == 0 ? "construction" : "upgrade")} authorized: {colony.SurfaceHubUpgradeDaysRemaining:0.0} game days at full funding. Building slots unlock when construction completes.");
     }
 
     public static bool IsAvailableForSettlement(ColonyState colony, SurfaceBuildingDefinition definition) =>
@@ -284,6 +287,7 @@ public static class SurfaceConstruction
     {
         var colony = galaxy.Colonies.FirstOrDefault(item => item.Id == colonyId && item.CivilizationId == civilizationId);
         if (colony is null) return new(false, "You can build only in a colony you own.");
+        if (colony.SurfaceHubLevel <= 0) return new(false, "Construct and complete the Command Center before adding planetary buildings.");
         var body = galaxy.PlanetaryBodies.FirstOrDefault(item => item.Id == colony.PlanetaryBodyId && item.SystemId == colony.SystemId);
         if (body is null || !body.Environment.HasSolidSurface)
             return new(false, "A surveyed colony on a solid planetary surface is required.");
@@ -309,10 +313,12 @@ public static class SurfaceConstruction
         var nextId = colony.SurfaceBuildings.Count == 0 ? 1 : colony.SurfaceBuildings.Max(item => item.Id) + 1;
         if (nextId <= 0) return new(false, "No building identifier is available.");
         economy.Credits -= authorizationCost;
+        AssignLegacySlots(colony);
         colony.SurfaceBuildings.Add(new SurfaceBuildingState
         {
             Id = nextId, TypeId = typeId, X = x, Z = z,
             RotationDegrees = ((rotationDegrees % 360) + 360) % 360,
+            SlotIndex = Enumerable.Range(0, capacity).First(index => colony.SurfaceBuildings.All(item => item.SlotIndex != index)),
         });
         return new(true, $"{definition.Name} placed and authorized for {currency.Format(authorizationCost)}. Construction uses available materials.");
     }
@@ -328,6 +334,7 @@ public static class SurfaceConstruction
         var economy = galaxy.Economies.FirstOrDefault(item => item.CivilizationId == civilizationId);
         if (economy is null) return new(false, "The colony has no construction economy.");
 
+        AssignLegacySlots(colony);
         colony.SurfaceBuildings.Remove(building);
         if (building.IsComplete)
             return new(true, $"{definition.Name} demolished. Its power use and production have stopped.");
@@ -673,15 +680,20 @@ public static class SurfaceConstruction
     public static void Validate(ColonyState colony)
     {
         if (colony.SurfaceBuildings is null) throw new InvalidDataException($"Colony {colony.Id} has a null surface building collection.");
+        if (colony.SurfaceHubLevel is < 0 or > 3 || colony.SurfaceBuildings.Count > GetBuildingCapacity(colony))
+            throw new InvalidDataException($"Colony {colony.Id} has invalid Command Center capacity.");
         var accepted = new List<SurfaceBuildingState>();
         if (!double.IsFinite(colony.SurfaceHubUpgradeDaysRemaining) || colony.SurfaceHubUpgradeDaysRemaining < 0 ||
-            colony.SurfaceHubUpgradeDaysRemaining > 0 && (colony.SurfaceHubLevel >= 3 || colony.Kind == SettlementKind.ResourceOutpost))
+            colony.SurfaceHubUpgradeDaysRemaining > 0 && (colony.SurfaceHubLevel >= 3 || colony.Kind == SettlementKind.ResourceOutpost && colony.SurfaceHubLevel > 0))
             throw new InvalidDataException($"Colony {colony.Id} has invalid hub expansion progress.");
         var ids = new HashSet<int>();
+        var slots = new HashSet<int>();
         foreach (var building in colony.SurfaceBuildings)
         {
             if (building is null || building.Id <= 0 || !ids.Add(building.Id))
                 throw new InvalidDataException($"Colony {colony.Id} has a missing or duplicate surface building identifier.");
+            if (building.SlotIndex is int slot && (slot < 0 || slot >= GetBuildingCapacity(colony) || !slots.Add(slot)))
+                throw new InvalidDataException($"Colony {colony.Id} has an invalid or duplicate planetary building slot.");
             var error = PlacementError(accepted, building.TypeId, building.X, building.Z, building.RotationDegrees);
             if (error is not null) throw new InvalidDataException($"Colony {colony.Id}, surface building {building.Id}: {error}");
             var cost = SurfaceBuildingCatalog.Find(building.TypeId)!.IndustryCost;
