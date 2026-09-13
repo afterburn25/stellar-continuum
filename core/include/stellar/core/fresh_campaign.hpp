@@ -3,6 +3,7 @@
 #include <stellar/core/colony_economy.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_seeding.hpp>
+#include <stellar/core/fleet_power_observation.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/knowledge.hpp>
 #include <stellar/core/legacy_technology.hpp>
@@ -32,6 +33,7 @@ struct FreshCampaignState {
   CivilizationKnowledgeState knowledge;
   std::optional<GalacticCore> core;
   bool used_constrained_home_fallback{};
+  std::vector<FleetPowerObservation> combat_intelligence;
 };
 
 FreshCampaignState

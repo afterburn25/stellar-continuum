@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.33",
+  "engineVersion": "0.1.34",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "Headless diagnostic host with fresh campaign initialization and retained ordered legacy campaign simulation benchmarks. Core includes campaign commands and Adaptive Research catalogs, state, eligibility, research views, timed runtime commands, expertise, calculated authority, starting profiles and standalone schema-1 through schema-5 research recovery, weak state support, pressure signals, visible-only research agendas, foreign discovery and deterministic outcomes behind a stable owning research runtime, plus per-civilization campaign ownership/schema-2 recovery, funding commands, authoritative construction/shipbuilding capability adapters, timed research campaign progression and low-level observer-safe Diplomacy state. Timing and state outputs are diagnostics, not FPS or player saves. Integrated Adaptive Research/diplomacy, player wrapper17 / galaxy16 persistence and graphical parity remain open."
+  "description": "Headless diagnostic host with fresh campaign initialization and retained ordered legacy campaign simulation benchmarks. Core includes campaign commands and Adaptive Research catalogs, state, eligibility, research views, timed runtime commands, expertise, calculated authority, starting profiles and standalone schema-1 through schema-5 research recovery, weak state support, pressure signals, visible-only research agendas, foreign discovery and deterministic outcomes behind a stable owning research runtime, plus per-civilization campaign ownership/schema-2 recovery, funding commands, authoritative construction/shipbuilding capability adapters, timed research campaign progression and observer-safe Diplomacy state, commands, lifecycle maintenance, exploration/combat runtime bridges and bounded fleet sensor intelligence. Timing and state outputs are diagnostics, not FPS or player saves. Integrated Adaptive Research/diplomacy, player wrapper17 / galaxy16 persistence and graphical parity remain open."
 }
