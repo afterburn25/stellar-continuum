@@ -110,3 +110,6 @@ refits cannot overbook capacity, damaged modules retain their cost, removal does
 not release capacity early, built-in docks remain free of equipment allocation,
 and saved blueprints cannot bypass current ownership, research or capacity rules.
 
+The allocation preview passed browser checks for empty cores, fixed docking,
+slot and point limits, minimum tiers, preserved loadouts, Tier 7 growth and narrow
+and wide layouts. Native refit, research and saved-blueprint checks remain queued.
