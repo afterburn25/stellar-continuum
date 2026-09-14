@@ -354,6 +354,46 @@ MissionReachAssessment ExplorationSimulation::assess_operational_reach(
                                                    destination_system_id);
 }
 
+ExplorationMissionOrderAssessment ExplorationSimulation::issue_travel_order(
+    ExplorationOrderWorldView world, const int fleet_id,
+    const int destination_system_id) const {
+  return issue_order(world, fleet_id, destination_system_id, false);
+}
+
+ExplorationMissionOrderAssessment ExplorationSimulation::issue_survey_order(
+    ExplorationOrderWorldView world, const int fleet_id,
+    const int destination_system_id) const {
+  return issue_order(world, fleet_id, destination_system_id, true);
+}
+
+ExplorationMissionOrderAssessment ExplorationSimulation::issue_order(
+    ExplorationOrderWorldView world, const int fleet_id,
+    const int destination_system_id, const bool require_survey_work) const {
+  auto assessment = mission_planner_.assess_order(
+      world.planning(), fleet_id, destination_system_id, require_survey_work);
+  if (!assessment.accepted)
+    return assessment;
+
+  const auto fleet =
+      std::find_if(world.fleets.begin(), world.fleets.end(),
+                   [fleet_id](const auto &candidate) {
+                     return candidate.id == fleet_id && candidate.is_active;
+                   });
+  if (fleet == world.fleets.end())
+    throw std::logic_error(
+        "Accepted exploration order no longer has an active fleet.");
+  if (assessment.is_local_survey) {
+    clear_fleet_route(*fleet);
+    return assessment;
+  }
+  if (!assessment.candidate)
+    throw std::logic_error(
+        "Accepted exploration travel order has no route candidate.");
+  assign_fleet_route(world.reach(), *fleet, destination_system_id,
+                     assessment.candidate->reach);
+  return assessment;
+}
+
 std::vector<ExplorationEvent>
 ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
                                double simulation_delta) const {

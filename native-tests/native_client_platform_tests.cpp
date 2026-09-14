@@ -22,6 +22,7 @@ int main(int argc,char **argv){
     const auto ordered=window.poll();
     check(ordered.events.size()==3,"same-poll pointer sequence was collapsed");
     if(ordered.events.size()==3){check(ordered.events[0].type==InputEventType::LeftPressed,"press was not first");check(ordered.events[1].type==InputEventType::PointerMove,"move was not second");check(ordered.events[2].type==InputEventType::LeftReleased,"release was not third");check(ordered.events[0].position.x!=ordered.events[2].position.x,"press position was replaced by release position");}
+    SDL_Event right_down{};right_down.type=SDL_EVENT_MOUSE_BUTTON_DOWN;right_down.button.button=SDL_BUTTON_RIGHT;right_down.button.x=240;right_down.button.y=160;push(right_down);SDL_Event right_up{};right_up.type=SDL_EVENT_MOUSE_BUTTON_UP;right_up.button.button=SDL_BUTTON_RIGHT;right_up.button.x=240;right_up.button.y=160;push(right_up);const auto right_click=window.poll();check(right_click.events.size()==2,"right-click events were dropped");if(right_click.events.size()==2){check(right_click.events[0].type==InputEventType::RightPressed,"right press was not ordered");check(right_click.events[1].type==InputEventType::RightReleased,"right release was not ordered");}
     push(down);SDL_Event focus{};focus.type=SDL_EVENT_WINDOW_FOCUS_LOST;push(focus);push(move);
     const auto cancelled=window.poll();
     check(cancelled.events.size()==3,"focus loss and hover motion were not preserved");

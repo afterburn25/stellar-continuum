@@ -46,6 +46,22 @@ struct ExplorationAdvanceWorldView {
   InterstellarLaneNetwork &lanes;
 };
 
+struct ExplorationOrderWorldView {
+  std::span<const StellarSystem> systems;
+  std::span<const PlanetaryBody> bodies;
+  std::span<FleetState> fleets;
+  std::span<const Colony> colonies;
+  const CivilizationKnowledgeState &knowledge;
+  InterstellarLaneNetwork &lanes;
+
+  [[nodiscard]] ExplorationPlanningWorldView planning() const noexcept {
+    return {systems, bodies, fleets, colonies, knowledge, lanes};
+  }
+  [[nodiscard]] OperationalReachWorldView reach() const noexcept {
+    return {systems, colonies, lanes};
+  }
+};
+
 class ExplorationSimulation {
 public:
   static constexpr double science_survey_progress_per_day = 0.08;
@@ -58,11 +74,20 @@ public:
   [[nodiscard]] MissionReachAssessment
   assess_operational_reach(ExplorationPlanningWorldView world, int fleet_id,
                            int destination_system_id) const;
+  [[nodiscard]] ExplorationMissionOrderAssessment
+  issue_travel_order(ExplorationOrderWorldView world, int fleet_id,
+                     int destination_system_id) const;
+  [[nodiscard]] ExplorationMissionOrderAssessment
+  issue_survey_order(ExplorationOrderWorldView world, int fleet_id,
+                     int destination_system_id) const;
 
   std::vector<ExplorationEvent>
   advance(ExplorationAdvanceWorldView world, double simulation_delta) const;
 
 private:
+  [[nodiscard]] ExplorationMissionOrderAssessment
+  issue_order(ExplorationOrderWorldView world, int fleet_id,
+              int destination_system_id, bool require_survey_work) const;
   ExplorationMissionPlanner mission_planner_;
   SurveyOperationsProfiler survey_profiler_;
 };

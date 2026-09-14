@@ -1,6 +1,9 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
 #include "native_campaign_session.hpp"
+#include "native_fleet_controller.hpp"
+#include "native_fleet_presentation.hpp"
+#include "native_fleet_workspace.hpp"
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
 #include "native_ui_layout.hpp"
@@ -37,6 +40,8 @@
 namespace {
 using namespace stellar::core;
 using namespace stellar::native_map;
+using namespace stellar::native_fleet;
+using namespace stellar::native_fleet_ui;
 using namespace stellar::native_research;
 using namespace stellar::native_research_ui;
 
@@ -50,6 +55,7 @@ struct Options {
   bool windowed{};
   bool load{};
   bool research_smoke{};
+  bool fleet_smoke{};
   bool save_path_overridden{};
 };
 
@@ -73,6 +79,7 @@ struct Options {
     else if(arg==L"--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
+    else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -84,10 +91,13 @@ struct Options {
     else if(arg=="--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
+    else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
+  if(result.research_smoke&&result.fleet_smoke)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
 }
@@ -137,6 +147,7 @@ struct Options {
 }
 void fill(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(FilledRectangle{bounds,color});}
 void stroke(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(StrokedRectangle{bounds,color});}
+[[nodiscard]] Point center(UiRect bounds)noexcept{return {bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f};}
 void label(DrawList &out, UiRect bounds, std::string value, Color color,
            int size, float scale, FontFace face = FontFace::Interface) {
   out.overlay.emplace_back(Text{
@@ -178,6 +189,7 @@ class NativeCampaign final {
       : session_(std::move(session)) {
     refresh_knowledge();
     fit_camera(width,height);
+    refresh_fleets(true);
   }
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
@@ -214,6 +226,71 @@ class NativeCampaign final {
     }
     smoke_research_node_=research_workspace_.selected_id();
   }
+  void prepare_fleet_smoke(int width,int height){
+    const auto click=[&](Point point,InputEventType press=InputEventType::LeftPressed){
+      InputSnapshot input;
+      input.drawable_width=width;
+      input.drawable_height=height;
+      input.pointer=point;
+      input.events={{press,point},
+                    {press==InputEventType::LeftPressed
+                         ?InputEventType::LeftReleased
+                         :InputEventType::RightReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Fleet smoke input closed the campaign.");
+    };
+    if(!fleet_workspace_.view()||fleet_workspace_.view()->own_fleets.empty())
+      throw std::runtime_error("Fleet smoke loaded no owned fleet fixture.");
+    const auto &fleets=fleet_workspace_.view()->own_fleets;
+    auto selected=std::ranges::find_if(fleets,[](const auto &fleet){
+      return fleet.destination_system_id.has_value();
+    });
+    if(selected==fleets.end())selected=std::ranges::find_if(
+        fleets,[](const auto &fleet){return fleet.role==FleetRole::Colony;});
+    if(selected==fleets.end())selected=fleets.begin();
+    const auto index=static_cast<std::size_t>(selected-fleets.begin());
+    const auto selected_fleet_id=selected->id;
+    const auto selected_current_system=selected->current_system_id;
+    const auto selected_destination=selected->destination_system_id;
+    const auto layout=FleetWorkspaceLayout::for_viewport(width,height);
+    click({layout.list.x+12.f*layout.scale,
+           layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
+    if(fleet_controller_.selection()!=std::optional<int>{selected_fleet_id})
+      throw std::runtime_error("Fleet smoke mouse selection failed.");
+    smoke_fleet_id_=selected_fleet_id;
+    if(!selected_destination){
+      const auto panel=layout.panel;
+      std::optional<int> target;
+      Point target_point;
+      double longest_eta=-1.;
+      for(const auto &system:session_->frame().runtime().world().campaign().systems){
+        if(selected_current_system==system.id)continue;
+        const auto candidate=fleet_controller_.preview_selected_route(
+            session_->frame(),session_->cache().generation,system.id);
+        const auto point=camera_.project({system.position.x,system.position.y},
+                                         width,height);
+        if(candidate.command_available&&candidate.estimated_transit_days&&
+           *candidate.estimated_transit_days>longest_eta&&point.x>=0&&
+           point.y>=0&&point.x<width&&point.y<height&&!panel.contains(point)){
+          target=system.id;target_point=point;
+          longest_eta=*candidate.estimated_transit_days;
+        }
+      }
+      if(!target)throw std::runtime_error(
+          "Fleet smoke found no visible authoritative route target.");
+      click(target_point,InputEventType::RightPressed);
+      if(!fleet_workspace_.preview()||
+         !fleet_workspace_.preview()->command_available)
+        throw std::runtime_error("Fleet smoke right-click preview failed.");
+      click(center(layout.confirm));
+      if(!last_fleet_command_accepted_)
+        throw std::runtime_error("Fleet smoke confirmation was rejected.");
+      smoke_fleet_destination_=target;
+      const auto main_layout=NativeUiLayout::for_viewport(width,height);
+      if(session_->frame().clock().speed()==StrategicSpeed::Paused)
+        click(center(main_layout.pause));
+    }else smoke_fleet_destination_=selected_destination;
+  }
   void request_smoke_save(){session_->request_save();}
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
@@ -226,6 +303,17 @@ class NativeCampaign final {
     std::ostringstream out;
     out<<*smoke_research_node_<<":"<<(found->active?"active":"inactive")
        <<":"<<std::fixed<<std::setprecision(6)<<found->total_progress;
+    return out.str();
+  }
+  [[nodiscard]] std::string fleet_smoke_status()const{
+    if(!smoke_fleet_id_||!smoke_fleet_destination_)return "unavailable";
+    const auto &fleets=session_->frame().runtime().world().campaign().fleets;
+    const auto found=std::ranges::find(fleets,*smoke_fleet_id_,&FleetState::id);
+    if(found==fleets.end())return "unavailable";
+    std::ostringstream out;
+    out<<found->id<<":"<<*smoke_fleet_destination_<<":"
+       <<found->mission_order_revision<<":"<<std::fixed
+       <<std::setprecision(6)<<found->transit_progress;
     return out.str();
   }
   [[nodiscard]] bool wants_text_input() const noexcept {
@@ -242,6 +330,10 @@ class NativeCampaign final {
       refresh_knowledge();
       research_workspace_.discard_campaign();
       projected_research_stamp_.reset();
+      fleet_workspace_.discard_campaign();
+      fleet_marker_offsets_.clear();
+      pending_fleet_preview_.reset();
+      refresh_fleets(true);
       if(research_workspace_.visible())refresh_research(true);
     }
     if(session_->exit_ready())return false;
@@ -269,6 +361,19 @@ class NativeCampaign final {
         if(command.captured||event.type==InputEventType::TextEntered||
            event.type==InputEventType::BackspacePressed)continue;
       }
+      if(!menu_&&!research_workspace_.visible()){
+        const auto markers=fleet_markers(width,height);
+        const auto target=event.type==InputEventType::RightPressed
+                              ?system_hit(event.position,width,height)
+                              :std::nullopt;
+        const auto fleet_command=fleet_workspace_.handle(
+            event,width,height,markers,target);
+        handle_fleet_command(fleet_command);
+        if(fleet_command.captured){
+          if(event.type==InputEventType::LeftPressed)gesture_.begin(true);
+          continue;
+        }
+      }
       if(event.type==InputEventType::LeftPressed){
         const auto action=layout.hit(event.position,menu_);bool captured=menu_||action!=UiAction::None;
         if(action==UiAction::Continue)toggle_menu();
@@ -294,6 +399,8 @@ class NativeCampaign final {
       (void)session_->advance(menu_?0.:elapsed,timestamp);
       research_refresh_elapsed_+=elapsed;
       refresh_research(false);
+      fleet_refresh_elapsed_+=elapsed;
+      refresh_fleets(false);
       if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
     }
     refresh_knowledge();
@@ -305,6 +412,16 @@ class NativeCampaign final {
     DrawList out; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-12||p.y<-12||p.x>width+12||p.y>height+12)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;const auto c=known?spectral_color(system.primary):Color{135,150,174,190};out.circles.push_back({p,selected?7.f:3.4f,{c.r,c.g,c.b,45}});out.circles.push_back({p,selected?4.2f:2.f,c});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    if(const auto &preview=fleet_workspace_.preview();preview){
+      for(std::size_t index=1;index<preview->route_system_ids.size();++index){
+        if(!known_.contains(preview->route_system_ids[index-1])||
+           !known_.contains(preview->route_system_ids[index]))continue;
+        const auto from=cache.systems_by_id.find(preview->route_system_ids[index-1]);
+        const auto to=cache.systems_by_id.find(preview->route_system_ids[index]);
+        if(from==cache.systems_by_id.end()||to==cache.systems_by_id.end())continue;
+        out.lines.push_back({camera_.project({from->second->position.x,from->second->position.y},width,height),camera_.project({to->second->position.x,to->second->position.y},width,height),preview->command_available?Color{102,232,164,220}:Color{255,190,112,210}});
+      }
+    }
     const auto layout = NativeUiLayout::for_viewport(width, height);
     const Color panel{7, 17, 32, 238};
     const Color button{12, 31, 54, 245};
@@ -371,6 +488,8 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
+    if(!menu_&&!research_workspace_.visible())
+      fleet_workspace_.render(out,width,height,fleet_markers(width,height));
     research_workspace_.render(out, width, height);
     return out;
   }
@@ -424,6 +543,118 @@ class NativeCampaign final {
     refresh_research(true);
   }
 
+  [[nodiscard]] std::vector<FleetScreenMarker> fleet_markers(
+      int width,int height)const{
+    std::vector<FleetScreenMarker> result;
+    if(!fleet_workspace_.view())return result;
+    result.reserve(fleet_workspace_.view()->own_fleets.size());
+    std::size_t offset_index{};
+    for(const auto &fleet:fleet_workspace_.view()->own_fleets){
+      auto point=camera_.project({fleet.position.x,fleet.position.y},width,height);
+      while(offset_index<fleet_marker_offsets_.size()&&
+            fleet_marker_offsets_[offset_index].fleet_id<fleet.id)
+        ++offset_index;
+      if(offset_index<fleet_marker_offsets_.size()&&
+         fleet_marker_offsets_[offset_index].fleet_id==fleet.id){
+        point.x+=fleet_marker_offsets_[offset_index].pixels.x;
+        point.y+=fleet_marker_offsets_[offset_index].pixels.y;
+      }
+      result.push_back({fleet.id,point});
+    }
+    return result;
+  }
+
+  [[nodiscard]] std::optional<int> system_hit(Point pointer,int width,
+                                               int height)const{
+    float best=10.f;
+    std::optional<int> result;
+    for(const auto &system:session_->frame().runtime().world().campaign().systems){
+      const auto point=camera_.project({system.position.x,system.position.y},width,height);
+      const auto distance=std::hypot(point.x-pointer.x,point.y-pointer.y);
+      if(distance<best){best=distance;result=system.id;}
+    }
+    return result;
+  }
+
+  [[nodiscard]] std::string system_display_name(int system_id)const{
+    if(!known_.contains(system_id))return "Unknown system";
+    const auto found=session_->cache().systems_by_id.find(system_id);
+    return found==session_->cache().systems_by_id.end()?"Unknown system":found->second->name;
+  }
+
+  [[nodiscard]] std::vector<ObservedSystemName> observed_system_names()const{
+    const auto &systems=session_->frame().runtime().world().campaign().systems;
+    std::vector<ObservedSystemName> result;
+    result.reserve(systems.size());
+    for(const auto &system:systems)
+      result.push_back({system.id,system.name,known_.contains(system.id)});
+    return result;
+  }
+
+  void refresh_fleets(bool force){
+    if(!force&&fleet_refresh_elapsed_<.1)return;
+    auto view=fleet_controller_.build(session_->frame(),
+                                      session_->cache().generation);
+    if(pending_fleet_preview_){
+      const auto selected=view.selected_fleet_id
+                              ?std::ranges::find(view.own_fleets,
+                                                 *view.selected_fleet_id,
+                                                 &NativeOwnFleet::id)
+                              :view.own_fleets.end();
+      if(selected==view.own_fleets.end()||
+         selected->id!=pending_fleet_preview_->fleet_id||
+         selected->mission_order_revision!=
+             pending_fleet_preview_->expected_mission_order_revision)
+        pending_fleet_preview_.reset();
+    }
+    fleet_marker_offsets_=deterministic_fleet_marker_offsets(view.own_fleets);
+    fleet_workspace_.set_view(std::move(view));
+    fleet_refresh_elapsed_=0.;
+  }
+
+  void handle_fleet_command(const FleetWorkspaceCommand &command){
+    if(command.kind==FleetWorkspaceCommandKind::None)return;
+    NativeFleetSelectionOutcome selection;
+    if(command.kind==FleetWorkspaceCommandKind::Select)
+      selection=fleet_controller_.select(session_->frame(),
+                                         session_->cache().generation,
+                                         command.fleet_id);
+    else if(command.kind==FleetWorkspaceCommandKind::SelectHits)
+      selection=fleet_controller_.select_next_hit(
+          session_->frame(),session_->cache().generation,
+          command.hit_fleet_ids);
+    if(command.kind==FleetWorkspaceCommandKind::Select||
+       command.kind==FleetWorkspaceCommandKind::SelectHits){
+      pending_fleet_preview_.reset();
+      fleet_workspace_.set_notice(selection.message,selection.accepted);
+      refresh_fleets(true);
+      return;
+    }
+    if(command.kind==FleetWorkspaceCommandKind::Preview){
+      auto preview=fleet_controller_.preview_selected_route(
+          session_->frame(),session_->cache().generation,
+          command.target_system_id);
+      pending_fleet_preview_=preview;
+      preview.message=observer_safe_fleet_message(preview.message,
+                                                  observed_system_names());
+      fleet_workspace_.set_preview(std::move(preview),
+                                   system_display_name(command.target_system_id));
+      return;
+    }
+    if(command.kind==FleetWorkspaceCommandKind::Confirm){
+      if(!pending_fleet_preview_)return;
+      const auto outcome=fleet_controller_.issue_selected_route(
+          session_->frame(),*pending_fleet_preview_);
+      pending_fleet_preview_.reset();
+      fleet_workspace_.clear_preview();
+      fleet_workspace_.set_notice(observer_safe_fleet_message(
+                                      outcome.message,observed_system_names()),
+                                  outcome.accepted);
+      last_fleet_command_accepted_=outcome.accepted;
+      refresh_fleets(true);
+    }
+  }
+
   void fit_camera(int width,int height){const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);}
   void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());}
@@ -436,10 +667,18 @@ class NativeCampaign final {
   std::optional<int> selected_id_;
   NativeResearchController research_controller_;
   NativeResearchWorkspace research_workspace_;
+  NativeFleetController fleet_controller_;
+  NativeFleetWorkspace fleet_workspace_;
+  std::vector<FleetMarkerOffset> fleet_marker_offsets_;
+  std::optional<NativeFleetRoutePreview> pending_fleet_preview_;
   std::optional<ResearchStamp> projected_research_stamp_;
   double research_refresh_elapsed_{};
+  double fleet_refresh_elapsed_{};
   bool last_research_command_accepted_{};
   std::optional<std::string> smoke_research_node_;
+  bool last_fleet_command_accepted_{};
+  std::optional<int> smoke_fleet_id_;
+  std::optional<int> smoke_fleet_destination_;
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
 };
 }
@@ -463,6 +702,9 @@ int main(int argc,char **argv){
       if(options.research_smoke)
         campaign.prepare_research_smoke(window.drawable_width(),
                                         window.drawable_height(),!options.load);
+      else if(options.fleet_smoke)
+        campaign.prepare_fleet_smoke(window.drawable_width(),
+                                     window.drawable_height());
       else
         campaign.prepare_smoke_ui();
     }
@@ -489,7 +731,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if(options.research_smoke&&frames==60)
+        if((options.research_smoke||options.fleet_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       const bool capture=options.smoke_screenshot&&frames>=120;
@@ -512,6 +754,8 @@ int main(int argc,char **argv){
                  <<utf8_path(*options.smoke_screenshot);
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
+        if(options.fleet_smoke)
+          std::cout<<" fleet="<<campaign.fleet_smoke_status();
         std::cout<<'\n';
         break;
       }

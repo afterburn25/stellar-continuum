@@ -21,7 +21,8 @@ using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
 // pixels, already projected relative to the camera by the application.
 struct DrawList { std::vector<Line> lines; std::vector<Circle> circles; std::vector<Text> text; std::vector<UiOverlayCommand> overlay; };
-enum class InputEventType { PointerMove, LeftPressed, LeftReleased, Wheel,
+enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
+                            RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, TextEntered,
                             PointerCancelled };
 struct InputEvent {
