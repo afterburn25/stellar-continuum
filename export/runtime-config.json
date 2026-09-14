@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.42",
+  "engineVersion": "0.1.43",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "Headless diagnostic host with retained legacy campaign benchmarks and an integrated Adaptive Research campaign mode. The integrated owner advances authoritative construction, shipbuilding, AI, fleet sensor intelligence, funded timed Adaptive Research and observer-safe Diplomacy in source order. Export includes the declared authored research JSON and seals every runtime file. State and timing outputs are diagnostics, not player saves or FPS. Core supports current Player17 JSON capture/restore with explicit representation exclusions and campaign tactical battle creation, observation, advancement, doctrine, engagement evidence and reconciliation on owned persistence state. Developer and historical campaign wrappers, session frame routing and recovery, and native graphical parity remain open."
+  "description": "C++23 campaign foundation with strategic clocks and canonical strategic/tactical frame routing. Headless diagnostics retain campaign benchmarks and integrated Adaptive Research. An opt-in SDL3/Vulkan native galaxy preview displays the real 500-system campaign with mouse navigation and pause/speed controls; its runtime requires no Godot or .NET. Exports seal declared data and reviewed runtime dependencies. Full native player UI, audio, save/load orchestration, colony/system screens, tactical rendering and graphical parity remain open. State and timing outputs are diagnostics, not player saves or an FPS guarantee."
 }

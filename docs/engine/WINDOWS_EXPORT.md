@@ -1,6 +1,6 @@
 # Stellar Engine Windows export
 
-Engine 0.1.23 adds Adaptive Research views, timed runtime commands and expertise catalog/state foundations alongside the existing research catalogs, eligibility and standalone snapshots. It retains the legacy campaign simulation, commands, scheduled strategic AI, and campaign benchmarks; game reference 0.1.7 Alpha. The native output is a console/headless diagnostic host, **not the graphical Stellar Continuum game**. Existing Godot exports remain the playable baseline. .NET is needed only to generate oracle fixtures; native runtime uses static CRT. Research data currently enters library parity tests; the packaged diagnostic host still runs the legacy campaign path. Calculated readiness and the authoritative research/campaign composition remain separate migration gates.
+Engine 0.1.43 adds the opt-in C++23 SDL3/Vulkan galaxy preview alongside the headless diagnostic host. It displays the real 500-system campaign with mouse navigation, selection, pause and speed controls. This is incomplete native graphical migration; existing Godot exports remain the full playable baseline. .NET is used only by development reference-fixture generators. Neither native executable needs Godot or .NET at runtime. See [native client scope and validation](NATIVE_CLIENT_VALIDATION.md).
 
 ## Developer setup
 
@@ -16,12 +16,13 @@ python tools/stellar-export/stellar.py export windows-headless
 python tools/stellar-export/stellar.py export windows-benchmark
 ```
 
-The native build also supports standard CMake configure/build/CTest presets from an x64 developer prompt. `--fresh` refreshes compiler detection so a stale/incomplete toolchain cache cannot silently persist. Configuration takes place in ignored `build-native/`; no existing game project is overwritten. Cold compilation has a 900-second limit after the 0.1.20 remote build exceeded the former 300 seconds. The complete CI job is bounded to 25 minutes. Configuration, test and runtime-check deadlines remain unchanged.
+The native build also supports standard CMake configure/build/CTest presets from an x64 developer prompt. `--fresh` refreshes compiler detection so a stale/incomplete toolchain cache cannot silently persist. Configuration takes place in ignored `build-native/`; no existing game project is overwritten. Cold compilation has a 1,800-second limit and the complete CI job is bounded to 45 minutes; see [the measured build budget](NATIVE_BUILD_BUDGET.md). Configuration, test and runtime-check deadlines remain unchanged.
 
 | Export preset | Current behavior |
 | --- | --- |
 | windows-development | Debug native foundation; application PDB included |
 | windows-testing | RelWithDebInfo foundation; runtime package excludes symbols |
+| windows-native-preview | RelWithDebInfo native galaxy preview plus headless diagnostics; pinned SDL3 runtime and license included; installed Vulkan driver required |
 | windows-headless | Release foundation; runtime package excludes symbols |
 | windows-benchmark | Release foundation, catalog/founding/fresh initialization, and retained legacy campaign-step benchmarks; no rendering/FPS claim |
 | windows-release | Fails with an explicit graphical-parity explanation; never substitutes headless output for a playable game |

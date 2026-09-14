@@ -85,6 +85,8 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/massive_combat_persistence.cpp
   core/src/massive_combat_engine.cpp
   core/src/campaign_massive_combat.cpp
+  core/src/campaign_frame.cpp
+  core/src/strategic_clock.cpp
   core/src/fleet_persistence.cpp
   core/src/shipyard_persistence.cpp
   core/src/galaxy_economy_persistence.cpp
@@ -696,6 +698,20 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/campaign-massive-lifecycle.json"
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(campaign_massive_lifecycle_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_campaign_frame_tests native-tests/campaign_frame_tests.cpp)
+  target_link_libraries(stellar_campaign_frame_tests PRIVATE stellar_core stellar_json)
+  target_include_directories(stellar_campaign_frame_tests PRIVATE "${CMAKE_SOURCE_DIR}/native-tests")
+  add_test(NAME campaign_frame_parity COMMAND stellar_campaign_frame_tests
+    "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/campaign-frame.json"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/integrated-adaptive-campaign.json")
+  set_tests_properties(campaign_frame_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_strategic_clock_tests native-tests/strategic_clock_tests.cpp)
+  target_link_libraries(stellar_strategic_clock_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME strategic_clock_parity COMMAND stellar_strategic_clock_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/strategic-clock.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(strategic_clock_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_fleet_persistence_tests native-tests/fleet_persistence_tests.cpp)
   target_link_libraries(stellar_fleet_persistence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_persistence_parity COMMAND stellar_fleet_persistence_tests
@@ -789,4 +805,9 @@ if(BUILD_TESTING)
   set_tests_properties(industry_allocation_parity strategic_intent_parity strategic_planning_parity strategic_input_support_parity strategic_input_builder_parity strategic_runtime_parity campaign_coordinator_parity logistics_routing_parity logistics_views_parity PROPERTIES TIMEOUT 60)
   set_tests_properties(headless_rejects_bad_arguments PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(foundation legacy_distance_parity headless_smoke campaign_simulation_smoke headless_rejects_bad_arguments PROPERTIES TIMEOUT 30)
+endif()
+
+option(STELLAR_BUILD_NATIVE_CLIENT "Build the SDL3/Vulkan native galaxy preview" OFF)
+if(STELLAR_BUILD_NATIVE_CLIENT)
+  include(cmake/StellarNativeClient.cmake)
 endif()

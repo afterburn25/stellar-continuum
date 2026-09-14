@@ -13,6 +13,7 @@ Parallelism stays at four; CTest, Python and individual runtime checks retain
 their existing deadlines. No test is skipped and no failure is converted to
 success. This change addresses runner compilation capacity, not game speed.
 
-Remote validation of this follow-up is recorded in draft PR #325 and
-coordination issue #324. The original 0.1.42 package remains evidence for its
+The repair commit `a47b82763a6f0bd5dd06a99fb700ea8c4d2bd406` passed all six
+remote workflows, including native run `34802101782`. Remote validation is
+recorded in draft PR #325 and coordination issue #324. The original 0.1.42 package remains evidence for its
 exact source commit; a later package must record its own commit and checks.

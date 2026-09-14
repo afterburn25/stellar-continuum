@@ -15,6 +15,7 @@ import sys
 import tempfile
 
 from research_runtime_files import copy_research_runtime_files
+from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
@@ -67,13 +68,14 @@ def native_build(preset, env):
     # checks retain their short deadlines so a hung game still fails promptly.
     run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
     run(["ctest", "--preset", preset], env=env)
-    suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless"}[preset]
+    suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
     run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
     return directory
 
-def executable_dependencies(executable, env):
+def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
     data = executable.read_bytes()
     if len(data) < 64 or data[:2] != b"MZ": raise RuntimeError("Export is not a Windows PE executable")
     offset = struct.unpack_from("<I", data, 0x3c)[0]
@@ -82,7 +84,8 @@ def executable_dependencies(executable, env):
     output = run(["dumpbin", "/nologo", "/dependents", executable], env=env, capture=True)
     dependencies = sorted(set(re.findall(r"(?im)^\s+([a-z0-9_.-]+\.dll)\s*$", output)))
     if not dependencies: raise RuntimeError("Could not identify executable imports")
-    unsupported = [name for name in dependencies if name.lower() not in SYSTEM_DLLS and not name.lower().startswith("api-ms-win-")]
+    approved = SYSTEM_DLLS | {name.lower() for name in runtime_dependencies} | {name.lower() for name in additional_windows_dependencies}
+    unsupported = [name for name in dependencies if name.lower() not in approved and not name.lower().startswith("api-ms-win-")]
     if unsupported: raise RuntimeError("Unpackaged runtime dependencies: " + ", ".join(unsupported))
     return dependencies
 
@@ -398,16 +401,33 @@ def export(preset_name):
             encoding="utf-8")
         if preset["includeSymbols"]:
             for symbol in directory.glob("stellar-continuum*.pdb"): shutil.copy2(symbol, output / symbol.name)
+        native_client = None
+        if preset.get("nativeClient"):
+            native_client = copy_native_client_runtime(ROOT, directory, output,
+                lambda binary, runtime, windows: executable_dependencies(binary, env, runtime, windows))
+            dependencies = sorted(set(dependencies + native_client["windowsImports"]))
+            readme = output / "README.txt"
+            readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
+                "Launch stellar-continuum-native.exe for the fullscreen galaxy preview.\n"
+                "Left drag pans; mouse wheel zooms; Escape opens Continue / Exit to Windows.\n"
+                "An installed Vulkan graphics driver is required. No Godot or .NET runtime is used.\n"
+                "Saves, audio, colony/system views and full gameplay controls are not yet integrated.\n\n"
+                + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
                     "configuration": preset["configurePreset"], "architecture": "x86_64", "mode": preset["mode"],
                     "includeSymbols": preset["includeSymbols"], "builtAtUtc": stamp, "windowsSystemDependencies": dependencies,
                     "gameplayParity": False, "shadersRequired": False, "graphicalAssetsRequired": False,
-                    "requiredRuntimeFiles":[*runtime_files, *research_files],
+                    "requiredRuntimeFiles":[*runtime_files, *research_files, *(native_client["requiredFiles"] if native_client else [])],
                     "files": hashes(output)}
         (output / "build-manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
+        if native_client:
+            manifest["nativeClient"] = native_client
+            (output / "build-manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
         validate_manifest(output)
         smoke = relocated_smoke(output)
+        if native_client:
+            smoke.update(validate_native_client_export(output, env))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]
             smoke["stellarGenerationBenchmarks"]=[json.loads(run([output/"stellar-continuum.exe","--headless","--generate-galaxy","--systems",count,"--repeat",10],env=env,capture=True)) for count in (250,500,1000,2500)]
