@@ -6,6 +6,8 @@
 #include "native_fleet_workspace.hpp"
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
+#include "native_shipyard_controller.hpp"
+#include "native_shipyard_workspace.hpp"
 #include "native_ui_layout.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
@@ -44,6 +46,8 @@ using namespace stellar::native_fleet;
 using namespace stellar::native_fleet_ui;
 using namespace stellar::native_research;
 using namespace stellar::native_research_ui;
+using namespace stellar::native_shipyard;
+using namespace stellar::native_shipyard_ui;
 
 struct Options {
   std::filesystem::path asset_root;
@@ -56,6 +60,7 @@ struct Options {
   bool load{};
   bool research_smoke{};
   bool fleet_smoke{};
+  bool shipyard_smoke{};
   bool save_path_overridden{};
 };
 
@@ -80,6 +85,7 @@ struct Options {
     else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
     else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
+    else if(arg==L"--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.shipyard_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -92,11 +98,12 @@ struct Options {
     else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
     else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
+    else if(arg=="--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.shipyard_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(result.research_smoke&&result.fleet_smoke)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
@@ -180,6 +187,7 @@ struct ResearchStamp {
   double funding_fraction{};
   double free_labs{};
   double total_labs{};
+  std::string player_species_id;
   bool operator==(const ResearchStamp &) const = default;
 };
 
@@ -291,6 +299,59 @@ class NativeCampaign final {
         click(center(main_layout.pause));
     }else smoke_fleet_destination_=selected_destination;
   }
+  void prepare_shipyard_smoke(int width,int height){
+    const auto click=[&](Point point){
+      InputSnapshot input;
+      input.drawable_width=width;
+      input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},
+                    {InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Shipyard smoke input closed the campaign.");
+    };
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    click(center(main_layout.shipyard));
+    if(!shipyard_workspace_.visible()||!shipyard_workspace_.view())
+      throw std::runtime_error("Shipyard smoke could not open the workspace.");
+    const auto layout=ShipyardWorkspaceLayout::for_viewport(width,height);
+    const auto first_actionable_index=[&]()->std::optional<std::size_t>{
+      const auto &designs=shipyard_workspace_.view()->available_designs;
+      const auto found=std::ranges::find(designs,true,&NativeShipDesign::can_start);
+      if(found==designs.end())return std::nullopt;
+      return static_cast<std::size_t>(found-designs.begin());
+    };
+    if(first_actionable_index()){
+      if(session_->frame().clock().speed()==StrategicSpeed::Paused)
+        click(center(main_layout.pause));
+      smoke_shipyard_start_was_running_=
+          session_->frame().clock().speed()!=StrategicSpeed::Paused;
+      InputSnapshot advancing;
+      advancing.drawable_width=width;
+      advancing.drawable_height=height;
+      if(!update(advancing,width,height,.25,true))
+        throw std::runtime_error("Shipyard smoke closed while advancing.");
+      const auto index=first_actionable_index();
+      if(!index)throw std::runtime_error(
+          "Shipyard readiness changed before the running Start input.");
+      click({layout.designs.x+20.f*layout.scale,
+             layout.designs.y+(27.f+static_cast<float>(*index)*58.f+24.f)*layout.scale});
+      click(center(layout.action));
+      if(!last_shipyard_command_accepted_)
+        throw std::runtime_error("Shipyard smoke canonical start was rejected.");
+      smoke_shipyard_order_started_=true;
+    }
+    if(shipyard_workspace_.view()&&!shipyard_workspace_.view()->orders.empty()){
+      if(session_->frame().clock().speed()==StrategicSpeed::Paused)
+        click(center(main_layout.pause));
+      smoke_shipyard_was_running_=
+          session_->frame().clock().speed()!=StrategicSpeed::Paused;
+      click({layout.orders.x+20.f*layout.scale,
+             layout.orders.y+51.f*layout.scale});
+      click(center(layout.action));
+      smoke_shipyard_order_id_=shipyard_workspace_.view()->orders.front().order_id;
+    }
+  }
   void request_smoke_save(){session_->request_save();}
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
@@ -316,8 +377,24 @@ class NativeCampaign final {
        <<std::setprecision(6)<<found->transit_progress;
     return out.str();
   }
+  [[nodiscard]] std::string shipyard_smoke_status()const{
+    if(!shipyard_workspace_.view())return "unavailable";
+    std::ostringstream out;
+    out<<(smoke_shipyard_order_started_
+             ?"started"
+             :shipyard_workspace_.view()->orders.empty()?"locked":"orders")<<":"
+       <<shipyard_workspace_.view()->shipyard_revision<<":"
+       <<shipyard_workspace_.view()->orders.size();
+    if(smoke_shipyard_order_id_)out<<":"<<*smoke_shipyard_order_id_;
+    out<<":"<<(smoke_shipyard_start_was_running_?"start-running":"start-not-run")
+       <<":"<<(smoke_shipyard_was_running_&&
+                         session_->frame().clock().speed()==StrategicSpeed::Paused
+                    ?"running-to-paused":"clock-unproven");
+    return out.str();
+  }
   [[nodiscard]] bool wants_text_input() const noexcept {
-    return research_workspace_.wants_text_input();
+    return research_workspace_.wants_text_input() &&
+           !shipyard_workspace_.visible();
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
@@ -331,24 +408,34 @@ class NativeCampaign final {
       research_workspace_.discard_campaign();
       projected_research_stamp_.reset();
       fleet_workspace_.discard_campaign();
+      shipyard_workspace_.discard_campaign();
       fleet_marker_offsets_.clear();
       pending_fleet_preview_.reset();
       refresh_fleets(true);
       if(research_workspace_.visible())refresh_research(true);
+      if(shipyard_workspace_.visible())refresh_shipyard(true);
     }
     if(session_->exit_ready())return false;
     if(input.quit_requested)session_->request_exit();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     for(const auto &event:input.events){
       if(event.type==InputEventType::EscapePressed){
-        if(research_workspace_.visible())research_workspace_.close();
+        if(shipyard_workspace_.visible())shipyard_workspace_.close();
+        else if(research_workspace_.visible())research_workspace_.close();
         else toggle_menu();
         continue;
       }
       if(event.type==InputEventType::PointerCancelled){
         gesture_.cancel();
         (void)research_workspace_.handle(event,width,height);
+        (void)shipyard_workspace_.handle(event,width,height);
         continue;
+      }
+      if(shipyard_workspace_.visible()){
+        const auto command=shipyard_workspace_.handle(event,width,height);
+        if(command.kind!=ShipyardWorkspaceCommandKind::None)
+          execute_shipyard(command);
+        if(command.captured)continue;
       }
       if(research_workspace_.visible()){
         const auto command=research_workspace_.handle(event,width,height);
@@ -361,7 +448,7 @@ class NativeCampaign final {
         if(command.captured||event.type==InputEventType::TextEntered||
            event.type==InputEventType::BackspacePressed)continue;
       }
-      if(!menu_&&!research_workspace_.visible()){
+      if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()){
         const auto markers=fleet_markers(width,height);
         const auto target=event.type==InputEventType::RightPressed
                               ?system_hit(event.position,width,height)
@@ -384,15 +471,20 @@ class NativeCampaign final {
         else if(action==UiAction::Speed)cycle_speed();
         else if(action==UiAction::Research){
           if(research_workspace_.visible())research_workspace_.close();
-          else{research_workspace_.open();refresh_research(true);}
+          else{shipyard_workspace_.close();research_workspace_.open();refresh_research(true);}
           captured=true;
         }
-        if(research_workspace_.visible())captured=true;
+        else if(action==UiAction::Shipyard){
+          if(shipyard_workspace_.visible())shipyard_workspace_.close();
+          else{research_workspace_.close();shipyard_workspace_.open();refresh_shipyard(true);}
+          captured=true;
+        }
+        if(research_workspace_.visible()||shipyard_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!research_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
-      if(event.type==InputEventType::Wheel){if(!menu_&&!research_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
-      if(event.type==InputEventType::LeftReleased){if(!menu_&&!research_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||research_workspace_.visible())(void)gesture_.release_as_world_click();}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::Wheel){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
+      if(event.type==InputEventType::LeftReleased){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||research_workspace_.visible()||shipyard_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
     if(research_workspace_.take_refresh_request())refresh_research(true);
     if(advance_simulation){
@@ -401,6 +493,8 @@ class NativeCampaign final {
       refresh_research(false);
       fleet_refresh_elapsed_+=elapsed;
       refresh_fleets(false);
+      shipyard_refresh_elapsed_+=elapsed;
+      refresh_shipyard(false);
       if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
     }
     refresh_knowledge();
@@ -447,6 +541,14 @@ class NativeCampaign final {
            research_workspace_.visible() ? Color{154, 225, 188, 255} : border);
     label(out, layout.research, "RESEARCH", {225, 238, 250, 255},
           layout.control_font_pixels, layout.scale);
+    fill(out, layout.shipyard,
+         shipyard_workspace_.visible()
+             ? selected
+             : layout.shipyard.contains(pointer_) ? hover : button);
+    stroke(out, layout.shipyard,
+           shipyard_workspace_.visible() ? Color{154, 225, 188, 255} : border);
+    label(out, layout.shipyard, "SHIPYARD", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -488,9 +590,10 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
-    if(!menu_&&!research_workspace_.visible())
+    if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height));
     research_workspace_.render(out, width, height);
+    shipyard_workspace_.render(out, width, height);
     return out;
   }
  private:
@@ -505,6 +608,10 @@ class NativeCampaign final {
     stamp.research_revision=state->revision();
     stamp.free_labs=state->free_effective_labs();
     stamp.total_labs=state->total_effective_research_labs();
+    const auto player=std::ranges::find(world.civilizations,
+                                         world.player_civilization_id,
+                                         &Civilization::id);
+    if(player!=world.civilizations.end())stamp.player_species_id=player->species_id;
     const auto economy=std::ranges::find(world.economies,
                                          world.player_civilization_id,
                                          &CivilizationEconomy::civilization_id);
@@ -536,11 +643,49 @@ class NativeCampaign final {
     }
     const auto outcome=research_controller_.execute(
         session_->frame(),session_->cache().generation,
-        view->research_revision,command.intent,command.node_id);
+        view->research_revision,view->funding_revision,
+        command.intent,command.node_id);
     research_workspace_.set_notice(outcome.message,outcome.accepted);
     last_research_command_accepted_=outcome.accepted;
     if(outcome.accepted)smoke_research_node_=command.node_id;
     refresh_research(true);
+  }
+
+  void refresh_shipyard(bool force){
+    if(!shipyard_workspace_.visible())return;
+    if(!force&&shipyard_refresh_elapsed_<.2)return;
+    shipyard_workspace_.set_view(shipyard_controller_.build(
+        session_->frame(),session_->cache().generation));
+    shipyard_refresh_elapsed_=0.;
+  }
+
+  void execute_shipyard(const ShipyardWorkspaceCommand &command){
+    const auto &view=shipyard_workspace_.view();
+    if(!view){
+      shipyard_workspace_.set_notice("Shipyard details are still loading.",false);
+      return;
+    }
+    NativeShipyardCommandOutcome outcome;
+    if(command.kind==ShipyardWorkspaceCommandKind::PrepareCancel){
+      auto &clock=session_->frame().clock();
+      if(clock.speed()!=StrategicSpeed::Paused)
+        clock.set_speed(StrategicSpeed::Paused);
+      refresh_shipyard(true);
+      if(!shipyard_workspace_.arm_cancel_confirmation(command.id))
+        shipyard_workspace_.set_notice(
+            "The cancellation quote changed; review the refreshed order.",false);
+      return;
+    }
+    if(command.kind==ShipyardWorkspaceCommandKind::Start)
+      outcome=shipyard_controller_.start(session_->frame(),
+          session_->cache().generation,view->shipyard_revision,command.id);
+    else if(command.kind==ShipyardWorkspaceCommandKind::Cancel)
+      outcome=shipyard_controller_.cancel(session_->frame(),
+          session_->cache().generation,view->shipyard_revision,command.id);
+    else return;
+    shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
+    last_shipyard_command_accepted_=outcome.accepted;
+    refresh_shipyard(true);
   }
 
   [[nodiscard]] std::vector<FleetScreenMarker> fleet_markers(
@@ -669,14 +814,22 @@ class NativeCampaign final {
   NativeResearchWorkspace research_workspace_;
   NativeFleetController fleet_controller_;
   NativeFleetWorkspace fleet_workspace_;
+  NativeShipyardController shipyard_controller_;
+  NativeShipyardWorkspace shipyard_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;
   std::optional<ResearchStamp> projected_research_stamp_;
   double research_refresh_elapsed_{};
   double fleet_refresh_elapsed_{};
+  double shipyard_refresh_elapsed_{};
   bool last_research_command_accepted_{};
   std::optional<std::string> smoke_research_node_;
   bool last_fleet_command_accepted_{};
+  bool last_shipyard_command_accepted_{};
+  bool smoke_shipyard_order_started_{};
+  bool smoke_shipyard_start_was_running_{};
+  bool smoke_shipyard_was_running_{};
+  std::optional<std::string> smoke_shipyard_order_id_;
   std::optional<int> smoke_fleet_id_;
   std::optional<int> smoke_fleet_destination_;
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
@@ -705,6 +858,9 @@ int main(int argc,char **argv){
       else if(options.fleet_smoke)
         campaign.prepare_fleet_smoke(window.drawable_width(),
                                      window.drawable_height());
+      else if(options.shipyard_smoke)
+        campaign.prepare_shipyard_smoke(window.drawable_width(),
+                                        window.drawable_height());
       else
         campaign.prepare_smoke_ui();
     }
@@ -731,7 +887,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       const bool capture=options.smoke_screenshot&&frames>=120;
@@ -756,6 +912,8 @@ int main(int argc,char **argv){
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)
           std::cout<<" fleet="<<campaign.fleet_smoke_status();
+        if(options.shipyard_smoke)
+          std::cout<<" shipyard="<<campaign.shipyard_smoke_status();
         std::cout<<'\n';
         break;
       }

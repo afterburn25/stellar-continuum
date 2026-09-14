@@ -415,6 +415,8 @@ def export(preset_name):
                 "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
                 "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
                 "Select a green fleet or its outliner entry, then right-click a destination to preview and confirm travel.\n"
+                "Shipyard shows available designs, authorization costs, population requirements and timed build orders.\n"
+                "Cancel pauses the campaign to review the current refund; confirm explicitly, then resume when ready.\n"
                 "The native campaign saves separately under LocalAppData/Stellar Continuum/NativePreview.\n"
                 "Use --save-path <path> for another slot, and --load to restore it; restored games start paused.\n"
                 "An installed Vulkan graphics driver is required. No Godot or .NET runtime is used.\n"

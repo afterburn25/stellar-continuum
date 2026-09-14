@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.46",
+  "engineVersion": "0.1.47",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "C++23 campaign foundation with strategic clocks, canonical strategic/tactical routing and durable Player17 save/recovery. The SDL3/Vulkan native client has responsive text, research, player-owned fleet selection, right-click travel previews and canonical timed fleet orders. Unknown system names are hidden in travel messages. Its runtime requires no Godot or .NET. Exports seal declared data, licensed UI fonts and reviewed dependencies, then validate real research and fleet input with save/reload. Production presentation, audio, shipbuilding/colony/system screens and full graphical parity remain open. Diagnostic timings are not an FPS guarantee."
+  "description": "C++23 campaign runtime and SDL3/Vulkan client with durable Player17 saves, native research, fleet navigation and shipyard workspaces. Shipbuilding uses canonical precommit costs and population readiness, timed orders and confirmed refunds. Research and shipyards display source sovereign currencies. No Godot or .NET runtime is required. Construction/unlock progression, full production visuals, colony/system/diplomacy screens and audio remain unfinished. Diagnostic timings are not an FPS guarantee."
 }

@@ -87,6 +87,10 @@ bool known_species(const std::optional<std::string> &id) {
     return false;
   }
 }
+struct PreparedShipBuild {
+  ShipbuildingStartAssessment assessment;
+  std::string authorization_display;
+};
 ShipbuildingStrategicPreference preference_for(ShipbuildingReadView world,
                                                 int id) {
   if (world.preference_query)
@@ -129,6 +133,126 @@ std::optional<std::string> prepare_order_id(const ShipyardState &state) {
           [&](const auto &order) { return order.order_id == candidate; }))
     throw std::invalid_argument("collision");
   return candidate;
+}
+PreparedShipBuild prepare_ship_build(ShipbuildingReadView world,
+                                     int civilization_id,
+                                     std::string_view design_id) {
+  PreparedShipBuild prepared;
+  auto &result = prepared.assessment;
+  result.maximum_pending_builds = maximum_pending_ship_builds;
+  const auto civilization =
+      std::find_if(world.civilizations.begin(), world.civilizations.end(),
+                   [=](const auto &value) {
+                     return value.id == civilization_id;
+                   });
+  if (civilization == world.civilizations.end()) {
+    result.blocker = "Unknown civilization.";
+    return prepared;
+  }
+
+  const auto &state = first(world.shipyards, [=](const auto &value) {
+    return value.civilization_id == civilization_id;
+  });
+  result.pending_build_count = state.pending_build_count();
+  if (result.pending_build_count >= maximum_pending_ship_builds) {
+    result.blocker =
+        "The shipyard queue is full (8 pending vessels maximum).";
+    return prepared;
+  }
+
+  const auto *design = find_ship_design(design_id);
+  if (!design) {
+    result.blocker = "Unknown ship design.";
+    return prepared;
+  }
+  result.design_id = design->id;
+  result.design_name = design->name;
+  result.industry_cost = design->industry_cost;
+  result.credit_cost = design->credit_cost;
+  result.population_cost_millions = design->population_cost_millions;
+  result.minimum_source_population_millions =
+      design->population_cost_millions > 0.
+          ? design->population_cost_millions +
+                minimum_retained_colony_population_millions
+          : 0.;
+  if (const auto reason =
+          ship_design_lock_reason(world.designs(), civilization_id, *design)) {
+    result.blocker = design->name + " " + *reason + ".";
+    return prepared;
+  }
+
+  const auto &economy = first(world.economies, [=](const auto &value) {
+    return value.civilization_id == civilization_id;
+  });
+  const auto currency =
+      sovereign_currency_for_civilization(world.civilizations,
+                                           civilization_id);
+  prepared.authorization_display = currency.format(design->credit_cost);
+  if (!std::isfinite(economy.credits) ||
+      economy.credits + .0001 < design->credit_cost) {
+    result.blocker = prepared.authorization_display +
+                     " is required to authorize " + design->name + ".";
+    return prepared;
+  }
+
+  try {
+    result.prepared_order_id = prepare_order_id(state);
+  } catch (const std::invalid_argument &error) {
+    const std::string_view kind = error.what();
+    if (kind == "invalid-identities")
+      result.blocker =
+          "This shipyard has invalid or duplicate vessel order identities.";
+    else if (kind == "counter")
+      result.blocker = "This shipyard's order counter does not follow its "
+                       "existing vessel identities.";
+    else if (kind == "collision")
+      result.blocker = "This shipyard's next order identity collides with an "
+                       "existing vessel order.";
+    else
+      throw;
+    return prepared;
+  }
+  if (!result.prepared_order_id) {
+    result.blocker =
+        "This shipyard cannot allocate another stable order identity.";
+    return prepared;
+  }
+
+  if (design->population_cost_millions > 0.) {
+    const Colony *source{};
+    for (const auto &colony : world.colonies)
+      if (colony.civilization_id == civilization_id &&
+          (!source ||
+           (std::isnan(source->population_millions) &&
+            !std::isnan(colony.population_millions)) ||
+           colony.population_millions > source->population_millions))
+        source = &colony;
+    if (source) {
+      result.population_source_colony_id = source->id;
+      result.population_species_id = source->population_species_id;
+      result.population_source_current_millions = source->population_millions;
+    }
+    if (!source || !std::isfinite(source->population_millions) ||
+        source->population_millions <
+            result.minimum_source_population_millions) {
+      result.blocker =
+          "At least " +
+          std::to_string(static_cast<int>(
+              result.minimum_source_population_millions)) +
+          " million population is required before reserving colonists for "
+          "this ship.";
+      return prepared;
+    }
+    if (!known_species(result.population_species_id)) {
+      result.blocker =
+          "The source colony references unknown population species '" +
+          *result.population_species_id + "'.";
+      return prepared;
+    }
+  }
+  result.will_queue = state.active_design_id.has_value();
+  result.can_start = true;
+  return prepared;
 }
 bool can_promote(const ShipBuildOrderState &order, std::string &reason) {
   if (!find_ship_design(order.design_id)) {
@@ -409,105 +533,55 @@ advance_core(ShipbuildingWorld world,
 ShipbuildingOrderResult start_ship_build(ShipbuildingWorld world,
                                          int civilization_id,
                                          std::string_view design_id) {
-  auto civ =
-      std::find_if(world.civilizations.begin(), world.civilizations.end(),
-                   [=](const auto &c) { return c.id == civilization_id; });
-  if (civ == world.civilizations.end())
-    return {false, "Unknown civilization."};
+  const auto prepared =
+      prepare_ship_build(world.read(), civilization_id, design_id);
+  const auto &assessment = prepared.assessment;
+  if (!assessment.can_start)
+    return {false, assessment.blocker.value()};
+
   auto &state = first(world.shipyards, [=](const auto &s) {
     return s.civilization_id == civilization_id;
   });
-  if (state.pending_build_count() >= maximum_pending_ship_builds)
-    return {false, "The shipyard queue is full (8 pending vessels maximum)."};
-  const auto *design = find_ship_design(design_id);
-  if (!design)
-    return {false, "Unknown ship design."};
-  if (auto reason = ship_design_lock_reason(world.read().designs(),
-                                            civilization_id, *design))
-    return {false, design->name + " " + *reason + "."};
   auto &economy = first(world.economies, [=](const auto &e) {
     return e.civilization_id == civilization_id;
   });
-  const auto currency =
-      sovereign_currency_for_civilization(world.civilizations, civilization_id);
-  if (!std::isfinite(economy.credits) ||
-      economy.credits + .0001 < design->credit_cost)
-    return {false, currency.format(design->credit_cost) +
-                       " is required to authorize " + design->name + "."};
-  std::optional<std::string> order_id;
-  try {
-    order_id = prepare_order_id(state);
-  } catch (const std::invalid_argument &e) {
-    const std::string_view kind = e.what();
-    if (kind == "invalid-identities")
-      return {
-          false,
-          "This shipyard has invalid or duplicate vessel order identities."};
-    if (kind == "counter")
-      return {false, "This shipyard's order counter does not follow its "
-                     "existing vessel identities."};
-    if (kind == "collision")
-      return {false, "This shipyard's next order identity collides with an "
-                     "existing vessel order."};
-    throw;
-  }
-  if (!order_id)
-    return {false,
-            "This shipyard cannot allocate another stable order identity."};
-  double population = 0;
-  std::optional<std::string> species;
-  std::optional<int> source_id;
-  Colony *source = nullptr;
-  if (design->population_cost_millions > 0) {
-    for (auto &colony : world.colonies)
-      if (colony.civilization_id == civilization_id &&
-          (!source ||
-           (std::isnan(source->population_millions) &&
-            !std::isnan(colony.population_millions)) ||
-           colony.population_millions > source->population_millions))
-        source = &colony;
-    if (!source || !std::isfinite(source->population_millions) ||
-        source->population_millions < design->population_cost_millions + 500)
-      return {false, "At least " +
-                         std::to_string(static_cast<int>(
-                             design->population_cost_millions + 500)) +
-                         " million population is required before reserving "
-                         "colonists for this ship."};
-    species = source->population_species_id;
-    if (!known_species(species))
-      return {false,
-              "The source colony references unknown population species '" +
-                  *species + "'."};
-    population = design->population_cost_millions;
-    source_id = source->id;
-  }
-  economy.credits -= design->credit_cost;
-  if (source_id)
+  economy.credits -= assessment.credit_cost;
+  if (assessment.population_source_colony_id)
     first(world.colonies, [&](const Colony &colony) {
-      return colony.id == *source_id;
-    }).population_millions -= population;
-  if (!state.active_design_id) {
-    state.active_design_id = design->id;
-    state.active_order_id = *order_id;
+      return colony.id == *assessment.population_source_colony_id;
+    }).population_millions -= assessment.population_cost_millions;
+  if (!assessment.will_queue) {
+    state.active_design_id = *assessment.design_id;
+    state.active_order_id = *assessment.prepared_order_id;
     state.active_build_progress = 0;
-    state.active_authorization_credits = design->credit_cost;
-    state.reserved_population_millions = population;
-    state.reserved_population_species_id = species;
-    state.reserved_population_source_colony_id = source_id;
+    state.active_authorization_credits = assessment.credit_cost;
+    state.reserved_population_millions = assessment.population_cost_millions;
+    state.reserved_population_species_id = assessment.population_species_id;
+    state.reserved_population_source_colony_id =
+        assessment.population_source_colony_id;
     ++state.next_order_sequence;
-    return {true, "Ship construction started: " + design->name +
+    return {true, "Ship construction started: " + *assessment.design_name +
                       ". Authorized for " +
-                      currency.format(design->credit_cost) + "."};
+                      prepared.authorization_display + "."};
   }
   validate_shipyard_population_persistence_safety(
       state); // QueuedBuilds.Add getter
-  state.queued_builds.push_back({*order_id, design->id, design->credit_cost,
-                                 population, species, source_id});
+  state.queued_builds.push_back(
+      {*assessment.prepared_order_id, *assessment.design_id,
+       assessment.credit_cost, assessment.population_cost_millions,
+       assessment.population_species_id,
+       assessment.population_source_colony_id});
   ++state.next_order_sequence;
-  return {true, "Queued " + design->name + " for " +
-                    currency.format(design->credit_cost) + ". " +
+  return {true, "Queued " + *assessment.design_name + " for " +
+                    prepared.authorization_display + ". " +
                     std::to_string(state.pending_build_count()) +
                     "/8 pending vessel slots are now in use."};
+}
+
+ShipbuildingStartAssessment assess_start_ship_build(
+    ShipbuildingReadView world, const int civilization_id,
+    const std::string_view design_id) {
+  return prepare_ship_build(world, civilization_id, design_id).assessment;
 }
 
 ShipbuildingCancellationAssessment

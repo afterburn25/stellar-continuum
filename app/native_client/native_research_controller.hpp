@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/sovereign_currency.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -32,6 +33,11 @@ struct NativeResearchCost {
   double estimated_total_credits{};
   double estimated_years_at_full_funding{};
   double credits_needed_to_start{};
+  std::string formatted_authorization;
+  std::string formatted_milestone_commitment;
+  std::string formatted_operating_cost_rate;
+  std::string formatted_estimated_total;
+  std::string formatted_credits_needed_to_start;
 };
 
 struct NativeResearchCapability {
@@ -75,6 +81,10 @@ struct NativeResearchEdge {
 struct NativeResearchWindow {
   std::uint64_t campaign_generation{};
   std::int64_t research_revision{};
+  std::uint64_t funding_revision{};
+  stellar::core::SovereignCurrencyDefinition currency;
+  std::optional<double> treasury_credits;
+  std::optional<std::string> formatted_treasury;
   double free_effective_labs{};
   double total_effective_labs{};
   std::vector<NativeResearchDomainTab> domain_tabs;
@@ -102,6 +112,7 @@ public:
   [[nodiscard]] NativeResearchCommandOutcome
   execute(stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
           std::int64_t expected_research_revision,
+          std::uint64_t expected_funding_revision,
           NativeResearchIntent intent, std::string_view node_id);
 
   void select(std::optional<std::string> node_id);
@@ -113,6 +124,8 @@ private:
 
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
+  std::uint64_t funding_revision_{};
+  std::optional<std::string> funding_signature_;
   std::optional<std::string> selected_node_id_;
 };
 

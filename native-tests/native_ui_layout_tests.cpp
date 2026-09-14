@@ -50,13 +50,15 @@ void verify(int width, int height, float expected_scale) {
   require(contains_rect(viewport, layout.pause) &&
               contains_rect(viewport, layout.speed) &&
               contains_rect(viewport, layout.research) &&
+              contains_rect(viewport, layout.shipyard) &&
               contains_rect(viewport, layout.day_text) &&
               contains_rect(viewport, layout.status_text) &&
               contains_rect(viewport, layout.menu_panel) &&
               contains_rect(layout.menu_panel, layout.menu_heading),
           "A UI rectangle escaped the drawable viewport.");
   require(!overlaps(layout.pause, layout.speed) &&
-              !overlaps(layout.speed, layout.research),
+              !overlaps(layout.speed, layout.research) &&
+              !overlaps(layout.research, layout.shipyard),
           "Top controls overlap each other.");
   require(!overlaps(layout.pause, layout.day_text) &&
               !overlaps(layout.speed, layout.day_text) &&
@@ -97,6 +99,10 @@ void verify(int width, int height, float expected_scale) {
   for (const auto point : interior_points(layout.research)) {
     require(layout.hit(point, false) == UiAction::Research,
             "A point inside Research missed its action.");
+  }
+  for (const auto point : interior_points(layout.shipyard)) {
+    require(layout.hit(point, false) == UiAction::Shipyard,
+            "A point inside Shipyard missed its action.");
   }
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,

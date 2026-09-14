@@ -1,6 +1,6 @@
 # Stellar Engine Windows export
 
-Engine 0.1.46 adds native fleet selection, canonical route previews and confirmed travel orders alongside the research workspace. Export validates actual map, funded-research and fleet-order save/load flows using isolated files and a restricted runtime path. The fleet input is a maintained actual-source 20-system Player17 fixture; fresh/research runs use 500 systems. Test inputs are not shipped in the package. This remains an incomplete C++23 client; the preserved Godot game is the full playable reference. Neither native executable requires Godot or .NET. See [client scope](NATIVE_CLIENT_VALIDATION.md), [research](NATIVE_RESEARCH.md) and [fleets](NATIVE_FLEETS.md).
+Engine 0.1.47 adds a native shipyard workspace with canonical readiness, timed orders and confirmed cancellation refunds, plus source-currency research presentation. Fleet selection and canonical travel remain integrated. Export validates actual map, funded-research and fleet-order save/load flows using isolated files and a restricted runtime path. The fleet input is a maintained actual-source 20-system Player17 fixture; fresh/research runs use 500 systems. Test inputs are not shipped in the package. This remains an incomplete C++23 client; the preserved Godot game is the full playable reference. Neither native executable requires Godot or .NET. See [client scope](NATIVE_CLIENT_VALIDATION.md), [research](NATIVE_RESEARCH.md) and [fleets](NATIVE_FLEETS.md) and [shipyard](NATIVE_SHIPYARD.md).
 
 ## Developer setup
 

@@ -66,3 +66,40 @@ only `SavedAtUtc` to change. Runs use a separate working directory, restricted
 Windows PATH and an isolated save; neither touches the default player slot.
 Screenshots are retained beside the sealed export. Unit regressions reject
 zero-progress/unfunded programs, changed treasury and a skipped loaded save.
+
+## Source currency presentation
+
+The native research controller continues to keep every funding quote in Core's
+raw budget units for eligibility and commands. It now also owns the player's
+`SovereignCurrencyDefinition` and strings formatted by that definition for the
+treasury, authorization, milestone commitment, operating cost rate, estimated
+total, and full reserve needed to start.
+
+The workspace consumes those strings directly. Its local decimal `cr` and
+round-up helpers were removed, so presentation no longer assigns a generic
+currency to species-specific values or creates a second reserve rounding rule.
+Normal daily costs use `SovereignCurrencyDefinition::format_rate` with a
+negative value, matching the preserved source cost presentation.
+
+Core's formatter displays two fractional local-currency digits. When a raw
+amount is positive but below that visible quantum, the owned explanatory string
+uses `Under ` followed by Core's formatted 0.01 local-currency amount. Daily
+costs append `/day`. Zero remains Core's ordinary zero. Raw values remain exact
+and the canonical funding comparisons are unchanged.
+
+`NativeResearchWindow::funding_revision` changes only when the complete player
+currency identity changes: species, currency name, code, symbol, or local-units
+conversion. Treasury movement is deliberately excluded: the canonical command
+revalidates current funds, so an ordinary economy tick cannot invalidate an
+otherwise affordable click from a throttled window. Commands carry the currency
+revision in addition to campaign generation and research revision. They reject
+a stale currency view before mutation. Accepted commands advance the canonical
+research revision; they do not churn the independent currency revision.
+
+Focused tests cover human UED and pelagic Tide Mark ownership, every normal
+canonical quote string, tiny-positive nonzero wording, treasury-driven funding
+presentation without revision churn, an affordable balance change followed by
+a canonical accepted Start, stale-currency rejection, and the existing 720p
+clipping proof with the longer currency names and symbols. Strict Debug and
+Release controller and workspace harnesses passed with MSVC C++ latest,
+`/W4 /WX`, UTF-8, and precise floating point.

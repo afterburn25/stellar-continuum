@@ -43,6 +43,10 @@ void require(bool condition, const char *message) {
   NativeResearchWindow window;
   window.campaign_generation = 7;
   window.research_revision = 19;
+  window.funding_revision = 3;
+  window.currency = {"United Earth Dollar", "UED", "$", 10'000'000.};
+  window.treasury_credits = 500.;
+  window.formatted_treasury = "$5B UED";
   window.free_effective_labs = 12;
   window.total_effective_labs = 20;
   window.domain_tabs = {{"", "All Research", 2},
@@ -67,8 +71,13 @@ void require(bool condition, const char *message) {
   active.blockers = {"Visible facility readiness is incomplete.",
                      "A second visible requirement is pending."};
   active.cost = NativeResearchCost{8, 120, 240, 3, 510, 1.75, 363};
-  active.cost->operating_credits_per_day = .020533881;
+  active.cost->operating_credits_per_day = 1e-15;
   active.cost->credits_needed_to_start = 3.041;
+  active.cost->formatted_authorization = "$1.2B UED";
+  active.cost->formatted_milestone_commitment = "$2.4B UED";
+  active.cost->formatted_operating_cost_rate = "Under $0.01 UED/day";
+  active.cost->formatted_estimated_total = "$5.1B UED";
+  active.cost->formatted_credits_needed_to_start = "$30.41M UED";
   active.primary_action = {NativeResearchIntent::Pause, true, {}};
   active.cancel_action = {NativeResearchIntent::Cancel, false,
                           "Cancellation is unavailable."};
@@ -83,6 +92,11 @@ void require(bool condition, const char *message) {
   available.graph_depth = 1;
   available.cost = NativeResearchCost{
       4, 90, 110, 2, 320, std::numeric_limits<double>::infinity(), 202};
+  available.cost->formatted_authorization = "$900M UED";
+  available.cost->formatted_milestone_commitment = "$1.1B UED";
+  available.cost->formatted_operating_cost_rate = "−$20M UED/day";
+  available.cost->formatted_estimated_total = "$3.2B UED";
+  available.cost->formatted_credits_needed_to_start = "$2.02B UED";
   available.primary_action = {NativeResearchIntent::Start, true, {}};
   window.nodes = {std::move(active), std::move(available)};
   window.edges = {{"known-active", "known-candidate", "known_prerequisite"}};
@@ -365,13 +379,18 @@ int main() try {
   workspace.render(rendered, 1280, 720);
   require(rendered_text_contains(rendered, "Known Active Program") &&
               rendered_text_contains(rendered, "Visible Capability") &&
-              rendered_text_contains(rendered, "Authorization 120.0") &&
-              rendered_text_contains(rendered, "Operations 0.0205 cr/day") &&
-              rendered_text_contains(rendered, "Reserve to start 3.05 cr") &&
+              rendered_text_contains(rendered, "$5B UED treasury") &&
+              rendered_text_contains(rendered,
+                                     "Authorization $1.2B UED") &&
+              rendered_text_contains(rendered,
+                                     "Operations Under $0.01 UED/day") &&
+              rendered_text_contains(rendered,
+                                     "Reserve to start $30.41M UED") &&
               rendered_text_contains(rendered, "Progress 42%"),
           "Research inspector omitted authoritative visible details.");
   require(!rendered_text_contains(rendered, "internal-capability-id") &&
               !rendered_text_contains(rendered, "SECRET FUTURE") &&
+              !rendered_text_contains(rendered, " cr") &&
               !rendered_text_contains(rendered, "CANCEL"),
           "Research UI disclosed an internal, unknown, or unsupported action.");
   const auto *cost=find_overlay_text(rendered,"COST & TIME");

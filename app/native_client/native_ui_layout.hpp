@@ -7,7 +7,17 @@
 
 namespace stellar::native_map {
 
-enum class UiAction { None, Pause, Speed, Research, Continue, Save, Load, Exit };
+enum class UiAction {
+  None,
+  Pause,
+  Speed,
+  Research,
+  Shipyard,
+  Continue,
+  Save,
+  Load,
+  Exit
+};
 
 struct NativeUiLayout {
   float scale{};
@@ -17,6 +27,7 @@ struct NativeUiLayout {
   UiRect pause;
   UiRect speed;
   UiRect research;
+  UiRect shipyard;
   UiRect day_text;
   UiRect status_text;
   UiRect menu_panel;
@@ -56,6 +67,7 @@ struct NativeUiLayout {
         {inset, inset, 76.f * scale, 32.f * scale},
         {inset + 86.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset + 200.f * scale, inset, 112.f * scale, 32.f * scale},
+        {inset + 322.f * scale, inset, 112.f * scale, 32.f * scale},
         {inset, 56.f * scale, 230.f * scale, 22.f * scale},
         {inset, 80.f * scale, status_width, 44.f * scale},
         panel,
@@ -82,6 +94,7 @@ struct NativeUiLayout {
     if (pause.contains(point)) return UiAction::Pause;
     if (speed.contains(point)) return UiAction::Speed;
     if (research.contains(point)) return UiAction::Research;
+    if (shipyard.contains(point)) return UiAction::Shipyard;
     return UiAction::None;
   }
 };

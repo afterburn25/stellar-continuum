@@ -136,30 +136,6 @@ void centered(DrawList &out, UiRect bounds, std::string value, Color color,
   return out.str();
 }
 
-[[nodiscard]] std::string money(double value) {
-  if (value == 0.) return "0.0";
-  const auto magnitude = std::abs(value);
-  const auto precision = magnitude < 1. ? 4 : 2;
-  auto result = fixed(value, precision);
-  while (result.size() > 2 && result.back() == '0' &&
-         result[result.size() - 2] != '.')
-    result.pop_back();
-  if (magnitude < .00005) return value > 0. ? "<0.0001" : ">-0.0001";
-  return result;
-}
-
-[[nodiscard]] std::string reserve_money(double value) {
-  if (value <= 0.) return money(value);
-  const auto precision = value < 1. ? 4 : 2;
-  const auto factor = std::pow(10., precision);
-  const auto displayed = std::ceil(value * factor - 1e-9) / factor;
-  auto result = fixed(displayed, precision);
-  while (result.size() > 2 && result.back() == '0' &&
-         result[result.size() - 2] != '.')
-    result.pop_back();
-  return result;
-}
-
 [[nodiscard]] std::string maturity(stellar::core::ResearchMaturity value) {
   using stellar::core::ResearchMaturity;
   switch (value) {
@@ -590,10 +566,13 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
   text(out, layout.title, "RESEARCH NETWORK", bright,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   if (window_) {
+    auto summary = fixed(window_->free_effective_labs) + " / " +
+                   fixed(window_->total_effective_labs) +
+                   " effective labs free";
+    if (window_->formatted_treasury)
+      summary = *window_->formatted_treasury + " treasury  |  " + summary;
     text(out, layout.labs,
-         fixed(window_->free_effective_labs) + " / " +
-             fixed(window_->total_effective_labs) +
-             " effective labs free",
+         std::move(summary),
          muted, layout.small_font_pixels);
   }
   fill(out, layout.search, raised);
@@ -762,12 +741,11 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
   if (node->cost) {
     const auto &cost = *node->cost;
     auto cost_text =
-        "COST & TIME\nAuthorization " + money(cost.authorization_credits) +
-        " cr\nMilestones " + money(cost.milestone_commitment_credits) +
-        " cr\nOperations " + money(cost.operating_credits_per_day) +
-        " cr/day\nEstimated total " + money(cost.estimated_total_credits) +
-        " cr\nReserve to start " + reserve_money(cost.credits_needed_to_start) +
-        " cr\n";
+        "COST & TIME\nAuthorization " + cost.formatted_authorization +
+        "\nMilestones " + cost.formatted_milestone_commitment +
+        "\nOperations " + cost.formatted_operating_cost_rate +
+        "\nEstimated total " + cost.formatted_estimated_total +
+        "\nReserve to start " + cost.formatted_credits_needed_to_start + "\n";
     cost_text += std::isfinite(cost.estimated_years_at_full_funding)
                      ? "At full funding " +
                            fixed(cost.estimated_years_at_full_funding, 2) +

@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Shipyard opens canonical known designs, costs, readiness and timed build queues. Cancel pauses, refreshes the refund, and requires explicit confirmation.
+
 - Research opens known programs, domain tabs, search and canonical Begin/Pause/Resume actions.
 - Select a green owned fleet or its outliner entry; right-click a destination and confirm the canonical route preview. Unknown names remain masked in feedback.
 
@@ -17,6 +19,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Engine0.1.47 passed121/121 CTest and57 Python checks, plus strict shipbuilding assessment parity (89actual-source rows in Debug and Release). Additional actual720p shipyard runs prove fresh locked state and running Start/pause/refund confirmation/save in an explicitly authored unlocked scenario. This is not natural unlock progression proof. See NATIVE_SHIPYARD.md and HANDOFF.md.
 
 Engine 0.1.46 passed 118/118 CTest and 29+19+9 Python checks. Six maintained real Vulkan client runs passed map/research/fleet save/load and complete paused payload recapture checks; see HANDOFF.md for measured timings and scope. Fleet smoke inputs are actual-source Player17 test data, not injected fresh-game ships.
 
@@ -59,4 +63,4 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, construction/unlock progression, shipbuilding, diplomacy, system/planet/colony views, tactical presentation and audio remain. Research and fleet interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, construction/unlock progression, diplomacy, system/planet/colony views, tactical presentation and audio remain. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.

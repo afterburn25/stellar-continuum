@@ -18,6 +18,7 @@
 
 namespace stellar::core {
 inline constexpr double shipbuilding_industry_per_day = 20.0;
+inline constexpr double minimum_retained_colony_population_millions = 500.0;
 
 struct ShipbuildingStrategicPreference {
   int civilization_id{};
@@ -66,6 +67,19 @@ struct ShipbuildingOrderResult {
   bool accepted{};
   std::string message;
 };
+struct ShipbuildingStartAssessment {
+  bool can_start{}, will_queue{};
+  std::optional<std::string> blocker;
+  std::optional<std::string> design_id;
+  std::optional<std::string> design_name;
+  double industry_cost{}, credit_cost{}, population_cost_millions{};
+  double minimum_source_population_millions{};
+  int pending_build_count{}, maximum_pending_builds{};
+  std::optional<std::string> prepared_order_id;
+  std::optional<int> population_source_colony_id;
+  std::optional<std::string> population_species_id;
+  std::optional<double> population_source_current_millions;
+};
 struct ShipbuildingCancellationAssessment {
   bool can_cancel{}, is_active{};
   std::optional<std::string> design_id;
@@ -85,6 +99,9 @@ struct ShipbuildingEvent {
 ShipbuildingOrderResult start_ship_build(ShipbuildingWorld world,
                                          int civilization_id,
                                          std::string_view design_id);
+ShipbuildingStartAssessment assess_start_ship_build(
+    ShipbuildingReadView world, int civilization_id,
+    std::string_view design_id);
 ShipbuildingCancellationAssessment
 assess_ship_build_cancellation(ShipbuildingReadView world, int civilization_id,
                                std::string_view order_id);

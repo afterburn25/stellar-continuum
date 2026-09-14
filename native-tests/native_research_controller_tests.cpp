@@ -16,6 +16,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace fs = std::filesystem;
 using Json = nlohmann::json;
@@ -68,10 +69,12 @@ void write(const fs::path &path, const std::string &value) {
 }
 
 [[nodiscard]] CampaignFrame fresh_500_frame(const fs::path &research_root,
-                                            const fs::path &catalog_path) {
+                                            const fs::path &catalog_path,
+                                            std::string species =
+                                                "terran_baseline") {
   auto world = seed_persistable_fresh_campaign(
       103500, load_nearby_catalog(catalog_path),
-      {"2044-05-06T07:08:09Z", 500, 6, 1, "terran_baseline"});
+      {"2044-05-06T07:08:09Z", 500, 6, 1, std::move(species)});
   auto research_runtime =
       load_adaptive_research_strategic_runtime(research_root);
   auto research = AdaptiveResearchCampaignFactory(research_runtime).create(world);
@@ -183,8 +186,8 @@ recognized_undetailed_node(CampaignFrame &frame) {
   require(hidden_result.nodes.empty(),
           "Searching a hidden identifier revealed future research.");
   const auto hidden_command = controller.execute(
-      frame, generation, window.research_revision, NativeResearchIntent::Start,
-      hidden->id);
+      frame, generation, window.research_revision, window.funding_revision,
+      NativeResearchIntent::Start, hidden->id);
   require(!hidden_command.accepted &&
               hidden_command.message.find(hidden->id) == std::string::npos &&
               hidden_command.message.find(hidden->name) == std::string::npos,
@@ -217,7 +220,8 @@ recognized_undetailed_node(CampaignFrame &frame) {
           "Campaign generation replacement retained stale research selection.");
   const auto stale = controller.execute(
       frame, generation, replaced.research_revision,
-      NativeResearchIntent::Start, window.nodes.front().id);
+      replaced.funding_revision, NativeResearchIntent::Start,
+      window.nodes.front().id);
   require(!stale.accepted && stale.message.find("campaign changed") != std::string::npos,
           "Stale campaign command was not rejected before mutation.");
   return undetailed.has_value();
@@ -245,8 +249,8 @@ void command_lifecycle(CampaignFrame &frame) {
           "Authoritative cost was not shown with precommit denial.");
   const auto before_denial_revision = window.research_revision;
   const auto denied = controller.execute(
-      frame, generation, before_denial_revision, NativeResearchIntent::Start,
-      node_id);
+      frame, generation, before_denial_revision, window.funding_revision,
+      NativeResearchIntent::Start, node_id);
   require(!denied.accepted && denied.research_revision == before_denial_revision &&
               player_economy(frame).credits == 0.,
           "Rejected start mutated research or treasury state.");
@@ -254,8 +258,8 @@ void command_lifecycle(CampaignFrame &frame) {
   player_economy(frame).credits = std::max(1'000'000., original_credit);
   window = controller.build(frame, generation);
   const auto started = controller.execute(
-      frame, generation, window.research_revision, NativeResearchIntent::Start,
-      node_id);
+      frame, generation, window.research_revision, window.funding_revision,
+      NativeResearchIntent::Start, node_id);
   require(started.accepted, "Canonical Core rejected a funded start candidate: " +
                                 started.message);
   (void)frame.advance(1.);
@@ -268,11 +272,13 @@ void command_lifecycle(CampaignFrame &frame) {
           "Started research did not expose authoritative active progress.");
   const auto cancel_revision = window.research_revision;
   const auto cancelled = controller.execute(
-      frame, generation, cancel_revision, NativeResearchIntent::Cancel, node_id);
+      frame, generation, cancel_revision, window.funding_revision,
+      NativeResearchIntent::Cancel, node_id);
   require(!cancelled.accepted && cancelled.research_revision == cancel_revision,
           "Unavailable cancellation mutated the active program.");
   const auto paused = controller.execute(
-      frame, generation, cancel_revision, NativeResearchIntent::Pause, node_id);
+      frame, generation, cancel_revision, window.funding_revision,
+      NativeResearchIntent::Pause, node_id);
   require(paused.accepted, "Canonical pause failed: " + paused.message);
   window = controller.build(frame, generation);
   const auto paused_node = std::ranges::find(window.nodes, node_id,
@@ -283,8 +289,102 @@ void command_lifecycle(CampaignFrame &frame) {
           "Paused program lost its retained progress or resume intent.");
   const auto resumed = controller.execute(
       frame, generation, window.research_revision,
-      NativeResearchIntent::Resume, node_id);
+      window.funding_revision, NativeResearchIntent::Resume, node_id);
   require(resumed.accepted, "Canonical resume failed: " + resumed.message);
+}
+
+void currency_projection(CampaignFrame &human, CampaignFrame &nonhuman) {
+  NativeResearchController human_controller;
+  auto human_window = human_controller.build(human, 41);
+  require(human_window.currency.name == "United Earth Dollar" &&
+              human_window.currency.code == "UED" &&
+              human_window.currency.symbol == "$" &&
+              human_window.treasury_credits &&
+              human_window.formatted_treasury ==
+                  human_window.currency.format(*human_window.treasury_credits),
+          "Human research view did not own canonical currency and treasury.");
+  const auto priced = std::ranges::find_if(
+      human_window.nodes, [](const auto &node) { return node.cost.has_value(); });
+  require(priced != human_window.nodes.end() &&
+              priced->cost->formatted_authorization ==
+                  human_window.currency.format(
+                      priced->cost->authorization_credits) &&
+              priced->cost->formatted_milestone_commitment ==
+                  human_window.currency.format(
+                      priced->cost->milestone_commitment_credits) &&
+              priced->cost->formatted_operating_cost_rate ==
+                  human_window.currency.format_rate(
+                      -priced->cost->operating_credits_per_day) &&
+              priced->cost->formatted_estimated_total ==
+                  human_window.currency.format(
+                      priced->cost->estimated_total_credits) &&
+              priced->cost->formatted_credits_needed_to_start ==
+                  human_window.currency.format(
+                      priced->cost->credits_needed_to_start),
+          "Research quote strings did not use the canonical human currency.");
+  const auto human_funding_revision = human_window.funding_revision;
+  const auto candidate = std::ranges::find_if(
+      human_window.nodes, [](const auto &node) {
+        return node.primary_action.intent == NativeResearchIntent::Start &&
+               node.primary_action.enabled;
+      });
+  require(candidate != human_window.nodes.end(),
+          "Human currency fixture lacks a startable research program.");
+  auto &human_world = human.runtime().world().campaign();
+  const auto human_player = std::ranges::find(
+      human_world.civilizations, human_world.player_civilization_id,
+      &Civilization::id);
+  require(human_player != human_world.civilizations.end(),
+          "Human currency fixture lost its player.");
+  human_player->species_id = "pelagic_high_pressure";
+  const auto stale_currency = human_controller.execute(
+      human, 41, human_window.research_revision,
+      human_window.funding_revision, NativeResearchIntent::Start,
+      candidate->id);
+  require(!stale_currency.accepted &&
+              stale_currency.message.find("funding changed") !=
+                  std::string::npos,
+          "A changed sovereign currency accepted an old research window.");
+  human_player->species_id = "terran_baseline";
+
+  NativeResearchController nonhuman_controller;
+  const auto nonhuman_window = nonhuman_controller.build(nonhuman, 42);
+  require(nonhuman_window.currency.name == "Tide Mark" &&
+              nonhuman_window.currency.code == "TM" &&
+              nonhuman_window.currency.symbol == "◈" &&
+              nonhuman_window.treasury_credits &&
+              nonhuman_window.formatted_treasury ==
+                  nonhuman_window.currency.format(
+                      *nonhuman_window.treasury_credits),
+          "Nonhuman research view reused the human currency.");
+
+  player_economy(human).credits = 1e-15;
+  human_window = human_controller.build(human, 41);
+  require(human_window.formatted_treasury &&
+              human_window.funding_revision == human_funding_revision &&
+              human_window.formatted_treasury->starts_with("Under ") &&
+              *human_window.formatted_treasury !=
+                  human_window.currency.format(0.),
+          "Tiny positive canonical money was presented as zero.");
+}
+
+void affordable_balance_change_allows_start(CampaignFrame &frame) {
+  NativeResearchController controller;
+  constexpr std::uint64_t generation = 51;
+  player_economy(frame).credits = 1'000'000.;
+  const auto window = controller.build(frame, generation);
+  const auto candidate = std::ranges::find_if(window.nodes, [](const auto &node) {
+    return node.primary_action.intent == NativeResearchIntent::Start &&
+           node.primary_action.enabled;
+  });
+  require(candidate != window.nodes.end(),
+          "Balance-change fixture lacks a startable research program.");
+  player_economy(frame).credits -= 1.;
+  const auto started = controller.execute(
+      frame, generation, window.research_revision, window.funding_revision,
+      NativeResearchIntent::Start, candidate->id);
+  require(started.accepted,
+          "An affordable treasury tick incorrectly invalidated Start.");
 }
 
 } // namespace
@@ -302,6 +402,12 @@ int main(int argc, char **argv) try {
   auto authored = source_frame(research_root, player_fixture, scratch);
   const auto authored_has_locked_preview = observer_safe_projection(authored, 1);
   auto fresh = fresh_500_frame(research_root, catalog);
+  auto nonhuman =
+      fresh_500_frame(research_root, catalog, "pelagic_high_pressure");
+  auto balance_change = fresh_500_frame(research_root, catalog);
+  currency_projection(fresh, nonhuman);
+  affordable_balance_change_allows_start(balance_change);
+  player_economy(fresh).credits = 500.;
   const auto fresh_has_locked_preview = observer_safe_projection(fresh, 3);
   require(authored_has_locked_preview || fresh_has_locked_preview,
           "Representative campaigns lack an anonymous locked preview.");

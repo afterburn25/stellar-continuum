@@ -1,11 +1,16 @@
 #include "native_research_controller.hpp"
 
 #include <stellar/core/adaptive_research_funding.hpp>
+#include <stellar/core/sovereign_currency.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <locale>
 #include <ranges>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -105,10 +110,42 @@ struct PlayerContext {
   return found == view.active_projects.end() ? nullptr : &*found;
 }
 
+[[nodiscard]] std::string positive_amount(
+    const SovereignCurrencyDefinition &currency, const double value) {
+  const auto formatted = currency.format(value);
+  if (value > 0. && formatted == currency.format(0.)) {
+    const auto smallest_visible_budget_unit =
+        .01 / currency.local_units_per_budget_unit;
+    return "Under " + currency.format(smallest_visible_budget_unit);
+  }
+  return formatted;
+}
+
+[[nodiscard]] std::string operating_cost_rate(
+    const SovereignCurrencyDefinition &currency, const double value) {
+  if (value > 0. && currency.format(value) == currency.format(0.))
+    return positive_amount(currency, value) + "/day";
+  return currency.format_rate(-value);
+}
+
+[[nodiscard]] std::string funding_signature(
+    const PlayerContext &player,
+    const SovereignCurrencyDefinition &currency) {
+  std::ostringstream result;
+  result.imbue(std::locale::classic());
+  result << std::hexfloat << player.civilization.species_id.size() << ':'
+         << player.civilization.species_id << ';' << currency.name.size() << ':'
+         << currency.name << ';' << currency.code.size() << ':' << currency.code
+         << ';' << currency.symbol.size() << ':' << currency.symbol << ';'
+         << currency.local_units_per_budget_unit << ';';
+  return result.str();
+}
+
 [[nodiscard]] std::optional<NativeResearchCost> quote_for(
     const PlayerContext &player, const AdaptiveResearchView &view,
-  const AdaptiveResearchNodeView &node,
-    const AdaptiveResearchProjectView *project) {
+    const AdaptiveResearchNodeView &node,
+    const AdaptiveResearchProjectView *project,
+    const SovereignCurrencyDefinition &currency) {
   if (!node.minimum_labs || !node.recommended_labs) return std::nullopt;
   if (!project && node.state >= ResearchMaturity::mature) return std::nullopt;
   const auto labs = project ? project->assigned_effective_labs
@@ -118,11 +155,27 @@ struct PlayerContext {
   const auto quote = AdaptiveResearchFundingPolicy::quote(
       player.authority.catalog().get_node(node.node_id), labs,
       player.authority.catalog());
+  const auto needed =
+      AdaptiveResearchCampaignCommands::credits_needed_to_start(quote);
   return NativeResearchCost{
-      quote.assigned_effective_labs, quote.authorization_credits,
-      quote.milestone_commitment_credits, quote.operating_credits_per_day,
-      quote.estimated_total_credits, quote.estimated_years_at_full_funding,
-      AdaptiveResearchCampaignCommands::credits_needed_to_start(quote)};
+      .assigned_effective_labs = quote.assigned_effective_labs,
+      .authorization_credits = quote.authorization_credits,
+      .milestone_commitment_credits = quote.milestone_commitment_credits,
+      .operating_credits_per_day = quote.operating_credits_per_day,
+      .estimated_total_credits = quote.estimated_total_credits,
+      .estimated_years_at_full_funding =
+          quote.estimated_years_at_full_funding,
+      .credits_needed_to_start = needed,
+      .formatted_authorization =
+          positive_amount(currency, quote.authorization_credits),
+      .formatted_milestone_commitment =
+          positive_amount(currency, quote.milestone_commitment_credits),
+      .formatted_operating_cost_rate =
+          operating_cost_rate(currency, quote.operating_credits_per_day),
+      .formatted_estimated_total =
+          positive_amount(currency, quote.estimated_total_credits),
+      .formatted_credits_needed_to_start =
+          positive_amount(currency, needed)};
 }
 
 [[nodiscard]] NativeResearchAction primary_action(
@@ -189,7 +242,11 @@ void NativeResearchController::require_owner() const {
 }
 
 void NativeResearchController::bind_generation(const std::uint64_t generation) {
-  if (generation_ && *generation_ != generation) selected_node_id_.reset();
+  if (generation_ && *generation_ != generation) {
+    selected_node_id_.reset();
+    funding_revision_ = 0;
+    funding_signature_.reset();
+  }
   generation_ = generation;
 }
 
@@ -204,6 +261,15 @@ NativeResearchWindow NativeResearchController::build(
     throw std::invalid_argument("Research search exceeds 256 UTF-8 bytes.");
   const auto folded_search = fold_ascii(std::move(search));
   auto player = context(frame);
+  const auto currency = sovereign_currency_for_civilization(
+      player.world.civilizations, player.world.player_civilization_id);
+  const auto signature = funding_signature(player, currency);
+  if (!funding_signature_ || *funding_signature_ != signature) {
+    if (funding_revision_ == std::numeric_limits<std::uint64_t>::max())
+      throw std::overflow_error("Native research funding revision is exhausted.");
+    ++funding_revision_;
+    funding_signature_ = signature;
+  }
   const auto target = "species:" + player.civilization.species_id;
   const auto view = player.authority.kernel().build_view(player.state, target);
 
@@ -218,7 +284,7 @@ NativeResearchWindow NativeResearchController::build(
     visible_ids.insert(node.node_id);
     ++domain_counts[node.domain_id];
     const auto *project = project_for(view, node.node_id);
-    const auto cost = quote_for(player, view, node, project);
+    const auto cost = quote_for(player, view, node, project, currency);
     NativeResearchNode projected{
         .id = node.node_id,
         .display_name = node.display_name,
@@ -256,6 +322,13 @@ NativeResearchWindow NativeResearchController::build(
   NativeResearchWindow result;
   result.campaign_generation = campaign_generation;
   result.research_revision = player.state.revision();
+  result.funding_revision = funding_revision_;
+  result.currency = currency;
+  if (player.economy) {
+    result.treasury_credits = player.economy->credits;
+    result.formatted_treasury =
+        positive_amount(currency, player.economy->credits);
+  }
   result.free_effective_labs = view.directed_program_capacity.free_effective_labs;
   result.total_effective_labs = player.state.total_effective_research_labs();
   result.domain_tabs.push_back({{}, "All Research", all_nodes.size()});
@@ -285,6 +358,7 @@ NativeResearchWindow NativeResearchController::build(
 NativeResearchCommandOutcome NativeResearchController::execute(
     CampaignFrame &frame, const std::uint64_t campaign_generation,
     const std::int64_t expected_research_revision,
+    const std::uint64_t expected_funding_revision,
     const NativeResearchIntent intent, const std::string_view node_id) {
   require_owner();
   if (!generation_ || *generation_ != campaign_generation)
@@ -292,6 +366,12 @@ NativeResearchCommandOutcome NativeResearchController::execute(
   auto player = context(frame);
   if (player.state.revision() != expected_research_revision)
     return {false, "Research changed; refresh before issuing a command.",
+            player.state.revision()};
+  const auto currency = sovereign_currency_for_civilization(
+      player.world.civilizations, player.world.player_civilization_id);
+  if (!funding_signature_ || expected_funding_revision != funding_revision_ ||
+      *funding_signature_ != funding_signature(player, currency))
+    return {false, "Research funding changed; refresh before issuing a command.",
             player.state.revision()};
   const auto target = "species:" + player.civilization.species_id;
   const auto view = player.authority.kernel().build_view(player.state, target);

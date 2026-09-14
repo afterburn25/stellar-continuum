@@ -6,7 +6,8 @@ target_link_libraries(stellar_native_platform PRIVATE SDL3::SDL3 Gdi32 User32)
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
   app/native_client/native_research_workspace.cpp app/native_client/native_fleet_controller.cpp
-  app/native_client/native_fleet_workspace.cpp app/native_client/native_fleet_presentation.cpp)
+  app/native_client/native_fleet_workspace.cpp app/native_client/native_fleet_presentation.cpp
+  app/native_client/native_shipyard_controller.cpp app/native_client/native_shipyard_workspace.cpp)
 add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_runtime_data)
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
