@@ -84,6 +84,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/galaxy_generation_metadata.cpp
   core/src/massive_combat_persistence.cpp
   core/src/massive_combat_engine.cpp
+  core/src/campaign_massive_combat.cpp
   core/src/fleet_persistence.cpp
   core/src/shipyard_persistence.cpp
   core/src/galaxy_economy_persistence.cpp
@@ -683,6 +684,18 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/massive-combat-engine.json"
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(massive_combat_engine_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_campaign_massive_combat_tests native-tests/campaign_massive_combat_tests.cpp)
+  target_link_libraries(stellar_campaign_massive_combat_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME campaign_massive_combat_parity COMMAND stellar_campaign_massive_combat_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/campaign-massive-combat.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(campaign_massive_combat_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_campaign_massive_lifecycle_tests native-tests/campaign_massive_lifecycle_tests.cpp)
+  target_link_libraries(stellar_campaign_massive_lifecycle_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME campaign_massive_lifecycle_parity COMMAND stellar_campaign_massive_lifecycle_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/campaign-massive-lifecycle.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(campaign_massive_lifecycle_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_fleet_persistence_tests native-tests/fleet_persistence_tests.cpp)
   target_link_libraries(stellar_fleet_persistence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_persistence_parity COMMAND stellar_fleet_persistence_tests

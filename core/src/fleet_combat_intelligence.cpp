@@ -1,4 +1,5 @@
 #include <stellar/core/fleet_combat_intelligence.hpp>
+#include <stellar/core/detail/fleet_combat_intelligence_indexed.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -264,6 +265,14 @@ void observe_fleet_combat_power_many(
                                                       targets.end());
   const auto members = fleet_map(world.fleets);
   observe_with_map(world, observer_id, owned_targets, day, engaged,
+                   scanning_capability, members);
+}
+
+void detail::observe_fleet_combat_power_many_indexed(
+    FleetCombatIntelligenceWorldView world, int observer_id,
+    std::span<const FleetState *const> targets, double day, bool engaged,
+    bool scanning_capability, const std::map<int, const FleetState *> &members) {
+  observe_with_map(world, observer_id, targets, day, engaged,
                    scanning_capability, members);
 }
 

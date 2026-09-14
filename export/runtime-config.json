@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.41",
+  "engineVersion": "0.1.42",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "Headless diagnostic host with retained legacy campaign benchmarks and an integrated Adaptive Research campaign mode. The integrated owner advances authoritative construction, shipbuilding, AI, fleet sensor intelligence, funded timed Adaptive Research and observer-safe Diplomacy in source order. Export includes the declared authored research JSON and seals every runtime file. State and timing outputs are diagnostics, not player saves or FPS. Core supports current Player17 JSON capture/restore with explicit representation exclusions and deterministic tactical battle stepping on owned persistence state. Developer and historical campaign wrappers, session recovery, tactical campaign reconciliation and native graphical parity remain open."
+  "description": "Headless diagnostic host with retained legacy campaign benchmarks and an integrated Adaptive Research campaign mode. The integrated owner advances authoritative construction, shipbuilding, AI, fleet sensor intelligence, funded timed Adaptive Research and observer-safe Diplomacy in source order. Export includes the declared authored research JSON and seals every runtime file. State and timing outputs are diagnostics, not player saves or FPS. Core supports current Player17 JSON capture/restore with explicit representation exclusions and campaign tactical battle creation, observation, advancement, doctrine, engagement evidence and reconciliation on owned persistence state. Developer and historical campaign wrappers, session frame routing and recovery, and native graphical parity remain open."
 }
