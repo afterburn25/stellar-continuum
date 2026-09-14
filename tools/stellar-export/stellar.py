@@ -61,10 +61,11 @@ def build_environment():
 
 def native_build(preset, env):
     run(["cmake", "--fresh", "--preset", preset], env=env)
-    # A clean CI build compiles the complete parity suite and can exceed five
-    # minutes. Keep the longer allowance specific to compilation; runtime smoke
+    # A clean Windows CI build compiles more than 650 native build actions and
+    # exceeded 15 minutes while still progressing in run 34800861449. Keep the
+    # 30-minute allowance specific to compilation; runtime smoke
     # checks retain their short deadlines so a hung game still fails promptly.
-    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=900)
+    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
     run(["ctest", "--preset", preset], env=env)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless"}[preset]
     directory = ROOT / "build-native" / suffix
