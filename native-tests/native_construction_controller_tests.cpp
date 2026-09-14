@@ -1,0 +1,38 @@
+#include "native_construction_controller.hpp"
+#include <stellar/core/adaptive_research_campaign.hpp>
+#include <stellar/core/adaptive_research_strategic_runtime.hpp>
+#include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/player_campaign_recovery.hpp>
+#include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <ranges>
+#include <sstream>
+#include <stdexcept>
+#include <thread>
+using namespace stellar::core; using namespace stellar::native_construction; namespace fs=std::filesystem; using Json=nlohmann::json;
+namespace {
+void require(bool v,const char*m){if(!v)throw std::runtime_error(m);} bool near(double a,double b){return std::abs(a-b)<1e-6;}
+std::string read(const fs::path&p){std::ifstream f(p,std::ios::binary);std::ostringstream s;s<<f.rdbuf();return s.str();}
+void write(const fs::path&p,std::string_view v){fs::create_directories(p.parent_path());std::ofstream f(p,std::ios::binary|std::ios::trunc);f.write(v.data(),static_cast<std::streamsize>(v.size()));}
+std::string player17(const fs::path&p){for(const auto&r:Json::parse(read(p)).at("Rows"))if(r.at("Name")=="valid-current17")return r.at("InputJson");throw std::runtime_error("missing Player17 row");}
+CampaignFrame source_frame(const fs::path&r,const fs::path&fixture,const fs::path&scratch){auto p=scratch/"construction-player17.json";write(p,player17(fixture));auto loaded=load_existing_player_campaign_v17(p,[r]{return load_adaptive_research_strategic_runtime(r);});StrategicClock c;c.restore(loaded.campaign.simulation_days());return {std::move(loaded.campaign).activate(),std::move(c),CampaignFramePolicy::Player};}
+FreshCampaignState fresh_world(const fs::path&catalog){return seed_persistable_fresh_campaign(113500,load_nearby_catalog(catalog),{"2044-05-06T07:08:09Z",500,6,1,"terran_baseline"});}
+CampaignFrame enabled_frame(const fs::path&r,const fs::path&catalog){auto world=fresh_world(catalog);auto runtime=load_adaptive_research_strategic_runtime(r);auto research=AdaptiveResearchCampaignFactory(runtime).create(world);auto snapshot=AdaptiveResearchCampaignSnapshotCodec(runtime).capture(research);auto civ=std::ranges::find(snapshot.civilizations,world.player_civilization_id,&AdaptiveResearchCampaignCivilizationSnapshot::civilization_id);civ->research.research.research.research.core.capabilities.push_back({"orbital_industry",std::nullopt});auto state=std::ranges::find(world.construction,world.player_civilization_id,&ConstructionState::civilization_id);state->completed_project_ids.push_back("orbital_launch_complex");auto economy=std::ranges::find(world.economies,world.player_civilization_id,&CivilizationEconomy::civilization_id);economy->credits=2000.;economy->industry=2000.;return {IntegratedAdaptiveCampaignRuntime::restore_research(std::move(runtime),std::move(world),snapshot,{},0.),StrategicClock{},CampaignFramePolicy::Player};}
+void projections(const fs::path&r,const fs::path&catalog,const fs::path&fixture,const fs::path&scratch){
+ auto source=source_frame(r,fixture,scratch);NativeConstructionController sc;const auto sv=sc.build(source,4);require(!sv.projects.empty(),"source Player17 lost known construction");require(std::ranges::none_of(sv.projects,[](const auto&p){return p.id=="orbital_shipyard";}),"locked orbital shipyard leaked");
+ auto fresh=fresh_world(catalog);CampaignFrame ff(IntegratedAdaptiveCampaignRuntime::create_fresh(load_adaptive_research_strategic_runtime(r),std::move(fresh)),{},CampaignFramePolicy::Player);NativeConstructionController fc;const auto fv=fc.build(ff,5);require(std::ranges::none_of(fv.projects,[](const auto&p){return p.id=="orbital_shipyard"||p.id=="warp_test_facility";}),"fresh view leaked locked future projects");
+ auto frame=enabled_frame(r,catalog);auto &world=frame.runtime().world().campaign();NativeConstructionController c;auto v=c.build(frame,6);auto shipyard=std::ranges::find(v.projects,std::string("orbital_shipyard"),&NativeConstructionProject::id);require(shipyard!=v.projects.end()&&shipyard->queue.enabled&&shipyard->formatted_credit_cost==v.currency.format(shipyard->credit_cost)&&shipyard->requirements==std::vector<std::string>{"Orbital Industry","Orbital Launch Complex"},"unlocked orbital shipyard projection diverged");
+ auto economy=std::ranges::find(world.economies,v.player_civilization_id,&CivilizationEconomy::civilization_id);economy->credits-=1.;const auto before=economy->credits;auto started=c.queue(frame,6,v.construction_revision,"orbital_shipyard");require(started.accepted&&near(economy->credits,before-350.),"affordable balance drift rejected canonical construction");v=c.build(frame,6);shipyard=std::ranges::find(v.projects,std::string("orbital_shipyard"),&NativeConstructionProject::id);require(shipyard!=v.projects.end()&&shipyard->active&&shipyard->cancellation_refund==350.,"active construction projection lost authorization");
+ (void)frame.advance(.25);v=c.build(frame,6);shipyard=std::ranges::find(v.projects,std::string("orbital_shipyard"),&NativeConstructionProject::id);require(shipyard!=v.projects.end()&&shipyard->industry_progress>0.&&shipyard->progress_fraction>0.,"construction progressed outside or failed through CampaignFrame");
+ auto base=std::ranges::find(v.projects,std::string("research_network"),&NativeConstructionProject::id);require(base!=v.projects.end()&&base->queue.enabled&&base->queue.will_queue,"canonical queued readiness missing");economy->credits=0.;auto denied=c.queue(frame,6,v.construction_revision,"research_network");require(!denied.accepted&&denied.message.find("required to authorize")!=std::string::npos&&world.construction.front().queued_projects.empty(),"current funding denial became stale or mutated queue");economy->credits=1000.;v=c.build(frame,6);base=std::ranges::find(v.projects,std::string("research_network"),&NativeConstructionProject::id);auto queued=c.queue(frame,6,v.construction_revision,"research_network");require(queued.accepted,"canonical queued project failed");v=c.build(frame,6);base=std::ranges::find(v.projects,std::string("research_network"),&NativeConstructionProject::id);const auto refund=base->cancellation_refund;const auto credits=economy->credits;auto cancelled=c.cancel(frame,6,v.construction_revision,"research_network");require(cancelled.accepted&&near(cancelled.refunded_credits,refund)&&near(economy->credits,credits+refund),"queued cancellation refund diverged");
+ const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);v=c.build(frame,6);const auto unchanged=economy->credits;player->species_id="pelagic_high_pressure";auto stale=c.queue(frame,6,v.construction_revision,"research_network");require(!stale.accepted&&near(economy->credits,unchanged),"currency change accepted stale quote");player->species_id="terran_baseline";
+ auto foreign=c.queue(frame,7,v.construction_revision,"research_network");require(!foreign.accepted,"foreign campaign generation accepted an order");
+ bool rejected{};std::thread t([&]{try{(void)c.build(frame,6);}catch(const std::logic_error&){rejected=true;}});t.join();require(rejected,"wrong thread was accepted");
+}
+}
+int main(int argc,char**argv)try{if(argc!=5)throw std::invalid_argument("Usage: test research catalog fixture scratch");projections(fs::absolute(argv[1]),fs::absolute(argv[2]),fs::absolute(argv[3]),fs::absolute(argv[4]));std::cout<<"Native construction knowledge, canonical quotes/orders/refunds and ownership tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<"native construction test failed: "<<e.what()<<'\n';return 1;}

@@ -72,6 +72,13 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   return "Ship";
 }
 
+[[nodiscard]] float progress_width(double fraction, float width) noexcept {
+  const auto progress = std::isfinite(fraction)
+                            ? std::clamp(fraction, 0., 1.)
+                            : 0.;
+  return width * static_cast<float>(progress);
+}
+
 [[nodiscard]] std::string visible_message(std::string value) {
   constexpr std::size_t limit = 180;
   if (value.size() <= limit) return value;
@@ -471,10 +478,30 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                bounds.y + 47.f * layout.scale,
                bounds.width - 16.f * layout.scale, 17.f * layout.scale}))
         text(out, *line,
-             "Progress " + number(order_value.progress_fraction * 100., 1) +
-                 "%  |  Remaining " +
+             (std::isfinite(order_value.progress_fraction)
+                  ? "Progress " +
+                        number(std::clamp(order_value.progress_fraction, 0.,
+                                          1.) *
+                                   100.,
+                               1) +
+                        "%"
+                  : "Progress unavailable") +
+                 "  |  Remaining " +
                  number(order_value.industry_remaining, 1),
              muted, layout.small_font_pixels);
+      const UiRect track{bounds.x + 8.f * layout.scale,
+                         bounds.y + 62.f * layout.scale,
+                         bounds.width - 16.f * layout.scale,
+                         3.f * layout.scale};
+      if (const auto clipped_track = intersection(track, order_rows)) {
+        fill(out, *clipped_track, {23, 45, 67, 255});
+        const UiRect completed{
+            track.x, track.y,
+            progress_width(order_value.progress_fraction, track.width),
+            track.height};
+        if (const auto clipped_completed = intersection(completed, order_rows))
+          fill(out, *clipped_completed, good);
+      }
     }
   }
 

@@ -86,6 +86,11 @@ CivilizationEconomy *economy_for(ConstructionWorld w, int id) {
                         [=](auto &e) { return e.civilization_id == id; });
   return i == w.economies.end() ? nullptr : &*i;
 }
+const CivilizationEconomy *economy_for(ConstructionReadView w, int id) {
+  auto i = std::find_if(w.economies.begin(), w.economies.end(),
+                        [=](auto &e) { return e.civilization_id == id; });
+  return i == w.economies.end() ? nullptr : &*i;
+}
 const Civilization *civ_for(std::span<const Civilization> cs, int id) {
   auto i =
       std::find_if(cs.begin(), cs.end(), [=](auto &c) { return c.id == id; });
@@ -117,41 +122,104 @@ std::string lock(ConstructionReadView w, int id,
   }
   return r;
 }
-void promote(ConstructionWorld w, int id, ConstructionState &s) {
+void promote(ConstructionReadView w, int id, ConstructionState &s) {
   if (s.active_project_id || s.queued_projects.empty())
     return;
   auto &o = s.queued_projects.front();
   auto *p = find_construction_project(o.project_id);
-  if (!p || done(s, o.project_id) || !lock(w.read(), id, *p).empty())
+  if (!p || done(s, o.project_id) || !lock(w, id, *p).empty())
     return;
   s.active_project_id = o.project_id;
   s.active_project_progress = 0;
   s.active_project_authorization_credits = o.authorization_credits;
   s.queued_projects.erase(s.queued_projects.begin());
 }
-ConstructionOrderResult authorize(ConstructionWorld w, int id,
-                                  std::string_view pid, ConstructionState &s) {
+ConstructionOrderAssessment prepare_after_promotion(
+    ConstructionReadView w, int id, std::string_view pid,
+    const ConstructionState &s, ConstructionOrderIntent intent) {
+  ConstructionOrderAssessment result;
+  if (intent == ConstructionOrderIntent::Start) {
+    if (s.active_project_id) {
+      result.message = "A construction project is already in progress.";
+      return result;
+    }
+    if (!s.queued_projects.empty()) {
+      auto b = construction_queue_blocker(w, id);
+      result.message = b ? "The queued construction head is blocked: " + *b +
+                               ". Cancel it or restore its requirements first."
+                         : "A queued construction project is waiting to start.";
+      return result;
+    }
+    result.will_start_now = true;
+  } else if (!s.active_project_id && s.queued_projects.empty()) {
+    result.will_start_now = true;
+  } else {
+    if (s.queued_projects.size() >= maximum_queued_construction_projects) {
+      result.message = "The construction queue is full (8 projects maximum).";
+      return result;
+    }
+    result.will_queue = true;
+  }
   auto *p = find_construction_project(pid);
-  if (!p)
-    return {false, "Unknown construction project."};
+  if (!p) {
+    result.message = "Unknown construction project.";
+    return result;
+  }
+  result.authorization_credits = p->credit_cost;
   if (done(s, p->id))
-    return {false, p->name + " is already complete."};
-  auto l = lock(w.read(), id, *p);
-  if (!l.empty())
-    return {false, p->name + " is locked: " + l + "."};
+    result.message = p->name + " is already complete.";
+  else if (auto l = lock(w, id, *p); !l.empty())
+    result.message = p->name + " is locked: " + l + ".";
+  else if (result.will_queue &&
+           (s.active_project_id == p->id ||
+            std::any_of(s.queued_projects.begin(), s.queued_projects.end(),
+                        [&](auto &o) { return o.project_id == p->id; })))
+    result.message = p->name + " is already active or queued.";
+  if (!result.message.empty())
+    return result;
   auto *e = economy_for(w, id);
   if (!e)
     throw std::out_of_range("Sequence contains no matching element");
   auto cur = sovereign_currency_for_civilization(w.civilizations, id);
-  if (e->credits + .0001 < p->credit_cost)
-    return {false, cur.format(p->credit_cost) + " is required to authorize " +
-                       p->name + "."};
+  if (e->credits + .0001 < p->credit_cost) {
+    result.message = cur.format(p->credit_cost) +
+                     " is required to authorize " + p->name + ".";
+    return result;
+  }
+  result.accepted = true;
+  result.message = result.will_queue
+                       ? "Queued " + p->name + ". Authorized for " +
+                             cur.format(p->credit_cost) + "."
+                       : "Construction started: " + p->name +
+                             ". Authorized for " + cur.format(p->credit_cost) +
+                             ".";
+  return result;
+}
+
+ConstructionOrderResult issue_order(ConstructionWorld w, int id,
+                                    std::string_view pid,
+                                    ConstructionOrderIntent intent) {
+  if (!civ_for(w.civilizations, id))
+    return {false, "Unknown civilization."};
+  auto *s = state_for(w, id);
+  if (!s)
+    throw std::out_of_range("Sequence contains no matching element");
+  promote(w.read(), id, *s);
+  const auto assessment =
+      prepare_after_promotion(w.read(), id, pid, *s, intent);
+  if (!assessment.accepted)
+    return {false, assessment.message};
+  const auto *p = find_construction_project(pid);
+  auto *e = economy_for(w, id);
   e->credits -= p->credit_cost;
-  s.active_project_id = p->id;
-  s.active_project_progress = 0;
-  s.active_project_authorization_credits = p->credit_cost;
-  return {true, "Construction started: " + p->name + ". Authorized for " +
-                    cur.format(p->credit_cost) + "."};
+  if (assessment.will_queue)
+    s->queued_projects.push_back({p->id, p->credit_cost});
+  else {
+    s->active_project_id = p->id;
+    s->active_project_progress = 0;
+    s->active_project_authorization_credits = p->credit_cost;
+  }
+  return {true, assessment.message};
 }
 } // namespace
 std::span<const ConstructionProjectDefinition> construction_project_catalog() {
@@ -206,57 +274,29 @@ std::optional<std::string> construction_queue_blocker(ConstructionReadView w,
 }
 ConstructionOrderResult start_construction_project(ConstructionWorld w, int id,
                                                    std::string_view pid) {
-  if (!civ_for(w.civilizations, id))
-    return {false, "Unknown civilization."};
-  auto *s = state_for(w, id);
-  if (!s)
-    throw std::out_of_range("Sequence contains no matching element");
-  promote(w, id, *s);
-  if (s->active_project_id)
-    return {false, "A construction project is already in progress."};
-  if (!s->queued_projects.empty()) {
-    auto b = construction_queue_blocker(w.read(), id);
-    return {false, b ? "The queued construction head is blocked: " + *b +
-                           ". Cancel it or restore its requirements first."
-                     : "A queued construction project is waiting to start."};
-  }
-  return authorize(w, id, pid, *s);
+  return issue_order(w, id, pid, ConstructionOrderIntent::Start);
 }
 ConstructionOrderResult queue_construction_project(ConstructionWorld w, int id,
                                                    std::string_view pid) {
-  if (!civ_for(w.civilizations, id))
+  return issue_order(w, id, pid, ConstructionOrderIntent::Queue);
+}
+
+ConstructionOrderAssessment assess_construction_project_order(
+    ConstructionReadView w, int id, std::string_view pid,
+    ConstructionOrderIntent intent) {
+  std::vector<ConstructionState> construction(w.construction.begin(),
+                                               w.construction.end());
+  ConstructionReadView copy{w.civilizations, w.bodies, construction,
+                            w.colonies, w.economies, w.capabilities,
+                            w.capability_query};
+  if (!civ_for(copy.civilizations, id))
     return {false, "Unknown civilization."};
-  auto *s = state_for(w, id);
-  if (!s)
+  const auto state = std::ranges::find(construction, id,
+                                       &ConstructionState::civilization_id);
+  if (state == construction.end())
     throw std::out_of_range("Sequence contains no matching element");
-  promote(w, id, *s);
-  if (!s->active_project_id && s->queued_projects.empty())
-    return authorize(w, id, pid, *s);
-  if (s->queued_projects.size() >= maximum_queued_construction_projects)
-    return {false, "The construction queue is full (8 projects maximum)."};
-  auto *p = find_construction_project(pid);
-  if (!p)
-    return {false, "Unknown construction project."};
-  if (done(*s, p->id))
-    return {false, p->name + " is already complete."};
-  auto l = lock(w.read(), id, *p);
-  if (!l.empty())
-    return {false, p->name + " is locked: " + l + "."};
-  if (s->active_project_id == p->id ||
-      std::any_of(s->queued_projects.begin(), s->queued_projects.end(),
-                  [&](auto &o) { return o.project_id == p->id; }))
-    return {false, p->name + " is already active or queued."};
-  auto *e = economy_for(w, id);
-  if (!e)
-    throw std::out_of_range("Sequence contains no matching element");
-  auto c = sovereign_currency_for_civilization(w.civilizations, id);
-  if (e->credits + .0001 < p->credit_cost)
-    return {false, c.format(p->credit_cost) + " is required to authorize " +
-                       p->name + "."};
-  e->credits -= p->credit_cost;
-  s->queued_projects.push_back({p->id, p->credit_cost});
-  return {true, "Queued " + p->name + ". Authorized for " +
-                    c.format(p->credit_cost) + "."};
+  promote(copy, id, *state);
+  return prepare_after_promotion(copy, id, pid, *state, intent);
 }
 double construction_cancellation_refund_preview(const ConstructionState &s,
                                                 std::string_view id) {
@@ -286,7 +326,7 @@ cancel_construction_project(ConstructionWorld w, int id, std::string_view pid) {
       s->active_project_id.reset();
       s->active_project_progress = 0;
       s->active_project_authorization_credits = 0;
-      promote(w, id, *s);
+      promote(w.read(), id, *s);
       auto c = sovereign_currency_for_civilization(w.civilizations, id);
       return {true,
               "Cancelled " + p->name + "; refunded " + c.format(r) +
@@ -301,7 +341,7 @@ cancel_construction_project(ConstructionWorld w, int id, std::string_view pid) {
   auto o = *i;
   s->queued_projects.erase(i);
   e->credits += o.authorization_credits;
-  promote(w, id, *s);
+  promote(w.read(), id, *s);
   auto name = get_construction_project(o.project_id).name;
   auto c = sovereign_currency_for_civilization(w.civilizations, id);
   return {true,
@@ -330,7 +370,7 @@ void ensure_automatic_construction_orders(ConstructionWorld w) {
     auto *s = state_for(w, c.id);
     if (!s)
       throw std::out_of_range("Sequence contains no matching element");
-    promote(w, c.id, *s);
+    promote(w.read(), c.id, *s);
     if (c.is_player || s->active_project_id || !s->queued_projects.empty())
       continue;
     auto *e = economy_for(w, c.id);
@@ -380,7 +420,7 @@ advance_construction_for_civilization(ConstructionWorld w, int id,
   auto *e = economy_for(w, id);
   if (!s || !e)
     throw std::out_of_range("Sequence contains no matching element");
-  promote(w, id, *s);
+  promote(w.read(), id, *s);
   if (!std::isfinite(e->industry))
     throw std::out_of_range("Available Industry must be finite.");
   if (!std::isfinite(budget))
@@ -418,7 +458,7 @@ advance_construction_for_civilization(ConstructionWorld w, int id,
   s->active_project_progress = 0;
   s->active_project_authorization_credits = 0;
   r.push_back({id, p.id, c->name + " completed " + p.name + "."});
-  promote(w, id, *s);
+  promote(w.read(), id, *s);
   return r;
 }
 std::vector<ConstructionEvent> advance_construction(

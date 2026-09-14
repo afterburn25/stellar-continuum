@@ -80,3 +80,41 @@ add_test(NAME native_shipyard_workspace COMMAND stellar_native_shipyard_workspac
 if(MSVC)
   target_compile_options(stellar_native_shipyard_workspace_tests PRIVATE /WX)
 endif()
+
+add_executable(stellar_native_construction_controller_tests
+  native-tests/native_construction_controller_tests.cpp app/native_client/native_construction_controller.cpp)
+target_include_directories(stellar_native_construction_controller_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_construction_controller_tests PRIVATE stellar_core stellar_json)
+add_test(NAME native_construction_controller COMMAND stellar_native_construction_controller_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json"
+  "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
+  "${CMAKE_BINARY_DIR}/native-construction-cases")
+set_tests_properties(native_construction_controller PROPERTIES TIMEOUT 90)
+add_executable(stellar_native_construction_workspace_tests
+  native-tests/native_construction_workspace_tests.cpp app/native_client/native_construction_workspace.cpp)
+target_include_directories(stellar_native_construction_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_construction_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_construction_workspace COMMAND stellar_native_construction_workspace_tests)
+if(MSVC)
+  target_compile_options(stellar_native_construction_controller_tests PRIVATE /WX)
+  target_compile_options(stellar_native_construction_workspace_tests PRIVATE /WX)
+endif()
+
+add_executable(stellar_native_fresh_progression_tests
+  native-tests/native_fresh_progression_tests.cpp
+  app/native_client/native_research_controller.cpp
+  app/native_client/native_construction_controller.cpp
+  app/native_client/native_shipyard_controller.cpp
+  app/native_client/native_fleet_controller.cpp)
+target_include_directories(stellar_native_fresh_progression_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_fresh_progression_tests PRIVATE stellar_core stellar_json)
+add_test(NAME native_fresh_progression COMMAND stellar_native_fresh_progression_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+# Two ordinary campaigns replay twice through thousands of bounded strategic
+# days. The checked Debug build takes about three minutes locally.
+set_tests_properties(native_fresh_progression PROPERTIES TIMEOUT 600)
+if(MSVC)
+  target_compile_options(stellar_native_fresh_progression_tests PRIVATE /WX)
+endif()

@@ -13,6 +13,7 @@ enum class UiAction {
   Speed,
   Research,
   Shipyard,
+  Construction,
   Continue,
   Save,
   Load,
@@ -28,6 +29,7 @@ struct NativeUiLayout {
   UiRect speed;
   UiRect research;
   UiRect shipyard;
+  UiRect construction;
   UiRect day_text;
   UiRect status_text;
   UiRect menu_panel;
@@ -68,6 +70,7 @@ struct NativeUiLayout {
         {inset + 86.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset + 200.f * scale, inset, 112.f * scale, 32.f * scale},
         {inset + 322.f * scale, inset, 112.f * scale, 32.f * scale},
+        {inset + 444.f * scale, inset, 140.f * scale, 32.f * scale},
         {inset, 56.f * scale, 230.f * scale, 22.f * scale},
         {inset, 80.f * scale, status_width, 44.f * scale},
         panel,
@@ -95,6 +98,7 @@ struct NativeUiLayout {
     if (speed.contains(point)) return UiAction::Speed;
     if (research.contains(point)) return UiAction::Research;
     if (shipyard.contains(point)) return UiAction::Shipyard;
+    if (construction.contains(point)) return UiAction::Construction;
     return UiAction::None;
   }
 };

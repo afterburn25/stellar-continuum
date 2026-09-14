@@ -20,6 +20,17 @@ std::optional<std::string> construction_project_lock_reason(ConstructionReadView
     const ConstructionProjectDefinition& project);
 std::vector<ConstructionProjectDefinition> available_construction_projects(ConstructionReadView world, int civilization_id);
 std::optional<std::string> construction_queue_blocker(ConstructionReadView world, int civilization_id);
+enum class ConstructionOrderIntent { Start, Queue };
+struct ConstructionOrderAssessment {
+    bool accepted{};
+    std::string message;
+    bool will_start_now{};
+    bool will_queue{};
+    double authorization_credits{};
+};
+ConstructionOrderAssessment assess_construction_project_order(
+    ConstructionReadView world, int civilization_id, std::string_view project_id,
+    ConstructionOrderIntent intent);
 ConstructionOrderResult start_construction_project(ConstructionWorld world, int civilization_id, std::string_view project_id);
 ConstructionOrderResult queue_construction_project(ConstructionWorld world, int civilization_id, std::string_view project_id);
 ConstructionCancellationResult cancel_construction_project(ConstructionWorld world, int civilization_id, std::string_view project_id);

@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Construction shows known projects, requirements, costs, timed progress and canonical Start/Queue/Cancel. Active work precedes queued and completed entries.
+
 - Shipyard opens canonical known designs, costs, readiness and timed build queues. Cancel pauses, refreshes the refund, and requires explicit confirmation.
 
 - Research opens known programs, domain tabs, search and canonical Begin/Pause/Resume actions.
@@ -19,6 +21,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Engine 0.1.48 passed 125/125 CTest and 83 Python checks. Eleven real Vulkan launches cover map, research, fleet, shipyard and construction inputs and saves. The maintained production validator rejects wrong design/authorization, nonfinite values, missing debit, skipped saves and reload mutations. Fresh seed 115501 reaches real scout transit through ordinary research and facilities; seed 115500 retains its canonical failed hypothesis and locked ships. See NATIVE_CONSTRUCTION.md and NATIVE_FRESH_PROGRESSION.md.
 
 Engine0.1.47 passed121/121 CTest and57 Python checks, plus strict shipbuilding assessment parity (89actual-source rows in Debug and Release). Additional actual720p shipyard runs prove fresh locked state and running Start/pause/refund confirmation/save in an explicitly authored unlocked scenario. This is not natural unlock progression proof. See NATIVE_SHIPYARD.md and HANDOFF.md.
 
