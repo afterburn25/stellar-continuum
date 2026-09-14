@@ -11,7 +11,7 @@ add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_shipyard_controller.cpp app/native_client/native_shipyard_workspace.cpp
   app/native_client/native_construction_controller.cpp app/native_client/native_construction_workspace.cpp
   app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
-  app/native_client/native_planet_disc_assets.cpp)
+  app/native_client/native_planet_disc_assets.cpp app/native_client/native_system_travel.cpp)
 add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_runtime_data)
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
@@ -21,6 +21,14 @@ add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_native_text_measure_tests native-tests/native_text_measure_tests.cpp)
+  target_link_libraries(stellar_native_text_measure_tests PRIVATE stellar_native_platform)
+  add_test(NAME native_text_measure COMMAND stellar_native_text_measure_tests
+    "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf")
+  set_tests_properties(native_text_measure PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+  if(MSVC)
+    target_compile_options(stellar_native_text_measure_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_planet_disc_assets_tests
     native-tests/native_planet_disc_assets_tests.cpp app/native_client/native_planet_disc_assets.cpp)
   target_include_directories(stellar_native_planet_disc_assets_tests PRIVATE app/native_client)

@@ -14,6 +14,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   add_compile_options(/W4 /permissive- /EHsc /fp:precise /utf-8)
+  # Preview/export builds retain debug symbols without multi-gigabyte .ilk caches.
+  add_link_options("$<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>")
 else()
   add_compile_options(-Wall -Wextra -Wpedantic -ffp-contract=off)
 endif()

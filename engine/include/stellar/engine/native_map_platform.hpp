@@ -17,6 +17,7 @@ struct Circle { Point center; float radius{}; Color color; };
 enum class TextAlign { Left, Center, Right };
 enum class FontFace { Interface, Heading };
 struct Text { Point at; std::string value; Color color; int font_pixel_size{15}; float wrap_width{}; std::optional<UiRect> clip; TextAlign align{TextAlign::Left}; FontFace face{FontFace::Interface}; };
+struct TextExtent { int width{},height{}; };
 struct FilledRectangle { UiRect bounds; Color color; };
 struct StrokedRectangle { UiRect bounds; Color color; };
 inline constexpr int maximum_rgba_image_dimension=8192;
@@ -92,6 +93,7 @@ class Window final {
   Window &operator=(const Window &) = delete;
   [[nodiscard]] InputSnapshot poll();
   void set_text_input(bool enabled);
+  [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
             const std::optional<std::filesystem::path> &screenshot = std::nullopt);
   [[nodiscard]] int drawable_width() const noexcept;

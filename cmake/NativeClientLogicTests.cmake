@@ -1,7 +1,21 @@
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
+add_executable(stellar_native_system_travel_tests
+  native-tests/native_system_travel_tests.cpp
+  app/native_client/native_system_travel.cpp app/native_client/native_system_view.cpp)
+target_include_directories(stellar_native_system_travel_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_system_travel_tests PRIVATE stellar_core)
+add_test(NAME native_system_travel COMMAND stellar_native_system_travel_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_system_travel PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_native_system_travel_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_system_workspace_tests
   native-tests/native_system_workspace_tests.cpp
-  app/native_client/native_system_workspace.cpp app/native_client/native_system_view.cpp)
+  app/native_client/native_system_workspace.cpp app/native_client/native_system_view.cpp
+  app/native_client/native_system_travel.cpp app/native_client/native_fleet_controller.cpp)
 target_include_directories(stellar_native_system_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_system_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_system_workspace COMMAND stellar_native_system_workspace_tests

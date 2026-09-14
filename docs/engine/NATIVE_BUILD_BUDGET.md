@@ -1,5 +1,18 @@
 # Native cold-build budget
 
+Engine 0.1.50's local preview link failed with LNK1116 / Windows error 112
+because the development drive was full. The ignored `build-native/` tree
+contained 268 incremental linker (`.ilk`) caches totalling 10,377,218,652
+bytes. Those generated caches were removed after checking every absolute
+path stayed within the build tree. One linker PDB left incomplete by the
+disk exhaustion was then rebuilt after LNK1285 identified it explicitly.
+Sources, saves, object libraries and sealed packages were retained.
+
+MSVC RelWithDebInfo builds now link with `/INCREMENTAL:NO`. Debug symbols
+remain available, while preview/export/test targets no longer accumulate
+these incremental linker caches. This changes build storage use, not game
+behavior or validation deadlines.
+
 The 0.1.42 native CI run `34800861449`, job `103843090974`, hit the
 900-second compilation deadline. Its log showed continuous progress through
 action 550/658 before timeout and 552/658 during process cleanup, with no

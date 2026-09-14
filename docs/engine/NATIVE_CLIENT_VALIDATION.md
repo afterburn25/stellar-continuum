@@ -6,6 +6,9 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- System views display selectable green owned fleets at canonical local positions. Real connected exits sit outside the dotted boundary with fixed-size forest-green arrows and measured labels. Unknown destinations stay masked.
+- Pause and speed retain the system view; map gestures are cleared at workspace transitions.
+
 - Known systems open an orbital view with transparent planet discs, eccentric orbits, observer-filtered body stats, left-drag pan, pointer-anchored zoom and Reset/Back navigation.
 
 - Construction shows known projects, requirements, costs, timed progress and canonical Start/Queue/Cancel. Active work precedes queued and completed entries.

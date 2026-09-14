@@ -79,8 +79,9 @@ images and save. The entire paused Player17 payload must match, excluding only
 the save timestamp. Exact committed build evidence belongs in HANDOFF.md and
 the migration PR; planned checks are not counted as passed until executed.
 
-Atmospheres, detailed stellar shaders, Saturn's rendered rings, system exit
-arrows, local fleet motion/combat, orbital structures, 3D planet/surface views
+Connected system exits and owned local fleet motion are now integrated; see
+NATIVE_SYSTEM_TRAVEL.md. Atmospheres, detailed stellar shaders, Saturn's
+rendered rings, local combat, orbital structures, 3D planet/surface views
 and audio remain migration work. The current cached orbital discs are not a
 full-resolution close-up renderer. This preview does not claim graphical or
 gameplay parity with the preserved game and is not a replacement release.
