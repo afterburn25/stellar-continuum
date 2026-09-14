@@ -14,6 +14,21 @@ This registry prevents duplicate visual concepts, records provenance/status, and
 
 ## Runtime visual system
 
+### Planet identity — 2026-09-14
+
+| Asset / implementation | Provenance and use | Status |
+|---|---|---|
+| assets/visual/shaders/planet_identity_orbit.gdshader and generated planet_identity_disc.gdshader | Original project procedural globe/portrait materials; same morphology and physics-derived identity | Production candidate |
+| assets/visual/shaders/planet_identity_surface.gdshader | Original geological ground materials, shared with the live colony renderer | Production candidate |
+| assets/visual/shaders/planet_identity_noise.gdshaderinc | Original deterministic value noise, crater and fracture construction | Production candidate |
+| assets/visual/shaders/planet_identity_sky.gdshader | Original system sky, nebula, atmospheric scattering and companion stellar discs | Production candidate |
+| assets/visual/planets/modifiers/mineral-detail-packed.png | Original native 2048×2048 periodic Fourier synthesis; seed 928317; exact SHA-256 in production/provenance.json; no model or external image | Production candidate |
+| assets/visual/planets/identity-manifest.json | 20 runtime families / 100 variants exported from PlanetVisualCatalog.cs | Active registry |
+| assets/visual/planets/production/jobs.json and comfy-api-template.json | 200 exact generation specifications and standard-node ComfyUI template; no generated imagery claimed | Pending external model/generation/review |
+| docs/evidence/planet-identity/* | Original captures of the actual game renderers; fixture worlds clearly labeled | Validation evidence |
+
+Existing canonical Sol images and their licenses are unchanged. No new third-party imagery was copied. All new procedural artwork was created for this repository; model licensing remains a required step before generating and approving external masters. See PLANET_ART_COMFYUI_WORKFLOW.md and PLANET_VISUAL_VALIDATION.md.
+
 ### Cinematic revision — 2026-09-10
 
 | Asset / implementation | Purpose | Provenance | Status |

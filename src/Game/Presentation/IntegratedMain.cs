@@ -26,6 +26,18 @@ public partial class IntegratedMain : Main
 
     public override void _Ready()
     {
+        // Export templates deliberately reject arbitrary scene-path overrides. This
+        // explicit read-only atlas entry starts before any campaign load or save.
+        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--stellar-planet-atlas") >= 0)
+        {
+            GetTree().AutoAcceptQuit = true;
+            Callable.From(() =>
+            {
+                var error = GetTree().ChangeSceneToFile("res://scenes/PlanetVisualGallery.tscn");
+                if (error != Error.Ok) { GD.PushError("Planet atlas could not open: " + error); GetTree().Quit(1); }
+            }).CallDeferred();
+            return;
+        }
         // A platform close request is an invitation to show the campaign menu. Only its
         // explicit Exit to Windows command may save and end a healthy campaign.
         GetTree().AutoAcceptQuit = false;

@@ -68,6 +68,13 @@ public partial class DeveloperToolsLayer : CanvasLayer
             _result.Modulate = VisualUi.Muted;
         }, VisualIconLibrary.Save);
         save.Name = "DeveloperSave"; body.AddChild(save);
+        body.AddChild(VisualUi.Button("Planet visual gallery", "Inspect synthetic examples in the actual orbital and surface renderers.", () =>
+        {
+            if (!_main.UiIsDeveloperMode || _overlay.GetNodeOrNull<Control>("PlanetAtlas") is not null) return;
+            var gallery = new PlanetIdentity.PlanetVisualGallery { Name = "PlanetAtlas" };
+            _overlay.AddChild(gallery);
+            gallery.Closed += () => { gallery.QueueFree(); _close.GrabFocus(); };
+        }));
         AddChild(_overlay);
         GetViewport().GuiFocusChanged += KeepToolsFocus;
     }
@@ -109,6 +116,8 @@ public partial class DeveloperToolsLayer : CanvasLayer
     public override void _Input(InputEvent input)
     {
         if (!IsOpen || _main.UiIsMenuOpen) return;
+        if (_overlay.GetNodeOrNull<Control>("PlanetAtlas") is {} gallery)
+        { if(input.IsActionPressed("ui_cancel")) {gallery.QueueFree();GetViewport().SetInputAsHandled();} return; }
         if (input.IsActionPressed("ui_cancel")) { Close(); GetViewport().SetInputAsHandled(); }
     }
 

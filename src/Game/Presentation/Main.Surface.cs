@@ -126,7 +126,9 @@ public partial class Main
             UiUpgradeSurfaceBuilding, UiRepairSurfaceBuilding, UiSetSurfaceBuildingEnabled,
             UiSetSurfaceBuildingPriority, UiUpgradeSurfaceHub);
         _planetSurfaceView.ReadSkyCompanions = () => _systemSpatialCanvas?.VisibleBodies
-            .Where(body => body.Kind == PlanetaryBodyKind.Moon && body.ParentBodyId == _surfaceBodyId).ToArray()
+            .Where(body => body.HasDetailedEnvironment && (body.Kind == PlanetaryBodyKind.Moon && body.ParentBodyId == _surfaceBodyId ||
+                body.BodyId == _systemSpatialCanvas.VisibleBodies.FirstOrDefault(active => active.BodyId == _surfaceBodyId)?.ParentBodyId))
+            .Take(6).ToArray()
             ?? Array.Empty<SystemSpatialBodyMarker>();
         _planetSurfaceView.IsInputBlocked = () => (UiIsMenuOpen || UiIsDeveloperToolsOpen);
         _planetSurfaceView.SaveRequested += UiSave;
@@ -310,7 +312,8 @@ public partial class Main
             output.WorkforceAvailableMillions, output.WorkforceDemandMillions,
             labor.WorkingAgePopulationMillions, labor.EmployedPopulationMillions, labor.EmploymentRate,
             colony.StoredFoodPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions),
-            colony.StoredWaterPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions), colony.SurfaceHubUpgradeDaysRemaining);
+            colony.StoredWaterPopulationDaysMillions / Math.Max(.001, colony.PopulationMillions), colony.SurfaceHubUpgradeDaysRemaining,
+            Game.Presentation.PlanetIdentity.PlanetPresentationResolver.Resolve(body, _galaxy.Systems.First(system => system.Id == body.SystemId), _galaxy.Seed, knownPopulationMillions: colony.PopulationMillions,radialFraction:PlanetVisualRadius(body.SystemId)));
     }
 
     private static string SurfaceVisualClass(PlanetaryBodyState body)
@@ -325,6 +328,13 @@ public partial class Main
             return "temperate";
         if (environment.Atmosphere == PlanetaryAtmosphereRegime.Reducing) return "reducing";
         return "rocky";
+    }
+    private double? PlanetVisualRadius(int systemId)
+    {
+        if(_galaxy?.GalacticCore is {} core && core.ExclusionRadius>0 &&
+            _galaxy.Systems.FirstOrDefault(s=>s.Id==systemId) is {} star)
+            return System.Numerics.Vector2.Distance(star.Position,new(core.X,core.Y))/(core.ExclusionRadius/.14);
+        return null;
     }
 
     public UiSurfaceOrderResult UiPlaceSurfaceBuilding(string typeId, float x, float z, float rotationDegrees)

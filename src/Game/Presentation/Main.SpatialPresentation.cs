@@ -91,6 +91,7 @@ public partial class Main
         _systemSpatialCanvas.FleetSelected += id => UiSelectOwnedFleet(id);
         _systemSpatialCanvas.LaneSelected += UiInspectLaneDestination;
         _systemSpatialCanvas.IsObjectInspectorOpen = () => UiSelectedFleetId.HasValue || UiSelectedOrbitalConstruction is not null;
+        _systemSpatialCanvas.ShowPlanetDebug = () => UiIsDeveloperMode;
         _systemSpatialCanvas.OpenSurfaceRequested += id => PlanetSurfaceRequested?.Invoke(id);
         _systemSpatialCanvas.DescentRequested += UiBeginPlanetDescent;
         _systemSpatialCanvas.InfrastructureRequested += InspectOrbitalStructure;
@@ -247,13 +248,15 @@ public partial class Main
             return;
         }
 
-        var snapshot = _systemSpatialProjection.Build(system);
+        var radial=PlanetVisualRadius(system.SystemId);
+        var snapshot = _systemSpatialProjection.Build(system, _galaxy.Seed,radial);
         // Our inhabited worlds are public to their owner. Never derive night lights from
         // hidden foreign colonies or turn a generic activity signature into a city map.
         var inhabited = _galaxy.Colonies.Where(c => c.CivilizationId == _galaxy.PlayerCivilizationId &&
-            c.SystemId == snapshot.SystemId && c.PopulationMillions > 0).Select(c => c.PlanetaryBodyId).ToHashSet();
+            c.SystemId == snapshot.SystemId && c.PopulationMillions > 0 && c.PlanetaryBodyId.HasValue).GroupBy(c => c.PlanetaryBodyId!.Value).ToDictionary(g => g.Key, g => g.Sum(c => c.PopulationMillions));
         snapshot = snapshot with { Bodies = snapshot.Bodies.Select(body => body with
-            { HasCityLights = body.HasDetailedEnvironment && inhabited.Contains(body.BodyId) }).ToArray() };
+            { HasCityLights = body.HasDetailedEnvironment && inhabited.ContainsKey(body.BodyId),
+              Presentation = body.Presentation is {} p ? Game.Presentation.PlanetIdentity.PlanetPresentationResolver.WithDevelopment(p, inhabited.TryGetValue(body.BodyId, out var population) ? population : 0) : null }).ToArray() };
         if (snapshot.SystemId == PlayerCivilization.HomeSystemId)
         {
             var construction = PlayerConstruction;

@@ -1,0 +1,3002 @@
+[
+  {
+    "id": "terran-01-orbital",
+    "class": "Terran",
+    "variant": "terran-01",
+    "view": "orbital",
+    "seed": 381982540238668,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Continental Blue, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/terran-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-01-surface",
+    "class": "Terran",
+    "variant": "terran-01",
+    "view": "surface",
+    "seed": 744587466246592,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Continental Blue, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/terran-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-02-orbital",
+    "class": "Terran",
+    "variant": "terran-02",
+    "view": "orbital",
+    "seed": 7125071698125060,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Archipelago, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/terran-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-02-surface",
+    "class": "Terran",
+    "variant": "terran-02",
+    "view": "surface",
+    "seed": 5842079066682567,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Archipelago, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/terran-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-03-orbital",
+    "class": "Terran",
+    "variant": "terran-03",
+    "view": "orbital",
+    "seed": 3812559166939265,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Highland Green, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/terran-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-03-surface",
+    "class": "Terran",
+    "variant": "terran-03",
+    "view": "surface",
+    "seed": 199093548204025,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Highland Green, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/terran-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-04-orbital",
+    "class": "Terran",
+    "variant": "terran-04",
+    "view": "orbital",
+    "seed": 7115448849861280,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Polar Coast, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/terran-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-04-surface",
+    "class": "Terran",
+    "variant": "terran-04",
+    "view": "surface",
+    "seed": 278670044374334,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Polar Coast, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/terran-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-05-orbital",
+    "class": "Terran",
+    "variant": "terran-05",
+    "view": "orbital",
+    "seed": 1129247728329257,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Old Continents, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/terran-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "terran-05-surface",
+    "class": "Terran",
+    "variant": "terran-05",
+    "view": "surface",
+    "seed": 3228533250446627,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Terran, Old Continents, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/terran-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-01-orbital",
+    "class": "Ocean",
+    "variant": "ocean-01",
+    "view": "orbital",
+    "seed": 209682477546189,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Deep Blue, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/ocean-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-01-surface",
+    "class": "Ocean",
+    "variant": "ocean-01",
+    "view": "surface",
+    "seed": 5962073424534689,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Deep Blue, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/ocean-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-02-orbital",
+    "class": "Ocean",
+    "variant": "ocean-02",
+    "view": "orbital",
+    "seed": 1398599900271967,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Teal Shallows, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/ocean-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-02-surface",
+    "class": "Ocean",
+    "variant": "ocean-02",
+    "view": "surface",
+    "seed": 355433972251468,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Teal Shallows, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/ocean-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-03-orbital",
+    "class": "Ocean",
+    "variant": "ocean-03",
+    "view": "orbital",
+    "seed": 7807140190788775,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Storm Ocean, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/ocean-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-03-surface",
+    "class": "Ocean",
+    "variant": "ocean-03",
+    "view": "surface",
+    "seed": 1991279828427103,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Storm Ocean, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/ocean-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-04-orbital",
+    "class": "Ocean",
+    "variant": "ocean-04",
+    "view": "orbital",
+    "seed": 8256790286535875,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Island Chains, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/ocean-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-04-surface",
+    "class": "Ocean",
+    "variant": "ocean-04",
+    "view": "surface",
+    "seed": 687868796503607,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Island Chains, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/ocean-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-05-orbital",
+    "class": "Ocean",
+    "variant": "ocean-05",
+    "view": "orbital",
+    "seed": 4413853711666914,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Polar Ocean, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/ocean-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ocean-05-surface",
+    "class": "Ocean",
+    "variant": "ocean-05",
+    "view": "surface",
+    "seed": 3549400284075226,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ocean, Polar Ocean, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #526c5d and #8f927d, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/ocean-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-01-orbital",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-01",
+    "view": "orbital",
+    "seed": 7153593383805258,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Abyssal Storm, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/high-pressure-ocean-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-01-surface",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-01",
+    "view": "surface",
+    "seed": 4682483379864179,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Abyssal Storm, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/high-pressure-ocean-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-02-orbital",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-02",
+    "view": "orbital",
+    "seed": 521731449504226,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Silver Cloud Sea, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/high-pressure-ocean-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-02-surface",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-02",
+    "view": "surface",
+    "seed": 8713568550370911,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Silver Cloud Sea, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/high-pressure-ocean-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-03-orbital",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-03",
+    "view": "orbital",
+    "seed": 5732555399866361,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Teal Cyclones, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/high-pressure-ocean-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-03-surface",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-03",
+    "view": "surface",
+    "seed": 2704738498322165,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Teal Cyclones, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/high-pressure-ocean-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-04-orbital",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-04",
+    "view": "orbital",
+    "seed": 3205462427375673,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Dark Pelagic, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/high-pressure-ocean-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-04-surface",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-04",
+    "view": "surface",
+    "seed": 3361255145262608,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Dark Pelagic, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/high-pressure-ocean-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-05-orbital",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-05",
+    "view": "orbital",
+    "seed": 4631306780757696,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Polar Maelstrom, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/orbital/high-pressure-ocean-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-pressure-ocean-05-surface",
+    "class": "HighPressureOcean",
+    "variant": "high-pressure-ocean-05",
+    "view": "surface",
+    "seed": 8277771260010659,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighPressureOcean, Polar Maelstrom, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #486c67 and #708c80, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface, land continents, mountains",
+    "approvedTarget": "assets/visual/planets/surface/high-pressure-ocean-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-01-orbital",
+    "class": "Desert",
+    "variant": "desert-01",
+    "view": "orbital",
+    "seed": 8590777244427274,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Red Canyon, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/desert-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-01-surface",
+    "class": "Desert",
+    "variant": "desert-01",
+    "view": "surface",
+    "seed": 7305977894464229,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Red Canyon, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/desert-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-02-orbital",
+    "class": "Desert",
+    "variant": "desert-02",
+    "view": "orbital",
+    "seed": 3314702162972563,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Golden Dune, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/desert-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-02-surface",
+    "class": "Desert",
+    "variant": "desert-02",
+    "view": "surface",
+    "seed": 6289650595090471,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Golden Dune, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/desert-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-03-orbital",
+    "class": "Desert",
+    "variant": "desert-03",
+    "view": "orbital",
+    "seed": 717123237880690,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Pale Salt Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/desert-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-03-surface",
+    "class": "Desert",
+    "variant": "desert-03",
+    "view": "surface",
+    "seed": 6811087914027837,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Pale Salt Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/desert-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-04-orbital",
+    "class": "Desert",
+    "variant": "desert-04",
+    "view": "orbital",
+    "seed": 3322915052233435,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Dark Rocky Desert, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/desert-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-04-surface",
+    "class": "Desert",
+    "variant": "desert-04",
+    "view": "surface",
+    "seed": 237970625922487,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Dark Rocky Desert, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/desert-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-05-orbital",
+    "class": "Desert",
+    "variant": "desert-05",
+    "view": "orbital",
+    "seed": 8193064814124674,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Orange Dust, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/desert-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "desert-05-surface",
+    "class": "Desert",
+    "variant": "desert-05",
+    "view": "surface",
+    "seed": 3751658165748334,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Desert, Orange Dust, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b38251 and #684c39, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/desert-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-01-orbital",
+    "class": "Arid",
+    "variant": "arid-01",
+    "view": "orbital",
+    "seed": 6926152141282566,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Dry Grassland, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/arid-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-01-surface",
+    "class": "Arid",
+    "variant": "arid-01",
+    "view": "surface",
+    "seed": 475763073297654,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Dry Grassland, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/arid-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-02-orbital",
+    "class": "Arid",
+    "variant": "arid-02",
+    "view": "orbital",
+    "seed": 2277372846034534,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Stone Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/arid-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-02-surface",
+    "class": "Arid",
+    "variant": "arid-02",
+    "view": "surface",
+    "seed": 852234391262587,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Stone Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/arid-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-03-orbital",
+    "class": "Arid",
+    "variant": "arid-03",
+    "view": "orbital",
+    "seed": 2877466524404047,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Salt Coast, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/arid-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-03-surface",
+    "class": "Arid",
+    "variant": "arid-03",
+    "view": "surface",
+    "seed": 6367336716027567,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Salt Coast, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/arid-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-04-orbital",
+    "class": "Arid",
+    "variant": "arid-04",
+    "view": "orbital",
+    "seed": 5833480117208747,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Copper Steppe, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/arid-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-04-surface",
+    "class": "Arid",
+    "variant": "arid-04",
+    "view": "surface",
+    "seed": 5555397340201901,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Copper Steppe, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/arid-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-05-orbital",
+    "class": "Arid",
+    "variant": "arid-05",
+    "view": "orbital",
+    "seed": 4367154781692875,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Wind Plateau, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/arid-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "arid-05-surface",
+    "class": "Arid",
+    "variant": "arid-05",
+    "view": "surface",
+    "seed": 810204961402934,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Arid, Wind Plateau, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #867d53 and #635c4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/arid-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-01-orbital",
+    "class": "Ice",
+    "variant": "ice-01",
+    "view": "orbital",
+    "seed": 689790448459346,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, White Glacier, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-01-surface",
+    "class": "Ice",
+    "variant": "ice-01",
+    "view": "surface",
+    "seed": 3867868123353562,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, White Glacier, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-02-orbital",
+    "class": "Ice",
+    "variant": "ice-02",
+    "view": "orbital",
+    "seed": 4477238531861360,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Blue Fractured Ice, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-02-surface",
+    "class": "Ice",
+    "variant": "ice-02",
+    "view": "surface",
+    "seed": 1799751707846766,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Blue Fractured Ice, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-03-orbital",
+    "class": "Ice",
+    "variant": "ice-03",
+    "view": "orbital",
+    "seed": 2508857808047511,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Dark Ice Rock, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-03-surface",
+    "class": "Ice",
+    "variant": "ice-03",
+    "view": "surface",
+    "seed": 5312240223653902,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Dark Ice Rock, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-04-orbital",
+    "class": "Ice",
+    "variant": "ice-04",
+    "view": "orbital",
+    "seed": 4579205680122166,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Snowstorm, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-04-surface",
+    "class": "Ice",
+    "variant": "ice-04",
+    "view": "surface",
+    "seed": 5240504986674941,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Snowstorm, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-05-orbital",
+    "class": "Ice",
+    "variant": "ice-05",
+    "view": "orbital",
+    "seed": 8582001376412798,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Polar Ridge, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-05-surface",
+    "class": "Ice",
+    "variant": "ice-05",
+    "view": "surface",
+    "seed": 7499578141754015,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Ice, Polar Ridge, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #bbcbd0 and #596f79, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-01-orbital",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-01",
+    "view": "orbital",
+    "seed": 8453164233025800,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Dark Methane Sea, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/cryogenic-hydrocarbon-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-01-surface",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-01",
+    "view": "surface",
+    "seed": 4787190632525145,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Dark Methane Sea, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/cryogenic-hydrocarbon-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-02-orbital",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-02",
+    "view": "orbital",
+    "seed": 2376609367862551,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Amber Haze, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/cryogenic-hydrocarbon-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-02-surface",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-02",
+    "view": "surface",
+    "seed": 2359025558429963,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Amber Haze, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/cryogenic-hydrocarbon-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-03-orbital",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-03",
+    "view": "orbital",
+    "seed": 4202313112089674,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Frozen Delta, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/cryogenic-hydrocarbon-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-03-surface",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-03",
+    "view": "surface",
+    "seed": 754128515671521,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Frozen Delta, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/cryogenic-hydrocarbon-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-04-orbital",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-04",
+    "view": "orbital",
+    "seed": 332771056234207,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Pale Hydrocarbon Plain, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/cryogenic-hydrocarbon-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-04-surface",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-04",
+    "view": "surface",
+    "seed": 6825037395213613,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Pale Hydrocarbon Plain, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/cryogenic-hydrocarbon-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-05-orbital",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-05",
+    "view": "orbital",
+    "seed": 6422704874392855,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Polar Lakes, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/cryogenic-hydrocarbon-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "cryogenic-hydrocarbon-05-surface",
+    "class": "CryogenicHydrocarbon",
+    "variant": "cryogenic-hydrocarbon-05",
+    "view": "surface",
+    "seed": 2219485118607502,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, CryogenicHydrocarbon, Polar Lakes, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #aa8353 and #666759, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/cryogenic-hydrocarbon-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-01-orbital",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-01",
+    "view": "orbital",
+    "seed": 4640160805313730,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Gray Cratered, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/airless-rocky-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-01-surface",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-01",
+    "view": "surface",
+    "seed": 4098497398842487,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Gray Cratered, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/airless-rocky-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-02-orbital",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-02",
+    "view": "orbital",
+    "seed": 5609193525934565,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Dark Basaltic, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/airless-rocky-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-02-surface",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-02",
+    "view": "surface",
+    "seed": 3364111272673264,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Dark Basaltic, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/airless-rocky-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-03-orbital",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-03",
+    "view": "orbital",
+    "seed": 2035535123464252,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Rusted Mineral, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/airless-rocky-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-03-surface",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-03",
+    "view": "surface",
+    "seed": 5636503541037035,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Rusted Mineral, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/airless-rocky-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-04-orbital",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-04",
+    "view": "orbital",
+    "seed": 6427703228452466,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Pale Dust, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/airless-rocky-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-04-surface",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-04",
+    "view": "surface",
+    "seed": 3120508154173263,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Pale Dust, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/airless-rocky-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-05-orbital",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-05",
+    "view": "orbital",
+    "seed": 5258116511067780,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Fractured Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/airless-rocky-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "airless-rocky-05-surface",
+    "class": "AirlessRocky",
+    "variant": "airless-rocky-05",
+    "view": "surface",
+    "seed": 8365641233842232,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, AirlessRocky, Fractured Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #898984 and #474e53, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/airless-rocky-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-01-orbital",
+    "class": "Greenhouse",
+    "variant": "greenhouse-01",
+    "view": "orbital",
+    "seed": 5940141596995997,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Cream Cloud Deck, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/greenhouse-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-01-surface",
+    "class": "Greenhouse",
+    "variant": "greenhouse-01",
+    "view": "surface",
+    "seed": 6033432794732450,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Cream Cloud Deck, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/greenhouse-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-02-orbital",
+    "class": "Greenhouse",
+    "variant": "greenhouse-02",
+    "view": "orbital",
+    "seed": 8910524748433971,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Amber Convection, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/greenhouse-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-02-surface",
+    "class": "Greenhouse",
+    "variant": "greenhouse-02",
+    "view": "surface",
+    "seed": 2074629040646089,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Amber Convection, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/greenhouse-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-03-orbital",
+    "class": "Greenhouse",
+    "variant": "greenhouse-03",
+    "view": "orbital",
+    "seed": 357687509577528,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Sulfur Veil, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/greenhouse-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-03-surface",
+    "class": "Greenhouse",
+    "variant": "greenhouse-03",
+    "view": "surface",
+    "seed": 4360934995087088,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Sulfur Veil, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/greenhouse-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-04-orbital",
+    "class": "Greenhouse",
+    "variant": "greenhouse-04",
+    "view": "orbital",
+    "seed": 7212728744916434,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Copper Furnace, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/greenhouse-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-04-surface",
+    "class": "Greenhouse",
+    "variant": "greenhouse-04",
+    "view": "surface",
+    "seed": 1847885748197388,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Copper Furnace, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/greenhouse-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-05-orbital",
+    "class": "Greenhouse",
+    "variant": "greenhouse-05",
+    "view": "orbital",
+    "seed": 8798305605525981,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Pale Superrotation, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/greenhouse-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "greenhouse-05-surface",
+    "class": "Greenhouse",
+    "variant": "greenhouse-05",
+    "view": "surface",
+    "seed": 4672663214882599,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Greenhouse, Pale Superrotation, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #ad8050 and #604638, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/greenhouse-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-01-orbital",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-01",
+    "view": "orbital",
+    "seed": 2083260317471151,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Ammoniac Haze, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/reducing-atmosphere-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-01-surface",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-01",
+    "view": "surface",
+    "seed": 5438357423309555,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Ammoniac Haze, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/reducing-atmosphere-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-02-orbital",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-02",
+    "view": "orbital",
+    "seed": 6967461149606187,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Dark Chemical Plain, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/reducing-atmosphere-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-02-surface",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-02",
+    "view": "surface",
+    "seed": 4856501805437585,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Dark Chemical Plain, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/reducing-atmosphere-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-03-orbital",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-03",
+    "view": "orbital",
+    "seed": 2903118805813808,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Amber Storm, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/reducing-atmosphere-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-03-surface",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-03",
+    "view": "surface",
+    "seed": 8060301553534587,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Amber Storm, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/reducing-atmosphere-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-04-orbital",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-04",
+    "view": "orbital",
+    "seed": 1713348305620876,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Mineral Rifts, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/reducing-atmosphere-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-04-surface",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-04",
+    "view": "surface",
+    "seed": 5141257036957938,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Mineral Rifts, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/reducing-atmosphere-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-05-orbital",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-05",
+    "view": "orbital",
+    "seed": 8543401920999979,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Pale Smog, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/reducing-atmosphere-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "reducing-atmosphere-05-surface",
+    "class": "ReducingAtmosphere",
+    "variant": "reducing-atmosphere-05",
+    "view": "surface",
+    "seed": 1690421252632036,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, ReducingAtmosphere, Pale Smog, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #80745a and #515b52, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/reducing-atmosphere-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-01-orbital",
+    "class": "Toxic",
+    "variant": "toxic-01",
+    "view": "orbital",
+    "seed": 755455429764712,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Pale Chemical Veil, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/toxic-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-01-surface",
+    "class": "Toxic",
+    "variant": "toxic-01",
+    "view": "surface",
+    "seed": 164676660323830,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Pale Chemical Veil, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/toxic-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-02-orbital",
+    "class": "Toxic",
+    "variant": "toxic-02",
+    "view": "orbital",
+    "seed": 4135347126594494,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Sulfate Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/toxic-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-02-surface",
+    "class": "Toxic",
+    "variant": "toxic-02",
+    "view": "surface",
+    "seed": 7457478481316897,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Sulfate Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/toxic-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-03-orbital",
+    "class": "Toxic",
+    "variant": "toxic-03",
+    "view": "orbital",
+    "seed": 2248724880532217,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Corrosive Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/toxic-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-03-surface",
+    "class": "Toxic",
+    "variant": "toxic-03",
+    "view": "surface",
+    "seed": 5766479503395237,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Corrosive Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/toxic-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-04-orbital",
+    "class": "Toxic",
+    "variant": "toxic-04",
+    "view": "orbital",
+    "seed": 7622994291118951,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Dark Cloud Bands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/toxic-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-04-surface",
+    "class": "Toxic",
+    "variant": "toxic-04",
+    "view": "surface",
+    "seed": 7825467447985808,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Dark Cloud Bands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/toxic-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-05-orbital",
+    "class": "Toxic",
+    "variant": "toxic-05",
+    "view": "orbital",
+    "seed": 6989041805631920,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Mineral Fog, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/toxic-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "toxic-05-surface",
+    "class": "Toxic",
+    "variant": "toxic-05",
+    "view": "surface",
+    "seed": 8122476435856522,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Toxic, Mineral Fog, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #8a8b66 and #666a59, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/toxic-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-01-orbital",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-01",
+    "view": "orbital",
+    "seed": 693544543483131,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Massive Plateau, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/high-gravity-super-earth-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-01-surface",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-01",
+    "view": "surface",
+    "seed": 5213741346683980,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Massive Plateau, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/high-gravity-super-earth-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-02-orbital",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-02",
+    "view": "orbital",
+    "seed": 2140557746036187,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Iron Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/high-gravity-super-earth-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-02-surface",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-02",
+    "view": "surface",
+    "seed": 100023347331747,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Iron Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/high-gravity-super-earth-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-03-orbital",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-03",
+    "view": "orbital",
+    "seed": 7122278818156984,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Lowland Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/high-gravity-super-earth-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-03-surface",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-03",
+    "view": "surface",
+    "seed": 923724896507293,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Lowland Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/high-gravity-super-earth-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-04-orbital",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-04",
+    "view": "orbital",
+    "seed": 4395054092225380,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Dense Cloud World, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/high-gravity-super-earth-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-04-surface",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-04",
+    "view": "surface",
+    "seed": 916408347109008,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Dense Cloud World, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/high-gravity-super-earth-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-05-orbital",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-05",
+    "view": "orbital",
+    "seed": 1242776131323587,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Heavy Ocean Coast, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/high-gravity-super-earth-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "high-gravity-super-earth-05-surface",
+    "class": "HighGravitySuperEarth",
+    "variant": "high-gravity-super-earth-05",
+    "view": "surface",
+    "seed": 1533507513272712,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, HighGravitySuperEarth, Heavy Ocean Coast, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #7e765f and #494e50, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/high-gravity-super-earth-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-01-orbital",
+    "class": "Volcanic",
+    "variant": "volcanic-01",
+    "view": "orbital",
+    "seed": 4535757122856448,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Basalt Fissures, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/volcanic-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-01-surface",
+    "class": "Volcanic",
+    "variant": "volcanic-01",
+    "view": "surface",
+    "seed": 5221763551381101,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Basalt Fissures, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/volcanic-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-02-orbital",
+    "class": "Volcanic",
+    "variant": "volcanic-02",
+    "view": "orbital",
+    "seed": 8504560590976665,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Lava Basins, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/volcanic-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-02-surface",
+    "class": "Volcanic",
+    "variant": "volcanic-02",
+    "view": "surface",
+    "seed": 6367886137717045,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Lava Basins, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/volcanic-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-03-orbital",
+    "class": "Volcanic",
+    "variant": "volcanic-03",
+    "view": "orbital",
+    "seed": 4660048143927261,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Ash Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/volcanic-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-03-surface",
+    "class": "Volcanic",
+    "variant": "volcanic-03",
+    "view": "surface",
+    "seed": 2630174710724542,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Ash Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/volcanic-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-04-orbital",
+    "class": "Volcanic",
+    "variant": "volcanic-04",
+    "view": "orbital",
+    "seed": 6529731887926480,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Thermal Rift, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/volcanic-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-04-surface",
+    "class": "Volcanic",
+    "variant": "volcanic-04",
+    "view": "surface",
+    "seed": 4942003703697551,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Thermal Rift, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/volcanic-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-05-orbital",
+    "class": "Volcanic",
+    "variant": "volcanic-05",
+    "view": "orbital",
+    "seed": 2676322954727675,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Dark Caldera, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/volcanic-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "volcanic-05-surface",
+    "class": "Volcanic",
+    "variant": "volcanic-05",
+    "view": "surface",
+    "seed": 1874376193727581,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Volcanic, Dark Caldera, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #3c3b3d and #71605b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/volcanic-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-01-orbital",
+    "class": "Exotic",
+    "variant": "exotic-01",
+    "view": "orbital",
+    "seed": 4487197166969694,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Ammonia Basins, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/exotic-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-01-surface",
+    "class": "Exotic",
+    "variant": "exotic-01",
+    "view": "surface",
+    "seed": 2849013349607951,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Ammonia Basins, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/exotic-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-02-orbital",
+    "class": "Exotic",
+    "variant": "exotic-02",
+    "view": "orbital",
+    "seed": 2649592122341868,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Iridescent Minerals, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/exotic-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-02-surface",
+    "class": "Exotic",
+    "variant": "exotic-02",
+    "view": "surface",
+    "seed": 2839193222471235,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Iridescent Minerals, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/exotic-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-03-orbital",
+    "class": "Exotic",
+    "variant": "exotic-03",
+    "view": "orbital",
+    "seed": 4353794439791092,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Radiation Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/exotic-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-03-surface",
+    "class": "Exotic",
+    "variant": "exotic-03",
+    "view": "surface",
+    "seed": 2269293977964721,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Radiation Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/exotic-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-04-orbital",
+    "class": "Exotic",
+    "variant": "exotic-04",
+    "view": "orbital",
+    "seed": 4524368693072341,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Dense Veiled World, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/exotic-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-04-surface",
+    "class": "Exotic",
+    "variant": "exotic-04",
+    "view": "surface",
+    "seed": 4111746335340084,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Dense Veiled World, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/exotic-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-05-orbital",
+    "class": "Exotic",
+    "variant": "exotic-05",
+    "view": "orbital",
+    "seed": 1634723050198325,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Dark Solvent Sea, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/exotic-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "exotic-05-surface",
+    "class": "Exotic",
+    "variant": "exotic-05",
+    "view": "surface",
+    "seed": 8986603056712702,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, Exotic, Dark Solvent Sea, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #716b82 and #4a565e, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/exotic-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-01-orbital",
+    "class": "GasGiant",
+    "variant": "gas-giant-01",
+    "view": "orbital",
+    "seed": 4957968491714157,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Ochre Banded, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/gas-giant-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-01-surface",
+    "class": "GasGiant",
+    "variant": "gas-giant-01",
+    "view": "surface",
+    "seed": 2189498562645881,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Ochre Banded, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/gas-giant-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-02-orbital",
+    "class": "GasGiant",
+    "variant": "gas-giant-02",
+    "view": "orbital",
+    "seed": 4480260848498900,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Pale Cream, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/gas-giant-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-02-surface",
+    "class": "GasGiant",
+    "variant": "gas-giant-02",
+    "view": "surface",
+    "seed": 5132416154438784,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Pale Cream, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/gas-giant-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-03-orbital",
+    "class": "GasGiant",
+    "variant": "gas-giant-03",
+    "view": "orbital",
+    "seed": 1518739646420665,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Blue Storm, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/gas-giant-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-03-surface",
+    "class": "GasGiant",
+    "variant": "gas-giant-03",
+    "view": "surface",
+    "seed": 7302678181122404,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Blue Storm, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/gas-giant-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-04-orbital",
+    "class": "GasGiant",
+    "variant": "gas-giant-04",
+    "view": "orbital",
+    "seed": 4096218555241988,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Dark Bands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/gas-giant-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-04-surface",
+    "class": "GasGiant",
+    "variant": "gas-giant-04",
+    "view": "surface",
+    "seed": 1600723269293818,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Dark Bands, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/gas-giant-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-05-orbital",
+    "class": "GasGiant",
+    "variant": "gas-giant-05",
+    "view": "orbital",
+    "seed": 7871945455750093,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Ringed Giant, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/gas-giant-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "gas-giant-05-surface",
+    "class": "GasGiant",
+    "variant": "gas-giant-05",
+    "view": "surface",
+    "seed": 6049865438253266,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, GasGiant, Ringed Giant, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #bd9d73 and #745b4b, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/gas-giant-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-01-orbital",
+    "class": "IceGiant",
+    "variant": "ice-giant-01",
+    "view": "orbital",
+    "seed": 3845946007739476,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Cyan Envelope, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-giant-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-01-surface",
+    "class": "IceGiant",
+    "variant": "ice-giant-01",
+    "view": "surface",
+    "seed": 6655140298315392,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Cyan Envelope, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-giant-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-02-orbital",
+    "class": "IceGiant",
+    "variant": "ice-giant-02",
+    "view": "orbital",
+    "seed": 8979108361859783,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Blue Storm, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-giant-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-02-surface",
+    "class": "IceGiant",
+    "variant": "ice-giant-02",
+    "view": "surface",
+    "seed": 7845737156951024,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Blue Storm, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-giant-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-03-orbital",
+    "class": "IceGiant",
+    "variant": "ice-giant-03",
+    "view": "orbital",
+    "seed": 941567651553239,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Jade Veil, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-giant-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-03-surface",
+    "class": "IceGiant",
+    "variant": "ice-giant-03",
+    "view": "surface",
+    "seed": 4478997505534976,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Jade Veil, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-giant-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-04-orbital",
+    "class": "IceGiant",
+    "variant": "ice-giant-04",
+    "view": "orbital",
+    "seed": 491079366383176,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Pale Volatile, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-giant-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-04-surface",
+    "class": "IceGiant",
+    "variant": "ice-giant-04",
+    "view": "surface",
+    "seed": 216358074584769,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Pale Volatile, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-giant-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-05-orbital",
+    "class": "IceGiant",
+    "variant": "ice-giant-05",
+    "view": "orbital",
+    "seed": 720482071740251,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Ringed Ice Giant, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-giant-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-giant-05-surface",
+    "class": "IceGiant",
+    "variant": "ice-giant-05",
+    "view": "surface",
+    "seed": 8787801513286535,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceGiant, Ringed Ice Giant, wide cinematic cloud-top atmospheric vista, no ground or terrain, no buildings, mineral and terrain detail, natural albedo palette #75a5ae and #355866, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-giant-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-01-orbital",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-01",
+    "view": "orbital",
+    "seed": 8737109176301841,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Pale Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/dwarf-planet-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-01-surface",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-01",
+    "view": "surface",
+    "seed": 2424774725821382,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Pale Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/dwarf-planet-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-02-orbital",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-02",
+    "view": "orbital",
+    "seed": 2870209368967818,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Ice Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/dwarf-planet-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-02-surface",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-02",
+    "view": "surface",
+    "seed": 5090043824195391,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Ice Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/dwarf-planet-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-03-orbital",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-03",
+    "view": "orbital",
+    "seed": 8061608841617173,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Dark Craters, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/dwarf-planet-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-03-surface",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-03",
+    "view": "surface",
+    "seed": 4752031193447272,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Dark Craters, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/dwarf-planet-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-04-orbital",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-04",
+    "view": "orbital",
+    "seed": 4682796789946451,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Rusted Dwarf, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/dwarf-planet-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-04-surface",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-04",
+    "view": "surface",
+    "seed": 8896097439796486,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Rusted Dwarf, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/dwarf-planet-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-05-orbital",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-05",
+    "view": "orbital",
+    "seed": 972898211387861,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Fractured Minor World, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/dwarf-planet-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "dwarf-planet-05-surface",
+    "class": "DwarfPlanet",
+    "variant": "dwarf-planet-05",
+    "view": "surface",
+    "seed": 2800734239056272,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, DwarfPlanet, Fractured Minor World, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #a49c8f and #655a51, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/dwarf-planet-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-01-orbital",
+    "class": "LargeMoon",
+    "variant": "large-moon-01",
+    "view": "orbital",
+    "seed": 5544013343578644,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Ancient Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/large-moon-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-01-surface",
+    "class": "LargeMoon",
+    "variant": "large-moon-01",
+    "view": "surface",
+    "seed": 8532421171010623,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Ancient Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/large-moon-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-02-orbital",
+    "class": "LargeMoon",
+    "variant": "large-moon-02",
+    "view": "orbital",
+    "seed": 3026206130820335,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Dark Maria, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/large-moon-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-02-surface",
+    "class": "LargeMoon",
+    "variant": "large-moon-02",
+    "view": "surface",
+    "seed": 3906366397194933,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Dark Maria, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/large-moon-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-03-orbital",
+    "class": "LargeMoon",
+    "variant": "large-moon-03",
+    "view": "orbital",
+    "seed": 824746479946697,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Pale Craters, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/large-moon-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-03-surface",
+    "class": "LargeMoon",
+    "variant": "large-moon-03",
+    "view": "surface",
+    "seed": 6005752779616954,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Pale Craters, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/large-moon-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-04-orbital",
+    "class": "LargeMoon",
+    "variant": "large-moon-04",
+    "view": "orbital",
+    "seed": 6205262559165580,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Mineral Ridges, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/large-moon-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-04-surface",
+    "class": "LargeMoon",
+    "variant": "large-moon-04",
+    "view": "surface",
+    "seed": 6704300824058786,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Mineral Ridges, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/large-moon-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-05-orbital",
+    "class": "LargeMoon",
+    "variant": "large-moon-05",
+    "view": "orbital",
+    "seed": 8145357972291334,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Volatile Basin, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/large-moon-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "large-moon-05-surface",
+    "class": "LargeMoon",
+    "variant": "large-moon-05",
+    "view": "surface",
+    "seed": 6037995332373053,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, LargeMoon, Volatile Basin, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #9c9787 and #575650, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/large-moon-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-01-orbital",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-01",
+    "view": "orbital",
+    "seed": 2002924561374670,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Gray Craters, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/barren-moon-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-01-surface",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-01",
+    "view": "surface",
+    "seed": 4677877251949398,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Gray Craters, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/barren-moon-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-02-orbital",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-02",
+    "view": "orbital",
+    "seed": 218325580199416,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Basalt Maria, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/barren-moon-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-02-surface",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-02",
+    "view": "surface",
+    "seed": 8704988716930382,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Basalt Maria, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/barren-moon-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-03-orbital",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-03",
+    "view": "orbital",
+    "seed": 6812866167487935,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Pale Regolith, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/barren-moon-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-03-surface",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-03",
+    "view": "surface",
+    "seed": 6950121570458832,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Pale Regolith, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/barren-moon-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-04-orbital",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-04",
+    "view": "orbital",
+    "seed": 4568684083139511,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Iron Scars, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/barren-moon-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-04-surface",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-04",
+    "view": "surface",
+    "seed": 484683657371830,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Iron Scars, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/barren-moon-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-05-orbital",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-05",
+    "view": "orbital",
+    "seed": 1171612161243143,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Fractured Highlands, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/barren-moon-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "barren-moon-05-surface",
+    "class": "BarrenMoon",
+    "variant": "barren-moon-05",
+    "view": "surface",
+    "seed": 6905410491479550,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, BarrenMoon, Fractured Highlands, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #99968e and #4b4c4c, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/barren-moon-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-01-orbital",
+    "class": "IceMoon",
+    "variant": "ice-moon-01",
+    "view": "orbital",
+    "seed": 329753007194273,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Fractured Shell, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-moon-01-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-01-surface",
+    "class": "IceMoon",
+    "variant": "ice-moon-01",
+    "view": "surface",
+    "seed": 8415085858147415,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Fractured Shell, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-moon-01-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-02-orbital",
+    "class": "IceMoon",
+    "variant": "ice-moon-02",
+    "view": "orbital",
+    "seed": 7919259570593563,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Blue Ice, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-moon-02-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-02-surface",
+    "class": "IceMoon",
+    "variant": "ice-moon-02",
+    "view": "surface",
+    "seed": 6978648551580396,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Blue Ice, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-moon-02-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-03-orbital",
+    "class": "IceMoon",
+    "variant": "ice-moon-03",
+    "view": "orbital",
+    "seed": 5710599371929300,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Dark Ice Rock, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-moon-03-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-03-surface",
+    "class": "IceMoon",
+    "variant": "ice-moon-03",
+    "view": "surface",
+    "seed": 3198523906024006,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Dark Ice Rock, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-moon-03-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-04-orbital",
+    "class": "IceMoon",
+    "variant": "ice-moon-04",
+    "view": "orbital",
+    "seed": 2645877643663550,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Pale Ridges, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-moon-04-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-04-surface",
+    "class": "IceMoon",
+    "variant": "ice-moon-04",
+    "view": "surface",
+    "seed": 8816147349971509,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Pale Ridges, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-moon-04-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-05-orbital",
+    "class": "IceMoon",
+    "variant": "ice-moon-05",
+    "view": "orbital",
+    "seed": 8316441840661000,
+    "dimensions": [
+      2048,
+      1024
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Frozen Basins, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/orbital/ice-moon-05-albedo.png",
+    "status": "pending-model-selection-generation-and-review"
+  },
+  {
+    "id": "ice-moon-05-surface",
+    "class": "IceMoon",
+    "variant": "ice-moon-05",
+    "view": "surface",
+    "seed": 4894602024149430,
+    "dimensions": [
+      2560,
+      1440
+    ],
+    "positive": "Photorealistic scientific planetary visualization, IceMoon, Frozen Basins, wide eye-level planetary landscape, coherent horizon, realistic geology, restrained natural light, mineral and terrain detail, natural albedo palette #b8cbd1 and #4b6473, no fictional biological habitability assumptions",
+    "negative": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface",
+    "approvedTarget": "assets/visual/planets/surface/ice-moon-05-master.png",
+    "status": "pending-model-selection-generation-and-review"
+  }
+]
