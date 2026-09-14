@@ -83,6 +83,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/integrated_adaptive_campaign.cpp
   core/src/galaxy_generation_metadata.cpp
   core/src/massive_combat_persistence.cpp
+  core/src/massive_combat_engine.cpp
   core/src/fleet_persistence.cpp
   core/src/shipyard_persistence.cpp
   core/src/galaxy_economy_persistence.cpp
@@ -96,6 +97,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/json_ordered_value.cpp
   core/src/legacy_galaxy_payload_persistence.cpp
   core/src/player_campaign_persistence.cpp
+  core/src/player_campaign_json.cpp
   core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
@@ -675,6 +677,12 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/massive-encounter.json"
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(massive_combat_persistence_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_massive_combat_engine_tests native-tests/massive_combat_engine_tests.cpp)
+  target_link_libraries(stellar_massive_combat_engine_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME massive_combat_engine_parity COMMAND stellar_massive_combat_engine_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/massive-combat-engine.json"
+    "${CMAKE_SOURCE_DIR}/src/Game")
+  set_tests_properties(massive_combat_engine_parity PROPERTIES TIMEOUT 180)
   add_executable(stellar_fleet_persistence_tests native-tests/fleet_persistence_tests.cpp)
   target_link_libraries(stellar_fleet_persistence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_persistence_parity COMMAND stellar_fleet_persistence_tests
@@ -743,6 +751,13 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/src/Game"
     "${CMAKE_SOURCE_DIR}/data/research/v1")
   set_tests_properties(player_campaign_persistence_parity PROPERTIES TIMEOUT 300)
+  add_executable(stellar_player_campaign_json_tests native-tests/player_campaign_json_tests.cpp)
+  target_link_libraries(stellar_player_campaign_json_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME player_campaign_json_parity COMMAND stellar_player_campaign_json_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1"
+    "${CMAKE_BINARY_DIR}/player-campaign-json-native-output.json")
+  set_tests_properties(player_campaign_json_parity PROPERTIES TIMEOUT 300)
   add_executable(stellar_legacy_campaign_recovery_tests native-tests/legacy_campaign_recovery_tests.cpp)
   target_link_libraries(stellar_legacy_campaign_recovery_tests PRIVATE stellar_core stellar_json)
   add_test(NAME legacy_campaign_recovery_parity COMMAND stellar_legacy_campaign_recovery_tests

@@ -1,6 +1,7 @@
 #include <stellar/core/galaxy_payload_json.hpp>
 
 #include "json_ordered_value.hpp"
+#include "galaxy_payload_json_internal.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -1280,21 +1281,29 @@ void replace_galaxy(GalaxyPayloadV16Dto &target,
   target.combat_intelligence = std::move(replacement.combat_intelligence);
 }
 
-GalaxyPayloadV16Dto decode_root(const Value &value) {
+GalaxyPayloadV16Dto decode_root(
+    const Value &value,
+    detail::GalaxyPayloadOrderedRootTransform transform = {}) {
   GalaxyPayloadV16Dto result;
-  result.format_version = 0;
+  result.format_version = transform.format_version.value_or(0);
   result.game_version.clear();
   result.saved_at_utc = "0001-01-01T00:00:00+00:00";
   result.simulation_days = 0;
   bool galaxy_seen{};
   std::vector<std::pair<std::string, std::exception_ptr>> deferred;
   for (const auto &[name, member] : object(value, "$")) {
+    if (std::ranges::find(transform.excluded_members, name) !=
+        transform.excluded_members.end())
+      continue;
     const auto p = child("$", name);
     std::erase_if(deferred, [&](const auto &entry) {
       return entry.first == name;
     });
     try {
-    if (name == "FormatVersion") result.format_version = integer<int>(member, p);
+    if (name == "FormatVersion") {
+      if (!transform.format_version)
+        result.format_version = integer<int>(member, p);
+    }
     else if (name == "GameVersion") result.game_version = string(member, p);
     else if (name == "SavedAtUtc") result.saved_at_utc = canonical_datetime_offset(member, p);
     else if (name == "SimulationDays") result.simulation_days = number(member, p);
@@ -2003,6 +2012,12 @@ Json encode_galaxy(const GalaxyPayloadV16Dto &value) {
 }
 
 } // namespace
+
+GalaxyPayloadV16Dto detail::decode_galaxy_payload_v16_ordered(
+    const json_detail::Value &root,
+    GalaxyPayloadOrderedRootTransform transform) {
+  return decode_root(root, transform);
+}
 
 GalaxyPayloadJsonError::GalaxyPayloadJsonError(
     GalaxyPayloadJsonErrorPhase phase, std::string message, std::string path,
