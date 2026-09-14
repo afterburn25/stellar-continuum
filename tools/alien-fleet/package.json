@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "esbuild": "0.25.9",
+    "gltf-validator": "2.0.0-dev.3.10",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "kind": "stellar-continuum-content-production-queue",
   "updated": "2026-09-13",
-  "priority": "Human modular orbital station first; player ships and matching assets follow",
-  "scope": "Bare human station cores with research-gated hub, defense and industrial modules; player fleet follows",
+  "priority": "Alien species fleet models and fitting workshop now; preserve human station and Terran fleet queues",
+  "scope": "Species-specific hulls and detachable equipment, plus the existing research-gated human station and player fleet",
   "productionStarted": true,
   "baseline": {
     "gameCommit": "97091aee84b782bdc917185307cd42b97b8fd7d0",
@@ -343,5 +343,23 @@
     "waiting_for_native_adapters"
   ],
   "stationResearchRules": "docs/content/HUMAN_STATION_DESIGN.json#/research",
-  "stationOutfittingRules": "docs/content/STATION_OUTFITTING.md"
+  "stationOutfittingRules": "docs/content/STATION_OUTFITTING.md",
+  "alienFleet": {
+    "version": "0.1.0",
+    "stage": "library_candidate",
+    "species": [
+      "pelagic_high_pressure",
+      "compact_high_gravity",
+      "cryogenic_hydrocarbon"
+    ],
+    "hulls": 18,
+    "reducedDetailHulls": 18,
+    "equipmentModels": 36,
+    "manifest": "assets/models/alien-fleet-v1/fleet-manifest.json",
+    "design": "docs/content/ALIEN_FLEET.md",
+    "workshop": "assets/models/alien-fleet-v1/Alien-Fleet-Workshop.html",
+    "nativeIntegration": "pending",
+    "researchBindings": "pending",
+    "source": "tools/alien-fleet"
+  }
 }

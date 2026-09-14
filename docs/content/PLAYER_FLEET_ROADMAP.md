@@ -3,13 +3,20 @@
 Updated 2026-09-13. The user selected **player ships and matching assets** as the
 first content priority while Stellar Engine conversion continues.
 
-The user's next instruction puts the **Human Modular Orbital Station first**,
+The initial station instruction put the **Human Modular Orbital Station first**,
 covering hub, defense and shipyard/industry roles through modules and visible
 upgrades, a bare-core start, modules unlocked by completed research and upward
 stacking at Tiers 5 and 6 followed by a solid starbase enclosure at Tier 7.
 See [the station design](HUMAN_MODULAR_STATION.md). The player-fleet
 tasks below remain queued and will reuse compatible station materials and docking
 interfaces after that first station asset.
+
+The latest request adds **unique ships for every other current race** now. The
+[alien fleet collection](ALIEN_FLEET.md) delivers 18 original 3D hull candidates
+(three species × six roles), 18 reduced-detail variants, 36 detachable equipment
+models and an offline fitting workshop. The race-specific shapes and proposed
+dimensions follow the species biology; the hardpoints are real named model nodes.
+The human station and Terran fleet requirements remain in the queue.
 
 ## Starting point
 
@@ -19,14 +26,17 @@ and colony. Before the station concept import, the editor library contained 174 
 audio files and nine data files. It has no imported model files at this audit.
 Procedural game geometry and an imported reusable model are separate assets.
 
-This roadmap schedules ship production work. New ship concepts, models, textures
-and effects listed below remain queued; the separate station concept pack is the
-first authored content delivered under the updated priority.
+This roadmap schedules ship production work. The station concept pack and alien
+model collection are delivered at their stated stages. The Terran models and
+other unfinished deliverables listed below remain queued.
 
 ## Production queue
 
 | Task | Priority | Deliverable | Current state |
 | --- | --- | --- | --- |
+| AF-001 | Current | Three alien families, six roles each, with biological scale proposals | 18 hulls and 18 reduced-detail variants; library candidates |
+| AF-002 | Current | Compatible physical hardpoints and matching equipment | 36 module models and offline fitting workshop; preview validated |
+| AF-003 | Integration | Native renderer, research, refits, combat and shipyard/fleet adapters | Pending; no campaign or save changes in this asset pass |
 | PF-001 | First | Fleet reference sheet, consistent materials and scale plan | Ready to start; existing references available |
 | PF-002 | First | Complete Pathfinder Scout pack | Brief ready; first ship to produce |
 | PF-008 | First | Shared hull, radiator, drive, docking and decal kit | Queued with the scout |

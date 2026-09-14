@@ -4,7 +4,15 @@ This is the public roadmap for **Stellar Continuum**, the working title for the 
 
 For durable design rules, current baseline status, and engineering constraints, also read the continuity records linked from the repository README.
 
-## Immediate content production — Human station, then player ships
+## Immediate content production — Stations and species fleets
+
+**Latest content request, 2026-09-13:** unique nonhuman ship families sized for each
+species, with hardpoints whose fitted weapons and modules change the silhouette.
+The [alien fleet collection](content/ALIEN_FLEET.md) now contains 18 hulls, 18
+reduced-detail variants and 36 matching equipment models. Its offline workshop
+supports fitting, removal, blueprint saving/loading and fitted GLB export. These
+are reusable library candidates; native/campaign integration is pending. Station
+and Terran fleet work below remains in scope.
 
 **First content priority, updated 2026-09-13:** create the
 [Human Modular Orbital Station](content/HUMAN_MODULAR_STATION.md). The user wants
