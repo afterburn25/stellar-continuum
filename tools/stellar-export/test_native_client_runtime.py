@@ -10,6 +10,7 @@ from unittest import mock
 
 import stellar as exporter
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
+from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -57,6 +58,15 @@ class NativeClientDependencyTests(unittest.TestCase):
             "license": {"source": self.font_license.relative_to(self.root).as_posix(),
                         "runtimePath": "Licenses/OFL-Rajdhani.txt",
                         "sha256": hashlib.sha256(self.font_license.read_bytes()).hexdigest()}}))
+        celestial_records = {}
+        for key, (source, runtime_path) in NATIVE_CELESTIAL_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only asset " + key).encode())
+            celestial_records[key] = {"source": source, "runtimePath": runtime_path,
+                                      "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.celestial_declaration = self.root / "export/native-celestial-assets.json"
+        self.celestial_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": celestial_records}))
 
     def inspect(self, binary, runtime=(), windows=()):
         text = "\n".join("    " + name for name in self.imports[binary.name])
@@ -76,6 +86,30 @@ class NativeClientDependencyTests(unittest.TestCase):
     def test_missing_license_blocks_package(self):
         self.license.unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing native client dependency"):
+            self.copy()
+
+    def test_missing_celestial_credits_blocks_package(self):
+        (self.root / "docs/SOL_VISUAL_SOURCES.md").unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native celestial credits"):
+            self.copy()
+
+    def test_tampered_planet_image_blocks_package(self):
+        (self.root / "assets/visual/sol/earth.jpg").write_bytes(b"unreviewed replacement")
+        with self.assertRaisesRegex(RuntimeError, "celestial earth differs from reviewed content"):
+            self.copy()
+
+    def test_unreviewed_celestial_path_cannot_escape_package(self):
+        declaration = json.loads(self.celestial_declaration.read_text())
+        declaration["assets"]["mars"]["runtimePath"] = "../outside.jpg"
+        self.celestial_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unreviewed native celestial mars path"):
+            self.copy()
+
+    def test_incomplete_celestial_declaration_blocks_package(self):
+        declaration = json.loads(self.celestial_declaration.read_text())
+        del declaration["assets"]["neptune"]
+        self.celestial_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "celestial asset set differs from reviewed content"):
             self.copy()
 
     def test_tampered_sdl_blocks_package(self):

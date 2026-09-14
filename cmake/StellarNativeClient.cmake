@@ -1,15 +1,18 @@
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
-target_link_libraries(stellar_native_platform PRIVATE SDL3::SDL3 Gdi32 User32)
+target_link_libraries(stellar_native_platform PRIVATE SDL3::SDL3 Gdi32 User32 Ole32 Windowscodecs)
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
   app/native_client/native_research_workspace.cpp app/native_client/native_fleet_controller.cpp
   app/native_client/native_fleet_workspace.cpp app/native_client/native_fleet_presentation.cpp
   app/native_client/native_shipyard_controller.cpp app/native_client/native_shipyard_workspace.cpp
-  app/native_client/native_construction_controller.cpp app/native_client/native_construction_workspace.cpp)
-add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_runtime_data)
+  app/native_client/native_construction_controller.cpp app/native_client/native_construction_workspace.cpp
+  app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
+  app/native_client/native_planet_disc_assets.cpp)
+add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_runtime_data)
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
@@ -18,10 +21,22 @@ add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_native_planet_disc_assets_tests
+    native-tests/native_planet_disc_assets_tests.cpp app/native_client/native_planet_disc_assets.cpp)
+  target_include_directories(stellar_native_planet_disc_assets_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_planet_disc_assets_tests PRIVATE stellar_native_platform stellar_core)
+  add_test(NAME native_planet_disc_assets COMMAND stellar_native_planet_disc_assets_tests
+    "${CMAKE_SOURCE_DIR}/assets/visual/sol")
+  set_tests_properties(native_planet_disc_assets PROPERTIES TIMEOUT 90)
+  if(MSVC)
+    target_compile_options(stellar_native_planet_disc_assets_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_client_platform_tests native-tests/native_client_platform_tests.cpp)
   target_link_libraries(stellar_native_client_platform_tests PRIVATE stellar_native_platform SDL3::SDL3)
   add_test(NAME native_client_platform COMMAND stellar_native_client_platform_tests
-    "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf")
+    "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf"
+    "${CMAKE_SOURCE_DIR}/assets/visual/sol/earth.jpg"
+    "${CMAKE_SOURCE_DIR}/assets/visual/space/campaign-galaxy-four-arm-v1.png")
   set_tests_properties(native_client_platform PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
   add_executable(stellar_native_campaign_session_tests
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp)

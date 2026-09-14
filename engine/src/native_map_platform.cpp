@@ -18,6 +18,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#include <objbase.h>
+#include <wincodec.h>
 #else
 #error The native UI preview requires the Windows GDI text rasterizer.
 #endif
@@ -37,6 +39,23 @@ void require(bool success,const char *operation){if(!success)throw sdl_error(ope
   return result;
 }
 [[nodiscard]] SDL_FRect sdl_rect(UiRect value){return {value.x,value.y,value.width,value.height};}
+template<class Interface> class ComOwner final {
+ public:
+  ~ComOwner(){if(value_)value_->Release();}
+  ComOwner()=default;ComOwner(const ComOwner&)=delete;ComOwner&operator=(const ComOwner&)=delete;
+  [[nodiscard]] Interface *get()const noexcept{return value_;}
+  [[nodiscard]] Interface **put()noexcept{return &value_;}
+  [[nodiscard]] Interface *operator->()const noexcept{return value_;}
+ private:Interface *value_{};
+};
+class ComApartment final {
+ public:
+  ComApartment(){const auto result=CoInitializeEx(nullptr,COINIT_MULTITHREADED);if(SUCCEEDED(result))uninitialize_=true;else if(result!=RPC_E_CHANGED_MODE)throw std::runtime_error("Windows image decoder COM initialization failed.");}
+  ~ComApartment(){if(uninitialize_)CoUninitialize();}
+  ComApartment(const ComApartment&)=delete;ComApartment&operator=(const ComApartment&)=delete;
+ private:bool uninitialize_{};
+};
+void require_wic(HRESULT result,const char *operation){if(FAILED(result))throw std::runtime_error(std::string(operation)+" (HRESULT "+std::to_string(static_cast<unsigned long>(result))+").");}
 struct TextKey {std::string value;int pixel_size{},wrap_pixels{};FontFace face{};bool operator==(const TextKey&)const=default;};
 struct TextKeyHash {[[nodiscard]] std::size_t operator()(const TextKey &key)const noexcept{auto hash=std::hash<std::string>{}(key.value);hash^=static_cast<std::size_t>(key.pixel_size)+0x9e3779b9u+(hash<<6u)+(hash>>2u);hash^=static_cast<std::size_t>(key.wrap_pixels)+0x9e3779b9u+(hash<<6u)+(hash>>2u);hash^=static_cast<std::size_t>(key.face)+0x9e3779b9u+(hash<<6u)+(hash>>2u);return hash;}};
 struct CachedText {SDL_Texture *texture{};int width{},height{};std::size_t bytes{};std::uint64_t last_use{};};
@@ -56,15 +75,41 @@ public:
 private:HDC dc_{};HGDIOBJ previous_{};
 };
 [[nodiscard]] bool valid_clip(UiRect value) noexcept{return std::isfinite(value.x)&&std::isfinite(value.y)&&std::isfinite(value.width)&&std::isfinite(value.height)&&std::abs(value.x)<=65536.f&&std::abs(value.y)<=65536.f&&value.width>=0.f&&value.width<=65536.f&&value.height>=0.f&&value.height<=65536.f;}
+[[nodiscard]] bool valid_positive_rect(UiRect value)noexcept{return valid_clip(value)&&value.width>0.f&&value.height>0.f;}
+[[nodiscard]] bool valid_point(Point value)noexcept{return std::isfinite(value.x)&&std::isfinite(value.y);}
+}
+
+std::shared_ptr<const RgbaImage> RgbaImage::create(int width,int height,std::vector<std::uint8_t> rgba_pixels){
+  if(width<=0||height<=0||width>maximum_rgba_image_dimension||height>maximum_rgba_image_dimension)throw std::length_error("RGBA image dimensions must be between 1 and 8192 pixels.");
+  const auto wide=static_cast<std::size_t>(width),high=static_cast<std::size_t>(height);
+  if(wide>maximum_rgba_image_bytes/4u/high)throw std::length_error("RGBA image exceeds the 64 MiB decoded-byte limit.");
+  const auto expected=wide*high*4u;if(rgba_pixels.size()!=expected)throw std::invalid_argument("RGBA image pixel storage does not match its dimensions.");
+  return std::shared_ptr<const RgbaImage>(new RgbaImage(width,height,std::move(rgba_pixels)));
+}
+
+std::shared_ptr<const RgbaImage> decode_rgba_image(const std::filesystem::path &path){
+  if(path.empty())throw std::invalid_argument("An image path is required.");
+  ComApartment apartment;ComOwner<IWICImagingFactory> factory;
+  require_wic(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,__uuidof(IWICImagingFactory),reinterpret_cast<void**>(factory.put())),"Windows image decoder creation failed");
+  ComOwner<IWICBitmapDecoder> decoder;require_wic(factory->CreateDecoderFromFilename(path.c_str(),nullptr,GENERIC_READ,WICDecodeMetadataCacheOnDemand,decoder.put()),"Windows could not open the image");
+  UINT frame_count{};require_wic(decoder->GetFrameCount(&frame_count),"Windows could not inspect the image frames");if(frame_count==0)throw std::runtime_error("The image contains no decodable frame.");
+  ComOwner<IWICBitmapFrameDecode> frame;require_wic(decoder->GetFrame(0,frame.put()),"Windows could not read the first image frame");UINT width{},height{};require_wic(frame->GetSize(&width,&height),"Windows could not inspect the image dimensions");
+  if(width==0||height==0||width>static_cast<UINT>(maximum_rgba_image_dimension)||height>static_cast<UINT>(maximum_rgba_image_dimension))throw std::length_error("Decoded image dimensions must be between 1 and 8192 pixels.");
+  const auto wide=static_cast<std::size_t>(width),high=static_cast<std::size_t>(height);if(wide>maximum_rgba_image_bytes/4u/high)throw std::length_error("Decoded image exceeds the 64 MiB RGBA limit.");const auto byte_count=wide*high*4u;
+  ComOwner<IWICFormatConverter> converter;require_wic(factory->CreateFormatConverter(converter.put()),"Windows image pixel converter creation failed");require_wic(converter->Initialize(frame.get(),GUID_WICPixelFormat32bppRGBA,WICBitmapDitherTypeNone,nullptr,0.,WICBitmapPaletteTypeCustom),"Windows could not convert the image to RGBA");
+  std::vector<std::uint8_t> pixels(byte_count);const auto stride=static_cast<UINT>(wide*4u);require_wic(converter->CopyPixels(nullptr,stride,static_cast<UINT>(byte_count),pixels.data()),"Windows could not decode the image pixels");return RgbaImage::create(static_cast<int>(width),static_cast<int>(height),std::move(pixels));
 }
 
 struct Window::Storage {
   static constexpr std::size_t text_cache_capacity=640,text_cache_byte_capacity=32u*1024u*1024u;
+  struct CachedImage {std::shared_ptr<const RgbaImage> owner;SDL_Texture *texture{};std::size_t resident_bytes{};std::uint64_t last_use{};};
   SDL_Window *window{};SDL_GPUDevice *device{};SDL_Renderer *renderer{};HDC text_dc{};
   std::filesystem::path private_font_path;bool private_font_added{};
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
+  std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{};bool initialized{},left_down{},focused{true},minimized{},vsync{},text_input_requested{},text_input_active{};Point pointer{};Uint64 fallback_interval_ns{},last_present_ns{};
   ~Storage(){
+    for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(const auto &[size,font_value]:fonts){(void)size;if(font_value)DeleteObject(font_value);}
     if(text_dc)DeleteDC(text_dc);if(private_font_added)RemoveFontResourceExW(private_font_path.c_str(),FR_PRIVATE,nullptr);
@@ -102,10 +147,34 @@ struct Window::Storage {
     try{require(SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND),"SDL text blend setup failed");require(SDL_SetTextureScaleMode(texture,SDL_SCALEMODE_LINEAR),"SDL text scale setup failed");require(SDL_UpdateTexture(texture,nullptr,pixels,static_cast<int>(text_width)*4),"SDL text texture upload failed");}catch(...){SDL_DestroyTexture(texture);throw;}
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture_owner(texture,SDL_DestroyTexture);auto [inserted,ok]=text_cache.emplace(std::move(key),CachedText{texture,static_cast<int>(text_width),static_cast<int>(text_height),byte_count,++text_use});if(!ok)throw std::logic_error("Duplicate UI text cache key.");(void)texture_owner.release();text_cache_bytes+=byte_count;return inserted->second;
   }
+  void evict_images(std::size_t incoming){
+    if(incoming>maximum_image_cache_resident_bytes)throw std::length_error("An image exceeds the 192 MiB texture-cache resident limit.");
+    while(image_cache.size()>=maximum_image_cache_entries||image_cache_resident_bytes+incoming>maximum_image_cache_resident_bytes){
+      const auto oldest=std::min_element(image_cache.begin(),image_cache.end(),[](const auto &left,const auto &right){return left.second.last_use<right.second.last_use;});
+      if(oldest==image_cache.end())break;image_cache_resident_bytes-=oldest->second.resident_bytes;SDL_DestroyTexture(oldest->second.texture);image_cache.erase(oldest);
+    }
+  }
+  [[nodiscard]] CachedImage &image(const std::shared_ptr<const RgbaImage> &resource){
+    if(!resource)throw std::invalid_argument("An image command requires an RGBA resource.");
+    if(const auto found=image_cache.find(resource.get());found!=image_cache.end()){found->second.last_use=++image_use;return found->second;}
+    const auto bytes=resource->byte_size();if(bytes>maximum_image_cache_resident_bytes-bytes)throw std::length_error("An image exceeds the texture-cache resident limit.");const auto resident=bytes*2u;evict_images(resident);
+    auto *texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,resource->width(),resource->height());if(!texture)throw sdl_error("SDL image texture creation failed");
+    try{require(SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND),"SDL image blend setup failed");require(SDL_SetTextureScaleMode(texture,SDL_SCALEMODE_LINEAR),"SDL image scale setup failed");require(SDL_UpdateTexture(texture,nullptr,resource->pixels().data(),resource->width()*4),"SDL image texture upload failed");}catch(...){SDL_DestroyTexture(texture);throw;}
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> owner(texture,SDL_DestroyTexture);auto [inserted,ok]=image_cache.emplace(resource.get(),CachedImage{resource,texture,resident,++image_use});if(!ok)throw std::logic_error("Duplicate image cache key.");(void)owner.release();image_cache_resident_bytes+=resident;++image_uploads;return inserted->second;
+  }
   void draw_text(const Text &label){
     if(label.value.empty())return;if(!std::isfinite(label.at.x)||!std::isfinite(label.at.y)||(label.clip&&!valid_clip(*label.clip)))throw std::invalid_argument("UI text bounds must be finite and within the drawable range.");auto &cached=text(label);require(SDL_SetTextureColorMod(cached.texture,label.color.r,label.color.g,label.color.b),"SDL text color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,label.color.a),"SDL text alpha modulation failed");float x=label.at.x;if(label.align==TextAlign::Center)x-=static_cast<float>(cached.width)*.5f;else if(label.align==TextAlign::Right)x-=static_cast<float>(cached.width);const SDL_FRect destination{x,label.at.y,static_cast<float>(cached.width),static_cast<float>(cached.height)};
     if(label.clip){const SDL_Rect clip{static_cast<int>(std::floor(label.clip->x)),static_cast<int>(std::floor(label.clip->y)),static_cast<int>(std::ceil(label.clip->width)),static_cast<int>(std::ceil(label.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL text clip setup failed");}
     const auto rendered=SDL_RenderTexture(renderer,cached.texture,nullptr,&destination);if(label.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL text clip reset failed");require(rendered,"SDL cached text draw failed");
+  }
+  void draw_image(const Image &command){
+    if(!valid_positive_rect(command.destination)||(command.clip&&!valid_clip(*command.clip)))throw std::invalid_argument("Image destination and clip bounds must be finite and within the drawable range.");
+    if(!command.resource)throw std::invalid_argument("An image command requires an RGBA resource.");std::optional<SDL_FRect> source;
+    if(command.source){const auto value=*command.source;if(!valid_positive_rect(value)||value.x<0.f||value.y<0.f||value.x+value.width>static_cast<float>(command.resource->width())||value.y+value.height>static_cast<float>(command.resource->height()))throw std::invalid_argument("Image source bounds must be finite and inside the resource.");source=sdl_rect(value);}
+    auto &cached=image(command.resource);
+    require(SDL_SetTextureColorMod(cached.texture,command.tint.r,command.tint.g,command.tint.b),"SDL image color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,command.tint.a),"SDL image alpha modulation failed");
+    if(command.clip){const SDL_Rect clip{static_cast<int>(std::floor(command.clip->x)),static_cast<int>(std::floor(command.clip->y)),static_cast<int>(std::ceil(command.clip->width)),static_cast<int>(std::ceil(command.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL image clip setup failed");}
+    const auto destination=sdl_rect(command.destination);const auto rendered=SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination);if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
   }
 };
 
@@ -123,8 +192,8 @@ InputSnapshot Window::poll(){
     case SDL_EVENT_KEY_DOWN:if(!event.key.repeat&&event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(!event.key.repeat&&event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});break;
     case SDL_EVENT_TEXT_INPUT:if(storage_->text_input_requested&&event.text.text)input.events.push_back({InputEventType::TextEntered,storage_->pointer,{},0.f,event.text.text});break;
     case SDL_EVENT_MOUSE_MOTION:{const auto prior=storage_->pointer;storage_->pointer=convert(event.motion.x,event.motion.y);input.events.push_back({InputEventType::PointerMove,storage_->pointer,{storage_->pointer.x-prior.x,storage_->pointer.y-prior.y}});break;}
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=true;input.events.push_back({InputEventType::LeftPressed,storage_->pointer,{}});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightPressed,storage_->pointer,{}});break;
-    case SDL_EVENT_MOUSE_BUTTON_UP:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=false;input.events.push_back({InputEventType::LeftReleased,storage_->pointer,{}});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightReleased,storage_->pointer,{}});break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=true;input.events.push_back({InputEventType::LeftPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=false;input.events.push_back({InputEventType::LeftReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
     case SDL_EVENT_MOUSE_WHEEL:{storage_->pointer=convert(event.wheel.mouse_x,event.wheel.mouse_y);const auto wheel=event.wheel.direction==SDL_MOUSEWHEEL_FLIPPED?-event.wheel.y:event.wheel.y;input.events.push_back({InputEventType::Wheel,storage_->pointer,{},wheel});break;}
     case SDL_EVENT_WINDOW_FOCUS_LOST:storage_->focused=false;storage_->left_down=false;if(storage_->text_input_active){require(SDL_StopTextInput(storage_->window),"SDL text input stop on focus loss failed");storage_->text_input_active=false;}input.events.push_back({InputEventType::PointerCancelled,storage_->pointer,{}});break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:storage_->focused=true;if(storage_->text_input_requested&&!storage_->text_input_active){require(SDL_StartTextInput(storage_->window),"SDL text input restart failed");storage_->text_input_active=true;}break;
@@ -134,12 +203,15 @@ InputSnapshot Window::poll(){
 }
 void Window::set_text_input(bool enabled){storage_->text_input_requested=enabled;if(!storage_->focused)return;if(enabled==storage_->text_input_active)return;require(enabled?SDL_StartTextInput(storage_->window):SDL_StopTextInput(storage_->window),enabled?"SDL text input start failed":"SDL text input stop failed");storage_->text_input_active=enabled;}
 void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot){
-  require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines){require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");}
-  for(const auto &circle:draw_list.circles){constexpr int segments=20;std::vector<SDL_Vertex> vertices;std::vector<int> indices;vertices.reserve(segments+2);indices.reserve(segments*3);const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices.push_back({{circle.center.x,circle.center.y},center_color,{0,0}});for(int index=0;index<=segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(segments);vertices.push_back({{circle.center.x+std::cos(angle)*circle.radius,circle.center.y+std::sin(angle)*circle.radius},edge_color,{0,0}});}for(int index=0;index<segments;++index){indices.push_back(0);indices.push_back(index+1);indices.push_back(index+2);}require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");}
-  for(const auto &label:draw_list.text)storage_->draw_text(label);for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>){require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL overlay line color failed");require(SDL_RenderLine(storage_->renderer,value.from.x,value.from.y,value.to.x,value.to.y),"SDL overlay line draw failed");}else storage_->draw_text(value);},command);}
+  const auto draw_line=[&](const Line &line){if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");};
+  const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");constexpr int segments=20;std::vector<SDL_Vertex> vertices;std::vector<int> indices;vertices.reserve(segments+2);indices.reserve(segments*3);const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices.push_back({{circle.center.x,circle.center.y},center_color,{0,0}});for(int index=0;index<=segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(segments);const Point edge{circle.center.x+std::cos(angle)*circle.radius,circle.center.y+std::sin(angle)*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices.push_back({{edge.x,edge.y},edge_color,{0,0}});}for(int index=0;index<segments;++index){indices.push_back(0);indices.push_back(index+1);indices.push_back(index+2);}require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
+  require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
+  for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
+  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else storage_->draw_text(value);},command);}
   if(screenshot){SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");}
   if(!storage_->vsync){const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<storage_->fallback_interval_ns)SDL_DelayPrecise(storage_->fallback_interval_ns-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();}require(SDL_RenderPresent(storage_->renderer),"SDL present failed");
 }
 int Window::drawable_width()const noexcept{return storage_->width;}int Window::drawable_height()const noexcept{return storage_->height;}std::string Window::gpu_driver()const{const char *driver=SDL_GetGPUDeviceDriver(storage_->device);if(!driver)throw sdl_error("SDL GPU driver query failed");return driver;}std::string Window::presentation_mode()const{return storage_->vsync?"vsync":"display-refresh-fallback";}
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
+std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
 } // namespace stellar::native_map

@@ -1,4 +1,29 @@
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
+add_executable(stellar_native_system_workspace_tests
+  native-tests/native_system_workspace_tests.cpp
+  app/native_client/native_system_workspace.cpp app/native_client/native_system_view.cpp)
+target_include_directories(stellar_native_system_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_system_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_system_workspace COMMAND stellar_native_system_workspace_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_system_workspace PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_native_system_workspace_tests PRIVATE /WX)
+endif()
+
+add_executable(stellar_native_system_view_tests
+  native-tests/native_system_view_tests.cpp app/native_client/native_system_view.cpp)
+target_include_directories(stellar_native_system_view_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_system_view_tests PRIVATE stellar_core)
+add_test(NAME native_system_view COMMAND stellar_native_system_view_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_system_view PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_native_system_view_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_research_controller_tests
   native-tests/native_research_controller_tests.cpp app/native_client/native_research_controller.cpp)
 target_include_directories(stellar_native_research_controller_tests PRIVATE app/native_client)

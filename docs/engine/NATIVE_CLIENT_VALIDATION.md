@@ -2,9 +2,11 @@
 
 The engine and client target is C++23. The preserved Godot/C# game remains the behavioral reference and current full playable baseline. C# added under `tests/` generates reference fixtures; it is not shipped with the native runtime.
 
-The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text and ordered panel/text overlays, with no Core dependency. The client owns a real 500-system fresh campaign through the integrated runtime and campaign frame adapter.
+The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text, immutable RGBA images and ordered world/panel/text layers, with no Core dependency. The client owns a real 500-system fresh campaign through the integrated runtime and campaign frame adapter.
 
 ## Current interaction
+
+- Known systems open an orbital view with transparent planet discs, eccentric orbits, observer-filtered body stats, left-drag pan, pointer-anchored zoom and Reset/Back navigation.
 
 - Construction shows known projects, requirements, costs, timed progress and canonical Start/Queue/Cancel. Active work precedes queued and completed entries.
 
@@ -21,6 +23,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Engine 0.1.49 passed 128/128 CTest, 96 Python checks and thirteen actual Vulkan launches. New orbital checks select Earth, pan, zoom, reset and return at 720p/1080p, with full paused save/reload equality. Both runs upload nine immutable images; camera movement reuses their identities. Platform tests cover Unicode decoding, malformed/oversized inputs and cache eviction. This is an orbital preview, not full visual parity. See NATIVE_SYSTEM_VIEW.md.
 
 Engine 0.1.48 passed 125/125 CTest and 83 Python checks. Eleven real Vulkan launches cover map, research, fleet, shipyard and construction inputs and saves. The maintained production validator rejects wrong design/authorization, nonfinite values, missing debit, skipped saves and reload mutations. Fresh seed 115501 reaches real scout transit through ordinary research and facilities; seed 115500 retains its canonical failed hypothesis and locked ships. See NATIVE_CONSTRUCTION.md and NATIVE_FRESH_PROGRESSION.md.
 

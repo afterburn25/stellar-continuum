@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 
 from native_ui_runtime import native_ui_asset_files
+from native_celestial_runtime import native_celestial_asset_files
 
 
 def _verified_file(path: Path, expected_hash: str) -> Path:
@@ -41,6 +42,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
         "Licenses/SDL3-zlib.txt": license_file,
     }
     files.update(native_ui_asset_files(root))
+    files.update(native_celestial_asset_files(root))
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
