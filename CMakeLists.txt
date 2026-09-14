@@ -101,6 +101,8 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/legacy_galaxy_payload_persistence.cpp
   core/src/player_campaign_persistence.cpp
   core/src/player_campaign_json.cpp
+  core/src/player_campaign_recovery.cpp
+  core/src/player_campaign_save.cpp
   core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
@@ -787,6 +789,20 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/data/research/v1"
     "${CMAKE_BINARY_DIR}/player-campaign-json-native-output.json")
   set_tests_properties(player_campaign_json_parity PROPERTIES TIMEOUT 300)
+  add_executable(stellar_player_campaign_recovery_tests native-tests/player_campaign_recovery_tests.cpp)
+  target_link_libraries(stellar_player_campaign_recovery_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME player_campaign_recovery_parity COMMAND stellar_player_campaign_recovery_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-recovery.json"
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-recovery"
+    "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_SOURCE_DIR}"
+    "${CMAKE_BINARY_DIR}/player-campaign-recovery-cases")
+  set_tests_properties(player_campaign_recovery_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_player_campaign_save_tests native-tests/player_campaign_save_tests.cpp)
+  target_link_libraries(stellar_player_campaign_save_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME player_campaign_save COMMAND stellar_player_campaign_save_tests
+    "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/player-campaign-save-cases")
+  set_tests_properties(player_campaign_save PROPERTIES TIMEOUT 180)
   add_executable(stellar_legacy_campaign_recovery_tests native-tests/legacy_campaign_recovery_tests.cpp)
   target_link_libraries(stellar_legacy_campaign_recovery_tests PRIVATE stellar_core stellar_json)
   add_test(NAME legacy_campaign_recovery_parity COMMAND stellar_legacy_campaign_recovery_tests

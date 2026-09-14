@@ -3,12 +3,13 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
 import stellar as exporter
-from native_client_runtime import copy_native_client_runtime
+from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 
 
 class NativeClientDependencyTests(unittest.TestCase):
@@ -80,6 +81,45 @@ class NativeClientDependencyTests(unittest.TestCase):
     def test_headless_dependency_policy_still_rejects_sdl(self):
         with self.assertRaisesRegex(RuntimeError, "Unpackaged runtime dependencies"):
             self.inspect(self.build / "stellar-continuum-native.exe")
+
+
+class NativeSessionExportTests(unittest.TestCase):
+    def exercise(self, mutate_load=False):
+        with tempfile.TemporaryDirectory(prefix="stellar-session-export-test-") as temporary:
+            package = Path(temporary) / "package"
+            package.mkdir()
+            calls = []
+            def launch(args, *, cwd, env, **unused):
+                save = Path(args[args.index("--save-path") + 1])
+                capture = Path(args[args.index("--smoke") + 1])
+                self.assertEqual(save.parent, cwd)
+                self.assertNotEqual(cwd, package)
+                self.assertEqual(capture.parent, cwd)
+                calls.append(args)
+                if "--load" in args:
+                    self.assertTrue(save.is_file())
+                    payload = json.loads(save.read_text())
+                    payload["SavedAtUtc"] = "later"
+                    if mutate_load:
+                        payload["SimulationDays"] += 1
+                else:
+                    payload = {"FormatVersion": 17, "SavedAtUtc": "earlier", "SimulationDays": 42.25,
+                               "Galaxy": {"Systems": list(range(500))}}
+                save.write_text(json.dumps(payload))
+                capture.write_bytes(b"BM" + bytes(54))
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 ", "")
+            with mock.patch("native_client_runtime.subprocess.run", side_effect=launch):
+                result = validate_native_client_export(package, {})
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(result["nativeClientPlayer17Reload"])
+            self.assertTrue(result["nativeClientIsolatedManualSave"])
+
+    def test_preview_uses_isolated_save_and_reloads_it(self):
+        self.exercise()
+
+    def test_load_cannot_silently_change_the_saved_world(self):
+        with self.assertRaisesRegex(RuntimeError, "changed during paused load"):
+            self.exercise(mutate_load=True)
 
 
 if __name__ == "__main__":

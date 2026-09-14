@@ -61,12 +61,13 @@ def validate_native_client_export(folder: Path, env: dict[str, str]):
     with tempfile.TemporaryDirectory(prefix="stellar-native-client-") as temporary:
         work = Path(temporary)
         screenshot = work / "native-preview.bmp"
+        save = work / "campaign.player17.json"
         clean_env = dict(env)
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
         clean_env["PATH"] = str(system_root / "System32") + os.pathsep + str(system_root)
         result = subprocess.run(
             [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
-             "--smoke", str(screenshot)],
+             "--save-path", str(save), "--smoke", str(screenshot)],
             cwd=work, env=clean_env, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
             raise RuntimeError(f"Relocated native client failed ({result.returncode}): {result.stderr}")
@@ -74,8 +75,27 @@ def validate_native_client_export(folder: Path, env: dict[str, str]):
             raise RuntimeError(f"Native client did not confirm its renderer/campaign: {result.stdout}")
         if not screenshot.is_file() or screenshot.stat().st_size < 54 or screenshot.read_bytes()[:2] != b"BM":
             raise RuntimeError("Native client did not capture its rendered frame")
+        if not save.is_file() or save.stat().st_size == 0:
+            raise RuntimeError("Native client did not complete its isolated manual save")
+        before = json.loads(save.read_text(encoding="utf-8"))
+        if before.get("FormatVersion") != 17 or len(before.get("Galaxy", {}).get("Systems", [])) != 500:
+            raise RuntimeError("Native client save does not contain its Player17 500-system campaign")
+        loaded = subprocess.run(
+            [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
+             "--save-path", str(save), "--load", "--smoke", str(screenshot)],
+            cwd=work, env=clean_env, capture_output=True, text=True, timeout=60)
+        if loaded.returncode != 0 or "gpu_driver=vulkan" not in loaded.stdout:
+            raise RuntimeError(f"Relocated native saved campaign failed to load: {loaded.stderr}")
+        after = json.loads(save.read_text(encoding="utf-8"))
+        before.pop("SavedAtUtc", None)
+        after.pop("SavedAtUtc", None)
+        if before != after:
+            raise RuntimeError("Native saved campaign changed during paused load/recapture")
         evidence = folder.parent / (folder.name + "-native-preview.bmp")
         shutil.copy2(screenshot, evidence)
         return {"nativeClientRelocatedLaunch": True, "nativeClientRestrictedPath": True,
+                "nativeClientIsolatedManualSave": True,
+                "nativeClientPlayer17Reload": True,
                 "renderer": "Vulkan", "capture": str(evidence),
-                "diagnostics": result.stdout.strip(), "graphicalParity": False}
+                "diagnostics": result.stdout.strip(), "loadDiagnostics": loaded.stdout.strip(),
+                "graphicalParity": False}

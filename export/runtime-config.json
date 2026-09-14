@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.43",
+  "engineVersion": "0.1.44",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "C++23 campaign foundation with strategic clocks and canonical strategic/tactical frame routing. Headless diagnostics retain campaign benchmarks and integrated Adaptive Research. An opt-in SDL3/Vulkan native galaxy preview displays the real 500-system campaign with mouse navigation and pause/speed controls; its runtime requires no Godot or .NET. Exports seal declared data and reviewed runtime dependencies. Full native player UI, audio, save/load orchestration, colony/system screens, tactical rendering and graphical parity remain open. State and timing outputs are diagnostics, not player saves or an FPS guarantee."
+  "description": "C++23 campaign foundation with strategic clocks, canonical strategic/tactical frame routing, immutable background Player17 saves and primary/backup load recovery. The opt-in SDL3/Vulkan native galaxy preview displays a real 500-system campaign with mouse navigation, pause/speed controls and transactional Save/Load/Exit. Its runtime requires no Godot or .NET. Exports seal declared data and reviewed runtime dependencies. Production player UI, audio, colony/system screens, tactical rendering and graphical parity remain open. Diagnostic timings are not an FPS guarantee."
 }

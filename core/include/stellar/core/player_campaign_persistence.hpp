@@ -15,12 +15,17 @@
 namespace stellar::core {
 
 class RestoredPlayerCampaignV17;
+struct PlayerCampaignRestoreHooks {
+  std::function<void()> before_diplomacy_references;
+  std::function<void()> before_research_restore;
+  std::function<void()> before_diplomacy_restore;
+};
 namespace detail {
 [[nodiscard]] RestoredPlayerCampaignV17 finalize_restored_player_campaign_v17(
     AdaptiveResearchStrategicRuntime,
     RestoredGalaxyPayloadV16,
     std::function<AdaptiveResearchCampaignSnapshot()>,
-    const DiplomacyStateSnapshot &);
+    const DiplomacyStateSnapshot &, const PlayerCampaignRestoreHooks & = {});
 }
 
 class PlayerCampaignPersistenceDataError final : public std::runtime_error {
@@ -114,10 +119,10 @@ private:
       const PlayerCampaignPayloadV17Dto &);
   friend RestoredPlayerCampaignV17
   detail::finalize_restored_player_campaign_v17(
-      AdaptiveResearchStrategicRuntime,
-      RestoredGalaxyPayloadV16,
-      std::function<AdaptiveResearchCampaignSnapshot()>,
-      const DiplomacyStateSnapshot &);
+       AdaptiveResearchStrategicRuntime,
+       RestoredGalaxyPayloadV16,
+       std::function<AdaptiveResearchCampaignSnapshot()>,
+       const DiplomacyStateSnapshot &, const PlayerCampaignRestoreHooks &);
 };
 
 [[nodiscard]] PlayerCampaignPayloadV17Dto capture_player_campaign_v17(

@@ -1,0 +1,756 @@
+{
+  "schemaVersion": 1,
+  "rowCount": 17,
+  "sourceFiles": [
+    {
+      "path": "Campaign/CampaignSessionService.cs",
+      "sha256": "C5E22123B690FC8E9E37A0FD709447B2800F9C2B47FF103128D7A01EB8044671"
+    },
+    {
+      "path": "Persistence/CampaignStatePersistenceService.cs",
+      "sha256": "9F8D76175B56CA01D77A06D5FDDDA0B18ADBE9761D2BBEFFCBEC4A432198921F"
+    }
+  ],
+  "encoding": {
+    "nativeAccepted": "strict UTF-8 with optional UTF-8 BOM",
+    "excluded": [
+      "UTF-16LE",
+      "UTF-16BE",
+      "legacy code pages",
+      "malformed UTF-8 byte streams (source decoding can reach JSON parsing before fallback)"
+    ]
+  },
+  "rows": [
+    {
+      "name": "primary-success",
+      "result": {
+        "status": "success",
+        "source": "LoadedSave",
+        "Seed": 980017,
+        "SimulationDays": 18.75,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": null,
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "4663F6230AFB2D4A4D802DB8BE3A3D260F5FF3D85A01AA511502F49D70B22A68",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "0ED9634F37388D25DC391926D569F7D3C35F5A9932B636CC4C1E56E8D56B918A"
+      }
+    },
+    {
+      "name": "corrupt-primary-backup-recovery",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave failed:\nSystem.Text.Json.JsonReaderException: \u0027m\u0027 is an invalid start of a property name. Expected a \u0027\u0022\u0027. LineNumber: 0 | BytePositionInLine: 2.\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "B690DB634B0A689C58A3399A8F51D2B469F77C3343F8ED85E75E1C5751F6B3A5",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "missing-primary-backup-recovery",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave was missing.\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.12,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.12,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "MISSING",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "both-malformed",
+      "result": {
+        "status": "failure",
+        "type": "System.IO.InvalidDataException",
+        "message": "Primary autosave failed:\nSystem.Text.Json.JsonReaderException: \u0027m\u0027 is an invalid start of a property name. Expected a \u0027\u0022\u0027. LineNumber: 0 | BytePositionInLine: 2.\nBackup autosave also failed:\nSystem.Text.Json.JsonReaderException: \u0027m\u0027 is an invalid start of a property name. Expected a \u0027\u0022\u0027. LineNumber: 0 | BytePositionInLine: 2.",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          }
+        ],
+        "hashes": [
+          "B690DB634B0A689C58A3399A8F51D2B469F77C3343F8ED85E75E1C5751F6B3A5",
+          "6393C351FF5A85FC92E9B84CFFFB312DB64EB6053AC25E173487254C945EBDFF"
+        ]
+      }
+    },
+    {
+      "name": "both-missing",
+      "result": {
+        "status": "failure",
+        "type": "System.IO.InvalidDataException",
+        "message": "Primary autosave was missing.\nNo backup autosave was available.",
+        "progress": [],
+        "hashes": [
+          "MISSING",
+          "MISSING"
+        ]
+      }
+    },
+    {
+      "name": "developer-envelope-rejected",
+      "result": {
+        "status": "failure",
+        "type": "System.IO.InvalidDataException",
+        "message": "Primary autosave failed:\nSystem.IO.InvalidDataException: Developer campaign envelopes cannot be opened as Player saves.\nBackup autosave also failed:\nSystem.IO.InvalidDataException: Developer campaign envelopes cannot be opened as Player saves.",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          }
+        ],
+        "hashes": [
+          "B95F5CE0DF8D2C04247907BEB8A83F2B55E7A186A234359B9F25931CDFCF8561",
+          "B95F5CE0DF8D2C04247907BEB8A83F2B55E7A186A234359B9F25931CDFCF8561"
+        ]
+      }
+    },
+    {
+      "name": "blank-primary-backup-valid",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave failed:\nSystem.Text.Json.JsonReaderException: The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0.\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "primary-valid-backup-malformed",
+      "result": {
+        "status": "success",
+        "source": "LoadedSave",
+        "Seed": 980017,
+        "SimulationDays": 18.75,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": null,
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "4663F6230AFB2D4A4D802DB8BE3A3D260F5FF3D85A01AA511502F49D70B22A68",
+          "0C21A879C732A67910D80988DF4919D794F6A070AAB610EF865032A28046B021"
+        ],
+        "stateHash": "0ED9634F37388D25DC391926D569F7D3C35F5A9932B636CC4C1E56E8D56B918A"
+      }
+    },
+    {
+      "name": "primary-progress-stages",
+      "result": {
+        "status": "success",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ]
+      }
+    },
+    {
+      "name": "backup-progress-carry",
+      "result": {
+        "status": "success",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ]
+      }
+    },
+    {
+      "name": "utf8-bom-primary",
+      "result": {
+        "status": "success",
+        "source": "LoadedSave",
+        "Seed": 980017,
+        "SimulationDays": 18.75,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": null,
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "D59DA4B13995C45513516B051C77B9840C16885A2464E218B7C16E501E8B14E8",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "0ED9634F37388D25DC391926D569F7D3C35F5A9932B636CC4C1E56E8D56B918A"
+      }
+    },
+    {
+      "name": "utf16-bom-primary-source-only",
+      "result": {
+        "nativeComparable": false,
+        "exclusion": "Native recovery deliberately accepts strict UTF-8 only.",
+        "source": {
+          "status": "success",
+          "source": "LoadedSave",
+          "Seed": 980017,
+          "SimulationDays": 18.75,
+          "GameVersion": "0.1.7-alpha",
+          "LoadFailure": null,
+          "progress": [
+            {
+              "Fraction": 0.04,
+              "Status": "Reading saved campaign"
+            },
+            {
+              "Fraction": 0.16,
+              "Status": "Decoding saved campaign"
+            },
+            {
+              "Fraction": 0.25,
+              "Status": "Restoring diplomacy"
+            },
+            {
+              "Fraction": 0.42,
+              "Status": "Restoring galaxy state"
+            },
+            {
+              "Fraction": 0.72,
+              "Status": "Validating campaign references"
+            },
+            {
+              "Fraction": 0.82,
+              "Status": "Restoring research progress"
+            },
+            {
+              "Fraction": 0.97,
+              "Status": "Finalizing restored campaign"
+            }
+          ],
+          "hashes": [
+            "049EA0141CEB5D921849159E7381DFCC80382D2F2CEA2694952EDFCE177B0539",
+            "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+          ],
+          "stateHash": "0ED9634F37388D25DC391926D569F7D3C35F5A9932B636CC4C1E56E8D56B918A"
+        }
+      }
+    },
+    {
+      "name": "invalid-utf8-primary-backup-recovery",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave failed:\nSystem.Text.Json.JsonReaderException: \u00270xEF\u0027 is an invalid start of a value. LineNumber: 0 | BytePositionInLine: 0.\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "8CA9F8C269C0A4B1D8BF0EFC67D97DF8AD5E0EA93630FD9099860D36C0FE75EA",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "directory-primary-backup-recovery",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave was missing.\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.12,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.12,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "MISSING",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "unicode-\u8DEF\u5F84-\uD83D\uDE80",
+      "result": {
+        "status": "success",
+        "source": "LoadedSave",
+        "Seed": 980017,
+        "SimulationDays": 18.75,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": null,
+        "progress": [
+          {
+            "Fraction": 0.04,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "4663F6230AFB2D4A4D802DB8BE3A3D260F5FF3D85A01AA511502F49D70B22A68",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "0ED9634F37388D25DC391926D569F7D3C35F5A9932B636CC4C1E56E8D56B918A"
+      }
+    },
+    {
+      "name": "callback-primary-failure-backup-recovery",
+      "result": {
+        "status": "success",
+        "source": "RecoveredFromBackup",
+        "Seed": 980017,
+        "SimulationDays": 12.5,
+        "GameVersion": "0.1.7-alpha",
+        "LoadFailure": "Primary autosave failed:\nCallbackMarkerException: callback-marker\nThe previous backup was recovered.",
+        "progress": [
+          {
+            "Fraction": 0.12,
+            "Status": "Primary save unavailable; restoring backup"
+          },
+          {
+            "Fraction": 0.12,
+            "Status": "Reading saved campaign"
+          },
+          {
+            "Fraction": 0.16,
+            "Status": "Decoding saved campaign"
+          },
+          {
+            "Fraction": 0.25,
+            "Status": "Restoring diplomacy"
+          },
+          {
+            "Fraction": 0.42,
+            "Status": "Restoring galaxy state"
+          },
+          {
+            "Fraction": 0.72,
+            "Status": "Validating campaign references"
+          },
+          {
+            "Fraction": 0.82,
+            "Status": "Restoring research progress"
+          },
+          {
+            "Fraction": 0.97,
+            "Status": "Finalizing restored campaign"
+          }
+        ],
+        "hashes": [
+          "4663F6230AFB2D4A4D802DB8BE3A3D260F5FF3D85A01AA511502F49D70B22A68",
+          "BEFAD7634474C4C30287AC688D3B3CD7180701C21EE36BDA9149F2FFCE4E4034"
+        ],
+        "stateHash": "E3AB5B37A3F17A26CF42E245DF221353D8DEB311F8A2C875C9B30827A28BB460"
+      }
+    },
+    {
+      "name": "whitespace-path-rejected",
+      "result": {
+        "status": "failure",
+        "type": "System.ArgumentException",
+        "message": "A save path is required. (Parameter \u0027savePath\u0027)"
+      }
+    }
+  ]
+}

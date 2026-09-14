@@ -1,6 +1,6 @@
 # Stellar Engine Windows export
 
-Engine 0.1.43 adds the opt-in C++23 SDL3/Vulkan galaxy preview alongside the headless diagnostic host. It displays the real 500-system campaign with mouse navigation, selection, pause and speed controls. This is incomplete native graphical migration; existing Godot exports remain the full playable baseline. .NET is used only by development reference-fixture generators. Neither native executable needs Godot or .NET at runtime. See [native client scope and validation](NATIVE_CLIENT_VALIDATION.md).
+Engine 0.1.44 adds native Player17 Save/Load/Exit and background autosave to the opt-in C++23 SDL3/Vulkan galaxy preview. It displays a real 500-system campaign with mouse navigation, selection, pause and speed controls. Preview export checks use isolated saves, reload them and compare complete paused state. This is incomplete native graphical migration; existing Godot exports remain the full playable baseline. .NET is used only by development reference-fixture generators. Neither native executable needs Godot or .NET at runtime. See [native client scope and validation](NATIVE_CLIENT_VALIDATION.md).
 
 ## Developer setup
 

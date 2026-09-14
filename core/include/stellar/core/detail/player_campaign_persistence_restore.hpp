@@ -12,6 +12,7 @@ namespace stellar::core::detail {
     AdaptiveResearchStrategicRuntime research_runtime,
     RestoredGalaxyPayloadV16 restored_galaxy,
     std::function<AdaptiveResearchCampaignSnapshot()> decode_research,
-    const DiplomacyStateSnapshot &diplomacy_snapshot);
+    const DiplomacyStateSnapshot &diplomacy_snapshot,
+    const PlayerCampaignRestoreHooks &hooks);
 
 } // namespace stellar::core::detail

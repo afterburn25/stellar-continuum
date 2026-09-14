@@ -142,7 +142,8 @@ struct RestoredPlayerCampaignV17::Storage {
   Storage(AdaptiveResearchStrategicRuntime runtime,
           RestoredGalaxyPayloadV16 restored,
           const AdaptiveResearchCampaignSnapshot &research_snapshot,
-          const DiplomacyStateSnapshot &diplomacy_snapshot)
+          const DiplomacyStateSnapshot &diplomacy_snapshot,
+          const PlayerCampaignRestoreHooks &hooks)
       : research_runtime(std::move(runtime)),
         galaxy(std::move(restored.galaxy)),
         simulation_days(restored.simulation_days),
@@ -151,6 +152,8 @@ struct RestoredPlayerCampaignV17::Storage {
     research = std::make_unique<AdaptiveResearchCampaignState>(
         AdaptiveResearchCampaignSnapshotCodec(research_runtime)
             .restore(galaxy, research_snapshot));
+    if (hooks.before_diplomacy_restore)
+      hooks.before_diplomacy_restore();
     diplomacy = std::make_unique<DiplomacyState>(
         DiplomacyState::restore(diplomacy_snapshot));
   }
@@ -215,14 +218,19 @@ RestoredPlayerCampaignV17 detail::finalize_restored_player_campaign_v17(
     AdaptiveResearchStrategicRuntime research_runtime,
     RestoredGalaxyPayloadV16 restored_galaxy,
     std::function<AdaptiveResearchCampaignSnapshot()> decode_research,
-    const DiplomacyStateSnapshot &diplomacy_snapshot) {
+    const DiplomacyStateSnapshot &diplomacy_snapshot,
+    const PlayerCampaignRestoreHooks &hooks) {
+  if (hooks.before_diplomacy_references)
+    hooks.before_diplomacy_references();
   DiplomacyCampaignReferenceValidator::validate(restored_galaxy.galaxy,
                                                  diplomacy_snapshot);
+  if (hooks.before_research_restore)
+    hooks.before_research_restore();
   auto research_snapshot = decode_research();
   return RestoredPlayerCampaignV17(
       std::make_unique<RestoredPlayerCampaignV17::Storage>(
           std::move(research_runtime), std::move(restored_galaxy),
-          research_snapshot, diplomacy_snapshot));
+          research_snapshot, diplomacy_snapshot, hooks));
 }
 
 PlayerCampaignPayloadV17Dto capture_player_campaign_v17(

@@ -13,6 +13,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <set>
 #include <sstream>
@@ -24,6 +25,26 @@ namespace {
 using OrderedValue = json_detail::Value;
 using OrderedObject = OrderedValue::Object;
 using Json = nlohmann::ordered_json;
+
+class RestoreProgressCallbackFailure final : public std::exception {
+public:
+  explicit RestoreProgressCallbackFailure(std::exception_ptr error)
+      : error_(std::move(error)) {}
+  [[nodiscard]] const std::exception_ptr &error() const noexcept { return error_; }
+  [[nodiscard]] const char *what() const noexcept override {
+    return "Player campaign restore progress callback failed.";
+  }
+private:
+  std::exception_ptr error_;
+};
+
+void report_restore_stage(const PlayerCampaignJsonRestoreHooks &hooks,
+                          PlayerCampaignJsonStage stage) {
+  if (!hooks.on_stage)
+    return;
+  try { hooks.on_stage(stage); }
+  catch (...) { throw RestoreProgressCallbackFailure(std::current_exception()); }
+}
 
 [[noreturn]] void fail(PlayerCampaignJsonStage stage, std::string source_type,
                        std::string message,
@@ -846,9 +867,10 @@ PlayerCampaignJsonError::byte() const noexcept {
   return byte_;
 }
 
-RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
+RestoredPlayerCampaignV17 restore_player_campaign_v17_json_impl(
     AdaptiveResearchStrategicRuntime research_runtime,
-    std::string_view utf8_json) {
+    std::string_view utf8_json, const PlayerCampaignJsonRestoreHooks &hooks) {
+  report_restore_stage(hooks, PlayerCampaignJsonStage::Parse);
   OrderedValue root_value;
   try {
     root_value = json_detail::parse_ordered_json(utf8_json);
@@ -880,6 +902,7 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
          "Current Player JSON persistence represents format 17 only.");
 
   const auto *diplomacy_member = member(*root, "Diplomacy");
+  report_restore_stage(hooks, PlayerCampaignJsonStage::DiplomacyDecode);
   if (!diplomacy_member ||
       std::holds_alternative<std::nullptr_t>(diplomacy_member->data))
     fail(PlayerCampaignJsonStage::DiplomacyDecode, "InvalidDataException",
@@ -894,6 +917,7 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
   }
 
   const auto *galaxy_format_member = member(*root, "GalaxyFormatVersion");
+  report_restore_stage(hooks, PlayerCampaignJsonStage::GalaxyDecode);
   if (!galaxy_format_member ||
       std::holds_alternative<std::nullptr_t>(galaxy_format_member->data))
     fail(PlayerCampaignJsonStage::GalaxyDecode, "InvalidDataException",
@@ -940,6 +964,16 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
   const auto *research_member = member(*root, "AdaptiveResearch");
   bool research_decode_started = false;
   try {
+    PlayerCampaignRestoreHooks restore_hooks;
+    restore_hooks.before_diplomacy_references = [&hooks] {
+      report_restore_stage(hooks, PlayerCampaignJsonStage::DiplomacyReferences);
+    };
+    restore_hooks.before_research_restore = [&hooks] {
+      report_restore_stage(hooks, PlayerCampaignJsonStage::ResearchDecode);
+    };
+    restore_hooks.before_diplomacy_restore = [&hooks] {
+      report_restore_stage(hooks, PlayerCampaignJsonStage::DiplomacyRestore);
+    };
     return detail::finalize_restored_player_campaign_v17(
         std::move(research_runtime), std::move(*restored),
         [research_member, &research_decode_started]() {
@@ -951,7 +985,7 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
                  "Format v17 save is missing Adaptive Research state.");
           return decode_research(*research_member);
         },
-        diplomacy);
+        diplomacy, restore_hooks);
   } catch (const PlayerCampaignJsonError &) {
     throw;
   } catch (const PlayerCampaignPersistenceDataError &error) {
@@ -974,6 +1008,17 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
   } catch (const AdaptiveResearchCampaignDataError &error) {
     fail(PlayerCampaignJsonStage::ResearchRestore, "InvalidDataException",
          error.what());
+  }
+}
+
+RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
+    AdaptiveResearchStrategicRuntime research_runtime, std::string_view utf8_json,
+    const PlayerCampaignJsonRestoreHooks &hooks) {
+  try {
+    return restore_player_campaign_v17_json_impl(
+        std::move(research_runtime), utf8_json, hooks);
+  } catch (const RestoreProgressCallbackFailure &failure) {
+    std::rethrow_exception(failure.error());
   }
 }
 

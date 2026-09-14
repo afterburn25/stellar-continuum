@@ -3,6 +3,7 @@
 #include <stellar/core/player_campaign_persistence.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -20,8 +21,13 @@ enum class PlayerCampaignJsonStage {
   DiplomacyReferences,
   ResearchDecode,
   ResearchRestore,
+  DiplomacyRestore,
   Representability,
   Encode,
+};
+
+struct PlayerCampaignJsonRestoreHooks {
+  std::function<void(PlayerCampaignJsonStage)> on_stage;
 };
 
 class PlayerCampaignJsonError final : public std::runtime_error {
@@ -53,6 +59,7 @@ encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload);
 
 [[nodiscard]] RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
     AdaptiveResearchStrategicRuntime research_runtime,
-    std::string_view utf8_json);
+    std::string_view utf8_json,
+    const PlayerCampaignJsonRestoreHooks &hooks = {});
 
 } // namespace stellar::core

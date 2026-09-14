@@ -28,6 +28,7 @@ on:
       - "tests/Stellar.StrategicPlanning.ParityGenerator/**"
       - "tests/Stellar.StrategicClock.ParityGenerator/**"
       - "tests/Stellar.CampaignFrame.ParityGenerator/**"
+      - "tests/Stellar.PlayerCampaignRecovery.ParityGenerator/**"
       - "tests/Stellar.ConstructionCurrency.ParityGenerator/**"
       - "tests/Stellar.SurfaceConstruction.ParityGenerator/**"
       - "tests/Stellar.ConstructionProjects.ParityGenerator/**"
