@@ -2,9 +2,11 @@
 
 The engine and client target is C++23. The preserved Godot/C# game remains the behavioral reference and current full playable baseline. C# added under `tests/` generates reference fixtures; it is not shipped with the native runtime.
 
-The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text, immutable RGBA images and ordered world/panel/text layers, with no Core dependency. The client owns a real 500-system fresh campaign through the integrated runtime and campaign frame adapter.
+The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text, immutable RGBA images and ordered world/panel/text layers, with no Core dependency. The client owns the selected 250/500/1,000/2,500-system campaign through the integrated runtime and campaign frame adapter.
 
 ## Current interaction
+
+- Startup offers New Campaign, Load Campaign and Exit. Species portraits, biographies, measured environment facts, size and seed precede generation. Work runs in the background, failures remain actionable, and a new campaign never selects an existing save for its first write. See NATIVE_STARTUP_FLOW.md.
 
 - Owned solid worlds expose an operational surface workspace: choose a known building, pan/zoom, review its exact footprint and costs, confirm placement, or cancel an unfinished site for the canonical refund. Material-dependent progress and complete paused reload equality are maintained. See NATIVE_SURFACE_WORKSPACE.md.
 
@@ -32,6 +34,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 
 Engine 0.1.53 passed 138 CTest, 206 Python checks and twenty-six actual Vulkan launches. Surface validation starts from an unaltered fresh 500-system campaign and verifies preview cancellation, paid placement, half-refund cancellation, noninstant progress and exact paused reload/resave. Engine image-overlay tests use actual GPU pixel readback for ordering, clipping, tint and immutable texture reuse. Surface captures at 720p/1080p were inspected; this operational grid is not final 3D presentation.
 

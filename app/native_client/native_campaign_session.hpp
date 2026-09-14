@@ -75,6 +75,14 @@ public:
           const stellar::core::PlayerCampaignRestorationProgress &)> &progress = {},
       NativeCampaignSessionDependencies dependencies = {});
 
+  // Owner-thread activation boundary for a detached worker load. The worker
+  // may produce LoadedPlayerCampaignV17, but must not construct this session.
+  static std::unique_ptr<NativeCampaignSession> create_loaded(
+      stellar::core::LoadedPlayerCampaignV17 loaded,
+      std::filesystem::path research_root, std::filesystem::path save_path,
+      std::string game_version,
+      NativeCampaignSessionDependencies dependencies = {});
+
   // Destruction waits for background work but cannot report its result. Durable
   // shutdown must use request_exit()/service() and observe exit_ready().
   ~NativeCampaignSession();

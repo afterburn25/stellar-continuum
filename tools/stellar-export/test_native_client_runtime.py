@@ -11,6 +11,7 @@ from unittest import mock
 import stellar as exporter
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
+from native_species_runtime import NATIVE_SPECIES_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -68,6 +69,17 @@ class NativeClientDependencyTests(unittest.TestCase):
         self.celestial_declaration = self.root / "export/native-celestial-assets.json"
         self.celestial_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": celestial_records}))
 
+        species_records = {}
+        for key, (source, runtime_path) in NATIVE_SPECIES_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only species " + key).encode())
+            species_records[key] = {"source": source, "runtimePath": runtime_path,
+                                    "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.species_declaration = self.root / "export/native-species-assets.json"
+        self.species_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": species_records}))
+
+
     def inspect(self, binary, runtime=(), windows=()):
         text = "\n".join("    " + name for name in self.imports[binary.name])
         with mock.patch.object(exporter, "run", return_value=text):
@@ -82,6 +94,49 @@ class NativeClientDependencyTests(unittest.TestCase):
         self.assertFalse(metadata["graphicalParity"])
         self.assertEqual(set(metadata["requiredFiles"]), {p.relative_to(self.output).as_posix()
                          for p in self.output.rglob("*") if p.is_file()})
+
+    def test_missing_species_portrait_blocks_package(self):
+        (self.root / NATIVE_SPECIES_SOURCES["terran-baseline"][0]).unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native species"):
+            self.copy()
+
+    def test_tampered_species_portrait_blocks_package(self):
+        (self.root / NATIVE_SPECIES_SOURCES["terran-baseline"][0]).write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+            self.copy()
+
+    def test_missing_species_credits_blocks_package(self):
+        (self.root / NATIVE_SPECIES_SOURCES["credits"][0]).unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native species credits"):
+            self.copy()
+
+    def test_unreviewed_species_source_is_rejected(self):
+        declaration = json.loads(self.species_declaration.read_text())
+        declaration["assets"]["terran-baseline"]["source"] = "../outside.jpg"
+        self.species_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unreviewed native species"):
+            self.copy()
+
+    def test_unreviewed_species_output_is_rejected(self):
+        declaration = json.loads(self.species_declaration.read_text())
+        declaration["assets"]["terran-baseline"]["runtimePath"] = "../outside.jpg"
+        self.species_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unreviewed native species"):
+            self.copy()
+
+    def test_unreviewed_species_set_is_rejected(self):
+        declaration = json.loads(self.species_declaration.read_text())
+        declaration["assets"]["other"] = declaration["assets"]["terran-baseline"]
+        self.species_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
+    def test_unsupported_species_schema_is_rejected(self):
+        declaration = json.loads(self.species_declaration.read_text())
+        declaration["schemaVersion"] = 2
+        self.species_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native species"):
+            self.copy()
 
     def test_missing_license_blocks_package(self):
         self.license.unlink()

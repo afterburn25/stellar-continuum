@@ -71,3 +71,19 @@ target_sources(stellar-continuum-native PRIVATE
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_surface_construction_controller.cpp
   app/native_client/native_surface_workspace.cpp)
+
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSpeciesAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_species_assets)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_new_campaign_setup.cpp
+  app/native_client/native_new_game_workspace.cpp
+  app/native_client/native_new_campaign_generation.cpp)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_startup_session.cpp)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_startup_workspace.cpp
+  app/native_client/native_startup_host.cpp
+  app/native_client/native_startup_entry.cpp)

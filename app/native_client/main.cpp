@@ -21,6 +21,7 @@
 #include "native_system_workspace.hpp"
 #include "native_planet_disc_assets.hpp"
 #include "native_ui_layout.hpp"
+#include "native_startup_entry.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
@@ -67,6 +68,7 @@ using namespace stellar::native_shipyard_ui;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
+using namespace stellar::native_startup_ui;
 
 struct Options {
   std::filesystem::path asset_root;
@@ -90,6 +92,7 @@ struct Options {
   bool settlement_reload_smoke{};
   bool surface_smoke{};
   bool surface_reload_smoke{};
+  bool new_game_smoke{};
   bool save_path_overridden{};
 };
 
@@ -112,6 +115,7 @@ struct Options {
     else if(arg==L"--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg==L"--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.windowed=true;}
+    else if(arg==L"--new-game-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
     else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
     else if(arg==L"--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.shipyard_smoke=true;result.windowed=true;}
@@ -135,6 +139,7 @@ struct Options {
     else if(arg=="--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg=="--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.windowed=true;}
+    else if(arg=="--new-game-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
     else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
     else if(arg=="--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.shipyard_smoke=true;result.windowed=true;}
@@ -152,7 +157,8 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
@@ -172,6 +178,19 @@ struct Options {
 
 [[nodiscard]] std::string utf8_path(const std::filesystem::path &path){
   const auto value=path.u8string();return {reinterpret_cast<const char*>(value.data()),value.size()};
+}
+
+[[nodiscard]] std::string json_string(std::string_view value){
+  std::ostringstream out;out<<'"';constexpr char hex[]="0123456789abcdef";
+  for(const unsigned char c:value){switch(c){case '"':out<<"\\\"";break;case '\\':out<<"\\\\";break;
+    case '\b':out<<"\\b";break;case '\f':out<<"\\f";break;case '\n':out<<"\\n";break;
+    case '\r':out<<"\\r";break;case '\t':out<<"\\t";break;
+    default:if(c<0x20)out<<"\\u00"<<hex[c>>4]<<hex[c&15];else out<<static_cast<char>(c);}}
+  out<<'"';return out.str();
+}
+[[nodiscard]] std::filesystem::path sidecar_path(const std::filesystem::path &path,
+                                                  const wchar_t *suffix){
+  return path.parent_path()/(path.stem().wstring()+suffix+path.extension().wstring());
 }
 
 [[nodiscard]] std::string utc_timestamp(){
@@ -713,6 +732,12 @@ class NativeCampaign final {
   void request_smoke_save(){if(smoke_settlement_mode_){session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();}if(smoke_surface_mode_)capture_surface_smoke_state();session_->request_save();}
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
+  [[nodiscard]] std::string player_species_id()const{
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
+    if(player==world.civilizations.end())throw std::runtime_error("The activated campaign has no player civilization.");
+    return player->species_id;
+  }
   [[nodiscard]] std::string research_smoke_status()const{
     if(!smoke_research_node_||!research_workspace_.window())return "unavailable";
     const auto found=std::ranges::find(research_workspace_.window()->nodes,
@@ -1610,14 +1635,32 @@ int main(int argc,char **argv){
 #endif
   try{
     const auto options=parse_options(argc,argv);
-    const auto startup_begin=std::chrono::steady_clock::now();
-    auto session=make_session(options);
+    const auto asset_root=std::filesystem::absolute(options.asset_root);
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed,
-                  std::filesystem::absolute(options.asset_root)/
-                      "assets/visual/fonts/Rajdhani-SemiBold.ttf");
-    NativeCampaign campaign(std::move(session),window.drawable_width(),
-                             window.drawable_height(),options.asset_root,
+                  asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    std::unique_ptr<NativeCampaignSession> session;
+    StartupEntryEvidence startup_evidence;
+    std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot;
+    if(options.new_game_smoke){
+      if(!std::filesystem::is_regular_file(options.save_path))throw std::invalid_argument("--new-game-smoke requires a preexisting save-path anchor.");
+      setup_screenshot=sidecar_path(*options.smoke_screenshot,L"-setup");
+      loading_screenshot=sidecar_path(*options.smoke_screenshot,L"-loading");
+      StartupEntryAutomation automation{std::to_string(options.seed),"pelagic_high_pressure",250,*setup_screenshot,*loading_screenshot};
+      auto result=run_native_startup_entry(window,{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp},&automation);
+      if(result.exit_requested||!result.session)throw std::runtime_error("Automated new campaign startup did not activate a session.");
+      startup_evidence=std::move(result.evidence);generated_save_path=result.session->save_path();
+      if(*generated_save_path==options.save_path)throw std::runtime_error("New campaign startup overwrote the requested save anchor.");
+      session=std::move(result.session);
+    }else if(options.load||options.smoke_screenshot){session=make_session(options);}
+    else{
+      auto result=run_native_startup_entry(window,{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp});
+      if(result.exit_requested)return 0;
+      if(!result.session)throw std::runtime_error("Startup ended without a campaign session.");
+      session=std::move(result.session);
+    }
+    const auto startup_begin=std::chrono::steady_clock::now();
+    NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);});
     if(options.smoke_screenshot){
       if(options.research_smoke)
@@ -1712,6 +1755,18 @@ int main(int argc,char **argv){
           std::cout<<" settlement="<<campaign.settlement_smoke_status();
         if(options.surface_smoke||options.surface_reload_smoke)
           std::cout<<" surface="<<campaign.surface_smoke_status();
+        if(options.new_game_smoke){
+          std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
+            <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")
+            <<",\"size_selected\":"<<(startup_evidence.size_selected?"true":"false")<<",\"seed_entered\":"<<(startup_evidence.seed_entered?"true":"false")
+            <<",\"create_requested\":"<<(startup_evidence.create_requested?"true":"false")<<",\"indeterminate_observed\":"<<(startup_evidence.indeterminate_observed?"true":"false")
+            <<",\"activated\":true,\"saved\":true,\"species_id\":"<<json_string(campaign.player_species_id())<<",\"system_count\":"<<campaign.system_count()
+            <<",\"seed\":"<<json_string(std::to_string(options.seed))<<",\"requested_save_path\":"<<json_string(utf8_path(options.save_path))
+            <<",\"generated_save_path\":"<<json_string(utf8_path(*generated_save_path))<<",\"unique_slot\":true,\"setup_screenshot\":"<<json_string(utf8_path(*setup_screenshot))
+            <<",\"loading_screenshot\":"<<json_string(utf8_path(*loading_screenshot))<<",\"statuses\":[";
+          for(std::size_t i=0;i<startup_evidence.displayed_statuses.size();++i){if(i)std::cout<<',';std::cout<<json_string(startup_evidence.displayed_statuses[i]);}
+          std::cout<<"]}";
+        }
         std::cout<<'\n';
         break;
       }

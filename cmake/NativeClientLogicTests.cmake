@@ -255,3 +255,58 @@ if(MSVC)
   target_compile_options(stellar_surface_view_tests PRIVATE
     /W4 /WX /permissive-)
 endif()
+
+
+add_executable(stellar_new_setup_tests
+  app/native_client/native_new_campaign_setup.cpp
+  native-tests/native_new_campaign_setup_tests.cpp)
+add_executable(stellar_new_generation_tests
+  app/native_client/native_new_campaign_setup.cpp
+  app/native_client/native_new_campaign_generation.cpp
+  native-tests/native_new_campaign_generation_tests.cpp)
+add_executable(stellar_new_ui_tests
+  app/native_client/native_new_game_workspace.cpp
+  native-tests/native_new_game_workspace_tests.cpp)
+foreach(STELLAR_SETUP_TEST IN ITEMS stellar_new_setup_tests stellar_new_generation_tests stellar_new_ui_tests)
+  target_include_directories(${STELLAR_SETUP_TEST} PRIVATE app/native_client engine/include)
+  target_link_libraries(${STELLAR_SETUP_TEST} PRIVATE stellar_core)
+  if(MSVC)
+    target_compile_options(${STELLAR_SETUP_TEST} PRIVATE /W4 /WX /permissive-)
+  endif()
+endforeach()
+add_test(NAME native_new_campaign_setup COMMAND stellar_new_setup_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+add_test(NAME native_new_campaign_generation COMMAND stellar_new_generation_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+add_test(NAME native_new_game_workspace COMMAND stellar_new_ui_tests)
+set_tests_properties(native_new_campaign_setup native_new_campaign_generation PROPERTIES TIMEOUT 180)
+
+add_executable(stellar_startup_tests
+  app/native_client/native_new_campaign_setup.cpp
+  app/native_client/native_new_campaign_generation.cpp
+  app/native_client/native_campaign_session.cpp
+  app/native_client/native_startup_session.cpp
+  native-tests/native_startup_session_tests.cpp)
+target_include_directories(stellar_startup_tests PRIVATE app/native_client)
+target_link_libraries(stellar_startup_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
+if(MSVC)
+  target_compile_options(stellar_startup_tests PRIVATE /W4 /WX /permissive-)
+endif()
+add_test(NAME native_startup_session COMMAND stellar_startup_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json"
+  "${CMAKE_BINARY_DIR}/native-startup-session-scratch")
+set_tests_properties(native_startup_session PROPERTIES TIMEOUT 240)
+
+add_executable(stellar_startup_ui_tests
+  app/native_client/native_new_game_workspace.cpp
+  app/native_client/native_startup_workspace.cpp
+  native-tests/native_startup_workspace_tests.cpp)
+target_include_directories(stellar_startup_ui_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_core)
+if(MSVC)
+  target_compile_options(stellar_startup_ui_tests PRIVATE /W4 /WX /permissive-)
+endif()
+add_test(NAME native_startup_workspace COMMAND stellar_startup_ui_tests)

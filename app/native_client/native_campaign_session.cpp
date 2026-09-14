@@ -165,6 +165,19 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::load_startup(
     return load_adaptive_research_strategic_runtime(root);
   };
   auto loaded = dependencies.loader(save_path, make_runtime, progress);
+  return create_loaded(std::move(loaded), std::move(research_root),
+                       std::move(save_path), std::move(game_version),
+                       std::move(dependencies));
+}
+
+std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
+    LoadedPlayerCampaignV17 loaded, std::filesystem::path research_root,
+    std::filesystem::path save_path, std::string game_version,
+    NativeCampaignSessionDependencies dependencies) {
+  if (save_path.empty()) {
+    throw std::invalid_argument("A native campaign save path is required.");
+  }
+  validate_dependencies(dependencies);
   const bool recovered = loaded.origin == PlayerCampaignLoadOrigin::Backup;
   const auto day = loaded.campaign.simulation_days();
   if (!std::isfinite(day) || day < 0.) {

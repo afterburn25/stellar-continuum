@@ -1,0 +1,33 @@
+# Only the native graphical client packages these approved original images.
+file(READ "${CMAKE_SOURCE_DIR}/export/native-species-assets.json" STELLAR_SPECIES_ASSETS)
+string(JSON STELLAR_SPECIES_SCHEMA GET "${STELLAR_SPECIES_ASSETS}" schemaVersion)
+string(JSON STELLAR_SPECIES_COUNT LENGTH "${STELLAR_SPECIES_ASSETS}" assets)
+if(NOT STELLAR_SPECIES_SCHEMA EQUAL 1 OR NOT STELLAR_SPECIES_COUNT EQUAL 5)
+  message(FATAL_ERROR "Unsupported native species asset declaration")
+endif()
+add_custom_target(stellar_native_species_assets)
+foreach(STELLAR_SPECIES_KEY IN ITEMS terran-baseline pelagic-high-pressure compact-high-gravity cryogenic-hydrocarbon credits)
+  if(STELLAR_SPECIES_KEY STREQUAL "credits")
+    set(STELLAR_SPECIES_EXPECTED_SOURCE "docs/engine/NATIVE_SPECIES_ART_SOURCES.md")
+    set(STELLAR_SPECIES_EXPECTED_RUNTIME "Licenses/Species-visual-sources.md")
+  else()
+    set(STELLAR_SPECIES_EXPECTED_SOURCE "assets/visual/species/${STELLAR_SPECIES_KEY}.jpg")
+    set(STELLAR_SPECIES_EXPECTED_RUNTIME "${STELLAR_SPECIES_EXPECTED_SOURCE}")
+  endif()
+  string(JSON STELLAR_SPECIES_SOURCE GET "${STELLAR_SPECIES_ASSETS}" assets ${STELLAR_SPECIES_KEY} source)
+  string(JSON STELLAR_SPECIES_RUNTIME GET "${STELLAR_SPECIES_ASSETS}" assets ${STELLAR_SPECIES_KEY} runtimePath)
+  string(JSON STELLAR_SPECIES_EXPECTED_HASH GET "${STELLAR_SPECIES_ASSETS}" assets ${STELLAR_SPECIES_KEY} sha256)
+  if(NOT STELLAR_SPECIES_SOURCE STREQUAL STELLAR_SPECIES_EXPECTED_SOURCE OR
+     NOT STELLAR_SPECIES_RUNTIME STREQUAL STELLAR_SPECIES_EXPECTED_RUNTIME)
+    message(FATAL_ERROR "Unreviewed native species ${STELLAR_SPECIES_KEY} path")
+  endif()
+  file(SHA256 "${CMAKE_SOURCE_DIR}/${STELLAR_SPECIES_SOURCE}" STELLAR_SPECIES_ACTUAL_HASH)
+  if(NOT STELLAR_SPECIES_ACTUAL_HASH STREQUAL STELLAR_SPECIES_EXPECTED_HASH)
+    message(FATAL_ERROR "Native species ${STELLAR_SPECIES_KEY} differs from reviewed content")
+  endif()
+  get_filename_component(STELLAR_SPECIES_DESTINATION "${CMAKE_BINARY_DIR}/${STELLAR_SPECIES_RUNTIME}" DIRECTORY)
+  add_custom_command(TARGET stellar_native_species_assets POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${STELLAR_SPECIES_DESTINATION}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/${STELLAR_SPECIES_SOURCE}" "${CMAKE_BINARY_DIR}/${STELLAR_SPECIES_RUNTIME}")
+endforeach()
