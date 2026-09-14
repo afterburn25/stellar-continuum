@@ -1,0 +1,1 @@
+Runtime procedural families are active. Approved raster masters may be placed here after seam, resolution, physical consistency and provenance review. Candidate jobs are in ../production/jobs.json. No pending master is claimed as generated.

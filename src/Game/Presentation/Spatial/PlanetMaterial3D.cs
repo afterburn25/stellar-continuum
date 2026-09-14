@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Game.Simulation.Models;
+using Game.Presentation.PlanetIdentity;
 
 namespace Game.Presentation.Spatial;
 
@@ -19,6 +20,8 @@ public static class PlanetMaterial3D
         ArgumentNullException.ThrowIfNull(body);
         var known = body.HasDetailedEnvironment && body.VisualClass is not
             (SystemSpatialBodyVisualClass.UnknownPlanet or SystemSpatialBodyVisualClass.UnknownMoon);
+        if (known && body.Presentation is { CanonicalKey: null } identity)
+            return PlanetIdentityMaterials.Orbit(identity);
         var earthPhoto = known && body.SurfaceKey == "earth" ? SolBodyMaterials.LoadColorTexture("earth") : null;
         var photographicEarth = earthPhoto is not null;
         var map = known && !photographicEarth ? LoadEquirectangularMap(body.SurfaceKey) : null;
@@ -51,7 +54,8 @@ public static class PlanetMaterial3D
         return material;
     }
 
-    public static Color AtmosphereColor(SystemSpatialBodyMarker body) => body.VisualClass switch
+    public static Color AtmosphereColor(SystemSpatialBodyMarker body) => body.Presentation is {} p
+        ? new Color(p.Variant.Atmosphere) : body.VisualClass switch
     {
         SystemSpatialBodyVisualClass.Oceanic => new Color("6da6d6"),
         SystemSpatialBodyVisualClass.IceGiant => new Color("9dcbd2"),
@@ -63,8 +67,10 @@ public static class PlanetMaterial3D
     };
 
     public static bool HasAtmosphere(SystemSpatialBodyMarker body) => body.HasDetailedEnvironment &&
+        body.VisualClass is not (SystemSpatialBodyVisualClass.UnknownPlanet or SystemSpatialBodyVisualClass.UnknownMoon) && (body.Presentation?.HasAtmosphere ??
+        (
         body.VisualClass is not (SystemSpatialBodyVisualClass.UnknownPlanet or SystemSpatialBodyVisualClass.UnknownMoon or SystemSpatialBodyVisualClass.Moon) &&
-        body.Atmosphere is { } atmosphere && atmosphere != PlanetaryAtmosphereRegime.Vacuum;
+        body.Atmosphere is { } atmosphere && atmosphere != PlanetaryAtmosphereRegime.Vacuum));
 
     private static Texture2D? LoadEquirectangularMap(string? key)
     {

@@ -8,6 +8,7 @@ namespace Game.Presentation.Spatial;
 /// <summary>A single organized, observer-filtered home for orbital world information.</summary>
 public partial class PlanetInspectorPanel : PanelContainer
 {
+    public bool DeveloperDetails { get; set; }
     private VBoxContainer _body = null!;
     private SystemSpatialSnapshot? _snapshot;
     private SystemSpatialBodyMarker? _selected;
@@ -57,6 +58,14 @@ public partial class PlanetInspectorPanel : PanelContainer
         var body = _selected!;
         var badge = VisualUi.Text(body.HasDetailedEnvironment ? "SURVEY COMPLETE" : "DETAILED SURVEY NEEDED", 10,
             body.HasDetailedEnvironment ? VisualUi.Accent : VisualUi.Gold); _body.AddChild(badge);
+        var classification = VisualUi.Text(body.Presentation?.Classification.Name ?? "Classification pending", 16, VisualUi.Accent, true);
+        classification.Name = "PlanetClass"; _body.AddChild(classification);
+        classification.TooltipText = body.Presentation?.Classification.Reason ?? "A complete environmental survey is needed to classify this world.";
+        var portrait=new TextureRect { Name="PlanetPortrait",Texture=CelestialBodyMaterials.WhiteTexture,
+            Material=CelestialBodyMaterials.GetPlanetMaterial(body),CustomMinimumSize=new(108,108),
+            ExpandMode=TextureRect.ExpandModeEnum.IgnoreSize,StretchMode=TextureRect.StretchModeEnum.KeepAspectCentered,
+            SizeFlagsHorizontal=SizeFlags.ShrinkCenter,MouseFilter=MouseFilterEnum.Ignore };
+        _body.AddChild(portrait);
         Section("PHYSICAL");
         Row("Type", body.Kind switch { PlanetaryBodyKind.Moon => "Moon", PlanetaryBodyKind.DwarfPlanet => "Dwarf planet", _ => "Planet" });
         Row("Radius", MetricFormat.Radius(body.RadiusEarth, body.HasDetailedEnvironment));
@@ -71,6 +80,9 @@ public partial class PlanetInspectorPanel : PanelContainer
         Row("Temperature", MetricFormat.Temperature(body.TemperatureKelvin, body.HasDetailedEnvironment));
         Row("Pressure", MetricFormat.Pressure(body.PressureKPa, body.HasDetailedEnvironment));
         Row("Atmosphere", body.HasDetailedEnvironment ? Atmosphere(body.Atmosphere) : "Unconfirmed");
+        Row("Solvent", body.AvailableSolvent?.ToString() ?? "Unconfirmed");
+        Row("Radiation", body.RadiationHazard is double radiation ? radiation < .2 ? "Low" : radiation < .6 ? "Elevated" : "Severe" : "Unconfirmed");
+        Row("Surface", body.HasSolidSurface is bool solid ? solid ? "Solid" : "Non-solid envelope" : "Unconfirmed");
         Section("SATELLITES & SIGNALS");
         if (body.ParentBodyId is int parentId)
             Row("Orbits", _snapshot.Bodies.FirstOrDefault(b => b.BodyId == parentId)?.Label ?? "Unknown");
@@ -79,6 +91,16 @@ public partial class PlanetInspectorPanel : PanelContainer
         Row("Activity", body.PositiveActivitySignature ? "Signal detected" : "Unconfirmed");
         Row("Anomaly", body.PositiveAnomalySignature ? "Signal detected" : "Unconfirmed");
         Section("ACTIONS");
+        if(DeveloperDetails && body.Presentation is {} p)
+        {
+            Section("VISUAL INSPECTOR");
+            Row("Identity",p.Identity.ToString("x16"));Row("Variant",p.Variant.Id);
+            Row("Orbit / ground",p.OrbitalFamily+" / "+p.SurfaceFamily);
+            Row("Modifiers",p.Modifiers.ToString());Row("Sky",p.Sky.Background);
+            Row("Host light",p.Sky.Primary.Class?.ToString()??"Unconfirmed");
+            Row("Seed",p.ShaderSeed.ToString("0.000",System.Globalization.CultureInfo.InvariantCulture));
+            Row("Reason",p.Classification.Reason);
+        }
         var focus = VisualUi.Button("Focus planet", "Move the camera toward this world.", () => FocusRequested?.Invoke(), VisualIconLibrary.NavZoomIn);
         focus.Name = "InspectorFocus"; _body.AddChild(focus);
         var surface = VisualUi.Button("Colony surface", _canLand ? "Visit your colony on this world." : "A surface view requires an owned colony on a solid world.",

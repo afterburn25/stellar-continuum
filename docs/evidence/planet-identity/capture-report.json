@@ -1,0 +1,1102 @@
+[
+  {
+    "file": "terran-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 273,
+    "processBytes": 681725952,
+    "objects": 2509,
+    "nodes": 395,
+    "videoBytes": 159577839
+  },
+  {
+    "file": "terran-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 454,
+    "processBytes": 800759808,
+    "objects": 2513,
+    "nodes": 395,
+    "videoBytes": 232669618
+  },
+  {
+    "file": "ocean-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 243,
+    "processBytes": 802762752,
+    "objects": 2529,
+    "nodes": 395,
+    "videoBytes": 233585156
+  },
+  {
+    "file": "ocean-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 382,
+    "processBytes": 822194176,
+    "objects": 2530,
+    "nodes": 395,
+    "videoBytes": 243535976
+  },
+  {
+    "file": "high-pressure-ocean-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 245,
+    "processBytes": 824258560,
+    "objects": 2546,
+    "nodes": 395,
+    "videoBytes": 244495204
+  },
+  {
+    "file": "high-pressure-ocean-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 389,
+    "processBytes": 837451776,
+    "objects": 2547,
+    "nodes": 395,
+    "videoBytes": 248055448
+  },
+  {
+    "file": "desert-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 227,
+    "processBytes": 839811072,
+    "objects": 2563,
+    "nodes": 395,
+    "videoBytes": 249014676
+  },
+  {
+    "file": "desert-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 383,
+    "processBytes": 806367232,
+    "objects": 2513,
+    "nodes": 395,
+    "videoBytes": 239022480
+  },
+  {
+    "file": "arid-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 241,
+    "processBytes": 776183808,
+    "objects": 2529,
+    "nodes": 395,
+    "videoBytes": 239981708
+  },
+  {
+    "file": "arid-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 377,
+    "processBytes": 662208512,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 239018496
+  },
+  {
+    "file": "ice-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 240,
+    "processBytes": 663244800,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 239977724
+  },
+  {
+    "file": "ice-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 306,
+    "processBytes": 671031296,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 243537968
+  },
+  {
+    "file": "cryogenic-hydrocarbon-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 261,
+    "processBytes": 670617600,
+    "objects": 2544,
+    "nodes": 395,
+    "videoBytes": 244497196
+  },
+  {
+    "file": "cryogenic-hydrocarbon-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 463,
+    "processBytes": 660054016,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 239020488
+  },
+  {
+    "file": "airless-rocky-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 234,
+    "processBytes": 660221952,
+    "objects": 2525,
+    "nodes": 394,
+    "videoBytes": 239641484
+  },
+  {
+    "file": "airless-rocky-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 338,
+    "processBytes": 637308928,
+    "objects": 2508,
+    "nodes": 394,
+    "videoBytes": 238680264
+  },
+  {
+    "file": "greenhouse-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 249,
+    "processBytes": 638009344,
+    "objects": 2525,
+    "nodes": 395,
+    "videoBytes": 239639492
+  },
+  {
+    "file": "greenhouse-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 470,
+    "processBytes": 645795840,
+    "objects": 2526,
+    "nodes": 395,
+    "videoBytes": 243199736
+  },
+  {
+    "file": "reducing-atmosphere-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 234,
+    "processBytes": 647823360,
+    "objects": 2542,
+    "nodes": 395,
+    "videoBytes": 244158964
+  },
+  {
+    "file": "reducing-atmosphere-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 432,
+    "processBytes": 643010560,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 239020488
+  },
+  {
+    "file": "toxic-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 247,
+    "processBytes": 643178496,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 239979716
+  },
+  {
+    "file": "toxic-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 442,
+    "processBytes": 634695680,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 239018496
+  },
+  {
+    "file": "high-gravity-super-earth-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 244,
+    "processBytes": 635576320,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 239977724
+  },
+  {
+    "file": "high-gravity-super-earth-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 381,
+    "processBytes": 643362816,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 243537968
+  },
+  {
+    "file": "volcanic-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 242,
+    "processBytes": 645595136,
+    "objects": 2544,
+    "nodes": 395,
+    "videoBytes": 244497196
+  },
+  {
+    "file": "volcanic-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 326,
+    "processBytes": 641609728,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 239020488
+  },
+  {
+    "file": "exotic-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 256,
+    "processBytes": 642007040,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 239979716
+  },
+  {
+    "file": "exotic-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 411,
+    "processBytes": 637923328,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 239018496
+  },
+  {
+    "file": "gas-giant-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 256,
+    "processBytes": 637923328,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 239977724
+  },
+  {
+    "file": "ice-giant-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 238,
+    "processBytes": 637960192,
+    "objects": 2543,
+    "nodes": 395,
+    "videoBytes": 240936952
+  },
+  {
+    "file": "dwarf-planet-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 250,
+    "processBytes": 638758912,
+    "objects": 2556,
+    "nodes": 394,
+    "videoBytes": 241557948
+  },
+  {
+    "file": "dwarf-planet-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 346,
+    "processBytes": 646594560,
+    "objects": 2557,
+    "nodes": 394,
+    "videoBytes": 245118192
+  },
+  {
+    "file": "large-moon-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 734,
+    "processBytes": 651431936,
+    "objects": 2571,
+    "nodes": 394,
+    "videoBytes": 245739188
+  },
+  {
+    "file": "large-moon-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 290,
+    "processBytes": 650878976,
+    "objects": 2519,
+    "nodes": 396,
+    "videoBytes": 238910744
+  },
+  {
+    "file": "barren-moon-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 225,
+    "processBytes": 650878976,
+    "objects": 2531,
+    "nodes": 394,
+    "videoBytes": 239531740
+  },
+  {
+    "file": "barren-moon-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 335,
+    "processBytes": 647311360,
+    "objects": 2515,
+    "nodes": 396,
+    "videoBytes": 238904768
+  },
+  {
+    "file": "ice-moon-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 245,
+    "processBytes": 647311360,
+    "objects": 2527,
+    "nodes": 394,
+    "videoBytes": 239525764
+  },
+  {
+    "file": "ice-moon-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 323,
+    "processBytes": 654127104,
+    "objects": 2535,
+    "nodes": 396,
+    "videoBytes": 243310512
+  },
+  {
+    "file": "sky-1-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 440,
+    "processBytes": 648466432,
+    "objects": 2517,
+    "nodes": 394,
+    "videoBytes": 239129272
+  },
+  {
+    "file": "sky-1-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 237,
+    "processBytes": 651288576,
+    "objects": 2534,
+    "nodes": 395,
+    "videoBytes": 240088500
+  },
+  {
+    "file": "sky-2-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 442,
+    "processBytes": 647856128,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 239018496
+  },
+  {
+    "file": "sky-2-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 254,
+    "processBytes": 647856128,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 239977724
+  },
+  {
+    "file": "sky-3-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 423,
+    "processBytes": 655704064,
+    "objects": 2530,
+    "nodes": 396,
+    "videoBytes": 243537968
+  },
+  {
+    "file": "sky-3-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 249,
+    "processBytes": 656228352,
+    "objects": 2553,
+    "nodes": 399,
+    "videoBytes": 244689568
+  },
+  {
+    "file": "sky-4-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 425,
+    "processBytes": 651591680,
+    "objects": 2519,
+    "nodes": 398,
+    "videoBytes": 239212860
+  },
+  {
+    "file": "sky-4-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 251,
+    "processBytes": 651591680,
+    "objects": 2532,
+    "nodes": 395,
+    "videoBytes": 240172088
+  },
+  {
+    "file": "sky-5-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 352,
+    "processBytes": 647503872,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 239018496
+  },
+  {
+    "file": "sky-5-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 233,
+    "processBytes": 647503872,
+    "objects": 2524,
+    "nodes": 394,
+    "videoBytes": 239628308
+  },
+  {
+    "file": "sky-6-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 417,
+    "processBytes": 655294464,
+    "objects": 2525,
+    "nodes": 394,
+    "videoBytes": 243188552
+  },
+  {
+    "file": "sky-6-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 235,
+    "processBytes": 656363520,
+    "objects": 2542,
+    "nodes": 395,
+    "videoBytes": 244190356
+  },
+  {
+    "file": "sky-7-surface-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 422,
+    "processBytes": 651546624,
+    "objects": 2514,
+    "nodes": 397,
+    "videoBytes": 239063064
+  },
+  {
+    "file": "sky-7-orbit-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 236,
+    "processBytes": 651546624,
+    "objects": 2544,
+    "nodes": 403,
+    "videoBytes": 240407036
+  },
+  {
+    "file": "inhabited-night-lights-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 200,
+    "processBytes": 651546624,
+    "objects": 2554,
+    "nodes": 397,
+    "videoBytes": 241366264
+  },
+  {
+    "file": "unknown-world-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 217,
+    "processBytes": 652460032,
+    "objects": 2568,
+    "nodes": 396,
+    "videoBytes": 241987260
+  },
+  {
+    "file": "partial-survey-1920x1080.png",
+    "width": 1920,
+    "height": 1080,
+    "settleMilliseconds": 216,
+    "processBytes": 652460032,
+    "objects": 2568,
+    "nodes": 396,
+    "videoBytes": 241987260
+  },
+  {
+    "file": "terran-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 226,
+    "processBytes": 639533056,
+    "objects": 2585,
+    "nodes": 397,
+    "videoBytes": 109858814
+  },
+  {
+    "file": "terran-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 252,
+    "processBytes": 629891072,
+    "objects": 2515,
+    "nodes": 395,
+    "videoBytes": 127220478
+  },
+  {
+    "file": "ocean-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 186,
+    "processBytes": 630800384,
+    "objects": 2531,
+    "nodes": 395,
+    "videoBytes": 128179706
+  },
+  {
+    "file": "ocean-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 261,
+    "processBytes": 638652416,
+    "objects": 2532,
+    "nodes": 395,
+    "videoBytes": 131739950
+  },
+  {
+    "file": "high-pressure-ocean-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 194,
+    "processBytes": 640471040,
+    "objects": 2548,
+    "nodes": 395,
+    "videoBytes": 132699178
+  },
+  {
+    "file": "high-pressure-ocean-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 247,
+    "processBytes": 631394304,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 127216494
+  },
+  {
+    "file": "desert-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 185,
+    "processBytes": 633454592,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 128175722
+  },
+  {
+    "file": "desert-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 234,
+    "processBytes": 630063104,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 127214502
+  },
+  {
+    "file": "arid-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 184,
+    "processBytes": 630067200,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 128173730
+  },
+  {
+    "file": "arid-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 228,
+    "processBytes": 638828544,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 131733974
+  },
+  {
+    "file": "ice-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 174,
+    "processBytes": 639893504,
+    "objects": 2544,
+    "nodes": 395,
+    "videoBytes": 132693202
+  },
+  {
+    "file": "ice-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 199,
+    "processBytes": 599564288,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 127216494
+  },
+  {
+    "file": "cryogenic-hydrocarbon-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 187,
+    "processBytes": 576303104,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 128175722
+  },
+  {
+    "file": "cryogenic-hydrocarbon-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 277,
+    "processBytes": 510906368,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 127214502
+  },
+  {
+    "file": "airless-rocky-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 183,
+    "processBytes": 510906368,
+    "objects": 2524,
+    "nodes": 394,
+    "videoBytes": 127835498
+  },
+  {
+    "file": "airless-rocky-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 229,
+    "processBytes": 517464064,
+    "objects": 2525,
+    "nodes": 394,
+    "videoBytes": 131395742
+  },
+  {
+    "file": "greenhouse-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 193,
+    "processBytes": 517464064,
+    "objects": 2542,
+    "nodes": 395,
+    "videoBytes": 132354970
+  },
+  {
+    "file": "greenhouse-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 268,
+    "processBytes": 506138624,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 127216494
+  },
+  {
+    "file": "reducing-atmosphere-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 182,
+    "processBytes": 508145664,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 128175722
+  },
+  {
+    "file": "reducing-atmosphere-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 255,
+    "processBytes": 504061952,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 127214502
+  },
+  {
+    "file": "toxic-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 181,
+    "processBytes": 504061952,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 128173730
+  },
+  {
+    "file": "toxic-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 255,
+    "processBytes": 510873600,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 131733974
+  },
+  {
+    "file": "high-gravity-super-earth-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 179,
+    "processBytes": 510873600,
+    "objects": 2544,
+    "nodes": 395,
+    "videoBytes": 132693202
+  },
+  {
+    "file": "high-gravity-super-earth-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 237,
+    "processBytes": 506851328,
+    "objects": 2512,
+    "nodes": 395,
+    "videoBytes": 127216494
+  },
+  {
+    "file": "volcanic-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 186,
+    "processBytes": 507887616,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 128175722
+  },
+  {
+    "file": "volcanic-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 218,
+    "processBytes": 503803904,
+    "objects": 2511,
+    "nodes": 395,
+    "videoBytes": 127214502
+  },
+  {
+    "file": "exotic-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 183,
+    "processBytes": 503803904,
+    "objects": 2527,
+    "nodes": 395,
+    "videoBytes": 128173730
+  },
+  {
+    "file": "exotic-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 248,
+    "processBytes": 511590400,
+    "objects": 2528,
+    "nodes": 395,
+    "videoBytes": 131733974
+  },
+  {
+    "file": "gas-giant-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 181,
+    "processBytes": 511590400,
+    "objects": 2544,
+    "nodes": 395,
+    "videoBytes": 132693202
+  },
+  {
+    "file": "ice-giant-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 193,
+    "processBytes": 512344064,
+    "objects": 2560,
+    "nodes": 395,
+    "videoBytes": 133652430
+  },
+  {
+    "file": "dwarf-planet-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 190,
+    "processBytes": 512544768,
+    "objects": 2573,
+    "nodes": 394,
+    "videoBytes": 134273426
+  },
+  {
+    "file": "dwarf-planet-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 216,
+    "processBytes": 503857152,
+    "objects": 2511,
+    "nodes": 394,
+    "videoBytes": 126882246
+  },
+  {
+    "file": "large-moon-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 183,
+    "processBytes": 505516032,
+    "objects": 2525,
+    "nodes": 394,
+    "videoBytes": 127503242
+  },
+  {
+    "file": "large-moon-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 210,
+    "processBytes": 502472704,
+    "objects": 2516,
+    "nodes": 396,
+    "videoBytes": 127100774
+  },
+  {
+    "file": "barren-moon-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 173,
+    "processBytes": 502657024,
+    "objects": 2528,
+    "nodes": 394,
+    "videoBytes": 127721770
+  },
+  {
+    "file": "barren-moon-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 212,
+    "processBytes": 510660608,
+    "objects": 2536,
+    "nodes": 396,
+    "videoBytes": 131506518
+  },
+  {
+    "file": "ice-moon-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 175,
+    "processBytes": 511176704,
+    "objects": 2548,
+    "nodes": 394,
+    "videoBytes": 132127514
+  },
+  {
+    "file": "ice-moon-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 204,
+    "processBytes": 505786368,
+    "objects": 2516,
+    "nodes": 396,
+    "videoBytes": 127102766
+  },
+  {
+    "file": "sky-1-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 267,
+    "processBytes": 502366208,
+    "objects": 2516,
+    "nodes": 394,
+    "videoBytes": 127323286
+  },
+  {
+    "file": "sky-1-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 183,
+    "processBytes": 502366208,
+    "objects": 2533,
+    "nodes": 395,
+    "videoBytes": 128282514
+  },
+  {
+    "file": "sky-2-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 253,
+    "processBytes": 510152704,
+    "objects": 2534,
+    "nodes": 395,
+    "videoBytes": 131842758
+  },
+  {
+    "file": "sky-2-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 194,
+    "processBytes": 510492672,
+    "objects": 2550,
+    "nodes": 395,
+    "videoBytes": 132801986
+  },
+  {
+    "file": "sky-3-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 250,
+    "processBytes": 505745408,
+    "objects": 2514,
+    "nodes": 396,
+    "videoBytes": 127216494
+  },
+  {
+    "file": "sky-3-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 195,
+    "processBytes": 506277888,
+    "objects": 2537,
+    "nodes": 399,
+    "videoBytes": 128368094
+  },
+  {
+    "file": "sky-4-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 252,
+    "processBytes": 498626560,
+    "objects": 2518,
+    "nodes": 398,
+    "videoBytes": 127406874
+  },
+  {
+    "file": "sky-4-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 189,
+    "processBytes": 496320512,
+    "objects": 2531,
+    "nodes": 395,
+    "videoBytes": 128366102
+  },
+  {
+    "file": "sky-5-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 224,
+    "processBytes": 504147968,
+    "objects": 2532,
+    "nodes": 395,
+    "videoBytes": 131926346
+  },
+  {
+    "file": "sky-5-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 177,
+    "processBytes": 505229312,
+    "objects": 2545,
+    "nodes": 394,
+    "videoBytes": 132536158
+  },
+  {
+    "file": "sky-6-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 258,
+    "processBytes": 500600832,
+    "objects": 2509,
+    "nodes": 394,
+    "videoBytes": 126867078
+  },
+  {
+    "file": "sky-6-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 184,
+    "processBytes": 497065984,
+    "objects": 2526,
+    "nodes": 395,
+    "videoBytes": 127868882
+  },
+  {
+    "file": "sky-7-surface-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 258,
+    "processBytes": 492978176,
+    "objects": 2513,
+    "nodes": 397,
+    "videoBytes": 127257078
+  },
+  {
+    "file": "sky-7-orbit-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 189,
+    "processBytes": 493027328,
+    "objects": 2543,
+    "nodes": 403,
+    "videoBytes": 128601050
+  },
+  {
+    "file": "inhabited-night-lights-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 176,
+    "processBytes": 493592576,
+    "objects": 2553,
+    "nodes": 397,
+    "videoBytes": 129560278
+  },
+  {
+    "file": "unknown-world-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 183,
+    "processBytes": 506441728,
+    "objects": 2567,
+    "nodes": 396,
+    "videoBytes": 108925770
+  },
+  {
+    "file": "partial-survey-1280x720.png",
+    "width": 1280,
+    "height": 720,
+    "settleMilliseconds": 178,
+    "processBytes": 506441728,
+    "objects": 2567,
+    "nodes": 396,
+    "videoBytes": 108925770
+  }
+]
