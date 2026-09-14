@@ -1,5 +1,7 @@
 # Native cold-build budget
 
+Engine 0.1.51 exposed a 263-character generated MSVC object dependency path for the surface construction controller test. Its CMake target is now `stellar_surface_ui_tests`, yielding a 235-character path at this checkout. Source files, registered test, strict compiler options and coverage are unchanged. The complete 135-test build passed after this path correction.
+
 Engine 0.1.50's local preview link failed with LNK1116 / Windows error 112
 because the development drive was full. The ignored `build-native/` tree
 contained 268 incremental linker (`.ilk`) caches totalling 10,377,218,652

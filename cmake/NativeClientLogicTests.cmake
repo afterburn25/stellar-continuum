@@ -157,3 +157,59 @@ set_tests_properties(native_fresh_progression PROPERTIES TIMEOUT 600)
 if(MSVC)
   target_compile_options(stellar_native_fresh_progression_tests PRIVATE /WX)
 endif()
+
+add_executable(stellar_native_colony_controller_tests
+  native-tests/native_colony_controller_tests.cpp
+  app/native_client/native_colony_controller.cpp
+  app/native_client/native_settlement_mission_controller.cpp
+  app/native_client/native_system_view.cpp)
+target_include_directories(stellar_native_colony_controller_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_colony_controller_tests PRIVATE stellar_core)
+add_test(NAME native_colony_controller COMMAND stellar_native_colony_controller_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_colony_controller PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_native_colony_controller_tests PRIVATE /WX)
+endif()
+
+add_executable(stellar_surface_ui_tests
+  native-tests/native_surface_construction_controller_tests.cpp
+  app/native_client/native_surface_construction_controller.cpp
+  app/native_client/native_colony_controller.cpp
+  app/native_client/native_system_view.cpp)
+target_include_directories(stellar_surface_ui_tests PRIVATE app/native_client)
+target_link_libraries(stellar_surface_ui_tests PRIVATE stellar_core)
+add_test(NAME native_surface_construction_controller COMMAND stellar_surface_ui_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_surface_construction_controller PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_surface_ui_tests PRIVATE /WX)
+endif()
+
+add_executable(stellar_native_colony_workspace_tests
+  native-tests/native_colony_workspace_tests.cpp
+  app/native_client/native_colony_workspace.cpp)
+target_include_directories(stellar_native_colony_workspace_tests PRIVATE
+  app/native_client
+  engine/include)
+target_link_libraries(stellar_native_colony_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_colony_workspace COMMAND stellar_native_colony_workspace_tests)
+
+add_executable(stellar_native_system_colony_entry_tests
+  native-tests/native_system_colony_entry_tests.cpp
+  app/native_client/native_system_view.cpp
+  app/native_client/native_system_travel.cpp
+  app/native_client/native_system_workspace.cpp
+  app/native_client/native_fleet_controller.cpp)
+target_include_directories(stellar_native_system_colony_entry_tests PRIVATE
+  app/native_client
+  engine/include)
+target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE stellar_core)
+add_test(NAME native_system_colony_entry COMMAND stellar_native_system_colony_entry_tests)
+
+if(MSVC)
+  target_compile_options(stellar_native_colony_workspace_tests PRIVATE /WX)
+  target_compile_options(stellar_native_system_colony_entry_tests PRIVATE /WX)
+endif()

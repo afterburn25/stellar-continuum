@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.50",
+  "engineVersion": "0.1.51",
   "gameVersion": "0.1.7-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "C++23 campaign runtime and SDL3/Vulkan client with durable Player17 saves, research, fleet orders, shipyard, construction and observer-safe orbital workspaces. Native local fleets follow canonical transit; connected exits preserve knowledge gates and orbital clearance. Planet imagery and mouse navigation use bounded caches. No Godot or .NET runtime is required. Detailed system graphics, orbital structures, colony/diplomacy screens and audio remain under development. Diagnostic timings are not an FPS guarantee."
+  "description": "C++23 campaign runtime and SDL3/Vulkan client with durable Player17 saves, research, fleet orders, shipyard, construction, orbital and owned-colony workspaces. Local fleet motion and connected exits follow canonical simulation. Colony telemetry preserves source currency, current reserves and construction progress. Surface assessments and ship-delivered settlement controllers retain authoritative rules. No Godot or .NET runtime is required. Detailed graphics, surface placement UI, settlement input, diplomacy and audio remain under development. Diagnostic timings are not an FPS guarantee."
 }

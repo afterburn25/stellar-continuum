@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Owned surveyed planets open a colony workspace with grouped population, labor/support, current reserves, surface production and sites; independently scrolling columns keep 720p readable. Back restores the same body; pause/speed retain it.
+
 - System views display selectable green owned fleets at canonical local positions. Real connected exits sit outside the dotted boundary with fixed-size forest-green arrows and measured labels. Unknown destinations stay masked.
 - Pause and speed retain the system view; map gestures are cleared at workspace transitions.
 
@@ -74,4 +76,4 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, construction/unlock progression, diplomacy, system/planet/colony views, tactical presentation and audio remain. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, full construction/unlock progression, diplomacy, 3D planet/surface views, tactical presentation and audio remain. Orbital and owned-colony telemetry views are integrated; graphical settlement and surface placement controls remain open. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.

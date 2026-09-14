@@ -377,6 +377,12 @@ if(BUILD_TESTING)
   add_test(NAME construction_projects_parity COMMAND stellar_construction_projects_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/construction-projects.json")
   set_tests_properties(construction_projects_parity PROPERTIES TIMEOUT 60)
+  add_executable(stellar_surface_assessment_tests native-tests/surface_assessment_tests.cpp)
+  target_link_libraries(stellar_surface_assessment_tests PRIVATE stellar_core)
+  add_test(NAME surface_placement_removal_assessment COMMAND stellar_surface_assessment_tests)
+  if(MSVC)
+    target_compile_options(stellar_surface_assessment_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_surface_construction_tests native-tests/surface_construction_tests.cpp)
   target_link_libraries(stellar_surface_construction_tests PRIVATE stellar_core stellar_json)
   add_test(NAME surface_construction_parity COMMAND stellar_surface_construction_tests

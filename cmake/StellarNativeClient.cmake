@@ -59,3 +59,7 @@ if(MSVC)
   target_compile_options(stellar_native_platform PRIVATE /WX)
   target_compile_options(stellar-continuum-native PRIVATE /WX)
 endif()
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_colony_controller.cpp
+  app/native_client/native_colony_workspace.cpp)

@@ -1,6 +1,8 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
 #include "native_campaign_session.hpp"
+#include "native_colony_controller.hpp"
+#include "native_colony_workspace.hpp"
 #include "native_construction_controller.hpp"
 #include "native_construction_workspace.hpp"
 #include "native_fleet_controller.hpp"
@@ -50,6 +52,8 @@ using namespace stellar::core;
 using namespace stellar::native_map;
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
+using namespace stellar::native_colony;
+using namespace stellar::native_colony_ui;
 using namespace stellar::native_fleet;
 using namespace stellar::native_fleet_ui;
 using namespace stellar::native_research;
@@ -76,6 +80,8 @@ struct Options {
   bool system_smoke{};
   bool system_travel_smoke{};
   bool system_travel_reload_smoke{};
+  bool colony_smoke{};
+  bool colony_reload_smoke{};
   bool save_path_overridden{};
 };
 
@@ -105,6 +111,8 @@ struct Options {
     else if(arg==L"--system-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_smoke=true;result.windowed=true;}
     else if(arg==L"--system-travel-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_travel_smoke=true;result.windowed=true;}
     else if(arg==L"--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_travel_reload_smoke=true;result.windowed=true;}
+    else if(arg==L"--colony-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.colony_smoke=true;result.windowed=true;}
+    else if(arg==L"--colony-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.colony_reload_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -122,14 +130,17 @@ struct Options {
     else if(arg=="--system-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_smoke=true;result.windowed=true;}
     else if(arg=="--system-travel-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_travel_smoke=true;result.windowed=true;}
     else if(arg=="--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_travel_reload_smoke=true;result.windowed=true;}
+    else if(arg=="--colony-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.colony_smoke=true;result.windowed=true;}
+    else if(arg=="--colony-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.colony_reload_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
+  if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
 }
@@ -270,6 +281,42 @@ class NativeCampaign final {
     if(system_workspace_.selected_body_id()!=earth_body_id)throw std::runtime_error("System smoke could not select Earth.");
     smoke_system_hit_=true;const auto before=*system_workspace_.viewport();InputSnapshot zoom;zoom.drawable_width=width;zoom.drawable_height=height;zoom.pointer={420,320};zoom.events={{InputEventType::Wheel,zoom.pointer,{},1}};(void)update(zoom,width,height,0.,false);const auto zoomed=*system_workspace_.viewport();smoke_system_zoomed_=zoomed.scale>before.scale;InputSnapshot move;move.drawable_width=width;move.drawable_height=height;move.pointer={392,318};move.events={{InputEventType::LeftPressed,{360,300}},{InputEventType::PointerMove,{392,318},{32,18}},{InputEventType::LeftReleased,{392,318}}};(void)update(move,width,height,0.,false);const auto after=*system_workspace_.viewport();smoke_system_panned_=after.center_x!=zoomed.center_x||after.center_y!=zoomed.center_y;
     if(!smoke_system_zoomed_||!smoke_system_panned_)throw std::runtime_error("System smoke did not preserve zoom and pan input.");
+  }
+  void prepare_colony_smoke(int width,int height,bool reload){
+    smoke_colony_reload_=reload;
+    auto &frame=session_->frame();
+    auto &world=frame.runtime().world().campaign();
+    frame.clock().set_speed(StrategicSpeed::Paused);
+    smoke_colony_day_=frame.clock().simulation_days();
+    const auto colony=std::ranges::find_if(world.colonies,[&](const Colony&candidate){return candidate.civilization_id==world.player_civilization_id&&candidate.planetary_body_id.has_value();});
+    if(colony==world.colonies.end())throw std::runtime_error("Colony smoke requires a player-owned planetary settlement.");
+    const auto system=session_->cache().systems_by_id.find(colony->system_id);
+    if(system==session_->cache().systems_by_id.end())throw std::runtime_error("Colony smoke settlement system is absent from the campaign cache.");
+    const auto click=[&](Point point,std::uint8_t count=1){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point,{},0,{},count},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Colony smoke input closed the campaign.");};
+    const auto system_point=camera_.project({system->second->position.x,system->second->position.y},width,height);
+    click(system_point,2);
+    if(!system_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.viewport())throw std::runtime_error("Colony smoke could not open its observer-safe system.");
+    const auto spatial=project_system(*system_workspace_.snapshot());
+    const auto body=std::ranges::find(spatial.bodies,*colony->planetary_body_id,&SystemSpatialBodyMarker::body_id);
+    if(body==spatial.bodies.end())throw std::runtime_error("Colony smoke owned body is not visible to the player observer.");
+    const auto body_point=system_workspace_.viewport()->world_to_screen(body->offset_x,body->offset_y);
+    click({body_point.x,body_point.y});
+    smoke_colony_selected_=system_workspace_.selected_body_id()==colony->planetary_body_id;
+    click(center(SystemWorkspaceLayout::for_viewport(width,height).colony_action));
+    if(!colony_workspace_.visible()||!colony_workspace_.view())throw std::runtime_error("Colony smoke did not open through the owned-body action.");
+    smoke_colony_opened_=true;
+    const auto expected_system=system_workspace_.system_id();
+    const auto expected_body=system_workspace_.selected_body_id();
+    InputSnapshot back;back.drawable_width=width;back.drawable_height=height;back.events={{InputEventType::EscapePressed}};(void)update(back,width,height,0.,false);
+    smoke_colony_back_=!colony_workspace_.visible()&&system_workspace_.visible()&&system_workspace_.system_id()==expected_system&&system_workspace_.selected_body_id()==expected_body;
+    click(center(SystemWorkspaceLayout::for_viewport(width,height).colony_action));
+    const auto ui=NativeUiLayout::for_viewport(width,height);
+    click(center(ui.pause));
+    smoke_colony_pause_retained_=colony_workspace_.visible()&&frame.clock().speed()!=StrategicSpeed::Paused;
+    for(int index=0;index<4;++index)click(center(ui.speed));
+    smoke_colony_speed_retained_=colony_workspace_.visible()&&frame.clock().speed()==StrategicSpeed::Normal;
+    click(center(ui.pause));
+    if(!smoke_colony_selected_||!smoke_colony_opened_||!smoke_colony_back_||!smoke_colony_pause_retained_||!smoke_colony_speed_retained_||frame.clock().speed()!=StrategicSpeed::Paused||frame.clock().simulation_days()!=smoke_colony_day_)throw std::runtime_error("Colony smoke input routing or paused state was not preserved.");
   }
   void prepare_system_travel_smoke(int width,int height,bool paused_reload){
     auto &world=session_->frame().runtime().world().campaign();
@@ -569,6 +616,32 @@ class NativeCampaign final {
       <<":day_unchanged="<<(session_->frame().clock().simulation_days()==smoke_system_day_);
     return out.str();
   }
+  [[nodiscard]] std::string colony_smoke_status()const{
+    if(!colony_workspace_.view())return "unavailable";
+    const auto&view=*colony_workspace_.view();
+    std::ostringstream out;out<<std::fixed<<std::setprecision(6)<<std::boolalpha
+      <<"{\"mode\":\""<<(smoke_colony_reload_?"paused_reload":"fresh")
+      <<"\",\"player_id\":"<<view.player_civilization_id
+      <<",\"system_id\":"<<view.system_id
+      <<",\"body_id\":"<<view.body_id
+      <<",\"colony_id\":"<<view.colony_id
+      <<",\"revision\":"<<view.revision
+      <<",\"site_count\":"<<view.construction_sites.size()
+      <<",\"population_millions\":"<<view.population_millions
+      <<",\"support_ratio\":"<<view.sustenance_support_ratio
+      <<",\"food_reserve_days\":"<<view.food_reserve_days
+      <<",\"water_reserve_days\":"<<view.water_reserve_days
+      <<",\"power_supply\":"<<view.power_supply
+      <<",\"power_demand\":"<<view.power_demand
+      <<",\"selected\":"<<smoke_colony_selected_
+      <<",\"opened\":"<<smoke_colony_opened_
+      <<",\"back_restored\":"<<smoke_colony_back_
+      <<",\"pause_retained\":"<<smoke_colony_pause_retained_
+      <<",\"speed_retained\":"<<smoke_colony_speed_retained_
+      <<",\"paused\":"<<(session_->frame().clock().speed()==StrategicSpeed::Paused)
+      <<",\"day_unchanged\":"<<(session_->frame().clock().simulation_days()==smoke_colony_day_)<<'}';
+    return out.str();
+  }
   [[nodiscard]] std::string system_travel_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(9)<<std::boolalpha<<"{\"mode\":\""<<(smoke_system_travel_reload_?"paused_reload":"progress")<<"\",\"fleet_id\":"<<smoke_system_travel_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_system_travel_system_id_.value_or(-1)<<",\"destination_id\":"<<smoke_system_travel_destination_id_.value_or(-1)<<",\"order_revision\":"<<smoke_system_travel_mission_revision_<<",\"lane_count\":"<<smoke_system_travel_lane_count_<<",\"before_x\":"<<smoke_system_travel_before_x_<<",\"before_y\":"<<smoke_system_travel_before_y_<<",\"after_x\":"<<smoke_system_travel_after_x_<<",\"after_y\":"<<smoke_system_travel_after_y_<<",\"before_days\":"<<smoke_system_travel_before_day_<<",\"after_days\":"<<smoke_system_travel_after_day_<<",\"selected\":"<<smoke_system_travel_selected_<<",\"canonical_moved\":"<<smoke_system_travel_canonical_moved_<<",\"rendered_moved\":"<<smoke_system_travel_rendered_moved_<<",\"paused_stable\":"<<smoke_system_travel_paused_stable_<<",\"pause_retained\":"<<smoke_system_travel_pause_retained_<<",\"known_arrow\":"<<smoke_system_travel_known_opened_<<",\"unknown_denied\":"<<smoke_system_travel_unknown_denied_<<",\"knowledge_unchanged\":"<<smoke_system_travel_knowledge_unchanged_<<",\"lanes_connected\":"<<smoke_system_travel_lanes_connected_<<'}';return out.str();}
   [[nodiscard]] bool wants_text_input() const noexcept {
     return research_workspace_.wants_text_input() &&
@@ -589,6 +662,8 @@ class NativeCampaign final {
       fleet_workspace_.discard_campaign();
       shipyard_workspace_.discard_campaign();
       construction_workspace_.discard_campaign();
+      colony_workspace_.discard_campaign();
+      colony_entry_view_.reset();
       system_workspace_.discard_campaign();
       planet_discs_.discard_campaign();
       fleet_marker_offsets_.clear();
@@ -602,7 +677,18 @@ class NativeCampaign final {
     if(input.quit_requested)session_->request_exit();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     for(const auto &event:input.events){
-      if(system_workspace_.visible()&&!menu_){
+      if(colony_workspace_.visible()&&!menu_){
+        const auto top_action=event.type==InputEventType::LeftPressed
+                                  ?layout.hit(event.position,false):UiAction::None;
+        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction;
+        if(opens_workspace)colony_workspace_.close();
+        else if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const auto command=colony_workspace_.handle(event,width,height);
+          if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
+          if(command.captured)continue;
+        }
+      }
+      if(system_workspace_.visible()&&!colony_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
         const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction;
@@ -612,11 +698,14 @@ class NativeCampaign final {
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::select_fleet){const auto selected=fleet_controller_.select_next_hit(session_->frame(),session_->cache().generation,command.hit_fleet_ids);system_workspace_.set_notice(selected.message);refresh_fleets(true);refresh_system_travel(true);}
           else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice("Destination details are not available to this observer.");}
+          else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
+          refresh_colony_entry(false);
           continue;
         }
       }
       if(event.type==InputEventType::EscapePressed){
-        if(construction_workspace_.visible())construction_workspace_.close();
+        if(colony_workspace_.visible())colony_workspace_.close();
+        else if(construction_workspace_.visible())construction_workspace_.close();
         else if(shipyard_workspace_.visible())shipyard_workspace_.close();
         else if(research_workspace_.visible())research_workspace_.close();
         else toggle_menu();
@@ -627,6 +716,7 @@ class NativeCampaign final {
         (void)research_workspace_.handle(event,width,height);
         (void)shipyard_workspace_.handle(event,width,height);
         (void)construction_workspace_.handle(event,width,height);
+        (void)colony_workspace_.handle(event,width,height);
         continue;
       }
       if(construction_workspace_.visible()){
@@ -652,7 +742,7 @@ class NativeCampaign final {
         if(command.captured||event.type==InputEventType::TextEntered||
            event.type==InputEventType::BackspacePressed)continue;
       }
-      if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
+      if(!menu_&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
         if(event.type==InputEventType::LeftPressed&&event.click_count>=2){
           if(const auto target=system_hit(event.position,width,height);target&&enter_system(*target,width,height)){
             gesture_.capture_for_ui();continue;
@@ -663,7 +753,7 @@ class NativeCampaign final {
           if(target&&enter_system(*target,width,height)){gesture_.capture_for_ui();continue;}
         }
       }
-      if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
+      if(!menu_&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
         const auto markers=fleet_markers(width,height);
         const auto target=event.type==InputEventType::RightPressed
                               ?system_hit(event.position,width,height)
@@ -699,12 +789,12 @@ class NativeCampaign final {
           else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.open();refresh_construction(true);}
           captured=true;
         }
-        if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())captured=true;
+        if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||colony_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
-      if(event.type==InputEventType::Wheel){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
-      if(event.type==InputEventType::LeftReleased){if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::Wheel){if(!menu_&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
+      if(event.type==InputEventType::LeftReleased){if(!menu_&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
     if(research_workspace_.take_refresh_request())refresh_research(true);
     if(advance_simulation){
@@ -717,6 +807,8 @@ class NativeCampaign final {
       refresh_shipyard(false);
       construction_refresh_elapsed_+=elapsed;
       refresh_construction(false);
+      colony_refresh_elapsed_+=elapsed;
+      refresh_colony(false);
       system_refresh_elapsed_+=elapsed;
       refresh_system(false);
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
@@ -826,11 +918,12 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
-    if(!menu_&&!system_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible())
+    if(!menu_&&!system_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height));
     research_workspace_.render(out, width, height);
     shipyard_workspace_.render(out, width, height);
     construction_workspace_.render(out, width, height);
+    colony_workspace_.render(out, width, height);
     return out;
   }
  private:
@@ -838,7 +931,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();colony_workspace_.close();colony_entry_view_.reset();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     if(travel.snapshot)system_workspace_.refresh_travel(std::move(*travel.snapshot),fleet_controller_.selection());else system_workspace_.set_notice(travel.denial);
     system_refresh_elapsed_=0.;return true;
@@ -851,10 +944,34 @@ class NativeCampaign final {
     if(!force&&system_refresh_elapsed_<1.&&system_workspace_.survey_level()==level)return;
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.system_id());
     if(!built.snapshot){system_workspace_.close();return;}
-    system_workspace_.refresh(std::move(*built.snapshot));system_refresh_elapsed_=0.;refresh_system_travel(true);
+    system_workspace_.refresh(std::move(*built.snapshot));system_refresh_elapsed_=0.;refresh_system_travel(true);refresh_colony_entry(true);
   }
 
   void refresh_system_travel(bool force){if(!force||!system_workspace_.visible()||!system_workspace_.snapshot())return;auto built=system_travel_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot());if(built.snapshot)system_workspace_.refresh_travel(std::move(*built.snapshot),fleet_controller_.selection());else{system_workspace_.clear_travel();system_workspace_.set_notice(built.denial);}}
+
+  void refresh_colony_entry(bool force){
+    if(!system_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.selected_body_id()){
+      colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);return;
+    }
+    if(!force&&colony_entry_view_&&colony_entry_view_->campaign_generation==session_->cache().generation&&colony_entry_view_->system_id==*system_workspace_.system_id()&&colony_entry_view_->body_id==*system_workspace_.selected_body_id())return;
+    auto built=colony_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot(),*system_workspace_.selected_body_id());
+    if(built.view){colony_entry_view_=std::move(*built.view);system_workspace_.set_colony_body(colony_entry_view_->body_id);}
+    else{colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);}
+  }
+
+  void open_colony_from_system(int body_id){
+    refresh_colony_entry(true);
+    if(!colony_entry_view_||colony_entry_view_->body_id!=body_id){system_workspace_.set_notice("Colony operations are unavailable for this body.");return;}
+    colony_workspace_.open(*colony_entry_view_);gesture_.capture_for_ui();colony_refresh_elapsed_=0.;
+  }
+
+  void refresh_colony(bool force){
+    if(!colony_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.selected_body_id())return;
+    if(!force&&colony_refresh_elapsed_<.2)return;
+    auto built=colony_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot(),*system_workspace_.selected_body_id());
+    if(!built.view){colony_workspace_.close();colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);return;}
+    colony_entry_view_=*built.view;colony_workspace_.set_view(std::move(*built.view));system_workspace_.set_colony_body(colony_entry_view_->body_id);colony_refresh_elapsed_=0.;
+  }
 
   [[nodiscard]] ResearchStamp current_research_stamp() const {
     auto &frame=session_->frame();
@@ -1122,6 +1239,9 @@ class NativeCampaign final {
   NativeShipyardWorkspace shipyard_workspace_;
   NativeConstructionController construction_controller_;
   NativeConstructionWorkspace construction_workspace_;
+  NativeColonyController colony_controller_;
+  NativeColonyWorkspace colony_workspace_;
+  std::optional<NativeColonyView> colony_entry_view_;
   NativeSystemViewController system_controller_;
   NativeSystemTravelController system_travel_controller_;
   NativePlanetDiscAssets planet_discs_;
@@ -1133,6 +1253,7 @@ class NativeCampaign final {
   double fleet_refresh_elapsed_{};
   double shipyard_refresh_elapsed_{};
   double construction_refresh_elapsed_{};
+  double colony_refresh_elapsed_{};
   double system_refresh_elapsed_{};
   bool last_construction_command_accepted_{};
   bool smoke_construction_started_{};
@@ -1155,6 +1276,8 @@ class NativeCampaign final {
   int smoke_system_travel_mission_revision_{};std::size_t smoke_system_travel_lane_count_{};
   float smoke_system_travel_before_x_{},smoke_system_travel_before_y_{},smoke_system_travel_after_x_{},smoke_system_travel_after_y_{};double smoke_system_travel_before_day_{},smoke_system_travel_after_day_{};
   bool smoke_system_travel_reload_{},smoke_system_travel_selected_{},smoke_system_travel_canonical_moved_{},smoke_system_travel_rendered_moved_{},smoke_system_travel_paused_stable_{},smoke_system_travel_pause_retained_{},smoke_system_travel_known_opened_{},smoke_system_travel_unknown_denied_{},smoke_system_travel_knowledge_unchanged_{},smoke_system_travel_lanes_connected_{};
+  bool smoke_colony_reload_{},smoke_colony_selected_{},smoke_colony_opened_{},smoke_colony_back_{},smoke_colony_pause_retained_{},smoke_colony_speed_retained_{};
+  double smoke_colony_day_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
 };
 }
@@ -1194,6 +1317,9 @@ int main(int argc,char **argv){
       else if(options.system_travel_smoke||options.system_travel_reload_smoke)
         campaign.prepare_system_travel_smoke(window.drawable_width(),
                                              window.drawable_height(),options.system_travel_reload_smoke);
+      else if(options.colony_smoke||options.colony_reload_smoke)
+        campaign.prepare_colony_smoke(window.drawable_width(),
+                                      window.drawable_height(),options.colony_reload_smoke);
       else
         campaign.prepare_smoke_ui();
     }
@@ -1220,7 +1346,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       const bool capture=options.smoke_screenshot&&frames>=120;
@@ -1253,6 +1379,8 @@ int main(int argc,char **argv){
           std::cout<<" system="<<campaign.system_smoke_status();
         if(options.system_travel_smoke||options.system_travel_reload_smoke)
           std::cout<<" system_travel="<<campaign.system_travel_smoke_status();
+        if(options.colony_smoke||options.colony_reload_smoke)
+          std::cout<<" colony="<<campaign.colony_smoke_status();
         std::cout<<'\n';
         break;
       }

@@ -202,84 +202,239 @@ surface_placement_error(std::span<const SurfaceBuilding> bs,
     return "This demo colony has reached its 64-building limit.";
   return {};
 }
-ConstructionOrderResult place_surface_building(ConstructionWorld w, int civ,
-                                               int id, std::string_view type,
-                                               float x, float z, float rot) {
-  auto *c = colony_for(w, civ, id);
+SurfaceBuildingPlacementAssessment assess_surface_building_placement(
+    ConstructionReadView w, int civ, int id, std::string_view type, float x,
+    float z, float rot) {
+  SurfaceBuildingPlacementAssessment result;
+  result.civilization_id = civ;
+  result.colony_id = id;
+  result.type_id = std::string(type);
+  result.x = x;
+  result.z = z;
+  result.normalized_rotation_degrees = rot;
+  const auto deny = [&](std::string message) {
+    result.message = std::move(message);
+    return result;
+  };
+  const auto *c = colony_for(w, civ, id);
   if (!c)
-    return {false, "You can build only in a colony you own."};
-  auto *b = body_for(w.read(), *c);
+    return deny("You can build only in a colony you own.");
+  const auto *b = body_for(w, *c);
   if (!b || !b->environment.has_solid_surface)
-    return {false,
-            "A surveyed colony on a solid planetary surface is required."};
-  auto *e = economy_for(w, civ);
-  if (!e)
-    return {false, "The colony has no construction economy."};
-  auto *d = find_surface_building(type);
+    return deny("A surveyed colony on a solid planetary surface is required.");
+  const auto economy = std::find_if(
+      w.economies.begin(), w.economies.end(),
+      [=](const auto &candidate) { return candidate.civilization_id == civ; });
+  if (economy == w.economies.end())
+    return deny("The colony has no construction economy.");
+  const auto *d = find_surface_building(type);
   if (!d || !surface_available_for_settlement(*c, *d)) {
-    if (c->kind == SettlementKind::ResourceOutpost && d && d->id == "trade_hub")
-      return {false, "A sealed resource outpost cannot support a civilian "
-                     "trade hub. Deliver extracted material by freighter."};
-    return {false, "That building type is available only as an upgrade."};
+    if (c->kind == SettlementKind::ResourceOutpost && d &&
+        d->id == "trade_hub")
+      return deny("A sealed resource outpost cannot support a civilian trade "
+                  "hub. Deliver extracted material by freighter.");
+    return deny("That building type is available only as an upgrade.");
   }
-  auto cap = surface_building_capacity(*c);
-  if (c->surface_buildings.size() >= static_cast<size_t>(cap))
-    return {false, "This settlement hub has reached its " +
-                       std::to_string(cap) + "-module capacity."};
-  if (auto err = surface_placement_error(c->surface_buildings, type, x, z, rot))
-    return {false, *err};
-  auto currency = currency_for(w.read(), civ);
-  auto cost = surface_authorization_cost(w.read(), *c, *d);
-  if (e->credits + .0001 < cost)
-    return {false, currency.format(cost) + " is required to authorize this " +
-                       d->name + " here."};
+  const auto capacity = surface_building_capacity(*c);
+  if (c->surface_buildings.size() >= static_cast<std::size_t>(capacity))
+    return deny("This settlement hub has reached its " +
+                std::to_string(capacity) + "-module capacity.");
+  if (auto error =
+          surface_placement_error(c->surface_buildings, type, x, z, rot))
+    return deny(*error);
+  const auto currency = currency_for(w, civ);
+  result.building_name = d->name;
+  result.authorization_cost = surface_authorization_cost(w, *c, *d);
+  result.industry_cost = d->industry_cost;
+  result.formatted_authorization =
+      currency.format(result.authorization_cost);
+  if (economy->credits + .0001 < result.authorization_cost)
+    return deny(result.formatted_authorization +
+                " is required to authorize this " + d->name + " here.");
   int next = 1;
   if (!c->surface_buildings.empty()) {
     int maximum = c->surface_buildings.front().id;
-    for (const auto &q : c->surface_buildings)
-      maximum = std::max(maximum, q.id);
+    for (const auto &site : c->surface_buildings)
+      maximum = std::max(maximum, site.id);
     if (maximum == std::numeric_limits<int>::max())
-      return {false, "No building identifier is available."};
+      return deny("No building identifier is available.");
     next = maximum + 1;
   }
   if (next <= 0)
-    return {false, "No building identifier is available."};
-  e->credits -= cost;
+    return deny("No building identifier is available.");
+  result.accepted = true;
+  result.prepared_building_id = next;
+  result.normalized_rotation_degrees =
+      std::fmod(std::fmod(rot, 360.F) + 360.F, 360.F);
+  result.message = d->name + " placed and authorized for " +
+                   result.formatted_authorization +
+                   ". Construction uses available materials.";
+  return result;
+}
+namespace {
+bool same_placement_quote(const SurfaceBuildingPlacementAssessment &left,
+                          const SurfaceBuildingPlacementAssessment &right) {
+  return left.accepted == right.accepted &&
+         left.civilization_id == right.civilization_id &&
+         left.colony_id == right.colony_id && left.type_id == right.type_id &&
+         left.building_name == right.building_name &&
+         left.x == right.x && left.z == right.z &&
+         left.normalized_rotation_degrees ==
+             right.normalized_rotation_degrees &&
+         left.prepared_building_id == right.prepared_building_id &&
+         left.authorization_cost == right.authorization_cost &&
+         left.industry_cost == right.industry_cost &&
+         left.formatted_authorization == right.formatted_authorization &&
+         left.message == right.message;
+}
+ConstructionOrderResult apply_surface_building_placement(
+    ConstructionWorld w, const SurfaceBuildingPlacementAssessment &prepared) {
+  auto *c = colony_for(w, prepared.civilization_id, prepared.colony_id);
+  auto *e = economy_for(w, prepared.civilization_id);
+  if (!c || !e)
+    throw std::logic_error("Prepared surface placement lost its owner.");
+  e->credits -= prepared.authorization_cost;
   c->surface_buildings.push_back(
-      {next, std::string(type), x, z,
-       std::fmod(std::fmod(rot, 360.F) + 360.F, 360.F)});
-  return {true, d->name + " placed and authorized for " +
-                    currency.format(cost) +
-                    ". Construction uses available materials."};
+      {prepared.prepared_building_id, prepared.type_id, prepared.x, prepared.z,
+       prepared.normalized_rotation_degrees});
+  return {true, prepared.message};
+}
+} // namespace
+ConstructionOrderResult commit_surface_building_placement(
+    ConstructionWorld w,
+    const SurfaceBuildingPlacementAssessment &assessment) {
+  const auto current = assess_surface_building_placement(
+      w.read(), assessment.civilization_id, assessment.colony_id,
+      assessment.type_id, assessment.x, assessment.z,
+      assessment.normalized_rotation_degrees);
+  if (!current.accepted)
+    return {false, current.message};
+  if (!assessment.accepted || !same_placement_quote(assessment, current))
+    return {false,
+            "Surface placement terms changed; review the current quote."};
+  return apply_surface_building_placement(w, current);
+}
+ConstructionOrderResult place_surface_building(ConstructionWorld w, int civ,
+                                               int id, std::string_view type,
+                                               float x, float z, float rot) {
+  const auto assessment =
+      assess_surface_building_placement(w.read(), civ, id, type, x, z, rot);
+  if (!assessment.accepted)
+    return {false, assessment.message};
+  return apply_surface_building_placement(w, assessment);
+}
+namespace {
+SurfaceBuildingRemovalAssessment prepare_surface_building_removal(
+    ConstructionReadView w, int civ, int id, int building_id) {
+  SurfaceBuildingRemovalAssessment result;
+  result.civilization_id = civ;
+  result.colony_id = id;
+  result.building_id = building_id;
+  const auto deny = [&](std::string message) {
+    result.message = std::move(message);
+    return result;
+  };
+  const auto *c = colony_for(w, civ, id);
+  if (!c)
+    return deny("You can remove buildings only from a colony you own.");
+  const auto site = std::find_if(
+      c->surface_buildings.begin(), c->surface_buildings.end(),
+      [=](const auto &candidate) { return candidate.id == building_id; });
+  if (site == c->surface_buildings.end())
+    return deny("That surface building no longer exists.");
+  const auto *d = find_surface_building(site->type_id);
+  if (!d)
+    return deny("That surface building has an unknown type and cannot be "
+                "removed safely.");
+  const auto economy = std::find_if(
+      w.economies.begin(), w.economies.end(),
+      [=](const auto &candidate) { return candidate.civilization_id == civ; });
+  if (economy == w.economies.end())
+    return deny("The colony has no construction economy.");
+  result.type_id = site->type_id;
+  result.building_name = d->name;
+  result.cancellation = !site->is_complete;
+  if (result.cancellation)
+    result.refund = surface_authorization_cost(w, *c, *d) * .5;
+  result.accepted = true;
+  return result;
+}
+SurfaceBuildingRemovalAssessment finish_surface_building_removal_assessment(
+    ConstructionReadView w, SurfaceBuildingRemovalAssessment result) {
+  if (!result.accepted)
+    return result;
+  if (result.cancellation) {
+    result.formatted_refund =
+        money(w, result.civilization_id, result.refund);
+    result.message = result.building_name + " construction cancelled. " +
+                     result.formatted_refund +
+                     " was recovered; spent industry was not recoverable.";
+  } else {
+    result.message = result.building_name +
+                     " demolished. Its power use and production have stopped.";
+  }
+  return result;
+}
+bool same_removal_quote(const SurfaceBuildingRemovalAssessment &left,
+                        const SurfaceBuildingRemovalAssessment &right) {
+  return left.accepted == right.accepted &&
+         left.civilization_id == right.civilization_id &&
+         left.colony_id == right.colony_id &&
+         left.building_id == right.building_id &&
+         left.type_id == right.type_id &&
+         left.building_name == right.building_name &&
+         left.cancellation == right.cancellation &&
+         left.refund == right.refund &&
+         left.formatted_refund == right.formatted_refund &&
+         left.message == right.message;
+}
+ConstructionOrderResult apply_surface_building_removal(
+    ConstructionWorld w, const SurfaceBuildingRemovalAssessment &prepared) {
+  auto *c = colony_for(w, prepared.civilization_id, prepared.colony_id);
+  auto *e = economy_for(w, prepared.civilization_id);
+  if (!c || !e)
+    throw std::logic_error("Prepared surface removal lost its owner.");
+  const auto site = std::find_if(
+      c->surface_buildings.begin(), c->surface_buildings.end(),
+      [&](const auto &candidate) { return candidate.id == prepared.building_id; });
+  if (site == c->surface_buildings.end())
+    throw std::logic_error("Prepared surface removal lost its building.");
+  c->surface_buildings.erase(site);
+  if (prepared.cancellation) {
+    e->credits += prepared.refund;
+    const auto formatted =
+        money(w.read(), prepared.civilization_id, prepared.refund);
+    return {true, prepared.building_name + " construction cancelled. " +
+                      formatted +
+                      " was recovered; spent industry was not recoverable."};
+  }
+  return {true, prepared.building_name +
+                    " demolished. Its power use and production have stopped."};
+}
+} // namespace
+SurfaceBuildingRemovalAssessment assess_surface_building_removal(
+    ConstructionReadView w, int civ, int id, int building_id) {
+  return finish_surface_building_removal_assessment(
+      w, prepare_surface_building_removal(w, civ, id, building_id));
+}
+ConstructionOrderResult commit_surface_building_removal(
+    ConstructionWorld w, const SurfaceBuildingRemovalAssessment &assessment) {
+  const auto current = assess_surface_building_removal(
+      w.read(), assessment.civilization_id, assessment.colony_id,
+      assessment.building_id);
+  if (!current.accepted)
+    return {false, current.message};
+  if (!assessment.accepted || !same_removal_quote(assessment, current))
+    return {false, "Surface removal terms changed; review the current quote."};
+  return apply_surface_building_removal(w, current);
 }
 ConstructionOrderResult remove_surface_building(ConstructionWorld w, int civ,
-                                                int id, int bid) {
-  auto *c = colony_for(w, civ, id);
-  if (!c)
-    return {false, "You can remove buildings only from a colony you own."};
-  auto p =
-      std::find_if(c->surface_buildings.begin(), c->surface_buildings.end(),
-                   [=](auto &b) { return b.id == bid; });
-  if (p == c->surface_buildings.end())
-    return {false, "That surface building no longer exists."};
-  auto *d = find_surface_building(p->type_id);
-  if (!d)
-    return {false, "That surface building has an unknown type and cannot be "
-                   "removed safely."};
-  auto *e = economy_for(w, civ);
-  if (!e)
-    return {false, "The colony has no construction economy."};
-  auto b = *p;
-  c->surface_buildings.erase(p);
-  if (b.is_complete)
-    return {true,
-            d->name +
-                " demolished. Its power use and production have stopped."};
-  auto refund = surface_authorization_cost(w.read(), *c, *d) * .5;
-  e->credits += refund;
-  return {true, d->name + " construction cancelled. " +
-                    money(w.read(), civ, refund) +
-                    " was recovered; spent industry was not recoverable."};
+                                                int id, int building_id) {
+  const auto prepared =
+      prepare_surface_building_removal(w.read(), civ, id, building_id);
+  if (!prepared.accepted)
+    return {false, prepared.message};
+  return apply_surface_building_removal(w, prepared);
 }
 ConstructionOrderResult upgrade_surface_building(ConstructionWorld w, int civ,
                                                  int id, int bid) {

@@ -22,7 +22,13 @@ struct SystemBodyAppearance {
 };
 using SystemImageProvider=std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(const SystemBodyAppearance&)>;
 using SystemTextMeasurer=std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>;
-enum class SystemWorkspaceCommandKind { none, close, select_fleet, open_destination };
+enum class SystemWorkspaceCommandKind {
+  none,
+  close,
+  select_fleet,
+  open_destination,
+  open_colony
+};
 struct SystemWorkspaceCommand {
   SystemWorkspaceCommandKind kind{SystemWorkspaceCommandKind::none};
   bool captured{};
@@ -34,6 +40,7 @@ struct SystemWorkspaceLayout {
   stellar::native_map::UiRect back;
   stellar::native_map::UiRect reset;
   stellar::native_map::UiRect inspector;
+  stellar::native_map::UiRect colony_action;
   stellar::native_map::UiRect world_field;
   [[nodiscard]] static SystemWorkspaceLayout for_viewport(int width,int height) noexcept;
 };
@@ -45,6 +52,7 @@ public:
   void refresh_travel(stellar::native_system_travel::NativeSystemTravelSnapshot,
                       std::optional<int> selected_fleet_id);
   void clear_travel() noexcept;
+  void set_colony_body(std::optional<int>) noexcept;
   void set_notice(std::string);
   void close() noexcept;
   void discard_campaign() noexcept;
@@ -65,6 +73,7 @@ public:
   void render(stellar::native_map::DrawList&,int width,int height);
   void reset_fit(int width,int height);
 private:
+  enum class InspectorFocus { automatic, body, fleet };
   void resize(int width,int height);
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
@@ -75,10 +84,13 @@ private:
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;
   std::optional<int> selected_body_id_;
+  std::optional<int> colony_body_id_;
   std::optional<stellar::native_system_travel::NativeSystemTravelSnapshot> travel_;
   std::vector<stellar::native_system_travel::NativeLaneLabelMetrics> lane_metrics_;
   std::optional<int> selected_fleet_id_,hovered_fleet_id_,hovered_lane_id_;
   std::string notice_;
+  stellar::native_map::Point pointer_{};
+  InspectorFocus inspector_focus_{InspectorFocus::automatic};
   bool dragging_{};
   int width_{},height_{};
 };
