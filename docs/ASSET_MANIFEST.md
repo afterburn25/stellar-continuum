@@ -5,12 +5,63 @@ Owner: `work/visual-style-assets`
 
 This registry prevents duplicate visual concepts, records provenance/status, and maps production-candidate visuals to the gameplay concepts that currently exist in shared integration.
 
+## Alien fleet metal construction collection — 2026-09-14 UTC
+
+The [alien fleet design and integration record](content/ALIEN_FLEET.md) covers
+`assets/models/alien-fleet-v2`: 18 original hulls, 18 reduced-detail hulls, 36
+species-matched equipment models, physically named attachment nodes, measured
+metre dimensions, an offline 3D fitting workshop and renders of the actual models.
+Semantic species/role mappings, socket transforms and SHA-256 hashes are in
+`fleet-manifest.json`. Editable source is retained in `tools/alien-fleet`.
+
+Status: **Library candidate**. Export validation and independent model import
+passed; gameplay/native renderer integration, final art approval, collision and
+weapon-arc review, research bindings and damage/animation states remain pending.
+The equipment meshes attach and detach in the workshop; their presence grants no
+new live-game capabilities. Assembled plates and service hardware use PBR metal
+materials with embedded texture maps. The original generated surface, derivatives,
+exact prompts and separately labelled construction reference are retained with
+[art provenance](art/ALIEN_FLEET_METAL_PROVENANCE.md). Third-party runtime/tool
+notices accompany the pack. Version 0.1.0 remains a superseded blockout.
+
+## Immediate station and player-fleet production — 2026-09-13
+
+The [Human Modular Orbital Station](content/HUMAN_MODULAR_STATION.md) is first:
+bare cores with empty hardpoints, research-gated modules and visible upgrades
+supporting hub, defense and shipyard/industry roles. Concept images and a proposed
+assembly/research design are available; models and runtime behavior remain queued.
+The [player-fleet queue](content/PLAYER_FLEET_ROADMAP.md) follows with the
+Pathfinder Scout, then completes the other five existing Terran designs and shared
+parts, icons, effects/audio and shipyard assets. Existing portraits and procedural
+geometry are references. New source/model/material packs remain queued; their
+presence in the roadmap does not promote them to production-candidate or ready.
+Register completed files here and in Engine Assets with their existing design IDs,
+source/provenance, dependency list, version and actual validation state.
+
 ## Status vocabulary
 
+- **Concept candidate** — design reference only; no model, gameplay integration or final visual approval is implied.
 - **Production candidate** — intended for the playable build; import/runtime validation has passed, but final integrated-context review may still be pending.
 - **Production ready** — validated in the actual integrated screen/background at intended sizes and approved for continued use.
 - **Temporary** — intentionally provisional and expected to be replaced.
 - **Superseded** — retained only for continuity/history; do not use in new work.
+
+## Human modular station concepts — 2026-09-13
+
+Design ID: `human_modular_orbital_station`. These references are not runtime
+models or default loadouts. Full prompts, reference roles and image hashes are in
+[station provenance](art/HUMAN_MODULAR_STATION_PROVENANCE.md).
+
+| Asset | Purpose | Status |
+| --- | --- | --- |
+| `assets/visual/stations/human-station-bare-cores-v1.png` | Empty hull and mounting-frame progression at the first four tiers | Concept candidate |
+| `assets/visual/stations/human-modular-station-tiers-v1.png` | Equipped examples after researched modules are built | Concept candidate |
+| `assets/visual/stations/human-station-module-upgrades-v1.png` | Three visible levels for defense, shipyard, habitat and power modules | Concept candidate |
+| `assets/visual/stations/human-station-vertical-expansion-v1.png` | Tier 5 and Tier 6 stack empty upper decks above the retained Tier 4 base | Concept candidate |
+| `assets/visual/stations/human-station-tier7-starbase-v1.png` | Tier 7 encloses the existing stack into a solid starbase while retaining empty module interfaces | Concept candidate |
+| `assets/visual/stations/human-station-built-in-docking-v1.png` | Core-integrated docking clamps and telescoping personnel tunnel; available without optional modules | Concept candidate |
+| `docs/content/HUMAN_STATION_DESIGN.json` | Proposed slots, module levels, empty starting state and unbound research prerequisites | Concept candidate; gameplay not implemented |
+| `docs/content/STATION_OUTFITTING.md` | Provisional allocation points, equipment costs, shield/armor options, slot growth and refit rules | Design specification; runtime outfitting not implemented |
 
 ## Runtime visual system
 

@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stellar Continuum — Alien Fleet Workshop</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --accent: #55dccd;
+        --ink: #e4ebf4;
+        --muted: #98a9ba;
+        --line: #2a3b4a;
+        --panel: #0d1824;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #070e17;
+        color: var(--ink);
+        font:
+          14px "Segoe UI",
+          Arial,
+          sans-serif;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: #122331;
+        border-radius: 6px;
+        padding: 9px 12px;
+        transition:
+          background 0.15s,
+          border 0.15s;
+      }
+      button:hover {
+        border-color: var(--accent);
+        background: #203543;
+      }
+      button:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      header {
+        height: 76px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--line);
+        background: #0b1520;
+      }
+      .wordmark {
+        font-size: 15px;
+        letter-spacing: 4px;
+      }
+      .wordmark strong {
+        color: var(--accent);
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 2.3px;
+        color: var(--accent);
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 11px;
+        margin-top: 6px;
+      }
+      .tag {
+        color: #aec1d2;
+        background: #152534;
+        padding: 6px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+      }
+      .racebar {
+        padding: 15px 28px;
+        display: flex;
+        gap: 10px;
+        border-bottom: 1px solid var(--line);
+        align-items: center;
+      }
+      .race {
+        padding: 11px 18px;
+        min-width: 190px;
+        text-align: left;
+      }
+      .race.active {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, #101e2a);
+      }
+      .race small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 4px;
+      }
+      .racebar .count {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 220px minmax(400px, 1fr) 310px;
+        min-height: 710px;
+        height: calc(100vh - 173px);
+      }
+      aside {
+        padding: 23px 18px;
+        background: #0b1621;
+        overflow: auto;
+      }
+      .left {
+        border-right: 1px solid var(--line);
+      }
+      .right {
+        border-left: 1px solid var(--line);
+      }
+      h2 {
+        font-size: 13px;
+        letter-spacing: 0.6px;
+        font-weight: 600;
+        margin: 0 0 15px;
+      }
+      .roles {
+        display: grid;
+        gap: 8px;
+      }
+      .role {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 10px;
+        text-align: left;
+        background: #101e2b;
+      }
+      .role.active {
+        border-color: var(--accent);
+        border-left: 3px solid var(--accent);
+        padding-left: 8px;
+      }
+      .role span {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .role .idx {
+        font-size: 11px;
+        color: var(--accent);
+        margin-left: 6px;
+      }
+      .biology {
+        margin-top: 24px;
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .biology strong {
+        display: block;
+        font-size: 11px;
+        color: var(--ink);
+        margin: 10px 0 4px;
+      }
+      .viewport {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        background: radial-gradient(
+          ellipse at 55% 30%,
+          #172939 0,
+          #09131f 56%,
+          #070e17 100%
+        );
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+      .model-title {
+        position: absolute;
+        top: 25px;
+        left: 28px;
+        pointer-events: none;
+      }
+      .model-title h1 {
+        font-weight: 400;
+        font-size: 34px;
+        letter-spacing: -0.7px;
+        margin: 7px 0;
+      }
+      .model-title p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        max-width: 440px;
+        line-height: 1.6;
+      }
+      .viewbar {
+        position: absolute;
+        right: 20px;
+        top: 26px;
+        display: flex;
+        gap: 6px;
+      }
+      .viewbar button {
+        padding: 7px 9px;
+        font-size: 11px;
+        background: #0c1824cc;
+      }
+      .viewbar button[aria-pressed="true"] {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .viewport-footer {
+        position: absolute;
+        bottom: 22px;
+        left: 28px;
+        right: 28px;
+        pointer-events: none;
+      }
+      .scale-row {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+      }
+      .metric label {
+        display: block;
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 1.1px;
+        margin-bottom: 5px;
+      }
+      .metric strong {
+        font-size: 19px;
+        font-weight: 500;
+      }
+      .model-help {
+        margin-top: 18px;
+        color: #849aae;
+        font-size: 11px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .scale-line {
+        border-bottom: 1px solid var(--accent);
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+        height: 5px;
+        width: 80px;
+        margin-top: 6px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+        color: #b3c3d3;
+        font-size: 10px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .controls {
+        display: flex;
+        gap: 7px;
+        margin-bottom: 17px;
+      }
+      .controls button {
+        flex: 1;
+        font-size: 11px;
+        padding: 9px 6px;
+      }
+      .primary {
+        color: #051419;
+        background: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .primary:hover {
+        background: var(--accent);
+        filter: brightness(1.12);
+      }
+      .budgets {
+        background: #101f2d;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 21px;
+      }
+      .budget-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        margin-bottom: 7px;
+      }
+      .bar {
+        background: #273642;
+        height: 4px;
+        border-radius: 4px;
+        margin-bottom: 13px;
+        overflow: hidden;
+      }
+      .bar:last-child {
+        margin-bottom: 0;
+      }
+      .bar i {
+        background: var(--accent);
+        height: 100%;
+        display: block;
+      }
+      .field-label {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 7px;
+      }
+      select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: #132330;
+        margin-bottom: 13px;
+      }
+      .socket-meta {
+        display: flex;
+        justify-content: space-between;
+        color: var(--accent);
+        font-size: 10px;
+        margin-bottom: 16px;
+      }
+      .module-desc {
+        font-size: 12px;
+        line-height: 1.65;
+        color: var(--muted);
+        min-height: 62px;
+        margin: 0 0 11px;
+      }
+      .module-cost {
+        font-size: 11px;
+        color: var(--ink);
+        margin-bottom: 17px;
+      }
+      .full {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+      .installed {
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--muted);
+        margin: 13px 0 0;
+        border-top: 1px solid var(--line);
+        padding-top: 15px;
+      }
+      .installed b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .notice {
+        padding: 11px 12px;
+        border: 1px solid #314153;
+        border-radius: 6px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #a6b8ca;
+        margin-top: 17px;
+      }
+      .notice.error {
+        color: #ffb3a9;
+        border-color: #a25750;
+      }
+      .files {
+        display: flex;
+        gap: 7px;
+        margin-top: 15px;
+      }
+      .files button {
+        flex: 1;
+        font-size: 10px;
+        padding: 8px 4px;
+      }
+      footer {
+        height: 30px;
+        padding: 7px 28px;
+        color: #6e879b;
+        font-size: 10px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        background: #08121c;
+      }
+      .hidden {
+        display: none !important;
+      }
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 178px minmax(320px, 1fr) 270px;
+        }
+        .viewbar {
+          top: 145px;
+          left: 28px;
+          right: auto;
+        }
+        .race {
+          min-width: 170px;
+        }
+        .metric strong {
+          font-size: 15px;
+        }
+        .scale-row {
+          gap: 16px;
+        }
+      }
+      @media (max-width: 800px) {
+        .layout {
+          display: flex;
+          flex-wrap: wrap;
+          height: auto;
+          min-height: 0;
+        }
+        .left {
+          width: 100%;
+          padding: 15px;
+        }
+        .roles {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .biology {
+          display: none;
+        }
+        .viewport {
+          height: 590px;
+          width: 100%;
+        }
+        .right {
+          width: 100%;
+          overflow: visible;
+        }
+        .racebar {
+          overflow: auto;
+          padding: 12px;
+        }
+        .racebar .count {
+          display: none;
+        }
+        .race {
+          min-width: 180px;
+        }
+        header {
+          padding: 15px;
+          height: 80px;
+        }
+        .tag {
+          max-width: 140px;
+        }
+        .viewbar {
+          top: 130px;
+        }
+        .metric strong {
+          font-size: 17px;
+        }
+        .model-help {
+          gap: 10px;
+        }
+        footer {
+          height: auto;
+          gap: 15px;
+          padding: 12px;
+        }
+        .wordmark {
+          font-size: 12px;
+          letter-spacing: 2px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="wordmark"><strong>STELLAR</strong> CONTINUUM</div>
+        <div class="sub">ALIEN FLEET WORKSHOP / METAL CONSTRUCTION 02</div>
+      </div>
+      <div class="tag">3D asset preview · Integration pending</div>
+    </header>
+    <nav id="races" class="racebar" aria-label="Species"></nav>
+    <main class="layout">
+      <aside class="left">
+        <div class="eyebrow" style="margin-bottom: 16px">Hull collection</div>
+        <div id="roles" class="roles"></div>
+        <div class="biology">
+          <div class="eyebrow">Built for their bodies</div>
+          <p id="biology"></p>
+          <strong>Proposed interior clearance</strong>
+          <div id="clearance"></div>
+          <strong>Design language</strong>
+          <div id="language"></div>
+        </div>
+      </aside>
+      <section
+        class="viewport"
+        id="viewport"
+        aria-label="Interactive ship model"
+      >
+        <canvas
+          id="canvas"
+          aria-label="Orbit the ship with your pointer"
+        ></canvas>
+        <div class="model-title">
+          <div class="eyebrow" id="ship-role"></div>
+          <h1 id="ship-name"></h1>
+          <p id="ship-tagline"></p>
+        </div>
+        <div class="viewbar">
+          <button data-view="iso">3D</button><button data-view="top">Top</button
+          ><button data-view="side">Side</button
+          ><button data-view="front">Front</button
+          ><button id="show-ports" aria-pressed="true">Ports</button>
+        </div>
+        <div class="viewport-footer">
+          <div class="scale-row">
+            <div class="metric">
+              <label>LENGTH</label><strong id="length"></strong>
+            </div>
+            <div class="metric">
+              <label>BEAM</label><strong id="width"></strong>
+            </div>
+            <div class="metric">
+              <label>HEIGHT</label><strong id="height"></strong>
+            </div>
+            <div class="metric">
+              <label>HARDPOINTS</label><strong id="port-count"></strong>
+            </div>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="model-help">
+            <span>Drag to orbit · Scroll to zoom · Click a port to select</span
+            ><span id="scale-label"></span>
+          </div>
+        </div>
+      </section>
+      <aside class="right">
+        <div class="eyebrow" style="margin-bottom: 15px">Outfitting bay</div>
+        <h2>Build your silhouette</h2>
+        <div class="controls">
+          <button id="bare">Bare hull</button
+          ><button id="preset">Role loadout</button>
+        </div>
+        <div class="budgets">
+          <div class="budget-label">
+            <span>Allocation points</span><span id="points"></span>
+          </div>
+          <div class="bar"><i id="points-bar"></i></div>
+          <div class="budget-label">
+            <span>Equipment power</span><span id="power"></span>
+          </div>
+          <div class="bar"><i id="power-bar"></i></div>
+        </div>
+        <label class="field-label" for="socket">Attachment point</label
+        ><select id="socket"></select>
+        <div class="socket-meta">
+          <span id="socket-kind"></span><span id="socket-size"></span>
+        </div>
+        <label class="field-label" for="module">Compatible equipment</label
+        ><select id="module"></select>
+        <p class="module-desc" id="module-desc"></p>
+        <div class="module-cost" id="module-cost"></div>
+        <button id="fit" class="primary full">Attach equipment</button>
+        <div class="controls">
+          <button id="remove">Remove</button
+          ><button id="focus">Focus port</button
+          ><button id="frame">Whole ship</button>
+        </div>
+        <div id="installed" class="installed"></div>
+        <div id="notice" class="notice" role="status">
+          Equipment is fitted at real named model nodes. Bare hulls retain
+          essential engines, habitat shells and docking collars.
+        </div>
+        <div class="files">
+          <button id="save">Save blueprint</button
+          ><button id="load">Load blueprint</button
+          ><button id="export">Export fitted GLB</button>
+        </div>
+        <input id="load-file" type="file" accept=".json" class="hidden" />
+        <div class="notice">
+          Design mode: proposed sizes and fitting budgets. Research, damage,
+          weapon arcs and campaign use still need game integration.
+        </div>
+      </aside>
+    </main>
+    <footer>
+      <span>Metres · +Y up · −Z forward · Separate hulls and equipment</span
+      ><span id="payload"></span>
+    </footer>
+    <script>
+      /* BUNDLE */
+    </script>
+  </body>
+</html>

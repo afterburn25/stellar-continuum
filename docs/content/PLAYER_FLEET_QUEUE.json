@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "kind": "stellar-continuum-content-production-queue",
+  "updated": "2026-09-13",
+  "priority": "Alien species fleet models and fitting workshop now; preserve human station and Terran fleet queues",
+  "scope": "Species-specific hulls and detachable equipment, plus the existing research-gated human station and player fleet",
+  "productionStarted": true,
+  "baseline": {
+    "gameCommit": "97091aee84b782bdc917185307cd42b97b8fd7d0",
+    "shipRegistry": "src/Game/Simulation/Shipbuilding/ShipDesignRegistry.cs",
+    "proceduralModels": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+    "libraryAudit": {
+      "assets": 174,
+      "images": 130,
+      "audio": 35,
+      "data": 9,
+      "importedModels": 0
+    }
+  },
+  "firstBatch": [
+    "HS-001",
+    "HS-002",
+    "HS-003"
+  ],
+  "stageVocabulary": [
+    "brief_ready",
+    "concept",
+    "model_materials",
+    "library_candidate",
+    "integrated_candidate",
+    "release_ready"
+  ],
+  "assetPackDeliverables": [
+    "design_views",
+    "editable_model_source",
+    "portable_model_export",
+    "materials_and_textures",
+    "reduced_detail_models",
+    "portrait_and_thumbnail",
+    "strategic_icon",
+    "attachment_points",
+    "supported_presentation_states",
+    "source_and_dependency_record"
+  ],
+  "ships": [
+    {
+      "taskId": "PF-002",
+      "designId": "warp_scout",
+      "name": "Pathfinder Scout",
+      "shipProductionOrder": 1,
+      "contentFamilyId": "sc.ships.terran.warp_scout",
+      "stage": "brief_ready",
+      "focus": "First complete production pack and shared fleet conventions.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/pathfinder-scout.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-001"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-003",
+      "designId": "science_vessel",
+      "name": "Deep-Space Science Vessel",
+      "shipProductionOrder": 2,
+      "contentFamilyId": "sc.ships.terran.science_vessel",
+      "stage": "brief_ready",
+      "focus": "Laboratory spine, habitat structure, sensing equipment and radiators.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/deep-space-science-vessel.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_science_vessel.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-004",
+      "designId": "patrol_corvette",
+      "name": "Patrol Corvette",
+      "shipProductionOrder": 3,
+      "contentFamilyId": "sc.ships.terran.patrol_corvette",
+      "stage": "brief_ready",
+      "focus": "Compact protected escort with supported weapon and effect locations.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/patrol-corvette.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_patrol_corvette.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-005",
+      "designId": "bulk_freighter",
+      "name": "Interstellar Bulk Freighter",
+      "shipProductionOrder": 4,
+      "contentFamilyId": "sc.ships.terran.bulk_freighter",
+      "stage": "brief_ready",
+      "focus": "Cargo modules, loading and transfer points, working logistics silhouette.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/interstellar-bulk-freighter.png",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-006",
+      "designId": "resource_outpost_ship",
+      "name": "Sealed Resource Outpost Vessel",
+      "shipProductionOrder": 5,
+      "contentFamilyId": "sc.ships.terran.resource_outpost_ship",
+      "stage": "brief_ready",
+      "focus": "Sealed habitat and industrial deployment payload; represented capacity review.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/resource-outpost-ship.png",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": null
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    },
+    {
+      "taskId": "PF-007",
+      "designId": "colony_ship",
+      "name": "Interstellar Colony Ship",
+      "shipProductionOrder": 6,
+      "contentFamilyId": "sc.ships.terran.colony_ship",
+      "stage": "brief_ready",
+      "focus": "Settlement carrier; represented population and scale review before final modeling.",
+      "existingReferences": {
+        "portrait": "assets/visual/ships/interstellar-colony-ship.jpg",
+        "proceduralGeometry": "src/Game/Presentation/Spatial/ShipGeometry.cs",
+        "dedicatedIcon": "assets/visual/icons/ships/icon_ship_colony_ship.svg"
+      },
+      "dependsOn": [
+        "PF-002",
+        "PF-008"
+      ],
+      "integrationTask": "PF-013"
+    }
+  ],
+  "supportTasks": [
+    {
+      "id": "HS-001",
+      "name": "Station progression, solid Tier 7 and permanent docking concepts",
+      "state": "concept_candidate",
+      "dependsOn": []
+    },
+    {
+      "id": "HS-002",
+      "name": "Station cores, upper decks, Tier 7 enclosure and fixed docking mechanisms",
+      "state": "queued",
+      "dependsOn": [
+        "HS-001"
+      ]
+    },
+    {
+      "id": "HS-003",
+      "name": "Weapon mounts and three-level upgrade modules",
+      "state": "queued",
+      "dependsOn": [
+        "HS-001"
+      ]
+    },
+    {
+      "id": "HS-004",
+      "name": "Docking, habitat, cargo, power and thermal modules",
+      "state": "queued",
+      "dependsOn": [
+        "HS-002"
+      ]
+    },
+    {
+      "id": "HS-005",
+      "name": "Shipyard, industry, research, sensor and protection modules",
+      "state": "queued",
+      "dependsOn": [
+        "HS-002"
+      ]
+    },
+    {
+      "id": "HS-006",
+      "name": "Station construction, damage, icons, audio and materials",
+      "state": "queued",
+      "dependsOn": [
+        "HS-002"
+      ]
+    },
+    {
+      "id": "HS-007",
+      "name": "Station preview and Engine Assets registration",
+      "state": "in_progress",
+      "dependsOn": [
+        "HS-001"
+      ],
+      "completed": [
+        "concept_library_registration"
+      ],
+      "remaining": [
+        "interactive_assembly_preview",
+        "model_dependency_checks"
+      ]
+    },
+    {
+      "id": "HS-008",
+      "name": "Research gates, bare station start, native module gameplay and saves",
+      "state": "waiting_for_native_adapters",
+      "dependsOn": [
+        "HS-002",
+        "HS-003",
+        "HS-004",
+        "HS-005",
+        "HS-009"
+      ],
+      "acceptance": [
+        "Start with zero installed modules",
+        "Only completed owner research unlocks core/module construction",
+        "Research does not auto-build equipment",
+        "New slots stay empty after a core upgrade",
+        "Allow compatible researched modules at every tier",
+        "Preserve research and loadout through save/reload",
+        "Tiers 5 and 6 add empty upper decks while preserving the Tier 4 base",
+        "Tier 7 fills the gaps around the retained stack without granting modules",
+        "Reject enclosure that blocks existing modules or required clearances",
+        "Zero-module cores support permanent docking and personnel transfer",
+        "Save and restore clamps, tunnel, docked ship and personnel state",
+        "Transfer requires secure clamps and a sealed compatible tunnel; undocking requires tunnel retraction",
+        "Every tier increases allocation points and total equipment slots",
+        "Reject equipment over point, slot or research limits",
+        "Keep fixed docking outside the equipment budget"
+      ]
+    },
+    {
+      "id": "PF-001",
+      "name": "Fleet reference sheet and scale plan",
+      "state": "ready_to_start",
+      "dependsOn": []
+    },
+    {
+      "id": "PF-008",
+      "name": "Shared parts and materials",
+      "state": "queued",
+      "dependsOn": [
+        "PF-001"
+      ]
+    },
+    {
+      "id": "PF-009",
+      "name": "Six matching fleet icons and thumbnails",
+      "state": "queued",
+      "dependsOn": [
+        "PF-001"
+      ]
+    },
+    {
+      "id": "PF-010",
+      "name": "Shared effects and event audio",
+      "state": "queued",
+      "dependsOn": [
+        "PF-002"
+      ]
+    },
+    {
+      "id": "PF-011",
+      "name": "Matching orbital shipyard and assembly assets",
+      "state": "queued",
+      "dependsOn": [
+        "PF-002",
+        "HS-005"
+      ]
+    },
+    {
+      "id": "PF-012",
+      "name": "Asset library registration and portable packaging per pack",
+      "state": "queued",
+      "dependsOn": []
+    },
+    {
+      "id": "PF-013",
+      "name": "Native game integration and view validation",
+      "state": "waiting_for_native_adapters",
+      "dependsOn": [
+        "PF-012"
+      ]
+    },
+    {
+      "id": "HS-009",
+      "name": "Station outfitting, allocation points, shields, refits and loadout blueprints",
+      "state": "in_progress",
+      "dependsOn": [
+        "HS-001"
+      ],
+      "completed": [
+        "allocation_and_slot_design",
+        "equipment_cost_and_shield_definitions",
+        "interactive_allocation_preview_in_conversation"
+      ],
+      "remaining": [
+        "native_outfitting_interface",
+        "authoritative_refits_and_blueprints",
+        "gameplay_balancing"
+      ]
+    }
+  ],
+  "boundaries": {
+    "authoringCanProceedDuringMigration": true,
+    "changesGameplayRules": false,
+    "changesSaveFormat": false,
+    "marksEngineComplete": false,
+    "nativePlayIntegrationRequired": true,
+    "sourceMastersRetained": true,
+    "preserveExistingShipDesignIds": true
+  },
+  "sourceDocs": [
+    "docs/ASSET_MANIFEST.md",
+    "docs/PREMIUM_ART_VISUAL_IDENTITY.md",
+    "docs/VISUAL_STYLE_GUIDE.md"
+  ],
+  "stationDesign": "docs/content/HUMAN_STATION_DESIGN.json",
+  "productionStateVocabulary": [
+    "queued",
+    "ready_to_start",
+    "concept_candidate",
+    "in_progress",
+    "waiting_for_native_adapters"
+  ],
+  "stationResearchRules": "docs/content/HUMAN_STATION_DESIGN.json#/research",
+  "stationOutfittingRules": "docs/content/STATION_OUTFITTING.md",
+  "alienFleet": {
+    "version": "0.2.0",
+    "stage": "library_candidate",
+    "visualStage": "metal_construction_pass_pending_final_art_review",
+    "supersedes": "0.1.0 blockout",
+    "provenance": "docs/art/ALIEN_FLEET_METAL_PROVENANCE.md",
+    "species": [
+      "pelagic_high_pressure",
+      "compact_high_gravity",
+      "cryogenic_hydrocarbon"
+    ],
+    "hulls": 18,
+    "reducedDetailHulls": 18,
+    "equipmentModels": 36,
+    "manifest": "assets/models/alien-fleet-v2/fleet-manifest.json",
+    "design": "docs/content/ALIEN_FLEET.md",
+    "workshop": "assets/models/alien-fleet-v2/Alien-Fleet-Workshop.html",
+    "nativeIntegration": "pending",
+    "researchBindings": "pending",
+    "source": "tools/alien-fleet"
+  }
+}
