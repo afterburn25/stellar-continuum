@@ -814,7 +814,8 @@ int main(int argc, char **argv) {
     const auto &rows = fixture.at("Rows");
     const auto find_row = [&](std::string_view wanted) -> const Json & {
       const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto &row) {
-        return row.at("Name").template get<std::string>() == wanted;
+        const auto name = row.at("Name").template get<std::string>();
+        return name.compare(wanted) == 0;
       });
       check(found != rows.end(), "missing ownership fixture row");
       return *found;
