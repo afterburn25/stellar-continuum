@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import {
   races,
   roles,
@@ -32,20 +33,36 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene(),
   camera = new THREE.PerspectiveCamera(36, 1, 0.1, 1000000),
   controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.1;
-scene.add(new THREE.HemisphereLight("#cce6ff", "#344252", 2.6));
+const pmrem = new THREE.PMREMGenerator(renderer);
+const room = new RoomEnvironment();
+scene.environment = pmrem.fromScene(room, 0.04).texture;
+scene.environmentIntensity = 0.6;
+room.dispose();
+pmrem.dispose();
+scene.add(new THREE.HemisphereLight("#c5d2df", "#141922", 0.55));
+let keyLight;
 for (const [color, power, pos] of [
-  ["#e0f3ff", 4, [-3, 5, -4]],
-  ["#7bb4e9", 2, [4, 1, 2]],
-  ["#ffe3bf", 2, [0, -1, 3]],
+  ["#e0e8f0", 3.2, [-3, 5, -4]],
+  ["#a9c4dd", 0.75, [4, 1, 2]],
+  ["#dfc7ab", 0.5, [0, -1, 3]],
 ]) {
   const light = new THREE.DirectionalLight(color, power);
   light.position.set(...pos);
+  if (!keyLight) {
+    keyLight = light;
+    light.castShadow = true;
+    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.normalBias = 0.05;
+    light.shadow.bias = -0.00005;
+  }
   scene.add(light);
 }
 const kinds = {
@@ -145,6 +162,16 @@ function makeMarkers() {
 function frame(view = "iso") {
   focusMode = false;
   const { length: L, width: W, height: H } = hull.ship.dimensions;
+  keyLight.position.set(-3 * L, 5 * L, -4 * L);
+  Object.assign(keyLight.shadow.camera, {
+    left: -L,
+    right: L,
+    top: L,
+    bottom: -L,
+    near: L,
+    far: L * 12,
+  });
+  keyLight.shadow.camera.updateProjectionMatrix();
   controls.target.set(0, 0, 0);
   const dist = Math.max(L, W, H) * Math.max(1.65, 1.1 / camera.aspect);
   const direction = {
@@ -155,7 +182,7 @@ function frame(view = "iso") {
   }[view];
   camera.up.set(0, 1, 0);
   camera.position.fromArray(direction).normalize().multiplyScalar(dist);
-  camera.near = Math.max(0.05, L / 10000);
+  camera.near = Math.max(0.05, L / 80);
   camera.far = L * 30;
   camera.updateProjectionMatrix();
   controls.minDistance = 2;
@@ -457,12 +484,23 @@ canvas.addEventListener("pointerup", (e) => {
 selectShip(raceId, roleId);
 function render() {
   controls.update();
+  const near = Math.max(
+    0.02,
+    camera.position.distanceTo(controls.target) * 0.008,
+  );
+  if (Math.abs(camera.near - near) > near * 0.02) {
+    camera.near = near;
+    camera.updateProjectionMatrix();
+  }
   renderer.render(scene, camera);
   requestAnimationFrame(render);
 }
 render();
 // Small deterministic automation surface for validation and image production.
 window.fleetWorkshop = {
+  setShadows: (value) => {
+    renderer.shadowMap.enabled = value;
+  },
   ready: true,
   selectShip,
   setFittings,

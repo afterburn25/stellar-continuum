@@ -14,6 +14,12 @@ supports fitting, removal, blueprint saving/loading and fitted GLB export. These
 are reusable library candidates; native/campaign integration is pending. Station
 and Terran fleet work below remains in scope.
 
+**Visual revision, 2026-09-14 UTC:** alien fleet 0.2.0 adds segmented metal plates,
+service hardware and textured metallic surfaces to the actual models. The user
+rejected the earlier cartoonish style; 0.1.0 is a superseded blockout. The realistic
+generated construction sheet is a design reference. Final model detailing and
+art approval remain pending alongside native integration.
+
 **First content priority, updated 2026-09-13:** create the
 [Human Modular Orbital Station](content/HUMAN_MODULAR_STATION.md). The user wants
 one station family supporting orbital-hub, military-defense and shipyard/industrial

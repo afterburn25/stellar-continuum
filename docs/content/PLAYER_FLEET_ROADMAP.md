@@ -18,6 +18,12 @@ models and an offline fitting workshop. The race-specific shapes and proposed
 dimensions follow the species biology; the hardpoints are real named model nodes.
 The human station and Terran fleet requirements remain in the queue.
 
+The 0.2.0 revision adds assembled metal plates, service hardware and textured
+metal materials following the user's rejection of the original cartoonish
+appearance. Version 0.1.0 is a superseded blockout. The generated construction
+reference is labelled separately from actual model renders; final detailing and
+art review remain open.
+
 ## Starting point
 
 At the initial fleet audit, the six current designs all have dedicated presentation images and procedural

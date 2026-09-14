@@ -1,6 +1,13 @@
-# Alien fleet — first 3D asset collection
+# Alien fleet — metal construction collection
 
-Created 2026-09-13. Version 0.1.0. **Library candidates; game integration pending.**
+Updated 2026-09-14 UTC. Version 0.2.0. **Library candidates; final art review and game integration pending.**
+
+This revision follows the user's request for realistic metal construction like the
+human ship artwork. The 0.1.0 collection is retained as a superseded blockout.
+The actual 3D hulls and equipment now have segmented metal plating, fasteners,
+service hatches, vents and textured metal surfaces. Large decorative glowing
+features have been removed. These models are an improved construction pass;
+they still need further detailing to match the generated design reference.
 
 The three current nonhuman species each receive six original role-specific hulls.
 Each family has different geometry, materials, habitat structure and proportions.
@@ -8,7 +15,7 @@ An offline fitting workshop attaches separate equipment models to real named
 hardpoint nodes, checks slot class and proposed fitting budgets, and saves or
 loads blueprints. It can export the fitted ship as a GLB model.
 
-Open `assets/models/alien-fleet-v1/Alien-Fleet-Workshop.html` in a browser. No server,
+Open `assets/models/alien-fleet-v2/Alien-Fleet-Workshop.html` in a browser. No server,
 installation or Internet connection is needed after delivery. Choose a species and
 ship, then **Role loadout** for an example. Select a port, choose compatible
 equipment, and attach, replace or remove it. **Focus port** makes equipment on the
@@ -94,12 +101,17 @@ not a completed animated docking or crew-transfer system.
 
 ## Files and reproducibility
 
-- `assets/models/alien-fleet-v1/Hulls`: 18 bare GLBs plus 18 reduced-detail GLBs.
+- `assets/models/alien-fleet-v2/Hulls`: 18 bare GLBs plus 18 reduced-detail GLBs.
 - `Modules`: 36 separate GLBs with matching materials and mount origins.
 - `fleet-manifest.json`: semantic asset IDs, role/species mappings, dimensions,
   sockets, examples, file hashes and integration status.
 - `Alien-Fleet-Workshop.html`: bundled offline 3D inspection and fitting tool.
 - `Renders`: original model renders, fleet sheet and fitting before/after images.
+- `References`: generated realistic metal construction illustration, explicitly
+  a design reference rather than a finished model render.
+- `Textures`: original generated metal surface and derived runtime albedo,
+  roughness/metalness and normal maps, embedded in the exported models.
+- `ART-PROVENANCE.md`: input references, exact generation prompts and limits.
 - `example-blueprint.json` and `example-fitted-corvette.glb`: tested roundtrip.
 - `validation-report.json`, `workshop-test-report.json`: completed checks.
 - `tools/alien-fleet`: editable procedural mesh source, viewer source, exporter,
@@ -112,10 +124,18 @@ The source is editable code plus portable meshes, not a Blender scene.
 
 Three.js 0.180.0 supplies geometry, rendering and GLB export/import. Esbuild 0.25.9
 bundles the offline workshop. Khronos glTF Validator 2.0.0-dev.3.10 checks exports.
-Third-party notices travel with the collection. Models and material definitions
-are original project-authored geometry created for this task; the PNGs are renders
-of those actual models, not illustrative concept images. No external textures or
-borrowed spacecraft meshes are required. Model hashes are in the manifest.
+The texture preparation/exporter uses @napi-rs/canvas 0.1.80. Third-party notices
+travel with the collection. Models are original project-authored geometry.
+Images in `Renders` show those actual models. The illustration in `References`
+and source image in `Textures` were created with the built-in image-generation
+tool; exact prompts and provenance are included. No borrowed spacecraft meshes
+are used. Model and material-source hashes are in the manifest.
+
+The 72 core GLBs total approximately 114 MiB; each is below the library's 25 MiB
+file limit. The full collection exceeds the editor's 100 MiB embedded-project
+budget. Keep the complete master set in Engine Assets and select the required
+hulls, detail levels and equipment for each project. Runtime optimization remains
+part of integration.
 
 ## Remaining integration work
 
@@ -128,7 +148,7 @@ borrowed spacecraft meshes are required. Model hashes are in the manifest.
    campaign saves, research unlocks or construction orders.
 4. Review carrier scale and real habitat budgets, docking clearances, module
    overlap, weapon arcs, thermal separation and collision meshes in context.
-5. Add the final surface-detail pass, construction/damage states, tracking and
+5. Complete the final art/detail pass, construction/damage states, tracking and
    effects, small map icons and shipyard/fleet UI adapters.
 
 This collection is reusable in Engine Assets now. Its availability does not mean

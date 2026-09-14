@@ -5,10 +5,10 @@ Owner: `work/visual-style-assets`
 
 This registry prevents duplicate visual concepts, records provenance/status, and maps production-candidate visuals to the gameplay concepts that currently exist in shared integration.
 
-## Alien fleet model collection — 2026-09-13
+## Alien fleet metal construction collection — 2026-09-14 UTC
 
 The [alien fleet design and integration record](content/ALIEN_FLEET.md) covers
-`assets/models/alien-fleet-v1`: 18 original hulls, 18 reduced-detail hulls, 36
+`assets/models/alien-fleet-v2`: 18 original hulls, 18 reduced-detail hulls, 36
 species-matched equipment models, physically named attachment nodes, measured
 metre dimensions, an offline 3D fitting workshop and renders of the actual models.
 Semantic species/role mappings, socket transforms and SHA-256 hashes are in
@@ -18,8 +18,11 @@ Status: **Library candidate**. Export validation and independent model import
 passed; gameplay/native renderer integration, final art approval, collision and
 weapon-arc review, research bindings and damage/animation states remain pending.
 The equipment meshes attach and detach in the workshop; their presence grants no
-new live-game capabilities. Materials are original numeric PBR definitions with
-no external textures. Third-party runtime/tool notices accompany the pack.
+new live-game capabilities. Assembled plates and service hardware use PBR metal
+materials with embedded texture maps. The original generated surface, derivatives,
+exact prompts and separately labelled construction reference are retained with
+[art provenance](art/ALIEN_FLEET_METAL_PROVENANCE.md). Third-party runtime/tool
+notices accompany the pack. Version 0.1.0 remains a superseded blockout.
 
 ## Immediate station and player-fleet production — 2026-09-13
 

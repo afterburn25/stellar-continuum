@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import "./node-image-api.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -17,10 +18,18 @@ import {
 } from "./geometry.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)),
   repo = path.resolve(here, "../.."),
-  out = path.join(repo, "assets/models/alien-fleet-v1");
+  out = path.join(repo, "assets/models/alien-fleet-v2");
 fs.mkdirSync(out, { recursive: true });
 for (const d of ["Hulls", "Modules", "Renders"])
   fs.mkdirSync(path.join(out, d), { recursive: true });
+fs.writeFileSync(
+  path.join(out, ".gdignore"),
+  "# Asset library candidates; import through the reviewed game adapter.\n",
+);
+fs.copyFileSync(
+  path.join(repo, "docs/art/ALIEN_FLEET_METAL_PROVENANCE.md"),
+  path.join(out, "ART-PROVENANCE.md"),
+);
 // Three's exporter uses the browser FileReader API; Node supplies the same Blob bytes.
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -134,9 +143,12 @@ for (const race of races)
 const catalogue = {
   schemaVersion: 1,
   kind: "stellar-alien-fleet-asset-pack",
-  version: "0.1.0",
-  date: "2026-09-13",
+  version: "0.2.0",
+  date: "2026-09-14",
   status: "library_candidate",
+  visualStage: "metal_construction_pass_pending_final_art_review",
+  supersedes:
+    "0.1.0 blockout; user requested realistic assembled metal construction",
   units: "metres",
   axes: { up: "+Y", forward: "-Z", moduleOutward: "+Y" },
   races,
@@ -144,6 +156,26 @@ const catalogue = {
   modules: moduleTypes,
   ships: shipRecords,
   files: records,
+  supportingAssets: [
+    "ART-PROVENANCE.md",
+    ...["Textures", "References"].flatMap((directory) =>
+      fs
+        .readdirSync(path.join(out, directory))
+        .map((name) => `${directory}/${name}`),
+    ),
+  ].map((relative) => {
+    const bytes = fs.readFileSync(path.join(out, relative));
+    return {
+      path: relative,
+      bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      purpose: relative.startsWith("References/")
+        ? "generated_design_reference_not_a_model_render"
+        : relative.startsWith("Textures/")
+          ? "original_or_derived_material_texture"
+          : "art_provenance_and_exact_prompts",
+    };
+  }),
   integration: {
     godot: "pending",
     nativeCpp: "pending",
@@ -188,7 +220,7 @@ const html = fs
   )
   .replace(/[\t ]+$/gm, "");
 fs.writeFileSync(path.join(out, "Alien-Fleet-Workshop.html"), html);
-const licenses = ["three", "esbuild", "gltf-validator"]
+const licenses = ["three", "esbuild", "gltf-validator", "@napi-rs/canvas"]
   .map((name) => {
     const root = path.join(here, "node_modules", name);
     const file = ["LICENSE", "LICENSE.md", "LICENSE.txt"].find((f) =>

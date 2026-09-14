@@ -345,8 +345,11 @@
   "stationResearchRules": "docs/content/HUMAN_STATION_DESIGN.json#/research",
   "stationOutfittingRules": "docs/content/STATION_OUTFITTING.md",
   "alienFleet": {
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stage": "library_candidate",
+    "visualStage": "metal_construction_pass_pending_final_art_review",
+    "supersedes": "0.1.0 blockout",
+    "provenance": "docs/art/ALIEN_FLEET_METAL_PROVENANCE.md",
     "species": [
       "pelagic_high_pressure",
       "compact_high_gravity",
@@ -355,9 +358,9 @@
     "hulls": 18,
     "reducedDetailHulls": 18,
     "equipmentModels": 36,
-    "manifest": "assets/models/alien-fleet-v1/fleet-manifest.json",
+    "manifest": "assets/models/alien-fleet-v2/fleet-manifest.json",
     "design": "docs/content/ALIEN_FLEET.md",
-    "workshop": "assets/models/alien-fleet-v1/Alien-Fleet-Workshop.html",
+    "workshop": "assets/models/alien-fleet-v2/Alien-Fleet-Workshop.html",
     "nativeIntegration": "pending",
     "researchBindings": "pending",
     "source": "tools/alien-fleet"

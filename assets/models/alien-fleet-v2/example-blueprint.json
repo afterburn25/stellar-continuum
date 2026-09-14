@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "stellar-alien-fleet-blueprint",
+  "assetId": "sc.ships.cryogenic_hydrocarbon.patrol_corvette.v2",
+  "raceId": "cryogenic_hydrocarbon",
+  "roleId": "patrol_corvette",
+  "units": "metres",
+  "fittings": {
+    "HP_W01": "kinetic_turret",
+    "HP_W02": "beam_turret",
+    "HP_W03": "kinetic_turret",
+    "HP_W04": "kinetic_turret",
+    "HP_W05": "kinetic_turret",
+    "HP_W06": "kinetic_turret",
+    "HP_U01": "sensor_array",
+    "HP_U02": "sensor_array",
+    "HP_D01": "shield_emitter",
+    "HP_T01": "radiator"
+  },
+  "gameIntegration": "pending"
+}

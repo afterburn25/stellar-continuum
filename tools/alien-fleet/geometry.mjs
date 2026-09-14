@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addMetalConstruction } from "./metal-construction.mjs";
 import {
   getRace,
   getRole,
@@ -11,25 +12,27 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 function materials(r) {
   const make = (color, metalness = 0.6, roughness = 0.4) =>
     new THREE.MeshStandardMaterial({ color, metalness, roughness });
-  return {
-    hull: make(r.hull, 0.48, 0.38),
+  const mats = {
+    hull: make(r.hull, 0.86, 0.48),
     dark: make(r.dark, 0.7, 0.45),
     metal: make(r.metal, 0.8, 0.32),
-    accent: make(r.accent, 0.65, 0.35),
+    accent: make(r.accent, 0.88, 0.46),
     glow: new THREE.MeshStandardMaterial({
       color: r.glow,
       emissive: r.glow,
-      emissiveIntensity: 1.8,
+      emissiveIntensity: 0.35,
       metalness: 0.2,
       roughness: 0.3,
     }),
     glass: new THREE.MeshStandardMaterial({
-      color: r.color,
-      metalness: 0.78,
-      roughness: 0.18,
+      color: "#1c2b34",
+      metalness: 0.55,
+      roughness: 0.24,
     }),
     radiator: make("#263d53", 0.8, 0.4),
   };
+  for (const [name, mat] of Object.entries(mats)) mat.name = name;
+  return mats;
 }
 function builder(root, p, lod) {
   let seq = 0;
@@ -132,7 +135,9 @@ function builder(root, p, lod) {
       }
       g.setIndex(idx);
       g.computeVertexNormals();
-      return mesh(g, mat, name);
+      const result = mesh(g, mat, name);
+      result.userData.loftSections = sections;
+      return result;
     },
   };
 }
@@ -166,7 +171,18 @@ function pelagic(b, role) {
     "colony_ship",
   ].indexOf(role);
   b.ell([0.13, 0.11, 0.44], [0, 0, 0], "dark", "water_circulation_trunk");
-  b.ell([0.235, 0.095, 0.37], [0, 0.018, -0.08], "hull", "dorsal_mantle");
+  b.loft(
+    [
+      [-0.48, 0.027, 0.018, 0],
+      [-0.41, 0.115, 0.04, 0],
+      [-0.24, 0.2, 0.07, 0.008],
+      [0.08, 0.22, 0.066, 0.008],
+      [0.25, 0.2, 0.03, 0],
+      [0.34, 0.1, 0.02, 0],
+    ],
+    "hull",
+    "armored_pressure_mantle",
+  );
   b.ell(
     [0.1, 0.072, 0.21],
     [0, 0.038, -0.34],
@@ -787,6 +803,7 @@ export function createHull(ship, { lod = 0 } = {}) {
     compact_high_gravity: compact,
     cryogenic_hydrocarbon: cryogenic,
   })[race.id](b, role.id);
+  addMetalConstruction(physical, race, { lod });
   physical.updateMatrixWorld(true);
   let box = new THREE.Box3().setFromObject(physical);
   const c = box.getCenter(V()),
@@ -1202,6 +1219,7 @@ export function createModule(raceId, moduleId, { lod = 0 } = {}) {
     b.ell([0.15, 0.06, 0.22], [0, 0.81, 0], "glow", "power_status");
   }
   // Modules are built in nominal-size units, not scaled with the host ship.
+  addMetalConstruction(root, race, { lod, module: true });
   root.scale.setScalar(sizeMeters[def.size]);
   root.updateMatrixWorld(true);
   return root;

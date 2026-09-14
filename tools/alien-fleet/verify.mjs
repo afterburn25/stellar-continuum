@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import "./node-image-api.mjs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,7 +10,7 @@ import * as THREE from "three";
 import { races, roles, ships, moduleTypes, checkFitting } from "./catalog.mjs";
 const require = createRequire(import.meta.url),
   here = path.dirname(fileURLToPath(import.meta.url)),
-  out = path.resolve(here, "../../assets/models/alien-fleet-v1"),
+  out = path.resolve(here, "../../assets/models/alien-fleet-v2"),
   manifest = JSON.parse(fs.readFileSync(path.join(out, "fleet-manifest.json"))),
   checks = [];
 function pass(name) {
@@ -247,7 +248,7 @@ const cards = roles
   )
   .flat();
 await sheet.setContent(
-  `<html><head><style>*{box-sizing:border-box}body{margin:0;background:#070e17;color:#e4edf5;font:14px 'Segoe UI',sans-serif;padding:42px}.eyebrow{color:#75d8d0;letter-spacing:5px;font-size:13px}h1{font-size:45px;font-weight:400;margin:10px 0}.intro{color:#9cabbc;font-size:18px;margin-bottom:24px}.columns,.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.columns{font-size:20px;margin:22px 0 16px}.columns span{border-top:2px solid;padding-top:13px}.card{background:#0b1723;border:1px solid #293d4d;overflow:hidden;border-radius:8px;height:332px}.card img{width:100%;height:274px;object-fit:contain;object-position:50% 50%}.caption{padding:5px 17px;color:#94a9bb;display:flex;justify-content:space-between;font-size:13px}.caption b{font-weight:500;color:#dce8f3;font-size:16px}footer{margin-top:23px;color:#839aaf;font-size:15px;line-height:1.8}</style></head><body><div class="eyebrow">STELLAR CONTINUUM / ALIEN FLEET 01</div><h1>Three species. Three ways to build a fleet.</h1><div class="intro">18 original 3D hulls · Detachable weapons and modules · Species-specific proportions</div><div class="columns">${races.map((r) => `<span style="color:${r.color}">${r.title}</span>`).join("")}</div><div class="grid">${cards.map(({ ship: s, file }) => `<div class="card"><img src="${imageData(file)}"><div class="caption"><b>${s.name}</b><span>${roles.find((r) => r.id === s.roleId).name} · ${s.dimensions.length >= 1000 ? s.dimensions.length / 1000 + " km" : s.dimensions.length + " m"}</span></div></div>`).join("")}</div><footer>Original model renders · Each ship framed independently; images are not at a common scale.<br>Asset candidates for the engine library. Game integration, interiors, weapon arcs and research bindings remain pending.</footer></body></html>`,
+  `<html><head><style>*{box-sizing:border-box}body{margin:0;background:#070e17;color:#e4edf5;font:14px 'Segoe UI',sans-serif;padding:42px}.eyebrow{color:#75d8d0;letter-spacing:5px;font-size:13px}h1{font-size:45px;font-weight:400;margin:10px 0}.intro{color:#9cabbc;font-size:18px;margin-bottom:24px}.columns,.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.columns{font-size:20px;margin:22px 0 16px}.columns span{border-top:2px solid;padding-top:13px}.card{background:#0b1723;border:1px solid #293d4d;overflow:hidden;border-radius:8px;height:332px}.card img{width:100%;height:274px;object-fit:contain;object-position:50% 50%}.caption{padding:5px 17px;color:#94a9bb;display:flex;justify-content:space-between;font-size:13px}.caption b{font-weight:500;color:#dce8f3;font-size:16px}footer{margin-top:23px;color:#839aaf;font-size:15px;line-height:1.8}</style></head><body><div class="eyebrow">STELLAR CONTINUUM / METAL CONSTRUCTION 02</div><h1>Three species. Three ways to build a fleet.</h1><div class="intro">18 original 3D hulls · Detachable weapons and modules · Species-specific proportions</div><div class="columns">${races.map((r) => `<span style="color:${r.color}">${r.title}</span>`).join("")}</div><div class="grid">${cards.map(({ ship: s, file }) => `<div class="card"><img src="${imageData(file)}"><div class="caption"><b>${s.name}</b><span>${roles.find((r) => r.id === s.roleId).name} · ${s.dimensions.length >= 1000 ? s.dimensions.length / 1000 + " km" : s.dimensions.length + " m"}</span></div></div>`).join("")}</div><footer>Original model renders · Each ship framed independently; images are not at a common scale.<br>Asset candidates for the engine library. Game integration, interiors, weapon arcs and research bindings remain pending.</footer></body></html>`,
 );
 await sheet.screenshot({
   path: path.join(out, "Renders", "alien-fleet-collection.png"),
