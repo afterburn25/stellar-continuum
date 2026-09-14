@@ -21,7 +21,7 @@ class FixtureDirectory final {
     }
     throw std::runtime_error("Could not create an isolated image test directory.");
   }
-  ~FixtureDirectory(){std::error_code ignored;std::filesystem::remove(path_/L"source-测试.png",ignored);std::filesystem::remove(path_/L"corrupt-测试.png",ignored);std::filesystem::remove(path_,ignored);}
+  ~FixtureDirectory(){std::error_code ignored;std::filesystem::remove(path_/L"source-测试.png",ignored);std::filesystem::remove(path_/L"corrupt-测试.png",ignored);std::filesystem::remove(path_/L"overlay-order.bmp",ignored);std::filesystem::remove(path_,ignored);}
   [[nodiscard]] const std::filesystem::path &path()const noexcept{return path_;}
  private:std::filesystem::path path_;
 };
@@ -60,6 +60,39 @@ int main(int argc,char **argv){
     DrawList pressure;for(int index=0;index<700;++index)pressure.overlay.emplace_back(Text{{-200,-200},"bounded-cache-"+std::to_string(index),{255,255,255,255},14});window.draw(pressure);check(window.text_cache_entries()<=640,"text cache exceeded entry capacity");check(window.text_cache_bytes()<=32u*1024u*1024u,"text cache exceeded byte capacity");
     DrawList invalid;invalid.overlay.emplace_back(Text{{0,0},"invalid",{255,255,255,255},14,std::numeric_limits<float>::quiet_NaN()});bool rejected_bounds{};try{window.draw(invalid);}catch(const std::invalid_argument &){rejected_bounds=true;}check(rejected_bounds,"non-finite UI text bounds reached native conversion");
     DrawList offscreen;offscreen.lines.push_back({{-10000000.f,180.f},{10000000.f,180.f},{80,120,180,100}});offscreen.world.emplace_back(Line{{20000000.f,-5000000.f},{21000000.f,-6000000.f},{80,120,180,100}});offscreen.world.emplace_back(Circle{{10000000.f,10000000.f},5000.f,{120,160,220,100}});window.draw(offscreen);DrawList invalid_geometry;invalid_geometry.world.emplace_back(Line{{std::numeric_limits<float>::infinity(),0},{0,0},{255,255,255,255}});bool nonfinite_rejected{};try{window.draw(invalid_geometry);}catch(const std::invalid_argument&){nonfinite_rejected=true;}check(nonfinite_rejected,"non-finite ordered geometry was accepted");
+    {
+      // A portrait must follow its panel and precede later controls. Both
+      // image layers share resource ownership, clipping and upload limits.
+      const auto portrait=RgbaImage::create(1,1,{255,255,255,255});
+      DrawList layers;
+      layers.world.emplace_back(Image{portrait,{0,0,8,8}});
+      layers.overlay.emplace_back(FilledRectangle{{0,0,160,160},{10,30,90,255}});
+      layers.overlay.emplace_back(Image{portrait,{20,20,80,80},std::nullopt,
+                                       {20,200,40,255},UiRect{40,40,40,40}});
+      layers.overlay.emplace_back(FilledRectangle{{60,60,20,20},{220,180,20,255}});
+      layers.overlay.emplace_back(FilledRectangle{{20,110,20,20},{200,20,40,255}});
+      const auto before=window.image_upload_count();
+      const auto capture=fixtures.path()/L"overlay-order.bmp";
+      window.draw(layers,capture);
+      check(window.image_upload_count()==before+1,"world/UI layers duplicated image uploads");
+      window.draw(layers);
+      check(window.image_upload_count()==before+1,"stable UI portrait uploaded again");
+      const auto pixels=decode_rgba_image(capture);
+      const auto matches=[&](int x,int y,int red,int green,int blue){
+        const auto offset=(static_cast<std::size_t>(y)*pixels->width()+x)*4u;
+        const auto &rgba=pixels->pixels();
+        return rgba[offset]==red&&rgba[offset+1]==green&&rgba[offset+2]==blue;
+      };
+      check(matches(50,50,20,200,40),"UI image was hidden behind its panel or lost tint");
+      check(matches(30,30,10,30,90)&&matches(90,90,10,30,90),"UI image escaped its clip");
+      check(matches(65,65,220,180,20),"UI image covered a later control");
+      check(matches(25,115,200,20,40),"UI image clip leaked into a later control");
+      DrawList invalid_overlay;
+      invalid_overlay.overlay.emplace_back(Image{portrait,{0,0,20,20},UiRect{0,0,2,2}});
+      bool invalid_overlay_rejected{};
+      try{window.draw(invalid_overlay);}catch(const std::invalid_argument&){invalid_overlay_rejected=true;}
+      check(invalid_overlay_rejected,"UI image bypassed source-bound validation");
+    }
     auto first_image=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,255));std::weak_ptr<const RgbaImage> first_weak=first_image;DrawList image_frame;image_frame.world.emplace_back(Image{first_image,{24,24,48,48}});window.draw(image_frame);const auto first_uploads=window.image_upload_count();window.draw(image_frame);check(window.image_upload_count()==first_uploads,"identical image resource was uploaded more than once");image_frame.world.clear();first_image.reset();check(!first_weak.expired(),"texture cache did not retain strong immutable image ownership");
     auto never_uploaded=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,128));DrawList invalid_image;invalid_image.world.emplace_back(Image{never_uploaded,{20,20,20,20},UiRect{1,1,4,4}});const auto uploads_before_invalid=window.image_upload_count();bool invalid_source_rejected{};try{window.draw(invalid_image);}catch(const std::invalid_argument&){invalid_source_rejected=true;}check(invalid_source_rejected&&window.image_upload_count()==uploads_before_invalid,"invalid source bounds uploaded or rendered a resource");
     DrawList image_pressure;for(std::size_t index=0;index<maximum_image_cache_entries;++index){auto pixels=std::vector<std::uint8_t>(16,static_cast<std::uint8_t>(index));pixels[3]=255;pixels[7]=255;pixels[11]=255;pixels[15]=255;image_pressure.world.emplace_back(Image{RgbaImage::create(2,2,std::move(pixels)),{-100,-100,2,2}});}window.draw(image_pressure);image_pressure.world.clear();check(first_weak.expired(),"evicted image cache entry retained its resource");check(window.image_cache_entries()<=maximum_image_cache_entries,"image cache exceeded entry capacity");check(window.image_cache_resident_bytes()<=maximum_image_cache_resident_bytes,"image cache exceeded resident byte capacity");

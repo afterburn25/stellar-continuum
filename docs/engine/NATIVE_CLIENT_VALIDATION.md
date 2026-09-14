@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Owned solid worlds expose an operational surface workspace: choose a known building, pan/zoom, review its exact footprint and costs, confirm placement, or cancel an unfinished site for the canonical refund. Material-dependent progress and complete paused reload equality are maintained. See NATIVE_SURFACE_WORKSPACE.md.
+
 - Select a populated colony/outpost ship and right-click an observed planet for exact settlement terms. Confirm invokes the canonical paid mission; Cancel spends nothing. The inspector shows live timed establishment, and paused saves retain mission identity and progress.
 
 - Owned surveyed planets open a colony workspace with grouped population, labor/support, current reserves, surface production and sites; independently scrolling columns keep 720p readable. Back restores the same body; pause/speed retain it.
@@ -30,6 +32,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Engine 0.1.53 passed 138 CTest, 206 Python checks and twenty-six actual Vulkan launches. Surface validation starts from an unaltered fresh 500-system campaign and verifies preview cancellation, paid placement, half-refund cancellation, noninstant progress and exact paused reload/resave. Engine image-overlay tests use actual GPU pixel readback for ordering, clipping, tint and immutable texture reuse. Surface captures at 720p/1080p were inspected; this operational grid is not final 3D presentation.
 
 Engine 0.1.49 passed 128/128 CTest, 96 Python checks and thirteen actual Vulkan launches. New orbital checks select Earth, pan, zoom, reset and return at 720p/1080p, with full paused save/reload equality. Both runs upload nine immutable images; camera movement reuses their identities. Platform tests cover Unicode decoding, malformed/oversized inputs and cache eviction. This is an orbital preview, not full visual parity. See NATIVE_SYSTEM_VIEW.md.
 
@@ -78,4 +82,4 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, full construction/unlock progression, diplomacy, 3D planet/surface views, tactical presentation and audio remain. Orbital and owned-colony telemetry views are integrated; graphical settlement and surface placement controls remain open. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, full construction/unlock progression, diplomacy, 3D planet/surface views, tactical presentation and audio remain. Orbital, owned-colony telemetry, ship-delivered settlement and operational surface placement/cancellation are integrated. Native new-game selection/generation is the next integration step. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.

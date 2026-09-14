@@ -49,7 +49,7 @@ struct Image {
   std::optional<UiRect> clip;
 };
 using WorldCommand=std::variant<Line,Circle,Text,Image>;
-using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text>;
+using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
 // pixels, already projected relative to the camera by the application.
 struct DrawList {

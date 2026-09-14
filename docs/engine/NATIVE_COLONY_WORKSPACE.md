@@ -27,9 +27,9 @@ compare full save payloads excluding only SavedAtUtc. Negative export tests
 reject malformed/truncated captures, missing known-system membership, identity
 or reserve mismatch, missed input and changed paused state.
 
-This is the telemetry workspace. Shared surface placement/removal assessments
-and guarded native mutation controllers are implemented separately, but their
-graphical placement actions remain open. Ship-delivered settlement is now
+This telemetry workspace now opens the operational surface placement/removal
+workspace for owned solid worlds. Graphical actions use the shared assessments
+and guarded mutation controllers; see NATIVE_SURFACE_WORKSPACE.md. Ship-delivered settlement is now
 exposed separately in the system view; see NATIVE_SETTLEMENT_WORKSPACE.md.
 It does not claim final 3D surface visuals, completed artwork, sustained 60 FPS,
 or full gameplay parity. See NATIVE_COLONY_CONTROLLERS.md and

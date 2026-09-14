@@ -121,6 +121,8 @@ ColonyWorkspaceLayout ColonyWorkspaceLayout::for_viewport(int width,
            surface.width - 92.f * scale, 32.f * scale},
           {surface.x + surface.width - 48.f * scale,
            surface.y + 12.f * scale, 34.f * scale, 34.f * scale},
+          {surface.x + surface.width - 208.f * scale,
+           surface.y + 12.f * scale, 150.f * scale, 34.f * scale},
           details,
           summary,
           sustenance,
@@ -183,6 +185,9 @@ ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
     close();
     return {ColonyWorkspaceCommandKind::Close, true};
   }
+  if (event.type == InputEventType::LeftPressed && view_->solid_surface &&
+      layout.open_surface.contains(event.position))
+    return {ColonyWorkspaceCommandKind::OpenSurface, true};
   if (event.type == InputEventType::Wheel &&
       layout.sites.contains(event.position)) {
     site_scroll_ += event.wheel_y * 44.f * layout.scale;
@@ -236,6 +241,13 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
   stroke(out, layout.close, border);
   text(out, layout.close, "BACK", bright, layout.small_font_pixels,
        TextAlign::Center);
+  if (view.solid_surface) {
+    fill(out, layout.open_surface,
+         layout.open_surface.contains(pointer_) ? hover : row);
+    stroke(out, layout.open_surface, good);
+    text(out, layout.open_surface, "OPEN SURFACE", bright,
+         layout.small_font_pixels, TextAlign::Center);
+  }
 
   panel_title(out, summary, layout.details,
               view.resource_outpost ? "RESOURCE OUTPOST" : "COLONY",

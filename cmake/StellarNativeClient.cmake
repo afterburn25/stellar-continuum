@@ -67,3 +67,7 @@ target_sources(stellar-continuum-native PRIVATE
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_settlement_mission_controller.cpp
   app/native_client/native_settlement_workspace.cpp)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_surface_construction_controller.cpp
+  app/native_client/native_surface_workspace.cpp)

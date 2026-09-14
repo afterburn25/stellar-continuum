@@ -11,7 +11,7 @@ namespace stellar::native_colony_ui {
 struct ColonyWorkspaceLayout {
   float scale{};
   int title_font_pixels{}, body_font_pixels{}, small_font_pixels{};
-  stellar::native_map::UiRect surface, title, close;
+  stellar::native_map::UiRect surface, title, close, open_surface;
   stellar::native_map::UiRect details, summary, sustenance, operations, sites,
       site_rows;
 
@@ -19,7 +19,7 @@ struct ColonyWorkspaceLayout {
                                                            int height) noexcept;
 };
 
-enum class ColonyWorkspaceCommandKind { None, Close };
+enum class ColonyWorkspaceCommandKind { None, Close, OpenSurface };
 
 struct ColonyWorkspaceCommand {
   ColonyWorkspaceCommandKind kind{ColonyWorkspaceCommandKind::None};
