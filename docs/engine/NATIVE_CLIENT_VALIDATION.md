@@ -2,7 +2,7 @@
 
 The engine and client target is C++23. The preserved Godot/C# game remains the behavioral reference and current full playable baseline. C# added under `tests/` generates reference fixtures; it is not shipped with the native runtime.
 
-The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points and debug text, with no Core dependency. The client owns a real 500-system fresh campaign through the integrated runtime and campaign frame adapter.
+The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text and ordered panel/text overlays, with no Core dependency. The client owns a real 500-system fresh campaign through the integrated runtime and campaign frame adapter.
 
 ## Current interaction
 
@@ -25,6 +25,8 @@ Maintained integration and sealed package results are recorded in `HANDOFF.md`, 
 
 ## Campaign persistence
 
+Exact Engine 0.1.44 package `StellarContinuum-windows-native-preview-51c0af46-20260914T141133791491Z` was sealed from clean commit `51c0af4662196d1d7e36d5f7def427d1bf8e173b`: 80 verified files, identical ZIP/folder bytes, valid ZIP CRC, 8,712,122-byte archive and all 14 relocation/session/recovery checks. Its committed export passed 111 CTest plus 29 existing and eight native export checks. The restricted-PATH fresh and loaded graphical runs rendered 120 frames each; startup was 580.798/528.210 ms and mean frame time 17.546/17.397 ms. Evidence is in `work/native-044-sealed-export.log` and `work/native-044-verification.json`.
+
 The default native save is `%LOCALAPPDATA%/Stellar Continuum/NativePreview/campaign.player17.json`. `--save-path <path>` selects another slot; `--load` explicitly loads it, starting paused. Wide Windows command-line paths preserve Unicode. Failed explicit loading never creates a fresh replacement or modifies the save files.
 
 Background saves own detached Player17 payloads. Load drains the current write first and suspends new save admission until the read finishes. The restored campaign, clock and caches are validated before replacing the live owner. A failed read, decode, activation or save drain preserves the current session. Exit closes only after a successful save; failure remains visible. Public session access is restricted to its simulation owner thread, and a failed frame invalidates save eligibility.
@@ -41,6 +43,14 @@ python tools/stellar-export/stellar.py export windows-native-preview
 The export seals the client, exact reviewed SDL3 DLL, license and declared data. Direct and transitive imports are inspected. The headless dependency policy stays unchanged. The preview exporter additionally launches from another directory with a restricted Windows PATH, verifies Vulkan and the campaign count, and captures the displayed frame. That local GPU check is opt-in; ordinary CI remains headless.
 
 The preview build folder is `build-native/preview` to stay within the Windows compiler's generated-path limits at this checkout depth. An offline SDL archive may be supplied through `STELLAR_SDL3_ARCHIVE`; its pinned hash is still mandatory.
+
+## Native UI assets and layout
+
+The Windows platform rasterizes private Rajdhani SemiBold headings and the host's Segoe UI interface font to alpha textures. The bundled Rajdhani font and its OFL license are declared by exact paths and SHA-256 hashes in `export/native-ui-assets.json`. Native CMake builds copy the reviewed font; the exporter verifies and seals both font and license. It never redistributes a machine-installed font. Missing/tampered inputs and unreviewed source/output paths fail packaging; missing runtime headings fail clearly rather than silently substituting a font.
+
+The renderer caches text by content, pixel size, wrapping and font role; color/opacity are texture modulation. Its LRU is bounded to 640 entries and 32 MiB. GDI drawing is flushed before alpha extraction; native resources are released on exceptions. Text supports clipping, wrapping and alignment. World primitives draw before the ordered overlay, so menu backgrounds actually occlude the map.
+
+One drawable-pixel layout supplies both painted rectangles and hit targets. Main controls, status, fonts and menu scale together at 720p, 1080p, 1440p and 4K, with narrow-window caps. Layout replay checks complete button containment, separation, and center/four-corner hits, including 1280x1080 and 640x360. Actual 120-frame fresh/load captures at the four standard sizes were inspected under `work/102-native-ui/build/responsive-1789395568139396800`; mean frame times ranged from 17.541 to 18.221 ms. These are diagnostic samples, not a performance guarantee. SDL event replay also verifies hover coordinates, font failures, stable text reuse and cache limits.
 
 ## Remaining migration
 

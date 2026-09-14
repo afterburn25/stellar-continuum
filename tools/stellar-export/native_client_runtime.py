@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import tempfile
 
+from native_ui_runtime import native_ui_asset_files
+
 
 def _verified_file(path: Path, expected_hash: str) -> Path:
     if not path.is_file():
@@ -38,6 +40,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
         "SDL3.dll": library,
         "Licenses/SDL3-zlib.txt": license_file,
     }
+    files.update(native_ui_asset_files(root))
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)

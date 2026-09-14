@@ -10,6 +10,7 @@ from unittest import mock
 
 import stellar as exporter
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
+from native_research_runtime import validate_native_research_export
 
 
 class NativeClientDependencyTests(unittest.TestCase):
@@ -42,6 +43,20 @@ class NativeClientDependencyTests(unittest.TestCase):
         lock_path.write_text(json.dumps(lock))
         self.imports = {"stellar-continuum-native.exe": ["SDL3.dll", "KERNEL32.dll"],
                         "SDL3.dll": ["USER32.dll"]}
+        self.font = self.root / "assets/visual/fonts/Rajdhani-SemiBold.ttf"
+        self.font.parent.mkdir(parents=True)
+        self.font.write_bytes(b"test-only font content")
+        self.font_license = self.font.with_name("OFL-Rajdhani.txt")
+        self.font_license.write_text("test-only font license")
+        self.ui_declaration = self.root / "export/native-ui-assets.json"
+        self.ui_declaration.parent.mkdir(parents=True)
+        self.ui_declaration.write_text(json.dumps({"schemaVersion": 1,
+            "font": {"source": self.font.relative_to(self.root).as_posix(),
+                     "runtimePath": self.font.relative_to(self.root).as_posix(),
+                     "sha256": hashlib.sha256(self.font.read_bytes()).hexdigest()},
+            "license": {"source": self.font_license.relative_to(self.root).as_posix(),
+                        "runtimePath": "Licenses/OFL-Rajdhani.txt",
+                        "sha256": hashlib.sha256(self.font_license.read_bytes()).hexdigest()}}))
 
     def inspect(self, binary, runtime=(), windows=()):
         text = "\n".join("    " + name for name in self.imports[binary.name])
@@ -66,6 +81,40 @@ class NativeClientDependencyTests(unittest.TestCase):
     def test_tampered_sdl_blocks_package(self):
         self.library.write_bytes(self.library.read_bytes() + b"changed")
         with self.assertRaisesRegex(RuntimeError, "differs from reviewed SDL"):
+            self.copy()
+
+    def test_missing_font_blocks_package(self):
+        self.font.unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native UI font"):
+            self.copy()
+
+    def test_missing_font_license_blocks_package(self):
+        self.font_license.unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native UI license"):
+            self.copy()
+
+    def test_tampered_font_blocks_package(self):
+        self.font.write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError, "font differs from reviewed content"):
+            self.copy()
+
+    def test_tampered_font_license_blocks_package(self):
+        self.font_license.write_text("changed")
+        with self.assertRaisesRegex(RuntimeError, "license differs from reviewed content"):
+            self.copy()
+
+    def test_unreviewed_font_path_cannot_escape_package(self):
+        declaration = json.loads(self.ui_declaration.read_text())
+        declaration["font"]["runtimePath"] = "../outside.ttf"
+        self.ui_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unreviewed native UI font path"):
+            self.copy()
+
+    def test_unreviewed_font_source_is_rejected(self):
+        declaration = json.loads(self.ui_declaration.read_text())
+        declaration["font"]["source"] = "../../outside.ttf"
+        self.ui_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unreviewed native UI font path"):
             self.copy()
 
     def test_undeclared_client_import_is_rejected(self):
@@ -120,6 +169,68 @@ class NativeSessionExportTests(unittest.TestCase):
     def test_load_cannot_silently_change_the_saved_world(self):
         with self.assertRaisesRegex(RuntimeError, "changed during paused load"):
             self.exercise(mutate_load=True)
+
+
+class NativeResearchExportTests(unittest.TestCase):
+    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False):
+        with tempfile.TemporaryDirectory(prefix="stellar-research-export-test-") as temporary:
+            package = Path(temporary) / "package"
+            package.mkdir()
+            calls = []
+
+            def launch(args, *, cwd, env, **unused):
+                self.assertNotEqual(cwd, package)
+                save = Path(args[args.index("--save-path") + 1])
+                capture = Path(args[args.index("--research-smoke") + 1])
+                self.assertEqual(save.parent, cwd)
+                self.assertEqual(capture.parent, cwd)
+                calls.append(args)
+                if "--load" in args:
+                    payload = json.loads(save.read_text())
+                    payload["SavedAtUtc"] = "later"
+                    if mutate_load:
+                        payload["Galaxy"]["Economies"][0]["Credits"] += 1
+                else:
+                    research = {"Core": {"ActiveProjects": [{"NodeId": "known",
+                                "Paused": False, "TotalResearchPoints": 1 if progressed else 0}]}}
+                    for _ in range(3):
+                        research = {"Research": research}
+                    payload = {"FormatVersion": 17, "SavedAtUtc": "earlier",
+                        "Galaxy": {"Systems": list(range(500)), "PlayerCivilizationId": 7,
+                                   "Economies": [{"CivilizationId": 7, "Credits": 100,
+                                                  "LastResearchSpendingPerDay": 2 if funded else 0}]},
+                        "AdaptiveResearch": {"Civilizations": [{"CivilizationId": 7,
+                                                                  "Research": research}]}}
+                save.write_text(json.dumps(payload))
+                capture.write_bytes(b"BM" + bytes(54))
+                saved = "preserved" if skipped_save and "--load" in args else "ok"
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1", "")
+
+            with mock.patch("native_research_runtime.subprocess.run", side_effect=launch):
+                result = validate_native_research_export(package, {})
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(result["nativeResearchPlayerInput"])
+            self.assertTrue(result["nativeResearchProgressReload"])
+            self.assertTrue(all(Path(path).is_file() for path in result["researchCaptures"]))
+
+    def test_research_input_progress_survives_isolated_reload(self):
+        self.exercise()
+
+    def test_research_reload_cannot_change_treasury(self):
+        with self.assertRaisesRegex(RuntimeError, "changed during paused load"):
+            self.exercise(mutate_load=True)
+
+    def test_unfunded_research_does_not_count_as_success(self):
+        with self.assertRaisesRegex(RuntimeError, "funded, advancing research"):
+            self.exercise(funded=False)
+
+    def test_zero_progress_does_not_count_as_success(self):
+        with self.assertRaisesRegex(RuntimeError, "funded, advancing research"):
+            self.exercise(progressed=False)
+
+    def test_skipping_loaded_save_is_not_a_roundtrip(self):
+        with self.assertRaisesRegex(RuntimeError, "actual manual save"):
+            self.exercise(skipped_save=True)
 
 
 if __name__ == "__main__":

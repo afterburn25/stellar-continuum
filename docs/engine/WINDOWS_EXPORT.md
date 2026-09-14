@@ -1,6 +1,6 @@
 # Stellar Engine Windows export
 
-Engine 0.1.44 adds native Player17 Save/Load/Exit and background autosave to the opt-in C++23 SDL3/Vulkan galaxy preview. It displays a real 500-system campaign with mouse navigation, selection, pause and speed controls. Preview export checks use isolated saves, reload them and compare complete paused state. This is incomplete native graphical migration; existing Godot exports remain the full playable baseline. .NET is used only by development reference-fixture generators. Neither native executable needs Godot or .NET at runtime. See [native client scope and validation](NATIVE_CLIENT_VALIDATION.md).
+Engine 0.1.45 adds a native C++23 research workspace with responsive, sharp text, domain tabs, search, canonical costs and Begin/Pause/Resume controls. The SDL3/Vulkan preview owns the 500-system campaign and Player17 save/load/exit. Export checks exercise real mouse-driven research, funded progress, saving and paused reload/recapture using isolated files. This remains an incomplete native client; the preserved Godot game is the full playable reference. Neither native executable requires Godot or .NET. See [native client scope and validation](NATIVE_CLIENT_VALIDATION.md) and [native research](NATIVE_RESEARCH.md).
 
 ## Developer setup
 
@@ -22,7 +22,7 @@ The native build also supports standard CMake configure/build/CTest presets from
 | --- | --- |
 | windows-development | Debug native foundation; application PDB included |
 | windows-testing | RelWithDebInfo foundation; runtime package excludes symbols |
-| windows-native-preview | RelWithDebInfo native galaxy preview plus headless diagnostics; pinned SDL3 runtime and license included; installed Vulkan driver required |
+| windows-native-preview | RelWithDebInfo native galaxy preview plus headless diagnostics; pinned SDL3 plus declared UI font and licenses included; installed Vulkan driver required |
 | windows-headless | Release foundation; runtime package excludes symbols |
 | windows-benchmark | Release foundation, catalog/founding/fresh initialization, and retained legacy campaign-step benchmarks; no rendering/FPS claim |
 | windows-release | Fails with an explicit graphical-parity explanation; never substitutes headless output for a playable game |
@@ -34,13 +34,13 @@ Presets live in `export/stellar-presets.json`; CMake configurations live in `CMa
 
 The runtime links the C++ runtime statically and only imports allowlisted Windows system DLLs. PE machine type must be AMD64. No Godot, .NET, Python, compiler, CMake, Ninja or Vulkan SDK is needed by this native executable. Non-system dependencies cause export failure until deliberately supported and packaged; the exporter does not copy arbitrary developer DLL directories.
 
-Version resources embed game/engine versions and source commit. The manifest records source commit, dirty state, configuration, UTC build ID, content version, mode, architecture, runtime imports and SHA-256/size of every runtime file. Explicit fields state gameplay parity is false and graphics/shaders are not yet required by this headless host. Only selected runtime files are copied. Manifest checks reject tampering, omitted/extra files, duplicate/escaping paths, source/object files and public symbols. Validate an existing directory with:
+Version resources embed game/engine versions and source commit. The manifest records source commit, dirty state, configuration, UTC build ID, content version, mode, architecture, runtime imports and SHA-256/size of every runtime file. Explicit fields state gameplay parity is false. Headless packages require no graphics assets; the native preview declares its required font and license. No custom precompiled shaders are required yet. Only selected runtime files are copied. Manifest checks reject tampering, omitted/extra files, duplicate/escaping paths, source/object files and public symbols. Validate an existing directory with:
 
 ```powershell
 python tools/stellar-export/stellar.py validate Builds/Windows/<export-directory>
 ```
 
-Build/export runs CTest and Python integrity/recovery checks. Then an independent copy launches in a temporary folder with a Windows-system-only PATH. It creates and restores a foundation checkpoint, resolves the packaged astronomy catalog, initializes a fresh campaign, and advances a retained campaign simulation while checking its deterministic diagnostic state. Failures produce a terminal error and nonzero status; partial output is marked `EXPORT_FAILED.txt` and is not zipped as validated.
+Build/export runs CTest and Python integrity/recovery checks. Pure client research/layout/input tests also run in the headless CI configuration. Native-preview export additionally performs four real graphical runs: map save/load and research start/advance/save/load, with complete paused Player17 recapture equality and positive funded research checks. Then an independent copy launches in a temporary folder with a Windows-system-only PATH. It creates and restores a foundation checkpoint, resolves the packaged astronomy catalog, initializes a fresh campaign, and advances a retained campaign simulation while checking its deterministic diagnostic state. Failures produce a terminal error and nonzero status; partial output is marked `EXPORT_FAILED.txt` and is not zipped as validated.
 
 This relocated test is **not clean-machine certification**: it runs on the development machine. A separate Windows VM/device without development tools remains a required release gate. Hashes detect integrity changes; they are not a digital signature/authenticity guarantee.
 
