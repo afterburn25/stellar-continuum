@@ -36,6 +36,11 @@ struct ColonizationEvent {
   std::string message;
 };
 
+struct SettlementExpeditionAuthorizationTerms {
+  bool is_new_expedition{};
+  double charge_budget_units{};
+};
+
 class ColonizationSimulation {
 public:
   static constexpr double colony_expedition_credit_cost = 120.0;
@@ -46,6 +51,10 @@ public:
   explicit ColonizationSimulation(SettlementReachAssessment reach = {});
 
   [[nodiscard]] static double establishment_days(const FleetState &fleet);
+  [[nodiscard]] static SettlementExpeditionAuthorizationTerms
+  colony_expedition_authorization(const FleetState &fleet) noexcept;
+  [[nodiscard]] static SettlementExpeditionAuthorizationTerms
+  resource_outpost_expedition_authorization(const FleetState &fleet) noexcept;
   [[nodiscard]] std::vector<ColonizationEvent>
   advance(ColonizationWorldView world, double simulation_days = 1.0) const;
   [[nodiscard]] ColonyOrderResult
@@ -61,6 +70,10 @@ public:
       ColonizationWorldView world, int fleet_id,
       int maximum_candidates =
           ResourceOutpostOpportunityPlanner::default_maximum_candidates) const;
+  [[nodiscard]] ResourceOutpostOrderAssessment
+  assess_resource_outpost_order(ColonizationWorldView world, int fleet_id,
+                                int destination_system_id,
+                                int planetary_body_id) const;
   [[nodiscard]] ColonyOrderResult
   issue_resource_outpost_fleet_order(ColonizationWorldView world, int fleet_id,
                                      int destination_system_id,

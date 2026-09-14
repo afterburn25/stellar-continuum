@@ -194,6 +194,29 @@ double ColonizationSimulation::establishment_days(const FleetState &fleet) {
              : colony_establishment_days;
 }
 
+namespace {
+SettlementExpeditionAuthorizationTerms authorization_terms(
+    const FleetState &fleet, const double full_charge) noexcept {
+  const bool is_new =
+      fleet.prevent_automatic_settlement ||
+      (!fleet.destination_system_id && !fleet.destination_planetary_body_id &&
+       !fleet.settlement_body_id);
+  return {is_new, is_new ? full_charge : 0.};
+}
+} // namespace
+
+SettlementExpeditionAuthorizationTerms
+ColonizationSimulation::colony_expedition_authorization(
+    const FleetState &fleet) noexcept {
+  return authorization_terms(fleet, colony_expedition_credit_cost);
+}
+
+SettlementExpeditionAuthorizationTerms
+ColonizationSimulation::resource_outpost_expedition_authorization(
+    const FleetState &fleet) noexcept {
+  return authorization_terms(fleet, resource_outpost_expedition_credit_cost);
+}
+
 void ColonizationSimulation::abandon_mission_for_transit(FleetState &fleet) {
   fleet.destination_planetary_body_id.reset();
   fleet.settlement_body_id.reset();
@@ -450,6 +473,15 @@ ColonizationSimulation::get_resource_outpost_opportunity_plan(
                                      maximum_candidates);
 }
 
+ResourceOutpostOrderAssessment
+ColonizationSimulation::assess_resource_outpost_order(
+    ColonizationWorldView world, int fleet_id, int destination_system_id,
+    int planetary_body_id) const {
+  return outpost_planner_.assess_order(world.planning(), fleet_id,
+                                       destination_system_id,
+                                       planetary_body_id);
+}
+
 ColonyOrderResult ColonizationSimulation::issue_resource_outpost_fleet_order(
     ColonizationWorldView world, int fleet_id, int destination_system_id,
     int planetary_body_id) const {
@@ -463,19 +495,17 @@ ColonyOrderResult ColonizationSimulation::issue_resource_outpost_fleet_order(
   });
   if (!fleet)
     throw std::runtime_error("Sequence contains no matching element");
-  const bool is_new =
-      fleet->prevent_automatic_settlement ||
-      (!fleet->destination_system_id && !fleet->destination_planetary_body_id &&
-       !fleet->settlement_body_id);
+  const auto authorization =
+      resource_outpost_expedition_authorization(*fleet);
   auto &economy = require_economy(world, fleet->civilization_id);
   const auto currency = sovereign_currency_for_civilization(
       world.civilizations, fleet->civilization_id);
-  if (is_new &&
-      economy.credits + .0001 < resource_outpost_expedition_credit_cost)
+  if (authorization.is_new_expedition &&
+      economy.credits + .0001 < authorization.charge_budget_units)
     return {false, currency.format(resource_outpost_expedition_credit_cost) +
                        " is required to fund the resource-outpost expedition."};
-  if (is_new)
-    economy.credits -= resource_outpost_expedition_credit_cost;
+  if (authorization.is_new_expedition)
+    economy.credits -= authorization.charge_budget_units;
   assign_fleet_route(world.reach(), *fleet, destination_system_id,
                      assessment.candidate->reach);
   if (fleet->destination_planetary_body_id != planetary_body_id) {
@@ -485,7 +515,7 @@ ColonyOrderResult ColonizationSimulation::issue_resource_outpost_fleet_order(
   fleet->destination_planetary_body_id = planetary_body_id;
   fleet->prevent_automatic_settlement = false;
   return {true, assessment.message +
-                    (is_new ? " Expedition funded for " +
+                    (authorization.is_new_expedition ? " Expedition funded for " +
                                   currency.format(
                                       resource_outpost_expedition_credit_cost) +
                                   "."
@@ -554,18 +584,16 @@ ColonyOrderResult ColonizationSimulation::issue_colony_fleet_order(
   });
   if (!fleet)
     throw std::runtime_error("Sequence contains no matching element");
-  const bool is_new =
-      fleet->prevent_automatic_settlement ||
-      (!fleet->destination_system_id && !fleet->destination_planetary_body_id &&
-       !fleet->settlement_body_id);
+  const auto authorization = colony_expedition_authorization(*fleet);
   auto &economy = require_economy(world, fleet->civilization_id);
   const auto currency = sovereign_currency_for_civilization(
       world.civilizations, fleet->civilization_id);
-  if (is_new && economy.credits + .0001 < colony_expedition_credit_cost)
+  if (authorization.is_new_expedition &&
+      economy.credits + .0001 < authorization.charge_budget_units)
     return {false, currency.format(colony_expedition_credit_cost) +
                        " is required to fund the colony expedition."};
-  if (is_new)
-    economy.credits -= colony_expedition_credit_cost;
+  if (authorization.is_new_expedition)
+    economy.credits -= authorization.charge_budget_units;
   assign_fleet_route(world.reach(), *fleet, destination_system_id,
                      assessment.candidate->reach);
   if (fleet->destination_planetary_body_id != planetary_body_id) {
@@ -576,7 +604,7 @@ ColonyOrderResult ColonizationSimulation::issue_colony_fleet_order(
   fleet->prevent_automatic_settlement = false;
   return {true,
           assessment.message +
-              (is_new ? " Expedition funded for " +
+                    (authorization.is_new_expedition ? " Expedition funded for " +
                             currency.format(colony_expedition_credit_cost) + "."
                       : " Destination updated; the original expedition "
                         "authorization remains in effect.")};

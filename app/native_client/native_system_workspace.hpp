@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace stellar::native_system_ui {
 struct SystemBodyAppearance {
@@ -27,13 +28,20 @@ enum class SystemWorkspaceCommandKind {
   close,
   select_fleet,
   open_destination,
-  open_colony
+  open_colony,
+  settlement_target
 };
 struct SystemWorkspaceCommand {
   SystemWorkspaceCommandKind kind{SystemWorkspaceCommandKind::none};
   bool captured{};
   int target_id{-1};
   std::vector<int> hit_fleet_ids;
+};
+struct NativeSystemSettlementStatus {
+  int fleet_id{};
+  std::string status;
+  std::optional<int> destination_system_id, destination_body_id;
+  double settlement_days_completed{}, establishment_days{};
 };
 struct SystemWorkspaceLayout {
   stellar::native_map::UiRect controls_row;
@@ -53,6 +61,9 @@ public:
                       std::optional<int> selected_fleet_id);
   void clear_travel() noexcept;
   void set_colony_body(std::optional<int>) noexcept;
+  void set_settlement_status(std::optional<NativeSystemSettlementStatus> value) {
+    settlement_status_ = std::move(value);
+  }
   void set_notice(std::string);
   void close() noexcept;
   void discard_campaign() noexcept;
@@ -85,6 +96,7 @@ private:
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;
   std::optional<int> selected_body_id_;
   std::optional<int> colony_body_id_;
+  std::optional<NativeSystemSettlementStatus> settlement_status_;
   std::optional<stellar::native_system_travel::NativeSystemTravelSnapshot> travel_;
   std::vector<stellar::native_system_travel::NativeLaneLabelMetrics> lane_metrics_;
   std::optional<int> selected_fleet_id_,hovered_fleet_id_,hovered_lane_id_;

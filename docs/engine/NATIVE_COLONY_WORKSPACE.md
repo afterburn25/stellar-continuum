@@ -29,7 +29,8 @@ or reserve mismatch, missed input and changed paused state.
 
 This is the telemetry workspace. Shared surface placement/removal assessments
 and guarded native mutation controllers are implemented separately, but their
-graphical placement actions and ship-delivered settlement UI remain open.
+graphical placement actions remain open. Ship-delivered settlement is now
+exposed separately in the system view; see NATIVE_SETTLEMENT_WORKSPACE.md.
 It does not claim final 3D surface visuals, completed artwork, sustained 60 FPS,
 or full gameplay parity. See NATIVE_COLONY_CONTROLLERS.md and
 NATIVE_SURFACE_ASSESSMENTS.md; exact packaged evidence belongs in HANDOFF.md

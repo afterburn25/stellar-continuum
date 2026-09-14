@@ -63,3 +63,7 @@ endif()
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_colony_controller.cpp
   app/native_client/native_colony_workspace.cpp)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_settlement_mission_controller.cpp
+  app/native_client/native_settlement_workspace.cpp)

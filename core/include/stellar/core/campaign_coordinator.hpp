@@ -184,6 +184,13 @@ get_resource_outpost_opportunity_plan(
     CampaignSimulationState *campaign, int fleet_id,
     int maximum_candidates =
         ResourceOutpostOpportunityPlanner::default_maximum_candidates) const;
+[[nodiscard]] ResourceOutpostOrderAssessment
+assess_resource_outpost_fleet_order(
+    CampaignSimulationState *campaign, int acting_civilization_id,
+    int fleet_id, int destination_system_id, int planetary_body_id) const;
+[[nodiscard]] ColonizationOrderAssessment assess_colony_fleet_order(
+    CampaignSimulationState *campaign, int acting_civilization_id,
+    int fleet_id, int destination_system_id, int planetary_body_id) const;
 [[nodiscard]] ColonyOrderResult issue_resource_outpost_fleet_order(
     CampaignSimulationState *campaign, int acting_civilization_id,
     int fleet_id, int destination_system_id, int planetary_body_id) const;

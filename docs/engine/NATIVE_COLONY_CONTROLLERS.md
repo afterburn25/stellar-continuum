@@ -21,8 +21,9 @@ civilization income or treasury surplus.
 ## Ship-delivered settlement
 
 `NativeSettlementMissionController` copies the canonical colony/outpost
-opportunity plans for active owned populated settlement vessels. It retains
-only the planner's bounded candidate list. The existing coordinator owns
+opportunity plans for active owned populated settlement vessels. Suggested
+opportunities retain the planner's bounded list, while manual targeting uses
+an exact body assessment without that cap. The existing coordinator owns
 knowledge gates, species viability, deposits, reach, costs and mission admission.
 
 An order binds generation, player, view revision, fleet/order revision, design,
@@ -30,7 +31,10 @@ personnel, currency and cost, then re-resolves the vessel and current plan befor
 calling the coordinator. Funding loss or revoked knowledge cannot reuse an
 old preview. Ordinary treasury changes do not invent new eligibility rules.
 Core retains travel, 30-day colony/20-day outpost establishment and vessel
-consumption. No settlement is created by the client directly.
+consumption. No settlement is created by the client directly. Shared Core
+authorization terms quote the full initial charge and zero additional charge
+for an already authorized retarget. Live selected-vessel status requires no
+opportunity-planner search.
 
 The focused controller checks include fresh campaign telemetry, changed site
 revisions, current reserve values during a deficit, independent snapshots,
@@ -42,4 +46,4 @@ The maintained colonization oracle retains 124 actual-source cases plus four
 native boundaries. Exact combined results belong in the checkpoint handoff.
 
 Surface mutation is handled separately by NATIVE_SURFACE_ASSESSMENTS.md.
-The settlement controller is not yet wired to a graphical ship-order workflow.
+See NATIVE_SETTLEMENT_WORKSPACE.md for the manual ship-to-planet workflow.

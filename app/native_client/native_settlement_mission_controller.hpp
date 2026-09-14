@@ -43,8 +43,12 @@ struct NativeSettlementMissionView {
   NativeSettlementMissionKind kind{};
   std::string fleet_name, personnel_species_id, personnel_species_name;
   std::optional<std::string> design_id;
+  std::optional<int> destination_system_id, destination_body_id,
+      settlement_body_id;
   double personnel_millions{};
+  double settlement_days_completed{}, establishment_days{};
   bool can_receive_orders{}, funded{};
+  bool requires_new_authorization{};
   std::string status;
   double authorization_budget_units{}, treasury_budget_units{};
   std::string formatted_authorization, formatted_treasury;
@@ -57,6 +61,30 @@ struct NativeSettlementCommandOutcome {
   std::string message;
   int mission_order_revision{};
 };
+struct NativeSettlementLiveStatus {
+  int fleet_id{};
+  std::string status;
+  std::optional<int> destination_system_id, destination_body_id,
+      settlement_body_id;
+  double settlement_days_completed{}, establishment_days{};
+};
+
+// Detached authorization for one manually selected, observer-admitted body.
+// The target need not be present in the bounded suggestion list.
+struct NativeSettlementTargetPreview {
+  std::uint64_t campaign_generation{}, revision{};
+  int player_civilization_id{}, fleet_id{}, mission_order_revision{};
+  int destination_system_id{}, body_id{};
+  NativeSettlementMissionKind kind{};
+  std::string fleet_name, personnel_species_id, personnel_species_name;
+  std::optional<std::string> design_id;
+  double personnel_millions{};
+  double authorization_budget_units{}, treasury_budget_units{};
+  bool requires_new_authorization{}, funded{}, accepted{};
+  std::string formatted_authorization, formatted_treasury, message;
+  stellar::core::SovereignCurrencyDefinition currency;
+  std::optional<NativeSettlementCandidate> candidate;
+};
 
 class NativeSettlementMissionController final {
 public:
@@ -66,6 +94,17 @@ public:
   issue(stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
         std::uint64_t revision, int fleet_id, int destination_system_id,
         int body_id);
+  [[nodiscard]] NativeSettlementTargetPreview
+  preview_exact(stellar::core::CampaignFrame &,
+                std::uint64_t campaign_generation, int fleet_id,
+                int destination_system_id, int body_id);
+  [[nodiscard]] NativeSettlementCommandOutcome
+  issue_exact(stellar::core::CampaignFrame &,
+              std::uint64_t campaign_generation,
+              std::uint64_t preview_revision);
+  [[nodiscard]] std::optional<NativeSettlementLiveStatus>
+  live_status(stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+              int fleet_id);
   [[nodiscard]] bool is_current_generation(std::uint64_t) const noexcept;
 
 private:
@@ -75,6 +114,7 @@ private:
   std::optional<std::uint64_t> generation_;
   std::uint64_t next_revision_{1};
   std::vector<NativeSettlementMissionView> projected_;
+  std::optional<NativeSettlementTargetPreview> exact_;
 };
 
 } // namespace stellar::native_colony

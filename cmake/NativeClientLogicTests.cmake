@@ -213,3 +213,31 @@ if(MSVC)
   target_compile_options(stellar_native_colony_workspace_tests PRIVATE /WX)
   target_compile_options(stellar_native_system_colony_entry_tests PRIVATE /WX)
 endif()
+
+add_executable(stellar_settle_target_tests
+  native-tests/native_settlement_targeting_tests.cpp
+  app/native_client/native_settlement_mission_controller.cpp)
+target_include_directories(stellar_settle_target_tests PRIVATE app/native_client)
+target_link_libraries(stellar_settle_target_tests PRIVATE stellar_core)
+add_test(NAME native_settlement_targeting COMMAND stellar_settle_target_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_settlement_targeting PROPERTIES TIMEOUT 90)
+if(MSVC)
+  target_compile_options(stellar_settle_target_tests PRIVATE /WX)
+endif()
+
+add_executable(stellar_settle_ui_tests
+  native-tests/native_settlement_workspace_tests.cpp
+  app/native_client/native_settlement_workspace.cpp
+  app/native_client/native_system_workspace.cpp
+  app/native_client/native_system_view.cpp
+  app/native_client/native_system_travel.cpp)
+target_include_directories(stellar_settle_ui_tests PRIVATE
+  app/native_client
+  engine/include)
+target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_core)
+if(MSVC)
+  target_compile_options(stellar_settle_ui_tests PRIVATE /W4 /WX /permissive-)
+endif()
+add_test(NAME native_settlement_workspace COMMAND stellar_settle_ui_tests)

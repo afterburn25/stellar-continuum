@@ -3,6 +3,8 @@
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
+#include "native_settlement_mission_controller.hpp"
+#include "native_settlement_workspace.hpp"
 #include "native_construction_controller.hpp"
 #include "native_construction_workspace.hpp"
 #include "native_fleet_controller.hpp"
@@ -82,6 +84,8 @@ struct Options {
   bool system_travel_reload_smoke{};
   bool colony_smoke{};
   bool colony_reload_smoke{};
+  bool settlement_smoke{};
+  bool settlement_reload_smoke{};
   bool save_path_overridden{};
 };
 
@@ -113,6 +117,8 @@ struct Options {
     else if(arg==L"--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_travel_reload_smoke=true;result.windowed=true;}
     else if(arg==L"--colony-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.colony_smoke=true;result.windowed=true;}
     else if(arg==L"--colony-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.colony_reload_smoke=true;result.windowed=true;}
+    else if(arg==L"--settlement-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_smoke=true;result.windowed=true;}
+    else if(arg==L"--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_reload_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -132,15 +138,18 @@ struct Options {
     else if(arg=="--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_travel_reload_smoke=true;result.windowed=true;}
     else if(arg=="--colony-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.colony_smoke=true;result.windowed=true;}
     else if(arg=="--colony-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.colony_reload_smoke=true;result.windowed=true;}
+    else if(arg=="--settlement-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_smoke=true;result.windowed=true;}
+    else if(arg=="--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_reload_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
+  if((result.settlement_smoke||result.settlement_reload_smoke)&&!result.load)throw std::invalid_argument("Settlement smoke requires --load with a test-authored funded populated settlement vessel.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
 }
@@ -340,6 +349,73 @@ class NativeCampaign final {
     click(center(layout.pause));smoke_system_travel_pause_retained_=system_workspace_.visible()&&session_->frame().clock().speed()==StrategicSpeed::Paused;const auto paused_fleet=std::ranges::find(world.fleets,*smoke_system_travel_fleet_id_,&FleetState::id);if(paused_fleet==world.fleets.end())throw std::runtime_error("System travel smoke lost its canonical fleet before the pause check.");smoke_system_travel_after_x_=paused_fleet->local_transit_position.x;smoke_system_travel_after_y_=paused_fleet->local_transit_position.y;smoke_system_travel_after_day_=session_->frame().clock().simulation_days();const auto paused_canonical=paused_fleet->local_transit_position;const auto paused_screen=after_screen;InputSnapshot paused_tick;paused_tick.drawable_width=width;paused_tick.drawable_height=height;(void)update(paused_tick,width,height,1.,true);const auto stable_fleet=std::ranges::find(world.fleets,*smoke_system_travel_fleet_id_,&FleetState::id);const auto stable_snapshot=system_workspace_.travel_snapshot();if(stable_fleet==world.fleets.end()||!stable_snapshot)throw std::runtime_error("System travel smoke lost the paused fleet.");const auto stable_marker=std::ranges::find(stable_snapshot->fleets,*smoke_system_travel_fleet_id_,&NativeLocalFleetMarker::fleet_id);if(stable_marker==stable_snapshot->fleets.end())throw std::runtime_error("System travel smoke lost the paused fleet marker.");const auto stable_screen=local_fleet_anchor(*stable_marker,project_system(*system_workspace_.snapshot()),*system_workspace_.viewport());smoke_system_travel_paused_stable_=stable_fleet->local_transit_position.x==paused_canonical.x&&stable_fleet->local_transit_position.y==paused_canonical.y&&stable_screen.x==paused_screen.x&&stable_screen.y==paused_screen.y&&session_->frame().clock().simulation_days()==smoke_system_travel_after_day_;
     const auto order_unchanged=stable_fleet->mission_order_revision==smoke_system_travel_mission_revision_&&stable_fleet->destination_system_id==smoke_system_travel_destination_id_;if(!smoke_system_travel_selected_||!smoke_system_travel_canonical_moved_||!smoke_system_travel_rendered_moved_||!smoke_system_travel_pause_retained_||!smoke_system_travel_paused_stable_||!smoke_system_travel_known_opened_||!smoke_system_travel_unknown_denied_||!smoke_system_travel_knowledge_unchanged_||!order_unchanged||smoke_system_travel_after_day_<=smoke_system_travel_before_day_)throw std::runtime_error("System travel smoke did not prove navigation, selection, canonical movement, rendered movement, and paused stability.");
   }
+  void prepare_settlement_smoke(int width,int height,bool reload){
+    smoke_settlement_mode_=true;smoke_settlement_reload_=reload;
+    auto click=[&](Point point,InputEventType press=InputEventType::LeftPressed,std::uint8_t count=1){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{press,point,{},0,{},count},{press==InputEventType::RightPressed?InputEventType::RightReleased:InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Settlement smoke input closed the campaign.");};
+    auto views=settlement_controller_.build(session_->frame(),session_->cache().generation);
+    if(views.empty())throw std::runtime_error("Settlement smoke requires a test-authored populated colony or outpost vessel.");
+    const auto chosen=reload?std::ranges::find_if(views,has_active_settlement_target):views.begin();
+    if(chosen==views.end())throw std::runtime_error("Settlement reload smoke found no active settlement mission.");
+    smoke_settlement_fleet_id_=chosen->fleet_id;
+    if(reload){smoke_settlement_kind_=chosen->kind;smoke_settlement_authorization_=chosen->authorization_budget_units;smoke_settlement_requires_authorization_=chosen->requires_new_authorization;smoke_settlement_treasury_before_=chosen->treasury_budget_units;smoke_settlement_colonies_before_=session_->frame().runtime().world().campaign().colonies.size();smoke_settlement_before_day_=session_->frame().clock().simulation_days();}
+    if(!fleet_workspace_.view())refresh_fleets(true);
+    const auto fleet=std::ranges::find(fleet_workspace_.view()->own_fleets,chosen->fleet_id,&NativeOwnFleet::id);
+    if(fleet==fleet_workspace_.view()->own_fleets.end())throw std::runtime_error("Settlement vessel is absent from the owned fleet view.");
+    const auto fleet_index=static_cast<std::size_t>(fleet-fleet_workspace_.view()->own_fleets.begin());
+    const auto fleet_current_system_id=fleet->current_system_id;
+    const auto fleet_layout=FleetWorkspaceLayout::for_viewport(width,height);
+    click({fleet_layout.list.x+12.f*fleet_layout.scale,fleet_layout.list.y+(static_cast<float>(fleet_index)*45.f+20.f)*fleet_layout.scale});
+    smoke_settlement_selected_=fleet_controller_.selection()==smoke_settlement_fleet_id_;
+    if(reload){
+      smoke_settlement_system_id_=chosen->destination_system_id
+          ?chosen->destination_system_id:fleet_current_system_id;
+      smoke_settlement_body_id_=chosen->settlement_body_id
+          ?chosen->settlement_body_id:chosen->destination_body_id;
+      if(!smoke_settlement_system_id_||!smoke_settlement_body_id_)
+        throw std::runtime_error("Settlement reload smoke lost its canonical current target.");
+    }else{
+      const auto&world=session_->frame().runtime().world().campaign();
+      bool found{};
+      for(const auto&body:world.bodies){
+        const auto system=session_->cache().systems_by_id.find(body.system_id);
+        if(system==session_->cache().systems_by_id.end())continue;
+        const auto point=camera_.project({system->second->position.x,system->second->position.y},width,height);
+        if(point.x<0||point.y<0||point.x>=width||point.y>=height||fleet_layout.panel.contains(point))continue;
+        auto candidate=settlement_controller_.preview_exact(session_->frame(),session_->cache().generation,chosen->fleet_id,body.system_id,body.id);
+        if(candidate.accepted&&candidate.candidate){smoke_settlement_system_id_=body.system_id;smoke_settlement_body_id_=body.id;found=true;break;}
+      }
+      if(!found)throw std::runtime_error("Settlement smoke found no observer-admitted exact target for the authored vessel.");
+    }
+    const auto system=session_->cache().systems_by_id.find(*smoke_settlement_system_id_);
+    if(system==session_->cache().systems_by_id.end())throw std::runtime_error("Settlement target system is absent from the campaign cache.");
+    click(camera_.project({system->second->position.x,system->second->position.y},width,height),InputEventType::LeftPressed,2);
+    if(!system_workspace_.snapshot()||!system_workspace_.viewport())throw std::runtime_error("Settlement smoke could not open the target system.");
+    const auto spatial=project_system(*system_workspace_.snapshot());
+    const auto body=std::ranges::find(spatial.bodies,*smoke_settlement_body_id_,&SystemSpatialBodyMarker::body_id);
+    if(body==spatial.bodies.end())throw std::runtime_error("Settlement target is not visible to the player observer.");
+    const auto body_point=system_workspace_.viewport()->world_to_screen(body->offset_x,body->offset_y);
+    if(reload){click({body_point.x,body_point.y});session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();return;}
+    click({body_point.x,body_point.y},InputEventType::RightPressed);
+    smoke_settlement_previewed_=settlement_workspace_.preview()&&settlement_workspace_.preview()->accepted;
+    if(!smoke_settlement_previewed_)throw std::runtime_error("Settlement right-click did not produce an accepted exact quote.");
+    smoke_settlement_authorization_=settlement_workspace_.preview()->authorization_budget_units;
+    smoke_settlement_requires_authorization_=settlement_workspace_.preview()->requires_new_authorization;
+    smoke_settlement_kind_=settlement_workspace_.preview()->kind;
+    smoke_settlement_treasury_before_=settlement_workspace_.preview()->treasury_budget_units;
+    smoke_settlement_colonies_before_=session_->frame().runtime().world().campaign().colonies.size();
+    smoke_settlement_before_day_=session_->frame().clock().simulation_days();
+    const auto modal=SettlementWorkspaceLayout::for_viewport(width,height);
+    click(center(modal.cancel));
+    smoke_settlement_cancelled_=!settlement_workspace_.visible();
+    auto cancelled_check=settlement_controller_.preview_exact(session_->frame(),session_->cache().generation,chosen->fleet_id,*smoke_settlement_system_id_,*smoke_settlement_body_id_);
+    smoke_settlement_cancel_no_charge_=cancelled_check.treasury_budget_units==smoke_settlement_treasury_before_;
+    click({body_point.x,body_point.y},InputEventType::RightPressed);
+    if(!settlement_workspace_.preview()||!settlement_workspace_.preview()->accepted)throw std::runtime_error("Settlement smoke could not reopen the exact quote after cancellation.");
+    click(center(modal.confirm));
+    if(!smoke_settlement_accepted_)throw std::runtime_error("Settlement confirmation was rejected.");
+    session_->frame().clock().set_speed(StrategicSpeed::Normal);
+  }
+
   void prepare_research_smoke(int width,int height,bool execute_action){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -549,7 +625,7 @@ class NativeCampaign final {
           session_->frame().clock().speed()==StrategicSpeed::Paused;
     }
   }
-  void request_smoke_save(){session_->request_save();}
+  void request_smoke_save(){if(smoke_settlement_mode_){session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();}session_->request_save();}
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
   [[nodiscard]] std::string research_smoke_status()const{
@@ -642,6 +718,7 @@ class NativeCampaign final {
       <<",\"day_unchanged\":"<<(session_->frame().clock().simulation_days()==smoke_colony_day_)<<'}';
     return out.str();
   }
+  [[nodiscard]] std::string settlement_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(6)<<std::boolalpha<<"{\"mode\":\""<<(smoke_settlement_reload_?"paused_reload":"ordered")<<"\",\"kind\":\""<<(smoke_settlement_kind_==NativeSettlementMissionKind::ResourceOutpost?"outpost":"colony")<<"\",\"fleet_id\":"<<smoke_settlement_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_settlement_system_id_.value_or(-1)<<",\"body_id\":"<<smoke_settlement_body_id_.value_or(-1)<<",\"mission_revision\":"<<smoke_settlement_revision_<<",\"before_days\":"<<smoke_settlement_before_day_<<",\"saved_days\":"<<smoke_settlement_saved_day_<<",\"settlement_days\":"<<smoke_settlement_progress_<<",\"authorization\":"<<smoke_settlement_authorization_<<",\"treasury_before\":"<<smoke_settlement_treasury_before_<<",\"treasury_after\":"<<smoke_settlement_treasury_after_<<",\"requires_authorization\":"<<smoke_settlement_requires_authorization_<<",\"selected\":"<<smoke_settlement_selected_<<",\"previewed\":"<<smoke_settlement_previewed_<<",\"cancelled\":"<<smoke_settlement_cancelled_<<",\"cancel_no_charge\":"<<smoke_settlement_cancel_no_charge_<<",\"accepted\":"<<smoke_settlement_accepted_<<",\"no_instant_colony\":"<<smoke_settlement_no_instant_colony_<<",\"paused\":"<<(session_->frame().clock().speed()==StrategicSpeed::Paused)<<'}';return out.str();}
   [[nodiscard]] std::string system_travel_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(9)<<std::boolalpha<<"{\"mode\":\""<<(smoke_system_travel_reload_?"paused_reload":"progress")<<"\",\"fleet_id\":"<<smoke_system_travel_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_system_travel_system_id_.value_or(-1)<<",\"destination_id\":"<<smoke_system_travel_destination_id_.value_or(-1)<<",\"order_revision\":"<<smoke_system_travel_mission_revision_<<",\"lane_count\":"<<smoke_system_travel_lane_count_<<",\"before_x\":"<<smoke_system_travel_before_x_<<",\"before_y\":"<<smoke_system_travel_before_y_<<",\"after_x\":"<<smoke_system_travel_after_x_<<",\"after_y\":"<<smoke_system_travel_after_y_<<",\"before_days\":"<<smoke_system_travel_before_day_<<",\"after_days\":"<<smoke_system_travel_after_day_<<",\"selected\":"<<smoke_system_travel_selected_<<",\"canonical_moved\":"<<smoke_system_travel_canonical_moved_<<",\"rendered_moved\":"<<smoke_system_travel_rendered_moved_<<",\"paused_stable\":"<<smoke_system_travel_paused_stable_<<",\"pause_retained\":"<<smoke_system_travel_pause_retained_<<",\"known_arrow\":"<<smoke_system_travel_known_opened_<<",\"unknown_denied\":"<<smoke_system_travel_unknown_denied_<<",\"knowledge_unchanged\":"<<smoke_system_travel_knowledge_unchanged_<<",\"lanes_connected\":"<<smoke_system_travel_lanes_connected_<<'}';return out.str();}
   [[nodiscard]] bool wants_text_input() const noexcept {
     return research_workspace_.wants_text_input() &&
@@ -663,6 +740,7 @@ class NativeCampaign final {
       shipyard_workspace_.discard_campaign();
       construction_workspace_.discard_campaign();
       colony_workspace_.discard_campaign();
+      settlement_workspace_.discard_campaign();
       colony_entry_view_.reset();
       system_workspace_.discard_campaign();
       planet_discs_.discard_campaign();
@@ -677,6 +755,12 @@ class NativeCampaign final {
     if(input.quit_requested)session_->request_exit();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     for(const auto &event:input.events){
+      if(settlement_workspace_.visible()&&!menu_){
+        const auto command=settlement_workspace_.handle(event,width,height);
+        if(command.kind==SettlementWorkspaceCommandKind::Confirm)
+          execute_settlement();
+        if(command.captured)continue;
+      }
       if(colony_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
@@ -698,7 +782,8 @@ class NativeCampaign final {
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::select_fleet){const auto selected=fleet_controller_.select_next_hit(session_->frame(),session_->cache().generation,command.hit_fleet_ids);system_workspace_.set_notice(selected.message);refresh_fleets(true);refresh_system_travel(true);}
           else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice("Destination details are not available to this observer.");}
-          else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
+           else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
+           else if(command.kind==SystemWorkspaceCommandKind::settlement_target){preview_settlement(command.target_id,width,height);}
           refresh_colony_entry(false);
           continue;
         }
@@ -924,6 +1009,7 @@ class NativeCampaign final {
     shipyard_workspace_.render(out, width, height);
     construction_workspace_.render(out, width, height);
     colony_workspace_.render(out, width, height);
+    settlement_workspace_.render(out,width,height);
     return out;
   }
  private:
@@ -931,7 +1017,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();colony_workspace_.close();colony_entry_view_.reset();
+    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     if(travel.snapshot)system_workspace_.refresh_travel(std::move(*travel.snapshot),fleet_controller_.selection());else system_workspace_.set_notice(travel.denial);
     system_refresh_elapsed_=0.;return true;
@@ -947,7 +1033,8 @@ class NativeCampaign final {
     system_workspace_.refresh(std::move(*built.snapshot));system_refresh_elapsed_=0.;refresh_system_travel(true);refresh_colony_entry(true);
   }
 
-  void refresh_system_travel(bool force){if(!force||!system_workspace_.visible()||!system_workspace_.snapshot())return;auto built=system_travel_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot());if(built.snapshot)system_workspace_.refresh_travel(std::move(*built.snapshot),fleet_controller_.selection());else{system_workspace_.clear_travel();system_workspace_.set_notice(built.denial);}}
+  void refresh_system_travel(bool force){if(!force||!system_workspace_.visible()||!system_workspace_.snapshot())return;auto built=system_travel_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot());if(built.snapshot)system_workspace_.refresh_travel(std::move(*built.snapshot),fleet_controller_.selection());else{system_workspace_.clear_travel();system_workspace_.set_notice(built.denial);}refresh_settlement_status();}
+  void refresh_settlement_status(){const auto selected=fleet_controller_.selection();if(!selected){system_workspace_.set_settlement_status(std::nullopt);return;}const auto status=settlement_controller_.live_status(session_->frame(),session_->cache().generation,*selected);if(!status){system_workspace_.set_settlement_status(std::nullopt);return;}system_workspace_.set_settlement_status(NativeSystemSettlementStatus{status->fleet_id,status->status,status->destination_system_id,status->destination_body_id,status->settlement_days_completed,status->establishment_days});}
 
   void refresh_colony_entry(bool force){
     if(!system_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.selected_body_id()){
@@ -971,6 +1058,54 @@ class NativeCampaign final {
     auto built=colony_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot(),*system_workspace_.selected_body_id());
     if(!built.view){colony_workspace_.close();colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);return;}
     colony_entry_view_=*built.view;colony_workspace_.set_view(std::move(*built.view));system_workspace_.set_colony_body(colony_entry_view_->body_id);colony_refresh_elapsed_=0.;
+  }
+
+  void preview_settlement(int body_id,int width,int height){
+    if(!system_workspace_.system_id()||!fleet_controller_.selection()){
+      system_workspace_.set_notice("Select an owned colony or outpost vessel before choosing a settlement target.");
+      return;
+    }
+    if(!settlement_controller_.live_status(session_->frame(),session_->cache().generation,*fleet_controller_.selection())){
+      system_workspace_.set_notice("The selected fleet is not a populated settlement vessel.");
+      return;
+    }
+    session_->frame().clock().set_speed(StrategicSpeed::Paused);
+    auto preview=settlement_controller_.preview_exact(
+        session_->frame(),session_->cache().generation,
+        *fleet_controller_.selection(),*system_workspace_.system_id(),body_id);
+    settlement_workspace_.set_preview(std::move(preview));
+    (void)system_workspace_.handle({InputEventType::PointerCancelled},width,height);
+    gesture_.cancel();
+    gesture_.capture_for_ui();
+  }
+
+  void execute_settlement(){
+    if(!settlement_workspace_.preview())return;
+    const auto outcome=settlement_controller_.issue_exact(
+        session_->frame(),session_->cache().generation,
+        settlement_workspace_.preview()->revision);
+    smoke_settlement_accepted_=outcome.accepted;
+    if(outcome.accepted){const auto&world=session_->frame().runtime().world().campaign();const auto economy=std::ranges::find(world.economies,world.player_civilization_id,&CivilizationEconomy::civilization_id);if(economy==world.economies.end())throw std::runtime_error("Settlement command lost the player treasury.");smoke_settlement_treasury_after_=economy->credits;}
+    settlement_workspace_.clear();
+    system_workspace_.set_notice(outcome.message);
+    refresh_fleets(true);
+    refresh_system_travel(true);
+  }
+
+  void capture_settlement_smoke_state(){
+    if(!smoke_settlement_fleet_id_)return;
+    const auto&world=session_->frame().runtime().world().campaign();
+    const auto fleet=std::ranges::find(world.fleets,*smoke_settlement_fleet_id_,&FleetState::id);
+    if(fleet==world.fleets.end())throw std::runtime_error("Settlement smoke lost its canonical vessel.");
+    smoke_settlement_saved_day_=session_->frame().clock().simulation_days();
+    smoke_settlement_revision_=fleet->mission_order_revision;
+    smoke_settlement_progress_=fleet->settlement_days_completed;
+    const auto economy=std::ranges::find(world.economies,world.player_civilization_id,&CivilizationEconomy::civilization_id);
+    if(economy==world.economies.end())throw std::runtime_error("Settlement smoke lost the player treasury.");
+    if(smoke_settlement_reload_)smoke_settlement_treasury_after_=economy->credits;
+    smoke_settlement_no_instant_colony_=world.colonies.size()==smoke_settlement_colonies_before_;
+    if(!smoke_settlement_reload_&&smoke_settlement_saved_day_<=smoke_settlement_before_day_)
+      throw std::runtime_error("Settlement smoke recorded no positive canonical simulation advancement.");
   }
 
   [[nodiscard]] ResearchStamp current_research_stamp() const {
@@ -1241,6 +1376,8 @@ class NativeCampaign final {
   NativeConstructionWorkspace construction_workspace_;
   NativeColonyController colony_controller_;
   NativeColonyWorkspace colony_workspace_;
+  NativeSettlementMissionController settlement_controller_;
+  NativeSettlementWorkspace settlement_workspace_;
   std::optional<NativeColonyView> colony_entry_view_;
   NativeSystemViewController system_controller_;
   NativeSystemTravelController system_travel_controller_;
@@ -1278,6 +1415,12 @@ class NativeCampaign final {
   bool smoke_system_travel_reload_{},smoke_system_travel_selected_{},smoke_system_travel_canonical_moved_{},smoke_system_travel_rendered_moved_{},smoke_system_travel_paused_stable_{},smoke_system_travel_pause_retained_{},smoke_system_travel_known_opened_{},smoke_system_travel_unknown_denied_{},smoke_system_travel_knowledge_unchanged_{},smoke_system_travel_lanes_connected_{};
   bool smoke_colony_reload_{},smoke_colony_selected_{},smoke_colony_opened_{},smoke_colony_back_{},smoke_colony_pause_retained_{},smoke_colony_speed_retained_{};
   double smoke_colony_day_{};
+  bool smoke_settlement_mode_{},smoke_settlement_reload_{},smoke_settlement_selected_{},smoke_settlement_previewed_{},smoke_settlement_accepted_{};
+  bool smoke_settlement_cancelled_{},smoke_settlement_cancel_no_charge_{},smoke_settlement_requires_authorization_{},smoke_settlement_no_instant_colony_{};
+  std::optional<int> smoke_settlement_fleet_id_,smoke_settlement_system_id_,smoke_settlement_body_id_;
+  NativeSettlementMissionKind smoke_settlement_kind_{NativeSettlementMissionKind::Colony};
+  std::size_t smoke_settlement_colonies_before_{};
+  int smoke_settlement_revision_{};double smoke_settlement_before_day_{},smoke_settlement_saved_day_{},smoke_settlement_progress_{},smoke_settlement_authorization_{},smoke_settlement_treasury_before_{},smoke_settlement_treasury_after_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
 };
 }
@@ -1319,7 +1462,10 @@ int main(int argc,char **argv){
                                              window.drawable_height(),options.system_travel_reload_smoke);
       else if(options.colony_smoke||options.colony_reload_smoke)
         campaign.prepare_colony_smoke(window.drawable_width(),
-                                      window.drawable_height(),options.colony_reload_smoke);
+                                       window.drawable_height(),options.colony_reload_smoke);
+      else if(options.settlement_smoke||options.settlement_reload_smoke)
+        campaign.prepare_settlement_smoke(window.drawable_width(),
+                                           window.drawable_height(),options.settlement_reload_smoke);
       else
         campaign.prepare_smoke_ui();
     }
@@ -1346,7 +1492,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       const bool capture=options.smoke_screenshot&&frames>=120;
@@ -1381,6 +1527,8 @@ int main(int argc,char **argv){
           std::cout<<" system_travel="<<campaign.system_travel_smoke_status();
         if(options.colony_smoke||options.colony_reload_smoke)
           std::cout<<" colony="<<campaign.colony_smoke_status();
+        if(options.settlement_smoke||options.settlement_reload_smoke)
+          std::cout<<" settlement="<<campaign.settlement_smoke_status();
         std::cout<<'\n';
         break;
       }

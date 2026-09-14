@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Select a populated colony/outpost ship and right-click an observed planet for exact settlement terms. Confirm invokes the canonical paid mission; Cancel spends nothing. The inspector shows live timed establishment, and paused saves retain mission identity and progress.
+
 - Owned surveyed planets open a colony workspace with grouped population, labor/support, current reserves, surface production and sites; independently scrolling columns keep 720p readable. Back restores the same body; pause/speed retain it.
 
 - System views display selectable green owned fleets at canonical local positions. Real connected exits sit outside the dotted boundary with fixed-size forest-green arrows and measured labels. Unknown destinations stay masked.

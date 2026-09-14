@@ -176,6 +176,38 @@ GalaxySimulationStepCoordinator::get_resource_outpost_opportunity_plan(
       colonization_world(*state), fleet_id, maximum);
 }
 
+ResourceOutpostOrderAssessment
+GalaxySimulationStepCoordinator::assess_resource_outpost_fleet_order(
+    CampaignSimulationState *state, int civilization_id, int fleet_id,
+    int destination_system_id, int body_id) const {
+  auto &c = require_campaign(state);
+  const auto fleet = std::find_if(c.fleets.begin(), c.fleets.end(), [&](const auto &x) {
+    return x.id == fleet_id && x.civilization_id == civilization_id &&
+           ResourceOutpostOpportunityPlanner::is_outpost_fleet(x);
+  });
+  if (fleet == c.fleets.end())
+    return {false, "No controllable staffed resource-outpost vessel with that fleet ID is available.", {}};
+  return subsystems_.colonization.assess_resource_outpost_order(
+      colonization_world(*state), fleet->id, destination_system_id, body_id);
+}
+
+ColonizationOrderAssessment
+GalaxySimulationStepCoordinator::assess_colony_fleet_order(
+    CampaignSimulationState *state, int civilization_id, int fleet_id,
+    int destination_system_id, int body_id) const {
+  auto &c = require_campaign(state);
+  const auto fleet = std::find_if(c.fleets.begin(), c.fleets.end(), [&](const auto &x) {
+    return x.id == fleet_id && x.is_active &&
+           x.civilization_id == civilization_id && x.role == FleetRole::Colony &&
+           x.embarked_population_millions > 0.0 &&
+           !ResourceOutpostOpportunityPlanner::is_outpost_fleet(x);
+  });
+  if (fleet == c.fleets.end())
+    return {false, "No controllable populated colony ship with that fleet ID is available.", {}};
+  return subsystems_.colonization.assess_colony_order(
+      colonization_world(*state), fleet->id, destination_system_id, body_id);
+}
+
 ColonyOrderResult
 GalaxySimulationStepCoordinator::issue_resource_outpost_fleet_order(
     CampaignSimulationState *state, int civilization_id, int fleet_id,
