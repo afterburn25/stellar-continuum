@@ -107,6 +107,7 @@ struct Options {
   bool new_game_smoke{};
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
+  bool diplomacy_smoke{};
   bool save_path_overridden{};
 };
 
@@ -145,6 +146,7 @@ struct Options {
     else if(arg==L"--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_reload_smoke=true;result.windowed=true;}
     else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
+    else if(arg==L"--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -171,14 +173,16 @@ struct Options {
     else if(arg=="--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_reload_smoke=true;result.windowed=true;}
     else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
+    else if(arg=="--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
+  if(result.diplomacy_smoke&&!result.load)throw std::invalid_argument("--diplomacy-smoke requires --load with a diplomacy-bearing player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
@@ -836,6 +840,145 @@ class NativeCampaign final {
        <<",\"route_lines\":"<<smoke_route_stats_.emitted_lines
        <<",\"routed_fleet_id\":"<<smoke_fleet_id_.value_or(-1)
        <<",\"destination\":"<<smoke_fleet_destination_.value_or(-1)
+       <<"}";
+    return out.str();
+  }
+  void prepare_diplomacy_smoke(int width,int height){
+    const auto click=[&](Point point){
+      InputSnapshot input;
+      input.drawable_width=width;
+      input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},
+                    {InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Diplomacy smoke input closed the campaign.");
+    };
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    click(center(main_layout.diplomacy));
+    if(!diplomacy_workspace_.visible()||!diplomacy_workspace_.view())
+      throw std::runtime_error(
+          "Diplomacy smoke could not open the relations workspace.");
+    const auto &view=*diplomacy_workspace_.view();
+    std::size_t row=view.contacts.size();
+    for(std::size_t i=0;i<view.contacts.size();++i)
+      if(view.contacts[i].identified&&view.contacts[i].communication_available){
+        row=i;break;}
+    if(row==view.contacts.size())
+      for(std::size_t i=0;i<view.contacts.size();++i)
+        if(view.contacts[i].identified){row=i;break;}
+    if(row==view.contacts.size())
+      throw std::runtime_error(
+          "Diplomacy smoke found no identified contact.");
+    const auto layout=DiplomacyWorkspaceLayout::for_viewport(width,height);
+    const auto s=layout.scale;
+    click(center(UiRect{layout.contact_rows.x+4.f*s,
+                        layout.contact_rows.y+4.f*s+
+                            static_cast<float>(row)*62.f*s,
+                        layout.contact_rows.width-8.f*s,58.f*s}));
+    // The selection click carries no elapsed time; rebuild so the action
+    // column tracks the selected contact.
+    refresh_diplomacy(true);
+    const auto &selected=diplomacy_workspace_.view()->selected;
+    if(!selected.present)
+      throw std::runtime_error("Diplomacy smoke lost the selected contact.");
+    std::size_t action_index=0;
+    if(selected.has_visible_communication||selected.can_attempt_communication)
+      ++action_index;
+    const bool negotiate=selected.can_offer_non_aggression||
+        selected.can_request_access||selected.can_offer_peace||
+        selected.can_offer_ceasefire||selected.can_set_access;
+    if(!negotiate)
+      throw std::runtime_error("Diplomacy smoke found no negotiable channel.");
+    click(center(UiRect{layout.actions.x+8.f*s,
+                        layout.actions.y+8.f*s+
+                            static_cast<float>(action_index)*36.f*s,
+                        layout.actions.width-16.f*s,30.f*s}));
+    if(!diplomacy_workspace_.modal_open())
+      throw std::runtime_error(
+          "Diplomacy smoke could not open the negotiation modal.");
+    // The authored save leaves access unspecified, so the first offered term
+    // is the transit-access request; confirm it through the follow-up modal.
+    click(center(UiRect{layout.modal_panel.x+16.f*s,
+                        layout.modal_panel.y+74.f*s,
+                        layout.modal_panel.width-32.f*s,36.f*s}));
+    if(!diplomacy_workspace_.modal_open())
+      throw std::runtime_error(
+          "Diplomacy smoke lost the confirmation modal.");
+    click(center(UiRect{layout.modal_panel.x+16.f*s,
+                        layout.modal_panel.y+layout.modal_panel.height-92.f*s,
+                        layout.modal_panel.width-32.f*s,36.f*s}));
+  }
+  void capture_diplomacy_workspace(){
+    const auto &view=diplomacy_workspace_.view();
+    if(!view)
+      throw std::runtime_error("Diplomacy smoke lost its view.");
+    smoke_diplomacy_contacts_=view->contacts.size();
+    for(const auto &contact:view->contacts){
+      if(contact.identified)++smoke_diplomacy_identified_;
+      else{
+        ++smoke_diplomacy_unidentified_;
+        if(!contact.civilization_id&&!contact.species_name)
+          ++smoke_diplomacy_redacted_;
+      }
+      if(contact.communication_available)++smoke_diplomacy_channels_;
+    }
+    smoke_diplomacy_agreements_=view->agreements.size();
+    smoke_diplomacy_history_=view->history.size();
+    smoke_diplomacy_proposals_=view->proposals.size();
+    smoke_diplomacy_selected_civ_=
+        view->selected.target_civilization_id.value_or(-1);
+    smoke_diplomacy_last_system_=
+        view->selected.present&&view->selected.contact_index<view->contacts.size()
+            ? view->contacts[view->selected.contact_index]
+                  .last_observed_system_id.value_or(-1)
+            : -1;
+    for(const auto &proposal:view->proposals)
+      if(proposal.direction=="OUTGOING"&&proposal.can_withdraw)
+        smoke_diplomacy_proposal_id_=proposal.proposal_id;
+    for(const auto &[path,image]:diplomacy_portraits_)
+      if(image){smoke_diplomacy_portrait_=true;break;}
+  }
+  void prepare_diplomacy_proposals(int width,int height){
+    const auto layout=DiplomacyWorkspaceLayout::for_viewport(width,height);
+    const auto gap=8.f*layout.scale;
+    const auto tab_width=(layout.tabs.width-gap*4.f)/5.f;
+    InputSnapshot input;
+    input.drawable_width=width;
+    input.drawable_height=height;
+    input.pointer=center(UiRect{layout.tabs.x+tab_width+gap,layout.tabs.y,
+                                tab_width,layout.tabs.height});
+    input.events={{InputEventType::LeftPressed,input.pointer},
+                  {InputEventType::LeftReleased,input.pointer}};
+    if(!update(input,width,height,0.,false))
+      throw std::runtime_error("Diplomacy proposals input closed the campaign.");
+  }
+  void capture_diplomacy_proposals(){
+    const auto &view=diplomacy_workspace_.view();
+    if(!view)return;
+    for(const auto &proposal:view->proposals){
+      if(proposal.direction=="OUTGOING"&&proposal.can_withdraw)
+        ++smoke_diplomacy_pending_after_;
+      if(proposal.can_accept)++smoke_diplomacy_incoming_;
+    }
+  }
+  [[nodiscard]] std::string diplomacy_smoke_status()const{
+    std::ostringstream out;
+    out<<"{\"contacts\":"<<smoke_diplomacy_contacts_
+       <<",\"identified\":"<<smoke_diplomacy_identified_
+       <<",\"unidentified\":"<<smoke_diplomacy_unidentified_
+       <<",\"redacted\":"<<smoke_diplomacy_redacted_
+       <<",\"channels\":"<<smoke_diplomacy_channels_
+       <<",\"agreements\":"<<smoke_diplomacy_agreements_
+       <<",\"history\":"<<smoke_diplomacy_history_
+       <<",\"proposals\":"<<smoke_diplomacy_proposals_
+       <<",\"selected_civ\":"<<smoke_diplomacy_selected_civ_
+       <<",\"last_observed_system\":"<<smoke_diplomacy_last_system_
+       <<",\"portrait\":"<<(smoke_diplomacy_portrait_?1:0)
+       <<",\"command_accepted\":"<<(last_diplomacy_command_accepted_?1:0)
+       <<",\"proposal_id\":"<<smoke_diplomacy_proposal_id_
+       <<",\"pending_after\":"<<smoke_diplomacy_pending_after_
+       <<",\"incoming_pending\":"<<smoke_diplomacy_incoming_
        <<"}";
     return out.str();
   }
@@ -1691,6 +1834,7 @@ class NativeCampaign final {
         session_->frame(),session_->cache().generation,view->diplomacy_revision,
         command.action,command.target_civilization_id,command.proposal_id);
     diplomacy_workspace_.set_notice(outcome.message,outcome.accepted);
+    last_diplomacy_command_accepted_=outcome.accepted;
     refresh_diplomacy(true);
   }
 
@@ -1884,6 +2028,15 @@ class NativeCampaign final {
   std::size_t smoke_ship_art_decoded_{};
   std::size_t smoke_ship_art_cached_{};
   std::size_t smoke_ship_art_bytes_{};
+  bool last_diplomacy_command_accepted_{};
+  std::size_t smoke_diplomacy_contacts_{},smoke_diplomacy_identified_{},
+      smoke_diplomacy_unidentified_{},smoke_diplomacy_redacted_{},
+      smoke_diplomacy_channels_{},smoke_diplomacy_agreements_{},
+      smoke_diplomacy_history_{},smoke_diplomacy_proposals_{},
+      smoke_diplomacy_pending_after_{},smoke_diplomacy_incoming_{};
+  int smoke_diplomacy_selected_civ_{-1},smoke_diplomacy_last_system_{-1};
+  std::int64_t smoke_diplomacy_proposal_id_{-1};
+  bool smoke_diplomacy_portrait_{};
   std::optional<int> smoke_fleet_id_;
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
@@ -1977,6 +2130,9 @@ int main(int argc,char **argv){
       else if(options.ship_art_smoke)
         campaign.prepare_ship_art_smoke(window.drawable_width(),
                                         window.drawable_height());
+      else if(options.diplomacy_smoke)
+        campaign.prepare_diplomacy_smoke(window.drawable_width(),
+                                         window.drawable_height());
       else
         campaign.prepare_smoke_ui();
     }
@@ -2003,7 +2159,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       std::optional<std::filesystem::path> screenshot;
@@ -2015,6 +2171,9 @@ int main(int argc,char **argv){
         }else if(options.ship_art_smoke){
           if(frames==120)screenshot=options.smoke_screenshot;
           else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
+        }else if(options.diplomacy_smoke){
+          if(frames==120)screenshot=options.smoke_screenshot;
+          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-proposals");
         }else if(frames>=120)screenshot=options.smoke_screenshot;
       }
       window.draw(campaign.scene(input.drawable_width,input.drawable_height),screenshot);
@@ -2027,7 +2186,13 @@ int main(int argc,char **argv){
         if(frames==120)campaign.capture_ship_art_shipyard();
         else if(frames==121)campaign.capture_ship_art_map();
       }
-      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:options.ship_art_smoke?frames>=122:frames>=120);
+      if(options.diplomacy_smoke){
+        if(frames==120){campaign.capture_diplomacy_workspace();
+          campaign.prepare_diplomacy_proposals(input.drawable_width,
+                                               input.drawable_height);}
+        else if(frames==121)campaign.capture_diplomacy_proposals();
+      }
+      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:options.ship_art_smoke?frames>=122:options.diplomacy_smoke?frames>=122:frames>=120);
       if(capture){
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
@@ -2065,6 +2230,8 @@ int main(int argc,char **argv){
           std::cout<<" galaxy_art="<<campaign.galaxy_art_smoke_status();
         if(options.ship_art_smoke)
           std::cout<<" ship_art="<<campaign.ship_art_smoke_status();
+        if(options.diplomacy_smoke)
+          std::cout<<" diplomacy="<<campaign.diplomacy_smoke_status();
         if(options.new_game_smoke){
           std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")

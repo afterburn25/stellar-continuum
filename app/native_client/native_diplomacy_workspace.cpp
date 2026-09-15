@@ -171,7 +171,9 @@ constexpr std::pair<DiplomacyWorkspaceTab, const char *> tab_labels[] = {
 }
 
 [[nodiscard]] std::string species_portrait_path(std::string_view species_id) {
-  return "assets/visual/species/" + std::string(species_id) + ".jpg";
+  std::string id(species_id);
+  std::ranges::replace(id, '_', '-');
+  return "assets/visual/species/" + id + "-communications-v2.png";
 }
 
 } // namespace

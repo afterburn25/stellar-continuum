@@ -2,7 +2,9 @@
 
 #include <array>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <variant>
 
@@ -145,6 +147,20 @@ int main() try {
               has_text(draw, "RELATIONSHIP") &&
               has_text(draw, "COMMUNICATION CHANNEL AVAILABLE"),
           "Diplomacy workspace dropped its main panels.");
+
+  // The transmission stage resolves the approved hyphenated communications
+  // image for the selected species.
+  std::string requested_portrait;
+  NativeDiplomacyWorkspace::PortraitProvider provider =
+      [&](std::string_view relative) {
+        requested_portrait = relative;
+        return std::shared_ptr<const stellar::native_map::RgbaImage>{};
+      };
+  DrawList portrait_draw;
+  workspace.render(portrait_draw, 1280, 720, &provider);
+  require(requested_portrait ==
+              "assets/visual/species/terran-baseline-communications-v2.png",
+          "Diplomacy stage did not resolve the communications portrait.");
 
   // Contact selection emits the source index.
   const UiRect second_row{layout.contact_rows.x + 4.f * s,
