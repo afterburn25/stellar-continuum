@@ -63,14 +63,16 @@ struct DrawList {
 };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
-                            EscapePressed, BackspacePressed, TextEntered,
-                            PointerCancelled };
+                            EscapePressed, BackspacePressed, KeyPressed,
+                            TextEntered, PointerCancelled };
 struct InputEvent {
   InputEventType type{};
   Point position{}, delta{};
   float wheel_y{};
   std::string text;
   std::uint8_t click_count{};
+  // SDL_Keycode for KeyPressed events (e.g. SDLK_SPACE, SDLK_1).
+  std::uint32_t key{};
 };
 struct InputSnapshot {
   std::vector<InputEvent> events;

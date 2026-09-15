@@ -1462,6 +1462,28 @@ class NativeCampaign final {
         else toggle_menu();
         continue;
       }
+      // Reference keyboard shortcuts (Main.cs): Space pauses, 1-4 select a
+      // strategic speed, F6 saves. Suppressed while the menu, surface view, or
+      // diplomacy blocks gameplay input, or a text field owns the keyboard.
+      if(event.type==InputEventType::KeyPressed&&!menu_&&
+         !surface_workspace_.visible()&&!diplomacy_workspace_.visible()&&
+         !wants_text_input()){
+        auto &clock=session_->frame().clock();
+        bool handled=true;
+        switch(event.key){
+          case ' ':
+            if(clock.speed()==StrategicSpeed::Paused)clock.resume();
+            else clock.set_speed(StrategicSpeed::Paused);
+            break;
+          case '1':clock.set_speed(StrategicSpeed::Normal);break;
+          case '2':clock.set_speed(StrategicSpeed::Fast);break;
+          case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
+          case '4':clock.set_speed(StrategicSpeed::Maximum);break;
+          case 0x4000003fu:session_->request_save();break; // SDLK_F6
+          default:handled=false;break;
+        }
+        if(handled)continue;
+      }
       if(event.type==InputEventType::PointerCancelled){
         gesture_.cancel();
         (void)research_workspace_.handle(event,width,height);

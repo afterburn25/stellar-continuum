@@ -25,6 +25,13 @@ InputEvent press(InputEventType type, Point at) {
   return event;
 }
 
+InputEvent key_press(std::uint32_t key) {
+  InputEvent event{};
+  event.type = InputEventType::KeyPressed;
+  event.key = key;
+  return event;
+}
+
 MassiveObservedFormation formation(std::int64_t id, int civilization,
                                    MassivePoint at,
                                    std::string name = "Formation",
@@ -230,6 +237,42 @@ void order_commands() {
   require(command.order.type == MassiveCombatOrderType::Advance &&
               command.order.objective,
           "context advance order must carry an objective");
+
+  // Keyboard parity with the reference view: Space toggles pause, digits
+  // 1-5 select tactical speeds, F refits, Escape cancels targeting/menu.
+  command = workspace.handle(key_press(' '), width, height);
+  require(command.kind == BattleWorkspaceCommandKind::TogglePause &&
+              command.captured,
+          "space must toggle tactical pause");
+  const std::pair<std::uint32_t, double> speeds[] = {
+      {'1', .25}, {'2', .5}, {'3', 1.}, {'4', 2.}, {'5', 4.}};
+  for (const auto &[key, speed] : speeds) {
+    command = workspace.handle(key_press(key), width, height);
+    require(command.kind == BattleWorkspaceCommandKind::SetTacticalSpeed &&
+                std::abs(command.speed - speed) < 1e-9,
+            "digit key must select its tactical speed");
+  }
+  command = workspace.handle(key_press('f'), width, height);
+  require(command.kind == BattleWorkspaceCommandKind::None && command.captured,
+          "fit key must be handled inside the workspace");
+  command = workspace.handle(key_press('q'), width, height);
+  require(command.kind == BattleWorkspaceCommandKind::None && command.captured,
+          "unbound keys must stay captured");
+
+  // Escape while targeting cancels the pick instead of opening the menu.
+  command = workspace.handle(
+      press(InputEventType::LeftPressed, center(layout.order_buttons[2])),
+      width, height);
+  require(workspace.targeting(), "targeting not armed for escape test");
+  InputEvent escape{};
+  escape.type = InputEventType::EscapePressed;
+  command = workspace.handle(escape, width, height);
+  require(command.kind == BattleWorkspaceCommandKind::None &&
+              !workspace.targeting(),
+          "escape must cancel targeting");
+  command = workspace.handle(escape, width, height);
+  require(command.kind == BattleWorkspaceCommandKind::Menu,
+          "escape without targeting must request the menu");
 }
 
 void speed_and_chrome() {

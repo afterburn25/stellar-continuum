@@ -503,6 +503,29 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     }
     return command;
   }
+  if (event.type == InputEventType::KeyPressed) {
+    // SDL keycodes for these keys carry their ASCII value.
+    if (event.key == 'f' || event.key == 'F') {
+      fit(width, height);
+      return command;
+    }
+    if (event.key == ' ') {
+      command.kind = BattleWorkspaceCommandKind::TogglePause;
+      return command;
+    }
+    const double speed =
+        event.key == '1' ? .25
+        : event.key == '2' ? .5
+        : event.key == '3' ? 1.
+        : event.key == '4' ? 2.
+        : event.key == '5' ? 4.
+                           : -1.;
+    if (speed > 0.) {
+      command.kind = BattleWorkspaceCommandKind::SetTacticalSpeed;
+      command.speed = speed;
+    }
+    return command;
+  }
   if (event.type == InputEventType::Wheel) {
     const auto factor = event.wheel_y > 0.f ? 1.25f : 1.f / 1.25f;
     const auto before = to_world(event.position, width, height);
