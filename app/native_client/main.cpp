@@ -834,7 +834,7 @@ class NativeCampaign final {
     if(fleet_controller_.selection()!=std::optional<int>{selected_fleet_id})
       throw std::runtime_error("Fleet smoke mouse selection failed.");
     smoke_fleet_id_=selected_fleet_id;
-    if(!selected_destination){
+    {
       const auto panel=layout.panel;
       std::optional<int> target;
       Point target_point;
@@ -854,18 +854,34 @@ class NativeCampaign final {
       }
       if(!target)throw std::runtime_error(
           "Fleet smoke found no visible authoritative route target.");
-      click(target_point,InputEventType::RightPressed);
+      // Hover parity: UiFleetDestinationPreview shows the route on pointer
+      // motion alone, without arming CONFIRM.
+      {
+        InputSnapshot hover;hover.drawable_width=width;hover.drawable_height=height;
+        hover.pointer=target_point;
+        hover.events={{InputEventType::PointerMove,target_point,{}}};
+        if(!update(hover,width,height,0.,false))
+          throw std::runtime_error("Fleet smoke hover closed the campaign.");
+      }
       if(!fleet_workspace_.preview()||
-         !fleet_workspace_.preview()->command_available)
-        throw std::runtime_error("Fleet smoke right-click preview failed.");
-      click(center(layout.confirm));
-      if(!last_fleet_command_accepted_)
-        throw std::runtime_error("Fleet smoke confirmation was rejected.");
-      smoke_fleet_destination_=target;
-      const auto main_layout=NativeUiLayout::for_viewport(width,height);
-      if(session_->frame().clock().speed()==StrategicSpeed::Paused)
-        click(center(main_layout.pause));
-    }else smoke_fleet_destination_=selected_destination;
+         fleet_workspace_.preview()->target_system_id!=*target||
+         fleet_workspace_.preview()->command_available)
+        throw std::runtime_error("Fleet smoke hover did not produce a display-only preview.");
+      smoke_fleet_hover_preview_=true;
+      if(!selected_destination){
+        click(target_point,InputEventType::RightPressed);
+        if(!fleet_workspace_.preview()||
+           !fleet_workspace_.preview()->command_available)
+          throw std::runtime_error("Fleet smoke right-click preview failed.");
+        click(center(layout.confirm));
+        if(!last_fleet_command_accepted_)
+          throw std::runtime_error("Fleet smoke confirmation was rejected.");
+        smoke_fleet_destination_=target;
+        const auto main_layout=NativeUiLayout::for_viewport(width,height);
+        if(session_->frame().clock().speed()==StrategicSpeed::Paused)
+          click(center(main_layout.pause));
+      }else smoke_fleet_destination_=selected_destination;
+    }
   }
   void prepare_shipyard_smoke(int width,int height){
     const auto click=[&](Point point){
@@ -1493,7 +1509,8 @@ class NativeCampaign final {
     std::ostringstream out;
     out<<found->id<<":"<<*smoke_fleet_destination_<<":"
        <<found->mission_order_revision<<":"<<std::fixed
-       <<std::setprecision(6)<<found->transit_progress;
+       <<std::setprecision(6)<<found->transit_progress
+       <<":hover="<<(smoke_fleet_hover_preview_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -1856,7 +1873,7 @@ class NativeCampaign final {
         if(action!=UiAction::None)audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);update_fleet_hover_preview(event.position,width,height);continue;}
       if(event.type==InputEventType::Wheel){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
       if(event.type==InputEventType::LeftReleased){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
@@ -2624,8 +2641,48 @@ class NativeCampaign final {
     fleet_refresh_elapsed_=0.;
   }
 
+  // Reference UiFleetDestinationPreview: while an owned fleet is selected,
+  // hovering a star continuously previews its route in the detail panel. The
+  // hover preview is display-only — command_available stays false so CONFIRM
+  // is never armed, and an armed right-click preview takes precedence.
+  void update_fleet_hover_preview(Point pointer,int width,int height){
+    // An armed right-click preview owns the panel; hover must not touch it.
+    if(pending_fleet_preview_){
+      hover_preview_target_.reset();hover_preview_shown_=false;return;
+    }
+    const bool blocked=menu_||surface_workspace_.visible()||
+        colony_workspace_.visible()||research_workspace_.visible()||
+        shipyard_workspace_.visible()||construction_workspace_.visible()||
+        diplomacy_workspace_.visible()||notification_view_.visible()||
+        gesture_.captured_by_ui()||gesture_.allows_world_drag()||
+        !fleet_workspace_.selected_fleet_id();
+    const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
+    if(target==hover_preview_target_){
+      // refresh_fleets drops preview_ when the selection or order revision
+      // changes; recompute instead of staying dark on the same target.
+      if(target&&hover_preview_shown_&&!fleet_workspace_.preview())
+        hover_preview_shown_=false;
+      else return;
+    }
+    hover_preview_target_=target;
+    if(!target||FleetWorkspaceLayout::for_viewport(width,height)
+                  .panel.contains(pointer)){
+      if(hover_preview_shown_){fleet_workspace_.clear_preview();hover_preview_shown_=false;}
+      return;
+    }
+    auto preview=fleet_controller_.preview_selected_route(
+        session_->frame(),session_->cache().generation,*target);
+    preview.message=observer_safe_fleet_message(preview.message,
+                                                observed_system_names());
+    preview.command_available=false;
+    fleet_workspace_.set_preview(std::move(preview),
+                                 system_display_name(*target));
+    hover_preview_shown_=true;
+  }
+
   void handle_fleet_command(const FleetWorkspaceCommand &command){
     if(command.kind==FleetWorkspaceCommandKind::None)return;
+    hover_preview_target_.reset();hover_preview_shown_=false;
     NativeFleetSelectionOutcome selection;
     if(command.kind==FleetWorkspaceCommandKind::Select)
       selection=fleet_controller_.select(session_->frame(),
@@ -2791,6 +2848,8 @@ class NativeCampaign final {
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;
+  std::optional<int> hover_preview_target_;
+  bool hover_preview_shown_{};
   std::optional<ResearchStamp> projected_research_stamp_;
   double research_refresh_elapsed_{};
   double fleet_refresh_elapsed_{};
@@ -2846,6 +2905,7 @@ class NativeCampaign final {
       smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
+  bool smoke_fleet_hover_preview_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};

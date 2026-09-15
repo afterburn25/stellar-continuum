@@ -146,7 +146,20 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   slider drag, choice cycles and action commands. The reference's
   developer voice lab remains developer-only and unported.
 - `export/native-voice-assets.json` + `cmake/NativeVoiceAssets.cmake` gate
-  the three catalogue files by exact path and SHA-256.
+  the three catalogue files by exact path and SHA-256;
+  `native_voice_runtime.native_voice_asset_files` packages them into sealed
+  exports (the export previously shipped no voice catalogue, which disabled
+  the pipeline and the settings persistence check in `--audio-smoke`).
+
+## Hover route preview
+
+- With an owned fleet selected, `PointerMove` over a star drives
+  `update_fleet_hover_preview` → `preview_selected_route` →
+  `fleet_workspace_.set_preview` — the reference's
+  `UiFleetDestinationPreview` readout. Hover previews force
+  `command_available=false` (display-only; CONFIRM never arms), and an armed
+  right-click preview takes precedence until confirmed or superseded. The
+  fleet smoke asserts `hover=1` and `native_fleet_runtime` requires it.
 
 ## Notification feed slice (candidate for review)
 
