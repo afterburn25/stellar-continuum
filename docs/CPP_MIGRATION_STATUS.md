@@ -41,7 +41,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (18+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces + recent-events notification feed done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
-| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction`, `native_support` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save, T/R/C/B candidates, F8 support bundle) done; N mid-session new campaign not wired |
+| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction`, `native_support` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save, T/R/C/B candidates, N mid-session new campaign, F8 support bundle) done; menu NEW GAME row wired to the startup sandbox |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
 | Packaging | export tooling | `tools/stellar-export`, `export/*.json`, `cmake/Native*` | OK | sealed export validators | PARITY VERIFIED | No Godot/.NET/compiler at runtime |
@@ -97,6 +97,15 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   active-project guards match the reference ("Complete the current
   construction project…"). `--research-smoke`/`--construction-smoke` emit
   `shortcut=1` evidence; both export validators require it.
+- Mid-session New Game: `N` and the pause-menu NEW GAME row port the reference
+  `UiNewCampaign` — the live campaign is saved first (the outer loop waits for
+  the Saved notice), then the full startup sandbox entry runs again
+  (species/size/seed → Create → generation). Cancelling setup hands the saved
+  session back and resumes the campaign. `--new-game-restart-smoke` drives N,
+  the mid-session save, the automated second startup, and a second-campaign
+  save; `native_new_game_runtime` validates the `new_game_restart` diagnostic,
+  the re-saved prior campaign, the isolated `…-native-N` slot (seed 143251),
+  and all three restart captures.
 - Support bundle (`native_support`): ports `SupportLogger` — a per-session
   `game-<id>.log`/`system-<id>.txt` under `<save>/logs`, and a SUPPORT BUNDLE
   menu button plus F8 that export `support/support-<id>-<ts>.zip` as a

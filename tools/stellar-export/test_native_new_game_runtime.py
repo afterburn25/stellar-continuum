@@ -56,7 +56,42 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
                 height = int(args[args.index("--height") + 1])
                 if fault == "failed":
                     return subprocess.CompletedProcess(args, 9, "startup-output", "terminal-error")
-                if "--new-game-smoke" in args:
+                if "--new-game-restart-smoke" in args:
+                    capture = Path(args[args.index("--new-game-restart-smoke") + 1])
+                    setup = capture.with_name(capture.stem + "-restart-setup.bmp")
+                    loading = capture.with_name(capture.stem + "-restart-loading.bmp")
+                    generated = save.with_name(save.name.removesuffix(".player17.json") +
+                                               "-native-1.player17.json")
+                    state = {"saved_previous": True, "restarted": True,
+                             "entry_opened": True, "setup_opened": True,
+                             "species_selected": True, "size_selected": True,
+                             "seed_entered": True, "create_requested": True,
+                             "activated": True, "system_count": 250,
+                             "species_id": "pelagic_high_pressure",
+                             "seed": "143251",
+                             "generated_save_path": str(generated),
+                             "previous_save_path": str(save),
+                             "unique_slot": True}
+                    data = copy.deepcopy(fresh_payload)
+                    data["Galaxy"]["Seed"] = 143251
+                    data["Galaxy"]["GenerationMetadata"]["EnteredSeed"] = "143251"
+                    data["Galaxy"]["GenerationMetadata"]["InternalSeed"] = 143251
+                    if fault in state: state[fault] = False
+                    if fault == "restart_seed": data["Galaxy"]["Seed"] = 143250
+                    if fault == "restart_missing_save": pass
+                    else: generated.write_text(json.dumps(data), encoding="utf-8")
+                    anchor_state = {"FormatVersion": 17, "SavedAtUtc": "resaved",
+                                    "Galaxy": {"Systems": [{"Id": 0}]}}
+                    if fault == "restart_unsaved": anchor_state["FormatVersion"] = 16
+                    save.write_text(json.dumps(anchor_state), encoding="utf-8")
+                    if fault != "restart_no_capture":
+                        for image_path in (setup, loading, capture):
+                            image_path.write_bytes(bmp(width, height))
+                    stdout = ("gpu_driver=vulkan systems=250 image_uploads=4 save=ok"
+                              + ("" if fault == "restart_missing_diagnostic" else
+                                 " new_game_restart=" +
+                                 json.dumps(state, separators=(",", ":"))))
+                elif "--new-game-smoke" in args:
                     capture = Path(args[args.index("--new-game-smoke") + 1])
                     setup = capture.with_name(capture.stem + "-setup.bmp")
                     loading = capture.with_name(capture.stem + "-loading.bmp")
@@ -114,13 +149,15 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
 
             with mock.patch("native_new_game_runtime.subprocess.run", side_effect=run):
                 result = validate_native_new_game_export(package, {}, source)
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             self.assertIn("--new-game-smoke", calls[0]); self.assertNotIn("--load", calls[0])
             self.assertIn("--load", calls[1]); self.assertIn("--smoke", calls[1])
+            self.assertIn("--new-game-restart-smoke", calls[2])
             self.assertTrue(result["nativeNewGamePlayerInput"])
             self.assertTrue(result["nativeNewGameIndependentSave"])
             self.assertTrue(result["nativeNewGamePausedReload"])
-            self.assertEqual(len(result["newGameCaptures"]), 4)
+            self.assertTrue(result["nativeNewGameMidSessionRestart"])
+            self.assertEqual(len(result["newGameCaptures"]), 7)
 
     def test_valid(self): self.exercise()
     def test_entry_required(self):
@@ -183,6 +220,20 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("statuses")
     def test_arbitrary_setup_path(self):
         with self.assertRaises(RuntimeError): self.exercise("setup_path")
+    def test_restart_missing_diagnostic(self):
+        with self.assertRaises(RuntimeError): self.exercise("restart_missing_diagnostic")
+    def test_restart_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("restarted")
+    def test_restart_save_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("saved_previous")
+    def test_restart_seed(self):
+        with self.assertRaises(RuntimeError): self.exercise("restart_seed")
+    def test_restart_missing_save(self):
+        with self.assertRaises(RuntimeError): self.exercise("restart_missing_save")
+    def test_restart_unsaved_previous(self):
+        with self.assertRaises(RuntimeError): self.exercise("restart_unsaved")
+    def test_restart_missing_capture(self):
+        with self.assertRaises(RuntimeError): self.exercise("restart_no_capture")
     def test_launch_error_includes_streams(self):
         with self.assertRaises(RuntimeError) as caught:
             self.exercise("failed")

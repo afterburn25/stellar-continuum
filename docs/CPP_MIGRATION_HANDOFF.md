@@ -57,9 +57,30 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   construction path in `native_production_runtime.py` now require the flag,
   with negative mock tests in `test_native_client_runtime.py` /
   `test_native_production_runtime.py`.
-- Still unported from the reference key surface: N (mid-session new campaign —
-  the native pause menu has no new-game flow yet). F8 is covered by the
+- N / NEW GAME is now ported (see below). F8 is covered by the
   support-bundle slice below.
+
+## Mid-session New Game slice (candidate for review)
+
+- `N` and a new pause-menu NEW GAME row port `UiNewCampaign`: the live
+  campaign saves first (`request_new_game` → `request_save`; the outer
+  campaign-lifetime loop in `main` only exits the frame loop once the Saved
+  notice lands, and aborts the request on a Failure notice). The full startup
+  sandbox (`run_native_startup_entry`) then runs again — species/size/seed →
+  Create → generation — and a committed session replaces the campaign in
+  place. Cancelling setup calls `release_session` and resumes the saved
+  campaign, matching the reference's mode-select cancel.
+- `native_ui_layout` gained the 7th menu button (panel 378→425px, hit-tested).
+- `--new-game-restart-smoke` loads an anchor save, sends a real `N`
+  `KeyPressed` at frame 55, lets the save gate the transition, runs automated
+  sandbox setup (seed+1), and saves the second campaign — emitting a
+  `new_game_restart={…}` diagnostic (saved_previous, restarted, full startup
+  evidence, species/seed/system count, isolated slot path).
+- `native_new_game_runtime.py` now launches the restart smoke after the
+  fresh/reload proofs: it validates the diagnostic schema, the re-saved prior
+  campaign, the `…-native-N` slot with seed 143251, and the three restart
+  captures. `test_native_new_game_runtime.py` adds 7 negative tests (39
+  total).
 
 ## Support bundle slice (candidate for review)
 
