@@ -30,7 +30,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Legacy research | Technology* | `core/legacy_research`, `legacy_technology` | OK | `legacy_*_parity` | PARITY VERIFIED | Superseded path, kept for saves |
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
-| Diplomacy (presentation) | DiplomacyWorkspace*, Main.Diplomacy | none | — | — | NOT STARTED | No native workspace yet |
+| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | `native_diplomacy_controller`, `native_diplomacy_workspace` | PARTIAL | Observer-safe projection + RELATIONS workspace wired to top bar; playthrough smoke pending |
 | Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
@@ -38,7 +38,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Events | none in C# | none | — | — | N/A | No event subsystem exists in reference |
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
-| UI (native) | Main.*, panels | `app/native_client/*_workspace` (15+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/colony/surface/settlement/system/startup workspaces done; diplomacy panel missing |
+| UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects done; no surface/orbital scene art |
 | Audio | AudioDirector, voice | none | — | — | NOT STARTED | Engine has no audio module |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
@@ -48,18 +48,24 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Diplomacy has no native workspace — simulation is ported, presentation is not.
+1. Diplomacy workspace exists but has no real-playthrough/Vulkan smoke evidence yet.
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
 5. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
-## Current state (engine 0.1.57, commit `ac45d958`)
+## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 148/148 graphical CTest, 144/144 headless CTest, 61 Python export checks.
-- Sealed export `windows-native-preview`: relocated launch, restricted PATH, Player17
-  save/reload, all subsystem validators.
+- 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
+  144/144 headless CTest baseline, 61 Python export checks.
+- Diplomacy presentation: `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`
+  over `DiplomaticStateView` only — unidentified contacts carry no civ id/name/species/
+  metrics. Revision+signature stale-command guard covers relationship drift and
+  identification changes. `native_diplomacy_workspace` provides the RELATIONS workspace:
+  filterable contact directory, species transmission portrait or signal waveform, five
+  relationship meters, negotiation/war confirmation modals, agreements/proposals/history/
+  intelligence/overview tabs, proposal accept/reject/withdraw buttons, FocusSystem jump.
 - Ship artwork: six approved images, bounded 6-entry/4 MiB cache, 224px thumbnails,
   design_id→role resolution, fleet+shipyard rows/details, Vulkan-validated.
 - Fleet route effects: dashes, chevrons, trails for active owned fleets matching the

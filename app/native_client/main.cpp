@@ -10,6 +10,8 @@
 #include "native_surface_workspace.hpp"
 #include "native_construction_controller.hpp"
 #include "native_construction_workspace.hpp"
+#include "native_diplomacy_controller.hpp"
+#include "native_diplomacy_workspace.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_fleet_presentation.hpp"
 #include "native_fleet_workspace.hpp"
@@ -52,6 +54,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -62,6 +65,8 @@ using namespace stellar::native_map;
 
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
+using namespace stellar::native_diplomacy;
+using namespace stellar::native_diplomacy_ui;
 using namespace stellar::native_colony;
 using namespace stellar::native_colony_ui;
 using namespace stellar::native_fleet;
@@ -312,6 +317,7 @@ class NativeCampaign final {
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         ship_art_(std::filesystem::absolute(asset_root)),
+        asset_root_(std::filesystem::absolute(asset_root)),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
     refresh_knowledge();
     fit_camera(width,height);
@@ -1024,6 +1030,8 @@ class NativeCampaign final {
       fleet_workspace_.discard_campaign();
       shipyard_workspace_.discard_campaign();
       construction_workspace_.discard_campaign();
+      diplomacy_workspace_.discard_campaign();
+      diplomacy_portraits_.clear();
       colony_workspace_.discard_campaign();
       surface_workspace_.discard_campaign();
       settlement_workspace_.discard_campaign();
@@ -1044,7 +1052,7 @@ class NativeCampaign final {
       if(surface_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
-        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction;
+        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction||top_action==UiAction::Diplomacy;
         if(opens_workspace)surface_workspace_.close();
         else if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
           const auto command=surface_workspace_.handle(event,width,height);
@@ -1061,7 +1069,7 @@ class NativeCampaign final {
       if(colony_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
-        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction;
+        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction||top_action==UiAction::Diplomacy;
         if(opens_workspace)colony_workspace_.close();
         else if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
           const auto command=colony_workspace_.handle(event,width,height);
@@ -1073,7 +1081,7 @@ class NativeCampaign final {
       if(system_workspace_.visible()&&!colony_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
-        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction;
+        const auto opens_workspace=top_action==UiAction::Research||top_action==UiAction::Shipyard||top_action==UiAction::Construction||top_action==UiAction::Diplomacy;
         if(opens_workspace)system_workspace_.close();
         else if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
           const auto command=system_workspace_.handle(event,width,height);
@@ -1087,7 +1095,9 @@ class NativeCampaign final {
         }
       }
       if(event.type==InputEventType::EscapePressed){
-        if(surface_workspace_.visible())surface_workspace_.close();
+        if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
+        else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
+        else if(surface_workspace_.visible())surface_workspace_.close();
         else if(colony_workspace_.visible())colony_workspace_.close();
         else if(construction_workspace_.visible())construction_workspace_.close();
         else if(shipyard_workspace_.visible())shipyard_workspace_.close();
@@ -1100,9 +1110,24 @@ class NativeCampaign final {
         (void)research_workspace_.handle(event,width,height);
         (void)shipyard_workspace_.handle(event,width,height);
         (void)construction_workspace_.handle(event,width,height);
+        (void)diplomacy_workspace_.handle(event,width,height);
         (void)colony_workspace_.handle(event,width,height);
         (void)surface_workspace_.handle(event,width,height);
         continue;
+      }
+      if(diplomacy_workspace_.visible()){
+        const auto command=diplomacy_workspace_.handle(event,width,height);
+        if(command.kind==DiplomacyWorkspaceCommandKind::Close)
+          diplomacy_workspace_.close();
+        else if(command.kind==DiplomacyWorkspaceCommandKind::Action||
+                command.kind==DiplomacyWorkspaceCommandKind::ProposalAction)
+          execute_diplomacy(command);
+        else if(command.kind==DiplomacyWorkspaceCommandKind::FocusSystem){
+          if(!enter_system(command.focus_system_id,width,height))
+            diplomacy_workspace_.set_notice(
+                "The last observation is outside surveyed space.",false);
+        }
+        if(command.captured)continue;
       }
       if(construction_workspace_.visible()){
         const auto command=construction_workspace_.handle(event,width,height);
@@ -1127,7 +1152,7 @@ class NativeCampaign final {
         if(command.captured||event.type==InputEventType::TextEntered||
            event.type==InputEventType::BackspacePressed)continue;
       }
-      if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
+      if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
         if(event.type==InputEventType::LeftPressed&&event.click_count>=2){
           if(const auto target=system_hit(event.position,width,height);target&&enter_system(*target,width,height)){
             gesture_.capture_for_ui();continue;
@@ -1138,7 +1163,7 @@ class NativeCampaign final {
           if(target&&enter_system(*target,width,height)){gesture_.capture_for_ui();continue;}
         }
       }
-      if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()){
+      if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
         const auto markers=fleet_markers(width,height);
         const auto target=event.type==InputEventType::RightPressed
                               ?system_hit(event.position,width,height)
@@ -1161,25 +1186,30 @@ class NativeCampaign final {
         else if(action==UiAction::Speed)cycle_speed();
         else if(action==UiAction::Research){
           if(research_workspace_.visible())research_workspace_.close();
-          else{shipyard_workspace_.close();construction_workspace_.close();research_workspace_.open();refresh_research(true);}
+          else{shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();research_workspace_.open();refresh_research(true);}
           captured=true;
         }
         else if(action==UiAction::Shipyard){
           if(shipyard_workspace_.visible())shipyard_workspace_.close();
-          else{research_workspace_.close();construction_workspace_.close();shipyard_workspace_.open();refresh_shipyard(true);}
+          else{research_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();shipyard_workspace_.open();refresh_shipyard(true);}
           captured=true;
         }
         else if(action==UiAction::Construction){
           if(construction_workspace_.visible())construction_workspace_.close();
-          else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.open();refresh_construction(true);}
+          else{research_workspace_.close();shipyard_workspace_.close();diplomacy_workspace_.close();construction_workspace_.open();refresh_construction(true);}
           captured=true;
         }
-        if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
+        else if(action==UiAction::Diplomacy){
+          if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
+          else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);}
+          captured=true;
+        }
+        if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
-      if(event.type==InputEventType::Wheel){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
-      if(event.type==InputEventType::LeftReleased){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::Wheel){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
+      if(event.type==InputEventType::LeftReleased){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
     if(const auto request=surface_workspace_.take_preview_request())execute_surface(*request);
     if(research_workspace_.take_refresh_request())refresh_research(true);
@@ -1193,6 +1223,8 @@ class NativeCampaign final {
       refresh_shipyard(false);
       construction_refresh_elapsed_+=elapsed;
       refresh_construction(false);
+      diplomacy_refresh_elapsed_+=elapsed;
+      refresh_diplomacy(false);
       colony_refresh_elapsed_+=elapsed;
       refresh_colony(false);
       system_refresh_elapsed_+=elapsed;
@@ -1268,6 +1300,14 @@ class NativeCampaign final {
                                              : border);
     label(out, layout.construction, "CONSTRUCTION", {225, 238, 250, 255},
           layout.control_font_pixels, layout.scale);
+    fill(out, layout.diplomacy,
+         diplomacy_workspace_.visible()
+             ? selected
+             : layout.diplomacy.contains(pointer_) ? hover : button);
+    stroke(out, layout.diplomacy,
+           diplomacy_workspace_.visible() ? Color{154, 225, 188, 255} : border);
+    label(out, layout.diplomacy, "RELATIONS", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -1309,13 +1349,14 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
-    if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible())
+    if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
     research_workspace_.render(out, width, height);
     shipyard_workspace_.render(out, width, height, &ship_art_);
     construction_workspace_.render(out, width, height);
+    diplomacy_workspace_.render(out, width, height, &diplomacy_portrait_provider_);
     if(!surface_workspace_.visible())colony_workspace_.render(out, width, height);
     surface_workspace_.render(out,width,height);
     settlement_workspace_.render(out,width,height);
@@ -1326,7 +1367,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();colony_workspace_.close();surface_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
+    gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();surface_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     if(travel.snapshot)system_workspace_.refresh_travel(std::move(*travel.snapshot),fleet_controller_.selection());else system_workspace_.set_notice(travel.denial);
     system_refresh_elapsed_=0.;return true;
@@ -1624,6 +1665,35 @@ class NativeCampaign final {
     refresh_construction(true);
   }
 
+  void refresh_diplomacy(bool force){
+    if(!diplomacy_workspace_.visible())return;
+    if(!force&&diplomacy_refresh_elapsed_<.2)return;
+    const auto generation=session_->cache().generation;
+    diplomacy_workspace_.set_view(diplomacy_controller_.build(
+        session_->frame(),generation,diplomacy_workspace_.selected_contact_index()));
+    // Selection preservation can move the index when the contact list changed;
+    // re-project once so the details panel tracks the same civilization.
+    if(const auto &view=diplomacy_workspace_.view();
+       view&&!view->contacts.empty()&&
+       view->selected.contact_index!=diplomacy_workspace_.selected_contact_index())
+      diplomacy_workspace_.set_view(diplomacy_controller_.build(
+          session_->frame(),generation,diplomacy_workspace_.selected_contact_index()));
+    diplomacy_refresh_elapsed_=0.;
+  }
+
+  void execute_diplomacy(const DiplomacyWorkspaceCommand &command){
+    const auto &view=diplomacy_workspace_.view();
+    if(!view){
+      diplomacy_workspace_.set_notice("Diplomatic channels are still loading.",false);
+      return;
+    }
+    const auto outcome=diplomacy_controller_.execute(
+        session_->frame(),session_->cache().generation,view->diplomacy_revision,
+        command.action,command.target_civilization_id,command.proposal_id);
+    diplomacy_workspace_.set_notice(outcome.message,outcome.accepted);
+    refresh_diplomacy(true);
+  }
+
   [[nodiscard]] std::vector<FleetScreenMarker> fleet_markers(
       int width,int height)const{
     std::vector<FleetScreenMarker> result;
@@ -1756,6 +1826,19 @@ class NativeCampaign final {
   NativeShipyardWorkspace shipyard_workspace_;
   NativeConstructionController construction_controller_;
   NativeConstructionWorkspace construction_workspace_;
+  NativeDiplomacyController diplomacy_controller_;
+  NativeDiplomacyWorkspace diplomacy_workspace_;
+  std::filesystem::path asset_root_;
+  std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
+  NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
+      [this](std::string_view relative){
+        auto [entry,inserted]=diplomacy_portraits_.try_emplace(std::string(relative));
+        if(inserted){
+          try{entry->second=decode_rgba_image(asset_root_/entry->first);}
+          catch(...){entry->second.reset();}
+        }
+        return entry->second;
+      };
   NativeColonyController colony_controller_;
   NativeColonyWorkspace colony_workspace_;
   NativeSurfaceConstructionController surface_controller_;
@@ -1778,6 +1861,7 @@ class NativeCampaign final {
   double fleet_refresh_elapsed_{};
   double shipyard_refresh_elapsed_{};
   double construction_refresh_elapsed_{};
+  double diplomacy_refresh_elapsed_{};
   double colony_refresh_elapsed_{};
   double system_refresh_elapsed_{};
   bool last_construction_command_accepted_{};
