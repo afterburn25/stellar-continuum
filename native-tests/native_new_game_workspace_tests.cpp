@@ -5,16 +5,6 @@
 #include <unordered_set>
 #include <variant>
 
-// The focused UI binary does not link SDL/WIC. This member definition supplies
-// an immutable resource so the overlay can prove retained ownership; Engine's
-// real factory validation and texture lifetime have separate platform tests.
-std::shared_ptr<const stellar::native_map::RgbaImage>
-stellar::native_map::RgbaImage::create(
-    int width, int height, std::vector<std::uint8_t> pixels) {
-  return std::shared_ptr<const RgbaImage>(
-      new RgbaImage(width, height, std::move(pixels)));
-}
-
 namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_setup;

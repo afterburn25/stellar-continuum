@@ -107,3 +107,7 @@ The optional output is `stellar-campaign-simulation-diagnostic-v1`, not a
 player save. The command covers the ordered legacy coordinator phases currently
 implemented in Core. It does not claim integrated Adaptive Research, diplomacy,
 all campaign commands, rendering, audio, UI, or full gameplay parity.
+
+## Approved native startup artwork
+
+Engine 0.1.55 packages exactly four approved PNG files and scoped source attribution through `export/native-startup-art-assets.json`. Both build and exporter verify paths and SHA-256 content; this does not broaden the native package to the whole graphical asset tree. Existing planet discs and species portraits remain included. `NATIVE_STARTUP_ART_SOURCES.md` records provenance.

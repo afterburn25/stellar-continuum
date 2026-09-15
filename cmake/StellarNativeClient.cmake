@@ -87,3 +87,10 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_startup_workspace.cpp
   app/native_client/native_startup_host.cpp
   app/native_client/native_startup_entry.cpp)
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeStartupArtAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_startup_art_assets)
+
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_startup_artwork.cpp)
+
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_celestial_appearance.cpp)

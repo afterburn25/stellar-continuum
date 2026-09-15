@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_new_game_workspace.hpp"
+#include "native_startup_artwork.hpp"
 #include "native_startup_session.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
@@ -13,6 +14,7 @@
 namespace stellar::native_startup_ui {
 
 enum class StartupScreen { Entry, Setup, LoadSlots, Busy, Failure };
+enum class StartupOperationOrigin { NewCampaign, SavedCampaign };
 enum class StartupIntentKind {
   None, OpenSetup, OpenLoad, Back, Exit, Create, LoadSelected, CancelOperation
 };
@@ -43,6 +45,8 @@ public:
   void show_entry() noexcept;
   void set_slots(stellar::native_startup::NativeStartupSaveSlots);
   void set_setup_message(std::string message, bool accepted);
+  void begin_operation(stellar::native_startup::NativeStartupView,
+                       StartupOperationOrigin);
   void set_operation(stellar::native_startup::NativeStartupView);
   void show_failure(std::string message);
   [[nodiscard]] StartupScreen screen() const noexcept { return screen_; }
@@ -52,6 +56,9 @@ public:
                                      const TextMeasurer &);
   void render(stellar::native_map::DrawList &, int width, int height,
               const TextMeasurer &, const PortraitProvider * = nullptr) const;
+  void render(stellar::native_map::DrawList &, int width, int height,
+              const TextMeasurer &, const PortraitProvider *,
+              const StartupArtworkProvider *) const;
 
 private:
   void reset_pointer() noexcept;
@@ -61,6 +68,9 @@ private:
   std::optional<std::size_t> selected_slot_;
   float load_scroll_{};
   stellar::native_startup::NativeStartupView operation_;
+  StartupArtworkKind busy_artwork_{StartupArtworkKind::NewGalaxyGeneration};
+  std::string loading_tip_;
+  int last_loading_tip_{-1};
   std::string failure_;
   stellar::native_map::Point pointer_{};
 };

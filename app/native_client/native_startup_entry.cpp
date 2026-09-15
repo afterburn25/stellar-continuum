@@ -1,5 +1,6 @@
 #include "native_startup_entry.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <ranges>
@@ -24,6 +25,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
                                              const StartupEntryAutomation *automation) {
   if (!config.utc_timestamp)
     throw std::invalid_argument("Startup requires a UTC timestamp provider.");
+  if (config.minimum_boot_artwork < std::chrono::milliseconds::zero())
+    throw std::invalid_argument("Startup artwork minimum duration cannot be negative.");
   NativeStartupHost host(config.host);
   NativeStartupWorkspace workspace;
   const auto setup_view = host.setup();
@@ -36,8 +39,66 @@ StartupEntryResult run_native_startup_entry(Window &window,
           entry->second = decode_rgba_image(config.asset_root / entry->first);
         return entry->second;
       };
+  NativeStartupArtworkAssets artwork_assets(config.asset_root);
+  StartupArtworkProvider artwork_provider = [&](StartupArtworkKind kind) {
+    return artwork_assets.image(kind);
+  };
   auto measure = [&](const Text &text) { return window.measure_text(text); };
   StartupEntryEvidence evidence;
+
+  // The normal application shows the approved startup artwork for at least
+  // seven seconds while the four immutable startup images are staged. Smoke
+  // automation disables only the minimum dwell; it still draws the boot frame
+  // and loads the same resources before interacting with the menu.
+  const auto minimum_boot = automation ? std::chrono::milliseconds::zero()
+                                       : config.minimum_boot_artwork;
+  const auto boot_started = std::chrono::steady_clock::now();
+  auto boot = artwork_assets.image(StartupArtworkKind::ApplicationStartup);
+  std::size_t staged = 1;
+  for (;;) {
+    const auto input = window.poll();
+    if (input.quit_requested) return {{}, true};
+    if (input.renderable()) {
+      DrawList draw;
+      const auto destination = startup_artwork_destination(
+          boot->width(), boot->height(), input.drawable_width,
+          input.drawable_height);
+      const UiRect viewport{0, 0, static_cast<float>(input.drawable_width),
+                            static_cast<float>(input.drawable_height)};
+      draw.overlay.emplace_back(
+          Image{boot, destination, std::nullopt, {255, 255, 255, 255}, viewport});
+      const float scale = std::clamp(input.drawable_height / 900.f, 1.f, 2.4f);
+      const UiRect veil{input.drawable_width * .18f,
+                        input.drawable_height - 116.f * scale,
+                        input.drawable_width * .64f, 76.f * scale};
+      draw.overlay.emplace_back(FilledRectangle{veil, {5, 14, 27, 210}});
+      draw.overlay.emplace_back(Text{{veil.x + veil.width * .5f,
+                                      veil.y + 12.f * scale},
+                                     "LOADING GAME ASSETS", {235,244,255,255},
+                                     static_cast<int>(18 * scale), veil.width,
+                                     veil, TextAlign::Center, FontFace::Heading});
+      const UiRect track{veil.x + 26.f * scale, veil.y + 48.f * scale,
+                         veil.width - 52.f * scale, 8.f * scale};
+      draw.overlay.emplace_back(FilledRectangle{track, {12,31,54,245}});
+      const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - boot_started);
+      const float progress = static_cast<float>(
+          startup_boot_progress(staged, 4, elapsed, minimum_boot));
+      draw.overlay.emplace_back(FilledRectangle{
+          {track.x, track.y, track.width * progress, track.height},
+          {122,230,190,255}});
+      window.draw(draw);
+    }
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - boot_started);
+    if (staged == 4 && elapsed >= minimum_boot)
+      break;
+    if (staged < 4) {
+      (void)artwork_assets.image(static_cast<StartupArtworkKind>(staged));
+      ++staged;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+  }
   const auto dispatch = [&](const StartupIntent &intent) {
     switch (intent.kind) {
     case StartupIntentKind::OpenLoad:
@@ -48,7 +109,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
           {intent.seed_text, intent.system_count, intent.species_id,
            config.utc_timestamp()});
       if (started.accepted)
-        workspace.set_operation(host.poll());
+        workspace.begin_operation(host.poll(),
+                                  StartupOperationOrigin::NewCampaign);
       else
         workspace.set_setup_message(started.message, false);
       break;
@@ -56,7 +118,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
     case StartupIntentKind::LoadSelected: {
       const auto started = host.start_load(intent.save_path);
       if (started.accepted)
-        workspace.set_operation(host.poll());
+        workspace.begin_operation(host.poll(),
+                                  StartupOperationOrigin::SavedCampaign);
       else {
         std::cerr << started.message << '\n';
         workspace.show_failure(started.message);
@@ -111,7 +174,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
         height, measure);
     evidence.seed_entered = true;
     DrawList setup_draw;
-    workspace.render(setup_draw, width, height, measure, &portrait_provider);
+    workspace.render(setup_draw, width, height, measure, &portrait_provider,
+                     &artwork_provider);
     window.draw(setup_draw, automation->setup_screenshot);
     intent = workspace.handle(
         {InputEventType::LeftPressed, center(measured.base.create)}, width,
@@ -130,7 +194,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
     evidence.indeterminate_observed = !displayed.determinate_progress.has_value();
     evidence.displayed_statuses.push_back(displayed.status);
     DrawList loading_draw;
-    workspace.render(loading_draw, width, height, measure, &portrait_provider);
+    workspace.render(loading_draw, width, height, measure, &portrait_provider,
+                     &artwork_provider);
     window.draw(loading_draw, automation->loading_screenshot);
   }
   for (;;) {
@@ -182,7 +247,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     window.set_text_input(workspace.wants_text_input());
     DrawList draw;
     workspace.render(draw, input.drawable_width, input.drawable_height, measure,
-                     &portrait_provider);
+                     &portrait_provider, &artwork_provider);
     window.draw(draw);
   }
 }

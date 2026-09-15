@@ -5,6 +5,7 @@
 
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -16,6 +17,7 @@ struct StartupEntryConfig {
   StartupHostConfig host;
   std::filesystem::path asset_root;
   std::function<std::string()> utc_timestamp;
+  std::chrono::milliseconds minimum_boot_artwork{std::chrono::seconds(7)};
 };
 struct StartupEntryAutomation {
   std::string seed_text, species_id;

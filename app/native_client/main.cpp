@@ -1636,6 +1636,7 @@ int main(int argc,char **argv){
   try{
     const auto options=parse_options(argc,argv);
     const auto asset_root=std::filesystem::absolute(options.asset_root);
+    const auto startup_begin=std::chrono::steady_clock::now();
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
@@ -1659,7 +1660,6 @@ int main(int argc,char **argv){
       if(!result.session)throw std::runtime_error("Startup ended without a campaign session.");
       session=std::move(result.session);
     }
-    const auto startup_begin=std::chrono::steady_clock::now();
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);});
     if(options.smoke_screenshot){

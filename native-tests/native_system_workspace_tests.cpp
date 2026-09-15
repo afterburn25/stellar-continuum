@@ -7,11 +7,13 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <map>
 #include <ranges>
 #include <stdexcept>
+#include <vector>
 
 using namespace stellar::core;
 using namespace stellar::native_map;
@@ -26,6 +28,7 @@ CampaignFrame make_frame(const fs::path&root,const fs::path&catalog){return {Int
 Point center(UiRect r){return {r.x+r.width*.5f,r.y+r.height*.5f};}
 bool same_camera(const SystemSpatialViewport&a,const SystemSpatialViewport&b){return std::abs(a.center_x-b.center_x)<.001f&&std::abs(a.center_y-b.center_y)<.001f&&std::abs(a.scale-b.scale)<.00001f;}
 bool has_central_star(const DrawList&draw,const SystemSpatialViewport&camera,Color color){return std::ranges::any_of(draw.world,[&](const WorldCommand&item){const auto*circle=std::get_if<Circle>(&item);return circle&&std::abs(circle->center.x-camera.center_x)<.001f&&std::abs(circle->center.y-camera.center_y)<.001f&&circle->color.r==color.r&&circle->color.g==color.g&&circle->color.b==color.b&&circle->color.a==color.a;});}
+bool has_central_stellar_image(const DrawList&draw,const SystemSpatialViewport&camera){return std::ranges::any_of(draw.world,[&](const WorldCommand&item){const auto*image=std::get_if<Image>(&item);return image&&image->resource&&image->resource->width()==NativeCelestialAppearanceRenderer::stellar_texture_size&&std::abs(image->destination.x+image->destination.width*.5f-camera.center_x)<.001f&&std::abs(image->destination.y+image->destination.height*.5f-camera.center_y)<.001f;});}
 }
 
 int main(int argc,char**argv)try{
@@ -38,13 +41,14 @@ int main(int argc,char**argv)try{
   require(display_earth!=display.bodies.end(),"Sol view lacks Earth");
   display_earth->positive_signatures={NativePositiveSignature::rare_resource,NativePositiveSignature::anomaly,NativePositiveSignature::activity};
   const auto projected=project_system(display);
-  int image_requests{},texture_requests{};
-  int measurements{};NativeSystemWorkspace workspace([&](const SystemBodyAppearance&appearance){++image_requests;if(appearance.texture_key)++texture_requests;return std::shared_ptr<const RgbaImage>{};},[&](const Text&label){++measurements;return TextExtent{static_cast<int>(label.value.size()*7u),14};});
+  int image_requests{},texture_requests{};auto body_image=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,255));
+  int measurements{};NativeSystemWorkspace workspace([&](const SystemBodyAppearance&appearance){++image_requests;if(appearance.texture_key)++texture_requests;return body_image;},[&](const Text&label){++measurements;return TextExtent{static_cast<int>(label.value.size()*7u),14};});
   workspace.open(std::move(display),1280,720);
   require(workspace.visible()&&workspace.system_id()==sol_system_id,"workspace did not open fresh Sol");
   DrawList draw;workspace.render(draw,1280,720);
   require(!draw.world.empty()&&image_requests>0&&texture_requests>0,"workspace did not request eligible Sol appearances");
-  require(has_central_star(draw,*workspace.viewport(),{255,230,150,245}),"full-survey Sol did not use the native G-class palette");
+  require(has_central_stellar_image(draw,*workspace.viewport()),"full-survey Sol did not use a cached native stellar image");
+  const auto saturn=std::ranges::find_if(projected.bodies,[](const auto&body){return body.sol_texture_key==std::optional<std::string>{"saturn"};});require(saturn!=projected.bodies.end(),"Sol projection lacks observer-filtered Saturn");const auto saturn_screen=workspace.viewport()->world_to_screen(saturn->offset_x,saturn->offset_y);std::vector<std::size_t> saturn_layers;for(std::size_t i=0;i<draw.world.size();++i)if(const auto*image=std::get_if<Image>(&draw.world[i]);image&&std::abs(image->destination.x+image->destination.width*.5f-saturn_screen.x)<.01f&&std::abs(image->destination.y+image->destination.height*.5f-saturn_screen.y)<.01f)saturn_layers.push_back(i);require(saturn_layers.size()==3&&std::get<Image>(draw.world[saturn_layers[0]]).resource->width()==NativeCelestialAppearanceRenderer::ring_texture_size&&std::get<Image>(draw.world[saturn_layers[1]]).resource==body_image&&std::get<Image>(draw.world[saturn_layers[2]]).resource->width()==NativeCelestialAppearanceRenderer::ring_texture_size,"Saturn back/globe/front ordering was not preserved");
   const auto earth=std::ranges::find(projected.bodies,earth_body_id,&SystemSpatialBodyMarker::body_id);
   require(earth!=projected.bodies.end(),"Sol projection lacks Earth");
   auto earth_screen=workspace.viewport()->world_to_screen(earth->offset_x,earth->offset_y);

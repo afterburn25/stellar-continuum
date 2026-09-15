@@ -2,6 +2,7 @@
 
 #include "native_system_view.hpp"
 #include "native_system_travel.hpp"
+#include "native_celestial_appearance.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <functional>
@@ -91,6 +92,7 @@ private:
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
   SystemImageProvider image_provider_;
   SystemTextMeasurer text_measurer_;
+  NativeCelestialAppearanceRenderer celestial_appearance_;
   std::optional<stellar::native_system::NativeSystemSnapshot> snapshot_;
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;

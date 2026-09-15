@@ -6,6 +6,10 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Approved main-menu and loading artwork uses immutable cached images, responsive translucent controls and the requested seven-second application boot. Generation/save artwork follows the request through activation; each operation displays a gameplay tip. See NATIVE_STARTUP_ARTWORK.md.
+
+- Detailed class-coloured stellar discs, transient prominences and layered Saturn rings are cached with strict memory limits. See NATIVE_CELESTIAL_APPEARANCE.md.
+
 - Startup offers New Campaign, Load Campaign and Exit. Species portraits, biographies, measured environment facts, size and seed precede generation. Work runs in the background, failures remain actionable, and a new campaign never selects an existing save for its first write. See NATIVE_STARTUP_FLOW.md.
 
 - Owned solid worlds expose an operational surface workspace: choose a known building, pan/zoom, review its exact footprint and costs, confirm placement, or cancel an unfinished site for the canonical refund. Material-dependent progress and complete paused reload equality are maintained. See NATIVE_SURFACE_WORKSPACE.md.

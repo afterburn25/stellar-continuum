@@ -210,8 +210,21 @@ void explicit_load_failure(const fs::path &research, const fs::path &catalog,
 
 int main(int argc, char **argv) try {
   require(argc == 4, "Usage: tests <research> <catalog> <scratch>");
-  const auto scratch = fs::absolute(argv[3]);
-  fs::create_directories(scratch);
+  const auto scratch_root = fs::absolute(argv[3]);
+  fs::create_directories(scratch_root);
+  // Repeated CTest runs must preserve prior fixtures without treating their
+  // saved campaigns as the empty save slot required by this invocation.
+  fs::path scratch;
+  const auto run_stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+  for (unsigned attempt = 0; attempt < 1000; ++attempt) {
+    auto candidate = scratch_root /
+        ("run-" + std::to_string(run_stamp) + "-" + std::to_string(attempt));
+    if (fs::create_directory(candidate)) {
+      scratch = std::move(candidate);
+      break;
+    }
+  }
+  require(!scratch.empty(), "Could not allocate an isolated startup test directory");
   fresh_and_load(fs::absolute(argv[1]), fs::absolute(argv[2]), scratch);
   slots_and_unique_paths(scratch);
   cancellation_and_repeat(fs::absolute(argv[1]), fs::absolute(argv[2]), scratch);

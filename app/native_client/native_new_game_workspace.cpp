@@ -394,8 +394,16 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
 void NativeNewGameWorkspace::render(
     DrawList &out, int width, int height,
     const TextMeasurer &measure,
-    const PortraitProvider *portrait_provider) const {
+    const PortraitProvider *portrait_provider,
+    std::shared_ptr<const RgbaImage> backdrop) const {
   if (!view_) return;
+  const bool has_backdrop = static_cast<bool>(backdrop);
+  const Color panel_tint = has_backdrop ? Color{8, 20, 36, 200}
+                                        : panel;
+  const Color raised_tint = has_backdrop ? Color{12, 31, 54, 220}
+                                         : raised;
+  const Color selected_tint = has_backdrop ? Color{23, 67, 102, 235}
+                                           : selected;
   const auto measured = measure_layout(width, height, measure);
   const auto &layout = measured.base;
   const auto s = layout.scale;
@@ -409,7 +417,7 @@ void NativeNewGameWorkspace::render(
                                   std::string_view path) {
     const auto visible = intersection(frame, clipping);
     if (!visible) return;
-    fill(out, *visible, panel);
+    fill(out, *visible, panel_tint);
     if (portrait_provider) {
       if (const auto image = (*portrait_provider)(path)) {
         const float ratio = std::min(
@@ -425,19 +433,32 @@ void NativeNewGameWorkspace::render(
     }
     stroke(out, *visible, border);
   };
-  fill(out, {0, 0, static_cast<float>(width), static_cast<float>(height)},
-       background);
-  fill(out, layout.panel, panel);
+  if (backdrop) {
+    const float ratio = std::max(static_cast<float>(width) / backdrop->width(),
+                                 static_cast<float>(height) / backdrop->height());
+    const float image_width = backdrop->width() * ratio;
+    const float image_height = backdrop->height() * ratio;
+    out.overlay.emplace_back(Image{
+        std::move(backdrop),
+        {(width - image_width) * .5f, (height - image_height) * .5f,
+         image_width, image_height},
+        std::nullopt, {255, 255, 255, 255},
+        UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)}});
+  } else {
+    fill(out, {0, 0, static_cast<float>(width), static_cast<float>(height)},
+         background);
+  }
+  fill(out, layout.panel, panel_tint);
   stroke(out, layout.panel, border);
   text(out, layout.heading, "CONFIGURE SANDBOX", bright, layout.heading_font,
        TextAlign::Left, FontFace::Heading);
   fill(out, layout.cancel,
-       layout.cancel.contains(pointer_) ? hover : raised);
+       layout.cancel.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.cancel, border);
   text(out, layout.cancel, "CANCEL", bright, layout.body_font,
        TextAlign::Center);
 
-  fill(out, layout.mode_story, raised);
+  fill(out, layout.mode_story, raised_tint);
   stroke(out, layout.mode_story, muted);
   text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 7 * s,
              layout.mode_story.width - 20 * s, 22 * s},
@@ -445,7 +466,7 @@ void NativeNewGameWorkspace::render(
   text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 30 * s,
              layout.mode_story.width - 20 * s, 18 * s},
        "COMING SOON", gold, layout.small_font);
-  fill(out, layout.mode_sandbox, selected);
+  fill(out, layout.mode_sandbox, selected_tint);
   stroke(out, layout.mode_sandbox, accent);
   text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 7 * s,
              layout.mode_sandbox.width - 20 * s, 22 * s},
@@ -454,7 +475,7 @@ void NativeNewGameWorkspace::render(
              layout.mode_sandbox.width - 20 * s, 18 * s},
        "Configure a reproducible galaxy", accent, layout.small_font);
 
-  fill(out, layout.species, raised);
+  fill(out, layout.species, raised_tint);
   stroke(out, layout.species, border);
   text(out, {layout.species.x + 8 * s, layout.species.y + 8 * s,
              layout.species.width - 16 * s, 22 * s},
@@ -464,8 +485,8 @@ void NativeNewGameWorkspace::render(
     const auto clip = intersection(row, layout.species_rows);
     if (!clip) continue;
     const bool chosen = view_->species[index].id == selected_species_id_;
-    fill(out, *clip, chosen ? selected
-                           : row.contains(pointer_) ? hover : panel);
+    fill(out, *clip, chosen ? selected_tint
+                           : row.contains(pointer_) ? hover : panel_tint);
     if (chosen) stroke(out, *clip, accent);
     const UiRect thumbnail{row.x + 5.f * s, row.y + 5.f * s, 38.f * s,
                            row.height - 10.f * s};
@@ -479,7 +500,7 @@ void NativeNewGameWorkspace::render(
                  chosen ? accent : bright, layout.body_font);
   }
 
-  fill(out, layout.details, raised);
+  fill(out, layout.details, raised_tint);
   stroke(out, layout.details, border);
   if (const auto *species = selected_species(*view_, selected_species_id_)) {
     const auto clip = layout.details_content;
@@ -577,7 +598,8 @@ void NativeNewGameWorkspace::render(
   }
 
   text(out, layout.seed_label, "GALAXY SEED", gold, layout.small_font);
-  fill(out, layout.seed_input, seed_focused_ ? selected : raised);
+  fill(out, layout.seed_input,
+       seed_focused_ ? selected_tint : raised_tint);
   stroke(out, layout.seed_input, seed_focused_ ? accent : border);
   text(out, {layout.seed_input.x + 9 * s, layout.seed_input.y + 8 * s,
              layout.seed_input.width - 18 * s, 22 * s},
@@ -591,7 +613,8 @@ void NativeNewGameWorkspace::render(
       const auto &size = view_->size_presets[index];
       const auto button = layout.size_buttons[index];
       fill(out, button,
-           size.system_count == selected_system_count_ ? selected : raised);
+           size.system_count == selected_system_count_ ? selected_tint
+                                                       : raised_tint);
       stroke(out, button,
              size.system_count == selected_system_count_ ? accent : border);
       auto compact = size.label;
@@ -617,7 +640,7 @@ void NativeNewGameWorkspace::render(
        message_.empty() ? muted : assessment_accepted_ ? accent : warning,
        layout.small_font);
   fill(out, layout.create,
-       layout.create.contains(pointer_) ? hover : selected);
+       layout.create.contains(pointer_) ? hover : selected_tint);
   stroke(out, layout.create, accent);
   text(out, layout.create, "CREATE CAMPAIGN", bright, layout.body_font,
        TextAlign::Center);

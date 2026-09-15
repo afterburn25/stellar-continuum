@@ -91,7 +91,9 @@ public:
       const TextMeasurer &);
   void render(stellar::native_map::DrawList &, int width, int height,
               const TextMeasurer &,
-              const PortraitProvider *portrait_provider = nullptr) const;
+              const PortraitProvider *portrait_provider = nullptr,
+              std::shared_ptr<const stellar::native_map::RgbaImage> background =
+                  {}) const;
 
 private:
   [[nodiscard]] std::optional<std::size_t> species_hit(

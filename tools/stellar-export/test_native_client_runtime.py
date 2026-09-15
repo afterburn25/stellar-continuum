@@ -12,6 +12,7 @@ import stellar as exporter
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
+from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -78,6 +79,16 @@ class NativeClientDependencyTests(unittest.TestCase):
                                     "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.species_declaration = self.root / "export/native-species-assets.json"
         self.species_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": species_records}))
+        startup_art_records = {}
+        for key, (source, destination) in NATIVE_STARTUP_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only startup art " + key).encode())
+            startup_art_records[key] = {"source": source, "runtimePath": destination,
+                                        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.startup_art_declaration = self.root / "export/native-startup-art-assets.json"
+        self.startup_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":startup_art_records}))
+
 
 
     def inspect(self, binary, runtime=(), windows=()):
@@ -136,6 +147,50 @@ class NativeClientDependencyTests(unittest.TestCase):
         declaration["schemaVersion"] = 2
         self.species_declaration.write_text(json.dumps(declaration))
         with self.assertRaisesRegex(RuntimeError, "Unsupported native species"):
+            self.copy()
+
+    def test_missing_startup_art_blocks_package(self):
+        for source, destination in NATIVE_STARTUP_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native startup art"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_startup_art_blocks_package(self):
+        for source, destination in NATIVE_STARTUP_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_startup_art_paths_cannot_expand_package_scope(self):
+        original = self.startup_art_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["stellar-loading-splash"][field] = "../outside.png"
+                self.startup_art_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native startup art"):
+                    self.copy()
+        self.startup_art_declaration.write_text(original)
+
+    def test_startup_art_manifest_schema_and_set_are_strict(self):
+        original = self.startup_art_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.startup_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native startup art"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["stellar-loading-splash"]
+        self.startup_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 
     def test_missing_license_blocks_package(self):

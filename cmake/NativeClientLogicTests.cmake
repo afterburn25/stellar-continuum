@@ -310,3 +310,46 @@ if(MSVC)
   target_compile_options(stellar_startup_ui_tests PRIVATE /W4 /WX /permissive-)
 endif()
 add_test(NAME native_startup_workspace COMMAND stellar_startup_ui_tests)
+
+# Approved menu/loading artwork and its responsive player controls.
+add_executable(stellar_art_tests
+  app/native_client/native_startup_artwork.cpp
+  app/native_client/native_new_game_workspace.cpp
+  app/native_client/native_startup_workspace.cpp
+  native-tests/native_startup_artwork_tests.cpp)
+target_include_directories(stellar_art_tests PRIVATE app/native_client)
+target_link_libraries(stellar_art_tests PRIVATE stellar_core stellar_engine stellar_native_platform)
+if(MSVC)
+  target_compile_options(stellar_art_tests PRIVATE /W4 /WX /permissive-)
+endif()
+add_test(NAME native_startup_artwork COMMAND stellar_art_tests "${CMAKE_SOURCE_DIR}")
+target_sources(stellar_new_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
+target_sources(stellar_startup_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
+target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_platform)
+target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_platform)
+
+if(BUILD_TESTING)
+  add_executable(stellar_celestial_tests
+    native-tests/native_celestial_appearance_tests.cpp
+    app/native_client/native_celestial_appearance.cpp)
+  target_include_directories(stellar_celestial_tests PRIVATE
+    app/native_client engine/include)
+  target_link_libraries(stellar_celestial_tests PRIVATE
+    stellar_native_platform)
+  add_test(NAME native_celestial_appearance
+    COMMAND stellar_celestial_tests)
+  target_sources(stellar_native_system_workspace_tests PRIVATE
+    app/native_client/native_celestial_appearance.cpp)
+  target_sources(stellar_native_system_colony_entry_tests PRIVATE
+    app/native_client/native_celestial_appearance.cpp)
+  target_sources(stellar_settle_ui_tests PRIVATE
+    app/native_client/native_celestial_appearance.cpp)
+  target_link_libraries(stellar_native_system_workspace_tests PRIVATE
+    stellar_native_platform)
+  target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE
+    stellar_native_platform)
+  target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_platform)
+  if(MSVC)
+    target_compile_options(stellar_celestial_tests PRIVATE /W4 /WX /permissive-)
+  endif()
+endif()
