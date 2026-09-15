@@ -39,7 +39,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
-| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures done; no surface colony scene art |
+| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` CTest + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp; no settings UI, no voice duck hooks yet |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
@@ -48,7 +48,9 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Surface scene is a construction workspace, not the reference's rendered colony view.
+1. Surface scene renders hub/buildings/roads/ghosts as rasterized sprites, but
+   the reference's free camera orbit, terrain relief and settlement overlays
+   remain (workspace is a fixed top-down construction view).
 2. Audio settings UI and voice-duck integration are not wired (mixer, playback,
    event routing, and persisted volumes are implemented).
 3. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
@@ -56,10 +58,19 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 153/153 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
-  `native_orbital_structure`, `native_audio`, extended
-  `native_system_view`/`native_system_workspace`),
+- 154/154 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+  `native_orbital_structure`, `native_surface_scene`, `native_audio`, extended
+  `native_system_view`/`native_system_workspace`/`native_surface_workspace`),
   144/144 headless CTest baseline, all Python export checks.
+- Surface colony scene (`58aaf475`): the orbital rasterizer core moved to
+  `native_scene_raster.hpp`; `native_surface_scene` ports the
+  `SurfaceBuildingVisuals` silhouette grammar — per-type cylinder/box/sphere
+  meshes, foundation pads, three construction phases with scaffolding,
+  powered/offline/prioritized/capital/outpost markers, `advanced_` second tier —
+  into bounded cached sprites. The workspace draws the hub, south-to-north
+  building sprites with progress bars, civic ring road + site connectors, and
+  translucent placement ghosts; `scene_sprites` is asserted by the surface
+  export validator (mock suite extended).
 - Audio (`dbf07f81`): `native_audio` mixer — pure-CPU 48 kHz stereo, looping
   `claimed-by-the-void-loop.mp3` via pinned `dr_mp3` (MIT-0), bounded 16/24/32-bit
   WAV decoder, 8-voice SFX polyphony, hover/confirm + event-category routing,
