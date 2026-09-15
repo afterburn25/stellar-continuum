@@ -31,7 +31,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Legacy research | Technology* | `core/legacy_research`, `legacy_technology` | OK | `legacy_*_parity` | PARITY VERIFIED | Superseded path, kept for saves |
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
-| Diplomacy (presentation) | DiplomacyWorkspace*, Main.Diplomacy | none | — | — | NOT STARTED | No native workspace yet |
+| Diplomacy (presentation) | DiplomacyWorkspace*, Main.Diplomacy | remote Devin candidate (`native_diplomacy_controller`, `native_diplomacy_workspace`) | pending integration | pending review | NOT IN CURRENT CHECKOUT | Available on `cpp/devin-swe2-native-conversion` at `06b2b802`; review/integrate rather than re-port |
 | Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
@@ -49,11 +49,11 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Diplomacy has no native workspace — simulation is ported, presentation is not.
+1. Review and integrate the existing Devin diplomacy slice; do not duplicate the port. Its current evidence has no real-campaign or graphical diplomacy smoke because Player17 has no contacts, and it still lacks claims/border warnings, a demand/trade composer, and grievance UI.
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
+5. Smoke timing is ~20.6–21.2 ms mean / ~33.4–33.7 ms p95 for system/galaxy; render-present includes VSync wait, so 60 FPS is not established.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.57, commit `ac45d958`)
@@ -65,12 +65,12 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   design_id→role resolution, fleet+shipyard rows/details, Vulkan-validated.
 - Fleet route effects: dashes, chevrons, trails for active owned fleets matching the
   Godot map; unsurveyed-leg drawing is player-authorized own-fleet data.
-- No merge to integration/main; PR #325 remains draft coordination point.
+- No merge to integration/main; PR #332 is the candidate under review.
 
-## Codex candidate validation (separate branch)
+## Codex candidate checkpoint (PR #332)
 
-- Fixed a reproduced fresh-checkout native build failure without changing reviewed asset hashes: six packaged text assets now have explicit Git line endings. Both autocrlf modes are exercised by a real checkout test.
-- Removed per-circle allocation/trigonometry from the native renderer, preserving exact GPU pixels and layering. No simulation, observer filtering or save schema changes.
-- Candidate checks: native client build, 43 Python dependency tests, 2 focused Vulkan/text CTests, and four actual galaxy/ship-art launches with paused save/reload validation. Full shared-branch suite results above remain attributed to `ac45d958`, not this candidate.
-- Performance remains open: galaxy runs measured 21.359/21.166 ms mean and 33.464/36.504 ms p95 at 720p/1080p. Ship-art runs measured 18.401/18.389 ms mean and 31.096/30.126 ms p95. These short captures do not prove a speedup or sustained 60 FPS.
-- Visible next gap: Sol's fitted orbital view is too small with overlapping body labels. Diplomacy, surface/orbital scenery and native audio also remain incomplete; graphical parity is not claimed.
+- Fresh-checkout byte stability is covered for reviewed native assets; soft-circle submission now preserves the legacy 20-segment pixels and ordered blending without per-circle heap allocation or trigonometry.
+- Native system framing now uses measured labels, body/stellar/orbital envelopes and a 12px presentation inset. Selected labels take priority; lower-priority labels hide rather than overlap. Initial travel activation fits visible exits once, while later refreshes preserve pan/zoom.
+- Final evidence: five focused CTests (`native_system_travel`, `native_system_workspace`, `native_system_view`, `native_system_colony_entry`, `native_settlement_workspace`) and seven actual Vulkan galaxy/system/travel launches passed established validators, including exact paused Player17 reload and observer secrecy. See `native-system-layout-tests.log`, `native-system-checkpoint.log`, `work/layout-{galaxy,system,travel}.json`, and `build-native/preview-*.bmp`.
+- Smoke-only timing now records bounded update/scene/render-present mean and p95 before JSON diagnostics. System/galaxy means were about 20.6–21.2 ms and p95 about 33.4–33.7 ms; render-present mean about 16.4–16.6 ms includes VSync wait. This is not a GPU-only measurement or a 60 FPS claim; cold-entry versus steady scene/update spikes remain to investigate.
+- CI trigger coverage was proven green by native workflow `34927971070` for `21ea21d8` (`21ea21d8338b75d5ec09731c5d71ad341857e57d`). The final layout/timing candidate still needs CI at its exact head; this run does not cover uncommitted changes. No release bump, shared merge, full-suite claim, or clean-machine claim is made.
