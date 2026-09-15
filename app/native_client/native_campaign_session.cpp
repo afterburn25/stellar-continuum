@@ -295,8 +295,8 @@ CampaignFrameResult NativeCampaignSession::advance(
   require_owner();
   manual_capture_ready_ = false;
   auto result = live_->frame.advance(real_delta_seconds);
-  manual_capture_ready_ = result.route == CampaignFrameRoute::Strategic &&
-                          result.ready_for_save_capture;
+  manual_capture_ready_ = result.ready_for_save_capture ||
+                          result.route == CampaignFrameRoute::Tactical;
   if (pending_load_) {
     return result;
   }

@@ -127,6 +127,9 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
                      std::max(0.f, detail_space - fleet_height - 6.f * scale)};
+  const UiRect engage{details.x + details.width - 96.f * scale,
+                      details.y + details.height - 34.f * scale,
+                      92.f * scale, 30.f * scale};
   return {scale,
           static_cast<int>(std::lround(20.f * scale)),
           static_cast<int>(std::lround(14.f * scale)),
@@ -137,7 +140,8 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           details,
           route,
           feedback,
-          confirm};
+          confirm,
+          engage};
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
@@ -218,6 +222,10 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
+    if (const auto *fleet = selected_fleet();
+        fleet && fleet->combat_status && fleet->combat_status->is_armed &&
+        layout.engage.contains(event.position))
+      return {FleetWorkspaceCommandKind::Engage, true, fleet->id};
     if (view_) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
@@ -360,6 +368,17 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       }
     }
     text(out, details_bounds, details, bright, layout.small_font_pixels);
+    if (fleet->combat_status && fleet->combat_status->is_armed) {
+      fill(out, layout.engage,
+           layout.engage.contains(pointer_) ? hover_color : row_color);
+      stroke(out, layout.engage,
+             layout.engage.contains(pointer_) ? bright : border_color);
+      text(out,
+           {layout.engage.x, layout.engage.y + layout.engage.height * .3f,
+            layout.engage.width, layout.engage.height * .7f},
+           "ENGAGE", bright, layout.small_font_pixels, FontFace::Interface,
+           TextAlign::Center);
+    }
     std::string route;
     if (preview_) {
       route = "ROUTE PREVIEW\nDestination " + target_display_name_ +

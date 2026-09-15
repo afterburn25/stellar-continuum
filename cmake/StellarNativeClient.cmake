@@ -84,6 +84,9 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_surface_workspace.cpp
   app/native_client/native_surface_scene.cpp)
 
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_battle_workspace.cpp)
+
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSpeciesAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_species_assets)

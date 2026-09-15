@@ -29,6 +29,7 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect route;
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect confirm;
+  stellar::native_map::UiRect engage;
 
   [[nodiscard]] static FleetWorkspaceLayout for_viewport(int width,
                                                           int height) noexcept;
@@ -39,7 +40,8 @@ enum class FleetWorkspaceCommandKind {
   Select,
   SelectHits,
   Preview,
-  Confirm
+  Confirm,
+  Engage
 };
 
 struct FleetWorkspaceCommand {
