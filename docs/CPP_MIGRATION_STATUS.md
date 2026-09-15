@@ -13,7 +13,42 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-### Current readability checkpoint
+### Native top-down surface checkpoint (validated, 2026-09-15)
+
+Three actual Vulkan launches passed on the unaltered fresh 500-system campaign;
+ordered 720p and paused reload 1080p evidence is in
+`work/native-surface-scene-evidence.json`. Placement, cancel/no-change,
+half-refund, unfinished progress, paused Player17 equality and observer gating
+remain proven. Counters are `1/13/142/1` ordered and `1/14/174/1` reload for
+sites/meshes/triangles/roads. The presentation-only 14-type gallery passed at
+both resolutions with 20 meshes, 1,302 triangles and 14 roads. Six unique CTests
+and 121 Python checks pass; no manual roads, full 3D, finished-art, FPS or
+sealed-release claim is made.
+
+The scene uses clipped, batched C++ triangle geometry for building families,
+canonical positions and rotations, layered roofs/status indicators and a hollow
+selection ring. It fits the local colony on opening and clamps pan/zoom. Roads
+connect the hub and site aprons, check other footprints analytically and cache
+world-space routes; six bounded two-leg alternatives are tried before omitting a
+blocked route. The road-gap and hub-boundary rounding failures found during
+visual validation were repaired. This is cosmetic routing, not manual roads or
+full legacy A* parity. Advanced modules currently share their functional family
+silhouette. Scene limits are 128 sites, 8,192 triangles and 192 road segments,
+with simpler bodies above 24 sites; Core placement still enforces its own limits.
+The native client, workspace, art and optional gallery targets build with MSVC.
+The six focused CTests cover colony/construction controllers, surface workspace,
+triangle-mesh safety, image preparation and terrain assets. Python evidence is
+46 surface validator tests plus 75 colony/client neighbor tests. Real campaign
+captures and the separately labeled 14-type presentation gallery were inspected.
+The gallery is not proof of a naturally developed 14-building campaign.
+
+Prior published head `884accb2` passed Windows CI `34992777279`. This surface
+checkpoint still needs its own CI result after publication. Core, legacy C#,
+Player17 and approved terrain artwork are preserved. Next work should improve
+native HUD styling and detailed colony presentation toward the legacy reference;
+3D surfaces, manual roads and broader character casting remain incomplete.
+
+### Historical readability checkpoint
 
 This native C++ checkpoint builds the full MSVC app with the galaxy-label target at
 `/W4 /WX`. Six focused CTests passed in 1.67 seconds (`native_diplomacy_controller`,
@@ -47,14 +82,14 @@ math, and Player17 remain unchanged.
 
 `43622e72` is the prior checkpoint: its 95 Python checks and CI `34985891256` covered
 seven presentation targets before galaxy labels. Its faint-fill/overlapping-label
-finding is addressed above. Current 97-test and label evidence belongs to this
-checkpoint; new-label CI is pending. `graphicalParity=false`; the Engine 0.1.58 candidate/
+finding is addressed above. Current 97-test and label evidence belongs to the
+historical readability checkpoint `884accb2`, which passed CI `34992777279`. `graphicalParity=false`; the Engine 0.1.58 candidate/
 game 0.1.7-alpha is unmerged and unsealed, and clean-machine and broad-hardware 60 FPS
 are unproven. `891fbcb2` and duplicate-audio `dbf07f81` remain unimported; PR #332
 audio is authoritative. Review found callback races, clip-tail looping, non-atomic
 lowercase preferences, and lifecycle conflicts (issue #324 comment `5682904661`).
 `eb1ab876` remains unimported until Core provides a physical-body/system/orbit contract.
-Next: colony buildings/roads and wider casting.
+Next: wider casting and final graphical parity work.
 
 - Devin/SWE-2 was reviewed through `891fbcb2`. Territory presentation commit
   `ef7a4007` was selected: it ports the C# projection's observer-gated anchors,
@@ -132,7 +167,7 @@ Next: colony buildings/roads and wider casting.
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
 | Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | focused C++/Python checks + Vulkan smoke | PARTIAL | Observer-safe RELATIONS workspace covers the reference sections; strategic claims are map presentation |
-| Territory / exploration | Exploration*, StrategicTerritoryProjection | `core/exploration_*`, `survey_operations`, `knowledge`, `native_territory_projection`, `native_territory_overlay` | OK | exploration/knowledge parity + focused territory checks | PARTIAL | Survey secrecy preserved; reference-shaped native overlay selected, Vulkan/performance proof pending |
+| Territory / exploration | Exploration*, StrategicTerritoryProjection | `core/exploration_*`, `survey_operations`, `knowledge`, `native_territory_projection`, `native_territory_overlay` | OK | exploration/knowledge parity + focused territory checks | PARTIAL | Survey secrecy preserved; reference-shaped native overlay has Vulkan and bounded-worker evidence; broad-hardware FPS remains unproven |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
 | Combat | Combat*, MassiveCombat* | `core/combat_*`, `massive_combat_*`, `campaign_massive_combat` | OK | `combat_*_parity`, `massive_combat_*` | PARITY VERIFIED | Engine resolution; native battle view not started |
@@ -140,7 +175,7 @@ Next: colony buildings/roads and wider casting.
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
-| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ships, route effects, textured surface ground and selected territory overlay; detailed colony buildings/roads remain, physical orbital sites deferred |
+| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ships, route effects, textured surface ground, batched top-down surface site geometry and selected territory overlay; validated top-down surface scene; 3D and physical orbital sites deferred |
 | Audio | AudioDirector | `engine/native_audio`, `app/native_client/native_audio_director` | OK | audio/director CTest + relocated audio startup/reload | PARTIAL | Score, settings, completion cues and bounded fixed scientist speech; broader casting/device recovery remain |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
@@ -149,10 +184,10 @@ Next: colony buildings/roads and wider casting.
 
 ## What blocks "fully playable native"
 
-1. Surface construction now has textured ground with bounded asynchronous loading. Detailed colony buildings, roads, environment-specific scenery and full 3D remain.
+1. Surface construction now has textured ground with bounded asynchronous loading and a typed, batched top-down scene: building-family geometry, rotations, hollow selection, powered/staffed status, bounded cosmetic roads, route caching, local colony framing and clamped panning. Its campaign and gallery checks pass; this remains presentation-only 2D artwork, not manual roads or 3D.
 2. Physical orbital sites need an authoritative Core/save host and location contract. A labeled construction schematic can be ported without claiming physical placement.
 3. The human scientist now has three fixed British cues, and owned simulation events produce bounded notices/sounds. Full character/species casting, dynamic speech and playback-device recovery remain.
-4. The selected territory overlay still needs actual Vulkan/runtime and performance validation. Existing background-art measurements do not establish its cost or complete graphical parity.
+4. The territory overlay has Vulkan/runtime and bounded-worker evidence above; broader hardware performance and complete graphical parity remain unproven.
 5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. A developed 500-system campaign with 24 paid ships and nine total colonies averages ~16.7 ms on this host at 8X, including manual saves and exact paused reloads. Combat, much larger fleets and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 

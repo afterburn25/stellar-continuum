@@ -37,18 +37,27 @@ void stroke(DrawList &out, UiRect bounds, Color color) {
 }
 void text(DrawList &out, UiRect bounds, std::string value, Color color,
           int pixels, TextAlign align = TextAlign::Left) {
-  const auto x = align == TextAlign::Center
-                     ? bounds.x + bounds.width * .5f
-                     : align == TextAlign::Right ? bounds.x + bounds.width
-                                                 : bounds.x;
-  out.overlay.emplace_back(Text{{x, bounds.y}, std::move(value), color, pixels,
-                                bounds.width, bounds, align,
+  const auto x = align == TextAlign::Center  ? bounds.x + bounds.width * .5f
+                 : align == TextAlign::Right ? bounds.x + bounds.width
+                                             : bounds.x;
+  out.overlay.emplace_back(Text{{x, bounds.y},
+                                std::move(value),
+                                color,
+                                pixels,
+                                bounds.width,
+                                bounds,
+                                align,
                                 FontFace::Interface});
 }
-void clipped_text(DrawList &out, UiRect bounds, UiRect clip,
-                  std::string value, Color color, int pixels) {
-  out.overlay.emplace_back(Text{{bounds.x, bounds.y}, std::move(value), color,
-                                pixels, bounds.width, clip, TextAlign::Left,
+void clipped_text(DrawList &out, UiRect bounds, UiRect clip, std::string value,
+                  Color color, int pixels) {
+  out.overlay.emplace_back(Text{{bounds.x, bounds.y},
+                                std::move(value),
+                                color,
+                                pixels,
+                                bounds.width,
+                                clip,
+                                TextAlign::Left,
                                 FontFace::Interface});
 }
 [[nodiscard]] std::optional<UiRect> intersection(UiRect left,
@@ -57,7 +66,8 @@ void clipped_text(DrawList &out, UiRect bounds, UiRect clip,
   const auto y = std::max(left.y, right.y);
   const auto right_edge = std::min(left.x + left.width, right.x + right.width);
   const auto bottom = std::min(left.y + left.height, right.y + right.height);
-  if (right_edge <= x || bottom <= y) return std::nullopt;
+  if (right_edge <= x || bottom <= y)
+    return std::nullopt;
   return UiRect{x, y, right_edge - x, bottom - y};
 }
 [[nodiscard]] std::string number(double value, int precision = 1) {
@@ -65,15 +75,11 @@ void clipped_text(DrawList &out, UiRect bounds, UiRect clip,
   out << std::fixed << std::setprecision(precision) << value;
   return out.str();
 }
-[[nodiscard]] float safe_progress(double value, float width) noexcept {
-  return static_cast<float>(std::isfinite(value) ? std::clamp(value, 0., 1.)
-                                                 : 0.) *
-         width;
-}
 } // namespace
 
-SurfaceWorkspaceLayout SurfaceWorkspaceLayout::for_viewport(
-    const int width, const int height) noexcept {
+SurfaceWorkspaceLayout
+SurfaceWorkspaceLayout::for_viewport(const int width,
+                                     const int height) noexcept {
   const auto w = static_cast<float>(width), h = static_cast<float>(height);
   const auto requested = std::max(1.f, h / 900.f);
   const auto fit = std::max(.55f, std::min(w / 1180.f, h / 680.f));
@@ -82,23 +88,23 @@ SurfaceWorkspaceLayout SurfaceWorkspaceLayout::for_viewport(
   const UiRect surface{margin, top, std::max(1.f, w - 2.f * margin),
                        std::max(1.f, h - top - margin)};
   const auto header = 48.f * scale, gap = 9.f * scale;
-  const auto palette_width = std::min(std::max(246.f * scale, 190.f),
-                                      surface.width * .27f);
-  const auto inspector_width = std::min(std::max(292.f * scale, 225.f),
-                                        surface.width * .31f);
+  const auto palette_width =
+      std::min(std::max(246.f * scale, 190.f), surface.width * .27f);
+  const auto inspector_width =
+      std::min(std::max(292.f * scale, 225.f), surface.width * .31f);
   const auto content_y = surface.y + header;
   const auto content_h = surface.height - header;
   const UiRect palette{surface.x, content_y, palette_width, content_h};
-  const UiRect inspector{surface.x + surface.width - inspector_width,
-                         content_y, inspector_width, content_h};
-  const UiRect terrain{palette.x + palette.width + gap, content_y,
-                       std::max(1.f, inspector.x - gap -
-                                        (palette.x + palette.width + gap)),
-                       content_h};
+  const UiRect inspector{surface.x + surface.width - inspector_width, content_y,
+                         inspector_width, content_h};
+  const UiRect terrain{
+      palette.x + palette.width + gap, content_y,
+      std::max(1.f, inspector.x - gap - (palette.x + palette.width + gap)),
+      content_h};
   const auto modal_w = std::min(540.f * scale, w - 30.f * scale);
   const auto modal_h = 286.f * scale;
-  const UiRect confirmation{(w - modal_w) * .5f, (h - modal_h) * .5f,
-                            modal_w, modal_h};
+  const UiRect confirmation{(w - modal_w) * .5f, (h - modal_h) * .5f, modal_w,
+                            modal_h};
   return {scale,
           static_cast<int>(std::lround(22.f * scale)),
           static_cast<int>(std::lround(15.f * scale)),
@@ -121,11 +127,11 @@ SurfaceWorkspaceLayout SurfaceWorkspaceLayout::for_viewport(
            inspector.width - 20.f * scale, 34.f * scale},
           confirmation,
           {confirmation.x + confirmation.width - 174.f * scale,
-           confirmation.y + confirmation.height - 48.f * scale,
-           154.f * scale, 32.f * scale},
+           confirmation.y + confirmation.height - 48.f * scale, 154.f * scale,
+           32.f * scale},
           {confirmation.x + 20.f * scale,
-           confirmation.y + confirmation.height - 48.f * scale,
-           118.f * scale, 32.f * scale}};
+           confirmation.y + confirmation.height - 48.f * scale, 118.f * scale,
+           32.f * scale}};
 }
 
 Point SurfaceViewport::world_to_screen(const double x, const double z,
@@ -136,46 +142,68 @@ Point SurfaceViewport::world_to_screen(const double x, const double z,
                              (z - center_z) * pixels_per_unit)};
 }
 
-std::pair<double, double> SurfaceViewport::screen_to_world(
-    const Point point, const UiRect terrain) const noexcept {
-  return {center_x + (point.x - terrain.x - terrain.width * .5) /
-                         pixels_per_unit,
-          center_z + (point.y - terrain.y - terrain.height * .5) /
-                         pixels_per_unit};
+std::pair<double, double>
+SurfaceViewport::screen_to_world(const Point point,
+                                 const UiRect terrain) const noexcept {
+  return {
+      center_x + (point.x - terrain.x - terrain.width * .5) / pixels_per_unit,
+      center_z + (point.y - terrain.y - terrain.height * .5) / pixels_per_unit};
 }
 
 SurfaceViewport SurfaceViewport::translated(const float dx,
-                                             const float dy) const noexcept {
+                                            const float dy) const noexcept {
   auto result = *this;
-  result.center_x -= static_cast<double>(dx) / pixels_per_unit;
-  result.center_z -= static_cast<double>(dy) / pixels_per_unit;
+  constexpr double maximum_camera_center = 2048.;
+  result.center_x =
+      std::clamp(center_x - static_cast<double>(dx) / pixels_per_unit,
+                 -maximum_camera_center, maximum_camera_center);
+  result.center_z =
+      std::clamp(center_z - static_cast<double>(dy) / pixels_per_unit,
+                 -maximum_camera_center, maximum_camera_center);
   return result;
 }
 
-SurfaceViewport SurfaceViewport::zoomed_at(const float factor,
-                                           const Point anchor,
-                                           const UiRect terrain,
-                                           const double minimum,
-                                           const double maximum) const noexcept {
+SurfaceViewport
+SurfaceViewport::zoomed_at(const float factor, const Point anchor,
+                           const UiRect terrain, const double minimum,
+                           const double maximum) const noexcept {
   const auto before = screen_to_world(anchor, terrain);
   auto result = *this;
-  result.pixels_per_unit =
-      std::clamp(pixels_per_unit * static_cast<double>(factor), minimum,
-                 maximum);
+  result.pixels_per_unit = std::clamp(
+      pixels_per_unit * static_cast<double>(factor), minimum, maximum);
   const auto after = result.screen_to_world(anchor, terrain);
-  result.center_x += before.first - after.first;
-  result.center_z += before.second - after.second;
+  constexpr double maximum_camera_center = 2048.;
+  result.center_x = std::clamp(result.center_x + before.first - after.first,
+                               -maximum_camera_center, maximum_camera_center);
+  result.center_z = std::clamp(result.center_z + before.second - after.second,
+                               -maximum_camera_center, maximum_camera_center);
   return result;
 }
 
 void NativeSurfaceWorkspace::fit(const int width, const int height) noexcept {
   const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
-  viewport_.center_x = 0.;
-  viewport_.center_z = 0.;
+  double min_x = -surface_hub_radius, max_x = surface_hub_radius;
+  double min_z = -surface_hub_radius, max_z = surface_hub_radius;
+  if (view_)
+    for (const auto &site : view_->construction_sites) {
+      if (!std::isfinite(site.x) || !std::isfinite(site.z))
+        continue;
+      const auto radius = NativeSurfaceScene::footprint_radius(site) + 18.;
+      min_x = std::min(min_x, static_cast<double>(site.x) - radius);
+      max_x = std::max(max_x, static_cast<double>(site.x) + radius);
+      min_z = std::min(min_z, static_cast<double>(site.z) - radius);
+      max_z = std::max(max_z, static_cast<double>(site.z) + radius);
+    }
+  viewport_.center_x = (min_x + max_x) * .5;
+  viewport_.center_z = (min_z + max_z) * .5;
+  const auto span =
+      std::clamp(std::max({max_x - min_x, max_z - min_z, 240.}), 240.,
+                 2. * static_cast<double>(surface_area_half_size));
   viewport_.pixels_per_unit =
-      .9 * std::min(static_cast<double>(layout.terrain.width),
-                    static_cast<double>(layout.terrain.height)) /
-      (2. * surface_area_half_size);
+      .84 *
+      std::min(static_cast<double>(layout.terrain.width),
+               static_cast<double>(layout.terrain.height)) /
+      span;
 }
 
 void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
@@ -218,7 +246,8 @@ void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
 }
 
 void NativeSurfaceWorkspace::reconcile() {
-  if (!view_) return;
+  if (!view_)
+    return;
   if (selected_type_id_ &&
       std::ranges::none_of(view_->available_buildings, [&](const auto &item) {
         return item.type_id == *selected_type_id_;
@@ -240,6 +269,7 @@ void NativeSurfaceWorkspace::close() noexcept {
   confirmation_ = std::monostate{};
   pending_preview_.reset();
   last_preview_position_.reset();
+  scene_sites_ = scene_meshes_ = scene_triangles_ = scene_road_segments_ = 0;
 }
 
 void NativeSurfaceWorkspace::discard_campaign() noexcept {
@@ -255,6 +285,12 @@ void NativeSurfaceWorkspace::discard_campaign() noexcept {
   dragging_ = false;
   last_preview_position_.reset();
   notice_.clear();
+  scene_sites_ = scene_meshes_ = scene_triangles_ = scene_road_segments_ = 0;
+}
+
+NativeSurfaceSceneDiagnostics
+NativeSurfaceWorkspace::scene_diagnostics() const {
+  return {scene_sites_, scene_meshes_, scene_triangles_, scene_road_segments_};
 }
 
 void NativeSurfaceWorkspace::set_placement_quote(
@@ -288,9 +324,11 @@ void NativeSurfaceWorkspace::complete_command(std::string notice) {
 
 std::optional<std::size_t> NativeSurfaceWorkspace::palette_hit(
     const Point point, const SurfaceWorkspaceLayout &layout) const noexcept {
-  if (!view_ || !layout.palette_rows.contains(point)) return std::nullopt;
+  if (!view_ || !layout.palette_rows.contains(point))
+    return std::nullopt;
   const auto local = point.y - layout.palette_rows.y - palette_scroll_;
-  if (local < 0.f) return std::nullopt;
+  if (local < 0.f)
+    return std::nullopt;
   const auto index = static_cast<std::size_t>(
       std::floor(local / (palette_pitch * layout.scale)));
   return index < view_->available_buildings.size()
@@ -300,29 +338,35 @@ std::optional<std::size_t> NativeSurfaceWorkspace::palette_hit(
 
 std::optional<int> NativeSurfaceWorkspace::site_hit(
     const Point point, const SurfaceWorkspaceLayout &layout) const noexcept {
-  if (!view_ || !layout.terrain.contains(point)) return std::nullopt;
+  if (!view_ || !layout.terrain.contains(point))
+    return std::nullopt;
   for (auto it = view_->construction_sites.rbegin();
        it != view_->construction_sites.rend(); ++it) {
-    const auto center = viewport_.world_to_screen(it->x, it->z, layout.terrain);
-    const auto radius = std::max(7.f, 12.f * layout.scale);
-    const UiRect bounds{center.x-radius,center.y-radius,2.f*radius,2.f*radius};
-    const auto visible=intersection(bounds,layout.terrain);
-    if (visible&&visible->contains(point))
+    if (NativeSurfaceScene::contains_site(*it, point, viewport_,
+                                          layout.terrain))
       return it->building_id;
   }
   return std::nullopt;
 }
 
-SurfaceWorkspaceCommand NativeSurfaceWorkspace::placement_request(
-    const Point point, const SurfaceWorkspaceLayout &layout,
-    const bool confirm) {
+SurfaceWorkspaceCommand
+NativeSurfaceWorkspace::placement_request(const Point point,
+                                          const SurfaceWorkspaceLayout &layout,
+                                          const bool confirm) {
   if (!selected_type_id_ || !layout.terrain.contains(point))
     return {SurfaceWorkspaceCommandKind::None, true};
   const auto world = viewport_.screen_to_world(point, layout.terrain);
-  const auto x = static_cast<float>(world.first), z = static_cast<float>(world.second);
+  const auto x = static_cast<float>(world.first),
+             z = static_cast<float>(world.second);
   last_preview_position_ = std::pair{x, z};
-  return {SurfaceWorkspaceCommandKind::PreviewPlacement, true, confirm,
-          *selected_type_id_, 0, x, z, rotation_degrees_};
+  return {SurfaceWorkspaceCommandKind::PreviewPlacement,
+          true,
+          confirm,
+          *selected_type_id_,
+          0,
+          x,
+          z,
+          rotation_degrees_};
 }
 
 std::optional<SurfaceWorkspaceCommand>
@@ -332,18 +376,23 @@ NativeSurfaceWorkspace::take_preview_request() noexcept {
   return result;
 }
 
-SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
-    const InputEvent &event, const int width, const int height) {
-  if (!visible_ || !view_) return {};
+SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
+                                                       const int width,
+                                                       const int height) {
+  if (!visible_ || !view_)
+    return {};
   pointer_ = event.position;
   const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
   if (!std::holds_alternative<std::monostate>(confirmation_)) {
     const auto revision = std::visit(
         [](const auto &value) -> std::uint64_t {
           using T = std::decay_t<decltype(value)>;
-          if constexpr (std::is_same_v<T, std::monostate>) return 0;
-          else return value.quote_revision;
-        }, confirmation_);
+          if constexpr (std::is_same_v<T, std::monostate>)
+            return 0;
+          else
+            return value.quote_revision;
+        },
+        confirmation_);
     if (event.type == InputEventType::EscapePressed ||
         (event.type == InputEventType::LeftPressed &&
          layout.cancel.contains(event.position))) {
@@ -352,21 +401,33 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       removal_quote_.reset();
       last_preview_position_.reset();
       pending_preview_.reset();
-      return {SurfaceWorkspaceCommandKind::CancelQuote, true, false, {}, 0,
-              0, 0, 0, revision};
+      return {SurfaceWorkspaceCommandKind::CancelQuote,
+              true,
+              false,
+              {},
+              0,
+              0,
+              0,
+              0,
+              revision};
     }
     if (event.type == InputEventType::LeftPressed &&
         layout.confirm.contains(event.position)) {
       const auto accepted = std::visit(
           [](const auto &value) {
             using T = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, std::monostate>) return false;
-            else return value.accepted;
-          }, confirmation_);
-      if (!accepted) return {SurfaceWorkspaceCommandKind::None, true};
-      const auto kind = std::holds_alternative<NativeSurfacePlacementQuote>(confirmation_)
-                            ? SurfaceWorkspaceCommandKind::ConfirmPlacement
-                            : SurfaceWorkspaceCommandKind::ConfirmRemoval;
+            if constexpr (std::is_same_v<T, std::monostate>)
+              return false;
+            else
+              return value.accepted;
+          },
+          confirmation_);
+      if (!accepted)
+        return {SurfaceWorkspaceCommandKind::None, true};
+      const auto kind =
+          std::holds_alternative<NativeSurfacePlacementQuote>(confirmation_)
+              ? SurfaceWorkspaceCommandKind::ConfirmPlacement
+              : SurfaceWorkspaceCommandKind::ConfirmRemoval;
       return {kind, true, false, {}, 0, 0, 0, 0, revision};
     }
     return {SurfaceWorkspaceCommandKind::None, true};
@@ -380,8 +441,15 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       const auto revision = placement_quote_->quote_revision;
       placement_quote_.reset();
       selected_type_id_.reset();
-      return {SurfaceWorkspaceCommandKind::CancelQuote, true, false, {}, 0,
-              0, 0, 0, revision};
+      return {SurfaceWorkspaceCommandKind::CancelQuote,
+              true,
+              false,
+              {},
+              0,
+              0,
+              0,
+              0,
+              revision};
     }
     if (selected_type_id_) {
       selected_type_id_.reset();
@@ -400,9 +468,9 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       layout.palette.contains(event.position)) {
     const auto content = static_cast<float>(view_->available_buildings.size()) *
                          palette_pitch * layout.scale;
-    palette_scroll_ = std::clamp(
-        palette_scroll_ + event.wheel_y * 42.f * layout.scale,
-        std::min(0.f, layout.palette_rows.height - content), 0.f);
+    palette_scroll_ =
+        std::clamp(palette_scroll_ + event.wheel_y * 42.f * layout.scale,
+                   std::min(0.f, layout.palette_rows.height - content), 0.f);
     return {SurfaceWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::Wheel &&
@@ -431,7 +499,10 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       return {SurfaceWorkspaceCommandKind::None, true};
     }
     if (layout.remove.contains(event.position) && selected_building_id_)
-      return {SurfaceWorkspaceCommandKind::PreviewRemoval, true, false, {},
+      return {SurfaceWorkspaceCommandKind::PreviewRemoval,
+              true,
+              false,
+              {},
               *selected_building_id_};
     if (layout.terrain.contains(event.position)) {
       press_ = event.position;
@@ -444,8 +515,9 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
   }
   if (event.type == InputEventType::PointerMove &&
       layout.terrain.contains(event.position)) {
-    if (pressed_ && std::hypot(event.position.x - press_.x, event.position.y - press_.y) >
-        5.f * layout.scale &&
+    if (pressed_ &&
+        std::hypot(event.position.x - press_.x, event.position.y - press_.y) >
+            5.f * layout.scale &&
         (event.delta.x != 0.f || event.delta.y != 0.f))
       dragging_ = true;
     if (dragging_) {
@@ -454,8 +526,10 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       pending_preview_.reset();
       last_preview_position_.reset();
     } else if (selected_type_id_) {
-      const auto world = viewport_.screen_to_world(event.position, layout.terrain);
-      const auto x = static_cast<float>(world.first), z = static_cast<float>(world.second);
+      const auto world =
+          viewport_.screen_to_world(event.position, layout.terrain);
+      const auto x = static_cast<float>(world.first),
+                 z = static_cast<float>(world.second);
       if (!last_preview_position_ ||
           std::abs(last_preview_position_->first - x) > .25f ||
           std::abs(last_preview_position_->second - z) > .25f)
@@ -464,8 +538,9 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
     return {SurfaceWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::LeftReleased) {
-    if (!pressed_) return {SurfaceWorkspaceCommandKind::None,
-                           layout.surface.contains(event.position)};
+    if (!pressed_)
+      return {SurfaceWorkspaceCommandKind::None,
+              layout.surface.contains(event.position)};
     pressed_ = false;
     if (dragging_) {
       dragging_ = false;
@@ -473,7 +548,8 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
     }
     if (!layout.terrain.contains(event.position))
       return {SurfaceWorkspaceCommandKind::None, true};
-    if (selected_type_id_) return placement_request(event.position, layout, true);
+    if (selected_type_id_)
+      return placement_request(event.position, layout, true);
     selected_building_id_ = site_hit(event.position, layout);
     return {SurfaceWorkspaceCommandKind::None, true};
   }
@@ -489,7 +565,8 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
 
 void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                                     const int height) const {
-  if (!visible_ || !view_) return;
+  if (!visible_ || !view_)
+    return;
   const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
   const auto &view = *view_;
   fill(out, layout.surface, panel);
@@ -498,39 +575,40 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   stroke(out, layout.back, border);
   text(out, layout.back, "BACK", text_color, layout.small_font,
        TextAlign::Center);
-  text(out, layout.title,
-       view.colony_name + "  /  OPERATIONAL SURFACE", text_color,
-       layout.heading_font);
+  text(out, layout.title, view.colony_name + "  /  OPERATIONAL SURFACE",
+       text_color, layout.heading_font);
 
   fill(out, layout.palette, inset);
   stroke(out, layout.palette, border);
-  text(out, {layout.palette.x + 10.f * layout.scale,
-             layout.palette.y + 9.f * layout.scale,
-             layout.palette.width - 20.f * layout.scale, 24.f * layout.scale},
+  text(out,
+       {layout.palette.x + 10.f * layout.scale,
+        layout.palette.y + 9.f * layout.scale,
+        layout.palette.width - 20.f * layout.scale, 24.f * layout.scale},
        "BUILDING PALETTE", muted, layout.body_font);
-  for (std::size_t index = 0; index < view.available_buildings.size(); ++index) {
+  for (std::size_t index = 0; index < view.available_buildings.size();
+       ++index) {
     const auto &option = view.available_buildings[index];
-    const UiRect original{layout.palette_rows.x,
-                          layout.palette_rows.y + palette_scroll_ +
-                              static_cast<float>(index) * palette_pitch *
-                                  layout.scale,
-                          layout.palette_rows.width,
-                          (palette_pitch - 6.f) * layout.scale};
+    const UiRect original{
+        layout.palette_rows.x,
+        layout.palette_rows.y + palette_scroll_ +
+            static_cast<float>(index) * palette_pitch * layout.scale,
+        layout.palette_rows.width, (palette_pitch - 6.f) * layout.scale};
     const auto visible = intersection(original, layout.palette_rows);
-    if (!visible) continue;
-    const auto selected = selected_type_id_ &&
-                          *selected_type_id_ == option.type_id;
+    if (!visible)
+      continue;
+    const auto selected =
+        selected_type_id_ && *selected_type_id_ == option.type_id;
     fill(out, *visible, selected ? hover : row);
     stroke(out, *visible, selected ? good : border);
-    clipped_text(out, {original.x + 8.f * layout.scale,
-                       original.y + 7.f * layout.scale,
-                       original.width - 16.f * layout.scale,
-                       20.f * layout.scale},
+    clipped_text(out,
+                 {original.x + 8.f * layout.scale,
+                  original.y + 7.f * layout.scale,
+                  original.width - 16.f * layout.scale, 20.f * layout.scale},
                  *visible, option.name, text_color, layout.body_font);
-    clipped_text(out, {original.x + 8.f * layout.scale,
-                       original.y + 31.f * layout.scale,
-                       original.width - 16.f * layout.scale,
-                       34.f * layout.scale},
+    clipped_text(out,
+                 {original.x + 8.f * layout.scale,
+                  original.y + 31.f * layout.scale,
+                  original.width - 16.f * layout.scale, 34.f * layout.scale},
                  *visible,
                  option.formatted_authorization + "  |  Industry " +
                      number(option.industry_cost, 0),
@@ -539,32 +617,36 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
 
   fill(out, layout.terrain, {3, 18, 20, 255});
   if (terrain_image_) {
-    const auto& image = terrain_image_;
+    const auto &image = terrain_image_;
     const auto upper_left = viewport_.screen_to_world(
         {layout.terrain.x, layout.terrain.y}, layout.terrain);
-    const auto lower_right = viewport_.screen_to_world(
-        {layout.terrain.x + layout.terrain.width,
-         layout.terrain.y + layout.terrain.height}, layout.terrain);
+    const auto lower_right =
+        viewport_.screen_to_world({layout.terrain.x + layout.terrain.width,
+                                   layout.terrain.y + layout.terrain.height},
+                                  layout.terrain);
     const auto low_x = std::min(upper_left.first, lower_right.first);
     const auto high_x = std::max(upper_left.first, lower_right.first);
     const auto low_z = std::min(upper_left.second, lower_right.second);
     const auto high_z = std::max(upper_left.second, lower_right.second);
     auto tile_units = terrain_art_tile_world_units;
-    auto columns = static_cast<std::size_t>(
-        std::ceil((high_x - low_x) / tile_units)) + 2u;
-    auto rows = static_cast<std::size_t>(
-        std::ceil((high_z - low_z) / tile_units)) + 2u;
+    auto columns =
+        static_cast<std::size_t>(std::ceil((high_x - low_x) / tile_units)) + 2u;
+    auto rows =
+        static_cast<std::size_t>(std::ceil((high_z - low_z) / tile_units)) + 2u;
     while (columns * rows > 64u) {
       tile_units *= 2.;
-      columns = static_cast<std::size_t>(
-          std::ceil((high_x - low_x) / tile_units)) + 2u;
-      rows = static_cast<std::size_t>(
-          std::ceil((high_z - low_z) / tile_units)) + 2u;
+      columns =
+          static_cast<std::size_t>(std::ceil((high_x - low_x) / tile_units)) +
+          2u;
+      rows =
+          static_cast<std::size_t>(std::ceil((high_z - low_z) / tile_units)) +
+          2u;
     }
     const auto first_x = std::floor(low_x / tile_units) * tile_units;
     const auto first_z = std::floor(low_z / tile_units) * tile_units;
     for (std::size_t row_index = 0; row_index < rows; ++row_index)
-      for (std::size_t column_index = 0; column_index < columns; ++column_index) {
+      for (std::size_t column_index = 0; column_index < columns;
+           ++column_index) {
         const auto x = first_x + static_cast<double>(column_index) * tile_units;
         const auto z = first_z + static_cast<double>(row_index) * tile_units;
         const auto top_left = viewport_.world_to_screen(x, z, layout.terrain);
@@ -575,92 +657,73 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                             std::abs(bottom_right.x - top_left.x),
                             std::abs(bottom_right.y - top_left.y)};
         if (intersection(bounds, layout.terrain))
-          out.overlay.emplace_back(Image{image, bounds, std::nullopt,
-                                         {178, 184, 184, 255}, layout.terrain});
+          out.overlay.emplace_back(Image{image,
+                                         bounds,
+                                         std::nullopt,
+                                         {178, 184, 184, 255},
+                                         layout.terrain});
       }
   }
   // The approved source has visible soil and grass hues. A translucent neutral
   // overlay actually reduces that chroma; multiplying a tint alone would not.
-  if (terrain_image_) fill(out, layout.terrain, {92, 106, 108, 82});
+  if (terrain_image_)
+    fill(out, layout.terrain, {92, 106, 108, 82});
   stroke(out, layout.terrain, border);
-  const auto world_min = viewport_.world_to_screen(-surface_area_half_size,
-                                                    -surface_area_half_size,
-                                                    layout.terrain);
-  const auto world_max = viewport_.world_to_screen(surface_area_half_size,
-                                                    surface_area_half_size,
-                                                    layout.terrain);
-  if (const auto visible = intersection(
-          {std::min(world_min.x, world_max.x),
-           std::min(world_min.y, world_max.y), std::abs(world_max.x - world_min.x),
-           std::abs(world_max.y - world_min.y)}, layout.terrain))
+  const auto world_min = viewport_.world_to_screen(
+      -surface_area_half_size, -surface_area_half_size, layout.terrain);
+  const auto world_max = viewport_.world_to_screen(
+      surface_area_half_size, surface_area_half_size, layout.terrain);
+  if (const auto visible = intersection({std::min(world_min.x, world_max.x),
+                                         std::min(world_min.y, world_max.y),
+                                         std::abs(world_max.x - world_min.x),
+                                         std::abs(world_max.y - world_min.y)},
+                                        layout.terrain))
     stroke(out, *visible, {36, 91, 76, 220});
   for (int coordinate = -400; coordinate <= 400; coordinate += 100) {
-    const auto a = viewport_.world_to_screen(coordinate, -surface_area_half_size,
-                                             layout.terrain);
+    const auto a = viewport_.world_to_screen(
+        coordinate, -surface_area_half_size, layout.terrain);
     const auto b = viewport_.world_to_screen(coordinate, surface_area_half_size,
                                              layout.terrain);
-    if (a.x >= layout.terrain.x && a.x <= layout.terrain.x + layout.terrain.width)
-      out.overlay.emplace_back(FilledRectangle{
-          {a.x, layout.terrain.y, 1.f, layout.terrain.height},
-          {20, 55, 51, 120}});
-    const auto c = viewport_.world_to_screen(-surface_area_half_size, coordinate,
-                                             layout.terrain);
-    if (c.y >= layout.terrain.y && c.y <= layout.terrain.y + layout.terrain.height)
-      out.overlay.emplace_back(FilledRectangle{
-          {layout.terrain.x, c.y, layout.terrain.width, 1.f},
-          {20, 55, 51, 120}});
+    if (a.x >= layout.terrain.x &&
+        a.x <= layout.terrain.x + layout.terrain.width)
+      out.overlay.emplace_back(
+          FilledRectangle{{a.x, layout.terrain.y, 1.f, layout.terrain.height},
+                          {20, 55, 51, 120}});
+    const auto c = viewport_.world_to_screen(-surface_area_half_size,
+                                             coordinate, layout.terrain);
+    if (c.y >= layout.terrain.y &&
+        c.y <= layout.terrain.y + layout.terrain.height)
+      out.overlay.emplace_back(
+          FilledRectangle{{layout.terrain.x, c.y, layout.terrain.width, 1.f},
+                          {20, 55, 51, 120}});
     (void)b;
   }
-  const auto hub = viewport_.world_to_screen(0., 0., layout.terrain);
-  const auto hub_radius = static_cast<float>(surface_hub_radius *
-                                              viewport_.pixels_per_unit);
-  if (const auto visible = intersection(
-          {hub.x - hub_radius, hub.y - hub_radius, 2.f * hub_radius,
-           2.f * hub_radius}, layout.terrain)) {
-    fill(out, *visible, {38, 91, 104, 230});
-    stroke(out, *visible, {114, 208, 223, 255});
-  }
-  for (const auto &site : view.construction_sites) {
-    const auto center = viewport_.world_to_screen(site.x, site.z, layout.terrain);
-    const auto radius = std::max(7.f, 12.f * layout.scale);
-    const UiRect bounds{center.x - radius, center.y - radius, radius * 2.f,
-                        radius * 2.f};
-    if (const auto visible = intersection(bounds, layout.terrain)) {
-      fill(out, *visible, site.complete ? Color{38, 126, 91, 245}
-                                       : Color{154, 105, 37, 245});
-      stroke(out, *visible,
-             selected_building_id_ && *selected_building_id_ == site.building_id
-                 ? Color{245, 221, 114, 255}
-                 : border);
-      if (!site.complete) {
-        const UiRect bar{bounds.x, bounds.y + bounds.height - 4.f,
-                         bounds.width, 3.f};
-        if (const auto track = intersection(bar, layout.terrain))
-          fill(out, *track, {22, 31, 39, 255});
-        if (const auto progress = intersection(
-                {bar.x, bar.y, safe_progress(site.progress_fraction, bar.width),
-                 bar.height}, layout.terrain))
-          fill(out, *progress, good);
-      }
-    }
-  }
+  const auto diagnostics =
+      scene_.append(out, viewport_, layout.terrain, view.construction_sites,
+                    selected_building_id_, view.surface_hub_level);
+  scene_sites_ = diagnostics.sites;
+  scene_meshes_ = diagnostics.meshes;
+  scene_triangles_ = diagnostics.triangles;
+  scene_road_segments_ = diagnostics.road_segments;
   if (selected_type_id_ && placement_quote_) {
-    const auto option = std::ranges::find(view.available_buildings,
-                                          *selected_type_id_,
-                                          &NativeSurfaceBuildOption::type_id);
+    const auto option =
+        std::ranges::find(view.available_buildings, *selected_type_id_,
+                          &NativeSurfaceBuildOption::type_id);
     if (option != view.available_buildings.end()) {
       const auto center = viewport_.world_to_screen(
           placement_quote_->x, placement_quote_->z, layout.terrain);
-      const auto radius = std::max(6.f, option->footprint_radius *
-                                            static_cast<float>(viewport_.pixels_per_unit));
-      if (const auto visible = intersection(
-              {center.x - radius, center.y - radius, 2.f * radius,
-               2.f * radius}, layout.terrain)) {
-        fill(out, *visible, placement_quote_->accepted
-                                ? Color{48, 177, 112, 90}
-                                : Color{224, 75, 67, 95});
-        stroke(out, *visible, placement_quote_->accepted ? good
-                                                          : Color{246, 103, 90, 255});
+      const auto radius =
+          std::max(6.f, option->footprint_radius *
+                            static_cast<float>(viewport_.pixels_per_unit));
+      if (const auto visible =
+              intersection({center.x - radius, center.y - radius, 2.f * radius,
+                            2.f * radius},
+                           layout.terrain)) {
+        fill(out, *visible,
+             placement_quote_->accepted ? Color{48, 177, 112, 90}
+                                        : Color{224, 75, 67, 95});
+        stroke(out, *visible,
+               placement_quote_->accepted ? good : Color{246, 103, 90, 255});
       }
     }
   }
@@ -670,17 +733,16 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   const auto ix = layout.inspector.x + 10.f * layout.scale;
   auto iy = layout.inspector.y + 10.f * layout.scale;
   const auto iw = layout.inspector.width - 20.f * layout.scale;
-  const auto add = [&](std::string value, Color color, int pixels,
-                       float step) {
+  const auto add = [&](std::string value, Color color, int pixels, float step) {
     text(out, {ix, iy, iw, step * layout.scale}, std::move(value), color,
          pixels);
     iy += step * layout.scale;
   };
   add("SURFACE INSPECTOR", muted, layout.body_font, 30.f);
   if (selected_type_id_) {
-    const auto option = std::ranges::find(view.available_buildings,
-                                          *selected_type_id_,
-                                          &NativeSurfaceBuildOption::type_id);
+    const auto option =
+        std::ranges::find(view.available_buildings, *selected_type_id_,
+                          &NativeSurfaceBuildOption::type_id);
     if (option != view.available_buildings.end()) {
       add(option->name, text_color, layout.body_font, 25.f);
       add(option->description, muted, layout.small_font, 54.f);
@@ -688,8 +750,7 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
           layout.small_font, 23.f);
       add("Industry  " + number(option->industry_cost, 0), text_color,
           layout.small_font, 23.f);
-      add("Workforce  " + number(option->workforce_required_millions, 2) +
-              "M",
+      add("Workforce  " + number(option->workforce_required_millions, 2) + "M",
           muted, layout.small_font, 22.f);
       add("Power supply/demand  " + number(option->power_supply, 1) + " / " +
               number(option->power_demand, 1),
@@ -698,25 +759,24 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
           layout.small_font, 22.f);
       if (placement_quote_)
         add(placement_quote_->message,
-            placement_quote_->accepted ? good : warning,
-            layout.small_font, 56.f);
-      fill(out, layout.rotate,
-           layout.rotate.contains(pointer_) ? hover : row);
+            placement_quote_->accepted ? good : warning, layout.small_font,
+            56.f);
+      fill(out, layout.rotate, layout.rotate.contains(pointer_) ? hover : row);
       stroke(out, layout.rotate, border);
       text(out, layout.rotate,
            "ROTATE  " + number(rotation_degrees_, 0) + " deg", text_color,
            layout.small_font, TextAlign::Center);
     }
   } else if (selected_building_id_) {
-    const auto site = std::ranges::find(view.construction_sites,
-                                        *selected_building_id_,
-                                        &NativeSurfaceSite::building_id);
+    const auto site =
+        std::ranges::find(view.construction_sites, *selected_building_id_,
+                          &NativeSurfaceSite::building_id);
     if (site != view.construction_sites.end()) {
       add(site->name, text_color, layout.body_font, 26.f);
       add(site->complete ? "Operational module" : site->construction_stage,
           site->complete ? good : warning, layout.small_font, 23.f);
-      add("Position  " + number(site->x, 1) + ", " + number(site->z, 1),
-          muted, layout.small_font, 22.f);
+      add("Position  " + number(site->x, 1) + ", " + number(site->z, 1), muted,
+          layout.small_font, 22.f);
       add("Rotation  " + number(site->rotation_degrees, 0) + " deg", muted,
           layout.small_font, 22.f);
       add("Construction  " + number(site->progress_fraction * 100., 1) + "%",
@@ -727,8 +787,7 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
             muted, layout.small_font, 22.f);
       add("Completion depends on available construction materials.", muted,
           layout.small_font, 46.f);
-      fill(out, layout.remove,
-           layout.remove.contains(pointer_) ? hover : row);
+      fill(out, layout.remove, layout.remove.contains(pointer_) ? hover : row);
       stroke(out, layout.remove, warning);
       text(out, layout.remove,
            site->complete ? "REVIEW DEMOLITION" : "REVIEW CANCELLATION",
@@ -737,13 +796,14 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   } else {
     add("Choose a building or select an existing site.", muted,
         layout.body_font, 48.f);
-    add("Drag to pan. Wheel zooms at the pointer.", muted,
-        layout.small_font, 40.f);
+    add("Drag to pan. Wheel zooms at the pointer.", muted, layout.small_font,
+        40.f);
   }
   if (!notice_.empty())
-    text(out, {ix, layout.inspector.y + layout.inspector.height -
-                       138.f * layout.scale,
-               iw, 44.f * layout.scale},
+    text(out,
+         {ix,
+          layout.inspector.y + layout.inspector.height - 138.f * layout.scale,
+          iw, 44.f * layout.scale},
          notice_, warning, layout.small_font);
 
   if (!std::holds_alternative<std::monostate>(confirmation_)) {
@@ -790,23 +850,24 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
       text(out, {cx, cy, cw, 54.f * layout.scale}, removal->message,
            removal->accepted ? good : warning, layout.small_font);
     }
-    fill(out, layout.cancel,
-         layout.cancel.contains(pointer_) ? hover : row);
+    fill(out, layout.cancel, layout.cancel.contains(pointer_) ? hover : row);
     stroke(out, layout.cancel, border);
     text(out, layout.cancel, "BACK", text_color, layout.small_font,
          TextAlign::Center);
     const auto accepted = std::visit(
         [](const auto &value) {
           using T = std::decay_t<decltype(value)>;
-          if constexpr (std::is_same_v<T, std::monostate>) return false;
-          else return value.accepted;
-        }, confirmation_);
+          if constexpr (std::is_same_v<T, std::monostate>)
+            return false;
+          else
+            return value.accepted;
+        },
+        confirmation_);
     fill(out, layout.confirm,
          accepted && layout.confirm.contains(pointer_) ? hover : row);
     stroke(out, layout.confirm, accepted ? good : muted);
     text(out, layout.confirm, accepted ? "CONFIRM" : "UNAVAILABLE",
-         accepted ? text_color : muted, layout.small_font,
-         TextAlign::Center);
+         accepted ? text_color : muted, layout.small_font, TextAlign::Center);
   }
 }
 

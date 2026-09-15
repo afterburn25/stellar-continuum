@@ -3,9 +3,42 @@
 Concise cross-agent notes. Full milestone history lives in `docs/engine/MIGRATION_STATUS.md`;
 subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
-## Current territory integration checkpoint (2026-09-15)
+## Current integration checkpoint (2026-09-15)
 
-### Current readability checkpoint (2026-09-15)
+### Native top-down surface checkpoint (validated)
+
+Three actual Vulkan launches passed on the unaltered fresh 500-system campaign;
+ordered 720p and paused reload 1080p evidence is in
+`work/native-surface-scene-evidence.json`. Counters are `1/13/142/1` ordered
+and `1/14/174/1` reload for sites/meshes/triangles/roads. The presentation-only
+14-type gallery passed at both resolutions with 20 meshes, 1,302 triangles
+and 14 roads. Six unique CTests and 121 Python checks pass; no manual roads,
+full 3D, finished-art, FPS or sealed-release claim is made.
+
+The scene uses clipped, batched C++ triangle geometry for building families,
+canonical positions and rotations, layered roofs/status indicators and a hollow
+selection ring. It fits the local colony on opening and clamps pan/zoom. Roads
+connect the hub and site aprons, check other footprints analytically and cache
+world-space routes; six bounded two-leg alternatives are tried before omitting a
+blocked route. The road-gap and hub-boundary rounding failures found during
+visual validation were repaired. This is cosmetic routing, not manual roads or
+full legacy A* parity. Advanced modules currently share their functional family
+silhouette. Scene limits are 128 sites, 8,192 triangles and 192 road segments,
+with simpler bodies above 24 sites; Core placement still enforces its own limits.
+The native client, workspace, art and optional gallery targets build with MSVC.
+The six focused CTests cover colony/construction controllers, surface workspace,
+triangle-mesh safety, image preparation and terrain assets. Python evidence is
+46 surface validator tests plus 75 colony/client neighbor tests. Real campaign
+captures and the separately labeled 14-type presentation gallery were inspected.
+The gallery is not proof of a naturally developed 14-building campaign.
+
+Prior published head `884accb2` passed Windows CI `34992777279`. This surface
+checkpoint still needs its own CI result after publication. Core, legacy C#,
+Player17 and approved terrain artwork are preserved. Next work should improve
+native HUD styling and detailed colony presentation toward the legacy reference;
+3D surfaces, manual roads and broader character casting remain incomplete.
+
+### Historical readability checkpoint (2026-09-15)
 
 This native C++ checkpoint builds the full MSVC native app, including the galaxy-label
 target with `/W4 /WX`. Six focused CTests passed in 1.67 seconds:
@@ -42,9 +75,9 @@ presentation work only: C++ Core, projection math, and Player17 remain unchanged
 
 `43622e72` is the prior readability checkpoint: it passed 95 Python checks and CI
 `34985891256` for seven existing presentation targets before the galaxy-label target.
-Its faint fill and overlapping-label findings were addressed by this pass. New-label
-CI is pending; do not attribute the current 97 checks or label results to that older
-head. `graphicalParity=false`; Engine 0.1.58 candidate/game 0.1.7-alpha remains
+Its faint fill and overlapping-label findings were addressed by `884accb2`, which
+passed CI `34992777279`. The 97 checks and label results belong to that readability
+head, not this surface checkpoint. `graphicalParity=false`; Engine 0.1.58 candidate/game 0.1.7-alpha remains
 unmerged and unsealed, with clean-machine and broad-hardware 60 FPS still unproven.
 
 The selective Devin review through `891fbcb2`, including duplicate-audio commit
@@ -53,7 +86,7 @@ callback races, clip-tail looping, non-atomic lowercase preferences, and lifecyc
 conflicts. Existing engine audio/settings and `bf_emma` voice remain authoritative;
 issue #324 comment `5682904661` records the review. Orbital `eb1ab876` also remains
 unimported pending an authoritative Core physical-body/system/orbit contract. Next:
-colony buildings and roads, then wider casting.
+wider casting and final graphical parity work.
 
 - Devin/SWE-2 was reviewed through head `891fbcb2`. The selected change is
   territory presentation commit `ef7a4007`: a reference-shaped port of
@@ -598,8 +631,8 @@ colony buildings and roads, then wider casting.
   `work/native-audio-validation/package-local-travel-*.bmp`.
 - This is a local validated checkpoint on the Codex candidate, not a new sealed
   downloadable release. Engine 0.1.58 candidate / game 0.1.7-alpha and
-  `graphicalParity=false` remain. The next bounded implementation is native
-  surface terrain/art support without changing placement or costs.
+  `graphicalParity=false` remain. The native surface terrain/art checkpoint is
+  now extended by the validated bounded top-down scene described above.
 
 ## Native surface ground checkpoint (2026-09-15, candidate)
 
@@ -656,7 +689,7 @@ colony buildings and roads, then wider casting.
   presentation/audio below. Revisit timing for new failures or substantially
   larger fleet/combat workloads, not repeated unchanged maps or speculative
   renderer settings. Keep Core access and GPU/window work on the owner thread.
-- Surface colony visuals (buildings/roads) remain. Orbital construction geometry
+- Detailed 3D colony presentation and manual roads remain incomplete. Orbital construction geometry
   may be added as a labeled schematic preview, but physical station placement waits
   for an authoritative Core/save host and location contract.
 - Full character/species casting and dynamic speech remain. Fixed human

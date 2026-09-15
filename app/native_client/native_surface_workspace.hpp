@@ -1,10 +1,13 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_scene.hpp"
+#include "native_surface_viewport.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <optional>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,21 +22,6 @@ struct SurfaceWorkspaceLayout {
       terrain, inspector, rotate, remove, confirmation, confirm, cancel;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
-};
-
-struct SurfaceViewport {
-  double center_x{}, center_z{}, pixels_per_unit{.5};
-  [[nodiscard]] stellar::native_map::Point world_to_screen(
-      double x, double z, stellar::native_map::UiRect terrain) const noexcept;
-  [[nodiscard]] std::pair<double, double> screen_to_world(
-      stellar::native_map::Point, stellar::native_map::UiRect terrain) const
-      noexcept;
-  [[nodiscard]] SurfaceViewport translated(float dx, float dy) const noexcept;
-  [[nodiscard]] SurfaceViewport zoomed_at(float factor,
-                                          stellar::native_map::Point anchor,
-                                          stellar::native_map::UiRect terrain,
-                                          double minimum,
-                                          double maximum) const noexcept;
 };
 
 enum class SurfaceWorkspaceCommandKind {
@@ -89,6 +77,7 @@ public:
   [[nodiscard]] const SurfaceViewport& viewport() const noexcept {
     return viewport_;
   }
+  [[nodiscard]] NativeSurfaceSceneDiagnostics scene_diagnostics() const;
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -126,6 +115,9 @@ private:
   std::string notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
   std::shared_ptr<const stellar::native_map::RgbaImage> terrain_image_;
+  mutable std::size_t scene_sites_{}, scene_meshes_{}, scene_triangles_{},
+      scene_road_segments_{};
+  mutable NativeSurfaceScene scene_;
 };
 
 } // namespace stellar::native_colony_ui

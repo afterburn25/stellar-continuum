@@ -93,6 +93,7 @@ target_sources(stellar-continuum-native PRIVATE
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_surface_construction_controller.cpp
+  app/native_client/native_surface_scene.cpp
   app/native_client/native_surface_workspace.cpp)
 
 
@@ -137,3 +138,5 @@ target_sources(stellar-continuum-native PRIVATE
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_diplomacy_controller.cpp
   app/native_client/native_diplomacy_workspace.cpp)
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceVisualTests.cmake")

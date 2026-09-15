@@ -80,6 +80,8 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                              "placement_confirmed": not reload, "removal_previewed": not reload,
                              "removal_confirmed": not reload, "refund_exact": not reload,
                              "persisted_site": True, "paused": True}
+                    state["render"] = {"sites": 1, "meshes": 3, "triangles": 24,
+                                        "road_segments": 1}
                     if not reload:
                         payload["SavedAtUtc"] = "ordered"
                         payload["SimulationDays"] = .5
@@ -109,6 +111,12 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                     if fault == "no_progress": state["progress"] = 0
                     if fault == "no_time": state["saved_days"] = state["before_days"]
                     if fault == "site_count": state["site_count_saved"] = 2
+                    if fault == "render_missing": del state["render"]
+                    if fault == "render_extra": state["render"]["lines"] = 1
+                    if fault == "render_bool": state["render"]["triangles"] = True
+                    if fault == "render_negative": state["render"]["sites"] = -1
+                    if fault == "render_inconsistent": state["render"]["meshes"] = 25
+                    if fault == "render_huge": state["render"]["triangles"] = 8193
                     save.write_text(json.dumps(payload), encoding="utf-8")
                     flag = "--surface-reload-smoke" if reload else "--surface-smoke"
                     capture = Path(args[args.index(flag) + 1])
@@ -168,6 +176,18 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("no_time")
     def test_site_count_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("site_count")
+    def test_render_missing_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_missing")
+    def test_render_extra_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_extra")
+    def test_render_bool_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_bool")
+    def test_render_negative_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_negative")
+    def test_render_inconsistent_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_inconsistent")
+    def test_render_huge_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("render_huge")
     def test_extra_diagnostic_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("extra")
     def test_changed_system_count_rejected(self):

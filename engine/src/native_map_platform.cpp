@@ -1,4 +1,5 @@
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_triangle_mesh.hpp>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_render.h>
@@ -86,6 +87,7 @@ struct Window::Storage {
   struct CachedImage {std::shared_ptr<const RgbaImage> owner;SDL_Texture *texture{};std::size_t resident_bytes{};std::uint64_t last_use{};};
   SDL_Window *window{};SDL_GPUDevice *device{};SDL_Renderer *renderer{};HDC text_dc{};
   std::filesystem::path private_font_path;bool private_font_added{};
+  std::vector<SDL_Vertex> triangle_vertices;
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{};bool initialized{},left_down{},focused{true},minimized{},vsync{},text_input_requested{},text_input_active{};Point pointer{};Uint64 fallback_interval_ns{},last_present_ns{};
@@ -157,6 +159,31 @@ struct Window::Storage {
     if(command.clip){const SDL_Rect clip{static_cast<int>(std::floor(command.clip->x)),static_cast<int>(std::floor(command.clip->y)),static_cast<int>(std::ceil(command.clip->width)),static_cast<int>(std::ceil(command.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL image clip setup failed");}
     const auto destination=sdl_rect(command.destination);const auto rendered=SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination);if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
   }
+  void draw_triangle_mesh(const TriangleMesh &mesh) {
+    validate_triangle_mesh(mesh);
+    if (mesh.indices.empty() || (mesh.clip &&
+        (mesh.clip->width == 0.f || mesh.clip->height == 0.f))) return;
+    triangle_vertices.resize(mesh.vertices.size());
+    const SDL_FColor color{mesh.color.r / 255.f, mesh.color.g / 255.f,
+                           mesh.color.b / 255.f, mesh.color.a / 255.f};
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i)
+      triangle_vertices[i] = {{mesh.vertices[i].x, mesh.vertices[i].y}, color, {0.f, 0.f}};
+    if (mesh.clip) {
+      const auto left = static_cast<int>(std::floor(mesh.clip->x));
+      const auto top = static_cast<int>(std::floor(mesh.clip->y));
+      const SDL_Rect clip{left, top,
+          static_cast<int>(std::ceil(mesh.clip->x + mesh.clip->width)) - left,
+          static_cast<int>(std::ceil(mesh.clip->y + mesh.clip->height)) - top};
+      require(SDL_SetRenderClipRect(renderer, &clip), "SDL triangle clip setup failed");
+    }
+    const auto rendered = SDL_RenderGeometry(renderer, nullptr,
+        triangle_vertices.data(), static_cast<int>(triangle_vertices.size()),
+        mesh.indices.data(), static_cast<int>(mesh.indices.size()));
+    // Restore clip before propagating a submission failure to the entry point.
+    if (mesh.clip)
+      require(SDL_SetRenderClipRect(renderer, nullptr), "SDL triangle clip reset failed");
+    require(rendered, "SDL triangle mesh draw failed");
+  }
 };
 
 Window::Window(std::string title,int width,int height,bool fullscreen,std::filesystem::path font_path){
@@ -192,7 +219,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");std::array<SDL_Vertex,soft_circle_segments+2> vertices{};const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices[0]={{circle.center.x,circle.center.y},center_color,{0,0}};const auto &directions=soft_circle_directions();for(int index=0;index<=soft_circle_segments;++index){const auto direction=directions[static_cast<std::size_t>(index)];const Point edge{circle.center.x+direction.x*circle.radius,circle.center.y+direction.y*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices[static_cast<std::size_t>(index)+1u]={{edge.x,edge.y},edge_color,{0,0}};}const auto &indices=soft_circle_indices();require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
   require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
-  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else storage_->draw_text(value);},command);}
+  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
   if(timing)timing->submission_ms=elapsed_ms(*submission_started);
   if(screenshot){const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");if(timing)timing->readback_ms=elapsed_ms(*readback_started);}
   if(!storage_->vsync){const auto throttle_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<storage_->fallback_interval_ns)SDL_DelayPrecise(storage_->fallback_interval_ns-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();if(timing)timing->throttle_ms=elapsed_ms(*throttle_started);}

@@ -20,8 +20,12 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused",
+    "persisted_site", "paused", "render",
 }
+
+_RENDER_FIELDS = {"sites", "meshes", "triangles", "road_segments"}
+_MAX_RENDER_TRIANGLES = 8192
+_MAX_RENDER_ROAD_SEGMENTS = 192
 
 
 def _finite(value, label):
@@ -60,6 +64,20 @@ def _diagnostic(stdout: str, expected_mode: str):
         _finite(state.get(key), key)
     if state.get("persisted_site") is not True or state.get("paused") is not True:
         raise RuntimeError("Native surface did not prove a persisted paused site")
+    render = state.get("render")
+    if not isinstance(render, dict) or set(render) != _RENDER_FIELDS:
+        raise RuntimeError("Native surface reported an invalid render diagnostic")
+    for key in _RENDER_FIELDS:
+        value = render.get(key)
+        if type(value) is not int or value < 0:
+            raise RuntimeError(f"Native surface reported invalid render {key}")
+    if (render["sites"] < 1 or render["sites"] > state["site_count_saved"] or
+            render["meshes"] < 1 or render["triangles"] < 1 or
+            render["road_segments"] < 1 or
+            render["triangles"] > _MAX_RENDER_TRIANGLES or
+            render["road_segments"] > _MAX_RENDER_ROAD_SEGMENTS or
+            render["meshes"] > render["triangles"]):
+        raise RuntimeError("Native surface reported impossible render counters")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
                    "removal_confirmed", "refund_exact")

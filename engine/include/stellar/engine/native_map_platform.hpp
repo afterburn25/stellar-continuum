@@ -20,6 +20,14 @@ struct Text { Point at; std::string value; Color color; int font_pixel_size{15};
 struct TextExtent { int width{},height{}; };
 struct FilledRectangle { UiRect bounds; Color color; };
 struct StrokedRectangle { UiRect bounds; Color color; };
+// Ordered, untextured geometry in drawable pixels. Each three indices form one
+// triangle; callers batch compatible materials to keep submission work bounded.
+struct TriangleMesh {
+  std::vector<Point> vertices;
+  std::vector<int> indices;
+  Color color;
+  std::optional<UiRect> clip;
+};
 inline constexpr int maximum_rgba_image_dimension=8192;
 inline constexpr std::size_t maximum_rgba_image_bytes=64u*1024u*1024u;
 inline constexpr std::size_t maximum_image_cache_entries=128;
@@ -49,7 +57,7 @@ struct Image {
   std::optional<UiRect> clip;
 };
 using WorldCommand=std::variant<Line,Circle,Text,Image>;
-using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image>;
+using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
 // pixels, already projected relative to the camera by the application.
 struct DrawList {

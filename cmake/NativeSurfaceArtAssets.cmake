@@ -44,6 +44,7 @@ if(BUILD_TESTING)
   add_executable(stellar_native_surface_art_tests
     native-tests/native_surface_art_tests.cpp
     app/native_client/native_surface_art_assets.cpp
+    app/native_client/native_surface_scene.cpp
     app/native_client/native_surface_workspace.cpp)
   target_include_directories(stellar_native_surface_art_tests PRIVATE app/native_client)
   target_link_libraries(stellar_native_surface_art_tests PRIVATE stellar_native_image stellar_core)
