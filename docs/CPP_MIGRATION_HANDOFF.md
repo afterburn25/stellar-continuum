@@ -77,7 +77,9 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   every section the reference renders. No further diplomacy port is currently owed.
 - Surface colony visuals (buildings/roads) — the surface workspace is a construction
   grid, not the reference's rendered colony view.
-- Native audio — engine has no audio module at all; needs design before code.
+- Audio settings UI + voice-duck hooks — mixer/playback/persistence shipped in
+  `dbf07f81` (`native_audio*` + `--audio-smoke` + exact-hash packaging); the
+  remaining work is a volume-settings screen and wiring ducking to voice playback.
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.

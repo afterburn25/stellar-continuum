@@ -40,7 +40,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures done; no surface colony scene art |
-| Audio | AudioDirector, voice | none | — | — | NOT STARTED | Engine has no audio module |
+| Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` CTest + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp; no settings UI, no voice duck hooks yet |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
@@ -49,15 +49,25 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 ## What blocks "fully playable native"
 
 1. Surface scene is a construction workspace, not the reference's rendered colony view.
-2. No audio of any kind in the native client/engine.
+2. Audio settings UI and voice-duck integration are not wired (mixer, playback,
+   event routing, and persisted volumes are implemented).
 3. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
 4. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 152/152 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
-  `native_orbital_structure`, extended `native_system_view`/`native_system_workspace`),
+- 153/153 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+  `native_orbital_structure`, `native_audio`, extended
+  `native_system_view`/`native_system_workspace`),
   144/144 headless CTest baseline, all Python export checks.
+- Audio (`dbf07f81`): `native_audio` mixer — pure-CPU 48 kHz stereo, looping
+  `claimed-by-the-void-loop.mp3` via pinned `dr_mp3` (MIT-0), bounded 16/24/32-bit
+  WAV decoder, 8-voice SFX polyphony, hover/confirm + event-category routing,
+  voice-duck ramp, persisted master/music/SFX volumes beside the campaign save.
+  `native_audio_device` opens an SDL3 stream only after every required stream
+  decodes; audio failure cannot fail the campaign. `--audio-smoke` reports
+  decode/voice/bounds evidence; packaging is exact-hash gated (8 files incl.
+  `Licenses/dr_mp3-MIT-0.txt`) with an 18-test mock validator.
 - Sealed export `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`:
   118 files, 48 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false,
   150/150 CTest, 16/16 diplomacy validator Python tests. The `--diplomacy-smoke`
