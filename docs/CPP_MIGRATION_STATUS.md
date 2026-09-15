@@ -2,6 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion`.
+Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
 Evidence basis: states below cite real artifacts — `core/` parity CTests (`*_parity`,
@@ -65,3 +66,11 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 - Fleet route effects: dashes, chevrons, trails for active owned fleets matching the
   Godot map; unsurveyed-leg drawing is player-authorized own-fleet data.
 - No merge to integration/main; PR #325 remains draft coordination point.
+
+## Codex candidate validation (separate branch)
+
+- Fixed a reproduced fresh-checkout native build failure without changing reviewed asset hashes: six packaged text assets now have explicit Git line endings. Both autocrlf modes are exercised by a real checkout test.
+- Removed per-circle allocation/trigonometry from the native renderer, preserving exact GPU pixels and layering. No simulation, observer filtering or save schema changes.
+- Candidate checks: native client build, 43 Python dependency tests, 2 focused Vulkan/text CTests, and four actual galaxy/ship-art launches with paused save/reload validation. Full shared-branch suite results above remain attributed to `ac45d958`, not this candidate.
+- Performance remains open: galaxy runs measured 21.359/21.166 ms mean and 33.464/36.504 ms p95 at 720p/1080p. Ship-art runs measured 18.401/18.389 ms mean and 31.096/30.126 ms p95. These short captures do not prove a speedup or sustained 60 FPS.
+- Visible next gap: Sol's fitted orbital view is too small with overlapping body labels. Diplomacy, surface/orbital scenery and native audio also remain incomplete; graphical parity is not claimed.

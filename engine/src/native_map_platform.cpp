@@ -3,6 +3,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_render.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <iterator>
@@ -58,6 +59,25 @@ private:HDC dc_{};HGDIOBJ previous_{};
 [[nodiscard]] bool valid_clip(UiRect value) noexcept{return std::isfinite(value.x)&&std::isfinite(value.y)&&std::isfinite(value.width)&&std::isfinite(value.height)&&std::abs(value.x)<=65536.f&&std::abs(value.y)<=65536.f&&value.width>=0.f&&value.width<=65536.f&&value.height>=0.f&&value.height<=65536.f;}
 [[nodiscard]] bool valid_positive_rect(UiRect value)noexcept{return valid_clip(value)&&value.width>0.f&&value.height>0.f;}
 [[nodiscard]] bool valid_point(Point value)noexcept{return std::isfinite(value.x)&&std::isfinite(value.y);}
+constexpr int soft_circle_segments=20;
+using SoftCircleDirections=std::array<Point,soft_circle_segments+1>;
+using SoftCircleIndices=std::array<int,soft_circle_segments*3>;
+[[nodiscard]] const SoftCircleDirections &soft_circle_directions(){
+  static const SoftCircleDirections directions=[](){
+    SoftCircleDirections result{};
+    for(int index=0;index<=soft_circle_segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(soft_circle_segments);result[static_cast<std::size_t>(index)]={std::cos(angle),std::sin(angle)};}
+    return result;
+  }();
+  return directions;
+}
+[[nodiscard]] const SoftCircleIndices &soft_circle_indices(){
+  static const SoftCircleIndices indices=[](){
+    SoftCircleIndices result{};
+    for(int index=0;index<soft_circle_segments;++index){const auto offset=static_cast<std::size_t>(index)*3u;result[offset]=0;result[offset+1]=index+1;result[offset+2]=index+2;}
+    return result;
+  }();
+  return indices;
+}
 }
 
 struct Window::Storage {
@@ -165,7 +185,7 @@ void Window::set_text_input(bool enabled){storage_->text_input_requested=enabled
 TextExtent Window::measure_text(const Text &label){if(label.value.empty())return {};const auto &cached=storage_->text(label);return {cached.width,cached.height};}
 void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot){
   const auto draw_line=[&](const Line &line){if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");};
-  const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");constexpr int segments=20;std::vector<SDL_Vertex> vertices;std::vector<int> indices;vertices.reserve(segments+2);indices.reserve(segments*3);const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices.push_back({{circle.center.x,circle.center.y},center_color,{0,0}});for(int index=0;index<=segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(segments);const Point edge{circle.center.x+std::cos(angle)*circle.radius,circle.center.y+std::sin(angle)*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices.push_back({{edge.x,edge.y},edge_color,{0,0}});}for(int index=0;index<segments;++index){indices.push_back(0);indices.push_back(index+1);indices.push_back(index+2);}require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
+  const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");std::array<SDL_Vertex,soft_circle_segments+2> vertices{};const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices[0]={{circle.center.x,circle.center.y},center_color,{0,0}};const auto &directions=soft_circle_directions();for(int index=0;index<=soft_circle_segments;++index){const auto direction=directions[static_cast<std::size_t>(index)];const Point edge{circle.center.x+direction.x*circle.radius,circle.center.y+direction.y*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices[static_cast<std::size_t>(index)+1u]={{edge.x,edge.y},edge_color,{0,0}};}const auto &indices=soft_circle_indices();require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
   require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
   for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else storage_->draw_text(value);},command);}
