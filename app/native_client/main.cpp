@@ -909,6 +909,41 @@ class NativeCampaign final {
           click(center(main_layout.pause));
       }else smoke_fleet_destination_=selected_destination;
     }
+    // Civilian recovery parity: a second civilian fleet proves the HOLD /
+    // RESUME buttons and the return-preview Recovery row without mutating the
+    // routed fleet's save evidence.
+    {
+      const auto &view_fleets=fleet_workspace_.view()->own_fleets;
+      const auto civilian=std::ranges::find_if(view_fleets,[&](const auto &f){
+        return is_civilian_role(f.role)&&f.id!=selected_fleet_id;});
+      if(civilian==view_fleets.end())throw std::runtime_error(
+          "Fleet smoke found no second civilian fleet for recovery orders.");
+      // The row click refreshes the view — own the id before dereferencing.
+      const int civilian_fleet_id=civilian->id;
+      const auto civilian_index=static_cast<std::size_t>(civilian-view_fleets.begin());
+      click({layout.list.x+12.f*layout.scale,
+             layout.list.y+(static_cast<float>(civilian_index)*45.f+20.f)*layout.scale});
+      if(fleet_controller_.selection()!=std::optional<int>{civilian_fleet_id})
+        throw std::runtime_error("Fleet smoke civilian selection failed.");
+      const auto &view_after=fleet_workspace_.view();
+      const auto selected_row=std::ranges::find(view_after->own_fleets,
+                                                civilian_fleet_id,&NativeOwnFleet::id);
+      if(selected_row==view_after->own_fleets.end()||
+         selected_row->civilian_return_preview.empty())
+        throw std::runtime_error(
+            "Fleet smoke saw no civilian return preview in the Recovery row.");
+      click(center(layout.hold));
+      const auto held=std::ranges::find(
+          session_->frame().runtime().world().campaign().fleets,
+          civilian_fleet_id,&FleetState::id);
+      if(held==session_->frame().runtime().world().campaign().fleets.end()||
+         !held->hold_requested)
+        throw std::runtime_error("Fleet smoke hold order did not land.");
+      click(center(layout.hold));
+      if(held->hold_requested)
+        throw std::runtime_error("Fleet smoke resume order did not land.");
+      smoke_civilian_recovery_=true;
+    }
     // Inspection-card parity: clicking a star selects it and renders the
     // observer-gated intelligence card (reference SystemInspectionPanel).
     {
@@ -1618,7 +1653,8 @@ class NativeCampaign final {
        <<found->mission_order_revision<<":"<<std::fixed
        <<std::setprecision(6)<<found->transit_progress
        <<":hover="<<(smoke_fleet_hover_preview_?1:0)
-       <<":inspect="<<(smoke_inspection_?1:0);
+       <<":inspect="<<(smoke_inspection_?1:0)
+       <<":civilian="<<(smoke_civilian_recovery_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -2859,6 +2895,29 @@ class NativeCampaign final {
       refresh_fleets(true);
       return;
     }
+    if(command.kind==FleetWorkspaceCommandKind::HoldResume){
+      const auto outcome=fleet_controller_.toggle_selected_civilian_hold(
+          session_->frame(),session_->cache().generation);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(
+                                      outcome.message,observed_system_names()),
+                                  outcome.accepted);
+      last_fleet_command_accepted_=outcome.accepted;
+      refresh_fleets(true);
+      return;
+    }
+    if(command.kind==FleetWorkspaceCommandKind::ReturnToBase){
+      const auto outcome=fleet_controller_.request_selected_civilian_return(
+          session_->frame(),session_->cache().generation,
+          fleet_workspace_.civilian_return_pending());
+      fleet_workspace_.set_civilian_return_pending(
+          !outcome.accepted&&outcome.requires_confirmation);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(
+                                      outcome.message,observed_system_names()),
+                                  outcome.accepted||outcome.requires_confirmation);
+      last_fleet_command_accepted_=outcome.accepted;
+      refresh_fleets(true);
+      return;
+    }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
       fleet_workspace_.set_notice(observer_safe_fleet_message(
@@ -3048,7 +3107,8 @@ class NativeCampaign final {
       smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
-  bool smoke_fleet_hover_preview_{},smoke_inspection_{};
+  bool smoke_fleet_hover_preview_{},smoke_inspection_{},
+      smoke_civilian_recovery_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};

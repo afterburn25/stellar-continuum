@@ -30,6 +30,8 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect confirm;
   stellar::native_map::UiRect engage;
+  stellar::native_map::UiRect hold;
+  stellar::native_map::UiRect return_base;
 
   [[nodiscard]] static FleetWorkspaceLayout for_viewport(int width,
                                                           int height) noexcept;
@@ -41,7 +43,9 @@ enum class FleetWorkspaceCommandKind {
   SelectHits,
   Preview,
   Confirm,
-  Engage
+  Engage,
+  HoldResume,
+  ReturnToBase
 };
 
 struct FleetWorkspaceCommand {
@@ -60,6 +64,15 @@ public:
                    std::string target_display_name);
   void clear_preview();
   void set_notice(std::string message, bool accepted);
+  // Reference UiSelectedCivilianReturnNeedsConfirmation: the RETURN TO BASE
+  // button switches to a confirmation prompt while a paid-commitment return
+  // is pending operator confirmation.
+  void set_civilian_return_pending(bool pending) noexcept {
+    return_needs_confirmation_ = pending;
+  }
+  [[nodiscard]] bool civilian_return_pending() const noexcept {
+    return return_needs_confirmation_;
+  }
 
   [[nodiscard]] FleetWorkspaceCommand handle(
       const stellar::native_map::InputEvent &event, int width, int height,
@@ -87,6 +100,7 @@ private:
   std::string target_display_name_;
   std::string notice_;
   bool notice_accepted_{};
+  bool return_needs_confirmation_{};
   stellar::native_map::Point pointer_{};
   float list_scroll_{};
   mutable int last_ship_art_rows_{};

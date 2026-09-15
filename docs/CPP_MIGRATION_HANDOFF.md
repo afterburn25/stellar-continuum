@@ -206,6 +206,33 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `native_logistics` CTest covers the initializing state, home-network build,
   kind labels, panel containment/close, and rendering.
 
+## Civilian fleet controls slice (candidate for review)
+
+- Ports the reference `UiToggleSelectedCivilianFleetHold` /
+  `UiRequestSelectedCivilianReturnToBase` /
+  `UiSelectedCivilianReturnNeedsConfirmation` surfaces onto the core civilian
+  recovery API (`hold_civilian_fleet`, `resume_civilian_fleet`,
+  `preview_civilian_fleet_return`, `request_civilian_fleet_return`).
+- `native_fleet_controller`: `is_civilian_role` (Scout/Science/Colony),
+  `toggle_selected_civilian_hold`, `request_selected_civilian_return`, and
+  per-row `hold_requested` / `return_to_base_requested` /
+  `civilian_return_preview` view fields — the return preview is computed only
+  for the selected civilian fleet so the route planner never runs for hidden
+  rows. `NativeFleetOrderOutcome::requires_confirmation` carries the
+  paid-commitment gate.
+- `native_fleet_workspace`: HOLD / RESUME and RETURN TO BASE buttons on
+  civilian rows (`FleetWorkspaceCommand::{HoldResume,ReturnToBase}`),
+  `set_civilian_return_pending` switches the return button into the reference
+  confirmation prompt, and the detail panel renders the recovery status /
+  return preview lines.
+- `main.cpp` routes both commands through the controller; the smoke selects a
+  civilian fleet, verifies the hold→resume round trip and the return preview,
+  and emits `civilian=1` in the fleet status. `native_fleet_runtime` and the
+  system-travel validator parse the new token.
+- Lifetime note: `prepare_fleet_smoke` must copy fleet ids before clicking —
+  the row click refreshes `fleet_workspace_.view()`, invalidating any
+  reference or iterator into `own_fleets`.
+
 ## Notification feed slice (candidate for review)
 
 - `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`

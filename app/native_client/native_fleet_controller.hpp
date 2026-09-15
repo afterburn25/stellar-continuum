@@ -14,6 +14,14 @@
 
 namespace stellar::native_fleet {
 
+// Reference FleetRole civilian set: hold/resume and return-to-base orders.
+[[nodiscard]] inline bool
+is_civilian_role(stellar::core::FleetRole role) noexcept {
+  return role == stellar::core::FleetRole::Scout ||
+         role == stellar::core::FleetRole::Science ||
+         role == stellar::core::FleetRole::Colony;
+}
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -32,6 +40,12 @@ struct NativeOwnFleet {
   int mission_order_revision{};
   std::optional<stellar::core::OwnCombatFleetStatus> combat_status;
   double combat_power{};
+  // Civilian recovery state (reference UiOwnedFleetSnapshot): populated for
+  // every owned fleet; the return preview is only computed for the selected
+  // civilian fleet so the route planner never runs for hidden rows.
+  bool hold_requested{}, return_to_base_requested{};
+  std::optional<std::string> return_to_base_failure_reason;
+  std::string civilian_return_preview;
 };
 
 // A historic intelligence record owns no current position. The strategic
@@ -74,6 +88,9 @@ struct NativeFleetOrderOutcome {
   bool accepted{};
   std::string message;
   int mission_order_revision{};
+  // Reference UiSelectedCivilianReturnNeedsConfirmation: the order is held
+  // until the operator confirms abandoning paid colony work.
+  bool requires_confirmation{};
 };
 
 class NativeFleetController final {
@@ -100,6 +117,13 @@ public:
   [[nodiscard]] NativeFleetOrderOutcome
   issue_selected_route(stellar::core::CampaignFrame &,
                        const NativeFleetRoutePreview &preview);
+  // Reference UiToggleSelectedCivilianFleetHold /
+  // UiRequestSelectedCivilianReturnToBase.
+  [[nodiscard]] NativeFleetOrderOutcome toggle_selected_civilian_hold(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation);
+  [[nodiscard]] NativeFleetOrderOutcome request_selected_civilian_return(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      bool confirm_abandon);
   [[nodiscard]] std::optional<int> selection() const;
 
 private:

@@ -120,6 +120,9 @@ NativeFleetMapView NativeFleetController::build(
         .fuel_remaining_light_years = fleet.fuel_remaining_light_years,
         .mission_order_revision = fleet.mission_order_revision,
         .combat_power = own_fleet_combat_power(fleet),
+        .hold_requested = fleet.hold_requested,
+        .return_to_base_requested = fleet.return_to_base_requested,
+        .return_to_base_failure_reason = fleet.return_to_base_failure_reason,
     };
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
@@ -149,6 +152,23 @@ NativeFleetMapView NativeFleetController::build(
     result.selected_fleet_id = selected_fleet_id_;
   else
     selected_fleet_id_.reset();
+
+  // Reference UiSelectedCivilianReturnPreview: the Recovery row previews the
+  // return outcome for the selected civilian ship. Only computed for the
+  // selected fleet — the route planner never runs for outliner rows.
+  if (result.selected_fleet_id) {
+    const auto selected =
+        std::ranges::find(result.own_fleets, *result.selected_fleet_id,
+                          &NativeOwnFleet::id);
+    if (selected != result.own_fleets.end() &&
+        is_civilian_role(selected->role) &&
+        !selected->return_to_base_requested &&
+        !selected->return_to_base_failure_reason) {
+      const auto preview = player.runtime.core().preview_civilian_return_to_base(
+          &player.simulation, player.player_id, selected->id);
+      selected->civilian_return_preview = preview.message;
+    }
+  }
   return result;
 }
 
@@ -307,6 +327,51 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
   return {accepted, std::move(message),
           current ? current->mission_order_revision
                   : preview.expected_mission_order_revision};
+}
+
+NativeFleetOrderOutcome NativeFleetController::toggle_selected_civilian_hold(
+    CampaignFrame &frame, const std::uint64_t campaign_generation) {
+  require_owner();
+  if (!generation_ || *generation_ != campaign_generation)
+    return {false, "The campaign changed; refresh fleets before issuing an order."};
+  auto player = context(frame);
+  auto *fleet = selected_fleet_id_ ? find_owned(player, *selected_fleet_id_)
+                                   : nullptr;
+  if (!fleet)
+    return {false, "Select an owned fleet before holding or resuming."};
+  if (!is_civilian_role(fleet->role))
+    return {false, "Hold and resume orders apply to civilian mission ships.",
+            fleet->mission_order_revision};
+  const auto outcome = fleet->hold_requested
+      ? player.runtime.core().issue_civilian_resume_order(
+            &player.simulation, player.player_id, fleet->id)
+      : player.runtime.core().issue_civilian_hold_order(
+            &player.simulation, player.player_id, fleet->id);
+  const auto current = find_owned(player, fleet->id);
+  return {outcome.accepted, outcome.message,
+          current ? current->mission_order_revision : 0};
+}
+
+NativeFleetOrderOutcome NativeFleetController::request_selected_civilian_return(
+    CampaignFrame &frame, const std::uint64_t campaign_generation,
+    const bool confirm_abandon) {
+  require_owner();
+  if (!generation_ || *generation_ != campaign_generation)
+    return {false, "The campaign changed; refresh fleets before issuing an order."};
+  auto player = context(frame);
+  auto *fleet = selected_fleet_id_ ? find_owned(player, *selected_fleet_id_)
+                                   : nullptr;
+  if (!fleet)
+    return {false, "Select an owned fleet before requesting a return."};
+  if (!is_civilian_role(fleet->role))
+    return {false, "Return to base applies to civilian mission ships.",
+            fleet->mission_order_revision};
+  const auto outcome = player.runtime.core().issue_civilian_return_to_base_order(
+      &player.simulation, player.player_id, fleet->id, confirm_abandon);
+  const auto current = find_owned(player, fleet->id);
+  return {outcome.accepted, outcome.message,
+          current ? current->mission_order_revision : 0,
+          outcome.requires_confirmation};
 }
 
 std::optional<int> NativeFleetController::selection() const {
