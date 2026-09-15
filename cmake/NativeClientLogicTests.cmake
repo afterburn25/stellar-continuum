@@ -362,11 +362,14 @@ if(BUILD_TESTING)
   add_test(NAME native_celestial_appearance
     COMMAND stellar_celestial_tests)
   target_sources(stellar_native_system_workspace_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp)
+    app/native_client/native_celestial_appearance.cpp
+    app/native_client/native_orbital_structure.cpp)
   target_sources(stellar_native_system_colony_entry_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp)
+    app/native_client/native_celestial_appearance.cpp
+    app/native_client/native_orbital_structure.cpp)
   target_sources(stellar_settle_ui_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp)
+    app/native_client/native_celestial_appearance.cpp
+    app/native_client/native_orbital_structure.cpp)
   target_link_libraries(stellar_native_system_workspace_tests PRIVATE
     stellar_native_image)
   target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE
@@ -412,6 +415,17 @@ target_include_directories(stellar_territory_tests PRIVATE app/native_client eng
 target_link_libraries(stellar_territory_tests PRIVATE stellar_native_image stellar_core)
 add_test(NAME native_territory_projection COMMAND stellar_territory_tests)
 set_tests_properties(native_territory_projection PROPERTIES TIMEOUT 120)
+
+add_executable(stellar_orbital_structure_tests
+  app/native_client/native_orbital_structure.cpp
+  native-tests/native_orbital_structure_tests.cpp)
+target_include_directories(stellar_orbital_structure_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_orbital_structure_tests PRIVATE stellar_native_image)
+add_test(NAME native_orbital_structure COMMAND stellar_orbital_structure_tests)
+set_tests_properties(native_orbital_structure PROPERTIES TIMEOUT 60)
+if(MSVC)
+  target_compile_options(stellar_orbital_structure_tests PRIVATE /W4 /WX /permissive-)
+endif()
 if(MSVC)
   target_compile_options(stellar_galaxy_backdrop_tests PRIVATE /W4 /WX /permissive-)
   target_compile_options(stellar_galaxy_marker_tests PRIVATE /W4 /WX /permissive-)

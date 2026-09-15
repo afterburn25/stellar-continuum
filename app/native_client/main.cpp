@@ -1256,6 +1256,7 @@ class NativeCampaign final {
           else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice("Destination details are not available to this observer.");}
            else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
            else if(command.kind==SystemWorkspaceCommandKind::settlement_target){preview_settlement(command.target_id,width,height);}
+           else if(command.kind==SystemWorkspaceCommandKind::open_construction){research_workspace_.close();shipyard_workspace_.close();diplomacy_workspace_.close();construction_workspace_.open();refresh_construction(true);if(!command.project_id.empty())construction_workspace_.select_project(command.project_id);}
           refresh_colony_entry(false);
           continue;
         }

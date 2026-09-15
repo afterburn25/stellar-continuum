@@ -42,6 +42,14 @@ struct NativeSystemBody {
   std::optional<std::string> sol_texture_key;
 };
 
+enum class NativeInfrastructureState { locked, available, active, complete };
+struct NativeSystemInfrastructureMarker {
+  std::string project_id, label;
+  NativeInfrastructureState state{NativeInfrastructureState::locked};
+  double progress{};
+  std::optional<int> host_body_id;
+};
+
 struct NativeSystemSnapshot {
   std::uint64_t campaign_generation{};
   int observer_civilization_id{}, system_id{};
@@ -52,6 +60,9 @@ struct NativeSystemSnapshot {
   std::optional<stellar::core::StellarClass> primary_stellar_class,
       secondary_stellar_class, tertiary_stellar_class;
   std::vector<NativeSystemBody> bodies;
+  // Player-owned orbital construction markers. Home system only, matching the
+  // reference canvas: these are always the observer's own projects.
+  std::vector<NativeSystemInfrastructureMarker> infrastructure;
 };
 
 struct NativeSystemViewResult {
