@@ -13,11 +13,16 @@
 #include <vector>
 
 namespace stellar::native_startup_ui {
+struct StartupAudioHooks {
+  std::function<void()> service, menu_ready, confirm;
+  std::function<bool()> assets_ready;
+};
 struct StartupEntryConfig {
   StartupHostConfig host;
   std::filesystem::path asset_root;
   std::function<std::string()> utc_timestamp;
   std::chrono::milliseconds minimum_boot_artwork{std::chrono::seconds(7)};
+  StartupAudioHooks audio;
 };
 struct StartupEntryAutomation {
   std::string seed_text, species_id;

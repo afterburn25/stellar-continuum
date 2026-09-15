@@ -56,6 +56,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
   auto boot = artwork_assets.image(StartupArtworkKind::ApplicationStartup);
   std::size_t staged = 1;
   for (;;) {
+    if (config.audio.service) config.audio.service();
+    const bool audio_ready = !config.audio.assets_ready || config.audio.assets_ready();
     const auto input = window.poll();
     if (input.quit_requested) return {{}, true};
     if (input.renderable()) {
@@ -83,7 +85,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - boot_started);
       const float progress = static_cast<float>(
-          startup_boot_progress(staged, 4, elapsed, minimum_boot));
+          startup_boot_progress(staged + (config.audio.assets_ready && audio_ready ? 1u : 0u),
+                                config.audio.assets_ready ? 5u : 4u, elapsed, minimum_boot));
       draw.overlay.emplace_back(FilledRectangle{
           {track.x, track.y, track.width * progress, track.height},
           {122,230,190,255}});
@@ -91,7 +94,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - boot_started);
-    if (staged == 4 && elapsed >= minimum_boot)
+    if (staged == 4 && audio_ready && elapsed >= minimum_boot)
       break;
     if (staged < 4) {
       (void)artwork_assets.image(static_cast<StartupArtworkKind>(staged));
@@ -99,7 +102,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
+  if (config.audio.menu_ready) config.audio.menu_ready();
   const auto dispatch = [&](const StartupIntent &intent) {
+    if (intent.kind != StartupIntentKind::None && config.audio.confirm)
+      config.audio.confirm();
     switch (intent.kind) {
     case StartupIntentKind::OpenLoad:
       workspace.set_slots(host.slots());
@@ -199,6 +205,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     window.draw(loading_draw, automation->loading_screenshot);
   }
   for (;;) {
+    if (config.audio.service) config.audio.service();
     const auto input = window.poll();
     if (input.quit_requested) return {{}, true};
     if (!input.renderable()) {

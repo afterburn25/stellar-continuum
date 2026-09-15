@@ -372,6 +372,42 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - Prior `370079d0` passed native CI `34955639654`. This repair requires its own run.
   Engine 0.1.58 is still an unmerged candidate in PR #332, not a sealed release.
 
+## Native audio checkpoint (2026-09-15, candidate)
+
+- Engine `native_audio` adds immutable 48 kHz stereo clips, Windows Media
+  Foundation decoding and SDL3 output. No Core dependency or new decoder DLL.
+  One music stream queues at most 288000 bytes; eight finite SFX voices are each
+  capped at 1 MiB. Decode runs on one Engine worker; window/output/Core stay on
+  the owner thread. The director closes audio before Window's SDL teardown.
+- `NativeAudioDirector` decodes the existing user score and six WAV cues once.
+  Startup waits for staging or a reported audio failure, stays silent during
+  boot, then starts music once at menu admission. Campaign entry does not restart
+  it. Startup actions and campaign navigation confirm with the existing cue.
+  Hover/event APIs exist; settings, voice and full event hooks are still pending.
+- Exact-hash CMake/export manifests package only seven clips and their credits.
+  Credits use pinned CRLF bytes; both Git checkout modes pass. Application-only
+  MFPlat/MFReadWrite imports are reviewed without broadening SDL's allowlist.
+- Five focused CTests and 92 Python checks pass. Relocated Vulkan new-game 720p
+  and paused reload 1080p pass with `audio_check=True`, restricted PATH, Unicode
+  isolated save paths, independent new slot and complete Player17 equality.
+  Each starts music once, queues 288000 bytes and stops cleanly. Fresh startup
+  records 38 silent boot services and one confirmation; reload records zero for
+  both. Real default output is used; these diagnostics do not verify speakers
+  audibly or voice quality. An unavailable SDL audio driver fails the opt-in
+  check cleanly with exit 1 after reaching campaign, one disable diagnostic and
+  no retry; the source anchor remains unchanged.
+- Evidence: `work/native-audio-runtime-evidence.json`,
+  `native-audio-actual-runtime.log`, `native-audio-unavailable-device-final.log`,
+  `native-audio-final-validation.log`, `native-audio-python-validation.log`.
+  Final validation includes finite-effect flush/drain, plus 12 exporter integrity
+  tests (17 unrelated headless executable tests skipped without their opt-in).
+  Windows CI now explicitly builds/runs both audio targets on SDL's dummy driver;
+  it does not need a GPU or sound device. Hardware-backed runtime evidence is local.
+  The relocated folder is a local validation fixture, not a sealed release.
+  See `docs/engine/NATIVE_AUDIO.md` for limits and remaining work.
+- Previous exact head `a56351f8` passed native CI `34960835811`; the audio
+  checkpoint requires its own run. PR #332 remains unmerged.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
@@ -383,7 +419,8 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   larger fleet/combat workloads, not repeated unchanged maps or speculative
   renderer settings. Keep Core access and GPU/window work on the owner thread.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
-- Native audio — engine has no audio module at all; needs design before code.
+- Native audio settings/voice and full event wiring; the playback foundation,
+  main score and navigation confirmation are now integrated on this candidate.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
 

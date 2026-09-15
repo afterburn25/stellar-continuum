@@ -1,5 +1,15 @@
 # Stellar Engine migration status
 
+Current Codex candidate (2026-09-15) integrates native Engine audio using SDL3
+and Windows Media Foundation. The existing main score starts at menu admission,
+continues into the campaign, and stops before window teardown. A worker stages
+the seven immutable clips; music/SFX queues are bounded. Boot remains silent.
+Application imports and exact-hash audio assets are reviewed independently of
+SDL's pinned dependencies. New-game/reload Vulkan audio checks and an
+unavailable-device failure check pass; save state is preserved. Settings, voice
+and full event wiring remain partial. See `NATIVE_AUDIO.md` and the current
+`../CPP_MIGRATION_HANDOFF.md`. Candidate remains in PR #332 with no shared merge.
+
 Engine 0.1.58 adds the native observer-safe diplomacy presentation on `cpp/devin-swe2-native-conversion` (pending merge into this branch). `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`: a `DiplomaticStateView`-filtered projection of contacts, channels, relationships, access, agreements, proposals and three-event history with selection clamping, latest-tick access and the 2050 epoch calendar. Commands route through `ObserverDiplomacyCommandService` only after generation, revision and signature revalidation; relationship drift and identification changes bump the revision so stale quotes are rejected. `native_diplomacy_workspace` adds the RELATIONS top-bar workspace: contact directory with nine filters, transmission stage (species communications portrait or signal waveform), five relationship meters, negotiation/declaration modals and agreements/proposals/history/intelligence/overview tabs. Unidentified contacts expose no civilization id, name, species or metrics. Maintained validation passed 150/150 graphical CTest including two new diplomacy suites; full interactive playthrough evidence remains pending.
 
 Engine 0.1.57 adds bounded native ship artwork and authorized fleet route effects (`ac45d958`). `native_ship_art_assets` resolves design_id-then-role artwork from six reviewed 1254px sources through a single-decode 6-entry/4MiB cache of 224px thumbnails; fleet workspace rows/details and shipyard design rows/details render them, and `NativeOwnFleet` carries `design_id`. `native_fleet_route_effects` matches the Godot map for active owned fleets: faint under-stroke, dashed legs, chevron arrowheads and three bounded trail strokes. Own route geometry draws through unsurveyed systems because it is player-authorized; foreign contacts remain unplaced and unknown labels stay redacted. The ship-art validator authors a shipyard-capable save and demands six decoded sources, exact 1,204,224-byte cache, fleet/shipyard art rows and route/trail/marker evidence plus paused reload equality. Maintained validation passed 148/148 graphical CTest, 144/144 headless CTest and all Python export checks including 19 ship-art runtime tests.

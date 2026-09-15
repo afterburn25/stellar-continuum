@@ -1,4 +1,5 @@
 #include "map_camera.hpp"
+#include "native_audio_director.hpp"
 #include "map_interaction.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_campaign_session.hpp"
@@ -220,7 +221,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
-  bool campaign_profile{},menu_smoke{};
+  bool campaign_profile{},menu_smoke{},audio_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -239,6 +240,7 @@ struct Options {
     if(arg==L"--asset-root"&&i+1<argc) result.asset_root=argv[++i];
     else if(arg==L"--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg==L"--windowed") result.windowed=true;
+    else if(arg==L"--audio-check") result.audio_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg==L"--load") result.load=true;
     else if(arg==L"--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
@@ -269,6 +271,7 @@ struct Options {
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
     else if(arg=="--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg=="--windowed") result.windowed=true;
+    else if(arg=="--audio-check") result.audio_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg=="--load") result.load=true;
     else if(arg=="--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
@@ -298,6 +301,7 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
+  if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--audio-check requires an isolated --new-game-smoke or --smoke invocation.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
@@ -438,7 +442,8 @@ struct ResearchStamp {
 class NativeCampaign final {
  public:
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,int width,int height,
-                 const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer)
+                 const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer,
+                 std::function<void()> audio_confirm={})
       : session_(std::move(session)),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
@@ -453,6 +458,7 @@ class NativeCampaign final {
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
     refresh_fleets(true);
+    audio_confirm_=std::move(audio_confirm);
   }
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
@@ -1408,6 +1414,7 @@ class NativeCampaign final {
       }
       if(event.type==InputEventType::LeftPressed){
         const auto action=layout.hit(event.position,menu_);bool captured=menu_||action!=UiAction::None;
+        if(action!=UiAction::None&&audio_confirm_)audio_confirm_();
         if(action==UiAction::Continue)toggle_menu();
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
@@ -2151,6 +2158,7 @@ class NativeCampaign final {
   int smoke_settlement_revision_{};double smoke_settlement_before_day_{},smoke_settlement_saved_day_{},smoke_settlement_progress_{},smoke_settlement_authorization_{},smoke_settlement_treasury_before_{},smoke_settlement_treasury_after_{};
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
+  std::function<void()> audio_confirm_;
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
@@ -2170,6 +2178,17 @@ int main(int argc,char **argv){
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    // Declared after Window: audio closes its streams/device before SDL teardown.
+    stellar::native_audio::NativeAudioDirector audio(asset_root,!options.smoke_screenshot||options.audio_check);
+    bool audio_menu_ready{};std::size_t audio_boot_services{};
+    const StartupAudioHooks audio_hooks{
+      [&]{audio.service();if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
+      [&]{audio_menu_ready=true;audio.menu_ready();},
+      [&]{audio.confirm();},[&]{return audio.assets_ready();}};
+    const auto startup_config=[&]{
+      StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
+      config.audio=audio_hooks;return config;
+    };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence;
     std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot;
@@ -2178,20 +2197,21 @@ int main(int argc,char **argv){
       setup_screenshot=sidecar_path(*options.smoke_screenshot,L"-setup");
       loading_screenshot=sidecar_path(*options.smoke_screenshot,L"-loading");
       StartupEntryAutomation automation{std::to_string(options.seed),"pelagic_high_pressure",250,*setup_screenshot,*loading_screenshot};
-      auto result=run_native_startup_entry(window,{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp},&automation);
+      auto result=run_native_startup_entry(window,startup_config(),&automation);
       if(result.exit_requested||!result.session)throw std::runtime_error("Automated new campaign startup did not activate a session.");
       startup_evidence=std::move(result.evidence);generated_save_path=result.session->save_path();
       if(*generated_save_path==options.save_path)throw std::runtime_error("New campaign startup overwrote the requested save anchor.");
       session=std::move(result.session);
     }else if(options.load||options.smoke_screenshot){session=make_session(options);}
     else{
-      auto result=run_native_startup_entry(window,{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp});
+      auto result=run_native_startup_entry(window,startup_config());
       if(result.exit_requested)return 0;
       if(!result.session)throw std::runtime_error("Startup ended without a campaign session.");
       session=std::move(result.session);
     }
+    audio_menu_ready=true;audio.menu_ready();
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);});
+                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();});
     if(options.smoke_screenshot){
       if(options.research_smoke)
         campaign.prepare_research_smoke(window.drawable_width(),
@@ -2260,6 +2280,7 @@ int main(int argc,char **argv){
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
       prior=now;
       auto input=window.poll();
+      audio.service();
       if(!input.renderable()){
         discard_elapsed=true;
         if(!campaign.update(input,input.drawable_width,input.drawable_height,0.,false))break;
@@ -2362,6 +2383,14 @@ int main(int argc,char **argv){
         campaign.capture_diplomacy_unknown(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.audio_check){
+          const auto state=audio.stats();
+          if(!state.assets_loaded||state.failed||!state.music_started||state.music_start_count!=1||state.queued_music_bytes==0||(options.new_game_smoke&&(audio_boot_services==0||state.confirm_count==0)))
+            throw std::runtime_error("Native audio startup/playback proof failed: "+audio.failure_message());
+          audio.stop();const auto stopped=audio.stats();
+          if(!stopped.stopped||stopped.music_started||stopped.queued_music_bytes!=0)throw std::runtime_error("Native audio did not stop before window teardown.");
+          std::cout<<"audio_check={\"assets_loaded\":true,\"music_starts\":"<<state.music_start_count<<",\"confirm_count\":"<<state.confirm_count<<",\"queued_music_bytes\":"<<state.queued_music_bytes<<",\"boot_services\":"<<audio_boot_services<<",\"stopped\":true}\n";
+        }
         if(options.campaign_profile&&(!campaign_started||!campaign_mid_requested||!campaign_mid_saved||!campaign_advanced_after_mid||!campaign_final_requested||campaign.campaign_profile_notice()!=SessionNoticeKind::Saved||campaign.campaign_profile_speed()!=StrategicSpeed::Paused))throw std::runtime_error("Campaign profile did not complete active simulation, saves, and final UI pause.");
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");

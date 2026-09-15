@@ -79,6 +79,7 @@ on:
       - "export/**"
       - ".gitattributes"
       - "assets/visual/**"
+      - "assets/audio/**"
       - "docs/SOL_VISUAL_SOURCES.md"
       - "docs/engine/NATIVE_*_SOURCES.md"
       - "CMake*"
@@ -106,6 +107,22 @@ jobs:
       - name: Build, test and export native foundation
         shell: pwsh
         run: python tools/stellar-export/stellar.py export windows-benchmark
+      - name: Build and check native audio without a graphics device
+        shell: pwsh
+        run: |
+          @'
+          import sys
+          sys.path.insert(0, 'tools/stellar-export')
+          import stellar
+          env = stellar.build_environment()
+          stellar.run(['cmake', '--preset', 'windows-native-preview'], env=env)
+          stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4',
+                       '--target', 'stellar_native_audio_tests', 'stellar_native_audio_director_tests'],
+                      env=env, timeout=600)
+          stellar.run(['ctest', '--preset', 'windows-native-preview', '-R',
+                       '^(native_audio|native_audio_director)$', '--output-on-failure'], env=env)
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report
         uses: actions/upload-artifact@v4
         with:

@@ -15,6 +15,7 @@ from native_species_runtime import NATIVE_SPECIES_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
+from native_audio_assets import NATIVE_AUDIO_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -154,6 +155,16 @@ class NativeClientDependencyTests(unittest.TestCase):
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
+
+        audio_records = {}
+        for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only audio " + key).encode())
+            audio_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.audio_declaration = self.root / "export/native-audio-assets.json"
+        self.audio_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": audio_records}))
 
 
 
@@ -359,6 +370,50 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 
+    def test_missing_audio_blocks_package(self):
+        for source, destination in NATIVE_AUDIO_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native audio"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_audio_blocks_package(self):
+        for source, destination in NATIVE_AUDIO_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_audio_paths_cannot_expand_package_scope(self):
+        original = self.audio_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["main-music"][field] = "../outside.mp3"
+                self.audio_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native audio"):
+                    self.copy()
+        self.audio_declaration.write_text(original)
+
+    def test_audio_manifest_schema_and_set_are_strict(self):
+        original = self.audio_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.audio_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native audio"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["main-music"]
+        self.audio_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
     def test_missing_license_blocks_package(self):
         self.license.unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing native client dependency"):
@@ -426,6 +481,17 @@ class NativeClientDependencyTests(unittest.TestCase):
         self.ui_declaration.write_text(json.dumps(declaration))
         with self.assertRaisesRegex(RuntimeError, "Unreviewed native UI font path"):
             self.copy()
+
+    def test_application_media_foundation_imports_are_reviewed(self):
+        self.imports["stellar-continuum-native.exe"].extend(["MFPlat.DLL", "MFReadWrite.dll"])
+        result = copy_native_client_runtime(self.root, self.build, self.output, self.inspect)
+        self.assertIn("MFPlat.DLL", result["windowsImports"])
+        self.assertIn("MFReadWrite.dll", result["windowsImports"])
+
+    def test_sdl_cannot_inherit_application_audio_imports(self):
+        self.imports["SDL3.dll"].append("MFPlat.DLL")
+        with self.assertRaisesRegex(RuntimeError, "Unpackaged runtime dependencies"):
+            copy_native_client_runtime(self.root, self.build, self.output, self.inspect)
 
     def test_undeclared_client_import_is_rejected(self):
         self.imports["stellar-continuum-native.exe"].append("unreviewed.dll")

@@ -12,6 +12,8 @@ import struct
 import subprocess
 import tempfile
 
+from native_audio_runtime import parse_native_audio_check
+
 _FIELDS = {
     "mode", "entry_opened", "setup_opened", "species_selected",
     "size_selected", "seed_entered", "create_requested",
@@ -144,7 +146,7 @@ def _launch(args, cwd: Path, env: dict[str, str], label: str):
 
 
 def validate_native_new_game_export(folder: Path, env: dict[str, str],
-                                    fixture_path: Path):
+                                    fixture_path: Path, *, audio_check=False):
     anchor_payload = _source_payload(fixture_path)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
@@ -160,11 +162,15 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         setup_capture = work / "new-game-1280x720-setup.bmp"
         loading_capture = work / "new-game-1280x720-loading.bmp"
         exe = str(folder / "stellar-continuum-native.exe")
-        fresh = _launch([
+        fresh_args = [
             exe, "--asset-root", str(folder), "--save-path", str(anchor),
             "--seed", _SEED, "--width", "1280", "--height", "720",
             "--windowed", "--new-game-smoke", str(final_capture),
-        ], cwd, clean, "fresh input")
+        ]
+        if audio_check:
+            fresh_args.append("--audio-check")
+        fresh = _launch(fresh_args, cwd, clean, "fresh input")
+        fresh_audio = parse_native_audio_check(fresh.stdout, fresh=True) if audio_check else None
         state = _diagnostic(fresh.stdout)
         requested = _resolved_reported(state["requested_save_path"], work, "requested path")
         generated = _resolved_reported(state["generated_save_path"], work, "generated path")
@@ -194,11 +200,15 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         _verify_campaign(generated_payload, state)
 
         reload_capture = work / "new-game-reload-1920x1080.bmp"
-        loaded = _launch([
+        reload_args = [
             exe, "--asset-root", str(folder), "--save-path", str(generated),
             "--load", "--width", "1920", "--height", "1080", "--windowed",
             "--smoke", str(reload_capture),
-        ], cwd, clean, "paused reload")
+        ]
+        if audio_check:
+            reload_args.append("--audio-check")
+        loaded = _launch(reload_args, cwd, clean, "paused reload")
+        reload_audio = parse_native_audio_check(loaded.stdout, fresh=False) if audio_check else None
         _bmp(reload_capture, 1920, 1080)
         if anchor.read_bytes() != anchor_bytes or not generated.is_file():
             raise RuntimeError("Reload changed the original anchor or removed generated save")
@@ -215,10 +225,14 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             shutil.copy2(path, evidence)
             captures.append(str(evidence))
         diagnostics.extend((fresh.stdout.strip(), loaded.stdout.strip()))
-        return {
+        result = {
             "nativeNewGamePlayerInput": True,
             "nativeNewGameIndependentSave": True,
             "nativeNewGamePausedReload": True,
             "newGameCaptures": captures,
             "newGameDiagnostics": diagnostics,
         }
+        if audio_check:
+            result["nativeNewGameAudioCheck"] = True
+            result["newGameAudioChecks"] = {"fresh": fresh_audio, "reload": reload_audio}
+        return result

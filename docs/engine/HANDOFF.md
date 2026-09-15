@@ -1,5 +1,16 @@
 # Stellar Engine migration handoff
 
+Current Codex candidate (2026-09-15): native C++ audio now plays the existing
+main score and navigation confirmation. Boot remains silent; menu admission
+starts music once and campaign entry retains it. Engine SDL3/MF playback has a
+bounded queue and effect voices, async decoding and owner-thread shutdown.
+Relocated new-game/reload audio checks pass without changing Player17 state;
+unavailable output reports once and never retries. Native settings, voice and
+full event wiring remain open, along with surface/orbital visuals and diplomacy
+composition. See `NATIVE_AUDIO.md` and `../CPP_MIGRATION_HANDOFF.md` for current
+evidence; the older release notes below are historical checkpoints. PR #332 is
+unmerged, graphicalParity remains false, and this is not a sealed player release.
+
 Engine 0.1.55 restores the four approved menu/loading artworks in the native C++23 client: application boot, main menu and race setup, new-galaxy generation, and saved-campaign restoration. The application-loading screen lasts at least seven seconds; its displayed progress is bounded by both loaded assets and the minimum presentation time. New/save operations retain real operation progress without an artificial delay. The right artwork survives immediate worker completion because the request origin is recorded explicitly. Responsive translucent controls, complete species portraits and one gameplay tip per operation remain legible at 720p and 1080p.
 
 System stars now use cached 1024px class-coloured photospheres, seeded sunspots and intermittent prominence animation. Saturn renders a textured globe between continuous back/front ring layers. Review caught and removed a diagonal ring-opacity seam. Generated celestial resources are bounded to 18 entries / 32 MiB; camera movement does not regenerate textures. These are improved 2D visuals, not full reference shader or 3D parity.

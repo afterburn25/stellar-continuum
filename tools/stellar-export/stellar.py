@@ -85,6 +85,8 @@ def native_build(preset, env):
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
     run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
@@ -441,11 +443,12 @@ def export(preset_name):
                 "Cancel pauses the campaign to review the current refund; confirm explicitly, then resume when ready.\n"
                 "The native campaign saves separately under LocalAppData/Stellar Continuum/NativePreview.\n"
                 "Use --save-path <path> for another slot, and --load to restore it; restored games start paused.\n"
-                "An installed Vulkan graphics driver is required. No Godot or .NET runtime is used.\n"
+                "An installed Vulkan graphics driver and Windows Media Foundation components are required. No Godot or .NET runtime is used.\n"
+                "Native music begins at the main menu and continues into the campaign; startup loading stays silent.\n"
                 "Known systems open orbital maps; owned planets show grouped colony information.\n"
                 "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots. Detailed 3D surfaces, audio and full gameplay controls remain in migration.\n\n"
+                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots. Detailed 3D surfaces, voice, audio settings and full gameplay controls remain in migration.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,

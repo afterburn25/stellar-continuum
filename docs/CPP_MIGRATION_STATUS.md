@@ -41,7 +41,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects done; no surface/orbital scene art |
-| Audio | AudioDirector, voice | none | — | — | NOT STARTED | Engine has no audio module |
+| Audio | AudioDirector | `engine/native_audio`, `app/native_client/native_audio_director` | OK | audio/director CTest + relocated audio startup/reload | PARTIAL | Existing score and navigation confirmation; settings, voice and full event wiring remain |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
@@ -52,7 +52,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 1. Diplomacy presentation remains partial: no claims/border warnings, demand/trade composer, or grievance display.
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
-4. No audio of any kind in the native client/engine.
+4. Native audio settings, voice and full event wiring remain; bounded music/SFX playback and startup/campaign navigation confirmation now work.
 5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. A developed 500-system campaign with 24 paid ships and nine total colonies averages ~16.7 ms on this host at 8X, including manual saves and exact paused reloads. Combat, much larger fleets and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
@@ -72,7 +72,7 @@ move in each measured interval; they have arrived by the final 1080p save. Inter
 means are 16.713/16.714 ms; p95 17.401/17.604 ms. Eight focused CTests and 17 Python
 checks pass. See NATIVE_FRESH_PROGRESSION.md and NATIVE_CLIENT_VALIDATION.md for
 offline preparation, full workload, source hash and timing limits. Previous head
-`370079d0` passed native CI `34955639654`; this repair needs its own CI.
+`a56351f8` passed native CI `34960835811`, covering this repair and developed-fleet checkpoint. The subsequent audio candidate needs its own CI.
 
 The preceding Codex checkpoint adds a separate opt-in running-campaign profiler. The
 canonical 500-system Player campaign runs 600 measured frames at 8X using real

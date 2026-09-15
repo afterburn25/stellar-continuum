@@ -15,6 +15,7 @@ from native_species_runtime import native_species_asset_files
 from native_startup_art_runtime import native_startup_art_asset_files
 from native_galaxy_art_runtime import native_galaxy_art_asset_files
 from native_ship_art_runtime import native_ship_art_asset_files
+from native_audio_assets import native_audio_asset_files
 
 
 def _verified_file(path: Path, expected_hash: str) -> Path:
@@ -34,9 +35,10 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     library = _verified_file(build / "SDL3.dll", lock["runtime"]["sha256"])
     license_file = _verified_file(dependency_root / lock["license"]["path"], lock["license"]["sha256"])
     windows = set(lock["windowsImports"])
-    # The application may import only its declared SDL dependency. SDL itself
-    # must import only the separately reviewed Windows libraries.
-    imports = inspect_dependencies(client, {"sdl3.dll"}, windows)
+    # Media Foundation is the application's Windows audio decoder. Keep these
+    # reviewed system imports separate from the pinned SDL dependency policy.
+    audio_windows = {"mfplat.dll", "mfreadwrite.dll"}
+    imports = inspect_dependencies(client, {"sdl3.dll"}, windows | audio_windows)
     if "sdl3.dll" not in {name.lower() for name in imports}:
         raise RuntimeError("Native client does not import its declared SDL runtime")
     library_imports = inspect_dependencies(library, set(), windows)
@@ -51,6 +53,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_startup_art_asset_files(root))
     files.update(native_galaxy_art_asset_files(root))
     files.update(native_ship_art_asset_files(root))
+    files.update(native_audio_asset_files(root))
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)

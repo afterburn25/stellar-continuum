@@ -1,4 +1,6 @@
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudio.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
@@ -18,10 +20,26 @@ target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio)
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
+add_dependencies(stellar-continuum-native stellar_native_audio_assets)
 add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_native_audio_director_tests
+    native-tests/native_audio_director_tests.cpp app/native_client/native_audio_director.cpp)
+  target_include_directories(stellar_native_audio_director_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_audio_director_tests PRIVATE stellar_native_audio stellar_engine)
+  add_custom_command(TARGET stellar_native_audio_director_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
+      "$<TARGET_FILE_DIR:stellar_native_audio_director_tests>/SDL3.dll")
+  add_test(NAME native_audio_director COMMAND stellar_native_audio_director_tests "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(native_audio_director PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+    ENVIRONMENT "SDL_AUDIODRIVER=dummy")
+  if(MSVC)
+    target_compile_options(stellar_native_audio_director_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_text_measure_tests native-tests/native_text_measure_tests.cpp)
   target_link_libraries(stellar_native_text_measure_tests PRIVATE stellar_native_platform)
   add_test(NAME native_text_measure COMMAND stellar_native_text_measure_tests
