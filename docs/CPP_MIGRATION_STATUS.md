@@ -41,7 +41,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (17+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
-| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
+| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save) done; T/R/C/B candidate-cycle keys have no native palette equivalent; F8 diagnostics bundle not wired |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
 | Packaging | export tooling | `tools/stellar-export`, `export/*.json`, `cmake/Native*` | OK | sealed export validators | PARITY VERIFIED | No Godot/.NET/compiler at runtime |
@@ -124,6 +124,13 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   (ordered/proposals × fresh/paused-reload). The run proved the sealed package decodes
   the communications portraits (`portrait=1`, real command `command_accepted=1`,
   unidentified-contact redaction verified).
+- Sealed export `StellarContinuum-windows-native-preview-e390b659-20260915T182516174478Z`:
+  every flag true — `nativeBattleWorkspace`/`ObserverRedaction`/`Order`/`Reload`
+  (tick 20→30), `nativeAudioStreams`/`Device` with `settings=1`, diplomacy,
+  ship art, surface, colony, settlement, galaxy-art validators. Instrumented
+  smokes show `cpu_mean_ms` 1.2–5.0 / `cpu_p95` <0.5 across all scenes against
+  a ~18.9 ms present interval — frame pacing is present-bound on the
+  measurement host's ~53 Hz Meta Virtual Monitor, not CPU-bound.
 - Prior sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`
   (113 files) remains the baseline for the pre-diplomacy slice.
 - Orbital construction presentation (`eb1ab876`): home-system infrastructure markers
