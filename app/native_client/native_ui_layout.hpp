@@ -20,6 +20,7 @@ enum class UiAction {
   Save,
   Load,
   Audio,
+  Support,
   Exit
 };
 
@@ -43,6 +44,7 @@ struct NativeUiLayout {
   UiRect save_button;
   UiRect load_button;
   UiRect audio_button;
+  UiRect support_button;
   UiRect exit_button;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
@@ -51,7 +53,7 @@ struct NativeUiLayout {
     const auto screen_height = static_cast<float>(height);
     const auto requested_scale = std::max(1.f, screen_height / 900.f);
     const auto width_scale = std::max(.5f, (screen_width - 36.f) / 300.f);
-    const auto height_scale = std::max(.5f, (screen_height - 36.f) / 331.f);
+    const auto height_scale = std::max(.5f, (screen_height - 36.f) / 378.f);
     const auto scale = std::min({requested_scale, width_scale, height_scale});
     const auto center_x = screen_width * .5f;
     const auto center_y = screen_height * .5f;
@@ -60,9 +62,9 @@ struct NativeUiLayout {
     const auto button_height = 38.f * scale;
     const auto gap = 9.f * scale;
     const UiRect panel{center_x - 150.f * scale,
-                       center_y - 165.5f * scale,
+                       center_y - 189.f * scale,
                        300.f * scale,
-                       331.f * scale};
+                       378.f * scale};
     const auto first_y = panel.y + 88.f * scale;
     const auto status_width = std::max(
         0.f, std::min(720.f * scale, screen_width - inset * 2.f));
@@ -93,7 +95,9 @@ struct NativeUiLayout {
         {center_x - button_width * .5f,
          first_y + (button_height + gap) * 3.f, button_width, button_height},
         {center_x - button_width * .5f,
-         first_y + (button_height + gap) * 4.f, button_width, button_height}};
+         first_y + (button_height + gap) * 4.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 5.f, button_width, button_height}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -102,6 +106,7 @@ struct NativeUiLayout {
       if (save_button.contains(point)) return UiAction::Save;
       if (load_button.contains(point)) return UiAction::Load;
       if (audio_button.contains(point)) return UiAction::Audio;
+      if (support_button.contains(point)) return UiAction::Support;
       if (exit_button.contains(point)) return UiAction::Exit;
       return UiAction::None;
     }

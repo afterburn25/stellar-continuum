@@ -317,6 +317,18 @@ if(MSVC)
     /W4 /WX /permissive-)
 endif()
 
+add_executable(stellar_native_support_tests
+  native-tests/native_support_tests.cpp
+  app/native_client/native_support.cpp)
+target_include_directories(stellar_native_support_tests PRIVATE
+  app/native_client
+  engine/include)
+add_test(NAME native_support COMMAND stellar_native_support_tests)
+if(MSVC)
+  target_compile_options(stellar_native_support_tests PRIVATE
+    /W4 /WX /permissive-)
+endif()
+
 
 add_executable(stellar_new_setup_tests
   app/native_client/native_new_campaign_setup.cpp
@@ -348,9 +360,10 @@ add_executable(stellar_startup_tests
   app/native_client/native_new_campaign_setup.cpp
   app/native_client/native_new_campaign_generation.cpp
   app/native_client/native_campaign_session.cpp
+  app/native_client/native_notifications.cpp
   app/native_client/native_startup_session.cpp
   native-tests/native_startup_session_tests.cpp)
-target_include_directories(stellar_startup_tests PRIVATE app/native_client)
+target_include_directories(stellar_startup_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_startup_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
 if(MSVC)
   target_compile_options(stellar_startup_tests PRIVATE /W4 /WX /permissive-)

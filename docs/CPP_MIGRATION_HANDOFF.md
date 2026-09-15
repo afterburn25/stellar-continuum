@@ -6,7 +6,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: diplomacy, territory, orbital, surface, audio, tactical battle, audio-settings, keyboard-parity and notification-feed slices (engine 0.1.58), pending PR into the migration branch.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: diplomacy, territory, orbital, surface, audio, tactical battle, audio-settings, keyboard-parity, notification-feed and support-bundle slices (engine 0.1.58), pending PR into the migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
 
@@ -58,8 +58,25 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   with negative mock tests in `test_native_client_runtime.py` /
   `test_native_production_runtime.py`.
 - Still unported from the reference key surface: N (mid-session new campaign —
-  the native pause menu has no new-game flow yet) and F8 (`UiExportDiagnostics`
-  support bundle — no native SupportLogger equivalent yet).
+  the native pause menu has no new-game flow yet). F8 is covered by the
+  support-bundle slice below.
+
+## Support bundle slice (candidate for review)
+
+- `app/native_client/native_support.{hpp,cpp}` — `NativeSupportLog` ports
+  `SupportLogger`: a 12-hex-char session id, `logs/game-<id>.log` +
+  `logs/system-<id>.txt` under `<save-dir>/`, and `export_bundle(save)` →
+  `support/support-<id>-<yyyymmdd-hhmmss>.zip` as a store-format (method 0)
+  ZIP with UTF-8 name flags — log, system info and save, matching the
+  reference's three entries. Verified by `native_support` tests (CRC32,
+  central-directory parse, content round-trip) and Python's `zipfile`.
+- `main.cpp`: `enable_support_log` is enabled per campaign after window
+  creation (system info from SDL: platform, CPU cores, RAM, GPU driver).
+  F8 and the new pause-menu SUPPORT BUNDLE button call
+  `export_support_bundle`, reporting the path via `publish_status`.
+- `--audio-smoke` now clicks SUPPORT BUNDLE, closes the menu and presses F8,
+  then emits `support=1` when a non-trivial `.zip` exists; the audio export
+  validator requires the flag and validates the bundle with `zipfile`.
 
 ## Notification feed slice (candidate for review)
 

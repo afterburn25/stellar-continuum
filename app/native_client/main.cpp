@@ -4,6 +4,7 @@
 #include "native_audio_settings.hpp"
 #include "native_battle_workspace.hpp"
 #include "native_notifications.hpp"
+#include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
@@ -43,6 +44,8 @@
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/engine/runtime_paths.hpp>
+
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <chrono>
@@ -85,6 +88,7 @@ namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_notifications = stellar::native_notifications;
+namespace native_support = stellar::native_support;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
@@ -355,6 +359,12 @@ class NativeCampaign final {
   }
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  // F8 / SUPPORT BUNDLE parity with the reference UiExportDiagnostics: a
+  // store-format ZIP of the session log, system info and campaign save.
+  void enable_support_log(native_support::NativeSupportLog::SystemInfo info){
+    support_log_.emplace(session_->save_path().parent_path(),
+                         std::move(info));
+  }
   void prepare_galaxy_art_smoke(int width,int height,bool reload){
     smoke_galaxy_mode_=true;smoke_galaxy_reload_=reload;
     smoke_galaxy_day_=session_->frame().clock().simulation_days();
@@ -687,13 +697,13 @@ class NativeCampaign final {
     session_->frame().clock().set_speed(StrategicSpeed::Normal);
   }
 
-  [[nodiscard]] bool send_key(char key,int width,int height){
+  [[nodiscard]] bool send_key(std::uint32_t key,int width,int height){
     InputSnapshot input;
     input.drawable_width=width;
     input.drawable_height=height;
     InputEvent event{};
     event.type=InputEventType::KeyPressed;
-    event.key=static_cast<std::uint32_t>(key);
+    event.key=key;
     input.events.push_back(event);
     return update(input,width,height,0.,false);
   }
@@ -1238,6 +1248,19 @@ class NativeCampaign final {
     if(std::abs(settings.master-.78f)>.001f||std::abs(settings.music-.64f)>.001f||std::abs(settings.sfx-.82f)>.001f)
       throw std::runtime_error("Audio smoke did not restore and persist the default mix.");
     smoke_audio_settings_=1;
+    // SUPPORT BUNDLE / F8 parity: the menu button exports while the menu is
+    // open; F8 exports with the menu closed. Both land in the support dir.
+    click(center(layout.support_button));
+    toggle_menu();
+    if(!send_key(0x40000041u,width,height)) // SDLK_F8
+      throw std::runtime_error("Audio smoke F8 input closed the campaign.");
+    std::error_code support_error;
+    for(const auto &entry:std::filesystem::directory_iterator(
+            session_->save_path().parent_path()/"support",support_error)){
+      if(!support_error&&entry.is_regular_file()&&
+         entry.path().extension()==".zip"&&entry.file_size()>22)
+        smoke_audio_support_=1;
+    }
     smoke_save_pending_=true;
   }
   [[nodiscard]] std::string audio_smoke_status(){
@@ -1271,7 +1294,8 @@ class NativeCampaign final {
        <<std::defaultfloat
        <<",\"master\":"<<settings.master<<",\"music_gain\":"<<settings.music
        <<",\"sfx_gain\":"<<settings.sfx
-       <<",\"settings\":"<<smoke_audio_settings_<<"}";
+       <<",\"settings\":"<<smoke_audio_settings_
+       <<",\"support\":"<<smoke_audio_support_<<"}";
     return out.str();
   }
   void prepare_construction_smoke(int width,int height){
@@ -1609,6 +1633,7 @@ class NativeCampaign final {
           case 'c':case 'C':cycle_construction_candidate();break;
           case 'b':case 'B':start_construction_candidate();break;
           case 0x4000003fu:session_->request_save();break; // SDLK_F6
+          case 0x40000041u:export_support_bundle();break; // SDLK_F8
           default:handled=false;break;
         }
         if(handled)continue;
@@ -1690,6 +1715,7 @@ class NativeCampaign final {
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
+        else if(action==UiAction::Support)export_support_bundle();
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
@@ -1887,6 +1913,7 @@ class NativeCampaign final {
       draw_button(layout.save_button, "SAVE");
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.audio_button, "AUDIO");
+      draw_button(layout.support_button, "SUPPORT BUNDLE");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
       }
     }
@@ -2224,6 +2251,12 @@ class NativeCampaign final {
   // project the controller reports as currently startable; the filtered list
   // ordering follows each view's own ordering rather than the reference's
   // plan-ranked ordering.
+  void export_support_bundle(){
+    if(!support_log_)return;
+    const auto bundle=
+        support_log_->export_bundle(session_->save_path());
+    session_->publish_status("Support bundle exported: "+utf8_path(bundle));
+  }
   [[nodiscard]] std::vector<const NativeResearchNode *>
   research_candidates(const NativeResearchWindow &view){
     std::vector<const NativeResearchNode *> candidates;
@@ -2604,6 +2637,8 @@ class NativeCampaign final {
   int research_candidate_index_{};
   int construction_candidate_index_{};
   bool smoke_shortcut_{};
+  int smoke_audio_support_{};
+  std::optional<native_support::NativeSupportLog> support_log_;
   std::optional<std::string> smoke_research_node_;
   bool last_fleet_command_accepted_{};
   bool last_shipyard_command_accepted_{};
@@ -2698,6 +2733,10 @@ int main(int argc,char **argv){
     }
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);});
+    campaign.enable_support_log({STELLAR_GAME_VERSION,SDL_GetPlatform(),
+                                 window.gpu_driver(),
+                                 SDL_GetNumLogicalCPUCores(),
+                                 SDL_GetSystemRAM(),1});
     if(options.smoke_screenshot){
       if(options.research_smoke)
         campaign.prepare_research_smoke(window.drawable_width(),

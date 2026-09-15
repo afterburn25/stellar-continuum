@@ -58,8 +58,9 @@ if(BUILD_TESTING)
     target_compile_options(stellar_native_audio_tests PRIVATE /WX)
   endif()
   add_executable(stellar_native_campaign_session_tests
-    native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp)
-  target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client)
+    native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
+    app/native_client/native_notifications.cpp)
+  target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client engine/include)
   target_link_libraries(stellar_native_campaign_session_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
   add_test(NAME native_campaign_session COMMAND stellar_native_campaign_session_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
@@ -135,5 +136,6 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio.cpp
   app/native_client/native_audio_device.cpp
   app/native_client/native_audio_settings.cpp
-  app/native_client/native_notifications.cpp)
+  app/native_client/native_notifications.cpp
+  app/native_client/native_support.cpp)
 target_include_directories(stellar-continuum-native PRIVATE third_party)

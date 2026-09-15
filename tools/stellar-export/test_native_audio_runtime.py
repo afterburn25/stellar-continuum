@@ -14,7 +14,7 @@ def diagnostic():
         "required": 1, "music": 1, "music_frames": 9361450, "device": 1,
         "voices": 2, "voiced_chunks": 12, "clipped_samples": 0,
         "peak": 0.5233, "master": 0.78, "music_gain": 0.64, "sfx_gain": 0.82,
-        "settings": 1,
+        "settings": 1, "support": 1,
     }
 
 
@@ -43,6 +43,7 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                 if fault == "gain": state["sfx_gain"] = 1.4
                 if fault == "settings_flag": state["settings"] = 0
                 if fault == "settings_mix": state["master"] = 0.4
+                if fault == "support_flag": state["support"] = 0
                 varied = bytes(range(256)) if fault != "blank" else bytes(200)
                 if fault != "capture":
                     capture.write_bytes(b"BM" + b"\0" * 52 + varied * 40)
@@ -54,6 +55,19 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                     if fault == "settings": persisted["master"] = 2
                     (save.parent / "audio-settings.json").write_text(
                         json.dumps(persisted), encoding="utf-8")
+                if fault != "bundle_missing":
+                    import zipfile
+                    support = save.parent / "support"
+                    support.mkdir(exist_ok=True)
+                    bundle = support / "support-TEST.zip"
+                    if fault == "bundle_bad":
+                        bundle.write_bytes(b"PK not a zip")
+                    else:
+                        with zipfile.ZipFile(bundle, "w") as archive:
+                            archive.writestr("game-TEST.log", "log")
+                            archive.writestr("system-TEST.txt", "info")
+                            archive.writestr("audio.player17.json",
+                                             save.read_text(encoding="utf-8"))
                 stdout = "gpu_driver=vulkan systems=500 save=ok " + \
                     f"audio={json.dumps(state, separators=(',', ':'))}"
                 if fault == "diagnostic":
@@ -102,6 +116,12 @@ class NativeAudioRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("settings_mix")
     def test_missing_diagnostic_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("diagnostic")
+    def test_unreported_support_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("support_flag")
+    def test_missing_bundle_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("bundle_missing")
+    def test_damaged_bundle_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("bundle_bad")
 
 
 class NativeAudioAssetTests(unittest.TestCase):

@@ -62,7 +62,7 @@ def _diagnostic(stdout: str):
     except (TypeError, ValueError) as error:
         raise RuntimeError("Native audio diagnostic is malformed") from error
     for key in ("required", "music", "device", "music_frames", "voices",
-                "voiced_chunks", "clipped_samples", "settings"):
+                "voiced_chunks", "clipped_samples", "settings", "support"):
         value = state.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
             raise RuntimeError(f"Native audio reported invalid {key}")
@@ -83,6 +83,8 @@ def _diagnostic(stdout: str):
         raise RuntimeError("Native audio reported out-of-range volume settings")
     if state["settings"] != 1:
         raise RuntimeError("Native audio settings view did not apply and restore")
+    if state["support"] != 1:
+        raise RuntimeError("Native support bundle did not export from the menu or F8")
     if abs(state["master"] - .78) > .01 or abs(state["music_gain"] - .64) > .01 \
             or abs(state["sfx_gain"] - .82) > .01:
         raise RuntimeError("Native audio did not persist the restored default mix")
@@ -139,6 +141,20 @@ def validate_native_audio_export(folder: Path, env: dict[str, str]):
             value = values.get(key)
             if not isinstance(value, (int, float)) or abs(value - default) > .01:
                 raise RuntimeError(f"Native audio persisted wrong {key} volume")
+        bundles = sorted((save.parent / "support").glob("*.zip"))
+        if not bundles:
+            raise RuntimeError("Native support bundle did not land on disk")
+        import zipfile
+        try:
+            with zipfile.ZipFile(bundles[-1]) as bundle:
+                names = bundle.namelist()
+                valid = (bundle.testzip() is None and len(names) == 3 and
+                         any(name.endswith(".json") and "player17" in name
+                             for name in names))
+        except zipfile.BadZipFile:
+            valid = False
+        if not valid:
+            raise RuntimeError("Native support bundle is not a valid three-entry ZIP")
     return {"nativeAudioStreams": True,
             "nativeAudioDevice": bool(state["device"]),
             "nativeAudioCapture": str(evidence),
