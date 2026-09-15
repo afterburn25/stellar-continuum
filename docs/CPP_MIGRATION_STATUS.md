@@ -58,7 +58,9 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
-  144/144 headless CTest baseline, 61 Python export checks.
+  144/144 headless CTest baseline, all Python export checks.
+- Sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`:
+  113 files, 39 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false.
 - Diplomacy presentation: `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`
   over `DiplomaticStateView` only — unidentified contacts carry no civ id/name/species/
   metrics. Revision+signature stale-command guard covers relationship drift and
