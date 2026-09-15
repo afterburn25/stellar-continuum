@@ -1,4 +1,5 @@
 #include "native_diplomacy_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -197,8 +198,10 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const auto fit = std::max(.55f, std::min(w / 1280.f, h / 700.f));
   const auto scale = std::min(requested, fit);
   const auto margin = 14.f * scale;
+  const auto left_margin = native_navigation_content_left * scale;
   const auto top = 60.f * scale;
-  const UiRect surface{margin, top, std::max(1.f, w - margin * 2.f),
+  const UiRect surface{left_margin, top,
+                       std::max(1.f, w - left_margin - margin),
                        std::max(1.f, h - top - margin)};
   const auto inner_x = surface.x + 14.f * scale;
   const auto inner_y = surface.y + 54.f * scale;

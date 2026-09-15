@@ -1,4 +1,5 @@
 #include "native_surface_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <stellar/core/surface_construction.hpp>
 
@@ -85,7 +86,9 @@ SurfaceWorkspaceLayout::for_viewport(const int width,
   const auto fit = std::max(.55f, std::min(w / 1180.f, h / 680.f));
   const auto scale = std::min(requested, fit);
   const auto margin = 12.f * scale, top = 60.f * scale;
-  const UiRect surface{margin, top, std::max(1.f, w - 2.f * margin),
+  const auto left_margin = native_navigation_content_left * scale;
+  const UiRect surface{left_margin, top,
+                       std::max(1.f, w - left_margin - margin),
                        std::max(1.f, h - top - margin)};
   const auto header = 48.f * scale, gap = 9.f * scale;
   const auto palette_width =

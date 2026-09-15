@@ -5,24 +5,34 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
-### Research inspector and tactical review
+### Compact native navigation and integration review
 
-Research details now use native-font measurements and independent bounded
-scrolling with a pinned action/result. Routine simulation refreshes preserve
-the reading position. Focused native build/CTest and 62 Python checks passed;
-two actual Vulkan runs at 720p/1080p produced four inspected captures and proved
-funded progress plus exact paused Player17 recapture. See
-`engine/NATIVE_RESEARCH.md` for evidence and limits.
+Research, Shipyard, Construction and Relations now use the approved icons in
+a compact left rail. All seven affected workspaces reserve its gutter and
+main input routing owns navigation before workspace input. Menus and modals
+retain ownership. Keep the layout/render/input changes together when adapting
+Devin's workspace ports. `engine/NATIVE_NAVIGATION.md` contains the precise
+contract, reproduction and validation evidence; artwork provenance and
+regeneration are in `engine/NATIVE_NAVIGATION_ART_SOURCES.md`.
 
-Devin tactical port `357872e8` is reviewed but not imported. Ship circles are
-covered by its opaque overlay; group orders affect only the first selection;
-gesture ownership, paused speed changes, camera coordinates, bounded drawing
-and tactical-save coverage need correction. See
-`engine/NATIVE_TACTICAL_WORKSPACE_REVIEW.md` and coordination issue #324 comment
-`5685514815`. Keep the existing Core combat owner; do not start a competing port.
-Next: corrected tactical checkpoint review and compact icon navigation using
-approved artwork. PR #332 remains unmerged and unsealed. Prior HUD/surface
-evidence below belongs to its named checkpoint.
+The prior research inspector repair remains integrated, including measured
+wrapping, bounded scrolling, pinned actions and stable position during live
+updates. See `engine/NATIVE_RESEARCH.md` for that checkpoint's evidence.
+
+Devin is reviewed through `e390b659`. Tactical `357872e8` and surface sprites
+`58aaf475` are not imported; their blocking source reviews remain in the
+corresponding Engine review documents. Later audio settings duplicate the
+validated NativeAudioSettings/NativeAudioDirector implementation. Later
+cpu/draw timing duplicates finer bounded diagnostics, retains normal-play
+history without a limit and cannot identify GPU-only timing. Issue #324 comment
+`5685997691` records this review and asks for corrected tactical work/uncovered
+ports instead. Keep Core's combat authority and avoid a competing bulk port.
+PR #332 remains unmerged and unsealed.
+
+Latest fetched Devin head is `7a85a099`, adding keyboard shortcut slice
+`749ad8e7` on top of `e390b659`. It is not imported and needs input-ownership
+review against the new rail/modal contract. It does not include the requested
+tactical render/group/gesture/persistence corrections.
 
 ### Native HUD and pause-control checkpoint (2026-09-15)
 

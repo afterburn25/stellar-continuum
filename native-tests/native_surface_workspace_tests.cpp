@@ -1,6 +1,7 @@
 #include "native_colony_workspace.hpp"
 #include "native_surface_scene.hpp"
 #include "native_surface_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -68,6 +69,11 @@ void responsive_layout() {
                                      {2560, 1440},
                                      {3840, 2160}}) {
     const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
+    if (height >= 720)
+      require(layout.surface.x >=
+                  navigation.research.x + navigation.research.width,
+              "surface overlaps navigation rail");
     require(layout.surface.contains(center(layout.back)),
             "back escaped surface");
     require(layout.surface.contains(center(layout.palette)),

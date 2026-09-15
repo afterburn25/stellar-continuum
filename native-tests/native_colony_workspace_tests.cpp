@@ -1,4 +1,5 @@
 #include "native_colony_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -110,11 +111,14 @@ NativeColonyView view(std::uint64_t generation = 1) {
 void responsive_layout_is_contained_and_nonoverlapping() {
   for (const auto [width, height] :
        {std::pair{1280, 720}, std::pair{1920, 1080},
-        std::pair{3840, 2160}}) {
+        std::pair{2560, 1440}, std::pair{3840, 2160}}) {
     const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.details, layout.summary,
                               layout.sustenance, layout.sites,
                               layout.site_rows, layout.close})

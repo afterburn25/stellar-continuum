@@ -18,6 +18,7 @@ from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
 from native_surface_art_assets import NATIVE_SURFACE_ART_SOURCES
+from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -33,6 +34,8 @@ class NativeAssetCheckoutTests(unittest.TestCase):
                     path = value["source"]
                     if Path(path).suffix in (".md", ".txt", ".json"):
                         sources[path] = value["sha256"]
+                if "source" in value and "sourceSha256" in value:
+                    sources[value["source"]] = value["sourceSha256"].lower()
                 for child in value.values():
                     collect(child)
 
@@ -176,6 +179,18 @@ class NativeClientDependencyTests(unittest.TestCase):
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.surface_art_declaration = self.root / "export/native-surface-art-assets.json"
         self.surface_art_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": surface_art_records}))
+
+        navigation_records = {}
+        for key, (source, destination) in NATIVE_NAVIGATION_SOURCES.items():
+            record = {"source": source, "runtimePath": destination}
+            for path, hash_field in ((source, "sourceSha256"), (destination, "runtimeSha256")):
+                asset = self.root / path
+                asset.parent.mkdir(parents=True, exist_ok=True)
+                asset.write_bytes(("fixture navigation " + path).encode())
+                record[hash_field] = hashlib.sha256(asset.read_bytes()).hexdigest()
+            navigation_records[key] = record
+        (self.root / "export/native-navigation-assets.json").write_text(json.dumps(
+            {"schemaVersion": 1, "size": 256, "assets": navigation_records}))
 
 
 

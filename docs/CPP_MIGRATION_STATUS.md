@@ -2,8 +2,8 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`357872e8`; tactical workspace and surface sprite port `58aaf475` reviewed
-and not imported).
+`e390b659`; tactical workspace `357872e8`, surface sprites `58aaf475`,
+duplicate audio settings and timing changes reviewed and not imported).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -14,19 +14,28 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-Research inspector clipping is repaired with renderer-measured sections,
-independent bounded scrolling, pinned actions/results and stable reading
-position during live updates. Focused native build/CTest, 62 Python checks
-and two actual Vulkan runs at 720p/1080p passed. Four captures were inspected;
-funded research and exact paused Player17 recapture remain valid. See
-`engine/NATIVE_RESEARCH.md` for the regression scope and evidence.
+The native C++ client now has a compact left icon rail for Research, Shipyard,
+Construction and Relations, using the four approved designs. It reserves
+workspace space, routes matching input before workspace handlers, and leaves
+pause/play and speed in the top strip. See `engine/NATIVE_NAVIGATION.md` for
+the shared layout contract and final validation evidence. The previous
+research inspector repair remains integrated; evidence is in
+`engine/NATIVE_RESEARCH.md`.
 
-Incoming tactical port `357872e8` has blocking render-order and group-command
-regressions, plus input, paused-speed and save-validation gaps. It remains
-outside PR #332; `engine/NATIVE_TACTICAL_WORKSPACE_REVIEW.md` records the
-source review sent to issue #324. Next priorities are that corrected checkpoint
-and compact icon navigation. Historical evidence below is not new-head CI or
-a sealed release claim.
+Incoming tactical port `357872e8` remains outside PR #332 while render order,
+group commands, gesture ownership, paused speed and save checks are corrected.
+Devin head `e390b659` adds duplicate audio settings and timing diagnostics;
+these were reviewed in issue #324 comment `5685997691` and not imported. Our
+bounded timing already separates update, scene, submission, readback, throttle
+and present; the incoming counters retain unbounded normal-play history and
+cannot establish GPU-only timing. Prioritize corrected tactical work and
+uncovered native behavior over a second audio or diagnostics implementation.
+Historical evidence below belongs to its named checkpoint, not this head or a
+sealed release.
+
+Latest fetched Devin head `7a85a099` adds keyboard shortcuts (`749ad8e7`),
+not the pending tactical corrections. That slice remains unimported pending
+review with the current input/modal contract.
 
 ### Native HUD and pause-control checkpoint (2026-09-15)
 

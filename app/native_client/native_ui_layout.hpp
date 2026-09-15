@@ -7,6 +7,15 @@
 
 namespace stellar::native_map {
 
+inline constexpr float native_navigation_content_left = 70.f;
+
+[[nodiscard]] inline constexpr bool native_navigation_available(
+    bool menu_open, bool settlement_visible, bool diplomacy_modal,
+    bool surface_modal, bool audio_settings_visible) noexcept {
+  return !menu_open && !settlement_visible && !diplomacy_modal &&
+         !surface_modal && !audio_settings_visible;
+}
+
 enum class UiAction {
   None,
   Pause,
@@ -62,8 +71,12 @@ struct NativeUiLayout {
                        center_y - 162.f * scale,
                        300.f * scale,
                        324.f * scale};
+    const auto status_x = inset + 200.f * scale;
     const auto status_width = std::max(
-        0.f, std::min(720.f * scale, screen_width - inset * 2.f));
+        0.f, std::min(720.f * scale, screen_width - status_x - inset));
+    const auto rail_size = std::max(40.f, 44.f * scale);
+    const auto rail_y = 138.f * scale;
+    const auto rail_gap = 8.f * scale;
 
     return {
         scale,
@@ -72,12 +85,12 @@ struct NativeUiLayout {
         static_cast<int>(std::lround(22.f * scale)),
         {inset, inset, 76.f * scale, 32.f * scale},
         {inset + 86.f * scale, inset, 104.f * scale, 32.f * scale},
-        {inset + 200.f * scale, inset, 112.f * scale, 32.f * scale},
-        {inset + 322.f * scale, inset, 112.f * scale, 32.f * scale},
-        {inset + 444.f * scale, inset, 140.f * scale, 32.f * scale},
-        {inset + 594.f * scale, inset, 128.f * scale, 32.f * scale},
-        {inset, 56.f * scale, 230.f * scale, 22.f * scale},
-        {inset, 80.f * scale, status_width, 44.f * scale},
+        {inset, rail_y, rail_size, rail_size},
+        {inset, rail_y + (rail_size + rail_gap), rail_size, rail_size},
+        {inset, rail_y + (rail_size + rail_gap) * 2.f, rail_size, rail_size},
+        {inset, rail_y + (rail_size + rail_gap) * 3.f, rail_size, rail_size},
+        {inset, 52.f * scale, 230.f * scale, 20.f * scale},
+        {status_x, inset, status_width, 32.f * scale},
         panel,
         {panel.x + 12.f * scale, panel.y + 20.f * scale,
          panel.width - 24.f * scale, 34.f * scale},

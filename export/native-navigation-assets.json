@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "size": 256,
+  "assets": {
+    "research": {
+      "source": "assets/visual/ui/navigation/nav_research.svg",
+      "runtimePath": "assets/visual/ui/navigation/nav_research.png",
+      "sourceSha256": "78C200C9E25832463C47B30D42364EF567B54534C51448230F7D83FEC69AD7EC",
+      "runtimeSha256": "D6E8D7D9955F6861DF2A6E4F0E16604740C5AFF9F356A29458B3B2807C708981"
+    },
+    "shipyard": {
+      "source": "assets/visual/ui/navigation/nav_shipyard.svg",
+      "runtimePath": "assets/visual/ui/navigation/nav_shipyard.png",
+      "sourceSha256": "EEBB5C342F3840F9F14C99638E74E67FC5D9130925EB001B5D2F617614A018C4",
+      "runtimeSha256": "508B020B58586BCDE46653FB849948E0481E69D54A26A9D98B35EDE9725B3800"
+    },
+    "construction": {
+      "source": "assets/visual/ui/navigation/nav_construction.svg",
+      "runtimePath": "assets/visual/ui/navigation/nav_construction.png",
+      "sourceSha256": "BE1F82114797F811750E52A6FFE8B15C2CC3E9054C18C5EC433956C5CDCDB00E",
+      "runtimeSha256": "1CEB54FAB8C17DF1B4C3D563E30D4C6D3F6B4282998AA111A0C0B2ACD28C33BA"
+    },
+    "relations": {
+      "source": "assets/visual/ui/navigation/nav_relations.svg",
+      "runtimePath": "assets/visual/ui/navigation/nav_relations.png",
+      "sourceSha256": "81AEF6CA97C2461173C79A6716DF63308A0096AE0AA2E0A54C86C189CAFF95C3",
+      "runtimeSha256": "FEBDDF87596181AB1850DF7919325DD01FC4582B4E7EEDF9871E2C5DF8289DD0"
+    }
+  }
+}

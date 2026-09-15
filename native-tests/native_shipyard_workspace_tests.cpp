@@ -1,4 +1,5 @@
 #include "native_shipyard_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -109,7 +110,10 @@ void layout_is_contained_and_action_stays_visible() {
     const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.designs, layout.design_details,
                               layout.orders, layout.readiness,
                               layout.feedback, layout.action})

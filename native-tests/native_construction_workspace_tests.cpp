@@ -1,4 +1,5 @@
 #include "native_construction_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -85,7 +86,10 @@ void responsive_layout_contains_full_actions() {
     const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.projects, layout.details, layout.orders,
                               layout.costs, layout.feedback,
                               layout.primary_action,

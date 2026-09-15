@@ -17,6 +17,7 @@ import tempfile
 from research_runtime_files import copy_research_runtime_files
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_research_runtime import validate_native_research_export
+from native_navigation_runtime import validate_native_navigation_export
 from native_fleet_runtime import validate_native_fleet_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
@@ -95,6 +96,8 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
@@ -438,6 +441,7 @@ def export(preset_name):
             readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
                 "Launch stellar-continuum-native.exe for the fullscreen galaxy preview.\n"
                 "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
+                "Use the left icon rail for Research, Shipyard, Construction and Relations; hover an icon for its name.\n"
                 "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
                 "Select a green fleet or its outliner entry, then right-click a destination to preview and confirm travel.\n"
                 "Shipyard shows available designs, authorization costs, population requirements and timed build orders.\n"
@@ -449,7 +453,8 @@ def export(preset_name):
                 "Known systems open orbital maps; owned planets show grouped colony information.\n"
                 "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots. Detailed 3D surfaces, voice, audio settings and full gameplay controls remain in migration.\n\n"
+                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots.\n"
+                "Settings in the main and pause menus control audio; three scientist voice cues are integrated. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
@@ -466,6 +471,7 @@ def export(preset_name):
         smoke = relocated_smoke(output)
         if native_client:
             smoke.update(validate_native_client_export(output, env))
+            smoke.update(validate_native_navigation_export(output, env))
             smoke.update(validate_native_research_export(output, env))
             smoke.update(validate_native_fleet_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))

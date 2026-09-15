@@ -61,6 +61,9 @@ public:
   void set_notice(std::string value) { notice_ = std::move(value); }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] bool modal_open() const noexcept {
+    return !std::holds_alternative<std::monostate>(confirmation_);
+  }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView>&
   view() const noexcept { return view_; }
   [[nodiscard]] const std::optional<std::string>& selected_type_id() const

@@ -1,4 +1,5 @@
 #include "native_research_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <array>
@@ -230,6 +231,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   const auto scale = std::min(std::max(1.f, screen_height / 900.f),
                               std::max(1.f, screen_width / 900.f));
   const auto inset = 18.f * scale;
+  const auto content_left = native_navigation_content_left * scale;
   const auto top = 64.f * scale;
   const auto search_width =
       std::clamp(screen_width * .28f, 180.f * scale, 330.f * scale);
@@ -237,7 +239,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   const auto gap = 8.f * scale;
   const auto tabs_y = top + 62.f * scale;
   const auto tab_gap = 5.f * scale;
-  const auto available = screen_width - inset * 2.f;
+  const auto available = screen_width - content_left - inset;
   const auto columns = std::max<std::size_t>(
       1, static_cast<std::size_t>(available / (128.f * scale)));
   const auto rows =
@@ -252,7 +254,8 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
     const auto column = index % columns;
     const auto row = index / columns;
     tabs.push_back({index,
-                    {inset + static_cast<float>(column) * (tab_width + tab_gap),
+                    {content_left + static_cast<float>(column) *
+                                        (tab_width + tab_gap),
                      tabs_y + static_cast<float>(row) * (tab_height + tab_gap),
                      tab_width, tab_height}});
   }
@@ -264,7 +267,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
       std::clamp(screen_width * .29f, 285.f * scale, 390.f * scale);
   const auto graph_width =
       std::max(180.f * scale, available - inspector_width - gap);
-  const UiRect inspector{inset + graph_width + gap, body_y, inspector_width,
+  const UiRect inspector{content_left + graph_width + gap, body_y, inspector_width,
                          body_height};
   const UiRect action{inspector.x + 12.f * scale,
                       inspector.y + inspector.height - 50.f * scale,
@@ -274,14 +277,14 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
           static_cast<int>(std::lround(14.f * scale)),
           static_cast<int>(std::lround(11.f * scale)),
           {0, top, screen_width, screen_height - top},
-          {inset, top + 12.f * scale, 280.f * scale, 30.f * scale},
-          {inset, top + 39.f * scale, 340.f * scale, 20.f * scale},
+      {content_left, top + 12.f * scale, 280.f * scale, 30.f * scale},
+      {content_left, top + 39.f * scale, 340.f * scale, 20.f * scale},
           {screen_width - inset - close_width - gap - search_width,
            top + 10.f * scale, search_width, 38.f * scale},
           {screen_width - inset - close_width, top + 10.f * scale, close_width,
            38.f * scale},
           std::move(tabs),
-          {inset, body_y, graph_width, body_height},
+      {content_left, body_y, graph_width, body_height},
           inspector,
           {action.x, action.y - 44.f * scale, action.width, 38.f * scale},
           action};

@@ -1,4 +1,5 @@
 #include "native_diplomacy_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <array>
@@ -131,8 +132,10 @@ void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
 int main() try {
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
-                  std::pair{1920, 1080}, std::pair{3840, 2160}}) {
+                  std::pair{1920, 1080}, std::pair{2560, 1440},
+                  std::pair{3840, 2160}}) {
     const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
     require(contained(viewport, layout.surface) &&
@@ -144,6 +147,10 @@ int main() try {
                 contained(layout.surface, layout.feedback) &&
                 contained(viewport, layout.modal_panel),
             "Diplomacy workspace escaped its viewport.");
+    if(height>=720)
+      require(layout.surface.x >=
+                  navigation.research.x + navigation.research.width,
+              "Diplomacy content overlaps the navigation rail.");
   }
 
   NativeDiplomacyWorkspace empty;

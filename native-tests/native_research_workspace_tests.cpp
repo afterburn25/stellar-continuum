@@ -1,4 +1,5 @@
 #include "native_research_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <array>
 #include <cmath>
@@ -107,6 +108,7 @@ void verify_layout(int width, int height) {
   const auto layout = ResearchWorkspaceLayout::for_viewport(width, height, 18);
   const UiRect viewport{0, 0, static_cast<float>(width),
                         static_cast<float>(height)};
+  const auto navigation = NativeUiLayout::for_viewport(width, height);
   require(contained(viewport, layout.surface) &&
               contained(viewport, layout.title) &&
               contained(viewport, layout.search) &&
@@ -116,6 +118,9 @@ void verify_layout(int width, int height) {
               contained(layout.inspector, layout.feedback) &&
               contained(layout.inspector, layout.action),
           "Research layout escaped the viewport.");
+  require(layout.graph.x >= navigation.research.x + navigation.research.width &&
+              layout.title.x >= navigation.research.x + navigation.research.width,
+          "Research content overlaps the navigation rail.");
   require(!overlaps(layout.search, layout.close) &&
               !overlaps(layout.graph, layout.inspector) &&
               !overlaps(layout.feedback, layout.action),
