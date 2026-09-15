@@ -22,13 +22,20 @@ public partial class ResearchWorkspaceView : PanelContainer
         ("XENOSCIENCE", new[] { "xenoscience" }),
     };
 
-    private static readonly Vector2 NodeSize = new(190, 82);
+    private static readonly Vector2 NodeSize = new(250, 96);
     private readonly Dictionary<string, WorkspaceNode> _nodes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Button> _buttons = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Vector2> _layout = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Button> _tabButtons = new(StringComparer.Ordinal);
     private readonly ResearchGraphCanvas _graph = new();
     private readonly Label _inspectorTitle = VisualUi.Text("SELECT A PROGRAM", 20, Colors.White, wrap: true);
+    private readonly TextureRect _inspectorArtwork = new()
+    {
+        Name = "ResearchInspectorArtwork", CustomMinimumSize = new(0, 170),
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        MouseFilter = MouseFilterEnum.Ignore, Visible = false,
+    };
     private readonly Label _inspectorState = VisualUi.Text("Choose a node to inspect its known details.", 11, VisualUi.Muted, wrap: true);
     private readonly Label _inspectorBody = VisualUi.Text(string.Empty, 12, VisualUi.Muted, wrap: true);
     private readonly ProgressBar _inspectorProgress = new() { MinValue = 0, MaxValue = 100, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 7) };
@@ -124,6 +131,7 @@ public partial class ResearchWorkspaceView : PanelContainer
         inspector.AddThemeConstantOverride("separation", 9);
         inspectorPanel.AddChild(inspector);
         inspector.AddChild(VisualUi.Text("PROGRAM INSPECTOR", 10, VisualUi.Accent));
+        inspector.AddChild(_inspectorArtwork);
         inspector.AddChild(_inspectorTitle);
         inspector.AddChild(_inspectorState);
         inspector.AddChild(_inspectorProgress);
@@ -145,6 +153,7 @@ public partial class ResearchWorkspaceView : PanelContainer
         Resized += () =>
         {
             inspectorPanel.CustomMinimumSize = new Vector2(Size.X < 1120 ? 285 : 350, 0);
+            _inspectorArtwork.CustomMinimumSize = new(0, Size.Y < 680 ? 104 : 170);
             ApplyTransform();
         };
     }
@@ -224,7 +233,7 @@ public partial class ResearchWorkspaceView : PanelContainer
             domainStarts[domain] = nextDomainX;
             var widestDepth = Math.Max(1, _nodes.Values.Where(node => node.Domain == domain)
                 .GroupBy(node => node.Depth).Select(group => group.Count()).DefaultIfEmpty(1).Max());
-            nextDomainX += widestDepth * 202 + 34;
+            nextDomainX += widestDepth * (NodeSize.X + 14) + 34;
         }
         var slots = new Dictionary<(string Domain, int Depth), int>();
         foreach (var node in _nodes.Values.OrderBy(node => node.Depth).ThenBy(node => Array.IndexOf(orderedDomains, node.Domain)).ThenBy(node => node.Key, StringComparer.Ordinal))
@@ -232,7 +241,7 @@ public partial class ResearchWorkspaceView : PanelContainer
             var slotKey = (node.Domain, node.Depth);
             var slot = slots.GetValueOrDefault(slotKey);
             slots[slotKey] = slot + 1;
-            var world = new Vector2(domainStarts[node.Domain] + slot * 202, 34 + node.Depth * 138);
+            var world = new Vector2(domainStarts[node.Domain] + slot * (NodeSize.X + 14), 34 + node.Depth * 150);
             _layout[node.Key] = world;
             var button = VisualUi.Button(string.Empty, string.Empty, () => SelectNode(node.Key),
                 node.Detail is null ? VisualIconLibrary.ResearchLocked : VisualIconLibrary.Research);
@@ -241,6 +250,10 @@ public partial class ResearchWorkspaceView : PanelContainer
             button.Size = NodeSize;
             button.ClipText = true;
             button.ToggleMode = true;
+            button.ExpandIcon = true;
+            button.AddThemeConstantOverride("icon_max_width", 68);
+            button.AddThemeConstantOverride("h_separation", 10);
+            button.AddThemeFontSizeOverride("font_size", 12);
             _graph.AddChild(button);
             _buttons[node.Key] = button;
         }
@@ -257,6 +270,7 @@ public partial class ResearchWorkspaceView : PanelContainer
         {
             var node = _nodes[pair.Key];
             var button = pair.Value;
+            button.Icon = CatalogArtwork.Texture(CatalogArtwork.ResearchArt(node.Detail?.Id, node.Detail is not null));
             if (node.Detail is null)
             {
                 button.Text = "????\nLOCKED";
@@ -269,7 +283,8 @@ public partial class ResearchWorkspaceView : PanelContainer
                 button.TooltipText = $"Select {node.Detail.Title}.\n{node.Detail.WhatItDoes}";
                 var stateColor = node.Detail.State == "MATURE" ? new Color("9ce6bd") :
                     node.Detail.State == "ACTIVE PROGRAM" ? new Color("8fdcff") : Colors.White;
-                button.Modulate = stateColor.Lerp(DomainColor(node.Domain), .24f);
+                button.Modulate = Colors.White;
+                button.AddThemeColorOverride("font_color", stateColor.Lerp(DomainColor(node.Domain), .24f));
             }
         }
     }
@@ -366,6 +381,7 @@ public partial class ResearchWorkspaceView : PanelContainer
         if (_selectedKey is null || !_nodes.TryGetValue(_selectedKey, out var node))
         {
             _inspectorTitle.Text = "SELECT A PROGRAM";
+            _inspectorArtwork.Visible = false;
             _inspectorState.Text = "Choose a node to inspect its known details.";
             _inspectorBody.Text = string.Empty;
             _inspectorProgress.Visible = false;
@@ -376,6 +392,9 @@ public partial class ResearchWorkspaceView : PanelContainer
         if (node.Detail is null)
         {
             _inspectorTitle.Text = "????";
+            _inspectorArtwork.Visible = true;
+            _inspectorArtwork.Texture = CatalogArtwork.Texture(CatalogArtwork.Concealed);
+            _inspectorArtwork.TooltipText = "Unrevealed research";
             _inspectorState.Text = "LOCKED";
             _inspectorBody.Text = "This branch has not been revealed. Advance known research to discover what becomes possible.";
             _inspectorProgress.Visible = false;
@@ -384,6 +403,9 @@ public partial class ResearchWorkspaceView : PanelContainer
             return;
         }
         var detail = node.Detail;
+        _inspectorArtwork.Visible = true;
+        _inspectorArtwork.Texture = CatalogArtwork.Texture(CatalogArtwork.ResearchArt(detail.Id, true), portrait: true);
+        _inspectorArtwork.TooltipText = detail.Title;
         _inspectorTitle.Text = detail.Title;
         _inspectorState.Text = $"{DisplayDomain(detail.DomainId)}  ·  {NodeState(detail)}";
         _inspectorBody.Text = $"WHAT IT DOES\n{detail.WhatItDoes}\n\nBENEFITS / UNLOCKS\n{detail.Benefits}\n\nCOST & TIME\n{detail.CostAndTime}\n\nREQUIREMENTS / STATUS\n{detail.RequirementsStatus}";

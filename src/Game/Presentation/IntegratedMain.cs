@@ -26,6 +26,11 @@ public partial class IntegratedMain : Main
 
     public override void _Ready()
     {
+        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--stellar-artwork-library") >= 0)
+        {
+            Callable.From(() => GetTree().ChangeSceneToFile("res://scenes/CatalogArtworkGallery.tscn")).CallDeferred();
+            return;
+        }
         // A platform close request is an invitation to show the campaign menu. Only its
         // explicit Exit to Windows command may save and end a healthy campaign.
         GetTree().AutoAcceptQuit = false;

@@ -93,7 +93,9 @@ public partial class ResearchHorizonView : VBoxContainer
         var body = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         body.AddThemeConstantOverride("separation", 9);
         content.AddChild(body);
-        body.AddChild(new ResearchNodeSigil(node.Id, node.Detail, stateColor));
+        body.AddChild(CatalogArtwork.Thumbnail(CatalogArtwork.ResearchArt(node.Id,
+            node.State is "INVESTIGABLE" or "EXPERIMENTAL" or "DEMONSTRATED" or "ENGINEERING" or "MATURE" or "ARCHIVED" or "ACTIVE PROGRAM"),
+            "ResearchThumbnail_" + node.Id));
         var copy = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         copy.AddThemeConstantOverride("separation", 2);
         body.AddChild(copy);
