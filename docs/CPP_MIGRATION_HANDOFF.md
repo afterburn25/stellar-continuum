@@ -27,8 +27,19 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `NativeUiLayout` gained `UiAction::Diplomacy` + `diplomacy` rect (top bar, RELATIONS).
 - `NativeDiplomacyWorkspace::render` takes an optional `PortraitProvider`
   (`string_view relative_asset_path -> shared_ptr<const RgbaImage>`); `nullptr` draws
-  the signal-waveform fallback. `main.cpp` resolves
-  `assets/visual/species/<id>-communications-v2.png` (underscores→hyphens).
+  the signal-waveform fallback. The workspace resolves
+  `assets/visual/species/<species>-communications-v2.png` (underscores→hyphens).
+- `stellar-continuum-native.exe --diplomacy-smoke <bmp>` (requires `--load`):
+  opens RELATIONS, selects the identified channel contact, drives the
+  negotiation modal to send a transit-access request, captures the workspace
+  plus a `-proposals` sidecar, prints `diplomacy={...}` (contacts, redaction,
+  channels, agreements, history, portrait, command outcome, proposal ids).
+- `tools/stellar-export/native_diplomacy_runtime.py` —
+  `validate_native_diplomacy_export(folder, env, player17_fixture)` authors an
+  unresolved-signal contact + pending incoming access petition onto the
+  fixture (tick = SimulationDays × 1000), runs the smoke twice (fresh +
+  paused reload), and verifies redaction, portrait, command acceptance,
+  proposal persistence and capture variance.
 
 ## Interfaces added in 0.1.57 (candidate for review)
 
@@ -55,9 +66,6 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Remaining blockers / next work
 
-- Diplomacy workspace has no graphical/real-campaign smoke evidence yet — the
-  Player17 fixture has no diplomacy contacts; a validator save with authored
-  contacts would exercise the real path (controller test covers authored state).
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.

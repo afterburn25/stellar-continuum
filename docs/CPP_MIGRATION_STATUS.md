@@ -30,7 +30,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Legacy research | Technology* | `core/legacy_research`, `legacy_technology` | OK | `legacy_*_parity` | PARITY VERIFIED | Superseded path, kept for saves |
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
-| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | `native_diplomacy_controller`, `native_diplomacy_workspace` | PARTIAL | Observer-safe projection + RELATIONS workspace wired to top bar; playthrough smoke pending |
+| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | `native_diplomacy_controller`, `native_diplomacy_workspace`, `--diplomacy-smoke` validator | PARITY VERIFIED | Observer-safe projection + RELATIONS workspace; sealed export drives a real command + redaction check |
 | Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
@@ -48,12 +48,11 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Diplomacy workspace exists but has no real-playthrough/Vulkan smoke evidence yet.
-2. Surface scene is a construction workspace, not the reference's rendered colony view.
-3. No orbital structure rendering.
-4. No audio of any kind in the native client/engine.
-5. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
-6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
+1. Surface scene is a construction workspace, not the reference's rendered colony view.
+2. No orbital structure rendering.
+3. No audio of any kind in the native client/engine.
+4. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
+5. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
@@ -61,6 +60,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   144/144 headless CTest baseline, all Python export checks.
 - Sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`:
   113 files, 39 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false.
+  A reseal covering the `--diplomacy-smoke` validator follows commit `30e1d49b`.
 - Diplomacy presentation: `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`
   over `DiplomaticStateView` only — unidentified contacts carry no civ id/name/species/
   metrics. Revision+signature stale-command guard covers relationship drift and
