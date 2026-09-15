@@ -22,6 +22,21 @@ once into a bounded thumbnail cache for fleet and shipyard presentation;
 authoritative design identity, role resolution and fleet state never come
 from the pixels.
 
-Only these six images and this source note are declared by
+These six portraits, the tactical derivative below, and this source note are declared by
 `export/native-ship-art-assets.json`; packaging verifies their paths and
 SHA-256 fingerprints.
+
+## Tactical corvette derivative
+
+`assets/visual/ships/patrol-corvette-tactical-v1.png` is an original project
+sprite generated on 2026-09-15 with OpenAI's built-in image generation tool,
+using the existing patrol-corvette portrait as its design reference. The
+full prompt is preserved in `docs/engine/NATIVE_TACTICAL_ART_PROMPT.md`.
+The 1254 by 1254 RGBA image has a transparent background, a nose pointing
+right and inactive thruster nozzles. It is a top-down 2D representation,
+not a 3D hull. The original portrait remains unchanged.
+
+The tactical layer decodes one shared full-resolution image (6,290,064 CPU
+bytes) and submits at most 32 rotated instances. The source's alpha is
+preserved; background JPEG portraits are never pasted into the battlefield.
+Only observer-owned, explicitly identified patrol corvettes may use it.

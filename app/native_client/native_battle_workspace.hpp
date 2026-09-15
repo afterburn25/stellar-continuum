@@ -10,6 +10,7 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <set>
 #include <string>
@@ -73,6 +74,13 @@ struct BattleWorkspaceCommand {
   double speed{};
 };
 
+struct BattleShipTarget {
+  std::int64_t formation_id{};
+  stellar::native_map::Point center{};
+  float size{};
+  float heading_degrees{};
+};
+
 class NativeBattleWorkspace final {
 public:
   void open(MassiveCombatSnapshot snapshot, int observer_civilization_id,
@@ -87,11 +95,17 @@ public:
   void set_snapshot(MassiveCombatSnapshot snapshot, double elapsed_seconds);
   void set_tactical_speed(double current, double resume) noexcept;
   void set_status(std::string message, bool error = false);
+  // Replaces the prior frame's artwork hits. Targets remain valid only while
+  // the viewport and camera exactly match the draw that supplied them.
+  void set_ship_targets(std::vector<BattleShipTarget> targets, int width,
+                        int height);
 
   [[nodiscard]] BattleWorkspaceCommand handle(
       const stellar::native_map::InputEvent &event, int width, int height);
+  using ShipLayer = std::function<void(stellar::native_map::DrawList&,
+      const stellar::native_map::UiRect&, float, float)>;
   void render(stellar::native_map::DrawList &out, int width,
-              int height) const;
+              int height, const ShipLayer& ship_layer = {}) const;
 
   // Projects an observer-snapshot world coordinate; used by tests and smoke
   // diagnostics to place synthetic input deterministically.
@@ -126,6 +140,8 @@ private:
   void issue_context(stellar::native_map::Point point, int width, int height,
                      BattleWorkspaceCommand &command) const;
   void adopt_viewport(int width, int height) noexcept;
+  void invalidate_ship_targets() noexcept;
+  [[nodiscard]] bool ship_targets_current(int width, int height) const noexcept;
 
   std::optional<MassiveCombatSnapshot> snapshot_;
   int observer_civilization_id_{-1};
@@ -136,6 +152,11 @@ private:
   float zoom_{1.f};
   MassivePoint world_center_{};
   bool camera_initialized_{};
+  std::uint64_t camera_revision_{};
+  std::vector<BattleShipTarget> ship_targets_;
+  int ship_targets_width_{};
+  int ship_targets_height_{};
+  std::uint64_t ship_targets_camera_revision_{};
   enum class Gesture { None, LeftField, RightField, Chrome };
   Gesture gesture_{Gesture::None};
   bool panning_{};

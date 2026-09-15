@@ -151,13 +151,19 @@ struct Window::Storage {
     const auto rendered=SDL_RenderTexture(renderer,cached.texture,nullptr,&destination);if(label.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL text clip reset failed");require(rendered,"SDL cached text draw failed");
   }
   void draw_image(const Image &command){
+    if(!std::isfinite(command.rotation_degrees))throw std::invalid_argument("Image rotation must be finite.");
     if(!valid_positive_rect(command.destination)||(command.clip&&!valid_clip(*command.clip)))throw std::invalid_argument("Image destination and clip bounds must be finite and within the drawable range.");
     if(!command.resource)throw std::invalid_argument("An image command requires an RGBA resource.");std::optional<SDL_FRect> source;
     if(command.source){const auto value=*command.source;if(!valid_positive_rect(value)||value.x<0.f||value.y<0.f||value.x+value.width>static_cast<float>(command.resource->width())||value.y+value.height>static_cast<float>(command.resource->height()))throw std::invalid_argument("Image source bounds must be finite and inside the resource.");source=sdl_rect(value);}
     auto &cached=image(command.resource);
     require(SDL_SetTextureColorMod(cached.texture,command.tint.r,command.tint.g,command.tint.b),"SDL image color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,command.tint.a),"SDL image alpha modulation failed");
     if(command.clip){const SDL_Rect clip{static_cast<int>(std::floor(command.clip->x)),static_cast<int>(std::floor(command.clip->y)),static_cast<int>(std::ceil(command.clip->width)),static_cast<int>(std::ceil(command.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL image clip setup failed");}
-    const auto destination=sdl_rect(command.destination);const auto rendered=SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination);if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
+    const auto destination=sdl_rect(command.destination);
+    const auto rendered=command.rotation_degrees==0.f
+        ?SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination)
+        :SDL_RenderTextureRotated(renderer,cached.texture,source?&*source:nullptr,&destination,
+            std::fmod(static_cast<double>(command.rotation_degrees),360.),nullptr,SDL_FLIP_NONE);
+    if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
   }
   void draw_triangle_mesh(const TriangleMesh &mesh) {
     validate_triangle_mesh(mesh);

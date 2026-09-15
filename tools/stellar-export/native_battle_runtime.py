@@ -124,6 +124,11 @@ def _author_battle_source(source: dict) -> dict:
     hostile = 3
     picket_fleet_id = max(fleet_ids) + 1
     tick = round(days * TICKS_PER_SIMULATION_DAY)
+    own_fleet = next(fleet for fleet in fleets if fleet.get("Id") == 0)
+    own_fleet["Role"] = 3
+    own_fleet["DesignId"] = "patrol_corvette"
+    fleet_one = next(fleet for fleet in fleets if fleet.get("Id") == 1)
+    fleet_one["DesignId"] = "colony_ship"
 
     # The identified contact gives the war relationship its legitimate basis.
     diplomacy["Contacts"].append({
@@ -151,8 +156,8 @@ def _author_battle_source(source: dict) -> dict:
             fleet["DestinationSystemId"] = None
     fleets.append(picket)
 
-    # Fleet 0 cannot be an important vessel (id 0 is invalid); bind it through
-    # a matching warp_scout cohort instead.
+    # Use the native reserved important-vessel identity for strategic fleet 0.
+    # Fleet 1 remains a colony ship, without an invented military sprite.
     galaxy["ActiveCombatEncounter"] = {
         "SystemId": 0, "StartedDay": days,
         "Battle": {
@@ -161,12 +166,9 @@ def _author_battle_source(source: dict) -> dict:
             "PendingSeconds": 0.0, "NextEventSequence": 1, "NextSalvoId": 1,
             "Formations": [
                 {**_formation(1, player, 1, 1, "Home Guard", -420.0, -120.0,
-                              1.0, 0.0, 2,
-                              [_vessel(1, "Pioneer One", True)]),
-                 "InitialShipCount": 2,
-                 "Cohorts": [{"Id": 11, "DesignId": "warp_scout",
-                              "InitialCount": 1, "ActiveCount": 1,
-                              "Experience": 0.5}]},
+                              .6, .8, 2,
+                              [{**_vessel(4294967296, "Home Guard Corvette", True), "DesignId": "patrol_corvette"},
+                               {**_vessel(1, "Pioneer One"), "DesignId": "colony_ship"}])},
                 _formation(2, hostile, 6, 6, "Vask Vanguard", 420.0, 120.0,
                            -1.0, 0.0, 0,
                            [_vessel(6, "Vask Dominion Scout", True),
@@ -229,6 +231,69 @@ def battle_proof(stdout: str, replay: bool, width: int, height: int) -> dict:
         raise RuntimeError("Native battle replay failed its observation or timing contract")
     return state
 
+def battle_art_proof(stdout: str) -> dict:
+    rows = re.findall(r"(?m)^battle_art=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1: raise RuntimeError("Native battle art evidence is missing or duplicated")
+    try: state = json.loads(rows[0], object_pairs_hook=_unique)
+    except (TypeError, ValueError) as error: raise RuntimeError("Native battle art evidence is malformed") from error
+    fields = {"sprites", "foreign_sprites", "source_width", "source_height", "source_bytes", "alpha_pixels", "center_x", "center_y", "size", "heading_degrees", "moving", "paused_unchanged", "ship_selected"}
+    if not isinstance(state, dict) or set(state) != fields: raise RuntimeError("Native battle art evidence has an invalid schema")
+    if any(type(state[k]) is not int or state[k] < 0 for k in ("sprites", "foreign_sprites", "source_width", "source_height", "source_bytes", "alpha_pixels")):
+        raise RuntimeError("Native battle art counters are invalid")
+    if any(type(state[k]) not in (int, float) or isinstance(state[k], bool) for k in ("center_x", "center_y", "size", "heading_degrees")):
+        raise RuntimeError("Native battle art geometry is invalid")
+    if (not 1 <= state["sprites"] <= 32 or state["foreign_sprites"] != 0 or
+            not 1 <= state["source_width"] <= 2048 or not 1 <= state["source_height"] <= 2048 or
+            state["source_bytes"] != state["source_width"] * state["source_height"] * 4 or state["source_bytes"] > 16 * 1024 * 1024 or
+            not .2 * state["source_width"] * state["source_height"] <= state["alpha_pixels"] <= .95 * state["source_width"] * state["source_height"] or
+            not all(math.isfinite(state[k]) and abs(state[k]) <= 100000 for k in ("center_x", "center_y", "size", "heading_degrees")) or
+            state["size"] <= 0 or state["size"] > 512 or state["paused_unchanged"] is not True or state["ship_selected"] is not True or type(state["moving"]) is not bool):
+        raise RuntimeError("Native battle art evidence violates its bounded contract")
+    return state
+
+def _art_rows(path: Path, width: int, height: int):
+    # Keep two bounded byte buffers, not millions of per-pixel Python objects.
+    _validate_capture(path, width, height)
+    data = path.read_bytes()
+    offset = struct.unpack_from("<I", data, 10)[0]
+    signed_height = struct.unpack_from("<i", data, 22)[0]
+    channels = struct.unpack_from("<H", data, 28)[0] // 8
+    stride = ((width * channels + 3) // 4) * 4
+    pixels = memoryview(data)
+    return channels, [pixels[offset + (y if signed_height < 0 else height - y - 1) * stride:
+                             offset + (y if signed_height < 0 else height - y - 1) * stride + width * channels]
+                      for y in range(height)]
+
+
+def _validate_art_difference(base_path: Path, suppressed_path: Path, width: int, height: int, art: dict):
+    channels_a, base_rows = _art_rows(base_path, width, height)
+    channels_b, suppressed_rows = _art_rows(suppressed_path, width, height)
+    side = art["size"]
+    radius = side * .75
+    cx, cy = art["center_x"], art["center_y"]
+    if not (0 < side <= 512 and all(math.isfinite(v) for v in (side, cx, cy)) and
+            cx + radius >= 0 and cy + radius >= 0 and cx - radius < width and cy - radius < height):
+        raise RuntimeError("Native battle art sprite is outside the viewport")
+    angle = math.radians(art["heading_degrees"])
+    cosine, sine = math.cos(angle), math.sin(angle)
+    inside = outside = corners = 0
+    for y, (base, suppressed) in enumerate(zip(base_rows, suppressed_rows)):
+        if channels_a == channels_b and base == suppressed:
+            continue
+        for x in range(width):
+            if base[x * channels_a:x * channels_a + 3] != suppressed[x * channels_b:x * channels_b + 3]:
+                dx, dy = x - cx, y - cy
+                if abs(dx) <= radius and abs(dy) <= radius:
+                    inside += 1
+                    local_x, local_y = dx * cosine + dy * sine, -dx * sine + dy * cosine
+                    if abs(local_x) > side * .44 and abs(local_y) > side * .44:
+                        corners += 1
+                else:
+                    outside += 1
+    if inside <= 25 or outside or corners:
+        raise RuntimeError("Native battle ship sidecar did not isolate transparent sprite pixels")
+    return inside
+
 
 def _visible_owned_token(path: Path, width: int, height: int, state: dict) -> None:
     _validate_capture(path, width, height)
@@ -283,7 +348,7 @@ def validate_native_battle_export(folder: Path, env: dict[str, str], player17_fi
     count = len(source["Galaxy"]["Systems"])
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics = [], []
+    captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
     prior = None
     with tempfile.TemporaryDirectory(prefix="stellar-native-battle-") as temporary:
         work = Path(temporary)
@@ -306,6 +371,12 @@ def validate_native_battle_export(folder: Path, env: dict[str, str], player17_fi
                    ("gpu_driver=vulkan ", f"systems={count} ", "save=ok ")):
                 raise RuntimeError("Native battle did not confirm Vulkan, campaign and save")
             proof = battle_proof(result.stdout, replay, width, height)
+            art = battle_art_proof(result.stdout)
+            if art["sprites"] != 1:
+                raise RuntimeError("Native battle art fixture must contain exactly one authored sprite")
+            sidecar = capture.with_name(capture.stem + "-without-ships.bmp")
+            _validate_capture(sidecar, width, height)
+            _validate_art_difference(capture, sidecar, width, height, art)
             _visible_owned_token(capture, width, height, proof)
             payload = _payload(save, count)
             battle = payload["Galaxy"]["ActiveCombatEncounter"]["Battle"]
@@ -316,9 +387,14 @@ def validate_native_battle_export(folder: Path, env: dict[str, str], player17_fi
             prior = payload
             shutil.copy2(save, evidence.with_suffix(".player17.json"))
             shutil.copy2(capture, evidence.with_suffix(".bmp"))
+            shutil.copy2(sidecar, evidence.with_name(evidence.stem + "-without-ships.bmp"))
             captures.append(str(evidence.with_suffix(".bmp")))
             diagnostics.append(proof)
+            art_diagnostics.append(art)
+            art_captures.append(str(evidence.with_name(evidence.stem + "-without-ships.bmp")))
     return {"nativeBattleWorkspace": True, "nativeBattleObserverRedaction": True,
             "nativeBattleVisibleTokens": True, "nativeBattleOrder": True,
             "nativeBattlePausedSpeed": True, "nativeBattlePausedCanonicalReload": True,
+            "nativeBattleShipArtwork": True, "battleArtDiagnostics": art_diagnostics,
+            "battleArtSuppressedCaptures": art_captures,
             "battleCaptures": captures, "battleDiagnostics": diagnostics}

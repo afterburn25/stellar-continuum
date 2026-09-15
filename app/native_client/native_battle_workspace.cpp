@@ -17,6 +17,9 @@ constexpr float minimum_zoom = .18f, maximum_zoom = 7.f;
 constexpr float selection_radius = 28.f;
 constexpr float maximum_world_coordinate = 10'000'000.f;
 constexpr float maximum_screen_coordinate = 1'000'000.f;
+constexpr float maximum_ship_target_size = 2'000.f;
+constexpr std::size_t maximum_ship_targets = 32;
+constexpr float degrees_to_radians = .01745329251994329577f;
 
 [[nodiscard]] bool finite_point(Point value) noexcept {
   return std::isfinite(value.x) && std::isfinite(value.y) &&
@@ -329,6 +332,7 @@ void NativeBattleWorkspace::open(MassiveCombatSnapshot snapshot,
                                  int observer_civilization_id, int width,
                                  int height) {
   snapshot_ = std::move(snapshot);
+  invalidate_ship_targets();
   observer_civilization_id_ = observer_civilization_id;
   visible_ = true;
   if (!camera_initialized_) fit(width, height);
@@ -346,6 +350,8 @@ void NativeBattleWorkspace::close() {
   latest_event_sequence_ = 0;
   camera_initialized_ = false;
   camera_viewport_width_ = camera_viewport_height_ = 0;
+  ++camera_revision_;
+  invalidate_ship_targets();
   status_.clear();
   status_error_ = false;
 }
@@ -356,6 +362,7 @@ const MassiveCombatSnapshot *NativeBattleWorkspace::snapshot() const noexcept {
 
 void NativeBattleWorkspace::set_snapshot(MassiveCombatSnapshot snapshot,
                                        double elapsed_seconds) {
+  const auto same_battle = snapshot_ && snapshot_->battle_id == snapshot.battle_id;
   const auto elapsed = static_cast<float>(
       std::max(0., std::isfinite(elapsed_seconds) ? elapsed_seconds : 0.));
   for (auto &event : visual_events_) event.age += elapsed;
@@ -418,6 +425,17 @@ void NativeBattleWorkspace::set_snapshot(MassiveCombatSnapshot snapshot,
       [&](const auto&formation){return formation.formation_id==*targeting_source_&&
                                       is_owned(formation);}))
     targeting_source_.reset();
+  if (!same_battle) {
+    invalidate_ship_targets();
+  } else {
+    std::erase_if(ship_targets_, [&](const BattleShipTarget &target) {
+      return std::ranges::none_of(
+          snapshot.formations, [&](const MassiveObservedFormation &formation) {
+            return formation.formation_id == target.formation_id &&
+                   is_owned(formation) && formation.is_exact;
+          });
+    });
+  }
   snapshot_ = std::move(snapshot);
 }
 void NativeBattleWorkspace::set_tactical_speed(const double current,
@@ -428,6 +446,45 @@ void NativeBattleWorkspace::set_tactical_speed(const double current,
 void NativeBattleWorkspace::set_status(std::string message, bool error) {
   status_ = std::move(message);
   status_error_ = error;
+}
+void NativeBattleWorkspace::set_ship_targets(
+    std::vector<BattleShipTarget> targets, const int width, const int height) {
+  invalidate_ship_targets();
+  if (!visible_ || !snapshot_ || !camera_initialized_ || width <= 0 ||
+      height <= 0)
+    return;
+  adopt_viewport(width, height);
+  ship_targets_.reserve(std::min(targets.size(), maximum_ship_targets));
+  for (const auto &target : targets) {
+    if (ship_targets_.size() >= maximum_ship_targets)
+      break;
+    if (target.formation_id <= 0 || !finite_point(target.center) ||
+        !std::isfinite(target.size) || target.size <= 0 ||
+        target.size > maximum_ship_target_size ||
+        !std::isfinite(target.heading_degrees) ||
+        std::abs(target.heading_degrees) > 1'000'000.f)
+      continue;
+    const auto formation = std::ranges::find(
+        snapshot_->formations, target.formation_id,
+        &MassiveObservedFormation::formation_id);
+    if (formation == snapshot_->formations.end() || !is_owned(*formation) ||
+        !formation->is_exact)
+      continue;
+    ship_targets_.push_back(target);
+  }
+  ship_targets_width_ = width;
+  ship_targets_height_ = height;
+  ship_targets_camera_revision_ = camera_revision_;
+}
+void NativeBattleWorkspace::invalidate_ship_targets() noexcept {
+  ship_targets_.clear();
+  ship_targets_width_ = ship_targets_height_ = 0;
+  ship_targets_camera_revision_ = camera_revision_;
+}
+bool NativeBattleWorkspace::ship_targets_current(const int width,
+                                                 const int height) const noexcept {
+  return width == ship_targets_width_ && height == ship_targets_height_ &&
+         camera_revision_ == ship_targets_camera_revision_;
 }
 Point NativeBattleWorkspace::project(const MassivePoint value, const int width,
                                      const int height) const {
@@ -465,6 +522,24 @@ NativeBattleWorkspace::to_world(const Point value, int width,
 std::optional<std::int64_t> NativeBattleWorkspace::hit_formation(
     const Point point, int width, int height) const noexcept {
   if (!snapshot_) return std::nullopt;
+  if (ship_targets_current(width, height)) {
+    for (auto target = ship_targets_.rbegin(); target != ship_targets_.rend();
+         ++target) {
+      const auto radians = target->heading_degrees * degrees_to_radians;
+      const auto cosine = std::cos(radians);
+      const auto sine = std::sin(radians);
+      const auto dx = point.x - target->center.x;
+      const auto dy = point.y - target->center.y;
+      const auto local_x = cosine * dx + sine * dy;
+      const auto local_y = -sine * dx + cosine * dy;
+      const auto radius_x = target->size * .46f;
+      const auto radius_y = target->size * .17f;
+      const auto normalized = local_x * local_x / (radius_x * radius_x) +
+                              local_y * local_y / (radius_y * radius_y);
+      if (std::isfinite(normalized) && normalized <= 1.f)
+        return target->formation_id;
+    }
+  }
   std::optional<std::int64_t> best;
   auto best_distance = selection_radius * selection_radius;
   for (const auto &formation : snapshot_->formations) {
@@ -496,6 +571,8 @@ std::vector<std::int64_t> NativeBattleWorkspace::selected_owned() const {
   return result;
 }
 void NativeBattleWorkspace::fit(int width, int height) noexcept {
+  ++camera_revision_;
+  invalidate_ship_targets();
   if (!snapshot_ || snapshot_->formations.empty()) {
     world_center_={};zoom_=1.f;camera_center_=battlefield_center(width,height);
     camera_viewport_width_=width;camera_viewport_height_=height;
@@ -533,10 +610,13 @@ void NativeBattleWorkspace::fit(int width, int height) noexcept {
 }
 void NativeBattleWorkspace::adopt_viewport(int width,int height) noexcept {
   if(!camera_initialized_||width<=0||height<=0)return;
+  if(width==camera_viewport_width_&&height==camera_viewport_height_)return;
   camera_center_=to_screen(world_center_,width,height);
   if(!finite_point(camera_center_))camera_center_=battlefield_center(width,height);
   camera_viewport_width_=width;
   camera_viewport_height_=height;
+  ++camera_revision_;
+  invalidate_ship_targets();
 }
 void NativeBattleWorkspace::issue_context(const Point point, int width,
                                           int height,
@@ -603,6 +683,8 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     camera_center_.y=std::clamp(camera_center_.y+event.position.y-after.y,
                                 -maximum_screen_coordinate,
                                 maximum_screen_coordinate);
+    ++camera_revision_;
+    invalidate_ship_targets();
     return command;
   }
   if (event.type == InputEventType::PointerMove) {
@@ -613,6 +695,8 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
       camera_center_.y=std::clamp(camera_center_.y+event.delta.y,
                                   -maximum_screen_coordinate,
                                   maximum_screen_coordinate);
+      ++camera_revision_;
+      invalidate_ship_targets();
       return command;
     }
     if (gesture_ == Gesture::LeftField && (event.delta.x != 0.f || event.delta.y != 0.f)) {
@@ -721,6 +805,11 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
             center.y <= y1)
           selection_.insert(formation.formation_id);
       }
+      if (ship_targets_current(width, height))
+        for (const auto &target : ship_targets_)
+          if (target.center.x >= x0 && target.center.x <= x1 &&
+              target.center.y >= y0 && target.center.y <= y1)
+            selection_.insert(target.formation_id);
     } else if (!from_chrome && !on_chrome(event.position, layout)) {
       const auto hit = hit_formation(event.position, width, height);
       selection_.clear();
@@ -755,7 +844,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
 }
 
 void NativeBattleWorkspace::render(DrawList &out, const int width,
-                                   const int height) const {
+                                   const int height, const ShipLayer& ship_layer) const {
   if (!visible_) return;
   const auto layout = BattleWorkspaceLayout::for_viewport(width, height);
   const auto top = layout.top_row.y + layout.top_row.height;
@@ -972,6 +1061,9 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
     }
   }
 
+  // Ship artwork belongs above the field but below labels and command chrome.
+  if (ship_layer) ship_layer(out, field, zoom_, layout.scale);
+
   // Labels with a bounded collision budget.
   const auto label_budget =
       zoom_ < .5f ? 48 : zoom_ < 1.1f ? 120 : 360;
@@ -979,6 +1071,16 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
   occupied.reserve(64);
   occupied.push_back(layout.event_feed);
   occupied.push_back(layout.orders);
+  if (ship_targets_current(width, height))
+    for (const auto &target : ship_targets_) {
+      const auto radians = target.heading_degrees * degrees_to_radians;
+      const auto half_extent = target.size * .5f *
+          (std::abs(std::cos(radians)) + std::abs(std::sin(radians)));
+      if (std::isfinite(half_extent))
+        occupied.push_back({target.center.x - half_extent,
+                            target.center.y - half_extent, half_extent * 2,
+                            half_extent * 2});
+    }
   int labelled = 0;
   // Reserve readable space for the hovered detail before less important labels.
   std::vector<const MassiveObservedFormation *> label_order;

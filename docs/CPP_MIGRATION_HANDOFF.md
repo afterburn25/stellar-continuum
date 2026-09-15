@@ -5,6 +5,49 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Tactical corvette artwork and interaction
+
+The native tactical view now uses a transparent, top-down derivative of the
+approved human patrol corvette. Exact owned encounter/vessel/design bindings
+feed a bounded camera projection, rotated hulls and motion-driven blue nozzles.
+Only human-player patrol corvettes use this first hull; alien/foreign/unsupported
+ships and aggregate cohorts retain their markers. One full-resolution RGBA
+resource is shared across at most 32 visible instances. The portrait cache is
+unchanged. Core simulation, Player17 and the documented zero-fleet compatibility
+exception are unchanged.
+
+Clicking the actual hull selects its formation, with rotated hit geometry and
+transparent-corner rejection. Camera/viewport changes invalidate geometry;
+same-battle observer refresh preserves the last drawn click surface, while
+removed/foreign targets are dropped. Labels reserve sprite space. See
+`engine/NATIVE_TACTICAL_SHIP_ART.md` for asset, rendering and evidence contracts.
+
+The final native MSVC build and six affected CTests pass. Ninety Python tests
+across the battle, ship-art and native-client validators pass. Two relocated
+Vulkan runs at 720p/1080p prove direct hull selection, an accepted Core order,
+paused canonical equality, actual F6 save and exact reload except SavedAtUtc.
+The detailed corvette uses one 1254-square RGBA resource; hostile detail remains
+inexact and the hidden picket remains undisclosed. Matched captures with the
+ship layer disabled confirm hull pixels, clear corners and no background changes.
+Both final captures were visually inspected. Four neighboring ship-art and
+500-system navigation runs pass with the final executable.
+
+Evidence: `work/native-battle-sprite-build.log`,
+`work/native-battle-sprite-ctest.log`, `work/native-battle-sprite-runtime.json`
+and `work/native-battle-sprite-neighbors.json`. The local package remains
+UNSEALED. This is one detailed 2D hull family on a schematic tactical battlefield;
+full 3D ships fighting in the solar-system scene remain open. The previous
+checkpoint `319ed4cd` passed GitHub Actions run `35027228449`; CI for the new
+artwork checkpoint is recorded separately after publication. No sustained-60-FPS
+claim is made: neighboring captures still measure cold artwork preparation spikes.
+
+Devin's new `b9e55e79` mid-session New Game change is source-reviewed but not
+imported. Its restart flow ignores explicit startup exit. Before integration,
+split cancellation from Exit to Windows, preserve the current save/audio/cache
+lifecycle, and test cancellation and save failure. The exact gates are in
+`engine/NATIVE_NEW_CAMPAIGN_REVIEW.md`. Surface sprites and quoted-action
+shortcuts remain pending their previously recorded corrections.
+
 ### Native tactical battle integration
 
 The native client now opens an observer-filtered tactical workspace for active
@@ -20,8 +63,8 @@ hidden beneath the incoming opaque backdrop; owned context/non-targeted orders
 apply to the whole selection. Cancelled/orphan/cross-panel gestures cannot issue
 orders. Camera initialization is explicit, fit reserves control space, and dash,
 token and effect work is bounded. Rendered captures exposed and corrected clipped
-formation text and overlapping event rows. Tactical ships remain schematic;
-this does not complete detailed ship artwork fighting in a solar-system scene.
+formation text and overlapping event rows. The corvette layer above extends
+this checkpoint; it does not complete detailed ships in a solar-system scene.
 
 Manual saves now accept a successfully completed tactical frame. Player17 shape
 and Core clock/save flags remain unchanged, and strategic autosave policy is

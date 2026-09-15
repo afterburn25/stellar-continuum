@@ -32,6 +32,9 @@ NATIVE_SHIP_ART_SOURCES = {
     "interstellar-bulk-freighter": (
         "assets/visual/ships/interstellar-bulk-freighter.png",
         "assets/visual/ships/interstellar-bulk-freighter.png"),
+    "patrol-corvette-tactical-v1": (
+        "assets/visual/ships/patrol-corvette-tactical-v1.png",
+        "assets/visual/ships/patrol-corvette-tactical-v1.png"),
     "credits": (
         "docs/engine/NATIVE_SHIP_ART_SOURCES.md",
         "Licenses/Ship-art-sources.md"),

@@ -55,6 +55,9 @@ struct Image {
   std::optional<UiRect> source;
   Color tint{255,255,255,255};
   std::optional<UiRect> clip;
+  // Clockwise rotation about the destination center, in drawable space.
+  // Appended with a neutral default to preserve existing image callers.
+  float rotation_degrees{};
 };
 using WorldCommand=std::variant<Line,Circle,Text,Image>;
 using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh>;

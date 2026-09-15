@@ -30,7 +30,9 @@ target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_d
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
   app/native_client/native_support.cpp app/native_client/native_support_service.cpp
-  app/native_client/native_battle_workspace.cpp)
+  app/native_client/native_battle_workspace.cpp
+  app/native_client/native_battle_art.cpp
+  app/native_client/native_battle_sprites.cpp)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_surface_art_assets.cpp)
 add_dependencies(stellar-continuum-native stellar_native_surface_art_assets)
 add_dependencies(stellar-continuum-native stellar_native_audio_assets)
@@ -147,3 +149,16 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_diplomacy_workspace.cpp)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceVisualTests.cmake")
+
+if(BUILD_TESTING)
+  add_executable(stellar_battle_sprites_tests
+    native-tests/native_battle_sprites_tests.cpp
+    app/native_client/native_battle_sprites.cpp
+    app/native_client/native_battle_workspace.cpp)
+  target_include_directories(stellar_battle_sprites_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_battle_sprites_tests PRIVATE stellar_native_image stellar_core)
+  if(MSVC)
+    target_compile_options(stellar_battle_sprites_tests PRIVATE /W4 /WX /permissive-)
+  endif()
+  add_test(NAME native_battle_sprites COMMAND stellar_battle_sprites_tests "${CMAKE_SOURCE_DIR}")
+endif()

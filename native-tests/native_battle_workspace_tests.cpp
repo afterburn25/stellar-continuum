@@ -365,6 +365,251 @@ void speed_and_chrome() {
           "escape must open the menu");
 }
 
+void ship_art_hit_targets() {
+  constexpr int width = 1280, height = 720;
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, width, height);
+  const BattleShipTarget first{11, {700, 400}, 120, 45};
+  const BattleShipTarget second{12, {850, 450}, 100, -20};
+  workspace.set_ship_targets({first, second}, width, height);
+
+  const auto radians = first.heading_degrees * .01745329251994329577f;
+  const Point hull{first.center.x + std::cos(radians) * first.size * .3f,
+                   first.center.y + std::sin(radians) * first.size * .3f};
+  (void)workspace.handle(press(InputEventType::LeftPressed, hull), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, hull), width,
+                         height);
+  require(workspace.selection() == std::set<std::int64_t>{11},
+          "rotated visible ship hull did not select its formation");
+
+  workspace.set_ship_targets(
+      {{11, {780, 420}, 120, 0}, {12, {780, 420}, 120, 0}}, width,
+      height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, {780, 420}), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, {780, 420}), width,
+                         height);
+  require(workspace.selection() == std::set<std::int64_t>{12},
+          "overlapping ship hits did not prefer last-drawn geometry");
+  workspace.set_ship_targets({first, second}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, hull), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, hull), width,
+                         height);
+
+  (void)workspace.handle(press(InputEventType::RightPressed, second.center),
+                         width, height);
+  const auto command = workspace.handle(
+      press(InputEventType::RightReleased, second.center), width, height);
+  require(command.kind == BattleWorkspaceCommandKind::IssueOrder &&
+              command.orders.size() == 1 &&
+              command.orders.front().formation_id == 11 &&
+              command.orders.front().target_formation_id ==
+                  std::optional<std::int64_t>{12},
+          "ship context hit changed the authoritative formation identities");
+
+  workspace.set_ship_targets({first}, width, height);
+  const Point transparent_corner{first.center.x + first.size * .4f,
+                                 first.center.y + first.size * .4f};
+  (void)workspace.handle(
+      press(InputEventType::LeftPressed, transparent_corner), width, height);
+  (void)workspace.handle(
+      press(InputEventType::LeftReleased, transparent_corner), width, height);
+  require(workspace.selection().empty(),
+          "transparent artwork corner selected the formation");
+  const Point plume{first.center.x - std::cos(radians) * first.size * .65f,
+                    first.center.y - std::sin(radians) * first.size * .65f};
+  (void)workspace.handle(press(InputEventType::LeftPressed, plume), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, plume), width,
+                         height);
+  require(workspace.selection().empty(),
+          "transparent thruster plume selected the formation");
+
+  workspace.set_ship_targets({BattleShipTarget{77, {760, 470}, 140, 0}},
+                             width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, {760, 470}), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, {760, 470}), width,
+                         height);
+  require(workspace.selection().empty(),
+          "foreign artwork exposed owned controls");
+
+  std::vector<BattleShipTarget> capped;
+  for (int index = 0; index < 32; ++index)
+    capped.push_back({11, {100.f + index * 14.f, 520}, 10, 0});
+  capped.push_back({11, {900, 520}, 80, 0});
+  workspace.set_ship_targets(std::move(capped), width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, {900, 520}), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, {900, 520}), width,
+                         height);
+  require(workspace.selection().empty(),
+          "ship target storage exceeded its hard limit");
+
+  workspace.set_ship_targets({first}, width, height);
+  auto refreshed = snapshot();
+  ++refreshed.tick;
+  workspace.set_snapshot(refreshed, .1);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().contains(11),
+          "same-battle observer refresh discarded last-drawn ship geometry");
+
+  workspace.set_ship_targets({first}, width, height);
+  auto changed_battle = snapshot();
+  changed_battle.battle_id[0] = 99;
+  workspace.set_snapshot(changed_battle, .1);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "changed battle retained stale ship geometry");
+
+  workspace.set_snapshot(snapshot(), .1);
+  workspace.set_ship_targets({first}, width, height);
+  auto departed = snapshot();
+  std::erase_if(departed.formations, [](const MassiveObservedFormation &value) {
+    return value.formation_id == 11;
+  });
+  workspace.set_snapshot(departed, .1);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "departed formation retained stale ship geometry");
+  workspace.set_snapshot(snapshot(), .1);
+
+  workspace.set_ship_targets({first}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, {690, 390}), width,
+                         height);
+  InputEvent drag = press(InputEventType::PointerMove, {710, 410});
+  drag.delta = {20, 20};
+  (void)workspace.handle(drag, width, height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, {710, 410}), width,
+                         height);
+  require(workspace.selection().contains(11),
+          "box selection omitted the visible owned hull center");
+
+  workspace.set_ship_targets({first}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), 1920,
+                         1080);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         1920, 1080);
+  require(workspace.selection().empty(),
+          "resized viewport retained stale ship geometry");
+  const BattleShipTarget resized{11, {1000, 600}, 120, 0};
+  DrawList resized_draw;
+  workspace.render(
+      resized_draw, 1920, 1080,
+      [&](DrawList &, const UiRect &, float, float) {
+        workspace.set_ship_targets({resized}, 1920, 1080);
+      });
+  (void)workspace.handle(press(InputEventType::LeftPressed, resized.center),
+                         1920, 1080);
+  (void)workspace.handle(press(InputEventType::LeftReleased, resized.center),
+                         1920, 1080);
+  require(workspace.selection().contains(11),
+          "fresh resized draw did not restore ship interaction");
+
+  workspace.set_ship_targets({first}, width, height);
+  InputEvent wheel = press(InputEventType::Wheel, {600, 350});
+  wheel.wheel_y = 1;
+  (void)workspace.handle(wheel, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "camera mutation retained stale ship geometry");
+  workspace.set_ship_targets({first}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().contains(11),
+          "fresh ship geometry was not restored after camera redraw");
+
+  workspace.set_ship_targets({first}, width, height);
+  const auto fit_button =
+      center(BattleWorkspaceLayout::for_viewport(width, height).fit);
+  (void)workspace.handle(press(InputEventType::LeftPressed, fit_button), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, fit_button), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "FIT retained stale ship geometry");
+
+  const BattleShipTarget pan_target{11, {900, 560}, 80, 0};
+  workspace.set_ship_targets({pan_target}, width, height);
+  (void)workspace.handle(press(InputEventType::RightPressed, {500, 300}), width,
+                         height);
+  InputEvent pan = press(InputEventType::PointerMove, {525, 315});
+  pan.delta = {25, 15};
+  (void)workspace.handle(pan, width, height);
+  (void)workspace.handle(press(InputEventType::RightReleased, {525, 315}), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, pan_target.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, pan_target.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "camera pan retained stale ship geometry");
+
+  const auto play = center(BattleWorkspaceLayout::for_viewport(width, height).play);
+  workspace.set_ship_targets({BattleShipTarget{11, play, 200, 0}}, width,
+                             height);
+  const auto chrome = workspace.handle(
+      press(InputEventType::LeftPressed, play), width, height);
+  require(chrome.kind == BattleWorkspaceCommandKind::TogglePause &&
+              workspace.selection().empty(),
+          "ship target bypassed authoritative chrome routing");
+
+  const auto formation_center = workspace.project({-60, 0}, width, height);
+  const BattleShipTarget label_blocker{
+      11, {formation_center.x + 60, formation_center.y}, 100, 0};
+  DrawList draw;
+  workspace.render(
+      draw, width, height,
+      [&](DrawList &, const UiRect &, float, float) {
+        workspace.set_ship_targets({label_blocker}, width, height);
+      });
+  const auto label = std::ranges::find_if(draw.overlay, [](const auto &item) {
+    const auto text = std::get_if<Text>(&item);
+    return text && text->value == "Vanguard Fleet";
+  });
+  require(label != draw.overlay.end(), "owned formation label disappeared");
+  const auto *label_text = std::get_if<Text>(&*label);
+  require(label_text && label_text->clip, "formation label has no bounds");
+  const UiRect ship_bounds{label_blocker.center.x - 50,
+                           label_blocker.center.y - 50, 100, 100};
+  const auto &label_bounds = *label_text->clip;
+  require(label_bounds.x + label_bounds.width <= ship_bounds.x ||
+              ship_bounds.x + ship_bounds.width <= label_bounds.x ||
+              label_bounds.y + label_bounds.height <= ship_bounds.y ||
+              ship_bounds.y + ship_bounds.height <= label_bounds.y,
+          "formation label overlapped current ship artwork");
+
+  workspace.set_ship_targets({first}, width, height);
+  workspace.close();
+  workspace.open(snapshot(), 1, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, first.center), width,
+                         height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, first.center),
+                         width, height);
+  require(workspace.selection().empty(),
+          "closed workspace retained stale ship geometry");
+}
+
 void camera_roundtrip_and_resize() {
   NativeBattleWorkspace workspace;
   workspace.open(snapshot(),1,1280,720);
@@ -524,6 +769,7 @@ int main() {
     gesture_ownership();
     order_commands();
     speed_and_chrome();
+    ship_art_hit_targets();
     camera_roundtrip_and_resize();
     malformed_geometry_is_bounded();
     snapshot_drops_departed_selection();

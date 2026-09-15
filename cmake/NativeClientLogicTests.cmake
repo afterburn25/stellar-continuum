@@ -9,6 +9,18 @@ if(MSVC)
   target_compile_options(stellar_battle_workspace_tests PRIVATE /W4 /WX /permissive-)
 endif()
 
+add_executable(stellar_native_battle_art_tests
+  native-tests/native_battle_art_tests.cpp
+  app/native_client/native_battle_art.cpp)
+target_include_directories(stellar_native_battle_art_tests PRIVATE
+  app/native_client engine/include)
+target_link_libraries(stellar_native_battle_art_tests PRIVATE stellar_core)
+add_test(NAME native_battle_art COMMAND stellar_native_battle_art_tests)
+if(MSVC)
+  target_compile_options(stellar_native_battle_art_tests PRIVATE
+    /W4 /WX /permissive-)
+endif()
+
 add_executable(stellar_native_support_tests
   native-tests/native_support_tests.cpp app/native_client/native_support.cpp)
 target_include_directories(stellar_native_support_tests PRIVATE app/native_client)

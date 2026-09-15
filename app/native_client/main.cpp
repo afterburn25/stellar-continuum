@@ -36,6 +36,8 @@
 #include "native_planet_disc_assets.hpp"
 #include "native_fleet_route_effects.hpp"
 #include "native_ship_art_assets.hpp"
+#include "native_battle_art.hpp"
+#include "native_battle_sprites.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
 #include "native_startup_entry.hpp"
@@ -77,6 +79,7 @@
 #include <vector>
 
 namespace {
+namespace native_battle_art=stellar::native_battle_art;
 using namespace stellar::core;
 using namespace stellar::native_map;
 
@@ -514,6 +517,7 @@ class NativeCampaign final {
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         ship_art_(std::filesystem::absolute(asset_root)),
+        battle_sprites_(std::filesystem::absolute(asset_root)),
         surface_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
         text_measurer_(text_measurer),
@@ -1478,6 +1482,15 @@ class NativeCampaign final {
       if(frame.tactical_clock().speed_multiplier()!=0.)throw std::runtime_error("Battle replay could not pause after advancement.");
     }
     refresh_battle(width,height,.1);
+    (void)scene(width,height); // Bind hit geometry from the actual drawn ship.
+    if(battle_art_plan_.size()!=1)throw std::runtime_error("Battle replay lacks its bound corvette.");
+    const auto ship_point=battle_art_plan_.front().center;
+    const auto ship_formation=battle_art_plan_.front().formation_id;
+    diplomacy_smoke_click({width*.45f,height*.72f},width,height);
+    if(!battle_workspace_.selection().empty())throw std::runtime_error("Battle sprite test did not clear formation selection.");
+    diplomacy_smoke_click(ship_point,width,height);
+    smoke_battle_ship_selected_=battle_workspace_.selection().contains(ship_formation);
+    if(!smoke_battle_ship_selected_)throw std::runtime_error("Clicking the drawn corvette did not select its formation.");
     smoke_battle_canonical_=canonical();
     if(reload&&smoke_battle_canonical_!=before)throw std::runtime_error("Paused tactical reload changed canonical state.");
     // Save through the real tactical F6 route; the frame loop has no fallback.
@@ -1511,6 +1524,30 @@ class NativeCampaign final {
         <<",\"tick\":"<<snapshot->tick<<",\"tokens\":"<<battle_workspace_.rendered_tokens()
         <<",\"sample_x\":"<<sample.x<<",\"sample_y\":"<<sample.y<<"}";
     return out.str();
+  }
+  void battle_art_smoke(int width,int height,const std::function<void(const DrawList&)>& draw_without){
+    const auto before=battle_smoke_status(width,height);
+    battle_art_suppressed_=true;
+    try {draw_without(scene(width,height));}
+    catch(...){battle_art_suppressed_=false;throw;}
+    battle_art_suppressed_=false;
+    if(battle_smoke_status(width,height)!=before)throw std::runtime_error("Battle artwork changed paused canonical state.");
+    if(battle_art_plan_.size()!=1||!battle_sprites_.resource())
+      throw std::runtime_error("Battle artwork smoke requires one bound corvette sprite.");
+    const auto& sprite=battle_art_plan_.front();const auto* resource=battle_sprites_.resource();
+    const auto& observed=battle_workspace_.snapshot()->formations;
+    const auto observer=session_->frame().runtime().world().campaign().player_civilization_id;
+    const auto foreign=std::ranges::count_if(battle_art_plan_,[&](const auto& planned){
+      const auto formation=std::ranges::find(observed,planned.formation_id,&MassiveObservedFormation::formation_id);
+      return formation==observed.end()||formation->civilization_id!=observer;
+    });
+    std::cout<<"battle_art={\"sprites\":"<<battle_art_plan_.size()<<",\"foreign_sprites\":"<<foreign
+      <<",\"source_width\":"<<resource->width()<<",\"source_height\":"<<resource->height()
+      <<",\"source_bytes\":"<<resource->byte_size()<<",\"alpha_pixels\":"<<battle_sprites_.transparent_pixels()
+      <<",\"center_x\":"<<sprite.center.x<<",\"center_y\":"<<sprite.center.y
+      <<",\"size\":"<<sprite.size.x<<",\"heading_degrees\":"<<sprite.heading_degrees
+      <<",\"moving\":"<<(sprite.moving?"true":"false")<<",\"ship_selected\":"<<(smoke_battle_ship_selected_?"true":"false")
+      <<",\"paused_unchanged\":true}\n";
   }
   void support_smoke(int width,int height,bool expect_failure,
       const std::function<void(const DrawList&,bool)>& draw){
@@ -1927,7 +1964,7 @@ class NativeCampaign final {
       diplomacy_portraits_.clear();
       colony_workspace_.discard_campaign();
       surface_workspace_.discard_campaign();
-      battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;
+      battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();battle_art_plan_.clear();
       settlement_workspace_.discard_campaign();
       colony_entry_view_.reset();
       system_workspace_.discard_campaign();
@@ -2242,7 +2279,19 @@ class NativeCampaign final {
 
   [[nodiscard]] DrawList scene(int width,int height){
     if(battle_workspace_.visible()&&!menu_){
-      DrawList tactical;battle_workspace_.render(tactical,width,height);return tactical;
+      DrawList tactical;
+      battle_art_plan_.clear();
+      battle_workspace_.render(tactical,width,height,[&](DrawList& layer,const UiRect& field,float zoom,float scale){
+        battle_art_plan_=native_battle_art::prepare_battle_art(battle_art_bindings_,
+            [&](MassivePoint point){return battle_workspace_.project(point,width,height);},field,zoom,scale);
+        std::vector<native_battle_ui::BattleShipTarget> targets;
+        targets.reserve(battle_art_plan_.size());
+        for(const auto& sprite:battle_art_plan_)
+          targets.push_back({sprite.formation_id,sprite.center,sprite.size.x,sprite.heading_degrees});
+        battle_workspace_.set_ship_targets(std::move(targets),width,height);
+        if(!battle_art_suppressed_)battle_sprites_.append(layer,battle_art_plan_);
+      });
+      return tactical;
     }
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
@@ -2549,19 +2598,29 @@ class NativeCampaign final {
     auto& frame=session_->frame();
     const auto& world=frame.runtime().world().campaign();
     const bool active=world.active_combat_encounter&&!world.active_combat_encounter->reconciled;
-    if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;return;}
+    if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();return;}
+    bool observed_changed=false;
     if(!battle_workspace_.visible()){
       notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
       construction_workspace_.close();diplomacy_workspace_.close();system_workspace_.close();
       colony_workspace_.close();surface_workspace_.close();
       battle_workspace_.open(frame.tactical_snapshot(),world.player_civilization_id,width,height);
+      observed_changed=true;
       battle_refresh_elapsed_=0.;
     }else{
       battle_refresh_elapsed_+=std::max(0.,elapsed);
       if(battle_refresh_elapsed_>=.1){
         battle_workspace_.set_snapshot(frame.tactical_snapshot(),battle_refresh_elapsed_);
+        observed_changed=true;
         battle_refresh_elapsed_=0.;
       }
+    }
+    if(observed_changed){
+      const auto fleets=fleet_controller_.build(frame,session_->cache().generation);
+      battle_art_bindings_.clear();
+      if(player_species_id()=="terran_baseline")
+        battle_art_bindings_=native_battle_art::bind_owned_battle_art(*battle_workspace_.snapshot(),
+            *world.active_combat_encounter,world.player_civilization_id,fleets);
     }
     battle_workspace_.set_tactical_speed(frame.tactical_clock().speed_multiplier(),frame.tactical_resume_speed());
   }
@@ -3188,6 +3247,11 @@ class NativeCampaign final {
   std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>()};
   NativePlanetDiscAssets planet_discs_;
   NativeShipArtAssets ship_art_;
+  native_battle_art::NativeBattleSprites battle_sprites_;
+  std::vector<native_battle_art::BattleArtBinding> battle_art_bindings_;
+  std::vector<native_battle_art::BattleArtSprite> battle_art_plan_;
+  bool battle_art_suppressed_{};
+  bool smoke_battle_ship_selected_{};
   stellar::native_surface_ui::NativeSurfaceArtAssets surface_art_;
   SystemTextMeasurer text_measurer_;
   NativeSystemWorkspace system_workspace_;
@@ -3533,6 +3597,10 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.battle_smoke)
+          campaign.battle_art_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
+            window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-ships"));
+          });
         if(options.support_check)
           campaign.support_smoke(window.drawable_width(),window.drawable_height(),
               options.support_failure_check,[&](const DrawList& draw,bool capture_result){
