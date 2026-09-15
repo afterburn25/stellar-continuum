@@ -1,0 +1,79 @@
+<Window x:Class="Stellar.Editor.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Stellar.Editor"
+        Title="Stellar Engine Editor" Width="1480" Height="940" MinWidth="1080" MinHeight="740" Background="#0B111B" Foreground="#DFE8F4" FontFamily="Segoe UI" UseLayoutRounding="True" Closing="OnClosing">
+  <Grid x:Name="RootGrid">
+    <Grid.RowDefinitions><RowDefinition Height="74"/><RowDefinition Height="46"/><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
+    <Border Background="#131D2B" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="20,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="✦" FontSize="33" Foreground="#69D8D0" Margin="0,0,12,0"/>
+          <StackPanel><TextBlock Text="STELLAR ENGINE" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="CONTINUUM WORLD EDITOR   /   EARLY ACCESS 0.1" FontSize="10" Foreground="{StaticResource Muted}" Margin="1,3,0,0"/></StackPanel>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button x:Name="NewButton" Content="New project" Click="NewClick" Margin="6,0"/>
+          <Button x:Name="OpenButton" Content="Open" Click="OpenClick" Margin="0,0,6,0"/>
+          <Button x:Name="SaveButton" Content="Save project" Click="SaveClick" Background="#246D72" BorderBrush="#469D9B" Margin="0,0,6,0"/>
+          <Button Content="Save as…" Click="SaveAsClick" Margin="0,0,6,0"/>
+          <Button Content="Help" Click="HelpClick"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+    <Border Grid.Row="1" Background="#0F1824" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="16,0">
+      <DockPanel VerticalAlignment="Center"><TextBlock x:Name="ProjectTitle" Text="Stellar Continuum — First Light" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><TextBlock Text="●" Foreground="#69D8D0" Margin="0,0,6,0"/><TextBlock Text="Native engine connected" Foreground="#A3C9CE"/><TextBlock Text="   |   Galaxy &amp; colony preview" Foreground="{StaticResource Muted}"/></StackPanel>
+      </DockPanel>
+    </Border>
+    <Grid x:Name="WorkspaceGrid" Grid.Row="2" Margin="10">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="248" MinWidth="210"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*" MinWidth="350"/><ColumnDefinition Width="5"/><ColumnDefinition Width="292" MinWidth="260"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="*" MinHeight="300"/><RowDefinition Height="5"/><RowDefinition Height="222" MinHeight="165"/></Grid.RowDefinitions>
+      <Border Grid.Column="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top"><TextBlock Text="WORLD OUTLINER" Style="{StaticResource SectionTitle}"/><ComboBox x:Name="CategoryBox" SelectedIndex="0" SelectionChanged="FilterChanged"><ComboBoxItem Content="Star systems"/><ComboBoxItem Content="Planetary bodies"/><ComboBoxItem Content="Civilizations"/><ComboBoxItem Content="Colonies"/><ComboBoxItem Content="Bookmarked systems"/></ComboBox><TextBox x:Name="SearchBox" Margin="0,9,0,6" TextChanged="SearchChanged" ToolTip="Search world objects by name"/><TextBlock x:Name="ObjectCount" Text="Generate a world to begin" Foreground="{StaticResource Muted}" FontSize="10" Margin="2,0,0,8"/></StackPanel>
+          <ListBox x:Name="ObjectList" SelectionChanged="ObjectSelected" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True"/>
+        </DockPanel>
+      </Border>
+      <GridSplitter Grid.Column="1" Grid.RowSpan="3" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="3"/>
+      <Border x:Name="GalaxyPanel" Grid.Column="2" Background="#080E17" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
+        <Grid>
+          <local:GalaxyViewport x:Name="Viewport" Margin="0,84,0,40"/>
+          <Border VerticalAlignment="Top" Background="#151F2E" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="10,7">
+            <StackPanel>
+              <DockPanel LastChildFill="False">
+                <ComboBox x:Name="ViewModeBox" Width="94" SelectedIndex="0" SelectionChanged="ViewModeChanged" ToolTip="Detailed galaxy or system map"><ComboBoxItem Content="Galaxy"/><ComboBoxItem Content="Map"/></ComboBox>
+                <CheckBox x:Name="LabelsBox" Content="Names" IsChecked="False" VerticalAlignment="Center" Checked="LabelsChanged" Unchecked="LabelsChanged" Margin="10,0"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button Content="Fit" Click="FitClick" Padding="8,4" Margin="0,0,5,0"/><Button Content="Focus" Click="FocusClick" Padding="8,4" Margin="0,0,5,0"/><Button x:Name="ExpandButton" Content="Expand" Click="ExpandClick" Padding="8,4"/></StackPanel>
+              </DockPanel>
+              <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions><TextBlock Text="Viewing angle" FontSize="10" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/><Slider x:Name="TiltSlider" Grid.Column="1" Minimum="0" Maximum="65" Value="24" ValueChanged="TiltChanged" ToolTip="Tilt the galaxy from above"/><TextBlock x:Name="TiltLabel" Grid.Column="2" Text="24°" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
+            </StackPanel>
+          </Border>
+          <Border VerticalAlignment="Bottom" Background="#111B29" Padding="10,6"><TextBlock Text="Scroll: zoom · Drag: pan · Right-drag: orbit · Click: inspect · F: focus" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource Muted}"/></Border>
+          <TextBlock x:Name="EmptyHint" Text="Your universe starts here.&#10;Choose a seed and generate a world." TextAlignment="Center" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="18" Foreground="#7E94AD" IsHitTestVisible="False"/>
+        </Grid>
+      </Border>
+      <GridSplitter Grid.Column="3" Grid.RowSpan="3" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="3"/>
+      <Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="14">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel><TextBlock Text="INSPECTOR" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="InspectorTitle" Text="Select a star system" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="InspectorKind" Text="Properties appear here" Foreground="{StaticResource Muted}" Margin="0,4,0,14"/><StackPanel x:Name="PropertyPanel"/>
+            <StackPanel x:Name="AnnotationPanel" Visibility="Collapsed" Margin="0,14,0,0"><TextBlock Text="AUTHORING" Style="{StaticResource SectionTitle}"/><TextBlock Text="Editor display name" Foreground="{StaticResource Muted}" Margin="0,0,0,5"/><TextBox x:Name="DisplayNameBox" MaxLength="120"/><TextBlock Text="Design notes" Foreground="{StaticResource Muted}" Margin="0,10,0,5"/><TextBox x:Name="ObjectNotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="74" MaxLength="10000" VerticalScrollBarVisibility="Auto"/><CheckBox x:Name="BookmarkBox" Content="Bookmark this system" Margin="0,10,0,8"/><Button x:Name="ApplyButton" Content="Apply to project" Click="ApplyClick"/><TextBlock Text="Names and notes are project annotations. Physical simulation values are shown read-only." TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,8,0,0"/></StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+      <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Height="3"/>
+      <Border Grid.Row="2" Grid.Column="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="WORLD GENERATOR" Style="{StaticResource SectionTitle}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="76"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,8,0"><TextBlock Text="Seed" Foreground="{StaticResource Muted}" Margin="0,0,0,4"/><TextBox x:Name="SeedBox" Text="8374837"/></StackPanel><StackPanel Grid.Column="1"><TextBlock Text="Systems" Foreground="{StaticResource Muted}" Margin="0,0,0,4"/><ComboBox x:Name="CountBox" SelectedIndex="1"><ComboBoxItem Content="250"/><ComboBoxItem Content="500"/><ComboBoxItem Content="1000"/><ComboBoxItem Content="2500"/></ComboBox></StackPanel></Grid><Button x:Name="GenerateButton" Content="▶  Generate world" Click="GenerateClick" Background="#246D72" BorderBrush="#469D9B" Margin="0,10,0,7"/><Button x:Name="CancelButton" Content="Cancel generation" Click="CancelClick" Visibility="Collapsed" Margin="0,0,0,7"/><TextBlock Text="Creates systems, planets, civilizations and starting colonies. Campaign play follows the migration." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="10"/></StackPanel></ScrollViewer>
+      </Border>
+      <Border Grid.Row="2" Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Margin="0,0,0,8"><TextBlock Text="ENGINE ASSETS" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" Margin="0"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Import…" Click="ImportClick" Padding="8,4" Margin="0,0,5,0"/><Button Content="Add to project" Click="AddAssetClick" Padding="8,4" Margin="0,0,5,0"/><Button Content="Folder" Click="AssetFolderClick" Padding="8,4"/></StackPanel></DockPanel>
+          <Grid Grid.Row="1" Margin="0,0,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="AssetCategoryBox" SelectedIndex="0" SelectionChanged="AssetFilterChanged"><ComboBoxItem Content="All assets"/><ComboBoxItem Content="Audio"/><ComboBoxItem Content="Images"/><ComboBoxItem Content="Models"/><ComboBoxItem Content="Data"/><ComboBoxItem Content="In this project"/></ComboBox><TextBox Grid.Column="1" x:Name="AssetSearchBox" Margin="6,0,0,0" ToolTip="Search assets by filename or source" TextChanged="AssetSearchChanged"/></Grid>
+          <ListBox Grid.Row="2" x:Name="AssetList" SelectionChanged="AssetSelected"/>
+          <DockPanel Grid.Row="3" Margin="0,5,0,0"><TextBlock x:Name="AssetSummary" Text="Your reusable art, voices, music and models" FontSize="10" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Preview" Click="PreviewAssetClick" Padding="8,3" Margin="5,0"/><Button Content="Stop audio" Click="StopAudioClick" Padding="8,3"/></StackPanel></DockPanel>
+        </Grid>
+      </Border>
+      <Border Grid.Row="2" Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="12">
+        <DockPanel><StackPanel DockPanel.Dock="Top"><TextBlock Text="PROJECT &amp; OUTPUT" Style="{StaticResource SectionTitle}"/><TextBox x:Name="ProjectNameBox" Text="Stellar Continuum — First Light" MaxLength="120" LostKeyboardFocus="ProjectNameChanged"/><Button Content="Export world snapshot…" Click="ExportClick" Margin="0,8,0,8"/></StackPanel><TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" BorderThickness="0" Background="Transparent" Foreground="#90A9C5" Padding="0" FontSize="10"/></DockPanel>
+      </Border>
+    </Grid>
+    <Border Grid.Row="3" Background="#142431" BorderBrush="#294051" BorderThickness="0,1,0,0" Padding="14,6"><DockPanel><TextBlock x:Name="StatusText" Text="Ready" FontSize="11"/><TextBlock Text="Stellar Engine 0.1.9   ·   Editor preview" FontSize="10" Foreground="#94B8C7" HorizontalAlignment="Right"/></DockPanel></Border>
+  </Grid>
+</Window>
