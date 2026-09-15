@@ -266,7 +266,18 @@ Existing menu controls and actions remain UI-owned and unchanged in function. Th
 
 ## Research iconography boundary
 
-Technology-specific icons remain intentionally deferred. Shared integration still contains a small legacy technology registry while Adaptive Research #179 owns an evolving possibility graph. Visual work will wait for a stable presentation/category contract rather than hardening transitional technology IDs or creating hundreds of speculative icons.
+The adaptive research catalog now has explicit artwork bindings for all 370 current
+technology IDs. These share 21 original research-family illustrations. Unrevealed
+technologies retain the neutral concealed icon; the artwork catalog does not grant
+knowledge or unlock technologies. The module library adds 42 distinct human station
+upgrade illustrations and 36 renders of existing alien module models. These remain
+concept/model candidates, with readiness stated in the library.
+
+See [Module and research artwork](CATALOG_ARTWORK.md) for coverage, production
+instructions, native UI evidence and remaining scope. The 99 square images ship as
+128-pixel thumbnails and 512-pixel portraits (198 PNGs, about 30 MiB).
+Generation prompts, source model hashes and delivery hashes are recorded in
+[the production provenance](../assets/visual/catalog/production/provenance.json).
 
 ## Provenance rules
 
