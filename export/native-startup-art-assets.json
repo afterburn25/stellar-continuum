@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "stellar-continuum-splash": {
+      "source": "assets/visual/loading/stellar-continuum-splash.png",
+      "runtimePath": "assets/visual/loading/stellar-continuum-splash.png",
+      "sha256": "6fffd2767e6a478bb149c295cce7a2c8fb311dba1f1fb01a6e7e4c3881767326"
+    },
+    "stellar-loading-splash": {
+      "source": "assets/visual/loading/stellar-loading-splash.png",
+      "runtimePath": "assets/visual/loading/stellar-loading-splash.png",
+      "sha256": "38344b1243df70006fc317f0e222a8e9b5f640fb145663cc2f01cd2b74bb9ecc"
+    },
+    "stellar-galaxy-generation": {
+      "source": "assets/visual/loading/stellar-galaxy-generation.png",
+      "runtimePath": "assets/visual/loading/stellar-galaxy-generation.png",
+      "sha256": "b6445c53df9e3b29101ff95f64d2a05a041c2f94c964a3bf69b1c30f57a59f5f"
+    },
+    "stellar-save-loading": {
+      "source": "assets/visual/loading/stellar-save-loading.png",
+      "runtimePath": "assets/visual/loading/stellar-save-loading.png",
+      "sha256": "facac0a68f057de5fbc724d6702ec92ff6564f5d4a1c7202da6c16c0679e49e9"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_STARTUP_ART_SOURCES.md",
+      "runtimePath": "Licenses/Startup-art-sources.md",
+      "sha256": "db174db14ea396c28286d381cd905c9a43f62f9fd9dbb61a094e19daa1ea51a4"
+    }
+  }
+}

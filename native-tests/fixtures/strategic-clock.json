@@ -1,0 +1,911 @@
+{
+  "SchemaVersion": 1,
+  "RowCount": 40,
+  "SourceFiles": [
+    {
+      "Path": "Simulation/SimulationClock.cs",
+      "Sha256": "CD028194B3E429BD8D3AEF76D6563475A93C4377BC6D181FDFF1628F4D7D383D"
+    },
+    {
+      "Path": "Campaign/CampaignAutosaveScheduler.cs",
+      "Sha256": "15D5E5617F1228D22A7E1C111F6D7213D04BEAA4AAE44A505466969772F72B6C"
+    },
+    {
+      "Path": "Campaign/PlayableDemoScenario.cs",
+      "Sha256": "E75940DEF3A7671ECFB5A5FCCCCB363E415E62BC54F6F92135549C23F7183C9B"
+    }
+  ],
+  "Rows": [
+    {
+      "Name": "restore-clamps-negative",
+      "Operation": "Restore",
+      "Input": {
+        "Days": -2
+      },
+      "Before": {
+        "Speed": 1,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 1,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 1,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 1,
+        "BacklogDays": 0
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "pause-zero-advance",
+      "Operation": "SetSpeed",
+      "Input": {
+        "Speed": 0
+      },
+      "Before": {
+        "Speed": 1,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 1,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 0,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 0
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "paused-advance",
+      "Operation": "Advance",
+      "Input": {
+        "Seconds": 10,
+        "MaximumStepDays": 0.25
+      },
+      "Before": {
+        "Speed": 0,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 0,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 0
+      },
+      "Result": 0,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "maximum-legacy-backlog",
+      "Operation": "SetSpeed",
+      "Input": {
+        "Speed": 4
+      },
+      "Before": {
+        "Speed": 0,
+        "ResumeSpeed": 1,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 0
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "maximum-legacy-advance",
+      "Operation": "Advance",
+      "Input": {
+        "Seconds": 1,
+        "MaximumStepDays": 0.25
+      },
+      "Before": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.3,
+        "EffectiveMultiplier": 0.3,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 7.7
+      },
+      "Result": 0.3,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "legacy-drains-backlog",
+      "Operation": "Advance",
+      "Input": {
+        "Seconds": 0.1,
+        "MaximumStepDays": 0.25
+      },
+      "Before": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.3,
+        "EffectiveMultiplier": 0.3,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 7.7
+      },
+      "After": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "Result": 0.3,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "pause-remembers-maximum",
+      "Operation": "SetSpeed",
+      "Input": {
+        "Speed": 0
+      },
+      "Before": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 0,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 8.2
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "resume-maximum",
+      "Operation": "Resume",
+      "Input": {},
+      "Before": {
+        "Speed": 0,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "select-resume-fast",
+      "Operation": "SelectResumeSpeed",
+      "Input": {
+        "Speed": 2
+      },
+      "Before": {
+        "Speed": 4,
+        "ResumeSpeed": 4,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 4,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "pause-then-resume-fast",
+      "Operation": "SetSpeed",
+      "Input": {
+        "Speed": 0
+      },
+      "Before": {
+        "Speed": 4,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 8,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 0,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 8.2
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "resume-selected-fast",
+      "Operation": "Resume",
+      "Input": {},
+      "Before": {
+        "Speed": 0,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 0,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 8.2
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "bounded-zero-frame",
+      "Operation": "AdvanceBoundedFrame",
+      "Input": {
+        "Seconds": 0,
+        "MaximumDays": 1,
+        "MaximumBacklogDays": 2
+      },
+      "Before": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 2.9999999999999996,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 8.2
+      },
+      "Result": 0,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "bounded-fast-budget",
+      "Operation": "AdvanceBoundedFrame",
+      "Input": {
+        "Seconds": 5,
+        "MaximumDays": 0.5,
+        "MaximumBacklogDays": 0.75
+      },
+      "Before": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 0.6,
+        "EffectiveMultiplier": 0,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 8.2
+      },
+      "After": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 1.1,
+        "EffectiveMultiplier": 0.1,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 0.75
+      },
+      "Result": 0.5,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "bounded-demo-large-jump",
+      "Operation": "SetSpeed",
+      "Input": {
+        "Speed": 5
+      },
+      "Before": {
+        "Speed": 2,
+        "ResumeSpeed": 2,
+        "SimulationDays": 1.1,
+        "EffectiveMultiplier": 0.1,
+        "RequestedMultiplier": 2,
+        "BacklogDays": 0.75
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 1.1,
+        "EffectiveMultiplier": 0.1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0.75
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "bounded-demo-clamped",
+      "Operation": "AdvanceBoundedFrame",
+      "Input": {
+        "Seconds": 1E+300,
+        "MaximumDays": 0.5,
+        "MaximumBacklogDays": 0.75
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 1.1,
+        "EffectiveMultiplier": 0.1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0.75
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 1.6,
+        "EffectiveMultiplier": 5E-301,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0.75
+      },
+      "Result": 0.5,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "developer-frame-four-substeps",
+      "Operation": "AdvanceDeveloperFrame",
+      "Input": {
+        "Seconds": 1
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 1.6,
+        "EffectiveMultiplier": 5E-301,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0.75
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "Result": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "bounded-invalid-budget",
+      "Operation": "AdvanceBoundedFrameInvalid",
+      "Input": {
+        "Seconds": 1,
+        "MaximumDays": 0,
+        "MaximumBacklogDays": 1
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Frame time and budgets must be finite and nonnegative; step budget must be positive. (Parameter \u0027realDeltaSeconds\u0027)"
+    },
+    {
+      "Name": "select-paused-invalid",
+      "Operation": "SelectResumeSpeed",
+      "Input": {
+        "Speed": 0
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Resume speed cannot be paused. (Parameter \u0027speed\u0027)"
+    },
+    {
+      "Name": "autosave-reset",
+      "Operation": "Reset",
+      "Input": {
+        "Days": 0
+      },
+      "Before": {
+        "NextDueDay": "Infinity"
+      },
+      "After": {
+        "NextDueDay": 30
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-before-due",
+      "Operation": "IsDue",
+      "Input": {
+        "Days": 29.999
+      },
+      "Before": {
+        "NextDueDay": 30
+      },
+      "After": {
+        "NextDueDay": 30
+      },
+      "Result": false,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-at-due",
+      "Operation": "IsDue",
+      "Input": {
+        "Days": 30
+      },
+      "Before": {
+        "NextDueDay": 30
+      },
+      "After": {
+        "NextDueDay": 30
+      },
+      "Result": true,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-success",
+      "Operation": "MarkSuccess",
+      "Input": {
+        "Days": 30
+      },
+      "Before": {
+        "NextDueDay": 30
+      },
+      "After": {
+        "NextDueDay": 60
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-large-jump-one-due",
+      "Operation": "IsDue",
+      "Input": {
+        "Days": 95
+      },
+      "Before": {
+        "NextDueDay": 60
+      },
+      "After": {
+        "NextDueDay": 60
+      },
+      "Result": true,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-large-jump-success",
+      "Operation": "MarkSuccess",
+      "Input": {
+        "Days": 95
+      },
+      "Before": {
+        "NextDueDay": 60
+      },
+      "After": {
+        "NextDueDay": 125
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-failure-retry",
+      "Operation": "MarkFailure",
+      "Input": {
+        "Days": 95
+      },
+      "Before": {
+        "NextDueDay": 125
+      },
+      "After": {
+        "NextDueDay": 96
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-retry-before-due",
+      "Operation": "IsDue",
+      "Input": {
+        "Days": 95.999
+      },
+      "Before": {
+        "NextDueDay": 96
+      },
+      "After": {
+        "NextDueDay": 96
+      },
+      "Result": false,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-retry-due",
+      "Operation": "IsDue",
+      "Input": {
+        "Days": 96
+      },
+      "Before": {
+        "NextDueDay": 96
+      },
+      "After": {
+        "NextDueDay": 96
+      },
+      "Result": true,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-overflow-saturates",
+      "Operation": "MarkSuccess",
+      "Input": {
+        "Days": 1.7976931348623157E+308
+      },
+      "Before": {
+        "NextDueDay": 96
+      },
+      "After": {
+        "NextDueDay": 1.7976931348623157E+308
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "autosave-invalid-days",
+      "Operation": "ResetInvalid",
+      "Input": {
+        "Days": -1
+      },
+      "Before": {
+        "NextDueDay": 1.7976931348623157E+308
+      },
+      "After": {
+        "NextDueDay": 1.7976931348623157E+308
+      },
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Simulation days must be finite and non-negative. (Parameter \u0027currentSimulationDays\u0027)"
+    },
+    {
+      "Name": "developer-autosave-reset",
+      "Operation": "DeveloperReset",
+      "Input": {
+        "Days": 0
+      },
+      "Before": {
+        "NextDueDay": "Infinity"
+      },
+      "After": {
+        "NextDueDay": 720
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "developer-autosave-failure",
+      "Operation": "DeveloperMarkFailure",
+      "Input": {
+        "Days": 720
+      },
+      "Before": {
+        "NextDueDay": 720
+      },
+      "After": {
+        "NextDueDay": 768
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "policy-invalid-interval",
+      "Operation": "Policy",
+      "Input": {
+        "IntervalDays": 0,
+        "FailureRetryDays": 1
+      },
+      "Before": {},
+      "After": {},
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Autosave interval must be finite and positive. (Parameter \u0027IntervalDays\u0027)"
+    },
+    {
+      "Name": "policy-invalid-retry",
+      "Operation": "Policy",
+      "Input": {
+        "IntervalDays": 30,
+        "FailureRetryDays": 0
+      },
+      "Before": {},
+      "After": {},
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Autosave retry delay must be finite and positive. (Parameter \u0027FailureRetryDays\u0027)"
+    },
+    {
+      "Name": "legacy-negative-zero-step-budget",
+      "Operation": "AdvanceNegativeZeroBudget",
+      "Input": {
+        "Seconds": 0,
+        "MaximumStepDays": "-0"
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 1,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "Result": "-0",
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "legacy-nan-step-budget",
+      "Operation": "AdvanceNaNBudget",
+      "Input": {
+        "Seconds": 0,
+        "MaximumStepDays": "NaN"
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 2.6,
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 2
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": "NaN"
+      },
+      "Result": "NaN",
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "restore-negative-zero",
+      "Operation": "Restore",
+      "Input": {
+        "Days": -0
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": "NaN"
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "restore-nan",
+      "Operation": "RestoreNaN",
+      "Input": {
+        "Days": "NaN"
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": 0,
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0
+      },
+      "Result": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "legacy-nan-propagates",
+      "Operation": "AdvanceNaN",
+      "Input": {
+        "Seconds": "NaN",
+        "MaximumStepDays": 0.25
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": 0
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": "NaN"
+      },
+      "Result": "NaN",
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "developer-frame-poisoned-nan-backlog",
+      "Operation": "AdvanceDeveloperFramePoisoned",
+      "Input": {
+        "Seconds": 1
+      },
+      "Before": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": 24,
+        "RequestedMultiplier": 24,
+        "BacklogDays": "NaN"
+      },
+      "After": {
+        "Speed": 5,
+        "ResumeSpeed": 5,
+        "SimulationDays": "NaN",
+        "EffectiveMultiplier": "NaN",
+        "RequestedMultiplier": 24,
+        "BacklogDays": "NaN"
+      },
+      "Result": null,
+      "ErrorType": "OverflowException",
+      "ErrorMessage": "Arithmetic operation resulted in an overflow."
+    },
+    {
+      "Name": "invalid-speed-fails-at-multiplier-lookup",
+      "Operation": "InvalidSpeedLookup",
+      "Input": {
+        "Speed": 99
+      },
+      "Before": {
+        "Speed": 99,
+        "ResumeSpeed": 99
+      },
+      "After": {
+        "Speed": 99,
+        "ResumeSpeed": 99
+      },
+      "Result": null,
+      "ErrorType": "IndexOutOfRangeException",
+      "ErrorMessage": "Index was outside the bounds of the array."
+    }
+  ]
+}

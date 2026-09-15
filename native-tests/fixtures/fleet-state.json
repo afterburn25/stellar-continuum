@@ -1,0 +1,4847 @@
+{
+  "Format": "stellar-fleet-state-oracle-v2",
+  "Cases": [
+    {
+      "Name": "combat-profile-catalog",
+      "Kind": "Catalog",
+      "Catalog": [
+        {
+          "Id": "civilian_light_v1",
+          "MaxShields": 0,
+          "MaxArmor": 10,
+          "MaxHull": 45,
+          "WeaponDamage": 0,
+          "WeaponIntervalDays": 1,
+          "RetreatDelayDays": 0.75,
+          "HasWeapon": false,
+          "SustainedDamagePerDay": 0
+        },
+        {
+          "Id": "civilian_science_v1",
+          "MaxShields": 0,
+          "MaxArmor": 14,
+          "MaxHull": 60,
+          "WeaponDamage": 0,
+          "WeaponIntervalDays": 1,
+          "RetreatDelayDays": 1,
+          "HasWeapon": false,
+          "SustainedDamagePerDay": 0
+        },
+        {
+          "Id": "civilian_heavy_v1",
+          "MaxShields": 0,
+          "MaxArmor": 24,
+          "MaxHull": 105,
+          "WeaponDamage": 0,
+          "WeaponIntervalDays": 1,
+          "RetreatDelayDays": 1.5,
+          "HasWeapon": false,
+          "SustainedDamagePerDay": 0
+        },
+        {
+          "Id": "patrol_corvette_mk1",
+          "MaxShields": 35,
+          "MaxArmor": 45,
+          "MaxHull": 95,
+          "WeaponDamage": 28,
+          "WeaponIntervalDays": 0.75,
+          "RetreatDelayDays": 1.5,
+          "HasWeapon": true,
+          "SustainedDamagePerDay": 37.333333333333336
+        }
+      ]
+    },
+    {
+      "Name": "profile-get-valid",
+      "Kind": "ProfileGet",
+      "Arguments": {
+        "ProfileId": "civilian_science_v1"
+      },
+      "Result": {
+        "Id": "civilian_science_v1",
+        "MaxShields": 0,
+        "MaxArmor": 14,
+        "MaxHull": 60,
+        "WeaponDamage": 0,
+        "WeaponIntervalDays": 1,
+        "RetreatDelayDays": 1,
+        "HasWeapon": false,
+        "SustainedDamagePerDay": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "profile-get-missing",
+      "Kind": "ProfileGet",
+      "Arguments": {
+        "ProfileId": "missing"
+      },
+      "Result": null,
+      "Error": {
+        "Type": "KeyNotFoundException",
+        "Message": "The given key \u0027missing\u0027 was not present in the dictionary."
+      }
+    },
+    {
+      "Name": "profile-find-valid",
+      "Kind": "ProfileFind",
+      "Arguments": {
+        "ProfileId": "civilian_heavy_v1"
+      },
+      "Result": {
+        "Id": "civilian_heavy_v1",
+        "MaxShields": 0,
+        "MaxArmor": 24,
+        "MaxHull": 105,
+        "WeaponDamage": 0,
+        "WeaponIntervalDays": 1,
+        "RetreatDelayDays": 1.5,
+        "HasWeapon": false,
+        "SustainedDamagePerDay": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "profile-find-missing",
+      "Kind": "ProfileFind",
+      "Arguments": {
+        "ProfileId": "missing"
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "initial-Scout",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 0,
+        "ProfileId": null
+      },
+      "Result": {
+        "ProfileId": "civilian_light_v1",
+        "Shields": 0,
+        "Armor": 10,
+        "Hull": 45,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-Science",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 1,
+        "ProfileId": null
+      },
+      "Result": {
+        "ProfileId": "civilian_science_v1",
+        "Shields": 0,
+        "Armor": 14,
+        "Hull": 60,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-Colony",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 2,
+        "ProfileId": null
+      },
+      "Result": {
+        "ProfileId": "civilian_heavy_v1",
+        "Shields": 0,
+        "Armor": 24,
+        "Hull": 105,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-Military",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 3,
+        "ProfileId": null
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 45,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-Logistics",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 4,
+        "ProfileId": null
+      },
+      "Result": {
+        "ProfileId": "civilian_light_v1",
+        "Shields": 0,
+        "Armor": 10,
+        "Hull": 45,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-explicit",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 0,
+        "ProfileId": "patrol_corvette_mk1"
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 45,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-empty",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 3,
+        "ProfileId": ""
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 45,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-whitespace",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 1,
+        "ProfileId": " \t"
+      },
+      "Result": {
+        "ProfileId": "civilian_science_v1",
+        "Shields": 0,
+        "Armor": 14,
+        "Hull": 60,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "initial-unknown",
+      "Kind": "Initial",
+      "Arguments": {
+        "Role": 3,
+        "ProfileId": "unknown"
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 45,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null
+    },
+    {
+      "Name": "ensure-null",
+      "Kind": "Ensure",
+      "Arguments": {},
+      "Before": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": null,
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 45,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null,
+      "After": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "patrol_corvette_mk1",
+          "Shields": 35,
+          "Armor": 45,
+          "Hull": 95,
+          "WeaponCooldownRemainingDays": 0,
+          "Order": 0,
+          "TargetFleetId": null,
+          "DefendSystemId": null,
+          "RetreatProgressDays": 0,
+          "RetreatStarted": false,
+          "IsDisengaged": false,
+          "DisengagedSystemId": null
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      }
+    },
+    {
+      "Name": "ensure-unknown-resets-whole-state",
+      "Kind": "Ensure",
+      "Arguments": {},
+      "Before": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 0,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "unknown",
+          "Shields": 0,
+          "Armor": 0,
+          "Hull": 4,
+          "WeaponCooldownRemainingDays": 0,
+          "Order": 0,
+          "TargetFleetId": 8,
+          "DefendSystemId": null,
+          "RetreatProgressDays": 0,
+          "RetreatStarted": false,
+          "IsDisengaged": false,
+          "DisengagedSystemId": null
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Result": {
+        "ProfileId": "civilian_light_v1",
+        "Shields": 0,
+        "Armor": 10,
+        "Hull": 45,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null,
+      "After": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 0,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "civilian_light_v1",
+          "Shields": 0,
+          "Armor": 10,
+          "Hull": 45,
+          "WeaponCooldownRemainingDays": 0,
+          "Order": 0,
+          "TargetFleetId": null,
+          "DefendSystemId": null,
+          "RetreatProgressDays": 0,
+          "RetreatStarted": false,
+          "IsDisengaged": false,
+          "DisengagedSystemId": null
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      }
+    },
+    {
+      "Name": "ensure-clamps-order-and-disengagement",
+      "Kind": "Ensure",
+      "Arguments": {},
+      "Before": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": 4,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "patrol_corvette_mk1",
+          "Shields": 99,
+          "Armor": -1,
+          "Hull": 200,
+          "WeaponCooldownRemainingDays": -1,
+          "Order": 99,
+          "TargetFleetId": 8,
+          "DefendSystemId": 4,
+          "RetreatProgressDays": -1,
+          "RetreatStarted": true,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 3
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": 35,
+        "Armor": 0,
+        "Hull": 95,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": 8,
+        "DefendSystemId": 4,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": true,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null,
+      "After": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": 4,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "patrol_corvette_mk1",
+          "Shields": 35,
+          "Armor": 0,
+          "Hull": 95,
+          "WeaponCooldownRemainingDays": 0,
+          "Order": 0,
+          "TargetFleetId": 8,
+          "DefendSystemId": 4,
+          "RetreatProgressDays": 0,
+          "RetreatStarted": true,
+          "IsDisengaged": false,
+          "DisengagedSystemId": null
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      }
+    },
+    {
+      "Name": "ensure-preserves-nan-and-current-disengagement",
+      "Kind": "Ensure",
+      "Arguments": {},
+      "Before": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": 4,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "patrol_corvette_mk1",
+          "Shields": "NaN",
+          "Armor": "NaN",
+          "Hull": "NaN",
+          "WeaponCooldownRemainingDays": "NaN",
+          "Order": 0,
+          "TargetFleetId": null,
+          "DefendSystemId": null,
+          "RetreatProgressDays": "NaN",
+          "RetreatStarted": false,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 4
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Result": {
+        "ProfileId": "patrol_corvette_mk1",
+        "Shields": "NaN",
+        "Armor": "NaN",
+        "Hull": "NaN",
+        "WeaponCooldownRemainingDays": "NaN",
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": "NaN",
+        "RetreatStarted": false,
+        "IsDisengaged": true,
+        "DisengagedSystemId": 4
+      },
+      "Error": null,
+      "After": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 3,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": 4,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": {
+          "ProfileId": "patrol_corvette_mk1",
+          "Shields": "NaN",
+          "Armor": "NaN",
+          "Hull": "NaN",
+          "WeaponCooldownRemainingDays": "NaN",
+          "Order": 0,
+          "TargetFleetId": null,
+          "DefendSystemId": null,
+          "RetreatProgressDays": "NaN",
+          "RetreatStarted": false,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 4
+        },
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      }
+    },
+    {
+      "Name": "fleet-default-roundtrip",
+      "Kind": "FleetRoundtrip",
+      "Arguments": {},
+      "Before": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 0,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": null,
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Result": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 0,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": null,
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      },
+      "Error": null,
+      "After": {
+        "Id": 7,
+        "CivilizationId": 2,
+        "Name": "Fixture",
+        "Role": 0,
+        "DesignId": null,
+        "Position": {
+          "X": 3,
+          "Y": 4
+        },
+        "CurrentSystemId": null,
+        "DestinationSystemId": null,
+        "TransitPhase": 0,
+        "TransitOriginSystemId": null,
+        "TransitTargetSystemId": null,
+        "TransitProgress": 0,
+        "LocalTransitStart": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitPosition": {
+          "X": 0,
+          "Y": 0
+        },
+        "LocalTransitTarget": {
+          "X": 0,
+          "Y": 0
+        },
+        "PlannedRouteSystemIds": [],
+        "HoldRequested": false,
+        "ReturnToBaseRequested": false,
+        "ReturnToBaseFailureReason": null,
+        "MissionOrderRevision": 0,
+        "DestinationPlanetaryBodyId": null,
+        "PreventAutomaticSettlement": false,
+        "SettlementBodyId": null,
+        "SettlementDaysCompleted": 0,
+        "ReconnaissanceSystemId": null,
+        "ReconnaissanceDaysCompleted": 0,
+        "FreightTargetOutpostId": null,
+        "FreightHomeColonyId": null,
+        "CargoMaterialCapacity": 0,
+        "CargoMaterials": 0,
+        "StrategicSpeed": 22,
+        "MaximumLegRangeLightYears": 360,
+        "FuelCapacityLightYears": 1000,
+        "FuelRemainingLightYears": 1000,
+        "SensorRange": 135,
+        "IsActive": true,
+        "EmbarkedPopulationMillions": 0,
+        "EmbarkedPopulationSpeciesId": null,
+        "Combat": null,
+        "TacticalLoadout": null,
+        "TacticalVessel": null
+      }
+    },
+    {
+      "Name": "fleet-full-roundtrip",
+      "Kind": "FleetRoundtrip",
+      "Arguments": {},
+      "Before": {
+        "Id": -2147483648,
+        "CivilizationId": 2147483647,
+        "Name": "Full",
+        "Role": 99,
+        "DesignId": "resource_outpost_ship",
+        "Position": {
+          "X": -3.25,
+          "Y": 4.5
+        },
+        "CurrentSystemId": -4,
+        "DestinationSystemId": 9,
+        "TransitPhase": 2,
+        "TransitOriginSystemId": 4,
+        "TransitTargetSystemId": 6,
+        "TransitProgress": 0.75,
+        "LocalTransitStart": {
+          "X": 1,
+          "Y": 2
+        },
+        "LocalTransitPosition": {
+          "X": 3,
+          "Y": 4
+        },
+        "LocalTransitTarget": {
+          "X": 5,
+          "Y": 6
+        },
+        "PlannedRouteSystemIds": [
+          6,
+          9,
+          -1
+        ],
+        "HoldRequested": true,
+        "ReturnToBaseRequested": true,
+        "ReturnToBaseFailureReason": "blocked",
+        "MissionOrderRevision": -8,
+        "DestinationPlanetaryBodyId": 44,
+        "PreventAutomaticSettlement": true,
+        "SettlementBodyId": 44,
+        "SettlementDaysCompleted": -2.5,
+        "ReconnaissanceSystemId": 7,
+        "ReconnaissanceDaysCompleted": "NaN",
+        "FreightTargetOutpostId": 8,
+        "FreightHomeColonyId": 2,
+        "CargoMaterialCapacity": -3,
+        "CargoMaterials": "Infinity",
+        "StrategicSpeed": -22,
+        "MaximumLegRangeLightYears": -360,
+        "FuelCapacityLightYears": -1000,
+        "FuelRemainingLightYears": "-Infinity",
+        "SensorRange": -135,
+        "IsActive": false,
+        "EmbarkedPopulationMillions": -7.5,
+        "EmbarkedPopulationSpeciesId": "species-x",
+        "Combat": {
+          "ProfileId": "custom",
+          "Shields": 1,
+          "Armor": 2,
+          "Hull": 3,
+          "WeaponCooldownRemainingDays": 4,
+          "Order": 3,
+          "TargetFleetId": 5,
+          "DefendSystemId": 6,
+          "RetreatProgressDays": 7,
+          "RetreatStarted": true,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 8
+        },
+        "TacticalLoadout": {
+          "MassPerShip": 1,
+          "Acceleration": 2,
+          "MaximumSpeed": 3,
+          "ShieldPerShip": 4,
+          "ArmorPerShip": 5,
+          "HullPerShip": 6,
+          "ReactorOutputPerShip": 7,
+          "CoolingPerShip": 8,
+          "WarpStabilization": 9,
+          "WarpSpoolSeconds": 10,
+          "ModuleSlotCapacity": 11,
+          "MaximumModuleMass": 12,
+          "Weapons": [
+            {
+              "Id": "weapon",
+              "Kind": 2,
+              "MountsPerShip": 2,
+              "DamagePerShot": 3,
+              "ShotsPerSecond": 4,
+              "Range": 5,
+              "Accuracy": 6,
+              "PowerPerSecond": 7,
+              "HeatPerSecond": 8
+            }
+          ],
+          "Modules": [
+            {
+              "Id": "module",
+              "Kind": 2,
+              "InstalledCount": 2,
+              "MassEach": 3,
+              "PowerPerSecondEach": 4,
+              "HeatPerSecondEach": 5,
+              "Condition": 0.5,
+              "Enabled": false,
+              "EffectiveRange": 6,
+              "FieldStrength": 7,
+              "DetectionSignature": 8,
+              "Slots": 9
+            }
+          ]
+        },
+        "TacticalVessel": {
+          "Id": 99,
+          "Name": "History",
+          "DesignId": "design",
+          "IsFlagship": true,
+          "IsCarrier": true,
+          "IsInterdictor": true,
+          "IsStoryShip": true,
+          "HullFraction": 0.1,
+          "EngineFraction": 0.2,
+          "SensorFraction": 0.3,
+          "WarpDriveFraction": 0.4,
+          "ReactorFraction": 0.5,
+          "InterdictorFraction": 0.6,
+          "BattlesFought": -4,
+          "ConfirmedKills": -2,
+          "Destroyed": true,
+          "Escaped": true
+        }
+      },
+      "Result": {
+        "Id": -2147483648,
+        "CivilizationId": 2147483647,
+        "Name": "Full",
+        "Role": 99,
+        "DesignId": "resource_outpost_ship",
+        "Position": {
+          "X": -3.25,
+          "Y": 4.5
+        },
+        "CurrentSystemId": -4,
+        "DestinationSystemId": 9,
+        "TransitPhase": 2,
+        "TransitOriginSystemId": 4,
+        "TransitTargetSystemId": 6,
+        "TransitProgress": 0.75,
+        "LocalTransitStart": {
+          "X": 1,
+          "Y": 2
+        },
+        "LocalTransitPosition": {
+          "X": 3,
+          "Y": 4
+        },
+        "LocalTransitTarget": {
+          "X": 5,
+          "Y": 6
+        },
+        "PlannedRouteSystemIds": [
+          6,
+          9,
+          -1
+        ],
+        "HoldRequested": true,
+        "ReturnToBaseRequested": true,
+        "ReturnToBaseFailureReason": "blocked",
+        "MissionOrderRevision": -8,
+        "DestinationPlanetaryBodyId": 44,
+        "PreventAutomaticSettlement": true,
+        "SettlementBodyId": 44,
+        "SettlementDaysCompleted": -2.5,
+        "ReconnaissanceSystemId": 7,
+        "ReconnaissanceDaysCompleted": "NaN",
+        "FreightTargetOutpostId": 8,
+        "FreightHomeColonyId": 2,
+        "CargoMaterialCapacity": -3,
+        "CargoMaterials": "Infinity",
+        "StrategicSpeed": -22,
+        "MaximumLegRangeLightYears": -360,
+        "FuelCapacityLightYears": -1000,
+        "FuelRemainingLightYears": "-Infinity",
+        "SensorRange": -135,
+        "IsActive": false,
+        "EmbarkedPopulationMillions": -7.5,
+        "EmbarkedPopulationSpeciesId": "species-x",
+        "Combat": {
+          "ProfileId": "custom",
+          "Shields": 1,
+          "Armor": 2,
+          "Hull": 3,
+          "WeaponCooldownRemainingDays": 4,
+          "Order": 3,
+          "TargetFleetId": 5,
+          "DefendSystemId": 6,
+          "RetreatProgressDays": 7,
+          "RetreatStarted": true,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 8
+        },
+        "TacticalLoadout": {
+          "MassPerShip": 1,
+          "Acceleration": 2,
+          "MaximumSpeed": 3,
+          "ShieldPerShip": 4,
+          "ArmorPerShip": 5,
+          "HullPerShip": 6,
+          "ReactorOutputPerShip": 7,
+          "CoolingPerShip": 8,
+          "WarpStabilization": 9,
+          "WarpSpoolSeconds": 10,
+          "ModuleSlotCapacity": 11,
+          "MaximumModuleMass": 12,
+          "Weapons": [
+            {
+              "Id": "weapon",
+              "Kind": 2,
+              "MountsPerShip": 2,
+              "DamagePerShot": 3,
+              "ShotsPerSecond": 4,
+              "Range": 5,
+              "Accuracy": 6,
+              "PowerPerSecond": 7,
+              "HeatPerSecond": 8
+            }
+          ],
+          "Modules": [
+            {
+              "Id": "module",
+              "Kind": 2,
+              "InstalledCount": 2,
+              "MassEach": 3,
+              "PowerPerSecondEach": 4,
+              "HeatPerSecondEach": 5,
+              "Condition": 0.5,
+              "Enabled": false,
+              "EffectiveRange": 6,
+              "FieldStrength": 7,
+              "DetectionSignature": 8,
+              "Slots": 9
+            }
+          ]
+        },
+        "TacticalVessel": {
+          "Id": 99,
+          "Name": "History",
+          "DesignId": "design",
+          "IsFlagship": true,
+          "IsCarrier": true,
+          "IsInterdictor": true,
+          "IsStoryShip": true,
+          "HullFraction": 0.1,
+          "EngineFraction": 0.2,
+          "SensorFraction": 0.3,
+          "WarpDriveFraction": 0.4,
+          "ReactorFraction": 0.5,
+          "InterdictorFraction": 0.6,
+          "BattlesFought": -4,
+          "ConfirmedKills": -2,
+          "Destroyed": true,
+          "Escaped": true
+        }
+      },
+      "Error": null,
+      "After": {
+        "Id": -2147483648,
+        "CivilizationId": 2147483647,
+        "Name": "Full",
+        "Role": 99,
+        "DesignId": "resource_outpost_ship",
+        "Position": {
+          "X": -3.25,
+          "Y": 4.5
+        },
+        "CurrentSystemId": -4,
+        "DestinationSystemId": 9,
+        "TransitPhase": 2,
+        "TransitOriginSystemId": 4,
+        "TransitTargetSystemId": 6,
+        "TransitProgress": 0.75,
+        "LocalTransitStart": {
+          "X": 1,
+          "Y": 2
+        },
+        "LocalTransitPosition": {
+          "X": 3,
+          "Y": 4
+        },
+        "LocalTransitTarget": {
+          "X": 5,
+          "Y": 6
+        },
+        "PlannedRouteSystemIds": [
+          6,
+          9,
+          -1
+        ],
+        "HoldRequested": true,
+        "ReturnToBaseRequested": true,
+        "ReturnToBaseFailureReason": "blocked",
+        "MissionOrderRevision": -8,
+        "DestinationPlanetaryBodyId": 44,
+        "PreventAutomaticSettlement": true,
+        "SettlementBodyId": 44,
+        "SettlementDaysCompleted": -2.5,
+        "ReconnaissanceSystemId": 7,
+        "ReconnaissanceDaysCompleted": "NaN",
+        "FreightTargetOutpostId": 8,
+        "FreightHomeColonyId": 2,
+        "CargoMaterialCapacity": -3,
+        "CargoMaterials": "Infinity",
+        "StrategicSpeed": -22,
+        "MaximumLegRangeLightYears": -360,
+        "FuelCapacityLightYears": -1000,
+        "FuelRemainingLightYears": "-Infinity",
+        "SensorRange": -135,
+        "IsActive": false,
+        "EmbarkedPopulationMillions": -7.5,
+        "EmbarkedPopulationSpeciesId": "species-x",
+        "Combat": {
+          "ProfileId": "custom",
+          "Shields": 1,
+          "Armor": 2,
+          "Hull": 3,
+          "WeaponCooldownRemainingDays": 4,
+          "Order": 3,
+          "TargetFleetId": 5,
+          "DefendSystemId": 6,
+          "RetreatProgressDays": 7,
+          "RetreatStarted": true,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 8
+        },
+        "TacticalLoadout": {
+          "MassPerShip": 1,
+          "Acceleration": 2,
+          "MaximumSpeed": 3,
+          "ShieldPerShip": 4,
+          "ArmorPerShip": 5,
+          "HullPerShip": 6,
+          "ReactorOutputPerShip": 7,
+          "CoolingPerShip": 8,
+          "WarpStabilization": 9,
+          "WarpSpoolSeconds": 10,
+          "ModuleSlotCapacity": 11,
+          "MaximumModuleMass": 12,
+          "Weapons": [
+            {
+              "Id": "weapon",
+              "Kind": 2,
+              "MountsPerShip": 2,
+              "DamagePerShot": 3,
+              "ShotsPerSecond": 4,
+              "Range": 5,
+              "Accuracy": 6,
+              "PowerPerSecond": 7,
+              "HeatPerSecond": 8
+            }
+          ],
+          "Modules": [
+            {
+              "Id": "module",
+              "Kind": 2,
+              "InstalledCount": 2,
+              "MassEach": 3,
+              "PowerPerSecondEach": 4,
+              "HeatPerSecondEach": 5,
+              "Condition": 0.5,
+              "Enabled": false,
+              "EffectiveRange": 6,
+              "FieldStrength": 7,
+              "DetectionSignature": 8,
+              "Slots": 9
+            }
+          ]
+        },
+        "TacticalVessel": {
+          "Id": 99,
+          "Name": "History",
+          "DesignId": "design",
+          "IsFlagship": true,
+          "IsCarrier": true,
+          "IsInterdictor": true,
+          "IsStoryShip": true,
+          "HullFraction": 0.1,
+          "EngineFraction": 0.2,
+          "SensorFraction": 0.3,
+          "WarpDriveFraction": 0.4,
+          "ReactorFraction": 0.5,
+          "InterdictorFraction": 0.6,
+          "BattlesFought": -4,
+          "ConfirmedKills": -2,
+          "Destroyed": true,
+          "Escaped": true
+        }
+      }
+    },
+    {
+      "Name": "ensure-preserves-unrelated-full-fleet",
+      "Kind": "Ensure",
+      "Arguments": {},
+      "Before": {
+        "Id": -2147483648,
+        "CivilizationId": 2147483647,
+        "Name": "Full",
+        "Role": 99,
+        "DesignId": "resource_outpost_ship",
+        "Position": {
+          "X": -3.25,
+          "Y": 4.5
+        },
+        "CurrentSystemId": -4,
+        "DestinationSystemId": 9,
+        "TransitPhase": 2,
+        "TransitOriginSystemId": 4,
+        "TransitTargetSystemId": 6,
+        "TransitProgress": 0.75,
+        "LocalTransitStart": {
+          "X": 1,
+          "Y": 2
+        },
+        "LocalTransitPosition": {
+          "X": 3,
+          "Y": 4
+        },
+        "LocalTransitTarget": {
+          "X": 5,
+          "Y": 6
+        },
+        "PlannedRouteSystemIds": [
+          6,
+          9,
+          -1
+        ],
+        "HoldRequested": true,
+        "ReturnToBaseRequested": true,
+        "ReturnToBaseFailureReason": "blocked",
+        "MissionOrderRevision": -8,
+        "DestinationPlanetaryBodyId": 44,
+        "PreventAutomaticSettlement": true,
+        "SettlementBodyId": 44,
+        "SettlementDaysCompleted": -2.5,
+        "ReconnaissanceSystemId": 7,
+        "ReconnaissanceDaysCompleted": "NaN",
+        "FreightTargetOutpostId": 8,
+        "FreightHomeColonyId": 2,
+        "CargoMaterialCapacity": -3,
+        "CargoMaterials": "Infinity",
+        "StrategicSpeed": -22,
+        "MaximumLegRangeLightYears": -360,
+        "FuelCapacityLightYears": -1000,
+        "FuelRemainingLightYears": "-Infinity",
+        "SensorRange": -135,
+        "IsActive": false,
+        "EmbarkedPopulationMillions": -7.5,
+        "EmbarkedPopulationSpeciesId": "species-x",
+        "Combat": {
+          "ProfileId": "custom",
+          "Shields": 1,
+          "Armor": 2,
+          "Hull": 3,
+          "WeaponCooldownRemainingDays": 4,
+          "Order": 3,
+          "TargetFleetId": 5,
+          "DefendSystemId": 6,
+          "RetreatProgressDays": 7,
+          "RetreatStarted": true,
+          "IsDisengaged": true,
+          "DisengagedSystemId": 8
+        },
+        "TacticalLoadout": {
+          "MassPerShip": 1,
+          "Acceleration": 2,
+          "MaximumSpeed": 3,
+          "ShieldPerShip": 4,
+          "ArmorPerShip": 5,
+          "HullPerShip": 6,
+          "ReactorOutputPerShip": 7,
+          "CoolingPerShip": 8,
+          "WarpStabilization": 9,
+          "WarpSpoolSeconds": 10,
+          "ModuleSlotCapacity": 11,
+          "MaximumModuleMass": 12,
+          "Weapons": [
+            {
+              "Id": "weapon",
+              "Kind": 2,
+              "MountsPerShip": 2,
+              "DamagePerShot": 3,
+              "ShotsPerSecond": 4,
+              "Range": 5,
+              "Accuracy": 6,
+              "PowerPerSecond": 7,
+              "HeatPerSecond": 8
+            }
+          ],
+          "Modules": [
+            {
+              "Id": "module",
+              "Kind": 2,
+              "InstalledCount": 2,
+              "MassEach": 3,
+              "PowerPerSecondEach": 4,
+              "HeatPerSecondEach": 5,
+              "Condition": 0.5,
+              "Enabled": false,
+              "EffectiveRange": 6,
+              "FieldStrength": 7,
+              "DetectionSignature": 8,
+              "Slots": 9
+            }
+          ]
+        },
+        "TacticalVessel": {
+          "Id": 99,
+          "Name": "History",
+          "DesignId": "design",
+          "IsFlagship": true,
+          "IsCarrier": true,
+          "IsInterdictor": true,
+          "IsStoryShip": true,
+          "HullFraction": 0.1,
+          "EngineFraction": 0.2,
+          "SensorFraction": 0.3,
+          "WarpDriveFraction": 0.4,
+          "ReactorFraction": 0.5,
+          "InterdictorFraction": 0.6,
+          "BattlesFought": -4,
+          "ConfirmedKills": -2,
+          "Destroyed": true,
+          "Escaped": true
+        }
+      },
+      "Result": {
+        "ProfileId": "civilian_light_v1",
+        "Shields": 0,
+        "Armor": 10,
+        "Hull": 45,
+        "WeaponCooldownRemainingDays": 0,
+        "Order": 0,
+        "TargetFleetId": null,
+        "DefendSystemId": null,
+        "RetreatProgressDays": 0,
+        "RetreatStarted": false,
+        "IsDisengaged": false,
+        "DisengagedSystemId": null
+      },
+      "Error": null,
+      "After": {
+        "Id": -2147483648,
+        "CivilizationId": 2147483647,
+        "Name": "Full",
+        "Role": 99,
+        "DesignId": "resource_outpost_ship",
+        "Position": {
+          "X": -3.25,
+          "Y": 4.5
+        },
+        "CurrentSystemId": -4,
+        "DestinationSystemId": 9,
+        "TransitPhase": 2,
+        "TransitOriginSystemId": 4,
+        "TransitTargetSystemId": 6,
+        "TransitProgress": 0.75,
+        "LocalTransitStart": {
+          "X": 1,
+          "Y": 2
+        },
+        "LocalTransitPosition": {
+          "X": 3,
+          "Y": 4
+        },
+        "LocalTransitTarget": {
+          "X": 5,
+          "Y": 6
+        },
+        "PlannedRouteSystemIds": [
+          6,
+          9,
+          -1
+        ],
+        "HoldRequested": true,
+        "ReturnToBaseRequested": true,
+        "ReturnToBaseFailureReason": "blocked",
+        "MissionOrderRevision": -8,
+        "DestinationPlanetaryBodyId": 44,
+        "PreventAutomaticSettlement": true,
+        "SettlementBodyId": 44,
+        "SettlementDaysCompleted": -2.5,
+        "ReconnaissanceSystemId": 7,
+        "ReconnaissanceDaysCompleted": "NaN",
+        "FreightTargetOutpostId": 8,
+        "FreightHomeColonyId": 2,
+        "CargoMaterialCapacity": -3,
+        "CargoMaterials": "Infinity",
+        "StrategicSpeed": -22,
+        "MaximumLegRangeLightYears": -360,
+        "FuelCapacityLightYears": -1000,
+        "FuelRemainingLightYears": "-Infinity",
+        "SensorRange": -135,
+        "IsActive": false,
+        "EmbarkedPopulationMillions": -7.5,
+        "EmbarkedPopulationSpeciesId": "species-x",
+        "Combat": {
+          "ProfileId": "civilian_light_v1",
+          "Shields": 0,
+          "Armor": 10,
+          "Hull": 45,
+          "WeaponCooldownRemainingDays": 0,
+          "Order": 0,
+          "TargetFleetId": null,
+          "DefendSystemId": null,
+          "RetreatProgressDays": 0,
+          "RetreatStarted": false,
+          "IsDisengaged": false,
+          "DisengagedSystemId": null
+        },
+        "TacticalLoadout": {
+          "MassPerShip": 1,
+          "Acceleration": 2,
+          "MaximumSpeed": 3,
+          "ShieldPerShip": 4,
+          "ArmorPerShip": 5,
+          "HullPerShip": 6,
+          "ReactorOutputPerShip": 7,
+          "CoolingPerShip": 8,
+          "WarpStabilization": 9,
+          "WarpSpoolSeconds": 10,
+          "ModuleSlotCapacity": 11,
+          "MaximumModuleMass": 12,
+          "Weapons": [
+            {
+              "Id": "weapon",
+              "Kind": 2,
+              "MountsPerShip": 2,
+              "DamagePerShot": 3,
+              "ShotsPerSecond": 4,
+              "Range": 5,
+              "Accuracy": 6,
+              "PowerPerSecond": 7,
+              "HeatPerSecond": 8
+            }
+          ],
+          "Modules": [
+            {
+              "Id": "module",
+              "Kind": 2,
+              "InstalledCount": 2,
+              "MassEach": 3,
+              "PowerPerSecondEach": 4,
+              "HeatPerSecondEach": 5,
+              "Condition": 0.5,
+              "Enabled": false,
+              "EffectiveRange": 6,
+              "FieldStrength": 7,
+              "DetectionSignature": 8,
+              "Slots": 9
+            }
+          ]
+        },
+        "TacticalVessel": {
+          "Id": 99,
+          "Name": "History",
+          "DesignId": "design",
+          "IsFlagship": true,
+          "IsCarrier": true,
+          "IsInterdictor": true,
+          "IsStoryShip": true,
+          "HullFraction": 0.1,
+          "EngineFraction": 0.2,
+          "SensorFraction": 0.3,
+          "WarpDriveFraction": 0.4,
+          "ReactorFraction": 0.5,
+          "InterdictorFraction": 0.6,
+          "BattlesFought": -4,
+          "ConfirmedKills": -2,
+          "Destroyed": true,
+          "Escaped": true
+        }
+      }
+    },
+    {
+      "Name": "legacy-loadout-civilian_light_v1",
+      "Kind": "LegacyLoadout",
+      "Arguments": {
+        "ProfileId": "civilian_light_v1"
+      },
+      "Result": {
+        "MassPerShip": 100,
+        "Acceleration": 18,
+        "MaximumSpeed": 120,
+        "ShieldPerShip": 0,
+        "ArmorPerShip": 10,
+        "HullPerShip": 45,
+        "ReactorOutputPerShip": 100,
+        "CoolingPerShip": 28,
+        "WarpStabilization": 50,
+        "WarpSpoolSeconds": 6,
+        "ModuleSlotCapacity": 12,
+        "MaximumModuleMass": 420,
+        "Weapons": [],
+        "Modules": [
+          {
+            "Id": "reactor",
+            "Kind": 0,
+            "InstalledCount": 1,
+            "MassEach": 18,
+            "PowerPerSecondEach": 0,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 100,
+            "DetectionSignature": 0,
+            "Slots": 1
+          },
+          {
+            "Id": "warp_drive",
+            "Kind": 3,
+            "InstalledCount": 1,
+            "MassEach": 22,
+            "PowerPerSecondEach": 12,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 0,
+            "DetectionSignature": 0,
+            "Slots": 1
+          }
+        ]
+      },
+      "Error": null
+    },
+    {
+      "Name": "legacy-loadout-civilian_science_v1",
+      "Kind": "LegacyLoadout",
+      "Arguments": {
+        "ProfileId": "civilian_science_v1"
+      },
+      "Result": {
+        "MassPerShip": 100,
+        "Acceleration": 18,
+        "MaximumSpeed": 120,
+        "ShieldPerShip": 0,
+        "ArmorPerShip": 14,
+        "HullPerShip": 60,
+        "ReactorOutputPerShip": 100,
+        "CoolingPerShip": 28,
+        "WarpStabilization": 50,
+        "WarpSpoolSeconds": 8,
+        "ModuleSlotCapacity": 12,
+        "MaximumModuleMass": 420,
+        "Weapons": [],
+        "Modules": [
+          {
+            "Id": "reactor",
+            "Kind": 0,
+            "InstalledCount": 1,
+            "MassEach": 18,
+            "PowerPerSecondEach": 0,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 100,
+            "DetectionSignature": 0,
+            "Slots": 1
+          },
+          {
+            "Id": "warp_drive",
+            "Kind": 3,
+            "InstalledCount": 1,
+            "MassEach": 22,
+            "PowerPerSecondEach": 12,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 0,
+            "DetectionSignature": 0,
+            "Slots": 1
+          }
+        ]
+      },
+      "Error": null
+    },
+    {
+      "Name": "legacy-loadout-civilian_heavy_v1",
+      "Kind": "LegacyLoadout",
+      "Arguments": {
+        "ProfileId": "civilian_heavy_v1"
+      },
+      "Result": {
+        "MassPerShip": 100,
+        "Acceleration": 18,
+        "MaximumSpeed": 120,
+        "ShieldPerShip": 0,
+        "ArmorPerShip": 24,
+        "HullPerShip": 105,
+        "ReactorOutputPerShip": 100,
+        "CoolingPerShip": 28,
+        "WarpStabilization": 50,
+        "WarpSpoolSeconds": 12,
+        "ModuleSlotCapacity": 12,
+        "MaximumModuleMass": 420,
+        "Weapons": [],
+        "Modules": [
+          {
+            "Id": "reactor",
+            "Kind": 0,
+            "InstalledCount": 1,
+            "MassEach": 18,
+            "PowerPerSecondEach": 0,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 100,
+            "DetectionSignature": 0,
+            "Slots": 1
+          },
+          {
+            "Id": "warp_drive",
+            "Kind": 3,
+            "InstalledCount": 1,
+            "MassEach": 22,
+            "PowerPerSecondEach": 12,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 0,
+            "DetectionSignature": 0,
+            "Slots": 1
+          }
+        ]
+      },
+      "Error": null
+    },
+    {
+      "Name": "legacy-loadout-patrol_corvette_mk1",
+      "Kind": "LegacyLoadout",
+      "Arguments": {
+        "ProfileId": "patrol_corvette_mk1"
+      },
+      "Result": {
+        "MassPerShip": 100,
+        "Acceleration": 18,
+        "MaximumSpeed": 120,
+        "ShieldPerShip": 35,
+        "ArmorPerShip": 45,
+        "HullPerShip": 95,
+        "ReactorOutputPerShip": 100,
+        "CoolingPerShip": 28,
+        "WarpStabilization": 50,
+        "WarpSpoolSeconds": 12,
+        "ModuleSlotCapacity": 12,
+        "MaximumModuleMass": 420,
+        "Weapons": [
+          {
+            "Id": "beam_battery",
+            "Kind": 0,
+            "MountsPerShip": 1,
+            "DamagePerShot": 28,
+            "ShotsPerSecond": 0.16666667,
+            "Range": 700,
+            "Accuracy": 0.65,
+            "PowerPerSecond": 3,
+            "HeatPerSecond": 2
+          }
+        ],
+        "Modules": [
+          {
+            "Id": "reactor",
+            "Kind": 0,
+            "InstalledCount": 1,
+            "MassEach": 18,
+            "PowerPerSecondEach": 0,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 100,
+            "DetectionSignature": 0,
+            "Slots": 1
+          },
+          {
+            "Id": "warp_drive",
+            "Kind": 3,
+            "InstalledCount": 1,
+            "MassEach": 22,
+            "PowerPerSecondEach": 12,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 0,
+            "DetectionSignature": 0,
+            "Slots": 1
+          }
+        ]
+      },
+      "Error": null
+    },
+    {
+      "Name": "legacy-loadout-custom-nan-retreat",
+      "Kind": "LegacyLoadout",
+      "Arguments": {
+        "Profile": {
+          "Id": "custom",
+          "MaxShields": 1,
+          "MaxArmor": 2,
+          "MaxHull": 3,
+          "WeaponDamage": 4,
+          "WeaponIntervalDays": 0.5,
+          "RetreatDelayDays": "NaN",
+          "HasWeapon": true,
+          "SustainedDamagePerDay": 8
+        }
+      },
+      "Result": {
+        "MassPerShip": 100,
+        "Acceleration": 18,
+        "MaximumSpeed": 120,
+        "ShieldPerShip": 1,
+        "ArmorPerShip": 2,
+        "HullPerShip": 3,
+        "ReactorOutputPerShip": 100,
+        "CoolingPerShip": 28,
+        "WarpStabilization": 50,
+        "WarpSpoolSeconds": "NaN",
+        "ModuleSlotCapacity": 12,
+        "MaximumModuleMass": 420,
+        "Weapons": [
+          {
+            "Id": "beam_battery",
+            "Kind": 0,
+            "MountsPerShip": 1,
+            "DamagePerShot": 4,
+            "ShotsPerSecond": 0.25,
+            "Range": 700,
+            "Accuracy": 0.65,
+            "PowerPerSecond": 3,
+            "HeatPerSecond": 2
+          }
+        ],
+        "Modules": [
+          {
+            "Id": "reactor",
+            "Kind": 0,
+            "InstalledCount": 1,
+            "MassEach": 18,
+            "PowerPerSecondEach": 0,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 100,
+            "DetectionSignature": 0,
+            "Slots": 1
+          },
+          {
+            "Id": "warp_drive",
+            "Kind": 3,
+            "InstalledCount": 1,
+            "MassEach": 22,
+            "PowerPerSecondEach": 12,
+            "HeatPerSecondEach": 0,
+            "Condition": 1,
+            "Enabled": true,
+            "EffectiveRange": 0,
+            "FieldStrength": 0,
+            "DetectionSignature": 0,
+            "Slots": 1
+          }
+        ]
+      },
+      "Error": null
+    },
+    {
+      "Name": "interdictor-default",
+      "Kind": "Interdictor",
+      "Arguments": {
+        "Range": 900,
+        "Strength": 72
+      },
+      "Result": {
+        "Id": "warp_interdiction_array",
+        "Kind": 7,
+        "InstalledCount": 1,
+        "MassEach": 85,
+        "PowerPerSecondEach": 42,
+        "HeatPerSecondEach": 18,
+        "Condition": 1,
+        "Enabled": true,
+        "EffectiveRange": 900,
+        "FieldStrength": 72,
+        "DetectionSignature": 85,
+        "Slots": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "interdictor-custom",
+      "Kind": "Interdictor",
+      "Arguments": {
+        "Range": 2000,
+        "Strength": 1
+      },
+      "Result": {
+        "Id": "warp_interdiction_array",
+        "Kind": 7,
+        "InstalledCount": 1,
+        "MassEach": 85,
+        "PowerPerSecondEach": 42,
+        "HeatPerSecondEach": 18,
+        "Condition": 1,
+        "Enabled": true,
+        "EffectiveRange": 2000,
+        "FieldStrength": 1,
+        "DetectionSignature": 85,
+        "Slots": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "weapon-valid-zero-boundary",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "weapon",
+          "Kind": 4,
+          "MountsPerShip": 0,
+          "DamagePerShot": 0,
+          "ShotsPerSecond": 0,
+          "Range": 0,
+          "Accuracy": 0,
+          "PowerPerSecond": 0,
+          "HeatPerSecond": 0
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "weapon-whitespace-id",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": " \t",
+          "Kind": 0,
+          "MountsPerShip": 1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": 0.65,
+          "PowerPerSecond": 3,
+          "HeatPerSecond": 2
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group identity is invalid."
+      }
+    },
+    {
+      "Name": "weapon-nbsp-id",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "\u00A0",
+          "Kind": 0,
+          "MountsPerShip": 1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": 0.65,
+          "PowerPerSecond": 3,
+          "HeatPerSecond": 2
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group identity is invalid."
+      }
+    },
+    {
+      "Name": "weapon-negative-mounts",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "MountsPerShip": -1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": 0.65,
+          "PowerPerSecond": 3,
+          "HeatPerSecond": 2
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group identity is invalid."
+      }
+    },
+    {
+      "Name": "weapon-invalid-kind",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "x",
+          "Kind": 99,
+          "MountsPerShip": 1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": 0.65,
+          "PowerPerSecond": 3,
+          "HeatPerSecond": 2
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group identity is invalid."
+      }
+    },
+    {
+      "Name": "weapon-nan-scalar",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "MountsPerShip": 1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": "NaN",
+          "PowerPerSecond": 3,
+          "HeatPerSecond": 2
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group scalar is invalid."
+      }
+    },
+    {
+      "Name": "weapon-negative-scalar",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Weapon",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "MountsPerShip": 1,
+          "DamagePerShot": 8,
+          "ShotsPerSecond": 1,
+          "Range": 650,
+          "Accuracy": 0.65,
+          "PowerPerSecond": 3,
+          "HeatPerSecond": -1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group scalar is invalid."
+      }
+    },
+    {
+      "Name": "module-valid-boundaries",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "module",
+          "Kind": 7,
+          "InstalledCount": 0,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 0,
+          "Enabled": true,
+          "EffectiveRange": 2000,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 0
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "module-whitespace-id",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": " ",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-em-space-id",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "\u2003",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-negative-count",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": -1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-negative-slots",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": -1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-invalid-kind",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 99,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-nan-condition",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": "NaN",
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-condition-high",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1.01,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "module-infinite-scalar",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": "Infinity",
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 0,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module scalar is invalid."
+      }
+    },
+    {
+      "Name": "module-range-high",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Module",
+        "Value": {
+          "Id": "x",
+          "Kind": 0,
+          "InstalledCount": 1,
+          "MassEach": 0,
+          "PowerPerSecondEach": 0,
+          "HeatPerSecondEach": 0,
+          "Condition": 1,
+          "Enabled": true,
+          "EffectiveRange": 2000.01,
+          "FieldStrength": 0,
+          "DetectionSignature": 0,
+          "Slots": 1
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module range exceeds the bounded combat spatial search."
+      }
+    },
+    {
+      "Name": "loadout-default-valid",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "loadout-nan-scalar",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": "NaN",
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout contains an invalid scalar."
+      }
+    },
+    {
+      "Name": "loadout-negative-scalar",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": -1,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout contains an invalid scalar."
+      }
+    },
+    {
+      "Name": "loadout-zero-hull",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 0,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-zero-spool",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 0,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-negative-capacity",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": -1,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-negative-mass-bound",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": -1,
+          "Weapons": [],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-weapon-count",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [
+            {
+              "Id": "w0",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w1",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w2",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w3",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w4",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w5",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w6",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w7",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w8",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w9",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w10",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w11",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w12",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w13",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w14",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w15",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w16",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w17",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w18",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w19",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w20",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w21",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w22",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w23",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w24",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w25",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w26",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w27",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w28",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w29",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w30",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w31",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            },
+            {
+              "Id": "w32",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            }
+          ],
+          "Modules": []
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-module-count",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "m0",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m1",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m2",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m3",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m4",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m5",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m6",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m7",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m8",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m9",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m10",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m11",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m12",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m13",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m14",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m15",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m16",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m17",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m18",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m19",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m20",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m21",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m22",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m23",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m24",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m25",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m26",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m27",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m28",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m29",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m30",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m31",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m32",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Combat loadout bounds are invalid."
+      }
+    },
+    {
+      "Name": "loadout-child-weapon-precedes-module",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 420,
+          "Weapons": [
+            {
+              "Id": " ",
+              "Kind": 0,
+              "MountsPerShip": 1,
+              "DamagePerShot": 8,
+              "ShotsPerSecond": 1,
+              "Range": 650,
+              "Accuracy": 0.65,
+              "PowerPerSecond": 3,
+              "HeatPerSecond": 2
+            }
+          ],
+          "Modules": [
+            {
+              "Id": " ",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Weapon group identity is invalid."
+      }
+    },
+    {
+      "Name": "loadout-slot-budget",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 1,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "m",
+              "Kind": 0,
+              "InstalledCount": 2,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Installed combat modules exceed the design\u0027s slot or mass budget."
+      }
+    },
+    {
+      "Name": "loadout-mass-budget",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 1,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "m",
+              "Kind": 0,
+              "InstalledCount": 2,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Installed combat modules exceed the design\u0027s slot or mass budget."
+      }
+    },
+    {
+      "Name": "loadout-checked-sum-overflow",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 2147483647,
+          "MaximumModuleMass": 3.4028235E+38,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "a",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 2147483647
+            },
+            {
+              "Id": "b",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "OverflowException",
+        "Message": "Arithmetic operation resulted in an overflow."
+      }
+    },
+    {
+      "Name": "loadout-unchecked-product-wrap",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 0,
+          "MaximumModuleMass": 420,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "m",
+              "Kind": 0,
+              "InstalledCount": 2,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 2147483647
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "loadout-validates-all-modules-before-sum",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 2147483647,
+          "MaximumModuleMass": 3.4028235E+38,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "a",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 2147483647
+            },
+            {
+              "Id": "b",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": " ",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 0,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Module identity or condition is invalid."
+      }
+    },
+    {
+      "Name": "loadout-mass-sum-double-accumulator",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Loadout",
+        "Value": {
+          "MassPerShip": 100,
+          "Acceleration": 18,
+          "MaximumSpeed": 120,
+          "ShieldPerShip": 35,
+          "ArmorPerShip": 45,
+          "HullPerShip": 95,
+          "ReactorOutputPerShip": 100,
+          "CoolingPerShip": 28,
+          "WarpStabilization": 50,
+          "WarpSpoolSeconds": 12,
+          "ModuleSlotCapacity": 12,
+          "MaximumModuleMass": 100000000,
+          "Weapons": [],
+          "Modules": [
+            {
+              "Id": "m0",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 100000000,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m1",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m2",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m3",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m4",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m5",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m6",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m7",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m8",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m9",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m10",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m11",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m12",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m13",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m14",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m15",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m16",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m17",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m18",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m19",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m20",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m21",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m22",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m23",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m24",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m25",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m26",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m27",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m28",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m29",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m30",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            },
+            {
+              "Id": "m31",
+              "Kind": 0,
+              "InstalledCount": 1,
+              "MassEach": 1,
+              "PowerPerSecondEach": 0,
+              "HeatPerSecondEach": 0,
+              "Condition": 1,
+              "Enabled": true,
+              "EffectiveRange": 0,
+              "FieldStrength": 0,
+              "DetectionSignature": 0,
+              "Slots": 1
+            }
+          ]
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Installed combat modules exceed the design\u0027s slot or mass budget."
+      }
+    },
+    {
+      "Name": "vessel-valid-condition-boundaries",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "V",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 0,
+          "EngineFraction": 1,
+          "SensorFraction": 0.5,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 0,
+          "InterdictorFraction": 1,
+          "BattlesFought": -1,
+          "ConfirmedKills": -1,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": null
+    },
+    {
+      "Name": "vessel-whitespace-name",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": " ",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel identity is invalid."
+      }
+    },
+    {
+      "Name": "vessel-nbsp-name",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "\u00A0",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel identity is invalid."
+      }
+    },
+    {
+      "Name": "vessel-zero-id",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 0,
+          "Name": "V",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel identity is invalid."
+      }
+    },
+    {
+      "Name": "vessel-whitespace-design",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "V",
+          "DesignId": "\t",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel identity is invalid."
+      }
+    },
+    {
+      "Name": "vessel-em-space-design",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "V",
+          "DesignId": "\u2003",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel identity is invalid."
+      }
+    },
+    {
+      "Name": "vessel-nan-condition",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "V",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": "NaN",
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel condition is invalid."
+      }
+    },
+    {
+      "Name": "vessel-condition-high",
+      "Kind": "Validation",
+      "Arguments": {
+        "Target": "Vessel",
+        "Value": {
+          "Id": 1,
+          "Name": "V",
+          "DesignId": "D",
+          "IsFlagship": false,
+          "IsCarrier": false,
+          "IsInterdictor": false,
+          "IsStoryShip": false,
+          "HullFraction": 1,
+          "EngineFraction": 1,
+          "SensorFraction": 1,
+          "WarpDriveFraction": 1,
+          "ReactorFraction": 1.01,
+          "InterdictorFraction": 1,
+          "BattlesFought": 0,
+          "ConfirmedKills": 0,
+          "Destroyed": false,
+          "Escaped": false
+        }
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Important vessel condition is invalid."
+      }
+    },
+    {
+      "Name": "economic-projection-order-and-unknown-role",
+      "Kind": "Projection",
+      "Arguments": {
+        "Fleets": [
+          {
+            "Id": 7,
+            "CivilizationId": 3,
+            "Name": "Fixture",
+            "Role": 1,
+            "DesignId": null,
+            "Position": {
+              "X": 3,
+              "Y": 4
+            },
+            "CurrentSystemId": null,
+            "DestinationSystemId": null,
+            "TransitPhase": 0,
+            "TransitOriginSystemId": null,
+            "TransitTargetSystemId": null,
+            "TransitProgress": 0,
+            "LocalTransitStart": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitPosition": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitTarget": {
+              "X": 0,
+              "Y": 0
+            },
+            "PlannedRouteSystemIds": [],
+            "HoldRequested": false,
+            "ReturnToBaseRequested": false,
+            "ReturnToBaseFailureReason": null,
+            "MissionOrderRevision": 0,
+            "DestinationPlanetaryBodyId": null,
+            "PreventAutomaticSettlement": false,
+            "SettlementBodyId": null,
+            "SettlementDaysCompleted": 0,
+            "ReconnaissanceSystemId": null,
+            "ReconnaissanceDaysCompleted": 0,
+            "FreightTargetOutpostId": null,
+            "FreightHomeColonyId": null,
+            "CargoMaterialCapacity": 0,
+            "CargoMaterials": 0,
+            "StrategicSpeed": 22,
+            "MaximumLegRangeLightYears": 360,
+            "FuelCapacityLightYears": 1000,
+            "FuelRemainingLightYears": 1000,
+            "SensorRange": 135,
+            "IsActive": false,
+            "EmbarkedPopulationMillions": 0,
+            "EmbarkedPopulationSpeciesId": null,
+            "Combat": null,
+            "TacticalLoadout": null,
+            "TacticalVessel": null
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 2,
+            "Name": "Fixture",
+            "Role": 4,
+            "DesignId": null,
+            "Position": {
+              "X": 3,
+              "Y": 4
+            },
+            "CurrentSystemId": null,
+            "DestinationSystemId": null,
+            "TransitPhase": 0,
+            "TransitOriginSystemId": null,
+            "TransitTargetSystemId": null,
+            "TransitProgress": 0,
+            "LocalTransitStart": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitPosition": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitTarget": {
+              "X": 0,
+              "Y": 0
+            },
+            "PlannedRouteSystemIds": [],
+            "HoldRequested": false,
+            "ReturnToBaseRequested": false,
+            "ReturnToBaseFailureReason": null,
+            "MissionOrderRevision": 0,
+            "DestinationPlanetaryBodyId": null,
+            "PreventAutomaticSettlement": false,
+            "SettlementBodyId": null,
+            "SettlementDaysCompleted": 0,
+            "ReconnaissanceSystemId": null,
+            "ReconnaissanceDaysCompleted": 0,
+            "FreightTargetOutpostId": null,
+            "FreightHomeColonyId": null,
+            "CargoMaterialCapacity": 0,
+            "CargoMaterials": 0,
+            "StrategicSpeed": 22,
+            "MaximumLegRangeLightYears": 360,
+            "FuelCapacityLightYears": 1000,
+            "FuelRemainingLightYears": 1000,
+            "SensorRange": 135,
+            "IsActive": true,
+            "EmbarkedPopulationMillions": 0,
+            "EmbarkedPopulationSpeciesId": null,
+            "Combat": null,
+            "TacticalLoadout": null,
+            "TacticalVessel": null
+          },
+          {
+            "Id": 7,
+            "CivilizationId": -1,
+            "Name": "Fixture",
+            "Role": 99,
+            "DesignId": null,
+            "Position": {
+              "X": 3,
+              "Y": 4
+            },
+            "CurrentSystemId": null,
+            "DestinationSystemId": null,
+            "TransitPhase": 0,
+            "TransitOriginSystemId": null,
+            "TransitTargetSystemId": null,
+            "TransitProgress": 0,
+            "LocalTransitStart": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitPosition": {
+              "X": 0,
+              "Y": 0
+            },
+            "LocalTransitTarget": {
+              "X": 0,
+              "Y": 0
+            },
+            "PlannedRouteSystemIds": [],
+            "HoldRequested": false,
+            "ReturnToBaseRequested": false,
+            "ReturnToBaseFailureReason": null,
+            "MissionOrderRevision": 0,
+            "DestinationPlanetaryBodyId": null,
+            "PreventAutomaticSettlement": false,
+            "SettlementBodyId": null,
+            "SettlementDaysCompleted": 0,
+            "ReconnaissanceSystemId": null,
+            "ReconnaissanceDaysCompleted": 0,
+            "FreightTargetOutpostId": null,
+            "FreightHomeColonyId": null,
+            "CargoMaterialCapacity": 0,
+            "CargoMaterials": 0,
+            "StrategicSpeed": 22,
+            "MaximumLegRangeLightYears": 360,
+            "FuelCapacityLightYears": 1000,
+            "FuelRemainingLightYears": 1000,
+            "SensorRange": 135,
+            "IsActive": true,
+            "EmbarkedPopulationMillions": 0,
+            "EmbarkedPopulationSpeciesId": null,
+            "Combat": null,
+            "TacticalLoadout": null,
+            "TacticalVessel": null
+          }
+        ]
+      },
+      "Result": [
+        {
+          "CivilizationId": 3,
+          "Role": 1,
+          "IsActive": false
+        },
+        {
+          "CivilizationId": 2,
+          "Role": 4,
+          "IsActive": true
+        },
+        {
+          "CivilizationId": -1,
+          "Role": 99,
+          "IsActive": true
+        }
+      ],
+      "Error": null
+    }
+  ]
+}

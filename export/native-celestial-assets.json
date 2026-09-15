@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "mercury": {
+      "source": "assets/visual/sol/mercury.jpg",
+      "runtimePath": "assets/visual/sol/mercury.jpg",
+      "sha256": "4c13eaf876575b39ed1581f5ded9d71b8070418e4c1c978719ffaad7bd52d53e"
+    },
+    "venus": {
+      "source": "assets/visual/sol/venus.jpg",
+      "runtimePath": "assets/visual/sol/venus.jpg",
+      "sha256": "9deaf7392cd41dcd77f2e6fc61a12641af3a2dc1a52ecfd652388a65bd225dbc"
+    },
+    "earth": {
+      "source": "assets/visual/sol/earth.jpg",
+      "runtimePath": "assets/visual/sol/earth.jpg",
+      "sha256": "12f6c594f6acc769598ae3cb908e9020f7973f2a0b73f7fb75bf3df737fb7b31"
+    },
+    "mars": {
+      "source": "assets/visual/sol/mars.jpg",
+      "runtimePath": "assets/visual/sol/mars.jpg",
+      "sha256": "12ec6bf02ebd42a246edc778cb2ce8c595b4d9f0892badf0bfff8abb2303c780"
+    },
+    "jupiter": {
+      "source": "assets/visual/sol/jupiter.jpg",
+      "runtimePath": "assets/visual/sol/jupiter.jpg",
+      "sha256": "ac2d387f8ea56a59f45dea37993c779a730f49d7d9fdbc8d36c307a351b1f1a1"
+    },
+    "saturn": {
+      "source": "assets/visual/sol/saturn.jpg",
+      "runtimePath": "assets/visual/sol/saturn.jpg",
+      "sha256": "d959a239e3d87630daf08e2a688dcbf315fe01b1fd474e55522770108f40aca7"
+    },
+    "uranus": {
+      "source": "assets/visual/sol/uranus.jpg",
+      "runtimePath": "assets/visual/sol/uranus.jpg",
+      "sha256": "749f4854d1a79c4e6ae7bdce7f1118d5b41d75b7e3a8d95d9a4dd82157a43829"
+    },
+    "neptune": {
+      "source": "assets/visual/sol/neptune.jpg",
+      "runtimePath": "assets/visual/sol/neptune.jpg",
+      "sha256": "e9bb2b7bcfb98d3f1adc6f2e20e833a00c11e9677238d8a00ae7431214ca70aa"
+    },
+    "moon": {
+      "source": "assets/visual/sol/moon.jpg",
+      "runtimePath": "assets/visual/sol/moon.jpg",
+      "sha256": "1318334a5089fb186d39996f60677b5f5b42cde74158ceff97b3e2283bfd41d4"
+    },
+    "credits": {
+      "source": "docs/SOL_VISUAL_SOURCES.md",
+      "runtimePath": "Licenses/Sol-visual-sources.md",
+      "sha256": "fe113adfa917418ce0de626ea5911065529203bd03596979b44411674b298c5a"
+    }
+  }
+}

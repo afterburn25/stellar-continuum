@@ -1,0 +1,1637 @@
+{
+  "Format": "stellar-construction-currency-oracle-v1",
+  "CurrencyCases": [
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "-Infinity",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0 UED",
+      "FormatWithoutCode": "$0",
+      "Rate": "\u2212$InfinityT UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "-100",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0 UED",
+      "FormatWithoutCode": "$0",
+      "Rate": "\u2212$1B UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "-0",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0 UED",
+      "FormatWithoutCode": "$0",
+      "Rate": "$0 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0 UED",
+      "FormatWithoutCode": "$0",
+      "Rate": "$0 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.000000049",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0.49 UED",
+      "FormatWithoutCode": "$0.49",
+      "Rate": "\u002B$0.49 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.00000005",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0.5 UED",
+      "FormatWithoutCode": "$0.5",
+      "Rate": "\u002B$0.5 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.000000099",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$0.99 UED",
+      "FormatWithoutCode": "$0.99",
+      "Rate": "\u002B$0.99 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.000099999",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$999.99 UED",
+      "FormatWithoutCode": "$999.99",
+      "Rate": "\u002B$999.99 UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.0001",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1K UED",
+      "FormatWithoutCode": "$1K",
+      "Rate": "\u002B$1K UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.000100001",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1K UED",
+      "FormatWithoutCode": "$1K",
+      "Rate": "\u002B$1K UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.099999999",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000K UED",
+      "FormatWithoutCode": "$1000K",
+      "Rate": "\u002B$1000K UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "0.1",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1M UED",
+      "FormatWithoutCode": "$1M",
+      "Rate": "\u002B$1M UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "99.9999999",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000M UED",
+      "FormatWithoutCode": "$1000M",
+      "Rate": "\u002B$1000M UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "100",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1B UED",
+      "FormatWithoutCode": "$1B",
+      "Rate": "\u002B$1B UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "99999.9999999",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000B UED",
+      "FormatWithoutCode": "$1000B",
+      "Rate": "\u002B$1000B UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1T UED",
+      "FormatWithoutCode": "$1T",
+      "Rate": "\u002B$1T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "99999999999.9999",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000000T UED",
+      "FormatWithoutCode": "$1000000T",
+      "Rate": "\u002B$1000000T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1T UED",
+      "FormatWithoutCode": "$1T",
+      "Rate": "\u002B$1T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "100000000",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000T UED",
+      "FormatWithoutCode": "$1000T",
+      "Rate": "\u002B$1000T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "100000000000",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$1000000T UED",
+      "FormatWithoutCode": "$1000000T",
+      "Rate": "\u002B$1000000T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "1E\u002B300",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T UED",
+      "FormatWithoutCode": "$10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T",
+      "Rate": "\u002B$10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "NaN",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$NaN UED",
+      "FormatWithoutCode": "$NaN",
+      "Rate": "$NaN UED/day"
+    },
+    {
+      "SpeciesId": "terran_baseline",
+      "BudgetUnits": "\u002BInfinity",
+      "Currency": {
+        "Name": "United Earth Dollar",
+        "Code": "UED",
+        "Symbol": "$",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "$InfinityT UED",
+      "FormatWithoutCode": "$InfinityT",
+      "Rate": "\u002B$InfinityT UED/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "-Infinity",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80 TM",
+      "FormatWithoutCode": "\u25C80",
+      "Rate": "\u2212\u25C8InfinityT TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "-100",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80 TM",
+      "FormatWithoutCode": "\u25C80",
+      "Rate": "\u2212\u25C81.2B TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "-0",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80 TM",
+      "FormatWithoutCode": "\u25C80",
+      "Rate": "\u25C80 TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80 TM",
+      "FormatWithoutCode": "\u25C80",
+      "Rate": "\u25C80 TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.000000049",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80.59 TM",
+      "FormatWithoutCode": "\u25C80.59",
+      "Rate": "\u002B\u25C80.59 TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.00000005",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C80.6 TM",
+      "FormatWithoutCode": "\u25C80.6",
+      "Rate": "\u002B\u25C80.6 TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.000000099",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.19 TM",
+      "FormatWithoutCode": "\u25C81.19",
+      "Rate": "\u002B\u25C81.19 TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.000099999",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2K TM",
+      "FormatWithoutCode": "\u25C81.2K",
+      "Rate": "\u002B\u25C81.2K TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.0001",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2K TM",
+      "FormatWithoutCode": "\u25C81.2K",
+      "Rate": "\u002B\u25C81.2K TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.000100001",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2K TM",
+      "FormatWithoutCode": "\u25C81.2K",
+      "Rate": "\u002B\u25C81.2K TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.099999999",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2M TM",
+      "FormatWithoutCode": "\u25C81.2M",
+      "Rate": "\u002B\u25C81.2M TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "0.1",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2M TM",
+      "FormatWithoutCode": "\u25C81.2M",
+      "Rate": "\u002B\u25C81.2M TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "99.9999999",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2B TM",
+      "FormatWithoutCode": "\u25C81.2B",
+      "Rate": "\u002B\u25C81.2B TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "100",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2B TM",
+      "FormatWithoutCode": "\u25C81.2B",
+      "Rate": "\u002B\u25C81.2B TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "99999.9999999",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2T TM",
+      "FormatWithoutCode": "\u25C81.2T",
+      "Rate": "\u002B\u25C81.2T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2T TM",
+      "FormatWithoutCode": "\u25C81.2T",
+      "Rate": "\u002B\u25C81.2T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "99999999999.9999",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81200000T TM",
+      "FormatWithoutCode": "\u25C81200000T",
+      "Rate": "\u002B\u25C81200000T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81.2T TM",
+      "FormatWithoutCode": "\u25C81.2T",
+      "Rate": "\u002B\u25C81.2T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "100000000",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81200T TM",
+      "FormatWithoutCode": "\u25C81200T",
+      "Rate": "\u002B\u25C81200T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "100000000000",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C81200000T TM",
+      "FormatWithoutCode": "\u25C81200000T",
+      "Rate": "\u002B\u25C81200000T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "1E\u002B300",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C812000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T TM",
+      "FormatWithoutCode": "\u25C812000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T",
+      "Rate": "\u002B\u25C812000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "NaN",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C8NaN TM",
+      "FormatWithoutCode": "\u25C8NaN",
+      "Rate": "\u25C8NaN TM/day"
+    },
+    {
+      "SpeciesId": "pelagic_high_pressure",
+      "BudgetUnits": "\u002BInfinity",
+      "Currency": {
+        "Name": "Tide Mark",
+        "Code": "TM",
+        "Symbol": "\u25C8",
+        "LocalUnitsPerBudgetUnit": 12000000
+      },
+      "Format": "\u25C8InfinityT TM",
+      "FormatWithoutCode": "\u25C8InfinityT",
+      "Rate": "\u002B\u25C8InfinityT TM/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "-Infinity",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60 FC",
+      "FormatWithoutCode": "\u25C60",
+      "Rate": "\u2212\u25C6InfinityT FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "-100",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60 FC",
+      "FormatWithoutCode": "\u25C60",
+      "Rate": "\u2212\u25C6800M FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "-0",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60 FC",
+      "FormatWithoutCode": "\u25C60",
+      "Rate": "\u25C60 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60 FC",
+      "FormatWithoutCode": "\u25C60",
+      "Rate": "\u25C60 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.000000049",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60.39 FC",
+      "FormatWithoutCode": "\u25C60.39",
+      "Rate": "\u002B\u25C60.39 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.00000005",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60.4 FC",
+      "FormatWithoutCode": "\u25C60.4",
+      "Rate": "\u002B\u25C60.4 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.000000099",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C60.79 FC",
+      "FormatWithoutCode": "\u25C60.79",
+      "Rate": "\u002B\u25C60.79 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.000099999",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6799.99 FC",
+      "FormatWithoutCode": "\u25C6799.99",
+      "Rate": "\u002B\u25C6799.99 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.0001",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800 FC",
+      "FormatWithoutCode": "\u25C6800",
+      "Rate": "\u002B\u25C6800 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.000100001",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800.01 FC",
+      "FormatWithoutCode": "\u25C6800.01",
+      "Rate": "\u002B\u25C6800.01 FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.099999999",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800K FC",
+      "FormatWithoutCode": "\u25C6800K",
+      "Rate": "\u002B\u25C6800K FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "0.1",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800K FC",
+      "FormatWithoutCode": "\u25C6800K",
+      "Rate": "\u002B\u25C6800K FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "99.9999999",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800M FC",
+      "FormatWithoutCode": "\u25C6800M",
+      "Rate": "\u002B\u25C6800M FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "100",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800M FC",
+      "FormatWithoutCode": "\u25C6800M",
+      "Rate": "\u002B\u25C6800M FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "99999.9999999",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800B FC",
+      "FormatWithoutCode": "\u25C6800B",
+      "Rate": "\u002B\u25C6800B FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800B FC",
+      "FormatWithoutCode": "\u25C6800B",
+      "Rate": "\u002B\u25C6800B FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "99999999999.9999",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800000T FC",
+      "FormatWithoutCode": "\u25C6800000T",
+      "Rate": "\u002B\u25C6800000T FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800B FC",
+      "FormatWithoutCode": "\u25C6800B",
+      "Rate": "\u002B\u25C6800B FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "100000000",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800T FC",
+      "FormatWithoutCode": "\u25C6800T",
+      "Rate": "\u002B\u25C6800T FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "100000000000",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6800000T FC",
+      "FormatWithoutCode": "\u25C6800000T",
+      "Rate": "\u002B\u25C6800000T FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "1E\u002B300",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T FC",
+      "FormatWithoutCode": "\u25C68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T",
+      "Rate": "\u002B\u25C68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "NaN",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6NaN FC",
+      "FormatWithoutCode": "\u25C6NaN",
+      "Rate": "\u25C6NaN FC/day"
+    },
+    {
+      "SpeciesId": "compact_high_gravity",
+      "BudgetUnits": "\u002BInfinity",
+      "Currency": {
+        "Name": "Forge Crown",
+        "Code": "FC",
+        "Symbol": "\u25C6",
+        "LocalUnitsPerBudgetUnit": 8000000
+      },
+      "Format": "\u25C6InfinityT FC",
+      "FormatWithoutCode": "\u25C6InfinityT",
+      "Rate": "\u002B\u25C6InfinityT FC/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "-Infinity",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70 TL",
+      "FormatWithoutCode": "\u25C70",
+      "Rate": "\u2212\u25C7InfinityT TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "-100",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70 TL",
+      "FormatWithoutCode": "\u25C70",
+      "Rate": "\u2212\u25C71.5B TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "-0",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70 TL",
+      "FormatWithoutCode": "\u25C70",
+      "Rate": "\u25C70 TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70 TL",
+      "FormatWithoutCode": "\u25C70",
+      "Rate": "\u25C70 TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.000000049",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70.74 TL",
+      "FormatWithoutCode": "\u25C70.74",
+      "Rate": "\u002B\u25C70.74 TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.00000005",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C70.75 TL",
+      "FormatWithoutCode": "\u25C70.75",
+      "Rate": "\u002B\u25C70.75 TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.000000099",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.49 TL",
+      "FormatWithoutCode": "\u25C71.49",
+      "Rate": "\u002B\u25C71.49 TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.000099999",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5K TL",
+      "FormatWithoutCode": "\u25C71.5K",
+      "Rate": "\u002B\u25C71.5K TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.0001",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5K TL",
+      "FormatWithoutCode": "\u25C71.5K",
+      "Rate": "\u002B\u25C71.5K TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.000100001",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5K TL",
+      "FormatWithoutCode": "\u25C71.5K",
+      "Rate": "\u002B\u25C71.5K TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.099999999",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5M TL",
+      "FormatWithoutCode": "\u25C71.5M",
+      "Rate": "\u002B\u25C71.5M TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "0.1",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5M TL",
+      "FormatWithoutCode": "\u25C71.5M",
+      "Rate": "\u002B\u25C71.5M TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "99.9999999",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5B TL",
+      "FormatWithoutCode": "\u25C71.5B",
+      "Rate": "\u002B\u25C71.5B TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "100",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5B TL",
+      "FormatWithoutCode": "\u25C71.5B",
+      "Rate": "\u002B\u25C71.5B TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "99999.9999999",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5T TL",
+      "FormatWithoutCode": "\u25C71.5T",
+      "Rate": "\u002B\u25C71.5T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5T TL",
+      "FormatWithoutCode": "\u25C71.5T",
+      "Rate": "\u002B\u25C71.5T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "99999999999.9999",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71500000T TL",
+      "FormatWithoutCode": "\u25C71500000T",
+      "Rate": "\u002B\u25C71500000T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71.5T TL",
+      "FormatWithoutCode": "\u25C71.5T",
+      "Rate": "\u002B\u25C71.5T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "100000000",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71500T TL",
+      "FormatWithoutCode": "\u25C71500T",
+      "Rate": "\u002B\u25C71500T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "100000000000",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C71500000T TL",
+      "FormatWithoutCode": "\u25C71500000T",
+      "Rate": "\u002B\u25C71500000T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "1E\u002B300",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C715000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T TL",
+      "FormatWithoutCode": "\u25C715000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T",
+      "Rate": "\u002B\u25C715000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "NaN",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C7NaN TL",
+      "FormatWithoutCode": "\u25C7NaN",
+      "Rate": "\u25C7NaN TL/day"
+    },
+    {
+      "SpeciesId": "cryogenic_hydrocarbon",
+      "BudgetUnits": "\u002BInfinity",
+      "Currency": {
+        "Name": "Thermal Ledger",
+        "Code": "TL",
+        "Symbol": "\u25C7",
+        "LocalUnitsPerBudgetUnit": 15000000
+      },
+      "Format": "\u25C7InfinityT TL",
+      "FormatWithoutCode": "\u25C7InfinityT",
+      "Rate": "\u002B\u25C7InfinityT TL/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "-Infinity",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40 SC",
+      "FormatWithoutCode": "\u00A40",
+      "Rate": "\u2212\u00A4InfinityT SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "-100",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40 SC",
+      "FormatWithoutCode": "\u00A40",
+      "Rate": "\u2212\u00A41B SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "-0",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40 SC",
+      "FormatWithoutCode": "\u00A40",
+      "Rate": "\u00A40 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40 SC",
+      "FormatWithoutCode": "\u00A40",
+      "Rate": "\u00A40 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.000000049",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40.49 SC",
+      "FormatWithoutCode": "\u00A40.49",
+      "Rate": "\u002B\u00A40.49 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.00000005",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40.5 SC",
+      "FormatWithoutCode": "\u00A40.5",
+      "Rate": "\u002B\u00A40.5 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.000000099",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A40.99 SC",
+      "FormatWithoutCode": "\u00A40.99",
+      "Rate": "\u002B\u00A40.99 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.000099999",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A4999.99 SC",
+      "FormatWithoutCode": "\u00A4999.99",
+      "Rate": "\u002B\u00A4999.99 SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.0001",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41K SC",
+      "FormatWithoutCode": "\u00A41K",
+      "Rate": "\u002B\u00A41K SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.000100001",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41K SC",
+      "FormatWithoutCode": "\u00A41K",
+      "Rate": "\u002B\u00A41K SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.099999999",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000K SC",
+      "FormatWithoutCode": "\u00A41000K",
+      "Rate": "\u002B\u00A41000K SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "0.1",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41M SC",
+      "FormatWithoutCode": "\u00A41M",
+      "Rate": "\u002B\u00A41M SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "99.9999999",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000M SC",
+      "FormatWithoutCode": "\u00A41000M",
+      "Rate": "\u002B\u00A41000M SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "100",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41B SC",
+      "FormatWithoutCode": "\u00A41B",
+      "Rate": "\u002B\u00A41B SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "99999.9999999",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000B SC",
+      "FormatWithoutCode": "\u00A41000B",
+      "Rate": "\u002B\u00A41000B SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41T SC",
+      "FormatWithoutCode": "\u00A41T",
+      "Rate": "\u002B\u00A41T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "99999999999.9999",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000000T SC",
+      "FormatWithoutCode": "\u00A41000000T",
+      "Rate": "\u002B\u00A41000000T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "100000",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41T SC",
+      "FormatWithoutCode": "\u00A41T",
+      "Rate": "\u002B\u00A41T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "100000000",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000T SC",
+      "FormatWithoutCode": "\u00A41000T",
+      "Rate": "\u002B\u00A41000T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "100000000000",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A41000000T SC",
+      "FormatWithoutCode": "\u00A41000000T",
+      "Rate": "\u002B\u00A41000000T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "1E\u002B300",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T SC",
+      "FormatWithoutCode": "\u00A410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T",
+      "Rate": "\u002B\u00A410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000T SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "NaN",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A4NaN SC",
+      "FormatWithoutCode": "\u00A4NaN",
+      "Rate": "\u00A4NaN SC/day"
+    },
+    {
+      "SpeciesId": "unknown_civilization",
+      "BudgetUnits": "\u002BInfinity",
+      "Currency": {
+        "Name": "Sovereign Currency",
+        "Code": "SC",
+        "Symbol": "\u00A4",
+        "LocalUnitsPerBudgetUnit": 10000000
+      },
+      "Format": "\u00A4InfinityT SC",
+      "FormatWithoutCode": "\u00A4InfinityT",
+      "Rate": "\u002B\u00A4InfinityT SC/day"
+    }
+  ],
+  "FixedOneDecimalCases": [
+    {
+      "Value": "-Infinity",
+      "Format": "-Infinity"
+    },
+    {
+      "Value": "-7.25",
+      "Format": "-7.3"
+    },
+    {
+      "Value": "-0",
+      "Format": "-0.0"
+    },
+    {
+      "Value": "0",
+      "Format": "0.0"
+    },
+    {
+      "Value": "0.05",
+      "Format": "0.1"
+    },
+    {
+      "Value": "7.15",
+      "Format": "7.2"
+    },
+    {
+      "Value": "7.25",
+      "Format": "7.3"
+    },
+    {
+      "Value": "1E\u002B300",
+      "Format": "1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0"
+    },
+    {
+      "Value": "NaN",
+      "Format": "NaN"
+    },
+    {
+      "Value": "\u002BInfinity",
+      "Format": "Infinity"
+    }
+  ],
+  "FixedPaddingCases": [
+    {
+      "Value": "123456789012345.6",
+      "FixedTwo": "123456789012346.00",
+      "FixedThree": "123456789012346.000"
+    },
+    {
+      "Value": "1E\u002B300",
+      "FixedTwo": "1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00",
+      "FixedThree": "1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.000"
+    }
+  ],
+  "CivilizationLookup": {
+    "Name": "United Earth Dollar",
+    "Code": "UED",
+    "Symbol": "$",
+    "LocalUnitsPerBudgetUnit": 10000000
+  },
+  "Seed": {
+    "Before": [
+      {
+        "Id": 9,
+        "Name": "Civ 9",
+        "HomeSystemId": 0,
+        "Archetype": 2,
+        "Traits": {
+          "Aggression": 0,
+          "Territoriality": 0,
+          "Greed": 0,
+          "ScientificCuriosity": 0,
+          "RiskTolerance": 0,
+          "SurvivalPriority": 0,
+          "HonorBound": false
+        },
+        "IsPlayer": true,
+        "DevelopmentStage": 1,
+        "IsSeededAncient": false,
+        "ExpansionAllowed": true,
+        "NeutralUnlessProvoked": false,
+        "SpeciesId": "terran_baseline",
+        "Leadership": {
+          "Offices": {}
+        }
+      },
+      {
+        "Id": 4,
+        "Name": "Civ 4",
+        "HomeSystemId": 0,
+        "Archetype": 2,
+        "Traits": {
+          "Aggression": 0,
+          "Territoriality": 0,
+          "Greed": 0,
+          "ScientificCuriosity": 0,
+          "RiskTolerance": 0,
+          "SurvivalPriority": 0,
+          "HonorBound": false
+        },
+        "IsPlayer": true,
+        "DevelopmentStage": 2,
+        "IsSeededAncient": true,
+        "ExpansionAllowed": true,
+        "NeutralUnlessProvoked": false,
+        "SpeciesId": "terran_baseline",
+        "Leadership": {
+          "Offices": {}
+        }
+      }
+    ],
+    "After": [
+      {
+        "CivilizationId": 9,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": null,
+        "ActiveProjectProgress": 0,
+        "ActiveProjectAuthorizationCredits": 0,
+        "QueuedProjects": []
+      },
+      {
+        "CivilizationId": 4,
+        "CompletedProjectIds": [
+          "research_network",
+          "industrial_automation",
+          "orbital_launch_complex",
+          "orbital_shipyard",
+          "asteroid_resource_network",
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": null,
+        "ActiveProjectProgress": 0,
+        "ActiveProjectAuthorizationCredits": 0,
+        "QueuedProjects": []
+      }
+    ]
+  }
+}

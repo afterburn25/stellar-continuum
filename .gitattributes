@@ -1,2 +1,4 @@
 # The catalogue verifier compares reproducible UTF-8 bytes on every platform.
 data/astronomy/hyg-nearby-500-v1.json text eol=lf
+# Keep the reviewed upstream header byte-identical on Windows checkouts.
+third_party/nlohmann/json.hpp text eol=lf

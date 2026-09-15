@@ -1,0 +1,47 @@
+#include <stellar/core/adaptive_research_facilities.hpp>
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <charconv>
+#include <fstream>
+#include <unordered_map>
+#include <unordered_set>
+
+namespace stellar::core {
+namespace {
+using Json = nlohmann::ordered_json;
+[[noreturn]] void fail(std::string message) { throw AdaptiveResearchFacilityCatalogError(std::move(message)); }
+Json read_json(const std::filesystem::path &path) { std::ifstream input(path); if (!input) fail("Unable to read Adaptive Research file: " + path.string()); try { return Json::parse(input); } catch (const Json::exception &) { fail("Malformed Adaptive Research JSON in " + path.string()); } }
+const Json &property(const Json &value, std::string_view name, const std::string &source) { const auto found=value.find(name); if(found==value.end()) fail(source+" is missing property '"+std::string(name)+"'."); return *found; }
+std::string required_string(const Json &value, std::string_view name, const std::string &source) { const auto &item=property(value,name,source); if(!item.is_string()) fail(source+" is missing string '"+std::string(name)+"'."); return item.get<std::string>(); }
+std::vector<std::string> strings(const Json &value, std::string_view name, const std::string &source) { const auto found=value.find(name); if(found==value.end()) return {}; if(!found->is_array()) fail(source+"."+std::string(name)+" must be an array."); std::vector<std::string> result; for(const auto &item:*found) { if(!item.is_string()) fail(std::string(name)+" contains null."); result.push_back(item.get<std::string>()); } return result; }
+void catalog_id(const Json &root,const AdaptiveResearchCatalog &catalog,const std::string &source) { const auto actual=required_string(root,"catalog_id",source); if(actual!=catalog.metadata().catalog_id) fail(source+" catalog_id '"+actual+"' does not match '"+catalog.metadata().catalog_id+"'."); }
+ResearchMaturity parse_stage(const std::string &value,const std::string &file,const std::string &node) { if(value=="experimental") return ResearchMaturity::experimental; if(value=="demonstrated") return ResearchMaturity::demonstrated; if(value=="engineering") return ResearchMaturity::engineering; fail(file+":"+node+" uses unsupported facility stage '"+value+"'."); }
+std::string dotnet_double(double value) { char buffer[64]; const auto result=std::to_chars(buffer,buffer+sizeof(buffer),value); std::string text(buffer,result.ptr); const auto exponent=text.find('e'); if(exponent!=std::string::npos) { text[exponent]='E'; auto digits=exponent+1; if(digits<text.size() && (text[digits]=='+' || text[digits]=='-')) ++digits; if(text.size()-digits==1) text.insert(digits,"0"); } return text; }
+std::string maturity_name(ResearchMaturity stage) { switch(stage) { case ResearchMaturity::rumored: return "Rumored"; case ResearchMaturity::hypothesized: return "Hypothesized"; case ResearchMaturity::investigable: return "Investigable"; case ResearchMaturity::experimental: return "Experimental"; case ResearchMaturity::demonstrated: return "Demonstrated"; case ResearchMaturity::engineering: return "Engineering"; case ResearchMaturity::mature: return "Mature"; case ResearchMaturity::archived: return "Archived"; default: return std::to_string(static_cast<int>(stage)); } }
+} // namespace
+
+struct AdaptiveResearchFacilityCatalog::Storage { struct Requirement { std::string node_id; ResearchMaturity stage; ResearchStageFacilityRequirement value; }; std::vector<std::string> capabilities; std::vector<ResearchFacilityInstitutionDefinition> institutions; std::unordered_map<std::string,size_t> institution_lookup; std::vector<Requirement> requirements; };
+AdaptiveResearchFacilityCatalogError::AdaptiveResearchFacilityCatalogError(std::string m):std::runtime_error(std::move(m)){}
+AdaptiveResearchFacilityCatalog::AdaptiveResearchFacilityCatalog(Storage s):storage_(std::make_unique<Storage>(std::move(s))){}
+AdaptiveResearchFacilityCatalog::AdaptiveResearchFacilityCatalog(AdaptiveResearchFacilityCatalog&&) noexcept=default;
+AdaptiveResearchFacilityCatalog& AdaptiveResearchFacilityCatalog::operator=(AdaptiveResearchFacilityCatalog&&) noexcept=default;
+AdaptiveResearchFacilityCatalog::~AdaptiveResearchFacilityCatalog()=default;
+std::span<const std::string> AdaptiveResearchFacilityCatalog::facility_capability_ids() const noexcept{return storage_->capabilities;}
+std::span<const ResearchFacilityInstitutionDefinition> AdaptiveResearchFacilityCatalog::institutions() const noexcept{return storage_->institutions;}
+const ResearchFacilityInstitutionDefinition *AdaptiveResearchFacilityCatalog::find_institution(std::string_view id) const noexcept { const auto found=std::ranges::find(storage_->institutions,id,&ResearchFacilityInstitutionDefinition::id); return found==storage_->institutions.end()?nullptr:&*found; }
+const ResearchStageFacilityRequirement *AdaptiveResearchFacilityCatalog::get_stage_requirement(std::string_view node,ResearchMaturity stage) const noexcept { const auto found=std::ranges::find_if(storage_->requirements,[&](const Storage::Requirement &item){return item.node_id==node && item.stage==stage;}); return found==storage_->requirements.end()?nullptr:&found->value; }
+AdaptiveResearchFacilityCatalog load_adaptive_research_facility_catalog(const std::filesystem::path &root,const AdaptiveResearchCatalog &catalog) {
+  const auto index=read_json(root/"research_facility_index.json"); catalog_id(index,catalog,"research_facility_index.json"); const auto &names=property(index,"facility_catalog_files","research_facility_index.json"); if(!names.is_array()) fail("research_facility_index.json.facility_catalog_files must be an array.");
+  std::vector<std::string> files; for(const auto &item:names) { if(!item.is_string()) fail("Facility catalog filename cannot be null."); files.push_back(item.get<std::string>()); } if(files.empty()) fail("research_facility_index.json contains no facility catalogs.");
+  struct File { std::string name; Json root; }; std::vector<File> documents; AdaptiveResearchFacilityCatalog::Storage storage; std::unordered_set<std::string> capability_set;
+  // Source order: collect every declared capability before reading any institution/stage.
+  for(const auto &name:files) { auto document=read_json(root/name); catalog_id(document,catalog,name); const auto &caps=property(document,"facility_capabilities",name); if(!caps.is_array()) fail(name+".facility_capabilities must be an array."); for(const auto &cap:caps) { const auto id=required_string(cap,"id",name); if(!capability_set.insert(id).second) fail("Duplicate declared facility capability '"+id+"' across facility catalogs."); storage.capabilities.push_back(id); } documents.push_back({name,std::move(document)}); }
+  for(const auto &file:documents) { const auto &items=property(file.root,"institution_archetypes",file.name); if(!items.is_array()) fail(file.name+".institution_archetypes must be an array."); for(const auto &item:items) { auto id=required_string(item,"id",file.name); auto caps=strings(item,"facility_capabilities",file.name); for(const auto &cap:caps) if(!capability_set.contains(cap)) fail("Institution '"+id+"' references undeclared facility capability '"+cap+"'."); const auto &lab=property(item,"effective_lab_units",file.name); if(!lab.is_number()) fail(file.name+".effective_lab_units must be numeric."); auto units=lab.get<double>(); if(units<=0.||std::isnan(units)||std::isinf(units)) fail("Institution '"+id+"' has invalid effective_lab_units "+dotnet_double(units)+"."); if(storage.institution_lookup.contains(id)) fail("Duplicate research institution '"+id+"'."); storage.institution_lookup.emplace(id,storage.institutions.size()); storage.institutions.push_back({std::move(id),units,std::move(caps)}); } }
+  std::unordered_set<std::string> provided; for(const auto &institution:storage.institutions) for(const auto &cap:institution.facility_capabilities) provided.insert(cap);
+  for(const auto &file:documents) { const auto found=file.root.find("stage_requirements"); if(found==file.root.end()) continue; if(!found->is_object()) fail(file.name+".stage_requirements must be an object."); for(auto node=found->begin();node!=found->end();++node) { if(!catalog.find_node(node.key())) fail(file.name+" stage requirement references unknown node '"+node.key()+"'."); if(!node.value().is_object()) fail(file.name+":"+node.key()+" stage requirements must be an object."); for(auto stage=node.value().begin();stage!=node.value().end();++stage) { auto maturity=parse_stage(stage.key(),file.name,node.key()); auto requirement=ResearchStageFacilityRequirement{strings(stage.value(),"all_of",file.name),strings(stage.value(),"any_of",file.name)}; for(const auto *values:{&requirement.all_of,&requirement.any_of}) for(const auto &cap:*values) { if(!capability_set.contains(cap)) fail(file.name+":"+node.key()+" references unknown facility capability '"+cap+"'."); if(!provided.contains(cap)) fail("No research institution provides required facility capability '"+cap+"'."); } const auto duplicate=std::ranges::find_if(storage.requirements,[&](const AdaptiveResearchFacilityCatalog::Storage::Requirement &item){return item.node_id==node.key() && item.stage==maturity;}); if(duplicate!=storage.requirements.end()) fail("Duplicate facility stage requirement for '"+node.key()+"' at "+maturity_name(maturity)+"."); storage.requirements.push_back({node.key(),maturity,std::move(requirement)}); } } }
+  return AdaptiveResearchFacilityCatalog(std::move(storage));
+}
+} // namespace stellar::core

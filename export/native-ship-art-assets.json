@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "pathfinder-scout": {
+      "source": "assets/visual/ships/pathfinder-scout.jpg",
+      "runtimePath": "assets/visual/ships/pathfinder-scout.jpg",
+      "sha256": "b931349492f4bffb081a08538d25ef8774d387bfb6826c2f16c2cfc962a93627"
+    },
+    "deep-space-science-vessel": {
+      "source": "assets/visual/ships/deep-space-science-vessel.jpg",
+      "runtimePath": "assets/visual/ships/deep-space-science-vessel.jpg",
+      "sha256": "a20ca4620dafb331588aae497cbcc41072c62ff0ac66f041c3b6f7d9c365636c"
+    },
+    "patrol-corvette": {
+      "source": "assets/visual/ships/patrol-corvette.jpg",
+      "runtimePath": "assets/visual/ships/patrol-corvette.jpg",
+      "sha256": "5a08507123a6b44f2fd33a15baa39bc266f2a702199175b5996c557d196aff7e"
+    },
+    "interstellar-colony-ship": {
+      "source": "assets/visual/ships/interstellar-colony-ship.jpg",
+      "runtimePath": "assets/visual/ships/interstellar-colony-ship.jpg",
+      "sha256": "be520ef76f0db63ccadb03861a8af9144fa2a3a5bd1427bfe279b8ea55318f21"
+    },
+    "resource-outpost-ship": {
+      "source": "assets/visual/ships/resource-outpost-ship.png",
+      "runtimePath": "assets/visual/ships/resource-outpost-ship.png",
+      "sha256": "04a7ee3f67e7246b57e252fa13ab26272c3b34589afa397683aabfd0f8064ec7"
+    },
+    "interstellar-bulk-freighter": {
+      "source": "assets/visual/ships/interstellar-bulk-freighter.png",
+      "runtimePath": "assets/visual/ships/interstellar-bulk-freighter.png",
+      "sha256": "1493ee2bc0d3aef47564edd6863ada71c365df2a6207f188007d86eb5901ad39"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_SHIP_ART_SOURCES.md",
+      "runtimePath": "Licenses/Ship-art-sources.md",
+      "sha256": "e2e343450805cd2e2948998ed644034f58f08b16a765443b935d04bd074dc864"
+    }
+  }
+}

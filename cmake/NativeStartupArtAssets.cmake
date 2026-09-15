@@ -1,0 +1,33 @@
+# Only the native graphical client packages these approved original images.
+file(READ "${CMAKE_SOURCE_DIR}/export/native-startup-art-assets.json" STELLAR_STARTUP_ART_ASSETS)
+string(JSON STELLAR_STARTUP_ART_SCHEMA GET "${STELLAR_STARTUP_ART_ASSETS}" schemaVersion)
+string(JSON STELLAR_STARTUP_ART_COUNT LENGTH "${STELLAR_STARTUP_ART_ASSETS}" assets)
+if(NOT STELLAR_STARTUP_ART_SCHEMA EQUAL 1 OR NOT STELLAR_STARTUP_ART_COUNT EQUAL 5)
+  message(FATAL_ERROR "Unsupported native startup art asset declaration")
+endif()
+add_custom_target(stellar_native_startup_art_assets)
+foreach(STELLAR_STARTUP_ART_KEY IN ITEMS stellar-continuum-splash stellar-loading-splash stellar-galaxy-generation stellar-save-loading credits)
+  if(STELLAR_STARTUP_ART_KEY STREQUAL "credits")
+    set(STELLAR_STARTUP_ART_EXPECTED_SOURCE "docs/engine/NATIVE_STARTUP_ART_SOURCES.md")
+    set(STELLAR_STARTUP_ART_EXPECTED_RUNTIME "Licenses/Startup-art-sources.md")
+  else()
+    set(STELLAR_STARTUP_ART_EXPECTED_SOURCE "assets/visual/loading/${STELLAR_STARTUP_ART_KEY}.png")
+    set(STELLAR_STARTUP_ART_EXPECTED_RUNTIME "${STELLAR_STARTUP_ART_EXPECTED_SOURCE}")
+  endif()
+  string(JSON STELLAR_STARTUP_ART_SOURCE GET "${STELLAR_STARTUP_ART_ASSETS}" assets ${STELLAR_STARTUP_ART_KEY} source)
+  string(JSON STELLAR_STARTUP_ART_RUNTIME GET "${STELLAR_STARTUP_ART_ASSETS}" assets ${STELLAR_STARTUP_ART_KEY} runtimePath)
+  string(JSON STELLAR_STARTUP_ART_EXPECTED_HASH GET "${STELLAR_STARTUP_ART_ASSETS}" assets ${STELLAR_STARTUP_ART_KEY} sha256)
+  if(NOT STELLAR_STARTUP_ART_SOURCE STREQUAL STELLAR_STARTUP_ART_EXPECTED_SOURCE OR
+     NOT STELLAR_STARTUP_ART_RUNTIME STREQUAL STELLAR_STARTUP_ART_EXPECTED_RUNTIME)
+    message(FATAL_ERROR "Unreviewed native startup art ${STELLAR_STARTUP_ART_KEY} path")
+  endif()
+  file(SHA256 "${CMAKE_SOURCE_DIR}/${STELLAR_STARTUP_ART_SOURCE}" STELLAR_STARTUP_ART_ACTUAL_HASH)
+  if(NOT STELLAR_STARTUP_ART_ACTUAL_HASH STREQUAL STELLAR_STARTUP_ART_EXPECTED_HASH)
+    message(FATAL_ERROR "Native startup art ${STELLAR_STARTUP_ART_KEY} differs from reviewed content")
+  endif()
+  get_filename_component(STELLAR_STARTUP_ART_DESTINATION "${CMAKE_BINARY_DIR}/${STELLAR_STARTUP_ART_RUNTIME}" DIRECTORY)
+  add_custom_command(TARGET stellar_native_startup_art_assets POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${STELLAR_STARTUP_ART_DESTINATION}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/${STELLAR_STARTUP_ART_SOURCE}" "${CMAKE_BINARY_DIR}/${STELLAR_STARTUP_ART_RUNTIME}")
+endforeach()

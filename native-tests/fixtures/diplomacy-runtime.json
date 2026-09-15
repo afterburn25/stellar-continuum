@@ -1,0 +1,3707 @@
+{
+  "Schema": "stellar-diplomacy-runtime-oracle-v1",
+  "Culture": "InvariantCulture",
+  "SourceFiles": [
+    {
+      "Path": "src/Game/Simulation/Diplomacy/ExplorationDiplomacyBridge.cs",
+      "Sha256": "4FA694D174D6A373B22B297AD8E8311B26DF0CB5A8D1A5FA35926BEDD76595B9"
+    },
+    {
+      "Path": "src/Game/Simulation/Diplomacy/CombatDiplomacyBridge.cs",
+      "Sha256": "E7CCDBA42B98B062CFED1F546890F5B5BF0491046E98234415E95CB8B02DE476"
+    },
+    {
+      "Path": "src/Game/Simulation/Diplomacy/DiplomacyCampaignRuntimeCoordinator.cs",
+      "Sha256": "7D9E2B0F87251104107105736DBD0D8AE6D842530C29079FCC78725111A3AD09"
+    },
+    {
+      "Path": "src/Game/Simulation/Combat/DiplomacyCombatHostilityView.cs",
+      "Sha256": "840FB96ABB8E1C4A267231DD60EA02B142C903BC017CCF3AD25B54F94FAC5354"
+    },
+    {
+      "Path": "src/Game/Simulation/AI/StrategicKnowledgeProvider.cs",
+      "Sha256": "7A3DC769BBFF2CF54DA8766DDB9B94F0054DA927087A1F2876D096057CFF4B90"
+    }
+  ],
+  "Rows": [
+    {
+      "Name": "exploration-ignored",
+      "Operation": "Exploration",
+      "Arguments": {
+        "Case": "exploration-ignored",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputBefore": {
+        "Case": "exploration-ignored",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputAfter": {
+        "Case": "exploration-ignored",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "exploration-first-contact",
+      "Operation": "Exploration",
+      "Arguments": {
+        "Case": "exploration-first-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputBefore": {
+        "Case": "exploration-first-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputAfter": {
+        "Case": "exploration-first-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "civilization:2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 4,
+            "LastObservedTick": 4,
+            "LastObservedSystemId": 7,
+            "Awareness": 4,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 4,
+            "Kind": 1,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as ContactEstablished (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "exploration-missing-target-after-success",
+      "Operation": "Exploration",
+      "Arguments": {
+        "Case": "exploration-missing-target-after-success",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            },
+            {
+              "Type": 11,
+              "CivilizationId": 3,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": null,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputBefore": {
+        "Case": "exploration-missing-target-after-success",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            },
+            {
+              "Type": 11,
+              "CivilizationId": 3,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": null,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "InputAfter": {
+        "Case": "exploration-missing-target-after-success",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 11,
+              "CivilizationId": 1,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": 2,
+              "PlanetaryBodyId": null
+            },
+            {
+              "Type": 11,
+              "CivilizationId": 3,
+              "FleetId": 80,
+              "SystemId": 7,
+              "Message": "explore",
+              "TargetCivilizationId": null,
+              "PlanetaryBodyId": null
+            }
+          ],
+          "Tick": 4
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Exploration FirstContact events must carry the legitimately identified target civilization ID."
+      },
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "civilization:2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 4,
+            "LastObservedTick": 4,
+            "LastObservedSystemId": 7,
+            "Awareness": 4,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 4,
+            "Kind": 1,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as ContactEstablished (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "exploration-negative-tick",
+      "Operation": "Exploration",
+      "Arguments": {
+        "Case": "exploration-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "InputBefore": {
+        "Case": "exploration-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "InputAfter": {
+        "Case": "exploration-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": null,
+      "Error": {
+        "Type": "ArgumentOutOfRangeException",
+        "Message": "Specified argument was out of the range of valid values. (Parameter \u0027observedAtTick\u0027)"
+      },
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "combat-hidden",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-hidden",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-hidden",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-hidden",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "combat-self-and-transient",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-self-and-transient",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 1,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            },
+            {
+              "Type": 1,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-self-and-transient",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 1,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            },
+            {
+              "Type": 1,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-self-and-transient",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 1,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            },
+            {
+              "Type": 1,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      },
+      "Result": 0,
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "combat-engagement",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-engagement",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-engagement",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-engagement",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 2,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 5,
+            "Kind": 17,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": null,
+            "Summary": "Hostile military engagement in system 7: combat",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      }
+    },
+    {
+      "Name": "combat-any-identified-contact",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-any-identified-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-any-identified-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-any-identified-contact",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 0,
+              "SystemId": 7,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 5
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "newer-unidentified",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 2,
+            "LastObservedTick": 2,
+            "LastObservedSystemId": 7,
+            "Awareness": 1,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 0.5
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "older-identified",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 2,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "newer-unidentified",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 2,
+            "LastObservedTick": 2,
+            "LastObservedSystemId": 7,
+            "Awareness": 1,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 0.5
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "older-identified",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 2,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 2,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 5,
+            "Kind": 17,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": null,
+            "Summary": "Hostile military engagement in system 7: combat",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "combat-destruction-unknown-system",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-destruction-unknown-system",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 4,
+              "SystemId": null,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 6
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-destruction-unknown-system",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 4,
+              "SystemId": null,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 6
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-destruction-unknown-system",
+        "Payload": {
+          "Events": [
+            {
+              "Type": 4,
+              "SystemId": null,
+              "ActorCivilizationId": 1,
+              "ActorFleetId": 10,
+              "TargetCivilizationId": 2,
+              "TargetFleetId": 20,
+              "ShieldDamage": 0,
+              "ArmorDamage": 0,
+              "HullDamage": 0,
+              "Message": "combat",
+              "EmbarkedPopulationCasualtiesMillions": 0
+            }
+          ],
+          "Tick": 6
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      },
+      "Result": 1,
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": [
+              {
+                "CreatedAtTick": 6,
+                "SourceCivilizationId": 1,
+                "Severity": 1,
+                "Reason": "Military vessel destroyed in system unknown: combat"
+              }
+            ]
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 6,
+            "Kind": 17,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": null,
+            "Summary": "Military vessel destroyed in system unknown: combat",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      }
+    },
+    {
+      "Name": "combat-negative-tick",
+      "Operation": "Combat",
+      "Arguments": {
+        "Case": "combat-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "InputBefore": {
+        "Case": "combat-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "InputAfter": {
+        "Case": "combat-negative-tick",
+        "Payload": {
+          "Events": [],
+          "Tick": -1
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": null,
+      "Error": {
+        "Type": "ArgumentOutOfRangeException",
+        "Message": "Specified argument was out of the range of valid values. (Parameter \u0027tick\u0027)"
+      },
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "hostility-Unknown",
+      "Operation": "Hostility",
+      "Arguments": {
+        "Case": "hostility-Unknown",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputBefore": {
+        "Case": "hostility-Unknown",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputAfter": {
+        "Case": "hostility-Unknown",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      },
+      "Result": {
+        "Other": false,
+        "Self": false
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      }
+    },
+    {
+      "Name": "hostility-Peace",
+      "Operation": "Hostility",
+      "Arguments": {
+        "Case": "hostility-Peace",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputBefore": {
+        "Case": "hostility-Peace",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputAfter": {
+        "Case": "hostility-Peace",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      },
+      "Result": {
+        "Other": false,
+        "Self": false
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      }
+    },
+    {
+      "Name": "hostility-Hostile",
+      "Operation": "Hostility",
+      "Arguments": {
+        "Case": "hostility-Hostile",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputBefore": {
+        "Case": "hostility-Hostile",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputAfter": {
+        "Case": "hostility-Hostile",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 2,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 3,
+            "Kind": 17,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "hostile",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 4
+      },
+      "Result": {
+        "Other": true,
+        "Self": false
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 2,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 3,
+            "Kind": 17,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "hostile",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 4
+      }
+    },
+    {
+      "Name": "hostility-AtWar",
+      "Operation": "Hostility",
+      "Arguments": {
+        "Case": "hostility-AtWar",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputBefore": {
+        "Case": "hostility-AtWar",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputAfter": {
+        "Case": "hostility-AtWar",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 3,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [
+          {
+            "GrantorCivilizationId": 1,
+            "VisitorCivilizationId": 2,
+            "Permission": 2,
+            "UpdatedAtTick": 3
+          },
+          {
+            "GrantorCivilizationId": 2,
+            "VisitorCivilizationId": 1,
+            "Permission": 2,
+            "UpdatedAtTick": 3
+          }
+        ],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 3,
+            "Kind": 18,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "Civilization 1 declared war on civilization 2.",
+            "KnownToCivilizationIds": [
+              1,
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 4
+      },
+      "Result": {
+        "Other": true,
+        "Self": false
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 3,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [
+          {
+            "GrantorCivilizationId": 1,
+            "VisitorCivilizationId": 2,
+            "Permission": 2,
+            "UpdatedAtTick": 3
+          },
+          {
+            "GrantorCivilizationId": 2,
+            "VisitorCivilizationId": 1,
+            "Permission": 2,
+            "UpdatedAtTick": 3
+          }
+        ],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 3,
+            "Kind": 18,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "Civilization 1 declared war on civilization 2.",
+            "KnownToCivilizationIds": [
+              1,
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 4
+      }
+    },
+    {
+      "Name": "hostility-Ceasefire",
+      "Operation": "Hostility",
+      "Arguments": {
+        "Case": "hostility-Ceasefire",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputBefore": {
+        "Case": "hostility-Ceasefire",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "InputAfter": {
+        "Case": "hostility-Ceasefire",
+        "Payload": {
+          "First": 1,
+          "Second": 2,
+          "Self": 1
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      },
+      "Result": {
+        "Other": false,
+        "Self": false
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      }
+    },
+    {
+      "Name": "knowledge-private-distinct-war",
+      "Operation": "Knowledge",
+      "Arguments": {
+        "Case": "knowledge-private-distinct-war",
+        "Payload": {
+          "Observer": 1,
+          "Tick": 9
+        }
+      },
+      "InputBefore": {
+        "Case": "knowledge-private-distinct-war",
+        "Payload": {
+          "Observer": 1,
+          "Tick": 9
+        }
+      },
+      "InputAfter": {
+        "Case": "knowledge-private-distinct-war",
+        "Payload": {
+          "Observer": 1,
+          "Tick": 9
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "a",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "b",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 2,
+            "LastObservedTick": 2,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-3",
+            "TargetCivilizationId": 3,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 3,
+            "Trust": 0.8,
+            "Hostility": 0.2,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          },
+          {
+            "CivilizationAId": 2,
+            "CivilizationBId": 3,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [
+          {
+            "GrantorCivilizationId": 1,
+            "VisitorCivilizationId": 2,
+            "Permission": 2,
+            "UpdatedAtTick": 4
+          },
+          {
+            "GrantorCivilizationId": 2,
+            "VisitorCivilizationId": 1,
+            "Permission": 2,
+            "UpdatedAtTick": 4
+          }
+        ],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 2,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 4,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 3,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 3 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 5,
+            "Tick": 3,
+            "Kind": 17,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "sentiment",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 6,
+            "Tick": 4,
+            "Kind": 18,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": null,
+            "Summary": "Civilization 2 declared war on civilization 1.",
+            "KnownToCivilizationIds": [
+              1,
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 7
+      },
+      "Result": {
+        "ObservedAtTick": 9,
+        "Civilizations": {
+          "2": {
+            "CivilizationId": 2,
+            "Trust": 0.6000000000000001,
+            "EstimatedMilitaryLow": 0,
+            "EstimatedMilitaryHigh": 0,
+            "EstimateConfidence": 0,
+            "LastMilitaryObservationTick": 0,
+            "HasSharedBorder": false,
+            "KnownTradeDependence": 0,
+            "KnownWarExhaustion": 0,
+            "KnownToBeAtWar": true,
+            "HasDefenseTreatyWithObserver": false,
+            "HasMilitaryEstimate": false,
+            "EstimatedMilitaryMidpoint": 0
+          }
+        }
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "a",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "b",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 2,
+            "LastObservedTick": 2,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-3",
+            "TargetCivilizationId": 3,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 3,
+            "Trust": 0.8,
+            "Hostility": 0.2,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          },
+          {
+            "CivilizationAId": 2,
+            "CivilizationBId": 3,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [
+          {
+            "GrantorCivilizationId": 1,
+            "VisitorCivilizationId": 2,
+            "Permission": 2,
+            "UpdatedAtTick": 4
+          },
+          {
+            "GrantorCivilizationId": 2,
+            "VisitorCivilizationId": 1,
+            "Permission": 2,
+            "UpdatedAtTick": 4
+          }
+        ],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 2,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 4,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 3,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 3 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 5,
+            "Tick": 3,
+            "Kind": 17,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "sentiment",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 6,
+            "Tick": 4,
+            "Kind": 18,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": null,
+            "Summary": "Civilization 2 declared war on civilization 1.",
+            "KnownToCivilizationIds": [
+              1,
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 7
+      }
+    },
+    {
+      "Name": "knowledge-invalid-observer-first",
+      "Operation": "Knowledge",
+      "Arguments": {
+        "Case": "knowledge-invalid-observer-first",
+        "Payload": {
+          "Observer": -1,
+          "Tick": -1
+        }
+      },
+      "InputBefore": {
+        "Case": "knowledge-invalid-observer-first",
+        "Payload": {
+          "Observer": -1,
+          "Tick": -1
+        }
+      },
+      "InputAfter": {
+        "Case": "knowledge-invalid-observer-first",
+        "Payload": {
+          "Observer": -1,
+          "Tick": -1
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": null,
+      "Error": {
+        "Type": "ArgumentOutOfRangeException",
+        "Message": "Specified argument was out of the range of valid values. (Parameter \u0027observerCivilizationId\u0027)"
+      },
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "knowledge-invalid-tick",
+      "Operation": "Knowledge",
+      "Arguments": {
+        "Case": "knowledge-invalid-tick",
+        "Payload": {
+          "Observer": 1,
+          "Tick": -1
+        }
+      },
+      "InputBefore": {
+        "Case": "knowledge-invalid-tick",
+        "Payload": {
+          "Observer": 1,
+          "Tick": -1
+        }
+      },
+      "InputAfter": {
+        "Case": "knowledge-invalid-tick",
+        "Payload": {
+          "Observer": 1,
+          "Tick": -1
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": null,
+      "Error": {
+        "Type": "ArgumentOutOfRangeException",
+        "Message": "Specified argument was out of the range of valid values. (Parameter \u0027nowTick\u0027)"
+      },
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "runtime-success-equal-and-backward",
+      "Operation": "Runtime",
+      "Arguments": {
+        "Case": "runtime-success-equal-and-backward",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": []
+            },
+            {
+              "Days": 1,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            },
+            {
+              "Days": 0.5,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            }
+          ]
+        }
+      },
+      "InputBefore": {
+        "Case": "runtime-success-equal-and-backward",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": []
+            },
+            {
+              "Days": 1,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            },
+            {
+              "Days": 0.5,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            }
+          ]
+        }
+      },
+      "InputAfter": {
+        "Case": "runtime-success-equal-and-backward",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": []
+            },
+            {
+              "Days": 1,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            },
+            {
+              "Days": 0.5,
+              "ExplorationEvents": [],
+              "CombatEvents": []
+            }
+          ]
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": {
+        "First": {
+          "Tick": 1000,
+          "FirstContactEventsProcessed": 1,
+          "CombatIncidentsProcessed": 0,
+          "Maintenance": {
+            "Ran": true,
+            "ReviewTick": 1000,
+            "ContactAging": {
+              "ReviewedContacts": 1,
+              "NewlyStaleContacts": 0
+            },
+            "ProposalLifecycle": {
+              "PendingProposalsReviewed": 0,
+              "NewlyExpiredProposals": 0
+            }
+          },
+          "MaintenanceTransitions": 0,
+          "ProcessedDiplomacyEvents": 1
+        },
+        "Equal": {
+          "Tick": 1000,
+          "FirstContactEventsProcessed": 0,
+          "CombatIncidentsProcessed": 0,
+          "Maintenance": {
+            "Ran": false,
+            "ReviewTick": 1000,
+            "ContactAging": {
+              "ReviewedContacts": 0,
+              "NewlyStaleContacts": 0
+            },
+            "ProposalLifecycle": {
+              "PendingProposalsReviewed": 0,
+              "NewlyExpiredProposals": 0
+            }
+          },
+          "MaintenanceTransitions": 0,
+          "ProcessedDiplomacyEvents": 0
+        },
+        "Backward": {
+          "Type": "InvalidOperationException",
+          "Message": "Campaign Diplomacy runtime cannot process an earlier tick after later diplomatic history has been applied."
+        },
+        "LastProcessedTick": 1000,
+        "NextMaintenanceReviewTick": 2000
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "civilization:2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1000,
+            "LastObservedTick": 1000,
+            "LastObservedSystemId": 7,
+            "Awareness": 4,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1000,
+            "Kind": 1,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as ContactEstablished (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "runtime-partial-exploration",
+      "Operation": "Runtime",
+      "Arguments": {
+        "Case": "runtime-partial-exploration",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                },
+                {
+                  "Type": 11,
+                  "CivilizationId": 3,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": null,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": [
+                {
+                  "Type": 0,
+                  "SystemId": 7,
+                  "ActorCivilizationId": 1,
+                  "ActorFleetId": 10,
+                  "TargetCivilizationId": 2,
+                  "TargetFleetId": 20,
+                  "ShieldDamage": 0,
+                  "ArmorDamage": 0,
+                  "HullDamage": 0,
+                  "Message": "combat",
+                  "EmbarkedPopulationCasualtiesMillions": 0
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "InputBefore": {
+        "Case": "runtime-partial-exploration",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                },
+                {
+                  "Type": 11,
+                  "CivilizationId": 3,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": null,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": [
+                {
+                  "Type": 0,
+                  "SystemId": 7,
+                  "ActorCivilizationId": 1,
+                  "ActorFleetId": 10,
+                  "TargetCivilizationId": 2,
+                  "TargetFleetId": 20,
+                  "ShieldDamage": 0,
+                  "ArmorDamage": 0,
+                  "HullDamage": 0,
+                  "Message": "combat",
+                  "EmbarkedPopulationCasualtiesMillions": 0
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "InputAfter": {
+        "Case": "runtime-partial-exploration",
+        "Payload": {
+          "Policy": {
+            "ReviewIntervalTicks": 1000,
+            "ContactStaleAfterTicks": 2000,
+            "ProposalLifetimeTicks": 1000
+          },
+          "ResetDays": 0,
+          "ResetImmediate": false,
+          "Steps": [
+            {
+              "Days": 1,
+              "ExplorationEvents": [
+                {
+                  "Type": 11,
+                  "CivilizationId": 1,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": 2,
+                  "PlanetaryBodyId": null
+                },
+                {
+                  "Type": 11,
+                  "CivilizationId": 3,
+                  "FleetId": 80,
+                  "SystemId": 7,
+                  "Message": "explore",
+                  "TargetCivilizationId": null,
+                  "PlanetaryBodyId": null
+                }
+              ],
+              "CombatEvents": [
+                {
+                  "Type": 0,
+                  "SystemId": 7,
+                  "ActorCivilizationId": 1,
+                  "ActorFleetId": 10,
+                  "TargetCivilizationId": 2,
+                  "TargetFleetId": 20,
+                  "ShieldDamage": 0,
+                  "ArmorDamage": 0,
+                  "HullDamage": 0,
+                  "Message": "combat",
+                  "EmbarkedPopulationCasualtiesMillions": 0
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": {
+        "Error": {
+          "Type": "InvalidOperationException",
+          "Message": "Exploration FirstContact events must carry the legitimately identified target civilization ID."
+        },
+        "LastProcessedTick": 0,
+        "NextMaintenanceReviewTick": 1000
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "civilization:2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1000,
+            "LastObservedTick": 1000,
+            "LastObservedSystemId": 7,
+            "Awareness": 4,
+            "Condition": 0,
+            "CommunicationAvailable": false,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1000,
+            "Kind": 1,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as ContactEstablished (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 2
+      }
+    },
+    {
+      "Name": "runtime-reset-immediate",
+      "Operation": "Runtime",
+      "Arguments": {
+        "Case": "runtime-reset-immediate",
+        "Payload": {
+          "ResetDays": 2,
+          "ResetImmediate": true
+        }
+      },
+      "InputBefore": {
+        "Case": "runtime-reset-immediate",
+        "Payload": {
+          "ResetDays": 2,
+          "ResetImmediate": true
+        }
+      },
+      "InputAfter": {
+        "Case": "runtime-reset-immediate",
+        "Payload": {
+          "ResetDays": 2,
+          "ResetImmediate": true
+        }
+      },
+      "Before": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      },
+      "Result": {
+        "LastProcessedTick": 2000,
+        "NextMaintenanceReviewTick": 2000
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [],
+        "Relationships": [],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 1
+      }
+    },
+    {
+      "Name": "command-preview-shared-hostility",
+      "Operation": "Preview",
+      "Arguments": {
+        "Case": "command-preview-shared-hostility",
+        "Payload": {
+          "Systems": [
+            {
+              "Id": 0,
+              "Name": "system"
+            }
+          ],
+          "Fleets": [
+            {
+              "Id": 10,
+              "CivilizationId": 1,
+              "Name": "f10",
+              "SystemId": 0
+            },
+            {
+              "Id": 20,
+              "CivilizationId": 2,
+              "Name": "f20",
+              "SystemId": 0
+            }
+          ],
+          "Order": {
+            "Type": 2,
+            "TargetFleetId": 20,
+            "DefendSystemId": null
+          },
+          "Sequence": [
+            "PreviewPeace",
+            "SetHostile",
+            "PreviewHostile",
+            "IssueHostile"
+          ]
+        }
+      },
+      "InputBefore": {
+        "Case": "command-preview-shared-hostility",
+        "Payload": {
+          "Systems": [
+            {
+              "Id": 0,
+              "Name": "system"
+            }
+          ],
+          "Fleets": [
+            {
+              "Id": 10,
+              "CivilizationId": 1,
+              "Name": "f10",
+              "SystemId": 0
+            },
+            {
+              "Id": 20,
+              "CivilizationId": 2,
+              "Name": "f20",
+              "SystemId": 0
+            }
+          ],
+          "Order": {
+            "Type": 2,
+            "TargetFleetId": 20,
+            "DefendSystemId": null
+          },
+          "Sequence": [
+            "PreviewPeace",
+            "SetHostile",
+            "PreviewHostile",
+            "IssueHostile"
+          ]
+        }
+      },
+      "InputAfter": {
+        "Case": "command-preview-shared-hostility",
+        "Payload": {
+          "Systems": [
+            {
+              "Id": 0,
+              "Name": "system"
+            }
+          ],
+          "Fleets": [
+            {
+              "Id": 10,
+              "CivilizationId": 1,
+              "Name": "f10",
+              "SystemId": 0
+            },
+            {
+              "Id": 20,
+              "CivilizationId": 2,
+              "Name": "f20",
+              "SystemId": 0
+            }
+          ],
+          "Order": {
+            "Type": 2,
+            "TargetFleetId": 20,
+            "DefendSystemId": null
+          },
+          "Sequence": [
+            "PreviewPeace",
+            "SetHostile",
+            "PreviewHostile",
+            "IssueHostile"
+          ]
+        }
+      },
+      "Before": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 1,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 3
+      },
+      "Result": {
+        "Peace": {
+          "CivilizationId": 1,
+          "FleetId": 10,
+          "Order": {
+            "Type": 2,
+            "TargetFleetId": 20,
+            "DefendSystemId": null
+          },
+          "Accepted": false,
+          "Message": "Diplomatic/political state does not currently permit a hostile engagement."
+        },
+        "Hostile": {
+          "CivilizationId": 1,
+          "FleetId": 10,
+          "Order": {
+            "Type": 2,
+            "TargetFleetId": 20,
+            "DefendSystemId": null
+          },
+          "Accepted": true,
+          "Message": "f10 can attack f20."
+        },
+        "Issued": {
+          "Accepted": true,
+          "Message": "f10 is attacking f20."
+        },
+        "FleetOrder": 2,
+        "FleetTarget": 20
+      },
+      "Error": null,
+      "After": {
+        "Contacts": [
+          {
+            "ObserverCivilizationId": 1,
+            "ContactId": "contact-1-2",
+            "TargetCivilizationId": 2,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          },
+          {
+            "ObserverCivilizationId": 2,
+            "ContactId": "contact-2-1",
+            "TargetCivilizationId": 1,
+            "FirstObservedTick": 1,
+            "LastObservedTick": 1,
+            "LastObservedSystemId": 7,
+            "Awareness": 5,
+            "Condition": 0,
+            "CommunicationAvailable": true,
+            "Confidence": 1
+          }
+        ],
+        "Relationships": [
+          {
+            "CivilizationAId": 1,
+            "CivilizationBId": 2,
+            "PoliticalState": 2,
+            "Trust": 0,
+            "Hostility": 0,
+            "Fear": 0,
+            "Respect": 0,
+            "Cooperation": 0,
+            "Grievances": []
+          }
+        ],
+        "AccessPermissions": [],
+        "Claims": [],
+        "ClaimResponses": [],
+        "Agreements": [],
+        "Proposals": [],
+        "RecentHistory": [
+          {
+            "EventId": 1,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": 7,
+            "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          },
+          {
+            "EventId": 2,
+            "Tick": 1,
+            "Kind": 2,
+            "PrimaryCivilizationId": 2,
+            "SecondaryCivilizationId": 1,
+            "SystemId": 7,
+            "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+            "KnownToCivilizationIds": [
+              2
+            ]
+          },
+          {
+            "EventId": 3,
+            "Tick": 3,
+            "Kind": 17,
+            "PrimaryCivilizationId": 1,
+            "SecondaryCivilizationId": 2,
+            "SystemId": null,
+            "Summary": "hostile",
+            "KnownToCivilizationIds": [
+              1
+            ]
+          }
+        ],
+        "NextClaimId": 1,
+        "NextAgreementId": 1,
+        "NextProposalId": 1,
+        "NextEventId": 4
+      }
+    }
+  ],
+  "RowCount": 22
+}

@@ -1,0 +1,6511 @@
+{
+  "Format": "stellar-galaxy-economy-persistence-actual-source-v1",
+  "SourceSha256Before": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E",
+  "SourceSha256After": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E",
+  "RowCount": 57,
+  "SourceCaptureAliasProbe": {
+    "Before": [
+      {
+        "Id": 88,
+        "CivilizationId": 1,
+        "SystemId": 4,
+        "PlanetaryBodyId": 41,
+        "Name": "State 88",
+        "Kind": 0,
+        "PopulationSpeciesId": "terran_baseline",
+        "PopulationMillions": 22,
+        "Infrastructure": 0.9,
+        "Stability": 0.6,
+        "StoredFoodPopulationDaysMillions": 12,
+        "StoredWaterPopulationDaysMillions": 5,
+        "StoredExtractedMaterials": 50,
+        "RemainingExtractableMaterials": 60,
+        "SurfaceHubLevel": 3,
+        "SurfaceHubUpgradeDaysRemaining": 6,
+        "SurfaceBuildings": [
+          {
+            "Id": 9,
+            "TypeId": "science_lab",
+            "X": 1.25,
+            "Z": -2.5,
+            "RotationDegrees": 33.5,
+            "IndustryProgress": 123.25,
+            "IsComplete": false,
+            "IsEnabled": false,
+            "PendingUpgradeTypeId": "advanced_science_lab",
+            "UpgradeDaysRemaining": 4.5,
+            "OperatingPriority": 7,
+            "Condition": 0.75,
+            "StoredPowerDays": 2.25
+          }
+        ]
+      }
+    ],
+    "After": [
+      {
+        "Id": 88,
+        "CivilizationId": 1,
+        "SystemId": 4,
+        "PlanetaryBodyId": 41,
+        "Name": "State 88",
+        "Kind": 0,
+        "PopulationSpeciesId": "terran_baseline",
+        "PopulationMillions": 22,
+        "Infrastructure": 0.9,
+        "Stability": 0.6,
+        "StoredFoodPopulationDaysMillions": 12,
+        "StoredWaterPopulationDaysMillions": 5,
+        "StoredExtractedMaterials": 50,
+        "RemainingExtractableMaterials": 60,
+        "SurfaceHubLevel": 3,
+        "SurfaceHubUpgradeDaysRemaining": 6,
+        "SurfaceBuildings": [
+          {
+            "Id": 9,
+            "TypeId": "mutated",
+            "X": 1.25,
+            "Z": -2.5,
+            "RotationDegrees": 33.5,
+            "IndustryProgress": 123.25,
+            "IsComplete": false,
+            "IsEnabled": false,
+            "PendingUpgradeTypeId": "advanced_science_lab",
+            "UpgradeDaysRemaining": 4.5,
+            "OperatingPriority": 7,
+            "Condition": 0.75,
+            "StoredPowerDays": 2.25
+          },
+          {
+            "Id": 9,
+            "TypeId": "science_lab",
+            "X": 1.25,
+            "Z": -2.5,
+            "RotationDegrees": 33.5,
+            "IndustryProgress": 123.25,
+            "IsComplete": false,
+            "IsEnabled": false,
+            "PendingUpgradeTypeId": "advanced_science_lab",
+            "UpgradeDaysRemaining": 4.5,
+            "OperatingPriority": 7,
+            "Condition": 0.75,
+            "StoredPowerDays": 2.25
+          }
+        ]
+      }
+    ]
+  },
+  "Rows": [
+    {
+      "Name": "colony-current-complete",
+      "Operation": "RestoreColonies",
+      "Version": 16,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "colony-current-nullable-fields",
+      "Operation": "RestoreColonies",
+      "Version": 16,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": null,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": null,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": null,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": null,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "colony-format7-derives-species-ignores-body",
+      "Operation": "RestoreColonies",
+      "Version": 7,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 2,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "unknown",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 2,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "unknown",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Colony 10 surface construction requires save format 12."
+      }
+    },
+    {
+      "Name": "colony-format7-unknown-civilization",
+      "Operation": "RestoreColonies",
+      "Version": 7,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 99,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 99,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Population state references unknown civilization 99."
+      }
+    },
+    {
+      "Name": "colony-format8-missing-species",
+      "Operation": "RestoreColonies",
+      "Version": 8,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": null,
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": null,
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "colony 10 references unknown population species ID \u0027\u0027."
+      }
+    },
+    {
+      "Name": "colony-format8-unicode-blank-species",
+      "Operation": "RestoreColonies",
+      "Version": 8,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "\u3000",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "\u3000",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "colony 10 references unknown population species ID \u0027\u3000\u0027."
+      }
+    },
+    {
+      "Name": "colony-format11-nonempty-surface",
+      "Operation": "RestoreColonies",
+      "Version": 11,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Colony 10 surface construction requires save format 12."
+      }
+    },
+    {
+      "Name": "colony-format11-null-surface-default-hub",
+      "Operation": "RestoreColonies",
+      "Version": 11,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": null,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": null,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "Result": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": []
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "colony-format11-empty-surface",
+      "Operation": "RestoreColonies",
+      "Version": 11,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": []
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": []
+        }
+      ],
+      "Result": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": []
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "colony-format12-null-surface",
+      "Operation": "RestoreColonies",
+      "Version": 12,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Colony 10 is missing its surface construction collection."
+      }
+    },
+    {
+      "Name": "colony-species-error-before-surface",
+      "Operation": "RestoreColonies",
+      "Version": 12,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "bad",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "bad",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "colony 10 references unknown population species ID \u0027bad\u0027."
+      }
+    },
+    {
+      "Name": "colony-second-row-failure-discards-output",
+      "Operation": "RestoreColonies",
+      "Version": 12,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 11",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 10,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 10",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        },
+        {
+          "Id": 11,
+          "CivilizationId": 1,
+          "SystemId": 3,
+          "PlanetaryBodyId": 31,
+          "Name": "Colony 11",
+          "Kind": 1,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 12.5,
+          "Infrastructure": 0.8,
+          "Stability": 0.7,
+          "StoredFoodPopulationDaysMillions": 44,
+          "StoredWaterPopulationDaysMillions": 22,
+          "StoredExtractedMaterials": 333,
+          "RemainingExtractableMaterials": 444,
+          "SurfaceHubLevel": 2,
+          "SurfaceHubUpgradeDaysRemaining": 5.5,
+          "SurfaceBuildings": null
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Colony 11 is missing its surface construction collection."
+      }
+    },
+    {
+      "Name": "colony-capture-complete",
+      "Operation": "CaptureColonies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "terran_baseline",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "colony-capture-unknown-species",
+      "Operation": "CaptureColonies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "bad",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "bad",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "colony 20 references unknown population species ID \u0027bad\u0027."
+      }
+    },
+    {
+      "Name": "colony-capture-unicode-blank-species",
+      "Operation": "CaptureColonies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "\u00A0",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "Id": 20,
+          "CivilizationId": 1,
+          "SystemId": 4,
+          "PlanetaryBodyId": 41,
+          "Name": "State 20",
+          "Kind": 0,
+          "PopulationSpeciesId": "\u00A0",
+          "PopulationMillions": 22,
+          "Infrastructure": 0.9,
+          "Stability": 0.6,
+          "StoredFoodPopulationDaysMillions": 12,
+          "StoredWaterPopulationDaysMillions": 5,
+          "StoredExtractedMaterials": 50,
+          "RemainingExtractableMaterials": 60,
+          "SurfaceHubLevel": 3,
+          "SurfaceHubUpgradeDaysRemaining": 6,
+          "SurfaceBuildings": [
+            {
+              "Id": 9,
+              "TypeId": "science_lab",
+              "X": 1.25,
+              "Z": -2.5,
+              "RotationDegrees": 33.5,
+              "IndustryProgress": 123.25,
+              "IsComplete": false,
+              "IsEnabled": false,
+              "PendingUpgradeTypeId": "advanced_science_lab",
+              "UpgradeDaysRemaining": 4.5,
+              "OperatingPriority": 7,
+              "Condition": 0.75,
+              "StoredPowerDays": 2.25
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "colony 20 references unknown population species ID \u0027\u00A0\u0027."
+      }
+    },
+    {
+      "Name": "economy-restore-complete",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "economy-null-industry-priority",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": null
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": null
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "economy-unvalidated-credit-nan",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": "NaN",
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": "NaN",
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "Credits": "NaN",
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "economy-invalid-spending",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": "NaN",
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": "NaN",
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has invalid research funding state."
+      }
+    },
+    {
+      "Name": "economy-invalid-funding",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 1.01,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 1.01,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has invalid research funding state."
+      }
+    },
+    {
+      "Name": "economy-invalid-arrears",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": -1,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": -1,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has invalid research funding state."
+      }
+    },
+    {
+      "Name": "economy-invalid-operations-funding",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": "Infinity",
+          "IndustryPriority": 1
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": "Infinity",
+          "IndustryPriority": 1
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has invalid research funding state."
+      }
+    },
+    {
+      "Name": "economy-invalid-enum",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 99
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": 4.5,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 99
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has an unknown industry priority."
+      }
+    },
+    {
+      "Name": "economy-funding-error-before-enum",
+      "Operation": "RestoreEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": -1,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 99
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "Credits": 10,
+          "Industry": 20,
+          "Science": 30,
+          "LastCreditsPerSecond": 1.25,
+          "LastIndustryPerSecond": 2.5,
+          "LastSciencePerSecond": 3.75,
+          "LastResearchSpendingPerDay": -1,
+          "LastResearchFundingFraction": 0.6,
+          "OperatingArrears": 7.5,
+          "LastBaseOperationsFundingFraction": 0.8,
+          "IndustryPriority": 99
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 1 has invalid research funding state."
+      }
+    },
+    {
+      "Name": "economy-capture-complete",
+      "Operation": "CaptureEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": 5,
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": 5,
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": 5,
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "economy-capture-does-not-revalidate-funding",
+      "Operation": "CaptureEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": "NaN",
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": "NaN",
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": "NaN",
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 2
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "economy-capture-invalid-enum",
+      "Operation": "CaptureEconomies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": 5,
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 99
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "Credits": 11,
+          "Industry": 21,
+          "Science": 31,
+          "LastCreditsPerSecond": 1.5,
+          "LastIndustryPerSecond": 2.75,
+          "LastSciencePerSecond": 4,
+          "LastResearchSpendingPerDay": 5,
+          "LastResearchFundingFraction": 0.65,
+          "OperatingArrears": 8,
+          "LastBaseOperationsFundingFraction": 0.85,
+          "IndustryPriority": 99
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Civilization 2 has an unknown industry priority."
+      }
+    },
+    {
+      "Name": "technology-restore-insertion-dedup",
+      "Operation": "RestoreTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha",
+            "beta"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": 12.25
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha",
+            "beta"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": 12.25
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": 12.25
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "technology-null-active-research",
+      "Operation": "RestoreTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha",
+            "beta"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha",
+            "beta"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "beta",
+            "alpha"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "technology-restore-null-completed",
+      "Operation": "RestoreTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": null,
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": 12.25
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": null,
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": 12.25
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "NullReferenceException",
+        "Message": "Object reference not set to an instance of an object."
+      }
+    },
+    {
+      "Name": "technology-restore-allows-arbitrary-values",
+      "Operation": "RestoreTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "",
+            "\u3000",
+            "unknown"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": "NaN"
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "",
+            "\u3000",
+            "unknown"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": "NaN"
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [
+            "",
+            "\u3000",
+            "unknown"
+          ],
+          "ActiveResearchId": "fusion_power",
+          "ActiveResearchProgress": "NaN"
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "technology-capture-utf16-ordinal-sort",
+      "Operation": "CaptureTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "alpha"
+          ],
+          "ActiveResearchId": "warp_field_control",
+          "ActiveResearchProgress": 13.5
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "alpha"
+          ],
+          "ActiveResearchId": "warp_field_control",
+          "ActiveResearchProgress": 13.5
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "alpha",
+            "\uD800\uDC00",
+            "\uE000"
+          ],
+          "ActiveResearchId": "warp_field_control",
+          "ActiveResearchProgress": 13.5
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "technology-capture-null-active-research",
+      "Operation": "CaptureTechnologies",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "alpha"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "alpha"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [
+            "alpha",
+            "\uD800\uDC00",
+            "\uE000"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": -0
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-restore-complete",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-valid-inactive",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 0,
+          "ActiveProjectAuthorizationCredits": 0,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-missing-completed",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": null,
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": null,
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 is missing required collections."
+      }
+    },
+    {
+      "Name": "construction-missing-queue",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": null
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": null
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 is missing required collections."
+      }
+    },
+    {
+      "Name": "construction-invalid-active-number",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has invalid active progress or authorization."
+      }
+    },
+    {
+      "Name": "construction-unknown-active",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 references an unknown active project."
+      }
+    },
+    {
+      "Name": "construction-orphan-active-values",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 1,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": null,
+          "ActiveProjectProgress": 1,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has active state without a project."
+      }
+    },
+    {
+      "Name": "construction-cost-tolerance-accepted",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 900.0001,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 900.0001,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 900.0001,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-cost-exceeded",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 900.0002,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 900.0002,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 exceeds active project materials."
+      }
+    },
+    {
+      "Name": "construction-completed-unknown",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "unknown"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "unknown"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has invalid completed projects."
+      }
+    },
+    {
+      "Name": "construction-completed-duplicate",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has invalid completed projects."
+      }
+    },
+    {
+      "Name": "construction-active-completed-overlap",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "industrial_automation"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network",
+            "industrial_automation"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 overlaps active and completed projects."
+      }
+    },
+    {
+      "Name": "construction-queue-overflow",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "x2",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x3",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x4",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x5",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x6",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x7",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x8",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "x2",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x3",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x4",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x5",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x6",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x7",
+              "AuthorizationCredits": 0
+            },
+            {
+              "ProjectId": "x8",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-null-queue-item",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            null
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            null
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-unicode-blank-queue-id",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "\u202F",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "\u202F",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-unknown-queue-id",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "unknown",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "unknown",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-invalid-queue-authorization",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": "NaN"
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": "NaN"
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-duplicate-queue",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-queue-completed-overlap",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "research_network",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "research_network",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-queue-active-overlap",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "industrial_automation",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            },
+            {
+              "ProjectId": "industrial_automation",
+              "AuthorizationCredits": 0
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 has an invalid queued project."
+      }
+    },
+    {
+      "Name": "construction-first-error-missing-before-number",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": null,
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": null,
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 1 is missing required collections."
+      }
+    },
+    {
+      "Name": "construction-second-row-failure-discards-output",
+      "Operation": "RestoreConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 1,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        },
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": 100,
+          "ActiveProjectAuthorizationCredits": 20,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 30
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 40
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "Error": {
+        "Type": "InvalidDataException",
+        "Message": "Construction state 2 references an unknown active project."
+      }
+    },
+    {
+      "Name": "construction-capture-utf16-sort-and-queue",
+      "Operation": "CaptureConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 101,
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "research_network"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 101,
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "research_network",
+            "\uD800\uDC00",
+            "\uE000"
+          ],
+          "ActiveProjectId": "industrial_automation",
+          "ActiveProjectProgress": 101,
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "Error": null
+    },
+    {
+      "Name": "construction-capture-does-not-validate",
+      "Operation": "CaptureConstruction",
+      "Version": 0,
+      "Civilizations": [
+        {
+          "Id": 1,
+          "Name": "C1",
+          "HomeSystemId": 1,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": {
+            "Offices": {}
+          }
+        },
+        {
+          "Id": 2,
+          "Name": "C2",
+          "HomeSystemId": 2,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.45,
+            "Territoriality": 0.35,
+            "Greed": 0.35,
+            "ScientificCuriosity": 0.55,
+            "RiskTolerance": 0.45,
+            "SurvivalPriority": 1,
+            "HonorBound": false
+          },
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": {
+            "Offices": {}
+          }
+        }
+      ],
+      "BeforeInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "AfterInput": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "\uE000",
+            "\uD800\uDC00",
+            "research_network"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "CompletedProjectIds": [
+            "research_network",
+            "\uD800\uDC00",
+            "\uE000"
+          ],
+          "ActiveProjectId": "unknown",
+          "ActiveProjectProgress": "NaN",
+          "ActiveProjectAuthorizationCredits": 22,
+          "QueuedProjects": [
+            {
+              "ProjectId": "orbital_launch_complex",
+              "AuthorizationCredits": 31
+            },
+            {
+              "ProjectId": "warp_test_facility",
+              "AuthorizationCredits": 41
+            }
+          ]
+        }
+      ],
+      "Error": null
+    }
+  ]
+}

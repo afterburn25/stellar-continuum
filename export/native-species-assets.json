@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "terran-baseline": {
+      "source": "assets/visual/species/terran-baseline.jpg",
+      "runtimePath": "assets/visual/species/terran-baseline.jpg",
+      "sha256": "478468474a95a23dfefe3ab0bc534e889a62968f5771321c8c08a750693d2b3d"
+    },
+    "pelagic-high-pressure": {
+      "source": "assets/visual/species/pelagic-high-pressure.jpg",
+      "runtimePath": "assets/visual/species/pelagic-high-pressure.jpg",
+      "sha256": "a8c249a0462fee23829270a86f7dd65eb7c761ed77115f99bf8492d5a263f6dd"
+    },
+    "compact-high-gravity": {
+      "source": "assets/visual/species/compact-high-gravity.jpg",
+      "runtimePath": "assets/visual/species/compact-high-gravity.jpg",
+      "sha256": "9c0ee83d5475c9dfd0c56b35d90d1b1a4ca2b97c4d6d4cc046ba6b5732ddbd63"
+    },
+    "cryogenic-hydrocarbon": {
+      "source": "assets/visual/species/cryogenic-hydrocarbon.jpg",
+      "runtimePath": "assets/visual/species/cryogenic-hydrocarbon.jpg",
+      "sha256": "fce3c8a2c2c9166ac6873d589612a72af3b49177dd9281e9309bc6560bd7f8d0"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_SPECIES_ART_SOURCES.md",
+      "runtimePath": "Licenses/Species-visual-sources.md",
+      "sha256": "57201dc8bc773f76b2f97a4037f9e98cd260e6bf2c15a6269dfe9047e5a2f881"
+    }
+  }
+}

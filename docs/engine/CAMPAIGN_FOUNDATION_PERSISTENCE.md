@@ -1,0 +1,9 @@
+# Gate 083A systems and civilizations persistence
+
+This gate ports only the private `CampaignSaveService` stellar-system and civilization adapters. It does not compose a galaxy codec, planetary bodies, fleets, knowledge, metadata, or player saves.
+
+The system DTO is field-complete and owned. Restore materializes every input in order and then validates depth, stellar enum values, companion presence, and the canonical Sol single-star rule in source order. Duplicate IDs and otherwise unusual unvalidated fields remain accepted here because later whole-galaxy reference validation owns them. Capture validates first and returns detached DTOs.
+
+The civilization DTO owns traits, stage flags, species, and every leadership character field. `leadership_present` preserves null versus an authored empty dictionary; entries carry an optional character so a null dictionary value retains the source `ArgumentNullException`. Current formats validate saved species. Formats before 8 deterministically assign species from campaign seed and civilization ID. The legacy-warp branch overrides stage, ancient, expansion, and neutral flags exactly. Null leadership creates the seven-office founding roster; present leadership is restored in UTF-16 ordinal office order with exact metadata and 32-office validation.
+
+The actual-source oracle is outside the repository at `../campaign-foundation-oracle-083a`. Its current 35 rows cover empty and ordered inputs, all stellar validation branches, capture ordering, null versus empty leadership, supplementary/private-use ordinal ordering, founding human/nonhuman rosters, historical species and warp branches, unknown enums accepted by this adapter, character metadata failures, capacity, and capture species validation. Rows retain complete before/after/result/error data and seven exact source hashes. The fixture SHA-256 is `7ED6F4E7318A8E66EE72008CFF40AADD3AA86B06C222803AA8E99F1092A039EA`.

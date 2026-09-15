@@ -1,0 +1,1769 @@
+{
+  "SchemaVersion": 1,
+  "Authority": "actual CampaignSaveService knowledge adapters",
+  "SourceFiles": [
+    {
+      "Path": "Persistence/CampaignSaveService.cs",
+      "Sha256": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E"
+    },
+    {
+      "Path": "Simulation/Knowledge/CivilizationKnowledgeState.cs",
+      "Sha256": "C0B6961609938A86571416215955F4B4B8FCCEC4E20C0F9234B5056541FFD4DE"
+    }
+  ],
+  "RowCount": 24,
+  "Rows": [
+    {
+      "Name": "empty",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": []
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": []
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": []
+      },
+      "Result": [],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "null-top",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": false,
+        "Entries": null
+      },
+      "Before": {
+        "EntriesPresent": false,
+        "Entries": null
+      },
+      "After": {
+        "EntriesPresent": false,
+        "Entries": null
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "null-entry",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          null
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          null
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          null
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "explored-without-access",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 1,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 1,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 1,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Landmark exploration requires its access unlock."
+    },
+    {
+      "Name": "negative-core-unlock",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": -1,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": -1,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": -1,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Specified argument was out of the range of valid values. (Parameter \u0027civilizationId\u0027)"
+    },
+    {
+      "Name": "core-only",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 8,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 8,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 8,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": true,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 8,
+          "CoreAccess": true,
+          "CoreExplored": true,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "legacy-known-systems",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9,
+              3,
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9,
+              3,
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9,
+              3,
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 2,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            3,
+            9
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 9,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "repeated-dtos",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          },
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [
+              7,
+              7
+            ],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          },
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [
+              7,
+              7
+            ],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              9
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          },
+          {
+            "CivilizationId": 2,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [
+              7,
+              7
+            ],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 2,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            3,
+            9
+          ],
+          "KnownCivilizations": [
+            7
+          ],
+          "Surveys": [
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 9,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "explicit-all-levels",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 3,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              8
+            ],
+            "KnownCivilizationIds": [
+              5,
+              3
+            ],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 0,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 2,
+                "Level": 1,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 3,
+                "Level": 2,
+                "Progress": 0.25
+              },
+              {
+                "SystemId": 4,
+                "Level": 3,
+                "Progress": 0.4
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 3,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              8
+            ],
+            "KnownCivilizationIds": [
+              5,
+              3
+            ],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 0,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 2,
+                "Level": 1,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 3,
+                "Level": 2,
+                "Progress": 0.25
+              },
+              {
+                "SystemId": 4,
+                "Level": 3,
+                "Progress": 0.4
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 3,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              8
+            ],
+            "KnownCivilizationIds": [
+              5,
+              3
+            ],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 0,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 2,
+                "Level": 1,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 3,
+                "Level": 2,
+                "Progress": 0.25
+              },
+              {
+                "SystemId": 4,
+                "Level": 3,
+                "Progress": 0.4
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 3,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            2,
+            3,
+            4,
+            8
+          ],
+          "KnownCivilizations": [
+            5
+          ],
+          "Surveys": [
+            {
+              "SystemId": 2,
+              "Level": 1,
+              "Progress": 0
+            },
+            {
+              "SystemId": 3,
+              "Level": 2,
+              "Progress": 0.25
+            },
+            {
+              "SystemId": 4,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 8,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "unknown-survey-level-noop",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 4,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 99,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 4,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 99,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 4,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 99,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "unknown-only-sparse-observer",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 44,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 0,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 44,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 0,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 44,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 9,
+                "Level": 0,
+                "Progress": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "null-surveys-after-core",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": null
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": null
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": true,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": null
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "null-known-systems-legacy",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "null-known-systems-explicit",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": null,
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "null-survey-after-reveal",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              null
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              null
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              null
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "null-known-civilizations-last",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": null,
+            "SystemSurveys": [
+              {
+                "SystemId": 8,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": null,
+            "SystemSurveys": [
+              {
+                "SystemId": 8,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 5,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              7
+            ],
+            "KnownCivilizationIds": null,
+            "SystemSurveys": [
+              {
+                "SystemId": 8,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Result": null,
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": "NullReferenceException",
+      "ErrorMessage": "Object reference not set to an instance of an object."
+    },
+    {
+      "Name": "partial-nan",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "NaN"
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "NaN"
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "NaN"
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 6,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            1
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 2,
+              "Progress": "NaN"
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "partial-positive-infinity",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 6,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            1
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 2,
+              "Progress": 0.999999
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "partial-negative-infinity",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "-Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "-Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": "-Infinity"
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 6,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            1
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 2,
+              "Progress": 1E-06
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "repeated-surveys",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.2
+              },
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 1,
+                "Level": 3,
+                "Progress": 0
+              },
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.2
+              },
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 1,
+                "Level": 3,
+                "Progress": 0
+              },
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 6,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": [
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.2
+              },
+              {
+                "SystemId": 1,
+                "Level": 2,
+                "Progress": 0.4
+              },
+              {
+                "SystemId": 1,
+                "Level": 3,
+                "Progress": 0
+              },
+              {
+                "SystemId": 1,
+                "Level": 1,
+                "Progress": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 6,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            1
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 1,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "success-with-continuation",
+      "Operation": "Restore",
+      "Input": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 7,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Before": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 7,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "After": {
+        "EntriesPresent": true,
+        "Entries": [
+          {
+            "CivilizationId": 7,
+            "GalacticCoreAccessUnlocked": false,
+            "GalacticCoreExplored": false,
+            "KnownSystemIds": [
+              3
+            ],
+            "KnownCivilizationIds": [],
+            "SystemSurveys": []
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": 7,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            3
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "BeforeNext": [
+        {
+          "Id": 7,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            3
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            }
+          ]
+        }
+      ],
+      "AfterNext": [
+        {
+          "Id": 7,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            3,
+            4
+          ],
+          "KnownCivilizations": [],
+          "Surveys": [
+            {
+              "SystemId": 3,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 4,
+              "Level": 2,
+              "Progress": 0.375
+            }
+          ]
+        }
+      ],
+      "NextResult": false,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "capture-empty",
+      "Operation": "Capture",
+      "Input": [],
+      "Before": [],
+      "After": [],
+      "Result": [],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "capture-core-only",
+      "Operation": "Capture",
+      "Input": [
+        {
+          "Id": 12,
+          "CoreAccess": true,
+          "CoreExplored": false,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "Before": [
+        {
+          "Id": 12,
+          "CoreAccess": true,
+          "CoreExplored": false,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "After": [
+        {
+          "Id": 12,
+          "CoreAccess": true,
+          "CoreExplored": false,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 12,
+          "GalacticCoreAccessUnlocked": true,
+          "GalacticCoreExplored": false,
+          "KnownSystemIds": [],
+          "KnownCivilizationIds": [],
+          "SystemSurveys": []
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "capture-mixed",
+      "Operation": "Capture",
+      "Input": [
+        {
+          "Id": 3,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            2,
+            7,
+            8
+          ],
+          "KnownCivilizations": [
+            4
+          ],
+          "Surveys": [
+            {
+              "SystemId": 2,
+              "Level": 2,
+              "Progress": 0.125
+            },
+            {
+              "SystemId": 7,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 8,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        },
+        {
+          "Id": 9,
+          "CoreAccess": true,
+          "CoreExplored": true,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "Before": [
+        {
+          "Id": 3,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            2,
+            7,
+            8
+          ],
+          "KnownCivilizations": [
+            4
+          ],
+          "Surveys": [
+            {
+              "SystemId": 2,
+              "Level": 2,
+              "Progress": 0.125
+            },
+            {
+              "SystemId": 7,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 8,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        },
+        {
+          "Id": 9,
+          "CoreAccess": true,
+          "CoreExplored": true,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "After": [
+        {
+          "Id": 3,
+          "CoreAccess": false,
+          "CoreExplored": false,
+          "KnownSystems": [
+            2,
+            7,
+            8
+          ],
+          "KnownCivilizations": [
+            4
+          ],
+          "Surveys": [
+            {
+              "SystemId": 2,
+              "Level": 2,
+              "Progress": 0.125
+            },
+            {
+              "SystemId": 7,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 8,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        },
+        {
+          "Id": 9,
+          "CoreAccess": true,
+          "CoreExplored": true,
+          "KnownSystems": [],
+          "KnownCivilizations": [],
+          "Surveys": []
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 3,
+          "GalacticCoreAccessUnlocked": false,
+          "GalacticCoreExplored": false,
+          "KnownSystemIds": [
+            2,
+            7,
+            8
+          ],
+          "KnownCivilizationIds": [
+            4
+          ],
+          "SystemSurveys": [
+            {
+              "SystemId": 2,
+              "Level": 2,
+              "Progress": 0.125
+            },
+            {
+              "SystemId": 7,
+              "Level": 3,
+              "Progress": 1
+            },
+            {
+              "SystemId": 8,
+              "Level": 1,
+              "Progress": 0
+            }
+          ]
+        },
+        {
+          "CivilizationId": 9,
+          "GalacticCoreAccessUnlocked": true,
+          "GalacticCoreExplored": true,
+          "KnownSystemIds": [],
+          "KnownCivilizationIds": [],
+          "SystemSurveys": []
+        }
+      ],
+      "BeforeNext": null,
+      "AfterNext": null,
+      "NextResult": null,
+      "ErrorType": null,
+      "ErrorMessage": null
+    }
+  ]
+}

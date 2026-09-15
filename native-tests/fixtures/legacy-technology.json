@@ -1,0 +1,2248 @@
+{
+  "Format": "stellar-legacy-technology-oracle-v1",
+  "Catalog": [
+    {
+      "Id": "orbital_industry",
+      "Name": "Orbital Industry",
+      "Description": "Large-scale orbital construction, automated fabrication, and sustained off-world infrastructure.",
+      "ResearchCost": 900,
+      "Prerequisites": [],
+      "RequiredProjects": [
+        "orbital_launch_complex"
+      ],
+      "Category": 0
+    },
+    {
+      "Id": "fusion_propulsion",
+      "Name": "Fusion Propulsion",
+      "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+      "ResearchCost": 1300,
+      "Prerequisites": [],
+      "RequiredProjects": [],
+      "Category": 1
+    },
+    {
+      "Id": "deep_space_sensors",
+      "Name": "Deep-Space Sensor Networks",
+      "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+      "ResearchCost": 1100,
+      "Prerequisites": [],
+      "RequiredProjects": [],
+      "Category": 2
+    },
+    {
+      "Id": "exotic_field_theory",
+      "Name": "Exotic Field Theory",
+      "Description": "Experimental physics describing controllable spacetime and subspace field interactions.",
+      "ResearchCost": 2200,
+      "Prerequisites": [
+        "fusion_propulsion",
+        "deep_space_sensors"
+      ],
+      "RequiredProjects": [],
+      "Category": 3
+    },
+    {
+      "Id": "warp_field_control",
+      "Name": "Warp Field Control",
+      "Description": "Stable laboratory-scale distortion fields and the control systems required to shape them.",
+      "ResearchCost": 3200,
+      "Prerequisites": [
+        "orbital_industry",
+        "exotic_field_theory"
+      ],
+      "RequiredProjects": [],
+      "Category": 4
+    },
+    {
+      "Id": "prototype_warp_drive",
+      "Name": "Prototype Warp Drive",
+      "Description": "A vessel-scale drive capable of sustained faster-than-light travel between star systems.",
+      "ResearchCost": 4800,
+      "Prerequisites": [
+        "warp_field_control"
+      ],
+      "RequiredProjects": [
+        "warp_test_facility"
+      ],
+      "Category": 4
+    }
+  ],
+  "Cases": [
+    {
+      "Name": "get-orbital_industry",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "orbital_industry"
+      },
+      "Result": {
+        "Id": "orbital_industry",
+        "Name": "Orbital Industry",
+        "Description": "Large-scale orbital construction, automated fabrication, and sustained off-world infrastructure.",
+        "ResearchCost": 900,
+        "Prerequisites": [],
+        "RequiredProjects": [
+          "orbital_launch_complex"
+        ],
+        "Category": 0
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-fusion_propulsion",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "fusion_propulsion"
+      },
+      "Result": {
+        "Id": "fusion_propulsion",
+        "Name": "Fusion Propulsion",
+        "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+        "ResearchCost": 1300,
+        "Prerequisites": [],
+        "RequiredProjects": [],
+        "Category": 1
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-deep_space_sensors",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "deep_space_sensors"
+      },
+      "Result": {
+        "Id": "deep_space_sensors",
+        "Name": "Deep-Space Sensor Networks",
+        "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+        "ResearchCost": 1100,
+        "Prerequisites": [],
+        "RequiredProjects": [],
+        "Category": 2
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-exotic_field_theory",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "exotic_field_theory"
+      },
+      "Result": {
+        "Id": "exotic_field_theory",
+        "Name": "Exotic Field Theory",
+        "Description": "Experimental physics describing controllable spacetime and subspace field interactions.",
+        "ResearchCost": 2200,
+        "Prerequisites": [
+          "fusion_propulsion",
+          "deep_space_sensors"
+        ],
+        "RequiredProjects": [],
+        "Category": 3
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-warp_field_control",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "warp_field_control"
+      },
+      "Result": {
+        "Id": "warp_field_control",
+        "Name": "Warp Field Control",
+        "Description": "Stable laboratory-scale distortion fields and the control systems required to shape them.",
+        "ResearchCost": 3200,
+        "Prerequisites": [
+          "orbital_industry",
+          "exotic_field_theory"
+        ],
+        "RequiredProjects": [],
+        "Category": 4
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-prototype_warp_drive",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "prototype_warp_drive"
+      },
+      "Result": {
+        "Id": "prototype_warp_drive",
+        "Name": "Prototype Warp Drive",
+        "Description": "A vessel-scale drive capable of sustained faster-than-light travel between star systems.",
+        "ResearchCost": 4800,
+        "Prerequisites": [
+          "warp_field_control"
+        ],
+        "RequiredProjects": [
+          "warp_test_facility"
+        ],
+        "Category": 4
+      },
+      "Error": null
+    },
+    {
+      "Name": "get-invalid-6",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "missing"
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "get-invalid-7",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "Orbital_Industry"
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "get-invalid-8",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": ""
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "get-invalid-9",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": " orbital_industry"
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "get-invalid-10",
+      "Kind": "Get",
+      "Arguments": {
+        "Id": "orbital_industry "
+      },
+      "Result": null,
+      "Error": {
+        "Type": "InvalidOperationException",
+        "Message": "Sequence contains no matching element"
+      }
+    },
+    {
+      "Name": "available-empty",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-orbital-project",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "orbital_launch_complex"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "orbital_industry",
+          "Name": "Orbital Industry",
+          "Description": "Large-scale orbital construction, automated fabrication, and sustained off-world infrastructure.",
+          "ResearchCost": 900,
+          "Prerequisites": [],
+          "RequiredProjects": [
+            "orbital_launch_complex"
+          ],
+          "Category": 0
+        },
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-fusion-complete",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "fusion_propulsion"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-exotic-prerequisites",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "fusion_propulsion",
+            "deep_space_sensors"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion",
+          "deep_space_sensors"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "exotic_field_theory",
+          "Name": "Exotic Field Theory",
+          "Description": "Experimental physics describing controllable spacetime and subspace field interactions.",
+          "ResearchCost": 2200,
+          "Prerequisites": [
+            "fusion_propulsion",
+            "deep_space_sensors"
+          ],
+          "RequiredProjects": [],
+          "Category": 3
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion",
+          "deep_space_sensors"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-warp-prerequisites-direct",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "exotic_field_theory"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "orbital_industry",
+          "exotic_field_theory"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        },
+        {
+          "Id": "warp_field_control",
+          "Name": "Warp Field Control",
+          "Description": "Stable laboratory-scale distortion fields and the control systems required to shape them.",
+          "ResearchCost": 3200,
+          "Prerequisites": [
+            "orbital_industry",
+            "exotic_field_theory"
+          ],
+          "RequiredProjects": [],
+          "Category": 4
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "orbital_industry",
+          "exotic_field_theory"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-prototype-tech-only",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "warp_field_control"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "warp_field_control"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "warp_field_control"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-prototype-project-only",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-prototype-unlocked",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "warp_field_control"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "warp_field_control"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        },
+        {
+          "Id": "prototype_warp_drive",
+          "Name": "Prototype Warp Drive",
+          "Description": "A vessel-scale drive capable of sustained faster-than-light travel between star systems.",
+          "ResearchCost": 4800,
+          "Prerequisites": [
+            "warp_field_control"
+          ],
+          "RequiredProjects": [
+            "warp_test_facility"
+          ],
+          "Category": 4
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "warp_field_control"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-all-complete",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "orbital_launch_complex",
+            "warp_test_facility"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "orbital_industry",
+          "fusion_propulsion",
+          "deep_space_sensors",
+          "exotic_field_theory",
+          "warp_field_control",
+          "prototype_warp_drive"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex",
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "orbital_industry",
+          "fusion_propulsion",
+          "deep_space_sensors",
+          "exotic_field_theory",
+          "warp_field_control",
+          "prototype_warp_drive"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex",
+          "warp_test_facility"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-unrelated-ids",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "future_tech",
+            "FUSION_PROPULSION"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "future_project",
+            "ORBITAL_LAUNCH_COMPLEX"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "future_tech",
+          "FUSION_PROPULSION"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "future_project",
+          "ORBITAL_LAUNCH_COMPLEX"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "future_tech",
+          "FUSION_PROPULSION"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "future_project",
+          "ORBITAL_LAUNCH_COMPLEX"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-duplicate-insertion",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "fusion_propulsion",
+            "future",
+            "deep_space_sensors"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion",
+          "future",
+          "deep_space_sensors"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "exotic_field_theory",
+          "Name": "Exotic Field Theory",
+          "Description": "Experimental physics describing controllable spacetime and subspace field interactions.",
+          "ResearchCost": 2200,
+          "Prerequisites": [
+            "fusion_propulsion",
+            "deep_space_sensors"
+          ],
+          "RequiredProjects": [],
+          "Category": 3
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion",
+          "future",
+          "deep_space_sensors"
+        ],
+        "ActiveResearchId": null,
+        "ActiveResearchProgress": 0
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-active-progress-ignored",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [
+            "fusion_propulsion"
+          ],
+          "ActiveResearchId": "deep_space_sensors",
+          "ActiveResearchProgress": 789.25
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [
+            "orbital_launch_complex"
+          ],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion"
+        ],
+        "ActiveResearchId": "deep_space_sensors",
+        "ActiveResearchProgress": 789.25
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "orbital_industry",
+          "Name": "Orbital Industry",
+          "Description": "Large-scale orbital construction, automated fabrication, and sustained off-world infrastructure.",
+          "ResearchCost": 900,
+          "Prerequisites": [],
+          "RequiredProjects": [
+            "orbital_launch_complex"
+          ],
+          "Category": 0
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [
+          "fusion_propulsion"
+        ],
+        "ActiveResearchId": "deep_space_sensors",
+        "ActiveResearchProgress": 789.25
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [
+          "orbital_launch_complex"
+        ],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "available-nonfinite-progress-ignored",
+      "Kind": "Available",
+      "Arguments": {
+        "State": {
+          "CivilizationId": 7,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": "missing_active",
+          "ActiveResearchProgress": "NaN"
+        },
+        "Construction": {
+          "CivilizationId": 91,
+          "CompletedProjectIds": [],
+          "ActiveProjectId": "unrelated_active",
+          "ActiveProjectProgress": 12.5,
+          "ActiveProjectAuthorizationCredits": 33,
+          "QueuedProjects": [
+            {
+              "ProjectId": "unrelated_queue",
+              "AuthorizationCredits": 4
+            }
+          ]
+        }
+      },
+      "BeforeState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": "missing_active",
+        "ActiveResearchProgress": "NaN"
+      },
+      "BeforeConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      },
+      "Result": [
+        {
+          "Id": "fusion_propulsion",
+          "Name": "Fusion Propulsion",
+          "Description": "High-efficiency fusion drives capable of sustained deep-space operations.",
+          "ResearchCost": 1300,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 1
+        },
+        {
+          "Id": "deep_space_sensors",
+          "Name": "Deep-Space Sensor Networks",
+          "Description": "Long-baseline arrays and autonomous observatories for detecting distant objects and field effects.",
+          "ResearchCost": 1100,
+          "Prerequisites": [],
+          "RequiredProjects": [],
+          "Category": 2
+        }
+      ],
+      "Error": null,
+      "AfterState": {
+        "CivilizationId": 7,
+        "CompletedTechnologyIds": [],
+        "ActiveResearchId": "missing_active",
+        "ActiveResearchProgress": "NaN"
+      },
+      "AfterConstruction": {
+        "CivilizationId": 91,
+        "CompletedProjectIds": [],
+        "ActiveProjectId": "unrelated_active",
+        "ActiveProjectProgress": 12.5,
+        "ActiveProjectAuthorizationCredits": 33,
+        "QueuedProjects": [
+          {
+            "ProjectId": "unrelated_queue",
+            "AuthorizationCredits": 4
+          }
+        ]
+      }
+    },
+    {
+      "Name": "seed-empty",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": []
+      },
+      "BeforeCivilizations": [],
+      "Result": [],
+      "Error": null,
+      "AfterCivilizations": []
+    },
+    {
+      "Name": "seed-prewarp",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": [
+          {
+            "Id": 1,
+            "Name": "Pre",
+            "HomeSystemId": 101,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_1",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-1",
+                  "DisplayName": "Leader 1",
+                  "VoiceProfileId": "voice-1",
+                  "Portrait": "portrait-1"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BeforeCivilizations": [
+        {
+          "Id": 1,
+          "Name": "Pre",
+          "HomeSystemId": 101,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_1",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-1",
+                "DisplayName": "Leader 1",
+                "VoiceProfileId": "voice-1",
+                "Portrait": "portrait-1"
+              }
+            }
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 1,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        }
+      ],
+      "Error": null,
+      "AfterCivilizations": [
+        {
+          "Id": 1,
+          "Name": "Pre",
+          "HomeSystemId": 101,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_1",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-1",
+                "DisplayName": "Leader 1",
+                "VoiceProfileId": "voice-1",
+                "Portrait": "portrait-1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Name": "seed-warp-capable",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": [
+          {
+            "Id": 2,
+            "Name": "Warp",
+            "HomeSystemId": 102,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_2",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-2",
+                  "DisplayName": "Leader 2",
+                  "VoiceProfileId": "voice-2",
+                  "Portrait": "portrait-2"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BeforeCivilizations": [
+        {
+          "Id": 2,
+          "Name": "Warp",
+          "HomeSystemId": 102,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_2",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-2",
+                "DisplayName": "Leader 2",
+                "VoiceProfileId": "voice-2",
+                "Portrait": "portrait-2"
+              }
+            }
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 2,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        }
+      ],
+      "Error": null,
+      "AfterCivilizations": [
+        {
+          "Id": 2,
+          "Name": "Warp",
+          "HomeSystemId": 102,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_2",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-2",
+                "DisplayName": "Leader 2",
+                "VoiceProfileId": "voice-2",
+                "Portrait": "portrait-2"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Name": "seed-ancient",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": [
+          {
+            "Id": 3,
+            "Name": "Ancient",
+            "HomeSystemId": 103,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": true,
+            "SpeciesId": "species_3",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-3",
+                  "DisplayName": "Leader 3",
+                  "VoiceProfileId": "voice-3",
+                  "Portrait": "portrait-3"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BeforeCivilizations": [
+        {
+          "Id": 3,
+          "Name": "Ancient",
+          "HomeSystemId": 103,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": true,
+          "SpeciesId": "species_3",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-3",
+                "DisplayName": "Leader 3",
+                "VoiceProfileId": "voice-3",
+                "Portrait": "portrait-3"
+              }
+            }
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 3,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        }
+      ],
+      "Error": null,
+      "AfterCivilizations": [
+        {
+          "Id": 3,
+          "Name": "Ancient",
+          "HomeSystemId": 103,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": false,
+          "NeutralUnlessProvoked": true,
+          "SpeciesId": "species_3",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-3",
+                "DisplayName": "Leader 3",
+                "VoiceProfileId": "voice-3",
+                "Portrait": "portrait-3"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Name": "seed-stage-order-and-duplicate-ids",
+      "Kind": "Seed",
+      "Arguments": {
+        "Civilizations": [
+          {
+            "Id": 8,
+            "Name": "Ancient first",
+            "HomeSystemId": 108,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_8",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-8",
+                  "DisplayName": "Leader 8",
+                  "VoiceProfileId": "voice-8",
+                  "Portrait": "portrait-8"
+                }
+              }
+            }
+          },
+          {
+            "Id": 4,
+            "Name": "Pre second",
+            "HomeSystemId": 104,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_4",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-4",
+                  "DisplayName": "Leader 4",
+                  "VoiceProfileId": "voice-4",
+                  "Portrait": "portrait-4"
+                }
+              }
+            }
+          },
+          {
+            "Id": 8,
+            "Name": "Duplicate ID third",
+            "HomeSystemId": 108,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_8",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader-8",
+                  "DisplayName": "Leader 8",
+                  "VoiceProfileId": "voice-8",
+                  "Portrait": "portrait-8"
+                }
+              }
+            }
+          },
+          {
+            "Id": -2,
+            "Name": "Ancient fourth",
+            "HomeSystemId": 98,
+            "Archetype": 0,
+            "Traits": {
+              "Aggression": 0.1,
+              "Territoriality": 0.2,
+              "Greed": 0.3,
+              "ScientificCuriosity": 0.4,
+              "RiskTolerance": 0.5,
+              "SurvivalPriority": 0.6,
+              "HonorBound": false
+            },
+            "IsPlayer": false,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "species_-2",
+            "Leadership": {
+              "Offices": {
+                "Science": {
+                  "Id": "leader--2",
+                  "DisplayName": "Leader -2",
+                  "VoiceProfileId": "voice--2",
+                  "Portrait": "portrait--2"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BeforeCivilizations": [
+        {
+          "Id": 8,
+          "Name": "Ancient first",
+          "HomeSystemId": 108,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_8",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-8",
+                "DisplayName": "Leader 8",
+                "VoiceProfileId": "voice-8",
+                "Portrait": "portrait-8"
+              }
+            }
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "Pre second",
+          "HomeSystemId": 104,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_4",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-4",
+                "DisplayName": "Leader 4",
+                "VoiceProfileId": "voice-4",
+                "Portrait": "portrait-4"
+              }
+            }
+          }
+        },
+        {
+          "Id": 8,
+          "Name": "Duplicate ID third",
+          "HomeSystemId": 108,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_8",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-8",
+                "DisplayName": "Leader 8",
+                "VoiceProfileId": "voice-8",
+                "Portrait": "portrait-8"
+              }
+            }
+          }
+        },
+        {
+          "Id": -2,
+          "Name": "Ancient fourth",
+          "HomeSystemId": 98,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_-2",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader--2",
+                "DisplayName": "Leader -2",
+                "VoiceProfileId": "voice--2",
+                "Portrait": "portrait--2"
+              }
+            }
+          }
+        }
+      ],
+      "Result": [
+        {
+          "CivilizationId": 8,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 4,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": 8,
+          "CompletedTechnologyIds": [],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        },
+        {
+          "CivilizationId": -2,
+          "CompletedTechnologyIds": [
+            "orbital_industry",
+            "fusion_propulsion",
+            "deep_space_sensors",
+            "exotic_field_theory",
+            "warp_field_control",
+            "prototype_warp_drive"
+          ],
+          "ActiveResearchId": null,
+          "ActiveResearchProgress": 0
+        }
+      ],
+      "Error": null,
+      "AfterCivilizations": [
+        {
+          "Id": 8,
+          "Name": "Ancient first",
+          "HomeSystemId": 108,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_8",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-8",
+                "DisplayName": "Leader 8",
+                "VoiceProfileId": "voice-8",
+                "Portrait": "portrait-8"
+              }
+            }
+          }
+        },
+        {
+          "Id": 4,
+          "Name": "Pre second",
+          "HomeSystemId": 104,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_4",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-4",
+                "DisplayName": "Leader 4",
+                "VoiceProfileId": "voice-4",
+                "Portrait": "portrait-4"
+              }
+            }
+          }
+        },
+        {
+          "Id": 8,
+          "Name": "Duplicate ID third",
+          "HomeSystemId": 108,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_8",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader-8",
+                "DisplayName": "Leader 8",
+                "VoiceProfileId": "voice-8",
+                "Portrait": "portrait-8"
+              }
+            }
+          }
+        },
+        {
+          "Id": -2,
+          "Name": "Ancient fourth",
+          "HomeSystemId": 98,
+          "Archetype": 0,
+          "Traits": {
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": false
+          },
+          "IsPlayer": false,
+          "DevelopmentStage": 2,
+          "IsSeededAncient": true,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "species_-2",
+          "Leadership": {
+            "Offices": {
+              "Science": {
+                "Id": "leader--2",
+                "DisplayName": "Leader -2",
+                "VoiceProfileId": "voice--2",
+                "Portrait": "portrait--2"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

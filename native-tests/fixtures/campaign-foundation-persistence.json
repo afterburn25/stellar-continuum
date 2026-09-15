@@ -1,0 +1,4504 @@
+{
+  "SchemaVersion": 1,
+  "Authority": "actual private CampaignSaveService stellar/civilization adapters",
+  "SourceFiles": [
+    {
+      "Path": "Persistence/CampaignSaveService.cs",
+      "Sha256": "5D3B16323EDEAD7E46A73C903161ACAF2DCF1CE104046D08A739FE8FBC26599E"
+    },
+    {
+      "Path": "Simulation/Models/StarSystemState.cs",
+      "Sha256": "4611F3B2EC2EBE4DEA1C1E666A75ECDF30E129F10F688459EE699EE5082A48BD"
+    },
+    {
+      "Path": "Simulation/Models/CivilizationState.cs",
+      "Sha256": "6831017D916B0262548C9DA7896BC02C8654F29E0FFE693D7270CA6CFACC9CEC"
+    },
+    {
+      "Path": "Simulation/Models/CivilizationLeadershipState.cs",
+      "Sha256": "2F20D57CB1B8D8523A8AEE64786C10FCA77DDCEC77734C37E1CD1193C66989B4"
+    },
+    {
+      "Path": "Simulation/Species/SpeciesAssignmentPolicy.cs",
+      "Sha256": "E7780DCE19A5D97448BF4D4DDEDDDDAC6E08412186FBC9955111ACE714DF131E"
+    },
+    {
+      "Path": "Simulation/Species/SpeciesCatalog.cs",
+      "Sha256": "077626054A9CDAA68C104AD6BF9405A73BB21D9F0CBC1CDBE3E6A9C55D3F5AC7"
+    },
+    {
+      "Path": "Simulation/Generation/SolCatalogPreset.cs",
+      "Sha256": "E6BF6164312F1ECE56DF95FBF13ED9071B801DB03A6AA272EB010F4D36757A1F"
+    }
+  ],
+  "RowCount": 35,
+  "Rows": [
+    {
+      "Name": "systems-empty",
+      "Operation": "RestoreSystems",
+      "Input": [],
+      "Before": [],
+      "After": [],
+      "Result": [],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "systems-valid-full",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "systems-order-and-duplicate-id",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        },
+        {
+          "Id": 2,
+          "Name": "System 2",
+          "X": 2.25,
+          "Y": -2.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "systems-depth-nan",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "NaN",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "NaN",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "NaN",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": "NaN",
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an invalid galactic depth."
+    },
+    {
+      "Name": "systems-depth-infinity",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "Infinity",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "Infinity",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": "Infinity",
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": "Infinity",
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an invalid galactic depth."
+    },
+    {
+      "Name": "systems-primary-unknown",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 99,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 99,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 99,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 99,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an invalid stellar class."
+    },
+    {
+      "Name": "systems-secondary-unknown",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": -1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": -1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": -1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": -1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an invalid stellar class."
+    },
+    {
+      "Name": "systems-tertiary-unknown",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 99
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 99
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 99
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 99,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an invalid stellar class."
+    },
+    {
+      "Name": "systems-secondary-without-primary",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "SecondaryStellarClass": 1
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "SecondaryStellarClass": 1
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "SecondaryStellarClass": 1
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an incomplete stellar companion configuration; B requires A and C requires B."
+    },
+    {
+      "Name": "systems-tertiary-without-secondary",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "StellarClass": 0,
+          "TertiaryStellarClass": 1
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "StellarClass": 0,
+          "TertiaryStellarClass": 1
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "StellarClass": 0,
+          "TertiaryStellarClass": 1
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": 0,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": 1,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 1 (System 1) has an incomplete stellar companion configuration; B requires A and C requires B."
+    },
+    {
+      "Name": "systems-sol-companion",
+      "Operation": "RestoreSystems",
+      "Input": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 0,
+          "Name": "System 0",
+          "X": 0.25,
+          "Y": -0.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "sol-v1",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Before": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 0,
+          "Name": "System 0",
+          "X": 0.25,
+          "Y": -0.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "sol-v1",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "After": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true
+        },
+        {
+          "Id": 0,
+          "Name": "System 0",
+          "X": 0.25,
+          "Y": -0.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "sol-v1",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "Result": [
+        {
+          "Id": 1,
+          "Name": "System 1",
+          "X": 1.25,
+          "Y": -1.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": null,
+          "StellarClass": null,
+          "SecondaryStellarClass": null,
+          "TertiaryStellarClass": null,
+          "GalacticDepthLightYears": null,
+          "StellarCatalogId": null
+        },
+        {
+          "Id": 0,
+          "Name": "System 0",
+          "X": 0.25,
+          "Y": -0.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "sol-v1",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 0 (Sol) must retain its single canonical star."
+    },
+    {
+      "Name": "systems-capture-valid",
+      "Operation": "CaptureSystems",
+      "Input": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "Before": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "After": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "Result": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "GalacticDepthLightYears": 12.5,
+          "StellarCatalogId": "catalog-id",
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "systems-capture-empty",
+      "Operation": "CaptureSystems",
+      "Input": [],
+      "Before": [],
+      "After": [],
+      "Result": [],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "systems-capture-invalid-before-copy",
+      "Operation": "CaptureSystems",
+      "Input": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": "-Infinity",
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "Before": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": "-Infinity",
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "After": [
+        {
+          "Id": 4,
+          "Name": "System 4",
+          "X": 4.25,
+          "Y": -4.5,
+          "Archetype": 1,
+          "HasHabitableWorld": true,
+          "HasAnomaly": true,
+          "HasRareResource": true,
+          "HasPreWarpCivilization": true,
+          "CatalogPresetId": "custom",
+          "StellarClass": 0,
+          "SecondaryStellarClass": 1,
+          "TertiaryStellarClass": 2,
+          "GalacticDepthLightYears": "-Infinity",
+          "StellarCatalogId": "catalog-id"
+        }
+      ],
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "System 4 (System 4) has an invalid galactic depth."
+    },
+    {
+      "Name": "civilization-current-null-leadership-human",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Result": [
+        {
+          "Id": 0,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": [
+            {
+              "Office": "FleetCommander",
+              "Id": "civ-0:FleetCommander:founder",
+              "DisplayName": "Commander Elena Voss",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ChiefScientist",
+              "Id": "civ-0:ChiefScientist:founder",
+              "DisplayName": "Dr. Amara Chen",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Diplomat",
+              "Id": "civ-0:Diplomat:founder",
+              "DisplayName": "Ambassador Mara Okafor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Governor",
+              "Id": "civ-0:Governor:founder",
+              "DisplayName": "Governor Elias Ward",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "EconomicAdvisor",
+              "Id": "civ-0:EconomicAdvisor:founder",
+              "DisplayName": "Economic Advisor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "OperationsOfficer",
+              "Id": "civ-0:OperationsOfficer:founder",
+              "DisplayName": "Operations Officer",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ExpeditionCommander",
+              "Id": "civ-0:ExpeditionCommander:founder",
+              "DisplayName": "Expedition Commander",
+              "VoiceProfileId": null,
+              "Portrait": null
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-restore-empty",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": [],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-current-null-leadership-nonhuman",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 8,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "pelagic_high_pressure"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 8,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "pelagic_high_pressure"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 8,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "pelagic_high_pressure"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Result": [
+        {
+          "Id": 8,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "pelagic_high_pressure",
+          "Leadership": [
+            {
+              "Office": "FleetCommander",
+              "Id": "civ-8:FleetCommander:founder",
+              "DisplayName": "Fleet Commander",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ChiefScientist",
+              "Id": "civ-8:ChiefScientist:founder",
+              "DisplayName": "Chief Scientist",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Diplomat",
+              "Id": "civ-8:Diplomat:founder",
+              "DisplayName": "Diplomatic Envoy",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Governor",
+              "Id": "civ-8:Governor:founder",
+              "DisplayName": "Governor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "EconomicAdvisor",
+              "Id": "civ-8:EconomicAdvisor:founder",
+              "DisplayName": "Economic Advisor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "OperationsOfficer",
+              "Id": "civ-8:OperationsOfficer:founder",
+              "DisplayName": "Operations Officer",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ExpeditionCommander",
+              "Id": "civ-8:ExpeditionCommander:founder",
+              "DisplayName": "Expedition Commander",
+              "VoiceProfileId": null,
+              "Portrait": null
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-current-empty-leadership",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {},
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {},
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {},
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Result": [
+        {
+          "Id": 0,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": []
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-current-unsorted-leadership",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\uD800\uDC00": {
+                "Id": "supplementary",
+                "DisplayName": "Supplementary",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              },
+              "\uE000": {
+                "Id": "private",
+                "DisplayName": "Private",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "A": {
+                "Id": "ascii",
+                "DisplayName": "ASCII",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\uD800\uDC00": {
+                "Id": "supplementary",
+                "DisplayName": "Supplementary",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              },
+              "\uE000": {
+                "Id": "private",
+                "DisplayName": "Private",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "A": {
+                "Id": "ascii",
+                "DisplayName": "ASCII",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\uD800\uDC00": {
+                "Id": "supplementary",
+                "DisplayName": "Supplementary",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              },
+              "\uE000": {
+                "Id": "private",
+                "DisplayName": "Private",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "A": {
+                "Id": "ascii",
+                "DisplayName": "ASCII",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 17
+      },
+      "Result": [
+        {
+          "Id": 0,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": [
+            {
+              "Office": "A",
+              "Id": "ascii",
+              "DisplayName": "ASCII",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "\uD800\uDC00",
+              "Id": "supplementary",
+              "DisplayName": "Supplementary",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            },
+            {
+              "Office": "\uE000",
+              "Id": "private",
+              "DisplayName": "Private",
+              "VoiceProfileId": null,
+              "Portrait": null
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-legacy-warp-overrides",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 2,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": true,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": true,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -33
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 2,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": true,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": true,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -33
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 2,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 2,
+            "IsSeededAncient": true,
+            "ExpansionAllowed": false,
+            "NeutralUnlessProvoked": true,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": true,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -33
+      },
+      "Result": [
+        {
+          "Id": 2,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-pre8-species-ignores-saved",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 3,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -9223372036854775808
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 3,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -9223372036854775808
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": null,
+            "Id": 3,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown-ignored"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": -9223372036854775808
+      },
+      "Result": [
+        {
+          "Id": 3,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 0,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": 0,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": [
+            {
+              "Office": "FleetCommander",
+              "Id": "civ-3:FleetCommander:founder",
+              "DisplayName": "Commander Elena Voss",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ChiefScientist",
+              "Id": "civ-3:ChiefScientist:founder",
+              "DisplayName": "Dr. Amara Chen",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Diplomat",
+              "Id": "civ-3:Diplomat:founder",
+              "DisplayName": "Ambassador Mara Okafor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "Governor",
+              "Id": "civ-3:Governor:founder",
+              "DisplayName": "Governor Elias Ward",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "EconomicAdvisor",
+              "Id": "civ-3:EconomicAdvisor:founder",
+              "DisplayName": "Economic Advisor",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "OperationsOfficer",
+              "Id": "civ-3:OperationsOfficer:founder",
+              "DisplayName": "Operations Officer",
+              "VoiceProfileId": null,
+              "Portrait": null
+            },
+            {
+              "Office": "ExpeditionCommander",
+              "Id": "civ-3:ExpeditionCommander:founder",
+              "DisplayName": "Expedition Commander",
+              "VoiceProfileId": null,
+              "Portrait": null
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-current-unknown-species",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "unknown"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Civilization 0 references unknown species ID \u0027unknown\u0027."
+    },
+    {
+      "Name": "civilization-current-blank-species-unicode",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "\u2003"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "\u2003"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "\u2003"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 8,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Civilization 0 references unknown species ID \u0027\u2003\u0027."
+    },
+    {
+      "Name": "civilization-pre8-negative-id",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": -1,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": -1,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": -1,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 7,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentOutOfRangeException",
+      "ErrorMessage": "Specified argument was out of the range of valid values. (Parameter \u0027civilizationId\u0027)"
+    },
+    {
+      "Name": "civilization-unknown-enums-accepted",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 99,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": -1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 99,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": -1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Governor": {
+                "Id": "id",
+                "DisplayName": "Name",
+                "VoiceProfileId": "voice",
+                "Portrait": "portrait"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 99,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": -1,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": [
+        {
+          "Id": 0,
+          "Name": "Civilization",
+          "HomeSystemId": 4,
+          "Archetype": 99,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": true,
+          "DevelopmentStage": -1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "terran_baseline",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-leadership-blank-office",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\u2003": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\u2003": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "\u2003": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentException",
+      "ErrorMessage": "An office assignment contains invalid character metadata."
+    },
+    {
+      "Name": "civilization-leadership-null-character",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": null
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": null
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": null
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentNullException",
+      "ErrorMessage": "Value cannot be null. (Parameter \u0027character\u0027)"
+    },
+    {
+      "Name": "civilization-leadership-blank-character-id",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": " ",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": " ",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": " ",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentException",
+      "ErrorMessage": "An office assignment contains invalid character metadata."
+    },
+    {
+      "Name": "civilization-leadership-blank-display",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "\u00A0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "\u00A0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "\u00A0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentException",
+      "ErrorMessage": "An office assignment contains invalid character metadata."
+    },
+    {
+      "Name": "civilization-leadership-long-voice",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentException",
+      "ErrorMessage": "An office assignment contains invalid character metadata."
+    },
+    {
+      "Name": "civilization-leadership-long-portrait",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office": {
+                "Id": "id",
+                "DisplayName": "name",
+                "VoiceProfileId": null,
+                "Portrait": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "ArgumentException",
+      "ErrorMessage": "An office assignment contains invalid character metadata."
+    },
+    {
+      "Name": "civilization-leadership-capacity",
+      "Operation": "RestoreCivilizations",
+      "Input": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office00": {
+                "Id": "id0",
+                "DisplayName": "name0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office01": {
+                "Id": "id1",
+                "DisplayName": "name1",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office02": {
+                "Id": "id2",
+                "DisplayName": "name2",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office03": {
+                "Id": "id3",
+                "DisplayName": "name3",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office04": {
+                "Id": "id4",
+                "DisplayName": "name4",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office05": {
+                "Id": "id5",
+                "DisplayName": "name5",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office06": {
+                "Id": "id6",
+                "DisplayName": "name6",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office07": {
+                "Id": "id7",
+                "DisplayName": "name7",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office08": {
+                "Id": "id8",
+                "DisplayName": "name8",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office09": {
+                "Id": "id9",
+                "DisplayName": "name9",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office10": {
+                "Id": "id10",
+                "DisplayName": "name10",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office11": {
+                "Id": "id11",
+                "DisplayName": "name11",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office12": {
+                "Id": "id12",
+                "DisplayName": "name12",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office13": {
+                "Id": "id13",
+                "DisplayName": "name13",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office14": {
+                "Id": "id14",
+                "DisplayName": "name14",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office15": {
+                "Id": "id15",
+                "DisplayName": "name15",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office16": {
+                "Id": "id16",
+                "DisplayName": "name16",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office17": {
+                "Id": "id17",
+                "DisplayName": "name17",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office18": {
+                "Id": "id18",
+                "DisplayName": "name18",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office19": {
+                "Id": "id19",
+                "DisplayName": "name19",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office20": {
+                "Id": "id20",
+                "DisplayName": "name20",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office21": {
+                "Id": "id21",
+                "DisplayName": "name21",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office22": {
+                "Id": "id22",
+                "DisplayName": "name22",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office23": {
+                "Id": "id23",
+                "DisplayName": "name23",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office24": {
+                "Id": "id24",
+                "DisplayName": "name24",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office25": {
+                "Id": "id25",
+                "DisplayName": "name25",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office26": {
+                "Id": "id26",
+                "DisplayName": "name26",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office27": {
+                "Id": "id27",
+                "DisplayName": "name27",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office28": {
+                "Id": "id28",
+                "DisplayName": "name28",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office29": {
+                "Id": "id29",
+                "DisplayName": "name29",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office30": {
+                "Id": "id30",
+                "DisplayName": "name30",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office31": {
+                "Id": "id31",
+                "DisplayName": "name31",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office32": {
+                "Id": "id32",
+                "DisplayName": "name32",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Before": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office00": {
+                "Id": "id0",
+                "DisplayName": "name0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office01": {
+                "Id": "id1",
+                "DisplayName": "name1",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office02": {
+                "Id": "id2",
+                "DisplayName": "name2",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office03": {
+                "Id": "id3",
+                "DisplayName": "name3",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office04": {
+                "Id": "id4",
+                "DisplayName": "name4",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office05": {
+                "Id": "id5",
+                "DisplayName": "name5",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office06": {
+                "Id": "id6",
+                "DisplayName": "name6",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office07": {
+                "Id": "id7",
+                "DisplayName": "name7",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office08": {
+                "Id": "id8",
+                "DisplayName": "name8",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office09": {
+                "Id": "id9",
+                "DisplayName": "name9",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office10": {
+                "Id": "id10",
+                "DisplayName": "name10",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office11": {
+                "Id": "id11",
+                "DisplayName": "name11",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office12": {
+                "Id": "id12",
+                "DisplayName": "name12",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office13": {
+                "Id": "id13",
+                "DisplayName": "name13",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office14": {
+                "Id": "id14",
+                "DisplayName": "name14",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office15": {
+                "Id": "id15",
+                "DisplayName": "name15",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office16": {
+                "Id": "id16",
+                "DisplayName": "name16",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office17": {
+                "Id": "id17",
+                "DisplayName": "name17",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office18": {
+                "Id": "id18",
+                "DisplayName": "name18",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office19": {
+                "Id": "id19",
+                "DisplayName": "name19",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office20": {
+                "Id": "id20",
+                "DisplayName": "name20",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office21": {
+                "Id": "id21",
+                "DisplayName": "name21",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office22": {
+                "Id": "id22",
+                "DisplayName": "name22",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office23": {
+                "Id": "id23",
+                "DisplayName": "name23",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office24": {
+                "Id": "id24",
+                "DisplayName": "name24",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office25": {
+                "Id": "id25",
+                "DisplayName": "name25",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office26": {
+                "Id": "id26",
+                "DisplayName": "name26",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office27": {
+                "Id": "id27",
+                "DisplayName": "name27",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office28": {
+                "Id": "id28",
+                "DisplayName": "name28",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office29": {
+                "Id": "id29",
+                "DisplayName": "name29",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office30": {
+                "Id": "id30",
+                "DisplayName": "name30",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office31": {
+                "Id": "id31",
+                "DisplayName": "name31",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office32": {
+                "Id": "id32",
+                "DisplayName": "name32",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "After": {
+        "Dtos": [
+          {
+            "Leadership": {
+              "Office00": {
+                "Id": "id0",
+                "DisplayName": "name0",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office01": {
+                "Id": "id1",
+                "DisplayName": "name1",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office02": {
+                "Id": "id2",
+                "DisplayName": "name2",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office03": {
+                "Id": "id3",
+                "DisplayName": "name3",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office04": {
+                "Id": "id4",
+                "DisplayName": "name4",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office05": {
+                "Id": "id5",
+                "DisplayName": "name5",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office06": {
+                "Id": "id6",
+                "DisplayName": "name6",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office07": {
+                "Id": "id7",
+                "DisplayName": "name7",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office08": {
+                "Id": "id8",
+                "DisplayName": "name8",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office09": {
+                "Id": "id9",
+                "DisplayName": "name9",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office10": {
+                "Id": "id10",
+                "DisplayName": "name10",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office11": {
+                "Id": "id11",
+                "DisplayName": "name11",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office12": {
+                "Id": "id12",
+                "DisplayName": "name12",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office13": {
+                "Id": "id13",
+                "DisplayName": "name13",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office14": {
+                "Id": "id14",
+                "DisplayName": "name14",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office15": {
+                "Id": "id15",
+                "DisplayName": "name15",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office16": {
+                "Id": "id16",
+                "DisplayName": "name16",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office17": {
+                "Id": "id17",
+                "DisplayName": "name17",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office18": {
+                "Id": "id18",
+                "DisplayName": "name18",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office19": {
+                "Id": "id19",
+                "DisplayName": "name19",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office20": {
+                "Id": "id20",
+                "DisplayName": "name20",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office21": {
+                "Id": "id21",
+                "DisplayName": "name21",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office22": {
+                "Id": "id22",
+                "DisplayName": "name22",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office23": {
+                "Id": "id23",
+                "DisplayName": "name23",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office24": {
+                "Id": "id24",
+                "DisplayName": "name24",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office25": {
+                "Id": "id25",
+                "DisplayName": "name25",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office26": {
+                "Id": "id26",
+                "DisplayName": "name26",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office27": {
+                "Id": "id27",
+                "DisplayName": "name27",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office28": {
+                "Id": "id28",
+                "DisplayName": "name28",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office29": {
+                "Id": "id29",
+                "DisplayName": "name29",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office30": {
+                "Id": "id30",
+                "DisplayName": "name30",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office31": {
+                "Id": "id31",
+                "DisplayName": "name31",
+                "VoiceProfileId": null,
+                "Portrait": null
+              },
+              "Office32": {
+                "Id": "id32",
+                "DisplayName": "name32",
+                "VoiceProfileId": null,
+                "Portrait": null
+              }
+            },
+            "Id": 0,
+            "Name": "Civilization",
+            "HomeSystemId": 4,
+            "Archetype": 0,
+            "Aggression": 0.1,
+            "Territoriality": 0.2,
+            "Greed": 0.3,
+            "ScientificCuriosity": 0.4,
+            "RiskTolerance": 0.5,
+            "SurvivalPriority": 0.6,
+            "HonorBound": true,
+            "IsPlayer": true,
+            "DevelopmentStage": 0,
+            "IsSeededAncient": false,
+            "ExpansionAllowed": true,
+            "NeutralUnlessProvoked": false,
+            "SpeciesId": "terran_baseline"
+          }
+        ],
+        "LegacyAlreadyWarpCapable": false,
+        "SaveFormatVersion": 16,
+        "CampaignSeed": 1
+      },
+      "Result": null,
+      "ErrorType": "InvalidOperationException",
+      "ErrorMessage": "A civilization cannot hold more than 32 named offices."
+    },
+    {
+      "Name": "civilization-capture-valid",
+      "Operation": "CaptureCivilizations",
+      "Input": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "compact_high_gravity",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "Before": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "compact_high_gravity",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "After": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "compact_high_gravity",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "Result": [
+        {
+          "Leadership": {
+            "Governor": {
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          },
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "compact_high_gravity"
+        }
+      ],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-capture-empty",
+      "Operation": "CaptureCivilizations",
+      "Input": [],
+      "Before": [],
+      "After": [],
+      "Result": [],
+      "ErrorType": null,
+      "ErrorMessage": null
+    },
+    {
+      "Name": "civilization-capture-unknown-species",
+      "Operation": "CaptureCivilizations",
+      "Input": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "unknown",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "Before": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "unknown",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "After": [
+        {
+          "Id": 5,
+          "Name": "Civilization",
+          "HomeSystemId": 9,
+          "Archetype": 2,
+          "Aggression": 0.1,
+          "Territoriality": 0.2,
+          "Greed": 0.3,
+          "ScientificCuriosity": 0.4,
+          "RiskTolerance": 0.5,
+          "SurvivalPriority": 0.6,
+          "HonorBound": true,
+          "IsPlayer": false,
+          "DevelopmentStage": 1,
+          "IsSeededAncient": false,
+          "ExpansionAllowed": true,
+          "NeutralUnlessProvoked": false,
+          "SpeciesId": "unknown",
+          "Leadership": [
+            {
+              "Office": "Governor",
+              "Id": "id",
+              "DisplayName": "Name",
+              "VoiceProfileId": "voice",
+              "Portrait": "portrait"
+            }
+          ]
+        }
+      ],
+      "Result": null,
+      "ErrorType": "InvalidDataException",
+      "ErrorMessage": "Civilization 5 references unknown species ID \u0027unknown\u0027."
+    }
+  ]
+}

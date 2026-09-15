@@ -1,0 +1,7238 @@
+{
+  "Format": "stellar-logistics-routing-oracle-v2",
+  "Cases": [
+    {
+      "Name": "constructor-valid",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "CacheCapacity": 3,
+        "CacheCount": 0
+      }
+    },
+    {
+      "Name": "constructor-invalid-cache",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 0
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "constructor-duplicate-node",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          }
+        ],
+        "Links": []
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentException"
+      }
+    },
+    {
+      "Name": "constructor-duplicate-link",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentException"
+      }
+    },
+    {
+      "Name": "constructor-missing-source",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 99,
+            "ToNodeId": 2,
+            "CapacityPerDay": 1,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    },
+    {
+      "Name": "constructor-missing-destination",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 99,
+            "CapacityPerDay": 1,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    },
+    {
+      "Name": "constructor-cross-owner",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 8,
+            "CapacityPerDay": 1,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    },
+    {
+      "Name": "constructor-disabled-invalid-capacity",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": "NaN",
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    },
+    {
+      "Name": "constructor-disabled-invalid-transit",
+      "Kind": "Constructor",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 1,
+            "TransitDays": "-Infinity",
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    },
+    {
+      "Name": "shortest-route",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 5,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 5,
+          "NodeIds": [
+            1,
+            2,
+            3,
+            5
+          ],
+          "LinkIds": [
+            10,
+            11,
+            13
+          ],
+          "TransitDays": 3,
+          "BottleneckCapacityPerDay": 5
+        },
+        "CacheCount": 1,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "same-node",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 1,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 1,
+          "NodeIds": [
+            1
+          ],
+          "LinkIds": [],
+          "TransitDays": 0,
+          "BottleneckCapacityPerDay": "Infinity"
+        },
+        "CacheCount": 0,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "cross-owner",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 8,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": null,
+        "CacheCount": 0,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "unknown-source",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 99,
+        "Destination": 1,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "unknown-destination",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 99,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "directed-forward",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 2,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 2,
+          "NodeIds": [
+            1,
+            2
+          ],
+          "LinkIds": [
+            1
+          ],
+          "TransitDays": 1,
+          "BottleneckCapacityPerDay": 5
+        },
+        "CacheCount": 1,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "directed-reverse",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 2,
+        "Destination": 1,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": null,
+        "CacheCount": 1,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "equal-routes-quaternary-heap",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N1",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N2",
+            "Kind": 5
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N3",
+            "Kind": 5
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N4",
+            "Kind": 5
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N5",
+            "Kind": 5
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N6",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N7",
+            "Kind": 5
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N8",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 207,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 8,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 206,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 8,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 205,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 8,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 204,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 8,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 203,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 8,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 107,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 106,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 105,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 5,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 104,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 4,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 103,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 3,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 102,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 8,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 8,
+          "NodeIds": [
+            1,
+            7,
+            8
+          ],
+          "LinkIds": [
+            107,
+            207
+          ],
+          "TransitDays": 2,
+          "BottleneckCapacityPerDay": 10
+        },
+        "CacheCount": 1,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "stale-queue-entry-and-cycle",
+      "Kind": "Route",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N1",
+            "Kind": 5
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N2",
+            "Kind": 5
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N3",
+            "Kind": 5
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N4",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 10,
+            "TransitDays": 10,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 3,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 2,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 10,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 1,
+            "CapacityPerDay": 10,
+            "TransitDays": 0,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "Source": 1,
+        "Destination": 4,
+        "CacheCapacity": 3
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 4,
+          "NodeIds": [
+            1,
+            3,
+            2,
+            4
+          ],
+          "LinkIds": [
+            2,
+            3,
+            4
+          ],
+          "TransitDays": 3,
+          "BottleneckCapacityPerDay": 10
+        },
+        "CacheCount": 1,
+        "CacheCapacity": 3
+      }
+    },
+    {
+      "Name": "planner-owns-graph-copy",
+      "Kind": "OwnedCopy",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 7,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": true
+          }
+        ]
+      },
+      "Arguments": {
+        "CacheCapacity": 2
+      },
+      "Outcome": {
+        "Expected": {
+          "SourceNodeId": 1,
+          "DestinationNodeId": 2,
+          "NodeIds": [
+            1,
+            2
+          ],
+          "LinkIds": [
+            1
+          ],
+          "TransitDays": 2,
+          "BottleneckCapacityPerDay": 7
+        },
+        "CacheCount": 1,
+        "CacheCapacity": 2
+      }
+    },
+    {
+      "Name": "lru-null-hit-and-eviction",
+      "Kind": "Sequence",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Queries": [
+          {
+            "Source": 1,
+            "Destination": 9
+          },
+          {
+            "Source": 1,
+            "Destination": 5
+          },
+          {
+            "Source": 1,
+            "Destination": 9
+          },
+          {
+            "Source": 2,
+            "Destination": 7
+          },
+          {
+            "Source": 1,
+            "Destination": 5
+          }
+        ],
+        "CacheCapacity": 2
+      },
+      "Outcome": {
+        "Expected": [
+          null,
+          {
+            "SourceNodeId": 1,
+            "DestinationNodeId": 5,
+            "NodeIds": [
+              1,
+              2,
+              3,
+              5
+            ],
+            "LinkIds": [
+              10,
+              11,
+              13
+            ],
+            "TransitDays": 3,
+            "BottleneckCapacityPerDay": 5
+          },
+          null,
+          {
+            "SourceNodeId": 2,
+            "DestinationNodeId": 7,
+            "NodeIds": [
+              2,
+              4,
+              5,
+              6,
+              7
+            ],
+            "LinkIds": [
+              12,
+              14,
+              15,
+              16
+            ],
+            "TransitDays": 4,
+            "BottleneckCapacityPerDay": 3
+          },
+          {
+            "SourceNodeId": 1,
+            "DestinationNodeId": 5,
+            "NodeIds": [
+              1,
+              2,
+              3,
+              5
+            ],
+            "LinkIds": [
+              10,
+              11,
+              13
+            ],
+            "TransitDays": 3,
+            "BottleneckCapacityPerDay": 5
+          }
+        ],
+        "CacheCounts": [
+          1,
+          2,
+          2,
+          2,
+          2
+        ],
+        "CacheCount": 2,
+        "CacheCapacity": 2
+      }
+    },
+    {
+      "Name": "same-node-and-cross-owner-not-cached",
+      "Kind": "Sequence",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "Links": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ]
+      },
+      "Arguments": {
+        "Queries": [
+          {
+            "Source": 1,
+            "Destination": 1
+          },
+          {
+            "Source": 1,
+            "Destination": 8
+          },
+          {
+            "Source": 1,
+            "Destination": 9
+          },
+          {
+            "Source": 1,
+            "Destination": 8
+          }
+        ],
+        "CacheCapacity": 2
+      },
+      "Outcome": {
+        "Expected": [
+          {
+            "SourceNodeId": 1,
+            "DestinationNodeId": 1,
+            "NodeIds": [
+              1
+            ],
+            "LinkIds": [],
+            "TransitDays": 0,
+            "BottleneckCapacityPerDay": "Infinity"
+          },
+          null,
+          null,
+          null
+        ],
+        "CacheCounts": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "CacheCount": 1,
+        "CacheCapacity": 2
+      }
+    },
+    {
+      "Name": "priority-shared-capacity",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 7
+          },
+          {
+            "NodeId": 3,
+            "AvailablePerDay": 8
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 7,
+            "RequiredPerDay": 7,
+            "Priority": 10
+          },
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 8,
+            "Priority": 1
+          }
+        ]
+      },
+      "Outcome": {
+        "Expected": {
+          "Allocations": [
+            {
+              "SourceNodeId": 3,
+              "DestinationNodeId": 7,
+              "AllocatedPerDay": 4,
+              "TransitDays": 3,
+              "RouteLinkIds": [
+                13,
+                15,
+                16
+              ]
+            },
+            {
+              "SourceNodeId": 3,
+              "DestinationNodeId": 5,
+              "AllocatedPerDay": 1,
+              "TransitDays": 1,
+              "RouteLinkIds": [
+                13
+              ]
+            }
+          ],
+          "UnmetDemandPerDay": [
+            {
+              "NodeId": 7,
+              "PerDay": 3
+            },
+            {
+              "NodeId": 5,
+              "PerDay": 7
+            }
+          ],
+          "UnusedSupplyPerDay": [
+            {
+              "NodeId": 1,
+              "PerDay": 7
+            },
+            {
+              "NodeId": 3,
+              "PerDay": 3
+            }
+          ],
+          "TotalAllocatedPerDay": 5,
+          "TotalUnmetDemandPerDay": 10
+        },
+        "CacheCount": 4
+      }
+    },
+    {
+      "Name": "multiple-suppliers-equal-time-order",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 5,
+            "AvailablePerDay": 2
+          },
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 5
+          },
+          {
+            "NodeId": 3,
+            "AvailablePerDay": 3
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 4,
+            "RequiredPerDay": 8,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "Expected": {
+          "Allocations": [
+            {
+              "SourceNodeId": 3,
+              "DestinationNodeId": 4,
+              "AllocatedPerDay": 2,
+              "TransitDays": 0,
+              "RouteLinkIds": [
+                18
+              ]
+            },
+            {
+              "SourceNodeId": 5,
+              "DestinationNodeId": 4,
+              "AllocatedPerDay": 2,
+              "TransitDays": 1,
+              "RouteLinkIds": [
+                14
+              ]
+            },
+            {
+              "SourceNodeId": 1,
+              "DestinationNodeId": 4,
+              "AllocatedPerDay": 3,
+              "TransitDays": 2,
+              "RouteLinkIds": [
+                10,
+                12
+              ]
+            }
+          ],
+          "UnmetDemandPerDay": [
+            {
+              "NodeId": 4,
+              "PerDay": 1
+            }
+          ],
+          "UnusedSupplyPerDay": [
+            {
+              "NodeId": 5,
+              "PerDay": 0
+            },
+            {
+              "NodeId": 1,
+              "PerDay": 2
+            },
+            {
+              "NodeId": 3,
+              "PerDay": 1
+            }
+          ],
+          "TotalAllocatedPerDay": 7,
+          "TotalUnmetDemandPerDay": 1
+        },
+        "CacheCount": 3
+      }
+    },
+    {
+      "Name": "duplicates-self-and-zero-overwrite-order",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 2
+          },
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 3
+          },
+          {
+            "NodeId": 5,
+            "AvailablePerDay": 10
+          },
+          {
+            "NodeId": 9,
+            "AvailablePerDay": 0
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 7,
+            "RequiredPerDay": 2,
+            "Priority": 3
+          },
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 4,
+            "Priority": 2
+          },
+          {
+            "NodeId": 7,
+            "RequiredPerDay": 6,
+            "Priority": 1
+          },
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 0,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "Expected": {
+          "Allocations": [
+            {
+              "SourceNodeId": 5,
+              "DestinationNodeId": 7,
+              "AllocatedPerDay": 2,
+              "TransitDays": 2,
+              "RouteLinkIds": [
+                15,
+                16
+              ]
+            },
+            {
+              "SourceNodeId": 1,
+              "DestinationNodeId": 5,
+              "AllocatedPerDay": 4,
+              "TransitDays": 3,
+              "RouteLinkIds": [
+                10,
+                11,
+                13
+              ]
+            },
+            {
+              "SourceNodeId": 5,
+              "DestinationNodeId": 7,
+              "AllocatedPerDay": 2,
+              "TransitDays": 2,
+              "RouteLinkIds": [
+                15,
+                16
+              ]
+            }
+          ],
+          "UnmetDemandPerDay": [
+            {
+              "NodeId": 7,
+              "PerDay": 4
+            },
+            {
+              "NodeId": 5,
+              "PerDay": 0
+            }
+          ],
+          "UnusedSupplyPerDay": [
+            {
+              "NodeId": 1,
+              "PerDay": 1
+            },
+            {
+              "NodeId": 5,
+              "PerDay": 6
+            },
+            {
+              "NodeId": 9,
+              "PerDay": 0
+            }
+          ],
+          "TotalAllocatedPerDay": 8,
+          "TotalUnmetDemandPerDay": 4
+        },
+        "CacheCount": 3
+      }
+    },
+    {
+      "Name": "disconnected-and-zero",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 4
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 9,
+            "RequiredPerDay": 2,
+            "Priority": 0
+          },
+          {
+            "NodeId": 7,
+            "RequiredPerDay": 0,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "Expected": {
+          "Allocations": [],
+          "UnmetDemandPerDay": [
+            {
+              "NodeId": 7,
+              "PerDay": 0
+            },
+            {
+              "NodeId": 9,
+              "PerDay": 2
+            }
+          ],
+          "UnusedSupplyPerDay": [
+            {
+              "NodeId": 1,
+              "PerDay": 4
+            }
+          ],
+          "TotalAllocatedPerDay": 0,
+          "TotalUnmetDemandPerDay": 2
+        },
+        "CacheCount": 1
+      }
+    },
+    {
+      "Name": "saturated-shortest-does-not-reroute",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N1",
+            "Kind": 5
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N2",
+            "Kind": 5
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N3",
+            "Kind": 5
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N4",
+            "Kind": 5
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "N5",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 2,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 2,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 2,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 2,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 10
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 4,
+            "RequiredPerDay": 5,
+            "Priority": 10
+          },
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 5,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "Expected": {
+          "Allocations": [
+            {
+              "SourceNodeId": 1,
+              "DestinationNodeId": 4,
+              "AllocatedPerDay": 5,
+              "TransitDays": 2,
+              "RouteLinkIds": [
+                1,
+                2
+              ]
+            }
+          ],
+          "UnmetDemandPerDay": [
+            {
+              "NodeId": 4,
+              "PerDay": 0
+            },
+            {
+              "NodeId": 5,
+              "PerDay": 5
+            }
+          ],
+          "UnusedSupplyPerDay": [
+            {
+              "NodeId": 1,
+              "PerDay": 5
+            }
+          ],
+          "TotalAllocatedPerDay": 5,
+          "TotalUnmetDemandPerDay": 5
+        },
+        "CacheCount": 2
+      }
+    },
+    {
+      "Name": "invalid-supply-negative",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": -1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "invalid-supply-nan",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": "NaN"
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "invalid-supply-positive-infinity",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": "Infinity"
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "invalid-demand-negative",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": -1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "invalid-demand-nan",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": "NaN",
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "invalid-demand-negative-infinity",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": "-Infinity",
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "unknown-supply-node",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 99,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 5,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "unknown-demand-node",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Home",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Hub",
+            "Kind": 1
+          },
+          {
+            "Id": 3,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Luna",
+            "Kind": 2
+          },
+          {
+            "Id": 4,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mars",
+            "Kind": 3
+          },
+          {
+            "Id": 5,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Mine",
+            "Kind": 4
+          },
+          {
+            "Id": 6,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Depot",
+            "Kind": 5
+          },
+          {
+            "Id": 7,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Shipyard",
+            "Kind": 6
+          },
+          {
+            "Id": 8,
+            "CivilizationId": 2,
+            "SystemId": 20,
+            "Name": "Foreign",
+            "Kind": 0
+          },
+          {
+            "Id": 9,
+            "CivilizationId": 1,
+            "SystemId": 10,
+            "Name": "Disconnected",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 10,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 8,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 11,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 3,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 12,
+            "CivilizationId": 1,
+            "FromNodeId": 2,
+            "ToNodeId": 4,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 13,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 5,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 14,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 5,
+            "CapacityPerDay": 3,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 15,
+            "CivilizationId": 1,
+            "FromNodeId": 5,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 16,
+            "CivilizationId": 1,
+            "FromNodeId": 6,
+            "ToNodeId": 7,
+            "CapacityPerDay": 4,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 17,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 7,
+            "CapacityPerDay": 1,
+            "TransitDays": 9,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 18,
+            "CivilizationId": 1,
+            "FromNodeId": 3,
+            "ToNodeId": 4,
+            "CapacityPerDay": 2,
+            "TransitDays": 0,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 19,
+            "CivilizationId": 1,
+            "FromNodeId": 4,
+            "ToNodeId": 7,
+            "CapacityPerDay": 0,
+            "TransitDays": 1,
+            "Bidirectional": true,
+            "Enabled": true
+          },
+          {
+            "Id": 20,
+            "CivilizationId": 1,
+            "FromNodeId": 7,
+            "ToNodeId": 6,
+            "CapacityPerDay": 2,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 21,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 6,
+            "CapacityPerDay": 4,
+            "TransitDays": 2,
+            "Bidirectional": true,
+            "Enabled": false
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 99,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentOutOfRangeException"
+      }
+    },
+    {
+      "Name": "allocator-duplicate-link",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ],
+        "AllocatorLinks": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          },
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 2,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "ArgumentException"
+      }
+    },
+    {
+      "Name": "allocator-link-mismatch",
+      "Kind": "Flow",
+      "Input": {
+        "Nodes": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "A",
+            "Kind": 0
+          },
+          {
+            "Id": 2,
+            "CivilizationId": 1,
+            "SystemId": 1,
+            "Name": "B",
+            "Kind": 5
+          }
+        ],
+        "PlannerLinks": [
+          {
+            "Id": 1,
+            "CivilizationId": 1,
+            "FromNodeId": 1,
+            "ToNodeId": 2,
+            "CapacityPerDay": 5,
+            "TransitDays": 1,
+            "Bidirectional": false,
+            "Enabled": true
+          }
+        ],
+        "AllocatorLinks": [],
+        "Offers": [
+          {
+            "NodeId": 1,
+            "AvailablePerDay": 1
+          }
+        ],
+        "Demands": [
+          {
+            "NodeId": 2,
+            "RequiredPerDay": 1,
+            "Priority": 0
+          }
+        ]
+      },
+      "Outcome": {
+        "ExpectedError": "InvalidOperationException"
+      }
+    }
+  ]
+}
