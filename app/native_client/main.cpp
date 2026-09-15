@@ -935,6 +935,12 @@ class NativeCampaign final {
     const auto layout=NativeUiLayout::for_viewport(width,height);
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)
       click(layout.pause);
+    // Manual saves use the existing completed strategic-frame boundary. A
+    // paused zero-duration frame establishes it without advancing gameplay.
+    InputSnapshot ready;
+    ready.drawable_width=width;ready.drawable_height=height;
+    if(!update(ready,width,height,0.,true))
+      throw std::runtime_error("Navigation replay could not establish a save boundary.");
     const auto& before=session_->frame().runtime().world().campaign();
     const auto economy=std::ranges::find(before.economies,
         before.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -946,12 +952,71 @@ class NativeCampaign final {
         smoke_navigation_day_,STELLAR_GAME_VERSION,utc_timestamp()};
     const auto canonical_before=encode_player_campaign_v17_json(
         capture_player_campaign_v17(session_->frame().runtime(),capture_options));
+    smoke_keyboard_commands_=0;
+    const auto send=[&](InputEvent event){
+      InputSnapshot input;
+      input.drawable_width=width;input.drawable_height=height;
+      input.events.push_back(std::move(event));
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Keyboard replay closed the campaign.");
+    };
+    const auto key=[&](std::uint32_t value){
+      InputEvent event{InputEventType::KeyPressed};event.key=value;send(event);
+    };
+    const auto playback=[&]{
+      auto& clock=session_->frame().clock();
+      const auto accepted=*smoke_keyboard_commands_;
+      for(std::uint32_t value='1';value<='4';++value){
+        const auto expected=static_cast<StrategicSpeed>(value-'0');
+        key(value);
+        if(clock.speed()!=expected)
+          throw std::runtime_error("Numeric shortcut did not select canonical speed.");
+        key(' ');
+        if(clock.speed()!=StrategicSpeed::Paused||clock.resume_speed()!=expected)
+          throw std::runtime_error("Space did not pause and retain selected speed.");
+        key(' ');
+        if(clock.speed()!=expected)
+          throw std::runtime_error("Space did not restore selected speed.");
+      }
+      key('1'); // Restore the normal resume speed expected by neighboring fixtures.
+      key(' ');
+      key('x'); // An unbound key must not dispatch a gameplay command.
+      if(*smoke_keyboard_commands_!=accepted+14||
+         clock.speed()!=StrategicSpeed::Paused)
+        throw std::runtime_error("Keyboard replay did not finish paused.");
+    };
+    const auto blocked_keys=[&]{
+      const auto accepted=*smoke_keyboard_commands_;
+      const auto speed=session_->frame().clock().speed();
+      const auto resume=session_->frame().clock().resume_speed();
+      for(const auto value:std::array<std::uint32_t,6>{' ','1','2','3','4',0x4000003fu})
+        key(value);
+      if(*smoke_keyboard_commands_!=accepted||
+         session_->frame().clock().speed()!=speed||
+         session_->frame().clock().resume_speed()!=resume)
+        throw std::runtime_error("A blocking view leaked strategic keyboard commands.");
+      ++smoke_keyboard_blocked_contexts_;
+    };
+    playback();
+    smoke_keyboard_playback_=true;
+    const auto sol=std::ranges::find(before.systems,std::string("Sol"),&StellarSystem::name);
+    if(sol==before.systems.end()||!enter_system(sol->id,width,height))
+      throw std::runtime_error("Keyboard replay could not enter the home system.");
+    playback();
+    smoke_keyboard_system_=true;
+    system_workspace_.close();
+    const auto accepted_before_save=*smoke_keyboard_commands_;
+    key(0x4000003fu);
+    smoke_keyboard_save_=*smoke_keyboard_commands_==accepted_before_save+1;
+    if(!smoke_keyboard_save_)
+      throw std::runtime_error("F6 did not request a campaign save.");
     InputSnapshot escape;
     escape.drawable_width=width;
     escape.drawable_height=height;
     escape.events={{InputEventType::EscapePressed}};
     if(!update(escape,width,height,0.,false)||!menu_)
       throw std::runtime_error("Navigation smoke could not open the pause menu.");
+    blocked_keys();
     click(layout.research);
     smoke_navigation_menu_blocked_=menu_&&!research_workspace_.visible();
     if(!smoke_navigation_menu_blocked_||!update(escape,width,height,0.,false)||menu_)
@@ -989,6 +1054,7 @@ class NativeCampaign final {
     click({surface_point.x,surface_point.y});
     if(!surface_workspace_.modal_open())
       throw std::runtime_error("Navigation smoke did not open a surface confirmation.");
+    blocked_keys();
     click(layout.research);
     smoke_navigation_modal_blocked_=surface_workspace_.visible()&&
         surface_workspace_.modal_open()&&!research_workspace_.visible();
@@ -1009,12 +1075,28 @@ class NativeCampaign final {
     };
     click(layout.research);
     verify_only(research_workspace_.visible(),"Research");
+    const auto research_layout=ResearchWorkspaceLayout::for_viewport(
+        width,height,research_workspace_.window()->domain_tabs.size());
+    click(research_layout.search);
+    if(!wants_text_input())
+      throw std::runtime_error("Research search did not acquire keyboard ownership.");
+    blocked_keys();
+    const auto original_search=research_workspace_.query().search;
+    send({InputEventType::TextEntered,{}, {},0.f,"1 "});
+    if(research_workspace_.query().search!=original_search+"1 ")
+      throw std::runtime_error("Gameplay shortcuts consumed research text.");
+    send({InputEventType::BackspacePressed});
+    send({InputEventType::BackspacePressed});
+    smoke_keyboard_text_=research_workspace_.query().search==original_search;
+    if(!smoke_keyboard_text_)
+      throw std::runtime_error("Research text could not be corrected.");
     click(layout.shipyard);
     verify_only(shipyard_workspace_.visible(),"Shipyard");
     click(layout.construction);
     verify_only(construction_workspace_.visible(),"Construction");
     click(layout.diplomacy);
     verify_only(diplomacy_workspace_.visible(),"Relations");
+    blocked_keys();
     const auto& after=session_->frame().runtime().world().campaign();
     const auto after_economy=std::ranges::find(after.economies,
         after.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -1469,6 +1551,11 @@ class NativeCampaign final {
        <<",\"menu_blocked\":"<<smoke_navigation_menu_blocked_
        <<",\"modal_blocked\":"<<smoke_navigation_modal_blocked_
        <<",\"pause_retained\":"<<smoke_navigation_pause_retained_
+       <<",\"keyboard_galaxy_playback\":"<<smoke_keyboard_playback_
+       <<",\"keyboard_system_playback\":"<<smoke_keyboard_system_
+       <<",\"keyboard_save_requested\":"<<smoke_keyboard_save_
+       <<",\"keyboard_text_preserved\":"<<smoke_keyboard_text_
+       <<",\"keyboard_blocked_contexts\":"<<smoke_keyboard_blocked_contexts_
        <<",\"day_unchanged\":"
        <<(session_->frame().clock().simulation_days()==smoke_navigation_day_)
        <<'}';
@@ -1626,6 +1713,33 @@ class NativeCampaign final {
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
+      }
+      // Strategic shortcuts precede system-view capture, but never take keys
+      // from text entry, a confirmation or a legacy gameplay-blocking view.
+      if(event.type==InputEventType::KeyPressed&&input.focused&&input.renderable()&&
+         !menu_&&!surface_workspace_.visible()&&!diplomacy_workspace_.visible()&&
+         !settlement_workspace_.visible()&&!wants_text_input()&&
+         !shipyard_workspace_.confirmation_open()&&
+         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
+        auto& clock=session_->frame().clock();
+        bool handled=true;
+        switch(event.key){
+        case ' ':
+          if(clock.speed()==StrategicSpeed::Paused)clock.resume();
+          else clock.set_speed(StrategicSpeed::Paused);
+          break;
+        case '1':clock.set_speed(StrategicSpeed::Normal);break;
+        case '2':clock.set_speed(StrategicSpeed::Fast);break;
+        case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
+        case '4':clock.set_speed(StrategicSpeed::Maximum);break;
+        case 0x4000003fu:session_->request_save();break; // SDLK_F6
+        default:handled=false;break;
+        }
+        if(handled){
+          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
+          if(audio_confirm_)audio_confirm_();
+          continue;
+        }
       }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
@@ -2662,6 +2776,10 @@ class NativeCampaign final {
   bool smoke_navigation_no_charge_{},smoke_navigation_canonical_unchanged_{};
   bool smoke_navigation_menu_blocked_{},smoke_navigation_modal_blocked_{};
   bool smoke_navigation_pause_retained_{};
+  std::optional<unsigned> smoke_keyboard_commands_;
+  bool smoke_keyboard_playback_{},smoke_keyboard_system_{};
+  bool smoke_keyboard_save_{},smoke_keyboard_text_{};
+  unsigned smoke_keyboard_blocked_contexts_{};
   bool last_fleet_command_accepted_{};
   bool last_shipyard_command_accepted_{};
   bool smoke_shipyard_order_started_{};
@@ -2881,7 +2999,8 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.navigation_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&((!options.voice_check&&frames==60)||(options.voice_check&&voice_prepared&&frames==capture_frame-60)))
+        // Navigation replay saves through its actual F6 input, with no fallback.
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&((!options.voice_check&&frames==60)||(options.voice_check&&voice_prepared&&frames==capture_frame-60)))
           campaign.request_smoke_save();
       }
       if(options.campaign_profile&&frames>=campaign_active_first&&frames<=campaign_active_last){

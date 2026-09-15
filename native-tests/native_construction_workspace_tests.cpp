@@ -129,11 +129,13 @@ void mouse_routes_start_queue_and_stable_cancel_confirmation() {
   refreshed.projects.front().formatted_cancellation_refund = "$650M UED";
   workspace.set_view(std::move(refreshed));
   REQUIRE(workspace.arm_cancel_confirmation(command.project_id));
+  REQUIRE(workspace.confirmation_open());
 
   auto changed = view(1, 6);
   changed.projects.front().active = true;
   changed.projects.front().formatted_cancellation_refund = "$600M UED";
   workspace.set_view(std::move(changed));
+  REQUIRE(!workspace.confirmation_open());
   command = workspace.handle(
       {InputEventType::LeftPressed, center(layout.secondary_action)}, 1280, 720);
   REQUIRE(command.kind == ConstructionWorkspaceCommandKind::PrepareCancel);

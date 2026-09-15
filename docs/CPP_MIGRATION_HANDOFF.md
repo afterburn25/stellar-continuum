@@ -5,6 +5,22 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Strategic keyboard integration
+
+Space, keys 1 through 4 and F6 now follow the legacy strategic pause/speed/save
+commands. They route before system-view capture and respect search, menu,
+settings, surface, Relations, settlement, production cancellation and fleet
+preview ownership. Canonical clock/save behavior is unchanged. This selectively
+adapts Devin `749ad8e7`; its tactical keyboard portion remains unimported.
+
+MSVC builds and four focused CTests plus six Python navigation checks pass.
+Two relocated Vulkan navigation replays exercise galaxy/system shortcuts,
+four actual blocking contexts, text entry/correction and an F6-only save;
+full canonical state remains unchanged and the saved reload differs only in
+`SavedAtUtc`. Two neighboring research runs pass. Exact evidence and limits:
+`engine/NATIVE_NAVIGATION.md`, `work/native-keyboard-runtime.json` and
+`work/native-keyboard-research-runtime.json`. Package remains unsealed.
+
 ### Compact native navigation and integration review
 
 Research, Shipyard, Construction and Relations now use the approved icons in
@@ -30,8 +46,8 @@ ports instead. Keep Core's combat authority and avoid a competing bulk port.
 PR #332 remains unmerged and unsealed.
 
 Latest fetched Devin head is `7a85a099`, adding keyboard shortcut slice
-`749ad8e7` on top of `e390b659`. It is not imported and needs input-ownership
-review against the new rail/modal contract. It does not include the requested
+`749ad8e7` on top of `e390b659`. Its strategic input has now been selectively
+adapted as described above. It does not include the requested
 tactical render/group/gesture/persistence corrections.
 
 ### Native HUD and pause-control checkpoint (2026-09-15)

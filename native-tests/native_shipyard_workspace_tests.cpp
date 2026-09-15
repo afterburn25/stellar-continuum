@@ -156,11 +156,13 @@ void start_and_cancel_use_real_mouse_hit_bounds() {
   refreshed.orders = {order()};
   workspace.set_view(std::move(refreshed));
   REQUIRE(workspace.arm_cancel_confirmation(command.id));
+  REQUIRE(workspace.confirmation_open());
   auto changed_quote = view();
   changed_quote.shipyard_revision = 6;
   changed_quote.orders = {order()};
   changed_quote.orders.front().formatted_refund = "$8.00 SOL";
   workspace.set_view(std::move(changed_quote));
+  REQUIRE(!workspace.confirmation_open());
   command = workspace.handle(
       {InputEventType::LeftPressed, center(layout.action)}, 1280, 720);
   REQUIRE(command.kind == ShipyardWorkspaceCommandKind::PrepareCancel);

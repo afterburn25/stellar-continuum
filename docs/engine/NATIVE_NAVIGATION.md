@@ -11,6 +11,25 @@ relations, colony, surface and system layouts. Workspace content must remain
 outside that gutter; changing the rail requires checking those layouts together.
 Pause/play and speed stay in the top strip.
 
+Strategic keyboard controls follow the legacy player commands: Space toggles
+pause while retaining the selected speed, keys 1 through 4 select Normal,
+Fast, Very Fast and Maximum (and resume if paused), and F6 requests a manual
+save through the existing session/save service. These work in the galaxy and
+system views. The separate mouse speed button still changes the resume speed
+without unpausing. No simulation speed multipliers or save rules changed.
+
+SDL emits a non-repeating key event separately from text input; Escape and
+Backspace retain their existing events. Strategic shortcut routing precedes
+system-view capture and requires a focused, renderable window. Research search,
+the pause menu, settings, surface/Relations views, settlement confirmation,
+production cancellation confirmation and fleet route previews retain keyboard
+ownership. Typing digits or spaces in a search field cannot run the simulation
+or request a save. Only the validation replay retains command counts.
+
+This selectively adapts Devin `749ad8e7`'s Engine event primitive and strategic
+shortcut mapping. Its tactical keyboard changes are not imported: tactical
+workspace review is still outstanding.
+
 Navigation is routed before workspace input and consumes its pointer gesture.
 The pause menu, settings and confirmation dialogs keep input ownership while
 open. An icon switches presentation only: it does not issue a research,
@@ -35,6 +54,35 @@ transparency, distinct artwork, action mapping and stable allocation. This
 does not establish full interface parity or a sustained frame-rate target.
 
 ## Validation, 2026-09-15
+
+### Strategic keyboard integration
+
+The MSVC native build passes. Four focused CTests pass (input, research,
+shipyard and construction), including confirmation lifetime on quote changes.
+Six Python navigation checks pass and reject false/missing keyboard proof or
+an incorrect count of blocked contexts. Two relocated Vulkan runs pass at
+720p and 1080p, using the normal campaign input path to exercise all four
+speed keys and Space in both galaxy and Sol views. F6 is the replay's only
+save request; its former frame-60 automatic save fallback is removed. A
+paused strategic frame establishes the existing safe save boundary first.
+
+The replay checks six blocked keys in each of four actual contexts: pause
+menu, surface placement confirmation, focused research search and Relations.
+It also enters and deletes digits/spaces through normal research text events.
+These interactions leave the complete canonical payload, treasury and day
+unchanged. The F6 save reloads with complete payload equality except
+`SavedAtUtc`. Two neighboring research runs also pass, preserving funding,
+progression, inspector scrolling and paused reload. Other guards are checked
+in source; this replay does not claim physical-key injection or coverage of
+every dialog combination.
+
+Evidence: `work/native-keyboard-final-build.log`,
+`work/native-keyboard-focused.log`, `work/native-keyboard-runtime.json`, and
+`work/native-keyboard-research-runtime.json`. The local runtime package is
+still unsealed. This input milestone makes no new graphical or frame-rate
+claim.
+
+### Prior icon-rail checkpoint
 
 The final MSVC native client and image/layout/workspace targets build. Ten
 unique focused CTests pass: seven affected workspaces, UI layout, native client

@@ -11,7 +11,10 @@ import native_navigation_runtime as runtime
 
 PROOF = {"switches": 4, "final_workspace": "relations", "credits_before": 500,
          "credits_after": 500, "no_charge": True, "canonical_payload_unchanged": True,
-         "menu_blocked": True, "modal_blocked": True, "pause_retained": True, "day_unchanged": True}
+         "menu_blocked": True, "modal_blocked": True, "pause_retained": True, "day_unchanged": True,
+         "keyboard_galaxy_playback": True, "keyboard_system_playback": True,
+         "keyboard_save_requested": True, "keyboard_text_preserved": True,
+         "keyboard_blocked_contexts": 4}
 
 
 class NavigationProofTests(unittest.TestCase):
@@ -26,6 +29,7 @@ class NavigationProofTests(unittest.TestCase):
 
     def test_false_and_spoofed_proofs(self):
         changes = [("switches", 3), ("final_workspace", "research"),
+                   ("keyboard_blocked_contexts", 3), ("keyboard_blocked_contexts", "4"),
                    ("credits_after", 499), ("credits_before", float("nan"))]
         changes.extend((key, value) for key in PROOF if PROOF[key] is True
                        for value in (False, 1, "true", None))

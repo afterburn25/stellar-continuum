@@ -74,7 +74,7 @@ struct DrawList {
 struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
-                            EscapePressed, BackspacePressed, TextEntered,
+                            EscapePressed, BackspacePressed, KeyPressed, TextEntered,
                             PointerCancelled };
 struct InputEvent {
   InputEventType type{};
@@ -82,6 +82,8 @@ struct InputEvent {
   float wheel_y{};
   std::string text;
   std::uint8_t click_count{};
+  // SDL_Keycode for non-repeating KeyPressed events.
+  std::uint32_t key{};
 };
 struct InputSnapshot {
   std::vector<InputEvent> events;

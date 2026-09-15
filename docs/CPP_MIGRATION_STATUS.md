@@ -14,6 +14,13 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
+Strategic Space/1-4/F6 shortcuts are integrated with the existing clock and save
+service, including galaxy/system routing and modal/text ownership. Four CTests,
+six Python navigation checks, two relocated navigation replays and two research
+replays pass. F6 is the navigation replay's only save request, with complete
+paused fresh/reload payload equality except `SavedAtUtc`. Full details and
+scope limits are in `engine/NATIVE_NAVIGATION.md`.
+
 The native C++ client now has a compact left icon rail for Research, Shipyard,
 Construction and Relations, using the four approved designs. It reserves
 workspace space, routes matching input before workspace handlers, and leaves
@@ -34,8 +41,9 @@ Historical evidence below belongs to its named checkpoint, not this head or a
 sealed release.
 
 Latest fetched Devin head `7a85a099` adds keyboard shortcuts (`749ad8e7`),
-not the pending tactical corrections. That slice remains unimported pending
-review with the current input/modal contract.
+not the pending tactical corrections. The Engine key primitive and strategic
+mapping are selectively adapted with stronger input/modal ownership; the
+tactical shortcuts remain unimported.
 
 ### Native HUD and pause-control checkpoint (2026-09-15)
 

@@ -22,9 +22,12 @@ def navigation_proof(stdout):
     except ValueError as error:
         raise RuntimeError("Native navigation proof is malformed") from error
     flags = ("no_charge", "canonical_payload_unchanged", "menu_blocked", "modal_blocked",
-             "pause_retained", "day_unchanged")
+             "pause_retained", "day_unchanged", "keyboard_galaxy_playback",
+             "keyboard_system_playback", "keyboard_save_requested", "keyboard_text_preserved")
     if (not isinstance(proof, dict) or type(proof.get("switches")) is not int or
             proof["switches"] != 4 or proof.get("final_workspace") != "relations" or
+            type(proof.get("keyboard_blocked_contexts")) is not int or
+            proof["keyboard_blocked_contexts"] != 4 or
             any(proof.get(key) is not True for key in flags)):
         raise RuntimeError("Native navigation replay did not satisfy the input/state contract")
     before, after = proof.get("credits_before"), proof.get("credits_after")
