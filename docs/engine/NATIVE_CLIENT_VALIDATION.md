@@ -191,6 +191,26 @@ cover busy campaigns or certify every resolution/GPU. Cold entry still takes
 in the separate timing maxima. No quality, authoritative simulation or save
 contract was changed by profiling.
 
+The subsequent cold diagnostic supplements `steady_profile` with exactly ten
+`cold_profile.rows` records when `--profile-frames` is requested. Each contains
+its frame, CPU update/scene, four `FrameTiming` phases, enclosing draw time and
+image upload before/after counts. Export results include `systemColdProfiles` or
+`galaxyColdProfiles`. Strict parsing rejects incomplete/duplicate/out-of-order
+data, nonfinite/negative timings, readback during these early frames, backwards
+upload counts and inconsistent phase totals. Normal rendering is unchanged.
+
+The strict native build and 57 Python checks passed. Four actual 600-frame map
+profiles at 720p/1080p passed artwork, UI, secrecy and exact paused reload; two
+default diplomacy runs passed too. At frame 7, present takes 65.471–66.460 ms.
+Sol's submission takes 0.236/0.258 ms with zero image uploads on that frame;
+galaxy submission takes 1.563/1.687 ms. SDL performs its deferred command flush
+inside [`SDL_RenderPresent`](https://github.com/libsdl-org/SDL/blob/release-3.4.16/src/render/SDL_render.c#L5110), so this phase includes driver/GPU/display work and
+cannot establish a GPU-only duration or a specific driver cause. Steady means
+remain 16.717–16.722 ms; no stall fix or universal 60 FPS result is claimed.
+Evidence: `native-cold-render-runtime.log`, `work/cold-render-{galaxy,system}.json`,
+`native-cold-profile-final-validation.log`, and
+`work/cold-profile-default-diplomacy.json`.
+
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 
 Engine 0.1.53 passed 138 CTest, 206 Python checks and twenty-six actual Vulkan launches. Surface validation starts from an unaltered fresh 500-system campaign and verifies preview cancellation, paid placement, half-refund cancellation, noninstant progress and exact paused reload/resave. Engine image-overlay tests use actual GPU pixel readback for ordering, clipping, tint and immutable texture reuse. Surface captures at 720p/1080p were inspected; this operational grid is not final 3D presentation.

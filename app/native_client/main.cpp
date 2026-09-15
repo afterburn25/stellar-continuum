@@ -178,6 +178,22 @@ struct SmokeSteadyProfile {
   }
 };
 
+// First-rendered-frame evidence is retained only for an opt-in bounded profile.
+struct SmokeColdProfile {
+  struct Row {int frame{};double update{},scene{},render_present{};FrameTiming timing{};std::uint64_t uploads_before{},uploads_after{};};
+  std::array<Row,10> rows{};std::size_t count{};
+  void observe(int frame,double update,double scene,double render_present,const FrameTiming &timing,std::uint64_t uploads_before,std::uint64_t uploads_after){
+    if(count>=rows.size())return;
+    rows[count++]={frame,update,scene,render_present,timing,uploads_before,uploads_after};
+  }
+  void write(std::ostream &out)const{
+    if(count!=rows.size())throw std::runtime_error("Cold profiling did not observe ten rendered frames.");
+    out<<" cold_profile={\"rows\":[";
+    for(std::size_t index=0;index<rows.size();++index){const auto &row=rows[index];if(index)out<<',';out<<"{\"frame\":"<<row.frame<<",\"update_ms\":"<<row.update<<",\"scene_ms\":"<<row.scene<<",\"submission_ms\":"<<row.timing.submission_ms<<",\"readback_ms\":"<<row.timing.readback_ms<<",\"throttle_ms\":"<<row.timing.throttle_ms<<",\"present_ms\":"<<row.timing.present_ms<<",\"render_present_ms\":"<<row.render_present<<",\"image_uploads_before\":"<<row.uploads_before<<",\"image_uploads_after\":"<<row.uploads_after<<'}';}
+    out<<"]}";
+  }
+};
+
 struct Options {
   std::filesystem::path asset_root;
   std::optional<std::filesystem::path> smoke_screenshot;
@@ -2214,6 +2230,8 @@ int main(int argc,char **argv){
     std::optional<std::chrono::steady_clock::time_point> artwork_pending_since;
     std::unique_ptr<SmokeSteadyProfile> steady_profile;
     if(options.profile_frames)steady_profile=std::make_unique<SmokeSteadyProfile>(*options.profile_frames);
+    std::unique_ptr<SmokeColdProfile> cold_profile;
+    if(options.profile_frames)cold_profile=std::make_unique<SmokeColdProfile>();
     FrameTiming draw_timing;
     while(true){
       const auto now=std::chrono::steady_clock::now();
@@ -2265,8 +2283,14 @@ int main(int argc,char **argv){
         else if(artwork_pending_since){artwork_prepare_max_ms=std::max(artwork_prepare_max_ms,std::chrono::duration<double,std::milli>(scene_end-*artwork_pending_since).count());artwork_pending_since.reset();}
       }
       if(waiting_for_artwork){screenshot.reset();if(++artwork_wait_frames>600)throw std::runtime_error("Map artwork did not finish preparation before capture.");}
-      window.draw(scene,screenshot,steady_profile?&draw_timing:nullptr);
+      const auto uploads_before=cold_profile?window.image_upload_count():0;
+      window.draw(scene,screenshot,(steady_profile||cold_profile)?&draw_timing:nullptr);
       const auto render_end=std::chrono::steady_clock::now();
+      if(cold_profile)cold_profile->observe(frames,
+        std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
+        std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),
+        std::chrono::duration<double,std::milli>(render_end-scene_end).count(),draw_timing,
+        uploads_before,window.image_upload_count());
       if(smoke_timing)
         smoke_timing->observe(frames,screenshot.has_value()||frames>=capture_frame,
           std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
@@ -2322,6 +2346,7 @@ int main(int argc,char **argv){
         print_phase("update",update_ms);print_phase("scene",scene_ms);print_phase("render_present",render_present_ms);
         smoke_timing->write(std::cout);
         if(steady_profile)steady_profile->write(std::cout);
+        if(cold_profile)cold_profile->write(std::cout);
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)

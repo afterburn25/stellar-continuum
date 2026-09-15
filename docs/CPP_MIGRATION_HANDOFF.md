@@ -257,14 +257,44 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   Previous system-art head `96b83092` passed native CI `34946960470`; this new
   checkpoint needs its own run.
 
+## Cold rendering diagnostic checkpoint
+
+- `--profile-frames` now also emits `cold_profile={"rows":[...]}` for exactly the
+  first ten rendered frames. Rows contain frame number, update/scene/submission/
+  readback/throttle/present/render-present milliseconds and image-upload counters
+  before/after the draw. This is a fixed-size diagnostic; normal play adds no
+  history, per-phase clocks or upload-counter queries. Engine behavior is unchanged.
+- The system/galaxy exporter returns `systemColdProfiles` / `galaxyColdProfiles`
+  only when profiling is requested. Parsing rejects missing/duplicate tokens or
+  JSON members, incomplete/out-of-order frames, nonfinite/negative timings,
+  screenshot readback, backwards upload counters and subphases exceeding their
+  enclosing draw (with three-decimal rounding allowance).
+- Strict native build and 57 Python checks passed. Four actual 600-frame Vulkan
+  galaxy/system profiles at 720p/1080p passed the existing artwork, UI, observer
+  and exact paused save/reload gates. Two default-frame diplomacy Vulkan launches
+  passed after restoring the unchanged Engine configuration.
+- Frame 7 contains 65.471–66.460 ms of present time. Sol uploads no images on that
+  frame and queues drawing in 0.236/0.258 ms; galaxy submission is 1.563/1.687 ms.
+  Present includes SDL's deferred command flush and GPU/driver/display waits,
+  not exclusively display waiting or GPU execution. The exact lower-level cause
+  remains unresolved. Paused steady means remain 16.717–16.722 ms.
+- A local one-frame-in-flight experiment was tested in four 120-frame map profiles.
+  It did not change the ~66–67 ms cold tail and was fully reverted before final
+  build/validation. Do not repeat that setting change without new evidence.
+- Evidence: `native-cold-render-runtime.log`, `work/cold-render-{galaxy,system}.json`,
+  `native-cold-profile-final-validation.log`, `work/cold-profile-default-diplomacy.json`.
+  Discarded experiment: `native-cold-queue-experiment-{build,runtime}.log` and
+  `work/cold-queue-one-{system,galaxy}.json`. Galaxy head `63d62d31` has native CI
+  `34950285134` in progress; the new diagnostic needs its own run. No shared merge.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- System and galaxy CPU imagery preparation is now staged as above. Next isolate
-  the remaining ~67 ms cold render/present tail, then profile busy
-  campaigns separately before making a general 60 FPS claim. Keep Core access
+- System and galaxy CPU imagery preparation is now staged as above. Next profile
+  active/busy campaigns; avoid repeatedly profiling the same paused maps or
+  changing renderer settings for an unproven cold-tail cause. Keep Core access
   and GPU/window work on the owner thread, preserve final pixels and capture gates.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.

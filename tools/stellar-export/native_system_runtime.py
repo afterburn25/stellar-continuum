@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import tempfile
 
-from native_frame_profile import validate_profile_frames, validate_steady_profile
+from native_frame_profile import validate_cold_profile, validate_profile_frames, validate_steady_profile
 
 
 def _system_diagnostic(stdout):
@@ -36,7 +36,7 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
     validate_profile_frames(profile_frames)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics, profiles = [], [], []
+    captures, diagnostics, profiles, cold_profiles = [], [], [], []
     baseline = None
     with tempfile.TemporaryDirectory(prefix="stellar-native-system-") as temporary:
         work = Path(temporary)
@@ -59,6 +59,7 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
             _system_diagnostic(result.stdout)
             if profile_frames:
                 profiles.append(validate_steady_profile(result.stdout, profile_frames))
+                cold_profiles.append(validate_cold_profile(result.stdout))
             if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
                 raise RuntimeError("Native orbital view did not capture the rendered frame")
             if not save.is_file():
@@ -83,4 +84,5 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
             "systemDiagnostics": diagnostics}
     if profile_frames:
         result["systemProfiles"] = profiles
+        result["systemColdProfiles"] = cold_profiles
     return result

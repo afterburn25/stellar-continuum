@@ -53,12 +53,21 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. A cold render/present tail of ~67 ms and busy-campaign performance remain to investigate. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
+5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. Next prioritize active-campaign performance. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
-Latest Codex checkpoint also prepares deep-field, galaxy and regional scenery on
+Latest Codex checkpoint adds an opt-in ten-frame cold profile to the existing
+bounded map profiler. The strict native build, 57 Python checks, four 600-frame
+Vulkan map profiles and two default diplomacy launches passed. Frame 7 spends
+65.471–66.460 ms inside presentation; Sol's submission takes 0.236/0.258 ms and
+uploads no images on that frame. Exact paused save/reload and finished-art gates
+remain intact. This is diagnostic evidence, not a fixed stall or GPU-only timing.
+No normal-play histories or Engine rendering changes were added. See the handoff
+for the next active-campaign performance work and the discarded queue experiment.
+
+Committed galaxy checkpoint `63d62d31` prepares deep-field, galaxy and regional scenery on
 the existing bounded Engine image worker. Each decoded scenery image is limited
 to 8 MiB, with three cache slots; missing/oversized sources retain their path/cause.
 Central fog remains visible while scenery prepares, navigation stays responsive,

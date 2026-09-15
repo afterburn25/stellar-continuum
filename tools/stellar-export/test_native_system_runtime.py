@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from native_system_runtime import validate_native_system_export
+from test_native_frame_profile import cold_profile
 
 
 def steady_profile(samples):
@@ -59,6 +60,8 @@ class NativeSystemExportTests(unittest.TestCase):
                 if profile_frames:
                     self.assertEqual(args[args.index("--profile-frames") + 1], str(profile_frames))
                     stdout += " steady_profile=" + json.dumps(steady_profile(profile_frames))
+                    if fault != "cold_profile":
+                        stdout += " cold_profile=" + json.dumps(cold_profile())
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_system_runtime.subprocess.run", side_effect=launch):
@@ -71,14 +74,19 @@ class NativeSystemExportTests(unittest.TestCase):
             self.assertTrue(result["nativeSystemPausedReload"])
             if profile_frames:
                 self.assertEqual(len(result["systemProfiles"]), 2)
+                self.assertEqual(result["systemColdProfiles"], [cold_profile(), cold_profile()])
             else:
                 self.assertNotIn("systemProfiles", result)
+                self.assertNotIn("systemColdProfiles", result)
 
     def test_actual_input_images_and_paused_reload_are_required(self):
         self.exercise()
 
     def test_requested_steady_profile_is_forwarded_and_validated(self):
         self.exercise(profile_frames=120)
+
+    def test_requested_profile_requires_cold_diagnostics(self):
+        with self.assertRaises(RuntimeError): self.exercise("cold_profile", profile_frames=120)
 
     def test_invalid_profile_request_is_rejected_before_launch(self):
         with mock.patch("native_system_runtime.subprocess.run") as launch:

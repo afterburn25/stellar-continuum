@@ -13,7 +13,7 @@ import struct
 import subprocess
 import tempfile
 
-from native_frame_profile import validate_profile_frames, validate_steady_profile
+from native_frame_profile import validate_cold_profile, validate_profile_frames, validate_steady_profile
 
 
 def _finite_positive(value, label):
@@ -122,7 +122,7 @@ def validate_native_galaxy_export(folder: Path, env: dict[str, str], *, profile_
     validate_profile_frames(profile_frames)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics, profiles = [], [], []
+    captures, diagnostics, profiles, cold_profiles = [], [], [], []
     baseline = None
     with tempfile.TemporaryDirectory(prefix="stellar-native-galaxy-") as temporary:
         work = Path(temporary)
@@ -152,6 +152,7 @@ def validate_native_galaxy_export(folder: Path, env: dict[str, str], *, profile_
             state = _diagnostic(result.stdout, "paused_reload" if reload else "fresh")
             if profile_frames:
                 profiles.append(validate_steady_profile(result.stdout, profile_frames))
+                cold_profiles.append(validate_cold_profile(result.stdout))
             pixels = [_bmp(path, width, height) for path in (overview, regional, system)]
             if len({hashlib.sha256(value).digest() for value in pixels}) != 3:
                 raise RuntimeError("Native galaxy smoke captures do not show three distinct views")
@@ -181,4 +182,5 @@ def validate_native_galaxy_export(folder: Path, env: dict[str, str], *, profile_
             "galaxyCaptures": captures, "galaxyDiagnostics": diagnostics}
     if profile_frames:
         result["galaxyProfiles"] = profiles
+        result["galaxyColdProfiles"] = cold_profiles
     return result
