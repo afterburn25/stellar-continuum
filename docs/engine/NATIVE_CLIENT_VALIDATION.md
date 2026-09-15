@@ -59,6 +59,20 @@ the frame-61 save request service, capture/transition frames 120 onward, and oth
 steady frames. Unlike the existing phase means/p95, maxima include capture frames
 in their separate bucket; expensive cold work remains visible in the overall maxima.
 
+Cold celestial follow-up: five focused CTests (celestial appearance, planet discs,
+system workspace, system colony entry, settlement workspace) and four final Vulkan
+system/galaxy launches passed. Optional `--capture` in the existing celestial/planet
+test executables records RGBA and dimensions/timings; eight before/after resources
+match exactly across all 19,398,656 bytes. This covers three star colors/seeds, the
+black hole, front/back rings, and Mercury/Neptune. Star generation improved from
+207.7–210.4 to 79.8–80.3 ms by skipping mathematically invisible work; resolution,
+granulation, sunspots, corona and transient flare behavior are retained. Full first
+system scene is now 209.7–213.0 ms, and final frame p95 remains about 33 ms including
+VSync. Further entry/pacing work is needed. Evidence: `native-celestial-cold-tests.log`,
+`native-celestial-cold-final-runtime.log`, `work/celestial-pixel-comparison.json`, and
+`work/cold-after-{system,galaxy}.json`. Native CI `34936942630` covers the preceding
+save fix at `b110e223`; this rendering candidate needs its own CI.
+
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 
 Engine 0.1.53 passed 138 CTest, 206 Python checks and twenty-six actual Vulkan launches. Surface validation starts from an unaltered fresh 500-system campaign and verifies preview cancellation, paid placement, half-refund cancellation, noninstant progress and exact paused reload/resave. Engine image-overlay tests use actual GPU pixel readback for ordering, clipping, tint and immutable texture reuse. Surface captures at 720p/1080p were inspected; this operational grid is not final 3D presentation.

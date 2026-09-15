@@ -119,14 +119,42 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - Diplomacy head `0e0835ae104be5582cae1061a36bc96e04f77286` passed native CI
   `34934085259`. The subsequent save candidate needs its own exact-head CI.
 
+## Cold celestial preparation checkpoint
+
+- `native_celestial_appearance.cpp` no longer evaluates sunspots/granulation for
+  halo pixels with zero photosphere coverage. It also skips corona math beneath
+  the fully opaque disc and outside the corona's zero-coverage boundary. Original
+  surface/limb/corona equations, 1024px resources, intermittent flares, cache limits,
+  spectral colors and blend order remain unchanged.
+- Existing repository tests now accept diagnostic captures:
+  `stellar_celestial_tests --capture <directory>` and
+  `stellar_native_planet_disc_assets_tests --capture <directory> <Sol asset root>`.
+  They write raw RGBA plus dimensions/timing profiles after running their assertions;
+  default CTest behavior is unchanged. No production helper or new runtime is added.
+- Baseline `b110e223` renderer versus candidate: all 19,398,656 bytes in eight
+  captures match exactly (three star colors/seeds, black hole, both ring halves,
+  Mercury and Neptune). Star generation fell from 207.7–210.4 to 79.8–80.3 ms.
+  Actual first system scene fell from 340–346 to 209.7–213.0 ms. Galaxy-to-system
+  capture transitions measured 209.5–209.9 ms. These include remaining planet
+  preparation and text work; they are not a claim of stall-free entry.
+- Strict build and five CTests passed: celestial appearance, planet discs, system
+  workspace, system colony entry and settlement workspace. Four final Vulkan
+  system/galaxy launches passed at 720p/1080p, including paused save/reload and
+  observer checks. Evidence: `native-celestial-cold-tests.log`,
+  `native-celestial-cold-final-runtime.log`, `work/celestial-{before,after}/`,
+  `work/celestial-pixel-comparison.json`, `work/cold-{before,after}-{system,galaxy}.json`.
+- The saved-game fix at `b110e223` passed the Windows export job of native CI
+  `34936942630`. The subsequent celestial candidate needs its own exact-head CI.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- Investigate cold system artwork decoding/disc generation and presentation pacing.
-  Cold system scene construction remains ~340–346 ms, while steady system CPU
-  update/scene was below 0.5 ms in this sample; 60 FPS remains unproven.
+- First-entry planet/art preparation still contributes to a 210–213 ms scene.
+  Investigate staged preparation from observer-safe data and longer steady-frame
+  sampling to separate CPU/submission from presentation waiting. Final short runs
+  still show frame p95 around 33 ms including VSync; 60 FPS remains unproven.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.
 - `cleanMachineTest` still needs a separate machine/VM.

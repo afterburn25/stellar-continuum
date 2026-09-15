@@ -75,6 +75,14 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Codex candidate checkpoint (PR #332)
 
+- Cold celestial generation now skips surface calculations that cannot contribute
+  to halo pixels, covered corona work and the transparent outer boundary. Exact
+  before/after comparison preserves every byte of eight RGBA resources (19.4 MB).
+  Star generation improved from ~210 to ~80 ms; full first system scene from
+  ~340–346 to ~210–213 ms. Five focused CTests and four final Vulkan system/galaxy
+  launches passed. Resource resolution, artwork, colors, flare behavior and observer
+  rules remain unchanged. Entry stalls and sustained 60 FPS remain unresolved;
+  see the cold celestial checkpoint in the handoff for evidence and next steps.
 - Integrated Devin's diplomacy code `410753da` as `c9338699` and reviewed the real campaign path. Contact selection now refreshes immediately, unknown contacts retain stable selection, confirmation commands use their original generation/revision, and proposal terms/precise relationship changes invalidate stale commands. Scroll clipping, intelligence layout, and 720p filter labels were repaired.
 - Communications-v2 PNGs now load through canonical species IDs and are explicitly packaged. Four lazy entries are capped at 32 MiB; the actual decoded artwork occupies 24 MiB. Missing declared artwork fails with its path/cause; unknown species retain the signal fallback.
 - Final combined validation passed seven focused CTests, 18 diplomacy-validator Python checks, 45 package/checkout Python checks, and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. Diplomacy acceptance, the visible new agreement, four known/unknown captures, unrelated-state preservation, and exact paused Player17 reload are covered by the maintained exporter. See `native-diplomacy-final.log` and `work/native-diplomacy-final-{diplomacy,system,galaxy}.json`.

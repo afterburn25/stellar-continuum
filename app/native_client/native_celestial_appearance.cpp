@@ -64,7 +64,6 @@ std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
     const float px = (2.f * (x + .5f) / size - 1.f);
     const float py = (2.f * (y + .5f) / size - 1.f);
     const float radial = std::sqrt(px * px + py * py);
-    const float theta = std::atan2(py, px);
     if (black_hole) {
       const float horizon = 1.f - std::clamp((radial - .41f) / .025f, 0.f, 1.f);
       const float rim = std::max(0.f, 1.f - std::abs(radial - .455f) / .035f);
@@ -73,14 +72,29 @@ std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
       pixel(rgba, size, x, y, .015f + rim * .45f, .02f + rim * .34f,
             .04f + rim * .58f, alpha); continue;
     }
+    // Beyond the corona's outer fade, the original pixel is fully untouched.
+    if (radial >= 1.f) continue;
     const float disc_alpha = 1.f - std::clamp((radial - .448f) / .016f, 0.f, 1.f);
-    const float corona_distance = std::max(0.f, radial - .455f);
-    const float streamers = .75f + .13f * std::sin(theta * 9.f) +
+    // A solid photosphere completely covers the corona. Preserve the original
+    // corona calculation at the limb and outside it, where it affects pixels.
+    float corona{};
+    if (disc_alpha < 1.f) {
+      const float theta = std::atan2(py, px);
+      const float corona_distance = std::max(0.f, radial - .455f);
+      const float streamers = .75f + .13f * std::sin(theta * 9.f) +
                             .09f * std::sin(theta * 17.f + .6f) +
                             .06f * std::sin(theta * 31.f + std::sin(theta * 5.f));
-    const float corona = std::exp(-corona_distance * 10.f) * streamers *
+      corona = std::exp(-corona_distance * 10.f) * streamers *
                          (1.f - std::clamp((radial - .68f) / .32f, 0.f, 1.f)) * .42f;
+    }
     if (disc_alpha <= 0 && corona <= .002f) continue;
+    if (disc_alpha <= 0) {
+      // The original surface-to-corona blend is exactly zero here. Sunspots
+      // and granulation cannot affect these pixels; keep the same RGB/alpha
+      // without evaluating their expensive surface noise across the halo.
+      pixel(rgba, size, x, y, cr * .62f, cg * .58f, cb * .55f, corona);
+      continue;
+    }
     const float offset=static_cast<float>(seed&1023u)*.031f;
     const float warp_x = (noise(px * 8.f + offset, py * 8.f - offset) - .5f) * .055f;
     const float warp_y = (noise(px * 8.f - offset * .4f, py * 8.f + offset * .6f) - .5f) * .055f;
