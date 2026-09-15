@@ -71,10 +71,12 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Remaining blockers / next work
 
-- Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
-  proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
-  no grievance display.
-- Surface colony visuals (buildings/roads), orbital structure rendering.
+- Diplomacy presentation: audited against the C# reference — the workspace has no
+  grievance display, demand/trade composer, or claims panel; claims render as dashed
+  arcs on the strategic map (ported in `ef7a4007`) and the native workspace covers
+  every section the reference renders. No further diplomacy port is currently owed.
+- Surface colony visuals (buildings/roads) — the surface workspace is a construction
+  grid, not the reference's rendered colony view.
 - Native audio — engine has no audio module at all; needs design before code.
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
 - `cleanMachineTest` still needs a separate machine/VM.

@@ -39,7 +39,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
-| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects done; no surface/orbital scene art |
+| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures done; no surface colony scene art |
 | Audio | AudioDirector, voice | none | — | — | NOT STARTED | Engine has no audio module |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
@@ -49,14 +49,14 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 ## What blocks "fully playable native"
 
 1. Surface scene is a construction workspace, not the reference's rendered colony view.
-2. No orbital structure rendering.
-3. No audio of any kind in the native client/engine.
-4. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
-5. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
+2. No audio of any kind in the native client/engine.
+3. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
+4. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
+- 152/152 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+  `native_orbital_structure`, extended `native_system_view`/`native_system_workspace`),
   144/144 headless CTest baseline, all Python export checks.
 - Sealed export `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`:
   118 files, 48 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false,
@@ -68,6 +68,12 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   unidentified-contact redaction verified).
 - Prior sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`
   (113 files) remains the baseline for the pre-diplomacy slice.
+- Orbital construction presentation (`eb1ab876`): home-system infrastructure markers
+  with leader lines, state colors, progress arcs and reference short labels; active and
+  complete projects draw the same staged primitive geometry as
+  `OrbitalStructureGeometry` via a bounded software rasterizer
+  (`native_orbital_structure`, 160px textures, ≤16-entry cache); markers focus the
+  system inspector with a staged preview and route to the construction workspace.
 - Diplomacy presentation: `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`
   over `DiplomaticStateView` only — unidentified contacts carry no civ id/name/species/
   metrics. Revision+signature stale-command guard covers relationship drift and
