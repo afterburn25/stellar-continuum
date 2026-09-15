@@ -31,6 +31,15 @@ target_include_directories(stellar_engine PUBLIC engine/include)
 target_link_libraries(stellar_engine PUBLIC Threads::Threads)
 if(WIN32)
   target_link_libraries(stellar_engine PRIVATE Ole32)
+  # CPU RGBA image creation and Windows image decoding stay available to both
+  # headless and graphical configurations; only the SDL/Vulkan window renderer
+  # is optional. Engine keeps no Core dependency.
+  add_library(stellar_native_image STATIC engine/src/native_image.cpp)
+  target_include_directories(stellar_native_image PUBLIC engine/include)
+  target_link_libraries(stellar_native_image PRIVATE Ole32 Windowscodecs)
+  if(MSVC)
+    target_compile_options(stellar_native_image PRIVATE /WX)
+  endif()
 endif()
 add_library(stellar_json INTERFACE)
 target_include_directories(stellar_json SYSTEM INTERFACE third_party)

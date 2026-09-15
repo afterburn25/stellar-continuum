@@ -318,15 +318,15 @@ add_executable(stellar_art_tests
   app/native_client/native_startup_workspace.cpp
   native-tests/native_startup_artwork_tests.cpp)
 target_include_directories(stellar_art_tests PRIVATE app/native_client)
-target_link_libraries(stellar_art_tests PRIVATE stellar_core stellar_engine stellar_native_platform)
+target_link_libraries(stellar_art_tests PRIVATE stellar_core stellar_engine stellar_native_image)
 if(MSVC)
   target_compile_options(stellar_art_tests PRIVATE /W4 /WX /permissive-)
 endif()
 add_test(NAME native_startup_artwork COMMAND stellar_art_tests "${CMAKE_SOURCE_DIR}")
 target_sources(stellar_new_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
 target_sources(stellar_startup_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
-target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_platform)
-target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_platform)
+target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_image)
+target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_image)
 
 if(BUILD_TESTING)
   add_executable(stellar_celestial_tests
@@ -335,7 +335,7 @@ if(BUILD_TESTING)
   target_include_directories(stellar_celestial_tests PRIVATE
     app/native_client engine/include)
   target_link_libraries(stellar_celestial_tests PRIVATE
-    stellar_native_platform)
+    stellar_native_image)
   add_test(NAME native_celestial_appearance
     COMMAND stellar_celestial_tests)
   target_sources(stellar_native_system_workspace_tests PRIVATE
@@ -345,11 +345,28 @@ if(BUILD_TESTING)
   target_sources(stellar_settle_ui_tests PRIVATE
     app/native_client/native_celestial_appearance.cpp)
   target_link_libraries(stellar_native_system_workspace_tests PRIVATE
-    stellar_native_platform)
+    stellar_native_image)
   target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE
-    stellar_native_platform)
-  target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_platform)
+    stellar_native_image)
+  target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_image)
   if(MSVC)
     target_compile_options(stellar_celestial_tests PRIVATE /W4 /WX /permissive-)
   endif()
+endif()
+
+
+add_executable(stellar_galaxy_backdrop_tests
+  app/native_client/native_galaxy_backdrop.cpp native-tests/native_galaxy_backdrop_tests.cpp)
+target_include_directories(stellar_galaxy_backdrop_tests PRIVATE app/native_client)
+target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_image)
+add_test(NAME native_galaxy_backdrop COMMAND stellar_galaxy_backdrop_tests "${CMAKE_SOURCE_DIR}")
+
+add_executable(stellar_galaxy_marker_tests
+  app/native_client/native_galaxy_star_markers.cpp native-tests/native_galaxy_star_markers_tests.cpp)
+target_include_directories(stellar_galaxy_marker_tests PRIVATE app/native_client)
+target_link_libraries(stellar_galaxy_marker_tests PRIVATE stellar_native_image)
+add_test(NAME native_galaxy_star_markers COMMAND stellar_galaxy_marker_tests)
+if(MSVC)
+  target_compile_options(stellar_galaxy_backdrop_tests PRIVATE /W4 /WX /permissive-)
+  target_compile_options(stellar_galaxy_marker_tests PRIVATE /W4 /WX /permissive-)
 endif()

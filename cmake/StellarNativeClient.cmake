@@ -3,7 +3,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
-target_link_libraries(stellar_native_platform PRIVATE SDL3::SDL3 Gdi32 User32 Ole32 Windowscodecs)
+target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
+  PRIVATE SDL3::SDL3 Gdi32 User32)
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
   app/native_client/native_research_workspace.cpp app/native_client/native_fleet_controller.cpp
@@ -94,3 +95,10 @@ add_dependencies(stellar-continuum-native stellar_native_startup_art_assets)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_startup_artwork.cpp)
 
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_celestial_appearance.cpp)
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeGalaxyArtAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_galaxy_art_assets)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_galaxy_backdrop.cpp
+  app/native_client/native_galaxy_star_markers.cpp)

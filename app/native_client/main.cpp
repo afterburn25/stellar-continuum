@@ -1,5 +1,6 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
+#include "native_galaxy_star_markers.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -22,6 +23,7 @@
 #include "native_planet_disc_assets.hpp"
 #include "native_ui_layout.hpp"
 #include "native_startup_entry.hpp"
+#include "native_galaxy_backdrop.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
@@ -55,6 +57,7 @@
 namespace {
 using namespace stellar::core;
 using namespace stellar::native_map;
+
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
 using namespace stellar::native_colony;
@@ -69,6 +72,7 @@ using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
 using namespace stellar::native_startup_ui;
+using namespace stellar::native_galaxy_ui;
 
 struct Options {
   std::filesystem::path asset_root;
@@ -93,6 +97,7 @@ struct Options {
   bool surface_smoke{};
   bool surface_reload_smoke{};
   bool new_game_smoke{};
+  bool galaxy_art_smoke{};
   bool save_path_overridden{};
 };
 
@@ -129,6 +134,7 @@ struct Options {
     else if(arg==L"--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_reload_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_reload_smoke=true;result.windowed=true;}
+    else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -153,11 +159,12 @@ struct Options {
     else if(arg=="--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_reload_smoke=true;result.windowed=true;}
     else if(arg=="--surface-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_smoke=true;result.windowed=true;}
     else if(arg=="--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_reload_smoke=true;result.windowed=true;}
+    else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
@@ -221,6 +228,23 @@ struct Options {
   }
   return {210,220,240,230};
 }
+[[nodiscard]] GalaxyStarVisualClass galaxy_star_visual(StellarClass value){
+  switch(value){
+    case StellarClass::MRedDwarf:return GalaxyStarVisualClass::m_red_dwarf;
+    case StellarClass::KOrangeDwarf:return GalaxyStarVisualClass::k_orange_dwarf;
+    case StellarClass::GYellowDwarf:return GalaxyStarVisualClass::g_yellow_dwarf;
+    case StellarClass::FYellowWhiteDwarf:return GalaxyStarVisualClass::f_yellow_white_dwarf;
+    case StellarClass::AWhiteStar:return GalaxyStarVisualClass::a_white_star;
+    case StellarClass::HotBlueStar:return GalaxyStarVisualClass::hot_blue_star;
+    case StellarClass::Giant:return GalaxyStarVisualClass::giant;
+    case StellarClass::WhiteDwarf:return GalaxyStarVisualClass::white_dwarf;
+    case StellarClass::NeutronStar:return GalaxyStarVisualClass::neutron_star;
+    case StellarClass::BlackHole:return GalaxyStarVisualClass::black_hole;
+    case StellarClass::Protostar:return GalaxyStarVisualClass::protostar;
+    case StellarClass::Pulsar:return GalaxyStarVisualClass::pulsar;
+  }
+  return GalaxyStarVisualClass::unknown;
+}
 [[nodiscard]] std::string spectral_name(std::optional<StellarClass> value){
   if(!value)return "Unclassified";
   switch(*value){case StellarClass::MRedDwarf:return "M red dwarf";case StellarClass::KOrangeDwarf:return "K orange dwarf";case StellarClass::GYellowDwarf:return "G yellow dwarf";case StellarClass::FYellowWhiteDwarf:return "F yellow-white dwarf";case StellarClass::AWhiteStar:return "A white star";case StellarClass::HotBlueStar:return "Hot blue star";case StellarClass::Giant:return "Giant";case StellarClass::WhiteDwarf:return "White dwarf";case StellarClass::NeutronStar:return "Neutron star";case StellarClass::BlackHole:return "Black hole";case StellarClass::Protostar:return "Protostar";case StellarClass::Pulsar:return "Pulsar";} return "Unclassified";
@@ -253,6 +277,14 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
     research_root,options.save_path,STELLAR_GAME_VERSION);
 }
 
+struct GalaxyArtSceneEvidence {
+  GalaxyBackdropRenderStats backdrop;
+  std::size_t catalog_markers{};
+  std::size_t known_markers{};
+  std::size_t unknown_markers{};
+  std::size_t revealed_unknown_labels{};
+};
+
 struct ResearchStamp {
   std::uint64_t campaign_generation{};
   std::int64_t research_revision{};
@@ -269,14 +301,96 @@ class NativeCampaign final {
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,int width,int height,
                  const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer)
       : session_(std::move(session)),
+        galaxy_assets_(std::filesystem::absolute(asset_root)),
+        galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
     refresh_knowledge();
     fit_camera(width,height);
+    bind_galaxy_backdrop(width,height);
     refresh_fleets(true);
   }
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  void prepare_galaxy_art_smoke(int width,int height,bool reload){
+    smoke_galaxy_mode_=true;smoke_galaxy_reload_=reload;
+    smoke_galaxy_day_=session_->frame().clock().simulation_days();
+    const auto click_pause=[&]{const auto layout=NativeUiLayout::for_viewport(width,height);const auto point=center(layout.pause);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke pause input closed the campaign.");};
+    if(session_->frame().clock().speed()==StrategicSpeed::Paused)click_pause();
+    click_pause();
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke did not pause through player input.");
+    smoke_galaxy_paused_=true;fit_camera(width,height);smoke_galaxy_fitted_scale_=camera_.pixels_per_world;
+  }
+  [[nodiscard]] GalaxyArtSceneEvidence galaxy_scene_evidence(int width,int height){
+    GalaxyArtSceneEvidence evidence;
+    galaxy_backdrop_.clear_render_stats();
+    const auto draw=scene(width,height);
+    evidence.backdrop=galaxy_backdrop_.last_render_stats();
+    const auto &world=session_->frame().runtime().world().campaign();
+    if(!system_workspace_.visible())
+      for(const auto &system:world.systems){
+        const auto p=camera_.project({system.position.x,system.position.y},width,height);
+        if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;
+        const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;
+        ++evidence.catalog_markers;
+        if(known)++evidence.known_markers;else ++evidence.unknown_markers;
+        if(selected&&!known)++evidence.revealed_unknown_labels;
+      }
+    return evidence;
+  }
+  void capture_galaxy_overview(int width,int height){smoke_galaxy_overview_=galaxy_scene_evidence(width,height);}
+  void prepare_galaxy_regional(int width,int height){
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto sol=std::ranges::find_if(world.systems,[](const auto &system){return system.name=="Sol";});
+    if(sol==world.systems.end())throw std::runtime_error("Galaxy artwork smoke could not locate Sol in the catalog.");
+    const auto sol_anchor=camera_.project({sol->position.x,sol->position.y},width,height);
+    const auto before=camera_.unproject(sol_anchor,width,height);
+    for(int wheel=0;wheel<12;++wheel){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=sol_anchor;input.events={{InputEventType::Wheel,sol_anchor,{},1.f}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke wheel input closed the campaign.");}
+    const auto after=camera_.unproject(sol_anchor,width,height);
+    if(std::hypot(after.x-before.x,after.y-before.y)>1e-9)throw std::runtime_error("Galaxy artwork smoke wheel zoom moved the world anchor beneath the pointer.");
+    if(camera_.pixels_per_world<smoke_galaxy_fitted_scale_*5.)throw std::runtime_error("Galaxy artwork smoke did not reach regional magnification.");
+    smoke_galaxy_regional_scale_=camera_.pixels_per_world;smoke_galaxy_wheel_input_=true;
+  }
+  void capture_galaxy_regional(int width,int height){smoke_galaxy_regional_=galaxy_scene_evidence(width,height);}
+  void prepare_galaxy_system(int width,int height){
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto sol=std::ranges::find_if(world.systems,[](const auto &system){return system.name=="Sol";});
+    if(sol==world.systems.end())throw std::runtime_error("Galaxy artwork smoke could not locate Sol in the catalog.");
+    const auto anchor=camera_.project({sol->position.x,sol->position.y},width,height);
+    InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=anchor;input.events={{InputEventType::LeftPressed,anchor,{},0,{},2},{InputEventType::LeftReleased,anchor}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke system entry input closed the campaign.");
+    if(!system_workspace_.visible())throw std::runtime_error("Galaxy artwork smoke double click did not open the observed system.");
+    smoke_galaxy_system_entry_=true;
+  }
+  void capture_galaxy_system(int width,int height){smoke_galaxy_system_=galaxy_scene_evidence(width,height);}
+  [[nodiscard]] std::string galaxy_art_smoke_status()const{
+    const auto view=[&](const GalaxyArtSceneEvidence &evidence,bool system){
+      std::ostringstream out;
+      out<<"{\"deep_field\":"<<evidence.backdrop.deep_field_images
+         <<",\"galaxy_layer\":"<<evidence.backdrop.galaxy_layer_images
+         <<",\"regional_nebula\":"<<evidence.backdrop.regional_nebula_images
+         <<",\"regional_points\":"<<evidence.backdrop.regional_points
+         <<",\"undisclosed_core_fog\":"<<evidence.backdrop.undisclosed_core_fog_images
+         <<",\"background_images\":"<<(system?evidence.backdrop.deep_field_images+evidence.backdrop.galaxy_layer_images+evidence.backdrop.regional_nebula_images+evidence.backdrop.undisclosed_core_fog_images:0)
+         <<",\"catalog_markers\":"<<evidence.catalog_markers
+         <<",\"known_markers\":"<<evidence.known_markers
+         <<",\"unknown_markers\":"<<evidence.unknown_markers
+         <<",\"revealed_unknown_labels\":"<<evidence.revealed_unknown_labels<<"}";
+      return out.str();
+    };
+    std::ostringstream out;
+    out<<"{\"mode\":"<<json_string(smoke_galaxy_reload_?"paused_reload":"fresh")
+       <<",\"wheel_input\":"<<(smoke_galaxy_wheel_input_?"true":"false")
+       <<",\"system_entry\":"<<(smoke_galaxy_system_entry_?"true":"false")
+       <<",\"paused\":"<<((smoke_galaxy_paused_&&session_->frame().clock().speed()==StrategicSpeed::Paused)?"true":"false")
+       <<",\"day_unchanged\":"<<((session_->frame().clock().simulation_days()==smoke_galaxy_day_)?"true":"false")
+       <<",\"fitted_scale\":"<<smoke_galaxy_fitted_scale_
+       <<",\"regional_scale\":"<<smoke_galaxy_regional_scale_
+       <<",\"decoded_sources\":"<<galaxy_assets_.decoded_count()
+       <<",\"overview\":"<<view(smoke_galaxy_overview_,false)
+       <<",\"regional\":"<<view(smoke_galaxy_regional_,false)
+       <<",\"system\":"<<view(smoke_galaxy_system_,true)<<"}";
+    return out.str();
+  }
   void prepare_system_smoke(int width,int height){
     session_->frame().clock().set_speed(StrategicSpeed::Paused);
     smoke_system_day_=session_->frame().clock().simulation_days();
@@ -844,6 +958,8 @@ class NativeCampaign final {
       selected_id_.reset();
       pre_menu_speed_=StrategicSpeed::Normal;
       fit_camera(width,height);
+      galaxy_backdrop_.discard_campaign();
+      bind_galaxy_backdrop(width,height);
       refresh_knowledge();
       research_workspace_.discard_campaign();
       projected_research_stamp_.reset();
@@ -1032,10 +1148,12 @@ class NativeCampaign final {
 
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
-    DrawList out; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
+    DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
+    galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
-    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-12||p.y<-12||p.x>width+12||p.y>height+12)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;const auto c=known?spectral_color(system.primary):Color{135,150,174,190};out.circles.push_back({p,selected?7.f:3.4f,{c.r,c.g,c.b,45}});out.circles.push_back({p,selected?4.2f:2.f,c});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    galaxy_marker_begin=out.world.size();
+    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
     if(const auto &preview=fleet_workspace_.preview();preview){
       for(std::size_t index=1;index<preview->route_system_ids.size();++index){
         if(!known_.contains(preview->route_system_ids[index-1])||
@@ -1132,6 +1250,8 @@ class NativeCampaign final {
     }
     if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height));
+    if(galaxy_marker_begin)
+      promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
     research_workspace_.render(out, width, height);
     shipyard_workspace_.render(out, width, height);
     construction_workspace_.render(out, width, height);
@@ -1555,14 +1675,16 @@ class NativeCampaign final {
     }
   }
 
-  void fit_camera(int width,int height){const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);}
+  void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
-  void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());}
+  void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
+  void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;}
   std::unique_ptr<NativeCampaignSession> session_;
   Camera camera_;
+  NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
   NativeResearchController research_controller_;
@@ -1582,6 +1704,9 @@ class NativeCampaign final {
   std::optional<NativeColonyView> colony_entry_view_;
   NativeSystemViewController system_controller_;
   NativeSystemTravelController system_travel_controller_;
+  NativeGalaxyBackdropAssets galaxy_assets_;
+  NativeGalaxyBackdrop galaxy_backdrop_;
+  double fitted_pixels_per_world_{.01};
   NativePlanetDiscAssets planet_discs_;
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
@@ -1625,6 +1750,9 @@ class NativeCampaign final {
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
+  double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
+  GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};
 };
 }
 
@@ -1690,6 +1818,9 @@ int main(int argc,char **argv){
       else if(options.surface_smoke||options.surface_reload_smoke)
         campaign.prepare_surface_smoke(window.drawable_width(),
                                        window.drawable_height(),options.surface_reload_smoke);
+      else if(options.galaxy_art_smoke)
+        campaign.prepare_galaxy_art_smoke(window.drawable_width(),
+                                          window.drawable_height(),options.load);
       else
         campaign.prepare_smoke_ui();
     }
@@ -1716,12 +1847,23 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
-      const bool capture=options.smoke_screenshot&&frames>=120;
-      window.draw(campaign.scene(input.drawable_width,input.drawable_height),
-                  capture?options.smoke_screenshot:std::nullopt);
+      std::optional<std::filesystem::path> screenshot;
+      if(options.smoke_screenshot){
+        if(!options.galaxy_art_smoke){if(frames>=120)screenshot=options.smoke_screenshot;}
+        else if(frames==120)screenshot=options.smoke_screenshot;
+        else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
+        else if(frames==122)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
+      }
+      window.draw(campaign.scene(input.drawable_width,input.drawable_height),screenshot);
+      if(options.galaxy_art_smoke){
+        if(frames==120){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
+        else if(frames==121){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
+        else if(frames==122)campaign.capture_galaxy_system(input.drawable_width,input.drawable_height);
+      }
+      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:frames>=120);
       if(capture){
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
@@ -1755,6 +1897,8 @@ int main(int argc,char **argv){
           std::cout<<" settlement="<<campaign.settlement_smoke_status();
         if(options.surface_smoke||options.surface_reload_smoke)
           std::cout<<" surface="<<campaign.surface_smoke_status();
+        if(options.galaxy_art_smoke)
+          std::cout<<" galaxy_art="<<campaign.galaxy_art_smoke_status();
         if(options.new_game_smoke){
           std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")
