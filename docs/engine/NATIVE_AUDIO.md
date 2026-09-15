@@ -65,6 +65,34 @@ CI explicitly builds and runs both audio test targets with SDL's dummy output,
 independent of the headless export build. Twelve exporter integrity tests pass;
 17 unrelated headless runtime tests were skipped without their opt-in binary.
 
-Remaining work includes native audio settings persistence and UI, the
-UK-female scientist voice path, complete event wiring, and playback-device
-loss/recovery.
+Remaining work includes the UK-female scientist voice path, complete event
+wiring, and playback-device loss/recovery.
+
+## Volume settings
+
+The startup and pause menus expose Settings, currently containing Master, Music,
+Effects, mute, Defaults, Cancel and Save. Slider changes are a live preview.
+Cancel or Escape restores the last saved preferences. Mute sets the effective
+master gain to zero while retaining the chosen sliders. Save atomically writes
+`%LOCALAPPDATA%/Stellar Continuum/NativePreview/audio-settings.json`; preferences
+apply at construction before the menu starts the score. They are separate from
+Player17 and survive campaign changes. Invalid or inaccessible settings fall
+back to defaults with a visible notice and one full path/cause diagnostic.
+
+The exact version-1 schema is `schemaVersion`, `master`, `music`, `effects`, and
+`muted`. Reads are bounded to 4 KiB, gains must be finite numbers from 0 through
+1, mute is boolean, and duplicate/unknown fields are rejected. Corrupt input is
+preserved until the player explicitly saves. Failed writes leave the overlay
+open and retain the previously saved preferences.
+
+For local hardware validation, call `validate_native_new_game_export` with both
+`audio_check=True` and `audio_settings_check=True`. These options stay off for
+ordinary export smoke runs. The latter adds `--audio-settings-check` to the two
+maintained native launches and isolates preferences beside the temporary save
+anchor. It requires complete menu-input evidence, 720p/1080p screenshots,
+25%/50%/75% persistence across processes, unchanged settings bytes on reload and
+full Player17 equality. Missing or malformed evidence fails validation. Six
+focused CTests and 97 Python tests pass; the actual Vulkan startup/reload pair
+passed again after the final text contrast correction. Windows CI runs the
+settings CTest alongside the two audio tests with dummy output; it does not
+claim hardware playback or speaker verification.

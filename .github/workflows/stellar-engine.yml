@@ -117,10 +117,11 @@ jobs:
           env = stellar.build_environment()
           stellar.run(['cmake', '--preset', 'windows-native-preview'], env=env)
           stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4',
-                       '--target', 'stellar_native_audio_tests', 'stellar_native_audio_director_tests'],
+                       '--target', 'stellar_native_audio_tests', 'stellar_native_audio_director_tests',
+                       'stellar_native_audio_settings_tests'],
                       env=env, timeout=600)
           stellar.run(['ctest', '--preset', 'windows-native-preview', '-R',
-                       '^(native_audio|native_audio_director)$', '--output-on-failure'], env=env)
+                       '^(native_audio|native_audio_director|native_audio_settings)$', '--output-on-failure'], env=env)
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report

@@ -16,7 +16,7 @@ namespace stellar::native_startup_ui {
 enum class StartupScreen { Entry, Setup, LoadSlots, Busy, Failure };
 enum class StartupOperationOrigin { NewCampaign, SavedCampaign };
 enum class StartupIntentKind {
-  None, OpenSetup, OpenLoad, Back, Exit, Create, LoadSelected, CancelOperation
+  None, OpenSetup, OpenLoad, OpenSettings, Back, Exit, Create, LoadSelected, CancelOperation
 };
 struct StartupIntent {
   StartupIntentKind kind{StartupIntentKind::None};
@@ -29,7 +29,7 @@ struct StartupLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, title, subtitle, new_campaign,
-      load_campaign, exit, list, back, primary, status;
+      load_campaign, exit, list, back, primary, status, settings;
   [[nodiscard]] static StartupLayout for_viewport(int width,
                                                    int height) noexcept;
 };

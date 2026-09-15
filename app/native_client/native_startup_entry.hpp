@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
   std::function<void()> service, menu_ready, confirm;
@@ -23,11 +24,13 @@ struct StartupEntryConfig {
   std::function<std::string()> utc_timestamp;
   std::chrono::milliseconds minimum_boot_artwork{std::chrono::seconds(7)};
   StartupAudioHooks audio;
+  stellar::native_audio::NativeAudioSettings* audio_settings{};
 };
 struct StartupEntryAutomation {
   std::string seed_text, species_id;
   int system_count{};
   std::filesystem::path setup_screenshot, loading_screenshot;
+  std::filesystem::path audio_settings_path, audio_settings_screenshot;
 };
 struct StartupEntryEvidence {
   bool entry_opened{}, setup_opened{}, species_selected{}, size_selected{},

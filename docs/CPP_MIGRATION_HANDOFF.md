@@ -6,7 +6,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `06b2b802`, with diplomacy presentation at `410753da` integrated here as `c9338699`. Combined focused and graphical validation passed; the candidate remains under review.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `7a04c0bc`. Its newer portrait resolution, bounded cache and asset declarations are already covered by this branch; audit found no missing code to duplicate. Diplomacy presentation at `410753da` was integrated here as `c9338699`. The candidate remains under review.
 - `cpp/codex-native-architecture-integration` — Codex architecture/integration branch, based on `ac45d958`. Carries Devin's existing coordination documents forward; changes go through a PR to the shared migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
@@ -383,7 +383,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   Startup waits for staging or a reported audio failure, stays silent during
   boot, then starts music once at menu admission. Campaign entry does not restart
   it. Startup actions and campaign navigation confirm with the existing cue.
-  Hover/event APIs exist; settings, voice and full event hooks are still pending.
+  Hover/event APIs exist; voice and full event hooks are still pending. Settings landed in the following checkpoint.
 - Exact-hash CMake/export manifests package only seven clips and their credits.
   Credits use pinned CRLF bytes; both Git checkout modes pass. Application-only
   MFPlat/MFReadWrite imports are reviewed without broadening SDL's allowlist.
@@ -405,8 +405,47 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   it does not need a GPU or sound device. Hardware-backed runtime evidence is local.
   The relocated folder is a local validation fixture, not a sealed release.
   See `docs/engine/NATIVE_AUDIO.md` for limits and remaining work.
-- Previous exact head `a56351f8` passed native CI `34960835811`; the audio
-  checkpoint requires its own run. PR #332 remains unmerged.
+- Audio foundation head `6e44bb40` passed native CI `34968941076`, including
+  the dedicated GPU-independent audio checks. PR #332 remains unmerged.
+
+## Native audio settings checkpoint (2026-09-15, candidate)
+
+- Main-menu Settings and pause-menu Settings open the same owner-thread overlay.
+  Master/Music/Effects sliders preview immediately; mute retains those levels,
+  Defaults previews the original levels, Cancel/Escape restores the last saved
+  preferences, and Save persists explicitly. Escape closes only this overlay;
+  campaign time and the parent pause menu stay paused. Controls use drawable
+  coordinates and resize/focus loss cancels a captured slider drag.
+- Settings are independent of Player17: normal play uses Windows LocalAppData
+  `Stellar Continuum/NativePreview/audio-settings.json`; all smoke invocations
+  isolate that file beside their explicitly supplied save anchor. Loaded levels
+  apply before music starts. No campaign payload, simulation or C# source changes.
+- The version-1 JSON has five exact fields, a 4 KiB bounded read, finite 0–1
+  gains, strict types, duplicate rejection and Engine atomic writes. Corrupt
+  preferences retain their original bytes until explicit Save; the game uses
+  defaults with a short visible explanation and a full path/cause on stderr.
+  Save failure keeps the panel open. Playback failure also appears in the panel.
+- Six focused CTests pass: audio backend/director/settings, startup workspace,
+  responsive menu layout and campaign session. Settings tests pass twice in
+  independent scratch children. All 97 related Python tests pass. Windows CI
+  now also builds/runs `native_audio_settings` without requiring a GPU/device.
+- Maintained opt-in `--audio-check --audio-settings-check` exercises actual menu
+  routing, previews 25%/50%/75%, toggles mute, verifies Cancel, saves and reopens.
+  Final relocated Vulkan runs pass at startup 720p and paused reload 1080p, with
+  inspected screenshots, restricted PATH and Unicode temporary paths. Reload
+  starts at the saved levels, retains byte-identical settings, and preserves the
+  entire paused Player17 payload except SavedAtUtc. The original anchor is intact.
+  Unsupported CLI use exits 1 with a useful message before opening a window.
+- Final evidence: `native-audio-settings-final-build.log` (six CTests),
+  `native-audio-settings-tests.log` (repeatability), `native-audio-settings-python.log`
+  (97 tests), `native-audio-settings-runtime.log`, and
+  `work/native-audio-settings-evidence.json`. Screenshots are under
+  `work/native-audio-validation/package-*-audio-settings.bmp`. This is local
+  validation, not a sealed release or proof of speaker/voice quality.
+- The preceding audio foundation has green CI at `6e44bb40`; this new settings
+  checkpoint needs its own run. Engine remains 0.1.58 candidate, game remains
+  0.1.7-alpha, and `graphicalParity=false`. Keep work on the Codex branch; do not
+  merge shared branches or duplicate the audited Devin changes.
 
 ## Remaining blockers / next work
 
@@ -419,8 +458,8 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   larger fleet/combat workloads, not repeated unchanged maps or speculative
   renderer settings. Keep Core access and GPU/window work on the owner thread.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
-- Native audio settings/voice and full event wiring; the playback foundation,
-  main score and navigation confirmation are now integrated on this candidate.
+- Native scientist/character voice and full event wiring; playback, main score,
+  navigation confirmation and persisted audio settings are now integrated.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
 

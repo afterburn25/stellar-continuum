@@ -38,10 +38,11 @@ void verify(int width, int height, float expected_scale) {
   const auto layout = NativeUiLayout::for_viewport(width, height);
   const UiRect viewport{0, 0, static_cast<float>(width),
                        static_cast<float>(height)};
-  const std::array<std::pair<UiRect, UiAction>, 4> menu{{
+  const std::array<std::pair<UiRect, UiAction>, 5> menu{{
       {layout.continue_button, UiAction::Continue},
       {layout.save_button, UiAction::Save},
       {layout.load_button, UiAction::Load},
+      {layout.settings_button, UiAction::Settings},
       {layout.exit_button, UiAction::Exit},
   }};
 

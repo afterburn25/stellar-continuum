@@ -1,4 +1,6 @@
 #include "native_startup_entry.hpp"
+#include "native_audio_settings.hpp"
+#include "native_audio_settings_smoke.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -107,6 +109,9 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (intent.kind != StartupIntentKind::None && config.audio.confirm)
       config.audio.confirm();
     switch (intent.kind) {
+    case StartupIntentKind::OpenSettings:
+      if (config.audio_settings) config.audio_settings->open();
+      break;
     case StartupIntentKind::OpenLoad:
       workspace.set_slots(host.slots());
       break;
@@ -144,6 +149,19 @@ StartupEntryResult run_native_startup_entry(Window &window,
     const int width = window.drawable_width(), height = window.drawable_height();
     evidence.entry_opened = workspace.screen() == StartupScreen::Entry;
     const auto entry_layout = StartupLayout::for_viewport(width, height);
+    if (!automation->audio_settings_screenshot.empty()) {
+      if (!config.audio_settings) throw std::runtime_error("Audio settings validation requires the real overlay.");
+      stellar::native_audio::check_audio_settings(*config.audio_settings,
+          automation->audio_settings_path, width, height, "startup",
+          [&] { dispatch(workspace.handle({InputEventType::LeftPressed, center(entry_layout.settings)}, width, height, measure)); },
+          [&](const InputEvent& event) { (void)config.audio_settings->handle(event, width, height); },
+          [&] {
+            DrawList draw;
+            workspace.render(draw, width, height, measure, &portrait_provider, &artwork_provider);
+            config.audio_settings->render(draw, width, height);
+            window.draw(draw, automation->audio_settings_screenshot);
+          });
+    }
     auto intent = workspace.handle(
         {InputEventType::LeftPressed, center(entry_layout.new_campaign)}, width,
         height, measure);
@@ -210,14 +228,20 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (input.quit_requested) return {{}, true};
     if (!input.renderable()) {
       for (const auto &event : input.events)
-        (void)workspace.handle(event, input.drawable_width,
-                               input.drawable_height, measure);
+        if (config.audio_settings && config.audio_settings->visible())
+          (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
+        else (void)workspace.handle(event, input.drawable_width,
+                                    input.drawable_height, measure);
       window.set_text_input(workspace.wants_text_input());
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
     }
     bool exit{};
     for (const auto &event : input.events) {
+      if (config.audio_settings && config.audio_settings->visible()) {
+        (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
+        continue;
+      }
       const auto intent = workspace.handle(event, input.drawable_width,
                                            input.drawable_height, measure);
       switch (intent.kind) {
@@ -255,6 +279,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
     DrawList draw;
     workspace.render(draw, input.drawable_width, input.drawable_height, measure,
                      &portrait_provider, &artwork_provider);
+    if (config.audio_settings)
+      config.audio_settings->render(draw, input.drawable_width, input.drawable_height);
     window.draw(draw);
   }
 }

@@ -1,5 +1,6 @@
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudio.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioSettings.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
@@ -20,7 +21,7 @@ target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
-target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
 add_dependencies(stellar-continuum-native stellar_native_audio_assets)
 add_custom_command(TARGET stellar-continuum-native POST_BUILD
