@@ -57,6 +57,20 @@ if(BUILD_TESTING)
   if(MSVC)
     target_compile_options(stellar_native_audio_tests PRIVATE /WX)
   endif()
+  add_executable(stellar_native_voice_tests
+    native-tests/native_voice_tests.cpp
+    app/native_client/native_voice.cpp
+    app/native_client/native_voice_playback.cpp
+    app/native_client/native_audio.cpp)
+  target_include_directories(stellar_native_voice_tests PRIVATE
+    app/native_client engine/include third_party)
+  target_link_libraries(stellar_native_voice_tests PRIVATE stellar_core)
+  add_test(NAME native_voice COMMAND stellar_native_voice_tests
+    "${CMAKE_BINARY_DIR}/native-voice-cases")
+  set_tests_properties(native_voice PROPERTIES TIMEOUT 60)
+  if(MSVC)
+    target_compile_options(stellar_native_voice_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_campaign_session_tests
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
     app/native_client/native_notifications.cpp)
@@ -132,10 +146,16 @@ target_sources(stellar-continuum-native PRIVATE
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_audio_assets)
+include("${CMAKE_CURRENT_LIST_DIR}/NativeVoiceAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_voice_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio.cpp
   app/native_client/native_audio_device.cpp
   app/native_client/native_audio_settings.cpp
   app/native_client/native_notifications.cpp
-  app/native_client/native_support.cpp)
+  app/native_client/native_support.cpp
+  app/native_client/native_voice.cpp
+  app/native_client/native_voice_bridge.cpp
+  app/native_client/native_voice_playback.cpp
+  app/native_client/native_voice_sapi.cpp)
 target_include_directories(stellar-continuum-native PRIVATE third_party)

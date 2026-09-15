@@ -40,10 +40,10 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (18+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces + recent-events notification feed done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
-| Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
+| Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) + dedicated dialogue voice with live ducking done |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction`, `native_support` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save, T/R/C/B candidates, N mid-session new campaign, F8 support bundle) done; menu NEW GAME row wired to the startup sandbox |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
-| Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
+| Voice | Main.Voice*, CharacterVoiceResolver | `native_voice*` + Windows SAPI | OK | `native_voice` CTest + `--audio-smoke` voice fields | PARTIAL | Catalogue/profiles/roles, observer-safe router, queue/dedupe/cooldown/interrupt playback, SAPI 5 synthesis, WAV cache, captions, gameplay bridge done; voice settings window and offline-neural backend remain |
 | Packaging | export tooling | `tools/stellar-export`, `export/*.json`, `cmake/Native*` | OK | sealed export validators | PARITY VERIFIED | No Godot/.NET/compiler at runtime |
 
 ## What blocks "fully playable native"
@@ -51,8 +51,9 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 1. Surface scene renders hub/buildings/roads/ghosts as rasterized sprites, but
    the reference's free camera orbit, terrain relief and settlement overlays
    remain (workspace is a fixed top-down construction view).
-2. Voice-duck integration is not wired (mixer, playback, event routing,
-   settings UI, and persisted volumes are implemented).
+2. Voice playback is wired end to end (catalogue → router → playback → mixer
+   dialogue voice → captions) over the Windows SAPI 5 backend; the reference's
+   offline-neural backend and the dedicated voice-settings window remain.
 3. Frame pacing is present-bound on the measurement host: smoke now reports
    `cpu_mean/p95` (update+scene build ≈ 2.3 ms mean / 0.14 ms p95) separately
    from `draw_mean/p95` (≈ 18.9 ms — the vsync interval of the ~53 Hz Meta
@@ -62,10 +63,10 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 158/158 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+- 159/159 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
   `native_orbital_structure`, `native_surface_scene`, `native_audio`,
   `native_audio_settings`, `native_battle_workspace`, `native_notifications`,
-  `native_support`,
+  `native_support`, `native_voice`,
   extended `native_system_view`/`native_system_workspace`/`native_surface_workspace`/
   `native_ui_layout`),
   144/144 headless CTest baseline, all Python export checks.
@@ -113,7 +114,25 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   the path through the status line. `--audio-smoke` exercises both entry
   points (`support=1`); the audio validator requires the flag and opens the
   bundle with a real ZIP reader. `native_support` tests verify CRC32s,
-  central-directory structure and entry contents.
+  central-directory structure and entry contents. The smoke now lands the
+  save before exporting so every bundle is a three-entry ZIP.
+- Voice (`native_voice*`): ports the reference voice presentation layer —
+  `NativeVoiceProfileRegistry`/`NativeCharacterVoiceResolver` load the
+  reviewed `Data/voice_profiles/{events,human,roles}.json` catalogue (SHA-256
+  gated by `export/native-voice-assets.json` + `cmake/NativeVoiceAssets.cmake`),
+  `NativeVoiceRouter` ports `VoiceEventRouter` (authorization, dedupe, once,
+  cooldown, frequency gate, deterministic variant selection, template render),
+  `NativeVoicePlayback` ports `VoicePlaybackController` (8-deep queue,
+  2-per-category, priority interrupts, 15 s dedupe, 40 s expiry, subtitle
+  fallback), and `NativeGameplayVoiceBridge` ports `GameplayVoiceEventBridge`
+  observing only player-authorized frame results. Windows SAPI 5 synthesis
+  runs on a dedicated STA worker at 22.05 kHz 16-bit mono into a hashed WAV
+  cache; decoded lines play through the mixer's dedicated dialogue voice with
+  live ducking, and captions render bottom-center (hidden while the menu or
+  relations workspace is open). `--audio-smoke` reports `voice_pipeline`,
+  `voice_backend` and `voice_lines` evidence. `native_voice` tests cover the
+  router, resolver, queue semantics, cache validation and subtitle fallback
+  with a fake backend.
 - Tactical battle presentation (`357872e8`): `native_battle_workspace` ports the
   reference `MassiveCombatView` — full-screen observer-filtered formation tokens
   (bounded 4096-token pool, zoom-dependent sampling), selection + box-select +

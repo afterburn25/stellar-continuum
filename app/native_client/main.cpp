@@ -31,6 +31,9 @@
 #include "native_fleet_route_effects.hpp"
 #include "native_ship_art_assets.hpp"
 #include "native_ui_layout.hpp"
+#include "native_voice.hpp"
+#include "native_voice_bridge.hpp"
+#include "native_voice_playback.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
 #include "native_territory_overlay.hpp"
@@ -89,6 +92,7 @@ namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_notifications = stellar::native_notifications;
 namespace native_support = stellar::native_support;
+namespace native_voice = stellar::native_voice;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
@@ -355,12 +359,54 @@ class NativeCampaign final {
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
     if(audio_mixer_.load_assets(asset_root_))audio_device_.open(audio_mixer_);
     audio_mixer_.complete_startup_loading();
+    initialize_voice();
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
     refresh_fleets(true);
   }
 
+  // Loads the reviewed voice catalogue from Data/voice_profiles, binds the
+  // router → playback → mixer dialogue chain, and seeds the event bridge.
+  // Missing or malformed voice data disables voice without failing the
+  // campaign, matching the reference's backend-unavailable fallback.
+  void initialize_voice(){
+    const auto voice_dir=asset_root_/"Data/voice_profiles";
+    const auto user_dir=session_->save_path().parent_path();
+    try{
+      if(!std::filesystem::is_regular_file(voice_dir/"events.json")||
+         !std::filesystem::is_regular_file(voice_dir/"human.json")||
+         !std::filesystem::is_regular_file(voice_dir/"roles.json"))
+        return;
+      voice_profiles_=native_voice::NativeVoiceProfileRegistry::load(voice_dir/"human.json");
+      voice_resolver_.emplace(native_voice::NativeCharacterVoiceResolver::load(&voice_profiles_,voice_dir/"roles.json"));
+      voice_router_.emplace(native_voice::NativeVoiceRouter::from_file(voice_dir/"events.json",
+        [this](native_voice::NativeSpeechRequest request){
+          if(voice_playback_)voice_playback_->speak(std::move(request));
+        },&*voice_resolver_));
+      voice_settings_=native_voice::NativeVoiceSettings::load(user_dir/"voice-settings.json");
+      voice_cache_.emplace(user_dir/"voice-cache");
+      voice_playback_.emplace(voice_settings_,&voice_profiles_,&*voice_resolver_,&*voice_cache_);
+      voice_playback_->attach_backend(native_voice::create_offline_speech_backend());
+      voice_playback_->bind(
+        [](const std::filesystem::path &path){
+          auto decoded=native_audio::decode_audio_file(path);
+          if(!decoded)return native_voice::NativeVoicePlayback::Stream{};
+          return native_voice::NativeVoicePlayback::Stream(
+            std::make_shared<native_audio::PcmData>(std::move(*decoded)));
+        },
+        [this](native_voice::NativeVoicePlayback::Stream stream,double){
+          audio_mixer_.play_dialogue(std::move(stream));
+        },
+        [this]{audio_mixer_.stop_dialogue();});
+      audio_mixer_.set_dialogue_volume(voice_settings_.volume);
+      voice_bridge_.emplace(*voice_router_);
+      voice_bridge_->reset(session_->frame().runtime());
+    }catch(...){
+      voice_bridge_.reset();voice_playback_.reset();voice_cache_.reset();
+      voice_router_.reset();voice_resolver_.reset();
+    }
+  }
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
   // F8 / SUPPORT BUNDLE parity with the reference UiExportDiagnostics: a
   // store-format ZIP of the session log, system info and campaign save.
@@ -1229,6 +1275,12 @@ class NativeCampaign final {
         throw std::runtime_error("Audio smoke input closed the campaign.");
     };
     const auto layout=NativeUiLayout::for_viewport(width,height);
+    // Land a strategic frame then a save before any bundle export so each ZIP
+    // carries all three entries (log, system info, campaign save).
+    InputSnapshot ready;ready.drawable_width=width;ready.drawable_height=height;
+    if(!update(ready,width,height,0.,true))
+      throw std::runtime_error("Audio smoke readiness frame closed the campaign.");
+    session_->request_save();
     click(center(layout.audio_button));
     if(!audio_settings_.visible())
       throw std::runtime_error("Audio smoke could not open the settings view.");
@@ -1298,7 +1350,12 @@ class NativeCampaign final {
        <<",\"master\":"<<settings.master<<",\"music_gain\":"<<settings.music
        <<",\"sfx_gain\":"<<settings.sfx
        <<",\"settings\":"<<smoke_audio_settings_
-       <<",\"support\":"<<smoke_audio_support_<<"}";
+       <<",\"support\":"<<smoke_audio_support_
+       <<",\"voice_pipeline\":"<<(voice_playback_?1:0)
+       <<",\"voice_backend\":"
+       <<json_string(voice_playback_?voice_playback_->backend_status():"none")
+       <<",\"voice_lines\":"<<(voice_playback_?voice_playback_->played_lines()+voice_playback_->subtitle_lines():0)
+       <<"}";
     return out.str();
   }
   void prepare_construction_smoke(int width,int height){
@@ -1517,6 +1574,8 @@ class NativeCampaign final {
       system_workspace_.discard_campaign();
       planet_discs_.discard_campaign();
       fleet_marker_offsets_.clear();
+      if(voice_playback_)voice_playback_->reset_campaign();
+      if(voice_bridge_)voice_bridge_->reset(session_->frame().runtime());
       pending_fleet_preview_.reset();
       refresh_fleets(true);
       if(research_workspace_.visible())refresh_research(true);
@@ -1784,7 +1843,21 @@ class NativeCampaign final {
       system_refresh_elapsed_+=elapsed;
       refresh_system(false);
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
+      if(voice_bridge_)
+        voice_bridge_->observe(frame_result,session_->frame().runtime(),
+                               session_->frame().clock().simulation_days(),
+                               voice_settings_.effective_frequency());
       if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
+    }
+    // The opening line fires once per campaign once the menu is closed
+    // (reference Main.Voice.cs TryEmitOpening).
+    if(!menu_&&voice_bridge_)
+      voice_bridge_->observe_opening(session_->frame().runtime(),
+                                     session_->frame().clock().simulation_days(),
+                                     voice_settings_.effective_frequency());
+    if(voice_playback_){
+      voice_playback_->update(elapsed);
+      audio_mixer_.set_voice_ducking(voice_playback_->ducking());
     }
     // Reference RefreshNotifications: each newly published item plays its
     // category event sound.
@@ -1949,6 +2022,29 @@ class NativeCampaign final {
     if(!menu_)
       notification_view_.render(out,session_->notifications().items(),width,
                               height);
+    // Voice captions (reference VoiceCaptionDock): hidden while the menu or
+    // diplomacy surface is open.
+    if(voice_playback_&&voice_playback_->has_active_subtitle()&&!menu_&&
+       !diplomacy_workspace_.visible()){
+      const auto &voice=voice_playback_->settings();
+      const auto scale=std::min(width/1280.f,height/720.f);
+      const auto pixels=static_cast<int>(voice.subtitle_size*scale);
+      const auto bar_width=std::min(720.f*scale,width-96.f*scale);
+      const auto bar_height=68.f*scale;
+      const UiRect bar{(width-bar_width)/2.f,height-bar_height-28.f*scale,
+                       bar_width,bar_height};
+      fill(out,bar,{8,13,22,static_cast<std::uint8_t>(190*voice.opacity)});
+      stroke(out,bar,{116,174,225,160});
+      auto caption_y=bar.y+8.f*scale;
+      if(const auto speaker=voice_playback_->active_speaker_name();!speaker.empty()){
+        out.overlay.emplace_back(Text{{bar.x+16.f*scale,caption_y},speaker,
+                                      {240,197,106,255},pixels,bar_width-32.f*scale});
+        caption_y+=(pixels+6.f)*scale;
+      }
+      out.overlay.emplace_back(Text{{bar.x+16.f*scale,caption_y},
+                                    voice_playback_->active_subtitle(),
+                                    {225,238,250,255},pixels,bar_width-32.f*scale});
+    }
     return out;
   }
  private:
@@ -2605,6 +2701,17 @@ class NativeCampaign final {
   std::filesystem::path asset_root_;
   native_audio::NativeAudioMixer audio_mixer_;
   native_audio::NativeAudioDevice audio_device_;
+  // Native voice pipeline (VoicePlaybackController + GameplayVoiceEventBridge
+  // port): profile registry → role resolver → event router → playback → the
+  // mixer's dedicated dialogue voice. Optional members stay empty when the
+  // packaged voice catalogue is absent, which disables voice entirely.
+  native_voice::NativeVoiceSettings voice_settings_;
+  native_voice::NativeVoiceProfileRegistry voice_profiles_;
+  std::optional<native_voice::NativeCharacterVoiceResolver> voice_resolver_;
+  std::optional<native_voice::NativeVoiceRouter> voice_router_;
+  std::optional<native_voice::NativeVoiceCache> voice_cache_;
+  std::optional<native_voice::NativeVoicePlayback> voice_playback_;
+  std::optional<native_voice::NativeGameplayVoiceBridge> voice_bridge_;
   native_audio_settings::NativeAudioSettingsView audio_settings_;
   native_notifications::NativeNotificationView notification_view_;
   std::int64_t last_played_notification_{};

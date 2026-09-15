@@ -97,7 +97,43 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   `export_support_bundle`, reporting the path via `publish_status`.
 - `--audio-smoke` now clicks SUPPORT BUNDLE, closes the menu and presses F8,
   then emits `support=1` when a non-trivial `.zip` exists; the audio export
-  validator requires the flag and validates the bundle with `zipfile`.
+  validator requires the flag and validates the bundle with `zipfile`. The
+  smoke lands a save before exporting so the bundle always carries its save
+  entry (this ordering fixed the earlier two-entry-ZIP export failure).
+
+## Voice slice (candidate for review)
+
+- `app/native_client/native_voice.{hpp,cpp}` — `NativeVoiceProfileRegistry`,
+  `NativeCharacterVoiceResolver` and `NativeVoiceRouter` port the reference
+  `VoiceEventRouter`/`CharacterVoiceResolver` over the reviewed
+  `Data/voice_profiles/{events,human,roles}.json` catalogue.
+- `app/native_client/native_voice_playback.{hpp,cpp}` —
+  `NativeVoicePlayback` ports `VoicePlaybackController` (queue/dedupe/
+  interrupt/expire/caption semantics); `NativeVoiceCache` validates hashed
+  PCM WAVs under a bounded byte budget; `native_voice_sapi.cpp` is the
+  Windows SAPI 5 backend (STA worker, 22.05 kHz 16-bit mono WAV, voice
+  selection by preferred id/description then gender/culture, 30 s timeout
+  and generation-based cancellation).
+- `app/native_client/native_voice_bridge.{hpp,cpp}` —
+  `NativeGameplayVoiceBridge` ports `GameplayVoiceEventBridge`/`Main.Voice`:
+  research/construction/ship/exploration/contact/combat/diplomacy/economy/
+  logistics routing, opening line, milestone tracking and baselines. It reads
+  only observer-authorized state (`build_view_for`, own events, own fleets).
+- `native_audio` gained the dedicated dialogue voice: `play_dialogue`,
+  `stop_dialogue`, `set_dialogue_volume`; the duck ramp is driven live by
+  `NativeVoicePlayback::ducking()`.
+- `main.cpp` `initialize_voice()` loads the catalogue, attaches the SAPI
+  backend, binds decode/play/stop to the mixer and wires the bridge into
+  `advance()`; captions render bottom-center and hide while the menu or
+  relations workspace is open. Missing catalogue files disable voice without
+  failing the campaign. `--audio-smoke` reports `voice_pipeline`,
+  `voice_backend`, `voice_lines`.
+- `native-tests/native_voice_tests.cpp` covers routing authorization,
+  dedupe/once/cooldown/frequency, deterministic variants, template
+  rejection, resolver species safety, settings round-trip, WAV validation,
+  and playback queue/subtitle behavior with a fake backend.
+- `export/native-voice-assets.json` + `cmake/NativeVoiceAssets.cmake` gate
+  the three catalogue files by exact path and SHA-256.
 
 ## Notification feed slice (candidate for review)
 
@@ -198,9 +234,10 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - Surface colony visuals — hub/buildings/roads/ghosts now render as rasterized
   sprites (`58aaf475`); the remaining gap is the reference's free camera orbit
   and terrain relief, not building art.
-- Voice-duck hooks — mixer/playback/persistence/settings UI shipped
-  (`dbf07f81`, `d108435a`); the remaining work is wiring the duck ramp to real
-  voice playback once voice lands.
+- Voice — the full presentation pipeline landed (catalogue, router, playback,
+  SAPI backend, WAV cache, captions, mixer dialogue voice + ducking, gameplay
+  bridge). Remaining: the reference's offline-neural backend and the
+  voice-settings window.
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.

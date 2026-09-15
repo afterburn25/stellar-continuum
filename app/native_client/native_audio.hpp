@@ -69,6 +69,13 @@ public:
   void play(NativeSfx sound);
   void play_hover();
   void play_event(std::string_view category);
+  // The single non-spatial dialogue voice (the reference's voice player).
+  // A new call replaces the currently playing line.
+  void play_dialogue(std::shared_ptr<const PcmData>);
+  void stop_dialogue();
+  [[nodiscard]] bool dialogue_playing() const noexcept;
+  // Voice-layer gain multiplier (from VoiceSettings.volume); defaults to 1.
+  void set_dialogue_volume(float) noexcept;
   // Fills interleaved 48 kHz stereo output; safe on the audio callback thread.
   void mix(float *output, std::size_t frame_count);
 
@@ -86,9 +93,10 @@ private:
   std::shared_ptr<const PcmData> music_;
   std::map<NativeSfx, std::shared_ptr<const PcmData>> sfx_streams_;
   std::vector<Voice> voices_;
+  std::optional<Voice> dialogue_;
   std::uint64_t music_cursor_{};
   bool startup_ready_{}, menu_context_{true}, music_playing_{};
-  float voice_duck_{1.f}, voice_duck_target_{1.f};
+  float voice_duck_{1.f}, voice_duck_target_{1.f}, dialogue_volume_{1.f};
   NativeAudioSettings settings_;
   std::uint64_t last_hover_ms_{};
   bool has_last_hover_{};

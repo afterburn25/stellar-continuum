@@ -286,6 +286,24 @@ std::optional<NativeSfx> NativeAudioMixer::event_sound(std::string_view category
 void NativeAudioMixer::play_event(std::string_view category) {
   if (const auto sound = event_sound(category)) play(*sound);
 }
+void NativeAudioMixer::play_dialogue(std::shared_ptr<const PcmData> stream) {
+  if (!stream || stream->frames.empty()) return;
+  std::lock_guard lock(voices_mutex_);
+  dialogue_ = Voice{std::move(stream), 0};
+}
+void NativeAudioMixer::stop_dialogue() {
+  std::lock_guard lock(voices_mutex_);
+  dialogue_.reset();
+}
+bool NativeAudioMixer::dialogue_playing() const noexcept {
+  std::lock_guard lock(voices_mutex_);
+  return dialogue_ && dialogue_->source &&
+         dialogue_->cursor <
+             dialogue_->source->frames.size() / output_channels;
+}
+void NativeAudioMixer::set_dialogue_volume(const float volume) noexcept {
+  dialogue_volume_ = std::isfinite(volume) ? std::clamp(volume, 0.f, 1.f) : 1.f;
+}
 
 void NativeAudioMixer::mix(float *output, const std::size_t frame_count) {
   std::fill(output, output + frame_count * output_channels, 0.f);
@@ -312,6 +330,15 @@ void NativeAudioMixer::mix(float *output, const std::size_t frame_count) {
       right += frames[frame + 1] * sfx_gain;
       ++voice.cursor;
     }
+    if (dialogue_ && dialogue_->source) {
+      const auto &frames = dialogue_->source->frames;
+      if (dialogue_->cursor < frames.size() / output_channels) {
+        const auto frame = dialogue_->cursor * 2;
+        left += frames[frame] * sfx_gain * dialogue_volume_;
+        right += frames[frame + 1] * sfx_gain * dialogue_volume_;
+        ++dialogue_->cursor;
+      }
+    }
     output[i * 2] = clampf(left);
     output[i * 2 + 1] = clampf(right);
   }
@@ -319,5 +346,8 @@ void NativeAudioMixer::mix(float *output, const std::size_t frame_count) {
     return !voice.source ||
            voice.cursor >= voice.source->frames.size() / output_channels;
   });
+  if (dialogue_ && dialogue_->source &&
+      dialogue_->cursor >= dialogue_->source->frames.size() / output_channels)
+    dialogue_.reset();
 }
 } // namespace stellar::native_audio
