@@ -1899,6 +1899,9 @@ int main(int argc,char **argv){
     const auto startup_ms=std::chrono::duration<double,std::milli>(
         std::chrono::steady_clock::now()-startup_begin).count();
     auto prior=std::chrono::steady_clock::now();int frames=0;std::vector<double> frame_ms;bool discard_elapsed{};
+    // Samples are retained only by the bounded smoke run. Normal play keeps
+    // no history; rendering time includes submission and presentation wait.
+    std::vector<double> update_ms,scene_ms,render_present_ms;
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
@@ -1914,8 +1917,10 @@ int main(int argc,char **argv){
       const auto elapsed=discard_elapsed?0.:measured_elapsed;
       if(frames>0&&!discard_elapsed)frame_ms.push_back(elapsed*1000.);
       discard_elapsed=false;
+      const auto update_begin=std::chrono::steady_clock::now();
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
                           elapsed))break;
+      const auto update_end=std::chrono::steady_clock::now();
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
@@ -1933,7 +1938,17 @@ int main(int argc,char **argv){
           else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
         }else if(frames>=120)screenshot=options.smoke_screenshot;
       }
-      window.draw(campaign.scene(input.drawable_width,input.drawable_height),screenshot);
+      const auto scene_begin=std::chrono::steady_clock::now();
+      const auto scene=campaign.scene(input.drawable_width,input.drawable_height);
+      const auto scene_end=std::chrono::steady_clock::now();
+      window.draw(scene,screenshot);
+      const auto render_end=std::chrono::steady_clock::now();
+      if(options.smoke_screenshot&&!screenshot){
+        // GPU readback/file writes deliberately stay out of phase samples.
+        update_ms.push_back(std::chrono::duration<double,std::milli>(update_end-update_begin).count());
+        scene_ms.push_back(std::chrono::duration<double,std::milli>(scene_end-scene_begin).count());
+        render_present_ms.push_back(std::chrono::duration<double,std::milli>(render_end-scene_end).count());
+      }
       if(options.galaxy_art_smoke){
         if(frames==120){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
         else if(frames==121){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
@@ -1959,6 +1974,15 @@ int main(int argc,char **argv){
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
                  <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
                  <<utf8_path(*options.smoke_screenshot);
+        const auto print_phase=[&](const char* name,std::vector<double>&samples){
+          if(samples.empty())throw std::runtime_error("Native smoke has no frame phase samples.");
+          std::ranges::sort(samples);
+          const auto mean=std::accumulate(samples.begin(),samples.end(),0.)/static_cast<double>(samples.size());
+          const auto percentile=samples[static_cast<std::size_t>(std::ceil(static_cast<double>(samples.size())*.95))-1];
+          std::cout<<' '<<name<<"_mean_ms="<<mean<<' '<<name<<"_p95_ms="<<percentile;
+        };
+        std::cout<<" phase_samples="<<update_ms.size();
+        print_phase("update",update_ms);print_phase("scene",scene_ms);print_phase("render_present",render_present_ms);
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)

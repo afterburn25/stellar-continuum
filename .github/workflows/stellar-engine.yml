@@ -84,6 +84,9 @@ on:
       - "CMake*"
       - ".github/workflows/stellar-engine.yml"
   workflow_dispatch:
+concurrency:
+  group: stellar-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

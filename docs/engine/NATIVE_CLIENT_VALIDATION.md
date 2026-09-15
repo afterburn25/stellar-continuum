@@ -39,6 +39,15 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Validation evidence
 
+Smoke diagnostics retain the existing frame-interval mean and p95 and now report
+`phase_samples` plus mean/p95 for `update`, `scene`, and `render_present` in
+milliseconds. These measure campaign update, CPU draw-list preparation, and
+renderer submission/presentation respectively. The last phase includes VSync or
+fallback waiting; it is not a GPU-only measurement. Capture frames are excluded
+from phase samples so screenshot readback and file writes do not inflate them.
+Normal play does not retain timing histories. These short checks locate likely
+bottlenecks; they are not sustained-FPS certification.
+
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 
 Engine 0.1.53 passed 138 CTest, 206 Python checks and twenty-six actual Vulkan launches. Surface validation starts from an unaltered fresh 500-system campaign and verifies preview cancellation, paid placement, half-refund cancellation, noninstant progress and exact paused reload/resave. Engine image-overlay tests use actual GPU pixel readback for ordering, clipping, tint and immutable texture reuse. Surface captures at 720p/1080p were inspected; this operational grid is not final 3D presentation.
