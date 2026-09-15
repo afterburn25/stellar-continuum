@@ -229,10 +229,14 @@ void NativeAudioMixer::set_menu_context(const bool menu) noexcept {
 void NativeAudioMixer::set_voice_ducking(const bool active) noexcept {
   voice_duck_target_ = active ? .55f : 1.f;
 }
-void NativeAudioMixer::set_volumes(const float master, const float music,
-                                   const float sfx) {
+void NativeAudioMixer::apply_volumes(const float master, const float music,
+                                     const float sfx) noexcept {
   settings_ = {std::clamp(master, 0.f, 1.f), std::clamp(music, 0.f, 1.f),
                std::clamp(sfx, 0.f, 1.f)};
+}
+void NativeAudioMixer::set_volumes(const float master, const float music,
+                                   const float sfx) {
+  apply_volumes(master, music, sfx);
   persist_settings();
 }
 NativeAudioSettings NativeAudioMixer::settings() const noexcept {

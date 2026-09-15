@@ -1,6 +1,7 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
 #include "native_audio_device.hpp"
+#include "native_audio_settings.hpp"
 #include "native_battle_workspace.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_campaign_session.hpp"
@@ -80,6 +81,7 @@ using namespace stellar::native_research_ui;
 using namespace stellar::native_shipyard;
 using namespace stellar::native_shipyard_ui;
 namespace native_audio = stellar::native_audio;
+namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
@@ -1095,6 +1097,43 @@ class NativeCampaign final {
        <<"}";
     return out.str();
   }
+  void prepare_audio_smoke(int width,int height){
+    // Exercise the menu's audio settings view before the generic save: open
+    // the menu, enter AUDIO, drag MASTER toward 25%, restore defaults, Done.
+    if(!menu_)toggle_menu();
+    const auto click=[&](Point point){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},
+                    {InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Audio smoke input closed the campaign.");
+    };
+    const auto layout=NativeUiLayout::for_viewport(width,height);
+    click(center(layout.audio_button));
+    if(!audio_settings_.visible())
+      throw std::runtime_error("Audio smoke could not open the settings view.");
+    const auto settings_layout=native_audio_settings::AudioSettingsLayout::for_viewport(width,height);
+    const auto &track=settings_layout.tracks[0];
+    const Point quarter{track.x+track.width*.25f,track.y+track.height*.5f};
+    InputSnapshot drag;drag.drawable_width=width;drag.drawable_height=height;drag.pointer=quarter;
+    drag.events={{InputEventType::LeftPressed,quarter},
+                 {InputEventType::PointerMove,quarter,{track.width*.25f,0.f}},
+                 {InputEventType::LeftReleased,quarter}};
+    if(!update(drag,width,height,0.,false))
+      throw std::runtime_error("Audio smoke drag closed the campaign.");
+    if(std::abs(audio_mixer_.settings().master-.25f)>.03f)
+      throw std::runtime_error("Audio smoke slider did not reach the dragged level.");
+    click(center(settings_layout.defaults));
+    click(center(settings_layout.done));
+    if(audio_settings_.visible())
+      throw std::runtime_error("Audio smoke could not close the settings view.");
+    const auto settings=audio_mixer_.settings();
+    if(std::abs(settings.master-.78f)>.001f||std::abs(settings.music-.64f)>.001f||std::abs(settings.sfx-.82f)>.001f)
+      throw std::runtime_error("Audio smoke did not restore and persist the default mix.");
+    smoke_audio_settings_=1;
+    smoke_save_pending_=true;
+  }
   [[nodiscard]] std::string audio_smoke_status(){
     // Mix bounded chunks on the caller thread so the smoke reports real decode,
     // voice and gain evidence without depending on an attached audio device.
@@ -1125,7 +1164,8 @@ class NativeCampaign final {
        <<",\"peak\":"<<std::fixed<<std::setprecision(4)<<peak
        <<std::defaultfloat
        <<",\"master\":"<<settings.master<<",\"music_gain\":"<<settings.music
-       <<",\"sfx_gain\":"<<settings.sfx<<"}";
+       <<",\"sfx_gain\":"<<settings.sfx
+       <<",\"settings\":"<<smoke_audio_settings_<<"}";
     return out.str();
   }
   void prepare_construction_smoke(int width,int height){
@@ -1401,6 +1441,16 @@ class NativeCampaign final {
           continue;
         }
       }
+      if(menu_&&audio_settings_.visible()){
+        const auto audio_result=audio_settings_.handle(event,width,height);
+        if(audio_result.command==native_audio_settings::AudioSettingsCommand::Apply)
+          audio_mixer_.apply_volumes(audio_result.values.master,audio_result.values.music,audio_result.values.sfx);
+        else if(audio_result.command==native_audio_settings::AudioSettingsCommand::Close){
+          audio_settings_.close();
+          audio_mixer_.set_volumes(audio_result.values.master,audio_result.values.music,audio_result.values.sfx);
+        }
+        continue;
+      }
       if(event.type==InputEventType::EscapePressed){
         if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
@@ -1488,6 +1538,7 @@ class NativeCampaign final {
         if(action==UiAction::Continue)toggle_menu();
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
+        else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
@@ -1644,6 +1695,9 @@ class NativeCampaign final {
           layout.status_text});
     }
     if (menu_) {
+      if (audio_settings_.visible()) {
+        audio_settings_.render(out, width, height);
+      } else {
       fill(out, layout.menu_panel, panel);
       stroke(out, layout.menu_panel, {116, 174, 225, 255});
       label(out, layout.menu_heading, "PAUSED", {238, 244, 255, 255},
@@ -1657,7 +1711,9 @@ class NativeCampaign final {
       draw_button(layout.continue_button, "CONTINUE");
       draw_button(layout.save_button, "SAVE");
       draw_button(layout.load_button, "LOAD");
+      draw_button(layout.audio_button, "AUDIO");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
+      }
     }
     if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
@@ -2159,7 +2215,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
@@ -2187,6 +2243,7 @@ class NativeCampaign final {
   std::filesystem::path asset_root_;
   native_audio::NativeAudioMixer audio_mixer_;
   native_audio::NativeAudioDevice audio_device_;
+  native_audio_settings::NativeAudioSettingsView audio_settings_;
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
       [this](std::string_view relative){
@@ -2276,7 +2333,7 @@ class NativeCampaign final {
   int smoke_settlement_revision_{};double smoke_settlement_before_day_{},smoke_settlement_saved_day_{},smoke_settlement_progress_{},smoke_settlement_authorization_{},smoke_settlement_treasury_before_{},smoke_settlement_treasury_after_{};
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
-  bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};bool smoke_save_pending_{};int smoke_audio_settings_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   UiAction hovered_action_{UiAction::None};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
@@ -2358,6 +2415,9 @@ int main(int argc,char **argv){
       else if(options.battle_smoke)
         campaign.prepare_battle_smoke(window.drawable_width(),
                                       window.drawable_height());
+      else if(options.audio_smoke)
+        campaign.prepare_audio_smoke(window.drawable_width(),
+                                     window.drawable_height());
       else
         campaign.prepare_smoke_ui();
     }

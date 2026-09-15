@@ -61,6 +61,8 @@ public:
   void set_menu_context(bool menu) noexcept;
   [[nodiscard]] bool is_menu_context() const noexcept { return menu_context_; }
   void set_voice_ducking(bool active) noexcept;
+  // Live mix only; used while a settings slider drags.
+  void apply_volumes(float master, float music, float sfx) noexcept;
   void set_volumes(float master, float music, float sfx);
   [[nodiscard]] NativeAudioSettings settings() const noexcept;
 

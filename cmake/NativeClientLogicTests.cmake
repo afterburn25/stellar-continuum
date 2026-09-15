@@ -293,6 +293,18 @@ if(MSVC)
     /W4 /WX /permissive-)
 endif()
 
+add_executable(stellar_audio_settings_tests
+  native-tests/native_audio_settings_tests.cpp
+  app/native_client/native_audio_settings.cpp)
+target_include_directories(stellar_audio_settings_tests PRIVATE
+  app/native_client
+  engine/include)
+add_test(NAME native_audio_settings COMMAND stellar_audio_settings_tests)
+if(MSVC)
+  target_compile_options(stellar_audio_settings_tests PRIVATE
+    /W4 /WX /permissive-)
+endif()
+
 
 add_executable(stellar_new_setup_tests
   app/native_client/native_new_campaign_setup.cpp

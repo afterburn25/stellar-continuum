@@ -62,7 +62,7 @@ def _diagnostic(stdout: str):
     except (TypeError, ValueError) as error:
         raise RuntimeError("Native audio diagnostic is malformed") from error
     for key in ("required", "music", "device", "music_frames", "voices",
-                "voiced_chunks", "clipped_samples"):
+                "voiced_chunks", "clipped_samples", "settings"):
         value = state.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
             raise RuntimeError(f"Native audio reported invalid {key}")
@@ -81,6 +81,11 @@ def _diagnostic(stdout: str):
     if not (0 <= state["master"] <= 1 and 0 <= state["music_gain"] <= 1 and
             0 <= state["sfx_gain"] <= 1):
         raise RuntimeError("Native audio reported out-of-range volume settings")
+    if state["settings"] != 1:
+        raise RuntimeError("Native audio settings view did not apply and restore")
+    if abs(state["master"] - .78) > .01 or abs(state["music_gain"] - .64) > .01 \
+            or abs(state["sfx_gain"] - .82) > .01:
+        raise RuntimeError("Native audio did not persist the restored default mix")
     return state
 
 
@@ -123,14 +128,17 @@ def validate_native_audio_export(folder: Path, env: dict[str, str]):
         payload = json.loads(save.read_text(encoding="utf-8"))
         if payload.get("FormatVersion") != 17:
             raise RuntimeError("Native audio smoke damaged the campaign payload")
-        # Persisted settings live beside the save path; they are optional until
-        # the player changes a volume, so only a written file must parse.
+        # The settings exercise ends on Done, which persists the restored
+        # default mix beside the save path.
         settings = save.parent / "audio-settings.json"
-        if settings.is_file():
-            values = json.loads(settings.read_text(encoding="utf-8"))
-            if not all(0 <= values.get(key, -1) <= 1
-                       for key in ("master", "music", "sfx")):
-                raise RuntimeError("Native audio persisted invalid volume settings")
+        if not settings.is_file():
+            raise RuntimeError("Native audio settings did not persist to disk")
+        values = json.loads(settings.read_text(encoding="utf-8"))
+        expected = {"master": .78, "music": .64, "sfx": .82}
+        for key, default in expected.items():
+            value = values.get(key)
+            if not isinstance(value, (int, float)) or abs(value - default) > .01:
+                raise RuntimeError(f"Native audio persisted wrong {key} volume")
     return {"nativeAudioStreams": True,
             "nativeAudioDevice": bool(state["device"]),
             "nativeAudioCapture": str(evidence),

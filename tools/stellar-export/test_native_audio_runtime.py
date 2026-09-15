@@ -14,6 +14,7 @@ def diagnostic():
         "required": 1, "music": 1, "music_frames": 9361450, "device": 1,
         "voices": 2, "voiced_chunks": 12, "clipped_samples": 0,
         "peak": 0.5233, "master": 0.78, "music_gain": 0.64, "sfx_gain": 0.82,
+        "settings": 1,
     }
 
 
@@ -40,15 +41,19 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                 if fault == "clipped": state["clipped_samples"] = 4
                 if fault == "peak": state["peak"] = 0
                 if fault == "gain": state["sfx_gain"] = 1.4
+                if fault == "settings_flag": state["settings"] = 0
+                if fault == "settings_mix": state["master"] = 0.4
                 varied = bytes(range(256)) if fault != "blank" else bytes(200)
                 if fault != "capture":
                     capture.write_bytes(b"BM" + b"\0" * 52 + varied * 40)
                 record = {"FormatVersion": 17}
                 if fault == "save": record["FormatVersion"] = 16
                 save.write_text(json.dumps(record), encoding="utf-8")
-                if fault == "settings":
+                if fault != "settings_missing":
+                    persisted = {"master": 0.78, "music": 0.64, "sfx": 0.82}
+                    if fault == "settings": persisted["master"] = 2
                     (save.parent / "audio-settings.json").write_text(
-                        json.dumps({"master": 2}), encoding="utf-8")
+                        json.dumps(persisted), encoding="utf-8")
                 stdout = "gpu_driver=vulkan systems=500 save=ok " + \
                     f"audio={json.dumps(state, separators=(',', ':'))}"
                 if fault == "diagnostic":
@@ -89,6 +94,12 @@ class NativeAudioRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("save")
     def test_invalid_settings_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("settings")
+    def test_missing_settings_file_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("settings_missing")
+    def test_unexercised_settings_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("settings_flag")
+    def test_nondefault_settings_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("settings_mix")
     def test_missing_diagnostic_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("diagnostic")
 
