@@ -37,11 +37,11 @@ def _fleet(payload: dict, fleet_id: int) -> tuple[dict, int]:
 
 def _diagnostic(stdout: str) -> tuple[int, int, int, float]:
     match = re.search(
-        r" fleet=(\d+):(\d+):(\d+):([0-9.]+):hover=1", stdout)
+        r" fleet=(\d+):(\d+):(\d+):([0-9.]+):hover=1:inspect=1", stdout)
     if not match:
         raise RuntimeError(
             "Native fleet did not report its selected route state "
-            "(hover preview is required)")
+            "(hover preview and inspection card are required)")
     fleet_id, destination, revision = map(int, match.groups()[:3])
     progress = float(match.group(4))
     if not math.isfinite(progress):

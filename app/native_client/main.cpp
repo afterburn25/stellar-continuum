@@ -6,6 +6,7 @@
 #include "native_notifications.hpp"
 #include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
+#include "native_inspection.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -91,6 +92,7 @@ using namespace stellar::native_shipyard_ui;
 namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
+namespace native_inspection = stellar::native_inspection;
 namespace native_notifications = stellar::native_notifications;
 namespace native_support = stellar::native_support;
 namespace native_voice = stellar::native_voice;
@@ -901,6 +903,40 @@ class NativeCampaign final {
           click(center(main_layout.pause));
       }else smoke_fleet_destination_=selected_destination;
     }
+    // Inspection-card parity: clicking a star selects it and renders the
+    // observer-gated intelligence card (reference SystemInspectionPanel).
+    {
+      const auto &map=session_->frame().runtime().world().campaign();
+      std::optional<int> inspect_id;Point inspect_point;
+      const auto markers=fleet_markers(width,height);
+      const auto marker_radius=11.f*FleetWorkspaceLayout::for_viewport(width,height).scale;
+      int inspect_rank=-1;
+      for(const auto &system:map.systems){
+        const auto point=camera_.project({system.position.x,system.position.y},
+                                         width,height);
+        if(point.x<0||point.y<0||point.x>=width||point.y>=height||
+           layout.panel.contains(point))continue;
+        if(std::ranges::any_of(markers,[&](const auto &marker){
+             return std::hypot(marker.position.x-point.x,
+                               marker.position.y-point.y)<=marker_radius;}))
+          continue;
+        const int rank=
+            map.knowledge.is_system_fully_surveyed(map.player_civilization_id,
+                                                   system.id)?2:
+            map.knowledge.is_system_known(map.player_civilization_id,system.id)
+                ?1:0;
+        if(rank>inspect_rank){inspect_rank=rank;inspect_id=system.id;
+                              inspect_point=point;}
+      }
+      if(inspect_id){
+        click(inspect_point);
+        (void)scene(width,height);
+        smoke_inspection_=selected_id_==inspect_id&&
+                          inspection_card_bounds_.has_value()&&
+                          inspection_card_bounds_->width>100.f;
+      }
+
+    }
   }
   void prepare_shipyard_smoke(int width,int height){
     const auto click=[&](Point point){
@@ -1529,7 +1565,8 @@ class NativeCampaign final {
     out<<found->id<<":"<<*smoke_fleet_destination_<<":"
        <<found->mission_order_revision<<":"<<std::fixed
        <<std::setprecision(6)<<found->transit_progress
-       <<":hover="<<(smoke_fleet_hover_preview_?1:0);
+       <<":hover="<<(smoke_fleet_hover_preview_?1:0)
+       <<":inspect="<<(smoke_inspection_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -2035,7 +2072,7 @@ class NativeCampaign final {
                      session_->frame().clock().simulation_days())),
         {154, 181, 211, 235}, layout.metric_font_pixels,
         layout.day_text.width, layout.day_text});
-    if(selected_id_){const auto found=cache.systems_by_id.find(*selected_id_);if(found!=cache.systems_by_id.end()){const bool known=known_.contains(*selected_id_);const float x=18,y=screen_height-82;out.text.push_back({{x,y},known?found->second->name:"Unknown system",{238,244,255,255}});out.text.push_back({{x,y+18},known?spectral_name(found->second->primary):"No survey data",{154,181,211,235}});}}
+    if(selected_id_){const auto &campaign=session_->frame().runtime().world().campaign();const auto inspection=native_inspection::build_system_inspection(campaign,*selected_id_);inspection_card_bounds_=native_inspection::append_inspection_card(out,inspection,{14.f,static_cast<float>(screen_height)-88.f},std::clamp(std::min(width/1024.f,screen_height/600.f),.75f,1.25f));}else inspection_card_bounds_=std::nullopt;
     const auto &notice = session_->notice();
     if (notice.kind != SessionNoticeKind::None) {
       auto message = notice.message;
@@ -2832,6 +2869,7 @@ class NativeCampaign final {
     if(!voice_settings_path_.empty())voice_settings_.save(voice_settings_path_);
   }
   native_voice::NativeVoiceProfileRegistry voice_profiles_;
+  std::optional<UiRect> inspection_card_bounds_;
   std::optional<native_voice::NativeCharacterVoiceResolver> voice_resolver_;
   std::optional<native_voice::NativeVoiceRouter> voice_router_;
   std::optional<native_voice::NativeVoiceCache> voice_cache_;
@@ -2924,7 +2962,7 @@ class NativeCampaign final {
       smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
-  bool smoke_fleet_hover_preview_{};
+  bool smoke_fleet_hover_preview_{},smoke_inspection_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};

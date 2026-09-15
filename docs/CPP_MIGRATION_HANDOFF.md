@@ -161,6 +161,25 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   right-click preview takes precedence until confirmed or superseded. The
   fleet smoke asserts `hover=1` and `native_fleet_runtime` requires it.
 
+## Inspection card slice (candidate for review)
+
+- `app/native_client/native_inspection.{hpp,cpp}` — `build_inspection(campaign,
+  player_civilization_id, system_id)` produces `NativeInspectionView` from the
+  player's knowledge row only (reference `Main.Inspection`/`SystemInspectionPanel`):
+  survey level + progress, guidance text for unknown/recon/fully-surveyed
+  states, intel facts (star class, archetype, distance from homeworld,
+  habitable/anomaly/rare-resource/pre-warp status) gated to full survey, and a
+  colony section that redacts foreign holdings unless the owner civilization is
+  identified. Own colonies additionally pull population/infrastructure/stability
+  and `economy_logistics` supply/demand lines when the economy row exists —
+  sparse campaigns omit logistics rather than surfacing an error.
+- `append_inspection_card` renders the bounded card bottom-left in the map
+  viewport via `DrawList`, replacing the old two-line selected-system readout.
+- The fleet smoke clicks a surveyed (or visible unoccupied) system and asserts
+  `inspect=1`; `native_fleet_runtime` requires the marker alongside `hover=1`.
+- `native_inspection` CTest covers unknown, detected, fully surveyed,
+  foreign-redacted, own-colony, and rendering/bounds cases.
+
 ## Notification feed slice (candidate for review)
 
 - `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`
@@ -262,8 +281,9 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   and terrain relief, not building art.
 - Voice — the full presentation pipeline landed (catalogue, router, playback,
   SAPI backend, WAV cache, captions, mixer dialogue voice + ducking, gameplay
-  bridge). Remaining: the reference's offline-neural backend and the
-  voice-settings window.
+  bridge, roster-based character resolution, settings window). Remaining: the
+  reference's optional manifest-gated offline-neural backend (SAPI is the
+  reference's own default fallback when the pack is absent).
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
