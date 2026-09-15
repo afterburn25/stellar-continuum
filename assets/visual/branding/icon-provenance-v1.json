@@ -1,0 +1,23 @@
+{
+  "tool": "OpenAI built-in image_gen",
+  "prompt": "Use case: logo-brand.\nAsset type: Windows executable, taskbar and Task Manager application icon for Stellar Continuum.\nReference image: the supplied Stellar Continuum title logo is the exact visual identity reference.\nCreate a single square icon derived from ONLY the spiral galaxy emblem in this logo. Remove all lettering. Preserve the recognizable sweeping silver metal galaxy arms, restrained luminous cyan inlays and small golden central star. Recompose the emblem into a balanced compact circular shape viewed straight on, centered on a square canvas, occupying about 84 percent of the canvas with safe margins. Thicken and simplify the existing arms and highlights so the silhouette remains readable at 16, 24, 32 and 48 pixels. Keep clean broad negative spaces between the arms and a solid bright central star. Realistic brushed titanium construction with shallow bevels; premium serious science-fiction game identity.\nOutput only this one finished emblem. Genuinely transparent alpha background outside the emblem and between the arms. No text, no initials, no border, no square tile, no mockup, no checkerboard texture, no starfield or cloudy halo backdrop. Avoid wispy details, needle-thin trails, long lens flares, enormous bloom, new symbols and extra ornaments. Retain the source logo's silver/cyan/gold palette. Square composition.",
+  "sourceLogoSha256": "9040a67106ccd463fb81af97b7d07ead79559347e80763bbe028aea2277eb124",
+  "generatedMasterSha256": "ea2477fa7f2c0197db6f9eeb792547b4e19be9c5794ec18fcc7470d27a4ab510",
+  "processing": "Pillow Lanczos delivery-size resampling and BMP-format ICO encoding only; generated alpha preserved",
+  "sizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "files": {
+    "stellar-continuum-icon-v1.png": "5942d3e6a0e82947bf4d9553409585ebf79572cbfede16348482ac2ce38c6065",
+    "stellar-continuum-v1.ico": "4b7b9a68eec5c5b823105d2346f66a5204653b355fa5fe3eb1d085c2913fc7f0"
+  }
+}

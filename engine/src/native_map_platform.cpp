@@ -1,4 +1,5 @@
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/windows_resource_ids.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_render.h>
@@ -139,6 +140,13 @@ struct Window::Storage {
 };
 
 Window::Window(std::string title,int width,int height,bool fullscreen,std::filesystem::path font_path){
+  // SDL reads both native icon hints during video initialization. Test hosts or
+  // other engine applications without an embedded icon keep their own default.
+  if(FindResource(GetModuleHandle(nullptr),MAKEINTRESOURCE(STELLAR_APPLICATION_ICON_ID),RT_GROUP_ICON)){
+    const auto icon_id=std::to_string(STELLAR_APPLICATION_ICON_ID);
+    SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON,icon_id.c_str(),SDL_HINT_OVERRIDE);
+    SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL,icon_id.c_str(),SDL_HINT_OVERRIDE);
+  }
   auto candidate=std::make_unique<Storage>();require(SDL_Init(SDL_INIT_VIDEO),"SDL video initialization failed");candidate->initialized=true;const auto flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY|(fullscreen?SDL_WINDOW_FULLSCREEN:0);candidate->window=SDL_CreateWindow(title.c_str(),width,height,flags);if(!candidate->window)throw sdl_error("SDL window creation failed");candidate->device=SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,false,"vulkan");if(!candidate->device)throw sdl_error("Vulkan SDL GPU device creation failed");const char *driver=SDL_GetGPUDeviceDriver(candidate->device);if(!driver||std::string(driver)!="vulkan")throw std::runtime_error("Vulkan SDL GPU device creation returned an unexpected backend");candidate->renderer=SDL_CreateGPURenderer(candidate->device,candidate->window);if(!candidate->renderer)throw sdl_error("Vulkan SDL GPU renderer creation failed");require(SDL_SetRenderDrawBlendMode(candidate->renderer,SDL_BLENDMODE_BLEND),"SDL renderer blend setup failed");
   candidate->text_dc=CreateCompatibleDC(nullptr);if(!candidate->text_dc)throw std::runtime_error("Windows text device creation failed.");if(font_path.empty())throw std::invalid_argument("A bundled native UI font path is required.");candidate->private_font_path=std::filesystem::absolute(std::move(font_path));candidate->private_font_added=AddFontResourceExW(candidate->private_font_path.c_str(),FR_PRIVATE,nullptr)>0;if(!candidate->private_font_added)throw std::runtime_error("Bundled Rajdhani font could not be loaded.");
   candidate->vsync=SDL_SetRenderVSync(candidate->renderer,1);if(!candidate->vsync){const std::string reason=SDL_GetError();float refresh=60.f;const auto display=SDL_GetDisplayForWindow(candidate->window);if(display){if(const auto *mode=SDL_GetDesktopDisplayMode(display);mode&&mode->refresh_rate>1.f)refresh=mode->refresh_rate;}candidate->fallback_interval_ns=static_cast<Uint64>(1000000000./static_cast<double>(refresh));SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,"Renderer VSync unavailable (%s); pacing presents at %.2f Hz",reason.c_str(),static_cast<double>(refresh));}
