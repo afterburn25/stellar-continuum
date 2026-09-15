@@ -205,6 +205,40 @@ native build passed. See `native-active-campaign-{build,unit,runtime,validation}
 This is an early campaign baseline with no developed player fleet, not a late-game
 benchmark, all-hardware 60 FPS certification or a fix for the separate cold tail.
 
+### Developed campaign profile
+
+Use the maintained fresh-progression test's `--profile-save` option described in
+`NATIVE_FRESH_PROGRESSION.md` to prepare a real, paid 24-ship campaign. Pass that
+file as `initial_save` to `validate_native_campaign_profile`, with
+`profile_frames=600` and `minimum_moving_fleets=24`. The helper copies it into
+an isolated slot; the actual game never receives the original file path.
+
+The helper requires 24 owned fleets in transit at the start of each active run,
+and actual changes in their position/transit fields by stable fleet ID afterward.
+Both paused reloads retain the whole payload except the new timestamp. The
+original file bytes must remain unchanged; its SHA-256 and before/after workload
+counts are returned with the timing evidence. Stationary fleets, missing fleets,
+source mutations and insufficient workloads fail rather than qualifying as load.
+
+The fixed fixture starts on day 10154 with 500 systems, 24 ships (12 scouts and
+12 science vessels), nine total colonies and three owned colonies. Both 600-frame
+8X Vulkan runs pass, followed by independent paused reloads. All 24 ships move
+in each interval; they remain in transit after 720p and have arrived by the final
+1080p save. This does not claim all 24 remain in transit for every measured frame.
+
+| Resolution | Start / final game day | Interval mean / p95 / p99 (ms) | Update mean / max (ms) |
+|---|---|---|---|
+| 1280x720 | 10154 / 10234.2218632 | 16.713 / 17.401 / 18.516 | 0.476 / 6.154 |
+| 1920x1080 reload | 10234.2218632 / 10314.4471072 | 16.714 / 17.604 / 18.560 | 0.385 / 3.586 |
+
+Four developed active/paused launches and two default system runs pass. The
+actual 1080p frame shows finished galaxy art, fleet outliner, final pause and saved
+day. Evidence: `work/developed-fleet-24-profile.json`,
+`work/developed-fleet-fixed-system.json`, `native-developed-fleet-fixed-runtime.log`.
+The associated enum writer repair passes eight focused CTests and 17 Python checks.
+This is a bounded fleet workload, not huge-fleet/combat/surface parity or universal
+60 FPS certification. Engine 0.1.58 remains a candidate with graphicalParity=false.
+
 ### Optional steady-frame profile
 
 Add `--profile-frames 600` to an isolated `--system-smoke <capture.bmp>` or

@@ -1,6 +1,8 @@
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 
+#include "../core/src/player_campaign_json_research.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
@@ -47,6 +49,93 @@ std::optional<std::string> optional_text(const Json &value,
   const auto &member = value.at(key);
   return member.is_null() ? std::nullopt
                           : std::optional(member.get<std::string>());
+}
+
+void check_player_research_enum_encoding() {
+  AdaptiveResearchCampaignSnapshot snapshot;
+  snapshot.schema_version = 2;
+  snapshot.catalog_id = "enum-regression";
+  AdaptiveResearchCampaignCivilizationSnapshot civilization;
+  civilization.civilization_id = 7;
+  civilization.species_id = "species-id";
+  civilization.reference_profile_id = "profile-id";
+  civilization.applicability_context_id = "context-id";
+
+  ResearchOutcomeHistoryRecord outcome;
+  outcome.sequence = 5;
+  outcome.node_id = "node-id";
+  outcome.checkpoint_id = "checkpoint-id";
+  outcome.attempt_index = 2;
+  outcome.outcome = ResearchOutcomeKind::hypothesis_supported;
+  outcome.year = 42.5;
+  outcome.explanation = "A readable explanation remains a string.";
+  civilization.research.outcomes.recent_records.push_back(std::move(outcome));
+
+  ForeignTechnologyAssessmentSnapshot assessment;
+  assessment.foreign_technology_reference = "foreign-reference";
+  assessment.source_lineage_reference = "lineage-reference";
+  assessment.understanding = ForeignUnderstandingState::engineering_understood;
+  assessment.operability = ForeignOperabilityState::adapted_operation;
+  assessment.reproduction = ForeignReproductionState::foreign_process_replication;
+  assessment.adaptation = ForeignAdaptationState::native_derivative;
+  civilization.research.research.foreign_assessments.push_back(
+      std::move(assessment));
+
+  ResearchTacitAssetSnapshot asset;
+  asset.asset_id = "asset-id";
+  asset.asset_type_id = "asset-type-id";
+  asset.scope_kind = ResearchTacitScopeKind::facility_or_process;
+  asset.scope_ref = "scope-reference";
+  asset.assimilation_stage = ResearchTacitAssimilationStage::native_practice;
+  asset.provenance = "provenance";
+  civilization.research.research.research.research.expertise.tacit_assets
+      .push_back(std::move(asset));
+  snapshot.civilizations.push_back(std::move(civilization));
+
+  const auto encoded = player_json_detail::encode_research(snapshot);
+  const auto &research = encoded.at("Civilizations").at(0).at("Research");
+  const auto &record = research.at("Outcomes").at("RecentRecords").at(0);
+  check(record.at("Outcome").is_number_integer(),
+        "Player17 outcome enum must be numeric");
+  check(record.at("Outcome") ==
+            static_cast<int>(ResearchOutcomeKind::hypothesis_supported),
+        "Player17 outcome enum value");
+  check(record.at("Explanation") == "A readable explanation remains a string.",
+        "Player17 preserves non-enum outcome strings");
+
+  const auto &v4 = research.at("Research");
+  const auto &foreign = v4.at("ForeignAssessments").at(0);
+  for (const auto key : {"Understanding", "Operability", "Reproduction",
+                         "Adaptation"})
+    check(foreign.at(key).is_number_integer(),
+          std::string("Player17 foreign enum must be numeric: ") + key);
+  check(foreign.at("Understanding") ==
+            static_cast<int>(ForeignUnderstandingState::engineering_understood) &&
+            foreign.at("Operability") ==
+                static_cast<int>(ForeignOperabilityState::adapted_operation) &&
+            foreign.at("Reproduction") == static_cast<int>(
+                ForeignReproductionState::foreign_process_replication) &&
+            foreign.at("Adaptation") ==
+                static_cast<int>(ForeignAdaptationState::native_derivative),
+        "Player17 foreign enum values");
+  check(foreign.at("ForeignTechnologyReference") == "foreign-reference",
+        "Player17 preserves foreign reference string");
+
+  const auto &tacit = v4.at("Research")
+                          .at("Research")
+                          .at("Expertise")
+                          .at("TacitAssets")
+                          .at(0);
+  check(tacit.at("ScopeKind").is_number_integer() &&
+            tacit.at("AssimilationStage").is_number_integer(),
+        "Player17 tacit enums must be numeric");
+  check(tacit.at("ScopeKind") ==
+            static_cast<int>(ResearchTacitScopeKind::facility_or_process) &&
+            tacit.at("AssimilationStage") ==
+                static_cast<int>(ResearchTacitAssimilationStage::native_practice),
+        "Player17 tacit enum values");
+  check(tacit.at("ScopeRef") == "scope-reference",
+        "Player17 preserves tacit scope reference string");
 }
 
 void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
@@ -169,6 +258,7 @@ int main(int argc, char **argv) try {
   const fs::path fixture = fs::absolute(argv[1]);
   const fs::path research_root = fs::absolute(argv[2]);
   const fs::path native_output = fs::absolute(argv[3]);
+  check_player_research_enum_encoding();
   const auto fixture_bytes = read_bytes(fixture);
   check(sha256(fixture_bytes) ==
             "138CDDA12594A77352294FE265F0632FCF9D3CAE9DEEDBAE869D51FE30ED8FCF",

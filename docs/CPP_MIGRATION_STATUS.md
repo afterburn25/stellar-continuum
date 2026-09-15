@@ -53,12 +53,28 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. An early 500-system campaign running at 8X now averages ~16.7 ms on this host through day 160, including manual saves and exact paused reloads. Busy developed campaigns and broad-hardware 60 FPS remain unproven.
+5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. A developed 500-system campaign with 24 paid ships and nine total colonies averages ~16.7 ms on this host at 8X, including manual saves and exact paused reloads. Combat, much larger fleets and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
-Latest Codex checkpoint adds a separate opt-in running-campaign profiler. The
+Latest Codex checkpoint fixes a real developed-campaign save failure: Player17
+research outcomes were written as string enum names but its strict reader expects
+integers. The writer now uses typed values at the seven affected outcome, tacit
+asset and foreign-assessment fields. The reader, standalone research codecs and
+simulation rules are unchanged. Both failed-hypothesis and successful progression
+tests now restore and recapture the complete payload with no fields omitted.
+
+The optional developed fixture pays for 24 ships through ordinary research and
+shipyard commands, then issues real routes on day 10154. Four actual Vulkan
+active/paused runs and two default system runs passed at 720p/1080p. All 24 fleets
+move in each measured interval; they have arrived by the final 1080p save. Interval
+means are 16.713/16.714 ms; p95 17.401/17.604 ms. Eight focused CTests and 17 Python
+checks pass. See NATIVE_FRESH_PROGRESSION.md and NATIVE_CLIENT_VALIDATION.md for
+offline preparation, full workload, source hash and timing limits. Previous head
+`370079d0` passed native CI `34955639654`; this repair needs its own CI.
+
+The preceding Codex checkpoint adds a separate opt-in running-campaign profiler. The
 canonical 500-system Player campaign runs 600 measured frames at 8X using real
 elapsed time and UI speed/resume/pause input, with a manual save during play.
 It proves time advances after that save completes, pauses for the final save,

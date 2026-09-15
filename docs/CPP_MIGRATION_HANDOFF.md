@@ -330,16 +330,58 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   explicitly documented fixture, then optimize measured costs with observer and
   whole save/reload checks. Keep required simulation steps authoritative.
 
+## Developed campaign save repair and fleet workload
+
+- A real 24-ship campaign written by the native game failed explicit loading at
+  research restore (82%): `Format v17 Adaptive Research state could not be decoded.`
+  `AdaptiveResearch.Civilizations[0].Research.Outcomes.RecentRecords[0].Outcome`
+  contained `"hypothesisSupported"`; the canonical ordered reader requires Int32.
+  The existing empty-outcome fresh fixture could not expose this writer defect.
+- Player17 now writes typed numeric values only at schema-defined paths: Outcome,
+  tacit ScopeKind/AssimilationStage, and four foreign-assessment axes. Standalone
+  Adaptive Research codecs, strict reader, C# fixtures and simulation stay unchanged.
+  The populated enum regression preserves ordinary text. Negative seed 115500 and
+  positive 115501 additionally restore/activate/recapture every payload field and
+  array element; JSON dictionary member order is intentionally ignored (Leadership
+  is reordered on restore), without excluding any campaign fields.
+- The maintained fresh-progression executable can export `--profile-save` to an
+  absolute nonexistent path. It uses actual controllers and paid research/builds:
+  12 scouts + 12 science vessels, day 10154, treasury 346.233, nine total colonies
+  (three owned). All ships receive ordinary routes and enter transit before save.
+  Offline Developer stepping is disclosed; no funds, capabilities or fleets are
+  injected. An initial 32-ship attempt exhausted the real budget after 25 ships;
+  the reproducible benchmark uses 24 rather than bypassing that limit.
+- `validate_native_campaign_profile` accepts `initial_save` and
+  `minimum_moving_fleets=24`. It copies the source to an isolated slot, requires
+  actual motion by stable fleet ID, performs two 600-frame Player-policy runs at
+  8X and two independent paused reloads, and verifies the original source bytes.
+  All 24 move in both intervals; all remain in transit after 720p but have arrived
+  by the end of 1080p. This is not a claim of 24 transiting ships on every frame.
+- Eight focused CTests, 17 Python checks, strict MSVC build, four active/paused
+  Vulkan launches and two default system runs pass. Interval mean/p95/p99:
+  720p 16.713/17.401/18.516 ms; 1080p 16.714/17.604/18.560 ms. Update mean/max:
+  0.476/6.154 and 0.385/3.586 ms. Days 10154 -> 10234.2218632 -> 10314.4471072.
+  The 1080p capture was inspected for finished art, fleet outliner and final pause.
+- Source `work/developed-fleet-24-fixed.player17.json` SHA-256:
+  `b5a57777a4eacc57458ee92c5ebc74cc77aaea5409732e86d665e7151915a17f`.
+  Results `work/developed-fleet-24-profile.json` and
+  `work/developed-fleet-fixed-system.json`; logs
+  `native-developed-fleet-fixed-{validation,runtime}.log` and
+  `native-developed-fleet-final-unit.log`. The older active fixture and runtime
+  failure log remain local generated evidence; do not hand-edit them into passing.
+- Prior `370079d0` passed native CI `34955639654`. This repair requires its own run.
+  Engine 0.1.58 is still an unmerged candidate in PR #332, not a sealed release.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- System and galaxy CPU imagery preparation is now staged as above. Early active
-  campaigns have a baseline; next profile developed/busy campaigns with real
-  fleet/colony workloads. Avoid repeatedly profiling the same maps or
-  changing renderer settings for an unproven cold-tail cause. Keep Core access
-  and GPU/window work on the owner thread, preserve final pixels and capture gates.
+- System and galaxy CPU imagery preparation is staged; early and developed
+  24-ship campaigns now have measured baselines. Prioritize the missing native
+  presentation/audio below. Revisit timing for new failures or substantially
+  larger fleet/combat workloads, not repeated unchanged maps or speculative
+  renderer settings. Keep Core access and GPU/window work on the owner thread.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.
 - `cleanMachineTest` still needs a separate machine/VM.

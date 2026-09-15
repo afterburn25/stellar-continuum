@@ -1,6 +1,7 @@
 """Opt-in running-campaign timing with a separate exact paused reload proof."""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -37,7 +38,7 @@ def validate_campaign_profile(stdout: str, samples: int) -> dict:
     return value
 
 
-def _saved_payload(path: Path, expected_days: float) -> dict:
+def _saved_payload(path: Path, expected_days: float | None = None) -> dict:
     if not path.is_file():
         raise RuntimeError("Active campaign did not write its isolated Player17 save")
     try:
@@ -51,36 +52,97 @@ def _saved_payload(path: Path, expected_days: float) -> dict:
     if not isinstance(systems, list) or len(systems) != 500:
         raise RuntimeError("Active campaign changed the 500-system catalog")
     days = _metric(payload.get("SimulationDays"), "saved SimulationDays")
-    if not math.isclose(days, expected_days, rel_tol=0., abs_tol=1e-9):
+    if expected_days is not None and not math.isclose(days, expected_days, rel_tol=0., abs_tol=1e-9):
         raise RuntimeError("Active campaign saved a stale or changed simulation day")
     payload.pop("SavedAtUtc", None)
     return payload
 
 
+def _fleet_workload(payload: dict) -> tuple[dict, dict]:
+    """Summarize actual owned fleets; never create ships or issue orders here."""
+    galaxy = payload["Galaxy"]
+    player = galaxy.get("PlayerCivilizationId")
+    fleets, colonies = galaxy.get("Fleets", []), galaxy.get("Colonies", [])
+    if not isinstance(fleets, list) or not isinstance(colonies, list):
+        raise RuntimeError("Campaign workload has malformed fleet/colony collections")
+    own, routed = {}, []
+    for fleet in fleets:
+        if not isinstance(fleet, dict):
+            raise RuntimeError("Campaign workload has a malformed fleet")
+        if fleet.get("CivilizationId") != player or not fleet.get("IsActive", True):
+            continue
+        identity = fleet.get("Id")
+        if type(identity) is not int or identity in own:
+            raise RuntimeError("Campaign workload has missing or duplicate owned fleet IDs")
+        own[identity] = fleet
+        if fleet.get("TransitPhase", 0) != 0:
+            routed.append(identity)
+    if any(not isinstance(colony, dict) for colony in colonies):
+        raise RuntimeError("Campaign workload has a malformed colony")
+    return {"owned_active_fleets": len(own), "owned_transiting_fleets": len(routed),
+            "transiting_fleet_ids": sorted(routed), "total_colonies": len(colonies),
+            "owned_colonies": sum(c.get("CivilizationId") == player for c in colonies)}, own
+
+
+def _fleet_progress(before: dict, after: dict, minimum: int) -> dict:
+    start, before_fleets = _fleet_workload(before)
+    finish, after_fleets = _fleet_workload(after)
+    if start["owned_transiting_fleets"] < minimum:
+        raise RuntimeError("Campaign lacks the requested active fleet workload")
+    motion = ("X", "Y", "CurrentSystemId", "TransitPhase", "TransitProgress",
+              "LocalTransitPositionX", "LocalTransitPositionY")
+    moved = [identity for identity in start["transiting_fleet_ids"]
+             if identity in after_fleets and any(before_fleets[identity].get(key) !=
+                 after_fleets[identity].get(key) for key in motion)]
+    if len(moved) < minimum:
+        raise RuntimeError("Campaign fleets did not demonstrate the requested transit progress")
+    return {"before": start, "after": finish, "moved_fleet_ids": sorted(moved)}
+
+
 def validate_native_campaign_profile(folder: Path, env: dict[str, str], *,
-                                     profile_frames: int = 600) -> dict:
+                                     profile_frames: int = 600,
+                                     initial_save: Path | None = None,
+                                     minimum_moving_fleets: int = 0) -> dict:
     """Measure fresh/running reloads and verify a paused round trip after each.
 
-    This establishes a baseline for the canonical 500-system early campaign. It
-    does not manufacture a populated late-game fixture or certify every GPU.
+    An initial save is copied into isolation, never opened by the game directly.
+    Workload checks prove actual fleet progress, not just passing simulation days.
     """
     validate_profile_frames(profile_frames)
     if profile_frames == 0:
         raise RuntimeError("Active campaign profiling requires a nonzero frame count")
+    if type(minimum_moving_fleets) is not int or not 0 <= minimum_moving_fleets <= 2500:
+        raise RuntimeError("Minimum moving fleets must be an integer from 0 to 2500")
+    if minimum_moving_fleets and initial_save is None:
+        raise RuntimeError("An active fleet workload requires an explicit initial save")
+    original_bytes, initial_payload = None, None
+    if initial_save is not None:
+        initial_save = initial_save.resolve()
+        initial_payload = _saved_payload(initial_save)
+        original_bytes = initial_save.read_bytes()
+        start, _ = _fleet_workload(initial_payload)
+        if start["owned_transiting_fleets"] < minimum_moving_fleets:
+            raise RuntimeError("Initial save lacks the requested active fleet workload")
     folder = folder.resolve()
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    profiles, cold_profiles, states, captures, diagnostics = [], [], [], [], []
-    before_days = 0.
+    profiles, cold_profiles, states, captures, diagnostics, workloads = [], [], [], [], [], []
+    before_days = initial_payload["SimulationDays"] if initial_payload is not None else 0.
     with tempfile.TemporaryDirectory(prefix="stellar-active-campaign-") as temporary:
         work = Path(temporary)
         save = work / "active.player17.json"
+        if original_bytes is not None:
+            save.write_bytes(original_bytes)
         for width, height, reload in ((1280, 720, False), (1920, 1080, True)):
+            starting_payload = _saved_payload(save, before_days) if save.is_file() else None
+            if starting_payload is not None and minimum_moving_fleets:
+                if _fleet_workload(starting_payload)[0]["owned_transiting_fleets"] < minimum_moving_fleets:
+                    raise RuntimeError("Reload lacks the requested active fleet workload")
             capture = work / f"active-{width}x{height}.bmp"
             args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                     "--save-path", str(save), "--width", str(width), "--height", str(height),
                     "--campaign-profile", str(capture), "--profile-frames", str(profile_frames)]
-            if reload:
+            if reload or initial_payload is not None:
                 args.append("--load")
             result = subprocess.run(args, cwd=work, env=clean_env, capture_output=True,
                                     text=True, timeout=120 + profile_frames // 15)
@@ -99,6 +161,8 @@ def validate_native_campaign_profile(folder: Path, env: dict[str, str], *,
             cold_profiles.append(validate_cold_profile(result.stdout))
             _bmp(capture, width, height)
             baseline = _saved_payload(save, state["after_days"])
+            if starting_payload is not None:
+                workloads.append(_fleet_progress(starting_payload, baseline, minimum_moving_fleets))
             before_days = state["after_days"]
             evidence = folder.parent / f"{folder.name}-active-{width}x{height}.bmp"
             shutil.copy2(capture, evidence)
@@ -125,7 +189,11 @@ def validate_native_campaign_profile(folder: Path, env: dict[str, str], *,
             if _saved_payload(save, before_days) != baseline:
                 raise RuntimeError("Paused validation modified the next active run's source")
             diagnostics.append(paused.stdout.strip())
+    if initial_save is not None and initial_save.read_bytes() != original_bytes:
+        raise RuntimeError("Campaign profile source save changed during validation")
     return {"nativeActiveCampaignProfile": True, "nativeActiveCampaignPausedReload": True,
             "campaignStates": states, "campaignProfiles": profiles,
             "campaignColdProfiles": cold_profiles, "campaignCaptures": captures,
-            "campaignDiagnostics": diagnostics}
+            "campaignDiagnostics": diagnostics, "campaignWorkloads": workloads,
+            "campaignInitialSaveSha256": hashlib.sha256(original_bytes).hexdigest()
+                if original_bytes is not None else None}
