@@ -18,6 +18,52 @@ from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
+class NativeAssetCheckoutTests(unittest.TestCase):
+    def test_reviewed_text_hashes_survive_git_checkout_settings(self):
+        # Reproduce an index containing normalized Git blobs, then check out
+        # with either developer setting. Hash verification stays byte-exact.
+        sources = {}
+
+        def collect(value):
+            if isinstance(value, dict):
+                if "source" in value and "sha256" in value:
+                    path = value["source"]
+                    if Path(path).suffix in (".md", ".txt"):
+                        sources[path] = value["sha256"]
+                for child in value.values():
+                    collect(child)
+
+        for manifest in (exporter.ROOT / "export").glob("native-*-assets.json"):
+            collect(json.loads(manifest.read_text(encoding="utf-8")))
+        self.assertTrue(sources, "No reviewed native text assets were found")
+        with tempfile.TemporaryDirectory(prefix="stellar-asset-checkout-") as temporary:
+            checkout = Path(temporary)
+
+            def git(*args):
+                subprocess.run(["git", *args], cwd=checkout, check=True,
+                               capture_output=True, timeout=30)
+
+            git("init", "--quiet")
+            (checkout / ".gitattributes").write_bytes(
+                (exporter.ROOT / ".gitattributes").read_bytes())
+            for source in sources:
+                target = checkout / source
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((exporter.ROOT / source).read_bytes().replace(b"\r\n", b"\n"))
+            git("-c", "core.autocrlf=false", "-c", "core.safecrlf=false", "add", "--", ".gitattributes", *sources)
+            for autocrlf in ("true", "false"):
+                # Git can skip an existing file whose stat entry is current;
+                # remove only these known fixture files to force a fresh checkout.
+                for source in sources:
+                    target = (checkout / source).resolve()
+                    self.assertTrue(target.is_relative_to(checkout.resolve()))
+                    target.unlink()
+                git("-c", f"core.autocrlf={autocrlf}", "checkout-index", "--all", "--force")
+                for source, expected in sources.items():
+                    with self.subTest(autocrlf=autocrlf, source=source):
+                        self.assertEqual(hashlib.sha256((checkout / source).read_bytes()).hexdigest(), expected)
+
+
 class NativeClientDependencyTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="stellar-dependency-test-")
