@@ -3,7 +3,7 @@ on:
   push:
     branches: ["engine/**"]
   pull_request:
-    branches: [integration, main]
+    branches: [integration, main, "engine/stellar-engine-migration"]
     paths:
       - "engine/**"
       - "core/**"
@@ -77,6 +77,10 @@ on:
       - "third_party/**"
       - "tools/stellar-export/**"
       - "export/**"
+      - ".gitattributes"
+      - "assets/visual/**"
+      - "docs/SOL_VISUAL_SOURCES.md"
+      - "docs/engine/NATIVE_*_SOURCES.md"
       - "CMake*"
       - ".github/workflows/stellar-engine.yml"
   workflow_dispatch:
