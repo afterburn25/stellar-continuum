@@ -31,7 +31,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Legacy research | Technology* | `core/legacy_research`, `legacy_technology` | OK | `legacy_*_parity` | PARITY VERIFIED | Superseded path, kept for saves |
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
-| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | `native_diplomacy_controller`, `native_diplomacy_workspace` | PARTIAL | Observer-safe projection + RELATIONS workspace wired to top bar; playthrough smoke pending |
+| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | focused C++/Python checks + Vulkan smoke | PARTIAL | Observer-safe RELATIONS workspace; claims/composer/grievance remain partial |
 | Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
@@ -49,14 +49,14 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Diplomacy workspace exists but has no real-playthrough/Vulkan smoke evidence yet.
+1. Diplomacy presentation remains partial: no claims/border warnings, demand/trade composer, or grievance display.
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
 5. Smoke timing is ~20.6–21.2 ms mean / ~33.4–33.7 ms p95 for system/galaxy; render-present includes VSync wait, so 60 FPS is not established.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
-## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
+## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
   144/144 headless CTest baseline, 61 Python export checks.
@@ -75,8 +75,12 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Codex candidate checkpoint (PR #332)
 
+- Integrated Devin's diplomacy code `410753da` as `c9338699` and reviewed the real campaign path. Contact selection now refreshes immediately, unknown contacts retain stable selection, confirmation commands use their original generation/revision, and proposal terms/precise relationship changes invalidate stale commands. Scroll clipping, intelligence layout, and 720p filter labels were repaired.
+- Communications-v2 PNGs now load through canonical species IDs and are explicitly packaged. Four lazy entries are capped at 32 MiB; the actual decoded artwork occupies 24 MiB. Missing declared artwork fails with its path/cause; unknown species retain the signal fallback.
+- Final combined validation passed seven focused CTests, 18 diplomacy-validator Python checks, 45 package/checkout Python checks, and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. Diplomacy acceptance, the visible new agreement, four known/unknown captures, unrelated-state preservation, and exact paused Player17 reload are covered by the maintained exporter. See `native-diplomacy-final.log` and `work/native-diplomacy-final-{diplomacy,system,galaxy}.json`.
+- Final diplomacy frame means were 17.790–17.791 ms and p95 28.367–32.663 ms; system/galaxy means 20.748–21.215 ms and p95 33.458–33.937 ms. This is not a sustained 60 FPS result. Full graphical parity, audio, orbital structures and final surface scenery remain outstanding.
 - Fresh-checkout byte stability is covered for reviewed native assets; soft-circle submission now preserves the legacy 20-segment pixels and ordered blending without per-circle heap allocation or trigonometry.
 - Native system framing now uses measured labels, body/stellar/orbital envelopes and a 12px presentation inset. Selected labels take priority; lower-priority labels hide rather than overlap. Initial travel activation fits visible exits once, while later refreshes preserve pan/zoom.
 - Final evidence: five focused CTests (`native_system_travel`, `native_system_workspace`, `native_system_view`, `native_system_colony_entry`, `native_settlement_workspace`) and seven actual Vulkan galaxy/system/travel launches passed established validators, including exact paused Player17 reload and observer secrecy. See `native-system-layout-tests.log`, `native-system-checkpoint.log`, `work/layout-{galaxy,system,travel}.json`, and `build-native/preview-*.bmp`.
 - Smoke-only timing now records bounded update/scene/render-present mean and p95 before JSON diagnostics. System/galaxy means were about 20.6–21.2 ms and p95 about 33.4–33.7 ms; render-present mean about 16.4–16.6 ms includes VSync wait. This is not a GPU-only measurement or a 60 FPS claim; cold-entry versus steady scene/update spikes remain to investigate.
-- CI trigger coverage was proven green by native workflow `34927971070` for `21ea21d8` (`21ea21d8338b75d5ec09731c5d71ad341857e57d`). The final layout/timing candidate still needs CI at its exact head; this run does not cover uncommitted changes. No release bump, shared merge, full-suite claim, or clean-machine claim is made.
+- The preceding layout/timing head `66c56b897ad04a99d2e662a2fb089cdcc160186b` passed native workflow `34929897092`. The new diplomacy head needs its own CI. Engine 0.1.58 is inherited from Devin's candidate; no new sealed release, shared merge, full-suite or clean-machine claim is made.

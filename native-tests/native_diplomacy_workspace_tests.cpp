@@ -1,5 +1,6 @@
 #include "native_diplomacy_workspace.hpp"
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -19,6 +20,30 @@ void require(bool value, const char *message) {
   return inner.x >= outer.x && inner.y >= outer.y &&
          inner.x + inner.width <= outer.x + outer.width &&
          inner.y + inner.height <= outer.y + outer.height;
+}
+
+[[nodiscard]] bool overlaps(UiRect left, UiRect right) noexcept {
+  return left.x < right.x + right.width && left.x + left.width > right.x &&
+         left.y < right.y + right.height && left.y + left.height > right.y;
+}
+
+void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
+                                  const char *message) {
+  for (const auto &command : draw.overlay) {
+    const auto check_rectangle = [&](UiRect bounds) {
+      if (overlaps(bounds, region) && bounds.height <= region.height &&
+          bounds.x >= region.x &&
+          bounds.x + bounds.width <= region.x + region.width)
+        require(contained(region, bounds), message);
+    };
+    if (const auto *filled = std::get_if<FilledRectangle>(&command))
+      check_rectangle(filled->bounds);
+    else if (const auto *stroked = std::get_if<StrokedRectangle>(&command))
+      check_rectangle(stroked->bounds);
+    else if (const auto *label = std::get_if<Text>(&command);
+             label && label->clip && overlaps(*label->clip, region))
+      require(contained(region, *label->clip), message);
+  }
 }
 
 [[nodiscard]] Point center(UiRect bounds) noexcept {
@@ -81,7 +106,7 @@ void require(bool value, const char *message) {
   selected.fear = .1;
   selected.hostility = .2;
   selected.cooperation = .7;
-  selected.species_id = "terran_baseline";
+  selected.species_id = "pelagic_high_pressure";
   selected.our_access = "UNSPECIFIED";
   selected.their_access = "GRANTED";
   selected.access_summary = "Your access: UNSPECIFIED · Their access: GRANTED";
@@ -140,11 +165,20 @@ int main() try {
   const auto s = layout.scale;
 
   DrawList draw;
-  workspace.render(draw, 1280, 720, nullptr);
+  std::string portrait_path;
+  const NativeDiplomacyWorkspace::PortraitProvider portrait_provider =
+      [&portrait_path](std::string_view path) {
+        portrait_path = path;
+        return std::shared_ptr<const RgbaImage>{};
+      };
+  workspace.render(draw, 1280, 720, &portrait_provider);
   require(has_text(draw, "Nova Concord") && has_text(draw, "CONTACT DIRECTORY") &&
               has_text(draw, "RELATIONSHIP") &&
               has_text(draw, "COMMUNICATION CHANNEL AVAILABLE"),
           "Diplomacy workspace dropped its main panels.");
+  require(portrait_path ==
+              "assets/visual/species/pelagic-high-pressure-communications-v2.png",
+          "Diplomacy workspace requested an obsolete portrait asset.");
 
   // Contact selection emits the source index.
   const UiRect second_row{layout.contact_rows.x + 4.f * s,
@@ -180,8 +214,27 @@ int main() try {
       {InputEventType::LeftPressed, center(accept)}, 1280, 720);
   require(accepted.kind == DiplomacyWorkspaceCommandKind::ProposalAction &&
               accepted.captured && accepted.proposal_id == 11 &&
-              accepted.action == DiplomacyWorkspaceAction::accept_proposal,
+              accepted.action == DiplomacyWorkspaceAction::accept_proposal &&
+              accepted.campaign_generation == 4 &&
+              accepted.diplomacy_revision == 3,
           "Accept button did not emit the proposal command.");
+
+  auto communication_pending = sample_view();
+  communication_pending.selected.has_visible_communication = false;
+  communication_pending.selected.can_attempt_communication = true;
+  NativeDiplomacyWorkspace immediate_action;
+  immediate_action.open();
+  immediate_action.set_view(communication_pending);
+  const UiRect establish{layout.actions.x + 8.f * s, layout.actions.y + 8.f * s,
+                         layout.actions.width - 16.f * s, 30.f * s};
+  const auto established = immediate_action.handle(
+      {InputEventType::LeftPressed, center(establish)}, 1280, 720);
+  require(established.kind == DiplomacyWorkspaceCommandKind::Action &&
+              established.action ==
+                  DiplomacyWorkspaceAction::establish_communication &&
+              established.campaign_generation == 4 &&
+              established.diplomacy_revision == 3,
+          "Immediate diplomacy action lost its state quote.");
 
   // Negotiate opens the term picker; a term opens the confirmation; confirm
   // emits the workspace action against the selected counterpart.
@@ -206,6 +259,7 @@ int main() try {
   require(sent.kind == DiplomacyWorkspaceCommandKind::Action &&
               sent.captured && sent.target_civilization_id == 7 &&
               sent.action == DiplomacyWorkspaceAction::propose_non_aggression &&
+              sent.campaign_generation == 4 && sent.diplomacy_revision == 3 &&
               !workspace.modal_open(),
           "Confirmed negotiation did not emit the proposal action.");
 
@@ -219,19 +273,150 @@ int main() try {
       {InputEventType::LeftPressed, center(confirm)}, 1280, 720);
   require(declared.kind == DiplomacyWorkspaceCommandKind::Action &&
               declared.action == DiplomacyWorkspaceAction::declare_war &&
-              declared.target_civilization_id == 7,
+              declared.target_civilization_id == 7 &&
+              declared.campaign_generation == 4 &&
+              declared.diplomacy_revision == 3,
           "War confirmation emitted the wrong action.");
 
-  // Selection survives a refreshed view keyed by civilization id.
+  // Explicit selection survives refresh and reordering by contact id, even for
+  // an unidentified contact and an incoming view that still selects Alpha.
   auto next = sample_view();
-  next.contacts.insert(next.contacts.begin(), next.contacts[1]);
+  std::swap(next.contacts[0], next.contacts[1]);
   next.contacts[0].source_index = 0;
-  next.contacts[0].contact_id = "contact-beta";
   next.contacts[1].source_index = 1;
-  next.contacts[2].source_index = 2;
   workspace.set_view(next);
-  require(workspace.selected_contact_index() == 1,
-          "Selection did not track the civilization across reordering.");
+  require(workspace.selected_contact_index() == 0,
+          "Explicit contact selection did not survive reordering by contact id.");
+
+  // A changed diplomacy quote invalidates a modal before old terms can issue
+  // an action under the refreshed state.
+  workspace.set_view(sample_view());
+  (void)workspace.handle({InputEventType::LeftPressed, center(negotiate)},
+                         1280, 720);
+  require(workspace.modal_open(), "Negotiation modal did not reopen.");
+  auto stale = sample_view();
+  ++stale.diplomacy_revision;
+  workspace.set_view(stale);
+  require(!workspace.modal_open() &&
+              workspace.notice().contains("Diplomacy state changed"),
+          "A changed diplomacy revision left an old modal actionable.");
+  const auto stale_confirm = workspace.handle(
+      {InputEventType::LeftPressed, center(confirm)}, 1280, 720);
+  require(stale_confirm.kind != DiplomacyWorkspaceCommandKind::Action,
+          "A dismissed stale modal still issued an action.");
+
+  // Contact rows and proposal buttons cannot be activated through a clipped
+  // edge after scrolling.
+  auto crowded = sample_view();
+  for (int index = 0; index < 8; ++index) {
+    auto contact = crowded.contacts.front();
+    contact.contact_id = "contact-extra-" + std::to_string(index);
+    contact.source_index = static_cast<std::size_t>(index + 2);
+    crowded.contacts.push_back(std::move(contact));
+  }
+  NativeDiplomacyWorkspace clipped_contacts;
+  clipped_contacts.open();
+  clipped_contacts.set_view(crowded);
+  (void)clipped_contacts.handle(
+      {InputEventType::Wheel, center(layout.contact_rows), {}, -1.f}, 1280,
+      720);
+  const auto below_contact_rows = Point{layout.contact_rows.x +
+                                            layout.contact_rows.width * .5f,
+                                        layout.contact_rows.y +
+                                            layout.contact_rows.height + 2.f};
+  const auto clipped_contact = clipped_contacts.handle(
+      {InputEventType::LeftPressed, below_contact_rows}, 1280, 720);
+  require(clipped_contact.kind != DiplomacyWorkspaceCommandKind::SelectContact,
+          "A contact row accepted a click outside its visible region.");
+  DrawList clipped_contact_draw;
+  clipped_contacts.render(clipped_contact_draw, 1280, 720, nullptr);
+  require_scrolled_draw_clipped(clipped_contact_draw, layout.contact_rows,
+                                "A contact row rendered beyond its visible region.");
+
+  auto many_proposals = sample_view();
+  for (int index = 0; index < 5; ++index) {
+    auto proposal = many_proposals.proposals.front();
+    proposal.proposal_id = 100 + index;
+    many_proposals.proposals.push_back(std::move(proposal));
+  }
+  NativeDiplomacyWorkspace clipped_proposals;
+  clipped_proposals.open();
+  clipped_proposals.set_view(many_proposals);
+  (void)clipped_proposals.handle(
+      {InputEventType::LeftPressed, center(proposals_tab)}, 1280, 720);
+  (void)clipped_proposals.handle(
+      {InputEventType::Wheel, center(layout.detail_rows), {}, -3.f}, 1280,
+      720);
+  const auto clipped_proposal = clipped_proposals.handle(
+      {InputEventType::LeftPressed,
+       {accept.x + accept.width * .5f, layout.detail_rows.y - 1.f}},
+      1280, 720);
+  require(clipped_proposal.kind != DiplomacyWorkspaceCommandKind::ProposalAction,
+          "A proposal button accepted a click outside its visible region.");
+  DrawList clipped_proposal_draw;
+  clipped_proposals.render(clipped_proposal_draw, 1280, 720, nullptr);
+  require_scrolled_draw_clipped(clipped_proposal_draw, layout.detail_rows,
+                                "A proposal card rendered beyond its detail region.");
+  (void)clipped_proposals.handle(
+      {InputEventType::Wheel, center(layout.detail_rows), {}, 10000.f}, 1280,
+      720);
+  const auto restored_proposal = clipped_proposals.handle(
+      {InputEventType::LeftPressed, center(accept)}, 1280, 720);
+  require(restored_proposal.kind == DiplomacyWorkspaceCommandKind::ProposalAction &&
+              restored_proposal.proposal_id == 11,
+          "Detail scrolling did not stay within active proposal content.");
+
+  // The intelligence control sits between its evidence and unresolved cards,
+  // and both drawing and hit testing respect the detail viewport.
+  NativeDiplomacyWorkspace intelligence;
+  intelligence.open();
+  intelligence.set_view(sample_view());
+  const UiRect intelligence_tab{
+      layout.tabs.x + 3.f * ((layout.tabs.width - 8.f * s * 4.f) / 5.f +
+                              8.f * s),
+      layout.tabs.y, (layout.tabs.width - 8.f * s * 4.f) / 5.f,
+      layout.tabs.height};
+  (void)intelligence.handle({InputEventType::LeftPressed, center(intelligence_tab)},
+                            1280, 720);
+  DrawList intelligence_draw;
+  intelligence.render(intelligence_draw, 1280, 720, nullptr);
+  require_scrolled_draw_clipped(intelligence_draw, layout.detail_rows,
+                                "An intelligence control rendered beyond its detail region.");
+  std::optional<Point> focus_label;
+  std::optional<Point> unresolved_label;
+  for (const auto &command : intelligence_draw.overlay)
+    if (const auto *label = std::get_if<Text>(&command)) {
+      if (label->value.contains("Last observation")) focus_label = label->at;
+      if (label->value == "UNRESOLVED INFORMATION") unresolved_label = label->at;
+    }
+  require(focus_label && unresolved_label &&
+              focus_label->y + 34.f * s <= unresolved_label->y - 8.f * s,
+          "The intelligence focus control overlaps unresolved information.");
+
+  const auto compact_layout = DiplomacyWorkspaceLayout::for_viewport(640, 360);
+  const auto compact_s = compact_layout.scale;
+  const UiRect compact_intelligence_tab{
+      compact_layout.tabs.x +
+          3.f * ((compact_layout.tabs.width - 8.f * compact_s * 4.f) / 5.f +
+                 8.f * compact_s),
+      compact_layout.tabs.y,
+      (compact_layout.tabs.width - 8.f * compact_s * 4.f) / 5.f,
+      compact_layout.tabs.height};
+  NativeDiplomacyWorkspace clipped_focus;
+  clipped_focus.open();
+  clipped_focus.set_view(sample_view());
+  (void)clipped_focus.handle(
+      {InputEventType::LeftPressed, center(compact_intelligence_tab)}, 640, 360);
+  (void)clipped_focus.handle(
+      {InputEventType::Wheel, center(compact_layout.detail_rows), {}, -2.f},
+      640, 360);
+  const auto hidden_focus = clipped_focus.handle(
+      {InputEventType::LeftPressed,
+       {compact_layout.detail_rows.x + compact_layout.detail_rows.width * .5f,
+        compact_layout.detail_rows.y - 1.f}},
+      640, 360);
+  require(hidden_focus.kind != DiplomacyWorkspaceCommandKind::FocusSystem,
+          "A clipped intelligence control accepted an off-region click.");
 
   // The close control emits Close.
   const auto closed = workspace.handle(

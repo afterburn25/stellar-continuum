@@ -84,11 +84,22 @@ constexpr std::pair<DiplomacyWorkspaceTab, const char *> tab_labels[] = {
   const auto s = layout.scale;
   const auto columns = 3;
   const auto gap = 4.f * s;
-  const auto width =
-      (layout.contact_panel.width - 16.f * s - gap * (columns - 1)) / columns;
+  const auto available =
+      layout.contact_panel.width - 16.f * s - gap * (columns - 1);
+  const auto first = (index / columns) * columns;
+  const auto weight = [](std::size_t item) {
+    return static_cast<float>(std::string_view(filter_labels[item].second).size() + 3);
+  };
+  float total_weight = 0.f, preceding_weight = 0.f;
+  for (auto item = first; item < first + columns; ++item) {
+    total_weight += weight(item);
+    if (item < index) preceding_weight += weight(item);
+  }
+  // Longer filter labels receive more room without shrinking 720p text.
+  const auto width = available * weight(index) / total_weight;
   const auto column = static_cast<float>(index % columns);
   const auto band = static_cast<float>(index / columns);
-  return {layout.contact_panel.x + 8.f * s + column * (width + gap),
+  return {layout.contact_panel.x + 8.f * s + available * preceding_weight / total_weight + column * gap,
           layout.contact_panel.y + 34.f * s + band * (26.f * s + gap), width,
           26.f * s};
 }
@@ -171,7 +182,9 @@ constexpr std::pair<DiplomacyWorkspaceTab, const char *> tab_labels[] = {
 }
 
 [[nodiscard]] std::string species_portrait_path(std::string_view species_id) {
-  return "assets/visual/species/" + std::string(species_id) + ".jpg";
+  auto asset_id = std::string(species_id);
+  std::ranges::replace(asset_id, '_', '-');
+  return "assets/visual/species/" + asset_id + "-communications-v2.png";
 }
 
 } // namespace
@@ -268,24 +281,38 @@ void NativeDiplomacyWorkspace::close() noexcept {
 }
 bool NativeDiplomacyWorkspace::visible() const noexcept { return visible_; }
 void NativeDiplomacyWorkspace::set_view(NativeDiplomacyView view) {
-  const auto previous_selection =
-      view_ && view_->selected.present
-          ? view_->selected.target_civilization_id
-          : std::optional<int>{};
+  auto previous_selection = selected_contact_id_;
+  if (!previous_selection && view_ && view_->selected.present &&
+      view_->selected.contact_index < view_->contacts.size())
+    previous_selection =
+        view_->contacts[view_->selected.contact_index].contact_id;
+  const auto quote_changed =
+      modal_ && view_ &&
+      (view_->campaign_generation != view.campaign_generation ||
+       view_->diplomacy_revision != view.diplomacy_revision);
   view_ = std::move(view);
   if (previous_selection) {
     const auto found = std::ranges::find_if(
         view_->contacts, [&](const auto &contact) {
-          return contact.civilization_id == previous_selection;
+          return contact.contact_id == *previous_selection;
         });
-    if (found != view_->contacts.end())
+    if (found != view_->contacts.end()) {
       selected_contact_index_ = found->source_index;
+      selected_contact_id_ = found->contact_id;
+    }
   }
   reconcile_selection();
+  if (quote_changed) {
+    modal_.reset();
+    set_notice("Diplomacy state changed. Reopen the action to review current "
+               "terms.",
+               false);
+  }
 }
 void NativeDiplomacyWorkspace::discard_campaign() {
   view_.reset();
   selected_contact_index_ = 0;
+  selected_contact_id_.reset();
   filter_ = NativeDiplomacyContactFilter::all;
   tab_ = DiplomacyWorkspaceTab::agreements;
   modal_.reset();
@@ -314,10 +341,72 @@ const std::string &NativeDiplomacyWorkspace::notice() const noexcept {
 void NativeDiplomacyWorkspace::reconcile_selection() {
   if (!view_ || view_->contacts.empty()) {
     selected_contact_index_ = 0;
+    selected_contact_id_.reset();
     return;
   }
-  selected_contact_index_ =
-      std::min(selected_contact_index_, view_->contacts.size() - 1);
+  const auto selected_contact = std::ranges::find_if(
+      view_->contacts, [&](const auto &contact) {
+        return contact.source_index == selected_contact_index_;
+      });
+  if (selected_contact != view_->contacts.end()) {
+    selected_contact_id_ = selected_contact->contact_id;
+    return;
+  }
+  const auto &fallback = view_->contacts.front();
+  selected_contact_index_ = fallback.source_index;
+  selected_contact_id_ = fallback.contact_id;
+}
+float NativeDiplomacyWorkspace::detail_scroll_limit(
+    const DiplomacyWorkspaceLayout &layout) const noexcept {
+  if (!view_) return 0.f;
+  const auto s = layout.scale;
+  const auto card_bottom = [s](std::size_t index, float height) {
+    return 8.f * s + static_cast<float>(index) * (height + 8.f * s) +
+           height;
+  };
+  float content = 0.f;
+  switch (tab_) {
+  case DiplomacyWorkspaceTab::agreements: {
+    std::size_t index = 0;
+    if (view_->selected.present && view_->selected.target_civilization_id)
+      content = std::max(content, card_bottom(index++, 52.f * s));
+    if (view_->agreements.empty())
+      content = std::max(content, card_bottom(index, 64.f * s));
+    else
+      for (; index < view_->agreements.size() +
+                           (view_->selected.present &&
+                                    view_->selected.target_civilization_id
+                                ? 1u
+                                : 0u);
+           ++index)
+        content = std::max(content, card_bottom(index, 64.f * s));
+    break;
+  }
+  case DiplomacyWorkspaceTab::proposals:
+    content = card_bottom(view_->proposals.empty() ? 0 :
+                                                    view_->proposals.size() - 1,
+                          view_->proposals.empty() ? 64.f * s : 108.f * s);
+    break;
+  case DiplomacyWorkspaceTab::history:
+    content = card_bottom(view_->history.empty() ? 0 : view_->history.size() - 1,
+                          view_->history.empty() ? 64.f * s : 62.f * s);
+    break;
+  case DiplomacyWorkspaceTab::intelligence:
+    if (view_->contacts.empty())
+      content = card_bottom(0, 64.f * s);
+    else if (view_->selected.present) {
+      const auto &contact = view_->contacts[view_->selected.contact_index];
+      content = 8.f * s + 62.f * s + 8.f * s +
+                (contact.last_observed_system_id ? 34.f * s + 8.f * s : 0.f) +
+                70.f * s;
+    }
+    break;
+  case DiplomacyWorkspaceTab::overview:
+    content = card_bottom(view_->contacts.empty() ? 0 : view_->contacts.size() - 1,
+                          view_->contacts.empty() ? 64.f * s : 44.f * s);
+    break;
+  }
+  return std::max(0.f, content - layout.detail_rows.height + 8.f * s);
 }
 std::vector<const NativeDiplomacyContact *>
 NativeDiplomacyWorkspace::filtered_contacts() const {
@@ -343,7 +432,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.detail_rows.contains(event.position)) {
-      detail_scroll_ = std::max(0.f, detail_scroll_ - event.wheel_y * 26.f);
+      detail_scroll_ = std::clamp(detail_scroll_ - event.wheel_y * 26.f, 0.f,
+                                  detail_scroll_limit(layout));
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.surface.contains(event.position))
@@ -367,8 +457,9 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
           next.description =
               "Counterpart: " + view_->selected.contact_name;
           next.action = modal.terms[index].second;
-          next.target_civilization_id =
-              view_->selected.target_civilization_id;
+          next.target_civilization_id = modal.target_civilization_id;
+          next.campaign_generation = modal.campaign_generation;
+          next.diplomacy_revision = modal.diplomacy_revision;
           next.confirm_label = next.action ==
                                            DiplomacyWorkspaceAction::grant_access ||
                                        next.action ==
@@ -386,6 +477,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
                                         true};
       command.action = modal.action;
       command.target_civilization_id = modal.target_civilization_id;
+      command.campaign_generation = modal.campaign_generation;
+      command.diplomacy_revision = modal.diplomacy_revision;
       modal_.reset();
       return command;
     }
@@ -417,11 +510,10 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
   const auto rows = filtered_contacts();
   for (std::size_t index = 0; index < rows.size(); ++index) {
     const auto bounds = contact_row(layout, index, contact_scroll_);
-    if (bounds.y >= layout.contact_rows.y + layout.contact_rows.height ||
-        bounds.y + bounds.height <= layout.contact_rows.y)
-      continue;
-    if (bounds.contains(event.position)) {
+    const auto clipped = intersection(bounds, layout.contact_rows);
+    if (clipped && clipped->contains(event.position)) {
       selected_contact_index_ = rows[index]->source_index;
+      selected_contact_id_ = rows[index]->contact_id;
       return {DiplomacyWorkspaceCommandKind::SelectContact, true,
               selected_contact_index_};
     }
@@ -450,6 +542,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
             DiplomacyWorkspaceCommandKind::Action, true};
         command.action = DiplomacyWorkspaceAction::establish_communication;
         command.target_civilization_id = s.target_civilization_id;
+        command.campaign_generation = view_->campaign_generation;
+        command.diplomacy_revision = view_->diplomacy_revision;
         return command;
       }
       ++action_index;
@@ -460,6 +554,9 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal.negotiation = true;
         modal.title = "NEGOTIATION";
         modal.description = "Choose the agreement you want to propose.";
+        modal.target_civilization_id = s.target_civilization_id;
+        modal.campaign_generation = view_->campaign_generation;
+        modal.diplomacy_revision = view_->diplomacy_revision;
         const auto add = [&](const char *name,
                              DiplomacyWorkspaceAction action, bool legal) {
           if (legal) modal.terms.emplace_back(name, action);
@@ -489,6 +586,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
             "may be affected.";
         modal.action = DiplomacyWorkspaceAction::declare_war;
         modal.target_civilization_id = s.target_civilization_id;
+        modal.campaign_generation = view_->campaign_generation;
+        modal.diplomacy_revision = view_->diplomacy_revision;
         modal.danger = true;
         modal.confirm_label = "DECLARE WAR";
         modal_ = std::move(modal);
@@ -507,12 +606,16 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
           {proposal.can_withdraw, DiplomacyWorkspaceAction::withdraw_proposal}};
       for (int which = 0; which < 3; ++which) {
         if (!buttons[which].first) continue;
-        if (proposal_button(layout, card, which, detail_scroll_)
-                .contains(event.position)) {
+        const auto clipped = intersection(
+            proposal_button(layout, card, which, detail_scroll_),
+            layout.detail_rows);
+        if (clipped && clipped->contains(event.position)) {
           DiplomacyWorkspaceCommand command{
               DiplomacyWorkspaceCommandKind::ProposalAction, true};
           command.action = buttons[which].second;
           command.proposal_id = proposal.proposal_id;
+          command.campaign_generation = view_->campaign_generation;
+          command.diplomacy_revision = view_->diplomacy_revision;
           return command;
         }
       }
@@ -525,7 +628,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       const UiRect focus{layout.detail_rows.x + 16.f * s2,
                          layout.detail_rows.y + 78.f * s2 - detail_scroll_,
                          layout.detail_rows.width - 32.f * s2, 34.f * s2};
-      if (focus.contains(event.position))
+      if (const auto clipped = intersection(focus, layout.detail_rows);
+          clipped && clipped->contains(event.position))
         return {DiplomacyWorkspaceCommandKind::FocusSystem, true, 0,
                 std::nullopt, std::nullopt,
                 DiplomacyWorkspaceAction::establish_communication,
@@ -588,32 +692,28 @@ void NativeDiplomacyWorkspace::render(
       continue;
     const auto &contact = *rows[index];
     const bool chosen = contact.source_index == selected_contact_index_;
-    fill(out, bounds, chosen ? selected
-                             : bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, chosen ? accent : border);
     const auto clip = intersection(bounds, layout.contact_rows);
     if (!clip) continue;
-    text(out, {bounds.x + 8.f * s, bounds.y + 5.f * s, bounds.width - 16.f * s,
-               18.f * s},
-         contact.display_name, bright, layout.body_font_pixels);
-    out.overlay.back() = Text{{bounds.x + 8.f * s, bounds.y + 5.f * s},
-                              contact.display_name,
-                              bright,
-                              layout.body_font_pixels,
-                              bounds.width - 16.f * s,
-                              *clip};
-    text(out, {bounds.x + 8.f * s, bounds.y + 23.f * s,
-               bounds.width - 16.f * s, 16.f * s},
-         contact.status, gold, layout.small_font_pixels);
-    text(out, {bounds.x + 8.f * s, bounds.y + 39.f * s,
-               bounds.width - 16.f * s, 16.f * s},
-         contact.identified
-             ? contact.communication
-             : "Identity confidence " +
-                   std::to_string(
-                       static_cast<int>(std::lround(contact.confidence * 100.))) +
-                   "%",
-         muted, layout.small_font_pixels);
+    fill(out, *clip, chosen ? selected
+                            : bounds.contains(pointer_) ? hover : row);
+    stroke(out, *clip, chosen ? accent : border);
+    const auto clipped_text = [&](float y, std::string value, Color color,
+                                  int pixels) {
+      out.overlay.emplace_back(Text{{bounds.x + 8.f * s, y}, std::move(value),
+                                    color, pixels, bounds.width - 16.f * s,
+                                    *clip});
+    };
+    clipped_text(bounds.y + 5.f * s, contact.display_name, bright,
+                 layout.body_font_pixels);
+    clipped_text(bounds.y + 23.f * s, contact.status, gold,
+                 layout.small_font_pixels);
+    clipped_text(bounds.y + 39.f * s,
+                 contact.identified
+                     ? contact.communication
+                     : "Identity confidence " + std::to_string(static_cast<int>(
+                                                   std::lround(contact.confidence * 100.))) +
+                           "%",
+                 muted, layout.small_font_pixels);
   }
 
   const auto &sel = view_->selected;
@@ -788,6 +888,12 @@ void NativeDiplomacyWorkspace::render(
   const auto detail_clip = [&](UiRect bounds) {
     return intersection(bounds, layout.detail_rows);
   };
+  const auto detail_fill = [&](UiRect bounds, Color color) {
+    if (const auto clipped = detail_clip(bounds)) fill(out, *clipped, color);
+  };
+  const auto detail_stroke = [&](UiRect bounds, Color color) {
+    if (const auto clipped = detail_clip(bounds)) stroke(out, *clipped, color);
+  };
   const auto card_text = [&](UiRect bounds, float dy, std::string value,
                              Color color, int pixels) {
     const auto clipped =
@@ -803,8 +909,8 @@ void NativeDiplomacyWorkspace::render(
     std::size_t index = 0;
     if (sel.present && sel.target_civilization_id) {
       const auto bounds = card(index, 52.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s,
                 "OUR FLEETS → THEIR SPACE   " + sel.their_access +
                     "      THEIR FLEETS → OUR SPACE   " + sel.our_access,
@@ -813,8 +919,8 @@ void NativeDiplomacyWorkspace::render(
     }
     if (view_->agreements.empty()) {
       const auto bounds = card(index++, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "NO AGREEMENTS", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -823,8 +929,8 @@ void NativeDiplomacyWorkspace::render(
     }
     for (const auto &agreement : view_->agreements) {
       const auto bounds = card(index++, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, agreement.type, accent,
                 layout.body_font_pixels);
       card_text(bounds, 32.f * s,
@@ -837,8 +943,8 @@ void NativeDiplomacyWorkspace::render(
   case DiplomacyWorkspaceTab::proposals: {
     if (view_->proposals.empty()) {
       const auto bounds = card(0, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "NO PENDING PROPOSALS", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -849,8 +955,8 @@ void NativeDiplomacyWorkspace::render(
       const auto &proposal = view_->proposals[index];
       const auto bounds =
           card(index, proposal_card_height(layout));
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s,
                 proposal.direction + " · " + proposal.kind +
                     (proposal.agreement_type.empty()
@@ -868,10 +974,12 @@ void NativeDiplomacyWorkspace::render(
         const auto button = proposal_button(layout, index, which, detail_scroll_);
         const auto clipped = detail_clip(button);
         if (!clipped) continue;
-        fill(out, button, button.contains(pointer_) ? hover : inset);
-        stroke(out, button, border);
-        text(out, button, buttons[which].second, bright,
-             layout.small_font_pixels, TextAlign::Center);
+        detail_fill(button, button.contains(pointer_) ? hover : inset);
+        detail_stroke(button, border);
+        out.overlay.emplace_back(Text{{button.x + button.width * .5f, button.y},
+                                      buttons[which].second, bright,
+                                      layout.small_font_pixels, button.width,
+                                      *clipped, TextAlign::Center});
       }
     }
     break;
@@ -879,8 +987,8 @@ void NativeDiplomacyWorkspace::render(
   case DiplomacyWorkspaceTab::history: {
     if (view_->history.empty()) {
       const auto bounds = card(0, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "A HISTORY YET TO BE WRITTEN", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -891,8 +999,8 @@ void NativeDiplomacyWorkspace::render(
     for (std::size_t index = 0; index < view_->history.size(); ++index) {
       const auto &event = view_->history[index];
       const auto bounds = card(index, 62.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, event.date + " · " + event.kind, accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s, event.summary, bright,
@@ -901,11 +1009,10 @@ void NativeDiplomacyWorkspace::render(
     break;
   }
   case DiplomacyWorkspaceTab::intelligence: {
-    std::size_t index = 0;
     if (view_->contacts.empty()) {
-      const auto bounds = card(index++, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      const auto bounds = card(0, 64.f * s);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "NO INTELLIGENCE", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -915,9 +1022,9 @@ void NativeDiplomacyWorkspace::render(
     }
     if (sel.present) {
       const auto &contact = view_->contacts[sel.contact_index];
-      const auto bounds = card(index++, 62.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      const auto bounds = card(0, 62.f * s);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "CONTACT EVIDENCE", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -931,17 +1038,23 @@ void NativeDiplomacyWorkspace::render(
         const UiRect focus{layout.detail_rows.x + 16.f * s,
                            layout.detail_rows.y + 78.f * s - detail_scroll_,
                            layout.detail_rows.width - 32.f * s, 34.f * s};
-        if (detail_clip(focus)) {
-          fill(out, focus, focus.contains(pointer_) ? hover : row);
-          stroke(out, focus, border);
-          text(out, focus,
-               "Last observation · " + contact.last_observed_system_name,
-               bright, layout.small_font_pixels, TextAlign::Center);
+        if (const auto clipped = detail_clip(focus)) {
+          detail_fill(focus, focus.contains(pointer_) ? hover : row);
+          detail_stroke(focus, border);
+          out.overlay.emplace_back(Text{{focus.x + focus.width * .5f, focus.y},
+                                        "Last observation · " +
+                                            contact.last_observed_system_name,
+                                        bright, layout.small_font_pixels,
+                                        focus.width, *clipped,
+                                        TextAlign::Center});
         }
       }
-      const auto unresolved = card(index++, 70.f * s);
-      fill(out, unresolved, row);
-      stroke(out, unresolved, border);
+      const auto unresolved_y = bounds.y + bounds.height + 8.f * s +
+          (contact.last_observed_system_id ? 34.f * s + 8.f * s : 0.f);
+      const UiRect unresolved{layout.detail_rows.x + 8.f * s, unresolved_y,
+                              layout.detail_rows.width - 16.f * s, 70.f * s};
+      detail_fill(unresolved, row);
+      detail_stroke(unresolved, border);
       card_text(unresolved, 8.f * s, "UNRESOLVED INFORMATION", accent,
                 layout.body_font_pixels);
       card_text(unresolved, 30.f * s,
@@ -955,8 +1068,8 @@ void NativeDiplomacyWorkspace::render(
   case DiplomacyWorkspaceTab::overview: {
     if (rows.empty()) {
       const auto bounds = card(0, 64.f * s);
-      fill(out, bounds, row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
       card_text(bounds, 8.f * s, "THE GALACTIC COMMUNITY", accent,
                 layout.body_font_pixels);
       card_text(bounds, 30.f * s,
@@ -966,11 +1079,10 @@ void NativeDiplomacyWorkspace::render(
     for (std::size_t index = 0; index < rows.size(); ++index) {
       const auto &contact = *rows[index];
       const auto bounds = card(index, 44.f * s);
-      fill(out, bounds,
-           contact.source_index == selected_contact_index_
-               ? selected
-               : bounds.contains(pointer_) ? hover : row);
-      stroke(out, bounds, border);
+      detail_fill(bounds, contact.source_index == selected_contact_index_
+                              ? selected
+                              : bounds.contains(pointer_) ? hover : row);
+      detail_stroke(bounds, border);
       card_text(bounds, 12.f * s,
                 contact.display_name + "   ·   " + contact.status + "   ·   " +
                     contact.communication,

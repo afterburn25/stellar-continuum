@@ -178,6 +178,32 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
                   std::string::npos,
           "unidentified selection leaked counterpart state");
 
+  // An unchanged proposal id/status does not authorize changed terms. Even a
+  // sub-display-precision relationship change invalidates the displayed quote.
+  const auto original_diplomacy = diplomacy.snapshot();
+  for (int mutation = 0; mutation < 3; ++mutation) {
+    auto altered = original_diplomacy;
+    auto pending = std::ranges::find(altered.proposals, incoming_id,
+                                     &DiplomaticProposalSnapshot::proposal_id);
+    require(pending != altered.proposals.end(), "missing pending proposal fixture");
+    if (mutation == 0) pending->agreement_type = DiplomaticAgreementType::research_exchange;
+    else if (mutation == 1) pending->summary += "; changed terms";
+    else altered.relationships.front().trust += .000000001;
+    diplomacy = DiplomacyState::restore(altered);
+    const auto rejected_quote = controller.execute(
+        frame, 7, view.diplomacy_revision,
+        DiplomacyWorkspaceAction::accept_proposal, std::nullopt, incoming_id);
+    require(!rejected_quote.accepted,
+            "changed proposal terms or precise relationship accepted a stale quote");
+    const auto preserved = diplomacy.snapshot();
+    const auto unresolved = std::ranges::find(preserved.proposals, incoming_id,
+                                             &DiplomaticProposalSnapshot::proposal_id);
+    require(unresolved != preserved.proposals.end() &&
+                unresolved->status == DiplomaticProposalStatus::pending,
+            "stale diplomatic quote mutated the proposal");
+    diplomacy = DiplomacyState::restore(original_diplomacy);
+  }
+
   // Command path: accept the incoming non-aggression proposal.
   const auto accepted = controller.execute(
       frame, 7, view.diplomacy_revision,

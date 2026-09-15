@@ -6,6 +6,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- RELATIONS opens an observer-safe contact directory, communications artwork, relationship meters, agreements/proposals/history/intelligence, and canonical negotiation/war/proposal commands. Contact changes refresh while paused; stale confirmations are rejected. Scroll drawing and hit areas are clipped together. Claims, grievances and a full demand/trade composer remain in migration.
+
 - Approved main-menu and loading artwork uses immutable cached images, responsive translucent controls and the requested seven-second application boot. Generation/save artwork follows the request through activation; each operation displays a gameplay tip. See NATIVE_STARTUP_ARTWORK.md.
 
 - Detailed class-coloured stellar discs, transient prominences and layered Saturn rings are cached with strict memory limits. See NATIVE_CELESTIAL_APPEARANCE.md.
@@ -38,6 +40,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+The combined Engine 0.1.58 candidate passed seven focused native CTests, 18 diplomacy-validator Python checks, 45 packaging/checkout checks and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. The diplomacy fixture retains existing contacts and agreements while adding isolated observations and an incoming research exchange. Real UI input changes selection, accepts the proposal, scrolls the new agreement into view, renders the packaged 2172×724 communications scene and hides unidentified identities/metrics/art. Progress validation preserves unrelated state; paused reload compares the complete saved payload except its timestamp. Baseline normalization follows the existing Player17 parity contract for fixture-only metadata and single-precision map coordinates. See the current C++ migration handoff and `work/native-diplomacy-final-*.json`; this is focused candidate evidence, not a new sealed release or full visual parity.
 
 Smoke diagnostics retain the existing frame-interval mean and p95 and now report
 `phase_samples` plus mean/p95 for `update`, `scene`, and `render_present` in
@@ -99,4 +103,4 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, full construction/unlock progression, diplomacy, 3D planet/surface views, tactical presentation and audio remain. Orbital, owned-colony telemetry, ship-delivered settlement and operational surface placement/cancellation are integrated. Native new-game selection/generation is the next integration step. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, full construction/unlock progression, remaining diplomacy commands, 3D planet/surface views, orbital structures, tactical presentation and audio remain. Native new-game selection/generation, orbital browsing, owned-colony telemetry, ship-delivered settlement, operational surface placement/cancellation and basic diplomacy are integrated. These are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.

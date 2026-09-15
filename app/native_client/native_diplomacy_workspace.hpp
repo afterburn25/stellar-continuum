@@ -66,6 +66,8 @@ struct DiplomacyWorkspaceCommand {
       stellar::native_diplomacy::DiplomacyWorkspaceAction::
           establish_communication};
   int focus_system_id{};
+  std::uint64_t campaign_generation{};
+  std::uint64_t diplomacy_revision{};
 };
 
 class NativeDiplomacyWorkspace final {
@@ -101,6 +103,8 @@ private:
     stellar::native_diplomacy::DiplomacyWorkspaceAction action{
         stellar::native_diplomacy::DiplomacyWorkspaceAction::declare_war};
     std::optional<int> target_civilization_id;
+    std::uint64_t campaign_generation{};
+    std::uint64_t diplomacy_revision{};
     bool danger{};
     std::string confirm_label;
     std::vector<std::pair<std::string,
@@ -109,6 +113,8 @@ private:
   };
 
   void reconcile_selection();
+  [[nodiscard]] float
+  detail_scroll_limit(const DiplomacyWorkspaceLayout &layout) const noexcept;
   [[nodiscard]] std::vector<const stellar::native_diplomacy::
                                 NativeDiplomacyContact *>
   filtered_contacts() const;
@@ -117,6 +123,7 @@ private:
   stellar::native_map::Point pointer_{};
   std::optional<stellar::native_diplomacy::NativeDiplomacyView> view_;
   std::size_t selected_contact_index_{};
+  std::optional<std::string> selected_contact_id_;
   stellar::native_diplomacy::NativeDiplomacyContactFilter filter_{
       stellar::native_diplomacy::NativeDiplomacyContactFilter::all};
   DiplomacyWorkspaceTab tab_{DiplomacyWorkspaceTab::agreements};

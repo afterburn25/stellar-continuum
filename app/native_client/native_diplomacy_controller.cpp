@@ -8,6 +8,9 @@
 #include <cctype>
 #include <cmath>
 #include <limits>
+#include <iomanip>
+#include <locale>
+#include <type_traits>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -190,7 +193,9 @@ void append_signature(std::ostringstream &out, std::string_view value) {
   out << value.size() << ':' << value << ';';
 }
 template <class T> void append_signature(std::ostringstream &out, const T &value) {
-  if constexpr (std::is_same_v<T, bool>)
+  if constexpr (std::is_convertible_v<T, std::string_view>)
+    append_signature(out, std::string_view(value));
+  else if constexpr (std::is_same_v<T, bool>)
     out << (value ? '1' : '0') << ';';
   else
     out << value << ';';
@@ -201,8 +206,11 @@ template <class T> void append_signature(std::ostringstream &out, const T &value
 [[nodiscard]] std::string signature_for(const DiplomaticStateView &view,
                                         std::string_view date) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   append_signature(out, date);
   append_signature(out, view.observer_civilization_id);
+  append_signature(out, view.contacts.size());
   for (const auto &contact : view.contacts) {
     append_signature(out, contact.contact_id);
     append_signature(out, contact.target_civilization_id.value_or(-1));
@@ -213,6 +221,7 @@ template <class T> void append_signature(std::ostringstream &out, const T &value
     append_signature(out, contact.last_observed_tick);
     append_signature(out, contact.last_observed_system_id.value_or(-1));
   }
+  append_signature(out, view.relationships.size());
   for (const auto &relationship : view.relationships) {
     append_signature(out, relationship.other_civilization_id);
     append_signature(out, static_cast<int>(relationship.political_state));
@@ -223,12 +232,14 @@ template <class T> void append_signature(std::ostringstream &out, const T &value
     append_signature(out, relationship.cooperation);
     append_signature(out, relationship.grievances.size());
   }
+  append_signature(out, view.access_permissions.size());
   for (const auto &access : view.access_permissions) {
     append_signature(out, access.grantor_civilization_id);
     append_signature(out, access.visitor_civilization_id);
     append_signature(out, static_cast<int>(access.permission));
     append_signature(out, access.updated_at_tick);
   }
+  append_signature(out, view.agreements.size());
   for (const auto &agreement : view.agreements) {
     append_signature(out, agreement.agreement_id);
     append_signature(out, agreement.civilization_a_id);
@@ -237,15 +248,24 @@ template <class T> void append_signature(std::ostringstream &out, const T &value
     append_signature(out, static_cast<int>(agreement.status));
     append_signature(out, agreement.started_at_tick);
     append_signature(out, agreement.ended_at_tick.value_or(-1));
+    append_signature(out, agreement.external_terms_reference.has_value());
+    append_signature(out, agreement.external_terms_reference.value_or(""));
   }
+  append_signature(out, view.proposals.size());
   for (const auto &proposal : view.proposals) {
     append_signature(out, proposal.proposal_id);
     append_signature(out, proposal.proposer_civilization_id);
     append_signature(out, proposal.recipient_civilization_id);
     append_signature(out, static_cast<int>(proposal.kind));
+    append_signature(out, proposal.agreement_type ? static_cast<int>(*proposal.agreement_type) : -1);
     append_signature(out, static_cast<int>(proposal.status));
+    append_signature(out, proposal.created_at_tick);
     append_signature(out, proposal.resolved_at_tick.value_or(-1));
+    append_signature(out, proposal.summary);
+    append_signature(out, proposal.external_terms_reference.has_value());
+    append_signature(out, proposal.external_terms_reference.value_or(""));
   }
+  append_signature(out, view.recent_events.size());
   for (const auto &event : view.recent_events)
     append_signature(out, event.event_id);
   return out.str();

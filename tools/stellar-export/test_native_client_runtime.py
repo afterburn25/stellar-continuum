@@ -182,6 +182,18 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
             self.copy()
 
+    def test_missing_species_communications_scene_blocks_package(self):
+        key = "terran-baseline-communications-v2"
+        (self.root / NATIVE_SPECIES_SOURCES[key][0]).unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native species"):
+            self.copy()
+
+    def test_tampered_species_communications_scene_blocks_package(self):
+        key = "pelagic-high-pressure-communications-v2"
+        (self.root / NATIVE_SPECIES_SOURCES[key][0]).write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+            self.copy()
+
     def test_missing_species_credits_blocks_package(self):
         (self.root / NATIVE_SPECIES_SOURCES["credits"][0]).unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing native species credits"):

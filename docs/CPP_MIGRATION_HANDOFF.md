@@ -6,7 +6,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `06b2b802`, with diplomacy presentation at `410753da` and sealed-export evidence. Its code slice is integrated in this candidate; review and combined validation are in progress.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `06b2b802`, with diplomacy presentation at `410753da` integrated here as `c9338699`. Combined focused and graphical validation passed; the candidate remains under review.
 - `cpp/codex-native-architecture-integration` — Codex architecture/integration branch, based on `ac45d958`. Carries Devin's existing coordination documents forward; changes go through a PR to the shared migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
@@ -20,16 +20,29 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   quoted revision against a fresh signature before calling
   `ObserverDiplomacyCommandService`. Signature covers contact awareness/identity,
   relationship metrics, access, agreements, proposals and event ids — selection moves
-  never bump it. Owner-thread pinned like other controllers.
+  never bump it. Review hardened the signature with length-prefixed strings, classic
+  locale/max-digits precision, collection counts and full proposal/terms fields.
+  Owner-thread pinned like other controllers.
 - `app/native_client/native_diplomacy_workspace.{hpp,cpp}` — fullscreen RELATIONS
   workspace. `handle` emits `SelectContact`, `Action`, `ProposalAction`,
-  `FocusSystem`, `Close`; `set_view` preserves selection by civilization id across
-  contact reordering (main re-projects once if the index shifted).
+  `FocusSystem`, `Close`; `set_view` preserves selection by stable `contact_id`
+  across contact reordering, including unidentified contacts. Main immediately
+  re-projects `SelectContact`, even while paused.
+- `DiplomacyWorkspaceCommand` now carries `campaign_generation` and
+  `diplomacy_revision`. Action and confirmation commands retain the quote shown
+  to the player; main passes these to `execute`, not the latest view revision.
+  Refreshed generation/revision dismisses an obsolete modal with an explanation.
 - `NativeUiLayout` gained `UiAction::Diplomacy` + `diplomacy` rect (top bar, RELATIONS).
 - `NativeDiplomacyWorkspace::render` takes an optional `PortraitProvider`
   (`string_view relative_asset_path -> shared_ptr<const RgbaImage>`); `nullptr` draws
   the signal-waveform fallback. `main.cpp` resolves
   `assets/visual/species/<id>-communications-v2.png` (underscores→hyphens).
+  The exact four reviewed PNGs are now declared/copied by CMake and the exporter.
+  The lazy cache is limited to four entries/32 MiB (24 MiB actual decoded RGBA);
+  declared art failures include the path and cause. Unknown species use waveform.
+- Scroll drawing and hit rectangles are intersected with their visible region.
+  Intelligence cards/focus controls use a non-overlapping stack. Filter widths
+  give long labels enough room at 720p without shrinking their text.
 
 ## Interfaces added in 0.1.57 (candidate for review)
 
@@ -54,11 +67,33 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `copy_native_client_runtime` now requires `export/native-ship-art-assets.json` +
   the six declared files; mocks must stub them (see `test_native_client_runtime` setUp).
 
+## Validated diplomacy integration
+
+- Diplomacy smoke now covers 1280×720 and 1920×1080 Vulkan launches, contact
+  selection, acceptance, scrolling, reload, communications PNG display, waveform
+  fallback, and observer secrecy. Player17 starts with reciprocal known contacts;
+  the isolated copy adds an unknown contact, a second known contact, and a pending
+  incoming research-exchange proposal. Four communications PNGs use a bounded
+  32 MiB cache (about 24 MiB decoded RGBA).
+- `native_diplomacy_runtime.py` authors only an isolated test save. Baseline
+  canonicalization follows `player_campaign_json_tests.cpp`: omit fixture-only
+  `Control`, convert numeric X/Y to float32; contacts are authored in the native
+  snapshot order. No general numeric tolerance or simulation changes are used.
+  Only the intended proposal, new agreement, two events and counters may change.
+  Reload compares the entire saved payload except `SavedAtUtc` exactly.
+- Final combined check: seven CTests (diplomacy controller/workspace, native input,
+  system workspace/travel, diplomacy observer-command parity, Player17 JSON parity),
+  18 diplomacy-validator and 45 package/checkout Python tests, six actual Vulkan
+  launches (diplomacy/system/galaxy, 720p and 1080p). Evidence:
+  `native-diplomacy-final.log`, `work/native-diplomacy-final-{diplomacy,system,galaxy}.json`,
+  and `build-native/preview-*.bmp`. Known/unknown portrait captures were inspected.
+- Final diplomacy frame means 17.790–17.791 ms, p95 28.367–32.663 ms; system/galaxy
+  means 20.748–21.215 ms, p95 33.458–33.937 ms. These short VSync-inclusive samples
+  do not establish sustained 60 FPS. This is Engine 0.1.58 candidate validation,
+  not a sealed release or clean-machine result.
+
 ## Remaining blockers / next work
 
-- Diplomacy workspace has no graphical/real-campaign smoke evidence yet — the
-  Player17 fixture has no diplomacy contacts; a validator save with authored
-  contacts would exercise the real path (controller test covers authored state).
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
@@ -89,5 +124,5 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - System framing uses measured body labels, disc/orbital/stellar envelopes, and a 12px presentation inset. Labels are collision-resolved with selected-body priority; initial travel activation frames exits once, while later travel refreshes retain the user's pan/zoom. Authoritative AU, transit, lane, and observer contracts remain unchanged.
 - Final evidence: `native_system_travel`, `native_system_workspace`, `native_system_view`, `native_system_colony_entry`, and `native_settlement_workspace` CTests passed, alongside seven actual Vulkan galaxy/system/travel launches with exact paused Player17 reload and observer-secrecy validation. Final logs are `native-system-layout-tests.log` and `native-system-checkpoint.log`; JSON is `work/layout-{galaxy,system,travel}.json`; captures are `build-native/preview-*.bmp`.
 - Smoke-only timing records bounded update/scene/render-present mean and p95 before JSON diagnostics. System/galaxy means were ~20.6–21.2 ms and p95 ~33.4–33.7 ms; render-present means ~16.4–16.6 ms include VSync wait. Treat this as investigation evidence, not a GPU-only metric or 60 FPS result.
-- CI trigger coverage was proven green by workflow `34927971070` for `21ea21d8` (`21ea21d8338b75d5ec09731c5d71ad341857e57d`). The final layout/timing candidate needs CI at its exact head; this run does not cover uncommitted changes. These checks are not a release, shared merge, full suite, or clean-machine certification.
+- The preceding complete layout/timing head `66c56b897ad04a99d2e662a2fb089cdcc160186b` passed GitHub workflow `34929897092`. The new diplomacy candidate needs its own exact-head CI; the earlier green run does not cover these changes. No shared merge or clean-machine certification is claimed.
 - The older 0.1.55 checkout/scratch work is preserved separately and must not be reapplied over the integrated 0.1.57 artwork.
