@@ -105,7 +105,7 @@ private:
   std::string notice_;
   stellar::native_map::Point pointer_{};
   InspectorFocus inspector_focus_{InspectorFocus::automatic};
-  bool dragging_{};
+  bool dragging_{},pending_initial_travel_fit_{};
   int width_{},height_{};
 };
 } // namespace stellar::native_system_ui
