@@ -43,6 +43,22 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
                                 bounds.width, bounds, align, face});
 }
 
+[[nodiscard]] UiRect cover_source(const RgbaImage &image,
+                                  UiRect destination) noexcept {
+  const auto width = static_cast<float>(image.width());
+  const auto height = static_cast<float>(image.height());
+  if (destination.width <= 0.f || destination.height <= 0.f)
+    return {0.f, 0.f, width, height};
+  const auto source_aspect = width / height;
+  const auto destination_aspect = destination.width / destination.height;
+  if (source_aspect > destination_aspect) {
+    const auto crop = height * destination_aspect;
+    return {(width - crop) * .5f, 0.f, crop, height};
+  }
+  const auto crop = width / destination_aspect;
+  return {0.f, (height - crop) * .5f, width, crop};
+}
+
 [[nodiscard]] std::optional<UiRect> intersection(UiRect left,
                                                  UiRect right) noexcept {
   const auto x = std::max(left.x, right.x);
@@ -338,7 +354,9 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(
 }
 
 void NativeShipyardWorkspace::render(DrawList &out, int width,
-                                     int height) const {
+                                     int height,
+                                     stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
+  last_ship_art_rows_ = 0;
   if (!visible_) return;
   const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
   fill(out, layout.surface, panel);
@@ -391,17 +409,33 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
            selected_design_id_ == design.id
                ? selected
                : clipped->contains(pointer_) ? hover : row);
+      float text_left = bounds.x + 8.f * layout.scale;
+      float text_width = bounds.width - 16.f * layout.scale;
+      if (ship_art) {
+        const auto image = ship_art->image_for(design.id, design.role);
+        if (image) {
+          const float side = 46.f * layout.scale;
+          out.overlay.emplace_back(Image{
+              image,
+              {bounds.x + 4.f * layout.scale,
+               bounds.y + 4.f * layout.scale, side, side},
+              std::nullopt, {255, 255, 255, 255}, *clipped});
+          ++last_ship_art_rows_;
+          text_left = bounds.x + 56.f * layout.scale;
+          text_width = std::max(0.f, bounds.width - 64.f * layout.scale);
+        }
+      }
       if (const auto line = intersection(
               *clipped,
-              {bounds.x + 8.f * layout.scale,
+              {text_left,
                bounds.y + 5.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 20.f * layout.scale}))
+               text_width, 20.f * layout.scale}))
         text(out, *line, design.name, bright, layout.body_font_pixels);
       if (const auto line = intersection(
               *clipped,
-              {bounds.x + 8.f * layout.scale,
+              {text_left,
                bounds.y + 29.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 18.f * layout.scale}))
+               text_width, 18.f * layout.scale}))
         text(out, *line,
              role_name(design.role) + "  |  " +
                  design.formatted_credit_cost,
@@ -422,6 +456,22 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                       layout.design_details.y + 32.f * layout.scale,
                       layout.design_details.width - 20.f * layout.scale,
                       layout.design_details.height - 42.f * layout.scale};
+    auto text_bounds = body;
+    if (ship_art) {
+      const auto image = ship_art->image_for(design->id, design->role);
+      const float art_height =
+          std::min(body.height * .40f, 190.f * layout.scale);
+      if (image && art_height >= 24.f * layout.scale && body.width > 0.f) {
+        const UiRect destination{body.x, body.y, body.width, art_height};
+        out.overlay.emplace_back(
+            Image{image, destination, cover_source(*image, destination),
+                  {255, 255, 255, 255}, body});
+        text_bounds = {body.x, body.y + art_height + 8.f * layout.scale,
+                       body.width,
+                       std::max(0.f, body.height - art_height -
+                                         8.f * layout.scale)};
+      }
+    }
     std::string details = design->name + "\n" + role_name(design->role) +
                           "\n\n" + design->description +
                           "\n\nSpeed  " + number(design->strategic_speed, 2) +
@@ -431,7 +481,8 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                           number(design->fuel_endurance_light_years, 2) +
                           " ly\nSensors  " + number(design->sensor_range, 1) +
                           "\nPropulsion  " + design->propulsion_generation;
-    text(out, body, std::move(details), bright, layout.small_font_pixels);
+    text(out, text_bounds, std::move(details), bright,
+         layout.small_font_pixels);
   }
 
   const UiRect order_rows{layout.orders.x,

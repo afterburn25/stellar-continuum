@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <memory>
 #include <ranges>
 #include <sstream>
 #include <utility>
@@ -244,8 +245,17 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
 }
 
 void NativeFleetWorkspace::render(DrawList &out, int width, int height,
-                                  std::span<const FleetScreenMarker> markers) const {
+                                  std::span<const FleetScreenMarker> markers,
+                                  stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
+  last_ship_art_rows_ = 0;
   const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  const auto artwork = [&](const stellar::native_fleet::NativeOwnFleet &fleet) {
+    if (!ship_art) return std::shared_ptr<const RgbaImage>{};
+    return ship_art->image_for(
+        fleet.design_id ? std::optional<std::string_view>(*fleet.design_id)
+                        : std::nullopt,
+        fleet.role);
+  };
   for (const auto &marker : markers) {
     const auto selected = selected_fleet_id() == marker.fleet_id;
     out.circles.push_back(
@@ -284,23 +294,39 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       fill(out, *clipped,
            selected ? selected_color
                     : clipped->contains(pointer_) ? hover_color : row_color);
+      float text_left = row.x + 8.f * layout.scale;
+      float text_width = row.width - 16.f * layout.scale;
+      if (ship_art) {
+        const auto image = artwork(fleet);
+        if (image) {
+          const float side = 33.f * layout.scale;
+          out.overlay.emplace_back(Image{
+              image,
+              {row.x + 4.f * layout.scale, row.y + 4.f * layout.scale, side,
+               side},
+              std::nullopt, {255, 255, 255, 255}, *clipped});
+          ++last_ship_art_rows_;
+          text_left = row.x + 42.f * layout.scale;
+          text_width = std::max(0.f, row.width - 50.f * layout.scale);
+        }
+      }
       if (const auto name_clip = intersection(
               *clipped,
-              {row.x + 6.f * layout.scale, row.y + 3.f * layout.scale,
-               row.width - 12.f * layout.scale, 18.f * layout.scale}))
+              {text_left - 2.f * layout.scale, row.y + 3.f * layout.scale,
+               text_width, 18.f * layout.scale}))
         out.overlay.emplace_back(Text{
-            {row.x + 8.f * layout.scale, row.y + 5.f * layout.scale},
+            {text_left, row.y + 5.f * layout.scale},
             fleet.name, bright, layout.body_font_pixels,
-            row.width - 16.f * layout.scale, *name_clip});
+            text_width, *name_clip});
       if (const auto role_clip = intersection(
               *clipped,
-              {row.x + 6.f * layout.scale, row.y + 21.f * layout.scale,
-               row.width - 12.f * layout.scale, 17.f * layout.scale}))
+              {text_left - 2.f * layout.scale, row.y + 21.f * layout.scale,
+               text_width, 17.f * layout.scale}))
         out.overlay.emplace_back(Text{
-            {row.x + 8.f * layout.scale, row.y + 23.f * layout.scale},
+            {text_left, row.y + 23.f * layout.scale},
             role_name(fleet.role) + "  |  " + transit_name(fleet.transit_phase),
             muted, layout.small_font_pixels,
-            row.width - 16.f * layout.scale, *role_clip});
+            text_width, *role_clip});
     }
   }
 
@@ -318,7 +344,22 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
         number(fleet->fuel_capacity_light_years, 2) + " ly\nMaximum leg " +
         number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
         number(fleet->strategic_speed, 2) + " ly/day";
-    text(out, layout.details, details, bright, layout.small_font_pixels);
+    auto details_bounds = layout.details;
+    if (ship_art) {
+      const auto image = artwork(*fleet);
+      const float side = std::min(layout.details.height - 8.f * layout.scale,
+                                  96.f * layout.scale);
+      if (image && side >= 8.f * layout.scale) {
+        out.overlay.emplace_back(Image{
+            image,
+            {layout.details.x + layout.details.width - side -
+                 4.f * layout.scale,
+             layout.details.y + 4.f * layout.scale, side, side},
+            std::nullopt, {255, 255, 255, 255}, layout.details});
+        details_bounds.width -= side + 10.f * layout.scale;
+      }
+    }
+    text(out, details_bounds, details, bright, layout.small_font_pixels);
     std::string route;
     if (preview_) {
       route = "ROUTE PREVIEW\nDestination " + target_display_name_ +

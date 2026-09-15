@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_fleet_controller.hpp"
+#include "native_ship_art_assets.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -63,7 +64,11 @@ public:
       std::span<const FleetScreenMarker> markers,
       std::optional<int> target_system_id);
   void render(stellar::native_map::DrawList &out, int width, int height,
-              std::span<const FleetScreenMarker> markers) const;
+              std::span<const FleetScreenMarker> markers,
+              stellar::native_ship_ui::NativeShipArtAssets *ship_art = nullptr) const;
+  [[nodiscard]] int last_ship_art_rows() const noexcept {
+    return last_ship_art_rows_;
+  }
 
   [[nodiscard]] const std::optional<stellar::native_fleet::NativeFleetMapView> &
   view() const noexcept;
@@ -82,6 +87,7 @@ private:
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
   float list_scroll_{};
+  mutable int last_ship_art_rows_{};
 };
 
 } // namespace stellar::native_fleet_ui

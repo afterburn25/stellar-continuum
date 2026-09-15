@@ -81,9 +81,10 @@ add_test(NAME native_fleet_controller COMMAND stellar_native_fleet_controller_te
   "${CMAKE_BINARY_DIR}/native-fleet-cases")
 set_tests_properties(native_fleet_controller PROPERTIES TIMEOUT 90)
 add_executable(stellar_native_fleet_workspace_tests
-  native-tests/native_fleet_workspace_tests.cpp app/native_client/native_fleet_workspace.cpp)
+  native-tests/native_fleet_workspace_tests.cpp app/native_client/native_fleet_workspace.cpp
+  app/native_client/native_ship_art_assets.cpp)
 target_include_directories(stellar_native_fleet_workspace_tests PRIVATE app/native_client engine/include)
-target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core)
+target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_fleet_workspace COMMAND stellar_native_fleet_workspace_tests)
 add_executable(stellar_native_fleet_presentation_tests
   native-tests/native_fleet_presentation_tests.cpp app/native_client/native_fleet_presentation.cpp)
@@ -112,9 +113,10 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_shipyard_workspace_tests
-  native-tests/native_shipyard_workspace_tests.cpp app/native_client/native_shipyard_workspace.cpp)
+  native-tests/native_shipyard_workspace_tests.cpp app/native_client/native_shipyard_workspace.cpp
+  app/native_client/native_ship_art_assets.cpp)
 target_include_directories(stellar_native_shipyard_workspace_tests PRIVATE app/native_client engine/include)
-target_link_libraries(stellar_native_shipyard_workspace_tests PRIVATE stellar_core)
+target_link_libraries(stellar_native_shipyard_workspace_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_shipyard_workspace COMMAND stellar_native_shipyard_workspace_tests)
 if(MSVC)
   target_compile_options(stellar_native_shipyard_workspace_tests PRIVATE /WX)
@@ -360,6 +362,20 @@ add_executable(stellar_galaxy_backdrop_tests
 target_include_directories(stellar_galaxy_backdrop_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_backdrop COMMAND stellar_galaxy_backdrop_tests "${CMAKE_SOURCE_DIR}")
+
+add_executable(stellar_ship_art_tests
+  native-tests/native_ship_art_tests.cpp
+  app/native_client/native_ship_art_assets.cpp
+  app/native_client/native_fleet_route_effects.cpp
+  app/native_client/native_fleet_workspace.cpp
+  app/native_client/native_shipyard_workspace.cpp)
+target_include_directories(stellar_ship_art_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_ship_art_tests PRIVATE stellar_native_image stellar_core)
+add_test(NAME native_ship_art COMMAND stellar_ship_art_tests "${CMAKE_SOURCE_DIR}")
+set_tests_properties(native_ship_art PROPERTIES TIMEOUT 120)
+if(MSVC)
+  target_compile_options(stellar_ship_art_tests PRIVATE /W4 /WX /permissive-)
+endif()
 
 add_executable(stellar_galaxy_marker_tests
   app/native_client/native_galaxy_star_markers.cpp native-tests/native_galaxy_star_markers_tests.cpp)

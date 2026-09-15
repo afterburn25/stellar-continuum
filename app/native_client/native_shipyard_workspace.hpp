@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_shipyard_controller.hpp"
+#include "native_ship_art_assets.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -54,7 +55,11 @@ public:
 
   [[nodiscard]] ShipyardWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
-  void render(stellar::native_map::DrawList &out, int width, int height) const;
+  void render(stellar::native_map::DrawList &out, int width, int height,
+              stellar::native_ship_ui::NativeShipArtAssets *ship_art = nullptr) const;
+  [[nodiscard]] int last_ship_art_rows() const noexcept {
+    return last_ship_art_rows_;
+  }
 
 private:
   [[nodiscard]] const stellar::native_shipyard::NativeShipDesign *
@@ -73,6 +78,7 @@ private:
   bool notice_accepted_{};
   float design_scroll_{};
   float order_scroll_{};
+  mutable int last_ship_art_rows_{};
 };
 
 } // namespace stellar::native_shipyard_ui

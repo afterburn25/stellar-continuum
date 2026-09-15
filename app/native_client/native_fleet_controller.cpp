@@ -107,6 +107,7 @@ NativeFleetMapView NativeFleetController::build(
         .id = fleet.id,
         .name = fleet.name,
         .role = fleet.role,
+        .design_id = fleet.design_id,
         .position = fleet.position,
         .current_system_id = fleet.current_system_id,
         .destination_system_id = fleet.destination_system_id,

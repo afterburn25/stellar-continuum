@@ -18,6 +18,7 @@ struct NativeOwnFleet {
   int id{};
   std::string name;
   stellar::core::FleetRole role{};
+  std::optional<std::string> design_id;
   stellar::core::Vec2 position{};
   std::optional<int> current_system_id;
   std::optional<int> destination_system_id;

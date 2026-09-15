@@ -21,6 +21,8 @@
 #include "native_system_travel.hpp"
 #include "native_system_workspace.hpp"
 #include "native_planet_disc_assets.hpp"
+#include "native_fleet_route_effects.hpp"
+#include "native_ship_art_assets.hpp"
 #include "native_ui_layout.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
@@ -73,6 +75,7 @@ using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
 using namespace stellar::native_startup_ui;
 using namespace stellar::native_galaxy_ui;
+using namespace stellar::native_ship_ui;
 
 struct Options {
   std::filesystem::path asset_root;
@@ -98,6 +101,7 @@ struct Options {
   bool surface_reload_smoke{};
   bool new_game_smoke{};
   bool galaxy_art_smoke{};
+  bool ship_art_smoke{};
   bool save_path_overridden{};
 };
 
@@ -135,6 +139,7 @@ struct Options {
     else if(arg==L"--surface-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_reload_smoke=true;result.windowed=true;}
     else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
+    else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -160,13 +165,15 @@ struct Options {
     else if(arg=="--surface-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_smoke=true;result.windowed=true;}
     else if(arg=="--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_reload_smoke=true;result.windowed=true;}
     else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
+    else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
+  if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
@@ -304,6 +311,7 @@ class NativeCampaign final {
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
+        ship_art_(std::filesystem::absolute(asset_root)),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
     refresh_knowledge();
     fit_camera(width,height);
@@ -775,6 +783,56 @@ class NativeCampaign final {
       smoke_shipyard_order_id_=shipyard_workspace_.view()->orders.front().order_id;
     }
   }
+  void prepare_ship_art_smoke(int width,int height){
+    // Route an owned fleet exactly like the fleet input smoke, then open the
+    // shipyard: the next rendered frame shows bounded design artwork while the
+    // following map frame shows fleet rows and live route effects.
+    prepare_fleet_smoke(width,height);
+    const auto click=[&](Point point){
+      InputSnapshot input;
+      input.drawable_width=width;
+      input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},
+                    {InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Ship art smoke input closed the campaign.");
+    };
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    click(center(main_layout.shipyard));
+    if(!shipyard_workspace_.visible()||!shipyard_workspace_.view())
+      throw std::runtime_error(
+          "Ship art smoke could not open the shipyard workspace.");
+  }
+  void capture_ship_art_shipyard(){
+    smoke_shipyard_art_rows_=shipyard_workspace_.last_ship_art_rows();
+    smoke_ship_art_decoded_=ship_art_.decoded_count();
+    smoke_ship_art_cached_=ship_art_.cached_count();
+    smoke_ship_art_bytes_=ship_art_.cache_bytes();
+    shipyard_workspace_.close();
+  }
+  void capture_ship_art_map(){
+    smoke_fleet_art_rows_=fleet_workspace_.last_ship_art_rows();
+    smoke_route_stats_=last_route_stats_;
+  }
+  [[nodiscard]] std::string ship_art_smoke_status()const{
+    std::ostringstream out;
+    out<<"{\"shipyard_art_rows\":"<<smoke_shipyard_art_rows_
+       <<",\"fleet_art_rows\":"<<smoke_fleet_art_rows_
+       <<",\"decoded_sources\":"<<smoke_ship_art_decoded_
+       <<",\"cached_entries\":"<<smoke_ship_art_cached_
+       <<",\"cache_bytes\":"<<smoke_ship_art_bytes_
+       <<",\"routed_fleets\":"<<smoke_route_stats_.routed_fleets
+       <<",\"drawn_legs\":"<<smoke_route_stats_.drawn_legs
+       <<",\"chevron_segments\":"<<smoke_route_stats_.chevron_segments
+       <<",\"trail_strokes\":"<<smoke_route_stats_.trail_strokes
+       <<",\"position_circles\":"<<smoke_route_stats_.position_circles
+       <<",\"route_lines\":"<<smoke_route_stats_.emitted_lines
+       <<",\"routed_fleet_id\":"<<smoke_fleet_id_.value_or(-1)
+       <<",\"destination\":"<<smoke_fleet_destination_.value_or(-1)
+       <<"}";
+    return out.str();
+  }
   void prepare_construction_smoke(int width,int height){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -1154,6 +1212,9 @@ class NativeCampaign final {
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     galaxy_marker_begin=out.world.size();
     for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    if(const auto &fleet_view=fleet_workspace_.view();fleet_view)
+      last_route_stats_=append_fleet_route_effects(out,fleet_view->own_fleets,cache.systems_by_id,camera_,width,height);
+    else last_route_stats_={};
     if(const auto &preview=fleet_workspace_.preview();preview){
       for(std::size_t index=1;index<preview->route_system_ids.size();++index){
         if(!known_.contains(preview->route_system_ids[index-1])||
@@ -1249,11 +1310,11 @@ class NativeCampaign final {
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
     if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible())
-      fleet_workspace_.render(out,width,height,fleet_markers(width,height));
+      fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
     research_workspace_.render(out, width, height);
-    shipyard_workspace_.render(out, width, height);
+    shipyard_workspace_.render(out, width, height, &ship_art_);
     construction_workspace_.render(out, width, height);
     if(!surface_workspace_.visible())colony_workspace_.render(out, width, height);
     surface_workspace_.render(out,width,height);
@@ -1708,6 +1769,7 @@ class NativeCampaign final {
   NativeGalaxyBackdrop galaxy_backdrop_;
   double fitted_pixels_per_world_{.01};
   NativePlanetDiscAssets planet_discs_;
+  NativeShipArtAssets ship_art_;
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;
@@ -1731,6 +1793,13 @@ class NativeCampaign final {
   bool smoke_shipyard_start_was_running_{};
   bool smoke_shipyard_was_running_{};
   std::optional<std::string> smoke_shipyard_order_id_;
+  FleetRouteEffectStats last_route_stats_{};
+  FleetRouteEffectStats smoke_route_stats_{};
+  int smoke_shipyard_art_rows_{};
+  int smoke_fleet_art_rows_{};
+  std::size_t smoke_ship_art_decoded_{};
+  std::size_t smoke_ship_art_cached_{};
+  std::size_t smoke_ship_art_bytes_{};
   std::optional<int> smoke_fleet_id_;
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
@@ -1821,6 +1890,9 @@ int main(int argc,char **argv){
       else if(options.galaxy_art_smoke)
         campaign.prepare_galaxy_art_smoke(window.drawable_width(),
                                           window.drawable_height(),options.load);
+      else if(options.ship_art_smoke)
+        campaign.prepare_ship_art_smoke(window.drawable_width(),
+                                        window.drawable_height());
       else
         campaign.prepare_smoke_ui();
     }
@@ -1847,15 +1919,19 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       std::optional<std::filesystem::path> screenshot;
       if(options.smoke_screenshot){
-        if(!options.galaxy_art_smoke){if(frames>=120)screenshot=options.smoke_screenshot;}
-        else if(frames==120)screenshot=options.smoke_screenshot;
-        else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
-        else if(frames==122)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
+        if(options.galaxy_art_smoke){
+          if(frames==120)screenshot=options.smoke_screenshot;
+          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
+          else if(frames==122)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
+        }else if(options.ship_art_smoke){
+          if(frames==120)screenshot=options.smoke_screenshot;
+          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
+        }else if(frames>=120)screenshot=options.smoke_screenshot;
       }
       window.draw(campaign.scene(input.drawable_width,input.drawable_height),screenshot);
       if(options.galaxy_art_smoke){
@@ -1863,7 +1939,11 @@ int main(int argc,char **argv){
         else if(frames==121){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
         else if(frames==122)campaign.capture_galaxy_system(input.drawable_width,input.drawable_height);
       }
-      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:frames>=120);
+      if(options.ship_art_smoke){
+        if(frames==120)campaign.capture_ship_art_shipyard();
+        else if(frames==121)campaign.capture_ship_art_map();
+      }
+      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:options.ship_art_smoke?frames>=122:frames>=120);
       if(capture){
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
@@ -1899,6 +1979,8 @@ int main(int argc,char **argv){
           std::cout<<" surface="<<campaign.surface_smoke_status();
         if(options.galaxy_art_smoke)
           std::cout<<" galaxy_art="<<campaign.galaxy_art_smoke_status();
+        if(options.ship_art_smoke)
+          std::cout<<" ship_art="<<campaign.ship_art_smoke_status();
         if(options.new_game_smoke){
           std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")
