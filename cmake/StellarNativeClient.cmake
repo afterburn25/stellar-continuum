@@ -71,6 +71,17 @@ if(BUILD_TESTING)
   if(MSVC)
     target_compile_options(stellar_native_voice_tests PRIVATE /WX)
   endif()
+  add_executable(stellar_native_voice_settings_tests
+    native-tests/native_voice_settings_tests.cpp
+    app/native_client/native_voice_settings.cpp
+    app/native_client/native_voice.cpp)
+  target_include_directories(stellar_native_voice_settings_tests PRIVATE
+    app/native_client engine/include third_party)
+  target_link_libraries(stellar_native_voice_settings_tests PRIVATE stellar_core)
+  add_test(NAME native_voice_settings COMMAND stellar_native_voice_settings_tests)
+  if(MSVC)
+    target_compile_options(stellar_native_voice_settings_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_campaign_session_tests
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
     app/native_client/native_notifications.cpp)
@@ -157,5 +168,6 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_voice.cpp
   app/native_client/native_voice_bridge.cpp
   app/native_client/native_voice_playback.cpp
-  app/native_client/native_voice_sapi.cpp)
+  app/native_client/native_voice_sapi.cpp
+  app/native_client/native_voice_settings.cpp)
 target_include_directories(stellar-continuum-native PRIVATE third_party)

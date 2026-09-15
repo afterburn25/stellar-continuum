@@ -43,7 +43,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) + dedicated dialogue voice with live ducking done |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction`, `native_support` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save, T/R/C/B candidates, N mid-session new campaign, F8 support bundle) done; menu NEW GAME row wired to the startup sandbox |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
-| Voice | Main.Voice*, CharacterVoiceResolver | `native_voice*` + Windows SAPI | OK | `native_voice` CTest + `--audio-smoke` voice fields | PARTIAL | Catalogue/profiles/roles, observer-safe router, queue/dedupe/cooldown/interrupt playback, SAPI 5 synthesis, WAV cache, captions, gameplay bridge done; voice settings window and offline-neural backend remain |
+| Voice | Main.Voice*, CharacterVoiceResolver | `native_voice*` + Windows SAPI | OK | `native_voice` + `native_voice_settings` CTests + `--audio-smoke` voice fields | PARTIAL | Catalogue/profiles/roles, observer-safe router, queue/dedupe/cooldown/interrupt playback, SAPI 5 synthesis, WAV cache, captions, gameplay bridge, settings UI (pause-menu VOICE button: toggles, sliders, size/frequency cycles, Replay/Stop, persisted) done; offline-neural backend remains |
 | Packaging | export tooling | `tools/stellar-export`, `export/*.json`, `cmake/Native*` | OK | sealed export validators | PARITY VERIFIED | No Godot/.NET/compiler at runtime |
 
 ## What blocks "fully playable native"
@@ -52,8 +52,9 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
    the reference's free camera orbit, terrain relief and settlement overlays
    remain (workspace is a fixed top-down construction view).
 2. Voice playback is wired end to end (catalogue → router → playback → mixer
-   dialogue voice → captions) over the Windows SAPI 5 backend; the reference's
-   offline-neural backend and the dedicated voice-settings window remain.
+   dialogue voice → captions) over the Windows SAPI 5 backend, with the voice
+   & subtitles settings view live under the pause menu's VOICE button; the
+   reference's offline-neural backend remains.
 3. Frame pacing is present-bound on the measurement host: smoke now reports
    `cpu_mean/p95` (update+scene build ≈ 2.3 ms mean / 0.14 ms p95) separately
    from `draw_mean/p95` (≈ 18.9 ms — the vsync interval of the ~53 Hz Meta

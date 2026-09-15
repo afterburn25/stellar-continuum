@@ -34,6 +34,7 @@
 #include "native_voice.hpp"
 #include "native_voice_bridge.hpp"
 #include "native_voice_playback.hpp"
+#include "native_voice_settings.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
 #include "native_territory_overlay.hpp"
@@ -93,6 +94,7 @@ namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_notifications = stellar::native_notifications;
 namespace native_support = stellar::native_support;
 namespace native_voice = stellar::native_voice;
+namespace native_voice_settings = stellar::native_voice_settings;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
@@ -384,7 +386,8 @@ class NativeCampaign final {
         [this](native_voice::NativeSpeechRequest request){
           if(voice_playback_)voice_playback_->speak(std::move(request));
         },&*voice_resolver_));
-      voice_settings_=native_voice::NativeVoiceSettings::load(user_dir/"voice-settings.json");
+      voice_settings_path_=user_dir/"voice-settings.json";
+      voice_settings_=native_voice::NativeVoiceSettings::load(voice_settings_path_);
       voice_cache_.emplace(user_dir/"voice-cache");
       voice_playback_.emplace(voice_settings_,&voice_profiles_,&*voice_resolver_,&*voice_cache_);
       voice_playback_->attach_backend(native_voice::create_offline_speech_backend());
@@ -1303,6 +1306,28 @@ class NativeCampaign final {
     if(std::abs(settings.master-.78f)>.001f||std::abs(settings.music-.64f)>.001f||std::abs(settings.sfx-.82f)>.001f)
       throw std::runtime_error("Audio smoke did not restore and persist the default mix.");
     smoke_audio_settings_=1;
+    // VOICE & SUBTITLES parity: open the voice settings view, flip a toggle,
+    // cycle a choice, close via Escape and verify the payload persisted.
+    click(center(layout.voice_button));
+    if(!voice_settings_view_.visible())
+      throw std::runtime_error("Audio smoke could not open the voice settings view.");
+    const auto voice_layout=native_voice_settings::VoiceSettingsLayout::for_viewport(width,height);
+    click(center(voice_layout.toggle_boxes[0]));
+    click(center(voice_layout.choice_buttons[1]));
+    {
+      InputSnapshot escape;escape.drawable_width=width;escape.drawable_height=height;
+      escape.events={{InputEventType::EscapePressed}};
+      if(!update(escape,width,height,0.,false))
+        throw std::runtime_error("Audio smoke voice Escape closed the campaign.");
+    }
+    if(voice_settings_view_.visible())
+      throw std::runtime_error("Audio smoke could not close the voice settings view.");
+    const auto persisted=native_voice::NativeVoiceSettings::load(voice_settings_path_);
+    if(persisted.enable_voices||persisted.frequency!=native_voice::VoiceFrequency::Frequent)
+      throw std::runtime_error("Audio smoke did not persist the voice settings.");
+    // Restore defaults so downstream voice evidence still synthesizes.
+    apply_voice_settings(native_voice::NativeVoiceSettings{});
+    smoke_voice_settings_=1;
     // SUPPORT BUNDLE / F8 parity: the menu button exports while the menu is
     // open; F8 exports with the menu closed. Both land in the support dir.
     click(center(layout.support_button));
@@ -1351,6 +1376,7 @@ class NativeCampaign final {
        <<",\"sfx_gain\":"<<settings.sfx
        <<",\"settings\":"<<smoke_audio_settings_
        <<",\"support\":"<<smoke_audio_support_
+       <<",\"voice_settings\":"<<smoke_voice_settings_
        <<",\"voice_pipeline\":"<<(voice_playback_?1:0)
        <<",\"voice_backend\":"
        <<json_string(voice_playback_?voice_playback_->backend_status():"none")
@@ -1658,6 +1684,15 @@ class NativeCampaign final {
         }
         continue;
       }
+      if(menu_&&voice_settings_view_.visible()){
+        const auto voice_result=voice_settings_view_.handle(event,width,height);
+        using VoiceCommand=native_voice_settings::VoiceSettingsCommand;
+        if(voice_result.command==VoiceCommand::Apply)apply_voice_settings(voice_result.values);
+        else if(voice_result.command==VoiceCommand::Replay){if(voice_playback_)voice_playback_->replay_last();}
+        else if(voice_result.command==VoiceCommand::Stop){if(voice_playback_)voice_playback_->stop();}
+        else if(voice_result.command==VoiceCommand::Close){apply_voice_settings(voice_result.values);voice_settings_view_.close();}
+        continue;
+      }
       if(notification_view_.visible()&&!menu_){
         const auto result=notification_view_.handle(
             event,session_->notifications().items(),width,height);
@@ -1788,6 +1823,7 @@ class NativeCampaign final {
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::NewGame)request_new_game();
         else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
+        else if(action==UiAction::Voice){audio_settings_.close();voice_settings_view_.open(voice_settings_);}
         else if(action==UiAction::Support)export_support_bundle();
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
@@ -1985,6 +2021,8 @@ class NativeCampaign final {
     if (menu_) {
       if (audio_settings_.visible()) {
         audio_settings_.render(out, width, height);
+      } else if (voice_settings_view_.visible()) {
+        voice_settings_view_.render(out, width, height);
       } else {
       fill(out, layout.menu_panel, panel);
       stroke(out, layout.menu_panel, {116, 174, 225, 255});
@@ -2001,6 +2039,7 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.new_game_button, "NEW GAME");
       draw_button(layout.audio_button, "AUDIO");
+      draw_button(layout.voice_button, "VOICE");
       draw_button(layout.support_button, "SUPPORT BUNDLE");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
       }
@@ -2673,7 +2712,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();notification_view_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();notification_view_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
@@ -2706,6 +2745,16 @@ class NativeCampaign final {
   // mixer's dedicated dialogue voice. Optional members stay empty when the
   // packaged voice catalogue is absent, which disables voice entirely.
   native_voice::NativeVoiceSettings voice_settings_;
+  std::filesystem::path voice_settings_path_;
+  native_voice_settings::NativeVoiceSettingsView voice_settings_view_;
+  // Live-applies a sanitized settings payload to playback, the dialogue gain
+  // and the persisted voice-settings.json (the reference ApplySettings port).
+  void apply_voice_settings(native_voice::NativeVoiceSettings values){
+    voice_settings_=values.sanitized();
+    if(voice_playback_)voice_playback_->apply_settings(voice_settings_);
+    audio_mixer_.set_dialogue_volume(voice_settings_.volume);
+    if(!voice_settings_path_.empty())voice_settings_.save(voice_settings_path_);
+  }
   native_voice::NativeVoiceProfileRegistry voice_profiles_;
   std::optional<native_voice::NativeCharacterVoiceResolver> voice_resolver_;
   std::optional<native_voice::NativeVoiceRouter> voice_router_;
@@ -2760,6 +2809,7 @@ class NativeCampaign final {
   int construction_candidate_index_{};
   bool smoke_shortcut_{};
   int smoke_audio_support_{};
+  int smoke_voice_settings_{};
   std::optional<native_support::NativeSupportLog> support_log_;
   std::optional<std::string> smoke_research_node_;
   bool last_fleet_command_accepted_{};

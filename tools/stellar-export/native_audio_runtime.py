@@ -62,7 +62,8 @@ def _diagnostic(stdout: str):
     except (TypeError, ValueError) as error:
         raise RuntimeError("Native audio diagnostic is malformed") from error
     for key in ("required", "music", "device", "music_frames", "voices",
-                "voiced_chunks", "clipped_samples", "settings", "support"):
+                "voiced_chunks", "clipped_samples", "settings", "support",
+                "voice_settings", "voice_pipeline", "voice_lines"):
         value = state.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
             raise RuntimeError(f"Native audio reported invalid {key}")
@@ -85,6 +86,13 @@ def _diagnostic(stdout: str):
         raise RuntimeError("Native audio settings view did not apply and restore")
     if state["support"] != 1:
         raise RuntimeError("Native support bundle did not export from the menu or F8")
+    if state["voice_settings"] != 1:
+        raise RuntimeError("Native voice settings view did not apply and persist")
+    if state["voice_pipeline"] != 1 or state["voice_lines"] < 1:
+        raise RuntimeError("Native voice pipeline produced no spoken line")
+    backend = state.get("voice_backend")
+    if not isinstance(backend, str) or "sapi" not in backend.lower():
+        raise RuntimeError("Native voice pipeline did not report the SAPI backend")
     if abs(state["master"] - .78) > .01 or abs(state["music_gain"] - .64) > .01 \
             or abs(state["sfx_gain"] - .82) > .01:
         raise RuntimeError("Native audio did not persist the restored default mix")
@@ -155,6 +163,14 @@ def validate_native_audio_export(folder: Path, env: dict[str, str]):
             valid = False
         if not valid:
             raise RuntimeError("Native support bundle is not a valid three-entry ZIP")
+        # The voice settings exercise ends on restored defaults persisted
+        # beside the save path.
+        voice_settings = save.parent / "voice-settings.json"
+        if not voice_settings.is_file():
+            raise RuntimeError("Native voice settings did not persist to disk")
+        voice_values = json.loads(voice_settings.read_text(encoding="utf-8"))
+        if voice_values.get("enableVoices") is not True:
+            raise RuntimeError("Native voice settings persisted the wrong state")
     return {"nativeAudioStreams": True,
             "nativeAudioDevice": bool(state["device"]),
             "nativeAudioCapture": str(evidence),

@@ -15,6 +15,8 @@ def diagnostic():
         "voices": 2, "voiced_chunks": 12, "clipped_samples": 0,
         "peak": 0.5233, "master": 0.78, "music_gain": 0.64, "sfx_gain": 0.82,
         "settings": 1, "support": 1,
+        "voice_settings": 1, "voice_pipeline": 1, "voice_lines": 1,
+        "voice_backend": "Backend: windows-sapi · 2 voices",
     }
 
 
@@ -44,6 +46,9 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                 if fault == "settings_flag": state["settings"] = 0
                 if fault == "settings_mix": state["master"] = 0.4
                 if fault == "support_flag": state["support"] = 0
+                if fault == "voice_flag": state["voice_settings"] = 0
+                if fault == "voice_lines": state["voice_lines"] = 0
+                if fault == "voice_backend": state["voice_backend"] = "none"
                 varied = bytes(range(256)) if fault != "blank" else bytes(200)
                 if fault != "capture":
                     capture.write_bytes(b"BM" + b"\0" * 52 + varied * 40)
@@ -68,6 +73,13 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                             archive.writestr("system-TEST.txt", "info")
                             archive.writestr("audio.player17.json",
                                              save.read_text(encoding="utf-8"))
+                if fault != "voice_settings_missing":
+                    voice = {"enableVoices": True, "subtitles": True,
+                             "frequency": "Normal", "subtitleSize": 18}
+                    if fault == "voice_state":
+                        voice["enableVoices"] = False
+                    (save.parent / "voice-settings.json").write_text(
+                        json.dumps(voice), encoding="utf-8")
                 stdout = "gpu_driver=vulkan systems=500 save=ok " + \
                     f"audio={json.dumps(state, separators=(',', ':'))}"
                 if fault == "diagnostic":
@@ -122,6 +134,16 @@ class NativeAudioRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("bundle_missing")
     def test_damaged_bundle_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("bundle_bad")
+    def test_unexercised_voice_settings_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice_flag")
+    def test_silent_voice_pipeline_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice_lines")
+    def test_wrong_voice_backend_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice_backend")
+    def test_missing_voice_settings_file_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice_settings_missing")
+    def test_wrong_voice_state_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice_state")
 
 
 class NativeAudioAssetTests(unittest.TestCase):

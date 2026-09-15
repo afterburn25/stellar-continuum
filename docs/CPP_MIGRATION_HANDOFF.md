@@ -132,6 +132,19 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   dedupe/once/cooldown/frequency, deterministic variants, template
   rejection, resolver species safety, settings round-trip, WAV validation,
   and playback queue/subtitle behavior with a fake backend.
+- `app/native_client/native_voice_settings.{hpp,cpp}` —
+  `NativeVoiceSettingsView` ports the reference voice & subtitles panel
+  (VoicePlaybackController.Settings.cs): four toggles, three sliders,
+  subtitle-size and announcement-frequency cycles (selecting a frequency
+  restores chatter level, matching the reference), and Replay/Stop/Close
+  actions. `NativeVoicePlayback::replay_last()` ports `ReplayLast`. The
+  pause menu's VOICE button opens the view; every Apply sanitizes, pushes
+  to playback + the dialogue gain, and persists `voice-settings.json`.
+  `--audio-smoke` exercises the view end to end (`voice_settings=1`) and
+  the export validator requires it plus the persisted file.
+  `native-tests/native_voice_settings_tests.cpp` covers layout, toggles,
+  slider drag, choice cycles and action commands. The reference's
+  developer voice lab remains developer-only and unported.
 - `export/native-voice-assets.json` + `cmake/NativeVoiceAssets.cmake` gate
   the three catalogue files by exact path and SHA-256.
 

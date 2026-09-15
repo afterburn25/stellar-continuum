@@ -398,6 +398,17 @@ void NativeVoicePlayback::stop() {
   queue_.clear();
 }
 
+void NativeVoicePlayback::replay_last() {
+  if (!last_) return;
+  auto last = *last_;
+  stop();
+  recent_.clear();
+  last.dedupe_key = "replay:" + std::to_string(time_);
+  last.expires_at =
+      std::chrono::system_clock::now() + std::chrono::seconds(40);
+  speak(std::move(last));
+}
+
 void NativeVoicePlayback::reset_campaign() {
   stop();
   recent_.clear();

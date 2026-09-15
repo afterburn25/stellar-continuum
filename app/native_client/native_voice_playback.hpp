@@ -94,6 +94,9 @@ public:
   // Drives the queue, backend completion and the caption lifetime.
   void update(double delta);
   void stop();
+  // ReplayLast port: stops the active line, clears dedupe history and
+  // re-presents the most recent request with a fresh dedupe key.
+  void replay_last();
   void reset_campaign();
 
   [[nodiscard]] bool is_speaking() const noexcept;

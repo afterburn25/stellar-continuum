@@ -165,6 +165,9 @@ int main(int argc, char **argv) {
   const std::filesystem::path temp =
       argc > 1 ? std::filesystem::path(argv[1])
                : std::filesystem::temp_directory_path() / "stellar-voice-tests";
+  // Wipe the shared work directory: cache assertions require a clean slate
+  // (a leftover wav makes "missing must be invalid" fail on repeat runs).
+  std::filesystem::remove_all(temp);
   std::filesystem::create_directories(temp);
 
   // --- Router: authorization -------------------------------------------
