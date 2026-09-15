@@ -382,6 +382,51 @@ int main(int argc, char **argv) {
     check(safe_fallback && safe_fallback->profile_id == "alien_diplomat",
           "alien role must reject a human profile");
 
+    // The roster callback names the office holder: its display name and
+    // character id win over the mapped profile, which stays the fallback.
+    NativeCharacterVoiceResolver rostered(&registry, mappings);
+    rostered.set_current_character(
+        [](const NativeVoiceSpeakerContext &context)
+            -> std::optional<NativeVoiceCharacter> {
+          if (context.source_civilization_id != 7) return std::nullopt;
+          return NativeVoiceCharacter{"char-1", "Cmdr. Voss", "Narrator",
+                                      std::nullopt, std::nullopt};
+        });
+    own.source_civilization_id = 7;
+    const auto named = rostered.resolve(own);
+    check(named && named->profile_id == "narrator" &&
+              named->display_name == "Cmdr. Voss" &&
+              named->character_id && *named->character_id == "char-1" &&
+              named->is_fallback,
+          "a roster character must name the mapped-profile fallback");
+    const auto foreign = rostered.resolve(envoy);
+    check(foreign && foreign->profile_id == "alien_diplomat" &&
+              foreign->display_name == "Envoy" && !foreign->character_id,
+          "a foreign speaker must never resolve to a roster character");
+    // A character-assigned profile wins over the role mapping.
+    NativeCharacterVoiceResolver voiced(&registry, mappings);
+    voiced.set_current_character(
+        [](const NativeVoiceSpeakerContext &)
+            -> std::optional<NativeVoiceCharacter> {
+          return NativeVoiceCharacter{"char-2", "Cmdr. Rho", "Narrator",
+                                      std::string("alien_diplomat"),
+                                      std::nullopt};
+        });
+    const auto character_profile = voiced.resolve(own);
+    check(character_profile &&
+              character_profile->profile_id == "alien_diplomat" &&
+              character_profile->display_name == "Cmdr. Rho" &&
+              !character_profile->is_fallback,
+          "a character's own voice profile must outrank the role mapping");
+    // An ExactCharacterId that does not match the holder drops the name.
+    NativeVoiceSpeakerContext exact_miss = own;
+    exact_miss.exact_character_id = "char-9";
+    const auto anonymous = voiced.resolve(exact_miss);
+    check(anonymous && anonymous->display_name == "NARRATOR" &&
+              !anonymous->character_id,
+          "a mismatched exact character must resolve anonymously");
+    own.source_civilization_id = 0;
+
     // Disabled profiles resolve through their fallback chain.
     check(registry.try_resolve("retired") != nullptr &&
               registry.try_resolve("retired")->id == "narrator",

@@ -325,6 +325,11 @@ NativeCharacterVoiceResolver NativeCharacterVoiceResolver::load(
   return NativeCharacterVoiceResolver(profiles, std::move(mappings));
 }
 
+void NativeCharacterVoiceResolver::set_current_character(
+    CurrentCharacter current) {
+  current_character_ = std::move(current);
+}
+
 std::optional<NativeResolvedSpeaker> NativeCharacterVoiceResolver::resolve(
     const NativeVoiceSpeakerContext &context) const {
   const bool require_non_human = is_alien_role(context.role) ||
@@ -338,17 +343,39 @@ std::optional<NativeResolvedSpeaker> NativeCharacterVoiceResolver::resolve(
     return profile;
   };
   const auto from_profile = [&](const NativeVoiceProfile &profile,
+                                const std::optional<std::string> &character_id,
                                 bool fallback) {
     return NativeResolvedSpeaker{profile.id,
                                  blank(profile.subtitle_name)
                                      ? profile.display_name
                                      : profile.subtitle_name,
-                                 context.role, context.exact_character_id,
+                                 context.role, character_id,
                                  profile.portrait, fallback};
+  };
+  const auto named = [&](const NativeVoiceCharacter &character,
+                         const NativeVoiceProfile &profile, bool fallback) {
+    return NativeResolvedSpeaker{profile.id, character.display_name,
+                                 context.role, character.id,
+                                 character.portrait ? character.portrait
+                                                    : profile.portrait,
+                                 fallback};
+  };
+  const auto character = current_character_ ? current_character_(context)
+                                            : std::optional<NativeVoiceCharacter>{};
+  const auto character_matches = [&] {
+    return character && (!context.exact_character_id ||
+                         iequals(*context.exact_character_id, character->id));
   };
 
   if (const auto *exact = try_profile(context.exact_voice_profile_id))
-    return from_profile(*exact, false);
+    return character_matches() ? named(*character, *exact, false)
+                               : from_profile(*exact, context.exact_character_id,
+                                              false);
+
+  if (character_matches())
+    if (const auto *character_profile =
+            try_profile(character->voice_profile_id))
+      return named(*character, *character_profile, false);
 
   std::vector<const NativeVoiceRoleMapping *> ranked;
   for (const auto &mapping : mappings_) {
@@ -369,7 +396,8 @@ std::optional<NativeResolvedSpeaker> NativeCharacterVoiceResolver::resolve(
   });
   for (const auto *mapping : ranked)
     if (const auto *profile = try_profile(mapping->profile))
-      return from_profile(*profile, true);
+      return character_matches() ? named(*character, *profile, true)
+                                 : from_profile(*profile, std::nullopt, true);
   return std::nullopt;
 }
 

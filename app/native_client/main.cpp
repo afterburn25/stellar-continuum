@@ -382,6 +382,25 @@ class NativeCampaign final {
         return;
       voice_profiles_=native_voice::NativeVoiceProfileRegistry::load(voice_dir/"human.json");
       voice_resolver_.emplace(native_voice::NativeCharacterVoiceResolver::load(&voice_profiles_,voice_dir/"roles.json"));
+      // ResolveCurrentVoiceCharacter port: only the player's own leadership
+      // roster may name speakers; foreign offices are never consulted.
+      voice_resolver_->set_current_character(
+        [this](const native_voice::NativeVoiceSpeakerContext &context)
+          ->std::optional<native_voice::NativeVoiceCharacter>{
+          if(!session_)return std::nullopt;
+          const auto &campaign=session_->frame().runtime().world().campaign();
+          const auto civilization=std::ranges::find(campaign.civilizations,context.source_civilization_id,&Civilization::id);
+          if(civilization==campaign.civilizations.end()||civilization->id!=campaign.player_civilization_id)return std::nullopt;
+          const std::string office=
+            context.role==native_voice::VoiceSpeakerRole::AlienDiplomat?"Diplomat":
+            context.role==native_voice::VoiceSpeakerRole::AlienScientist?"ChiefScientist":
+            context.role==native_voice::VoiceSpeakerRole::AlienCommander?"FleetCommander":
+            std::string(native_voice::speaker_role_name(context.role));
+          const auto holder=std::ranges::find_if(civilization->leadership,[&](const auto &entry){
+            return context.exact_character_id?entry.character.id==*context.exact_character_id:entry.office==office;});
+          if(holder==civilization->leadership.end())return std::nullopt;
+          return native_voice::NativeVoiceCharacter{holder->character.id,holder->character.display_name,holder->office,holder->character.voice_profile_id,holder->character.portrait};
+        });
       voice_router_.emplace(native_voice::NativeVoiceRouter::from_file(voice_dir/"events.json",
         [this](native_voice::NativeSpeechRequest request){
           if(voice_playback_)voice_playback_->speak(std::move(request));

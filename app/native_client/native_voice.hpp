@@ -93,20 +93,24 @@ struct NativeVoiceRoleMapping {
 
 // CharacterVoiceResolver port: role → roster character → civ/species/generic
 // profile fallback. The optional current-character callback is supplied by the
-// caller (the native client does not yet expose a character roster, so it
-// stays null and every call resolves through the ranked mappings).
+// caller; without it every call resolves through the ranked mappings.
 class NativeCharacterVoiceResolver final {
 public:
+  using CurrentCharacter =
+      std::function<std::optional<NativeVoiceCharacter>(
+          const NativeVoiceSpeakerContext &)>;
   NativeCharacterVoiceResolver(const NativeVoiceProfileRegistry *profiles,
                                std::vector<NativeVoiceRoleMapping> mappings);
   [[nodiscard]] static NativeCharacterVoiceResolver load(
       const NativeVoiceProfileRegistry *profiles, const std::filesystem::path &);
+  void set_current_character(CurrentCharacter current);
   [[nodiscard]] std::optional<NativeResolvedSpeaker>
   resolve(const NativeVoiceSpeakerContext &) const;
 
 private:
   const NativeVoiceProfileRegistry *profiles_;
   std::vector<NativeVoiceRoleMapping> mappings_;
+  CurrentCharacter current_character_;
 };
 
 struct NativeVoiceOverrides {
