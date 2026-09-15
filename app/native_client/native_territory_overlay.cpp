@@ -398,7 +398,8 @@ void NativeTerritoryOverlay::clear() noexcept {
 
 NativeTerritoryDrawStats NativeTerritoryOverlay::append(
     native_map::DrawList &out, const native_map::Camera &camera, int width,
-    int height, float fitted_pixels_per_world) const {
+    int height, float fitted_pixels_per_world,
+    NativeTerritoryRenderStyle style) const {
   preparation_->require_owner();
   NativeTerritoryDrawStats stats;
   if (!valid_) return stats;
@@ -433,7 +434,9 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
         fill_image_,
         rect_for(projection_.fog.position, projection_.fog.size),
         std::nullopt,
-        map_alpha({255, 255, 255, 255}, .042f * detail),
+        // The former 3–5 alpha values disappeared into the regional artwork.
+        // This remains translucent while making continuous ownership legible.
+        map_alpha({255, 255, 255, 255}, .16f * detail),
         std::nullopt});
     ++stats.fill_images;
   }
@@ -442,7 +445,7 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
   for (const auto &region : projection_.territories) {
     const Color color = map_alpha(
         native_territory_color(region.civilization_id, observer_),
-        .55f * detail);
+        .72f * detail);
     for (const auto &contour : region.contours) {
       if (contour.size() < 3) continue;
       for (std::size_t index = 0; index < contour.size(); ++index) {
@@ -456,24 +459,26 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
 
   // Region labels are suppressed at the complete-galaxy overview unless a
   // civilization holds more than one anchor, exactly like the reference.
-  for (const auto &region : projection_.territories) {
-    if (region.anchors.empty() ||
-        (overview > .82f && region.anchors.size() < 2))
-      continue;
-    const Point point = project(region.label_position);
-    std::string label = region.civilization_name;
-    for (auto &character : label)
-      character = static_cast<char>(std::toupper(
-          static_cast<unsigned char>(character)));
-    out.world.emplace_back(native_map::Text{
-        {point.x + 1.f, point.y + 1.f}, label,
-        map_alpha({0x05, 0x0b, 0x12, 255}, .9f), 13, 0.f, std::nullopt,
-        native_map::TextAlign::Center});
-    out.world.emplace_back(native_map::Text{
-        point, label,
-        map_alpha(native_territory_color(region.civilization_id, observer_),
-                  .82f * detail),
-        13, 0.f, std::nullopt, native_map::TextAlign::Center});
+  if (style.draw_labels) {
+    for (const auto &region : projection_.territories) {
+      if (region.anchors.empty() ||
+          (overview > .82f && region.anchors.size() < 2))
+        continue;
+      const Point point = project(region.label_position);
+      std::string label = region.civilization_name;
+      for (auto &character : label)
+        character = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(character)));
+      out.world.emplace_back(native_map::Text{
+          {point.x + 1.f, point.y + 1.f}, label,
+          map_alpha({0x05, 0x0b, 0x12, 255}, .9f), 13, 0.f, std::nullopt,
+          native_map::TextAlign::Center});
+      out.world.emplace_back(native_map::Text{
+          point, label,
+          map_alpha(native_territory_color(region.civilization_id, observer_),
+                    .82f * detail),
+          13, 0.f, std::nullopt, native_map::TextAlign::Center});
+    }
   }
 
   // Territorial claims read as dashed arcs over the claimed system.

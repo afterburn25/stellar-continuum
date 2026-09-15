@@ -23,6 +23,37 @@ def _finite_positive(value, label):
     return float(value)
 
 
+_LABEL_FIELDS = ("candidates", "measured", "placed", "selected_requested",
+                 "selected_placed", "label_overlaps", "obstacle_overlaps",
+                 "hud_overlaps", "star_overlaps", "outside_viewport")
+
+
+def _validate_labels(view, label):
+    labels = view.get("labels")
+    if not isinstance(labels, dict):
+        raise RuntimeError(f"Native {label} diagnostic lacks labels")
+    if set(labels) != set(_LABEL_FIELDS):
+        raise RuntimeError(f"Native {label} labels have an unexpected field set")
+    for field in _LABEL_FIELDS:
+        value = labels.get(field)
+        if type(value) is not int or value < 0:
+            raise RuntimeError(f"Native {label} reported invalid labels.{field}")
+    if labels["measured"] > 128 or labels["placed"] > labels["measured"]:
+        raise RuntimeError(f"Native {label} label placement exceeds its budget")
+    if labels["measured"] > labels["candidates"]:
+        raise RuntimeError(f"Native {label} measured more labels than candidates")
+    if labels["selected_requested"] > labels["candidates"] or \
+            labels["selected_placed"] > labels["selected_requested"] or \
+            labels["selected_placed"] > labels["placed"]:
+        raise RuntimeError(f"Native {label} selected label counts are inconsistent")
+    for field in ("label_overlaps", "obstacle_overlaps", "hud_overlaps",
+                  "star_overlaps", "outside_viewport"):
+        if labels[field] != 0:
+            raise RuntimeError(f"Native {label} labels have forbidden {field}")
+    if label == "regional" and labels["placed"] < 1:
+        raise RuntimeError("Native regional zoom placed no labels")
+
+
 def _diagnostic(stdout: str, expected_mode: str):
     match = re.search(r"(?:^|\s)galaxy_art=(\{[^\n]+\})(?:\s|$)", stdout)
     if not match:
@@ -62,6 +93,7 @@ def _diagnostic(stdout: str, expected_mode: str):
         raise RuntimeError("Galaxy scenery leaked into the system view")
     for view, label, exact_total in ((overview, "overview", 500),
                                      (regional_view, "regional", None)):
+        _validate_labels(view, label)
         for key in ("catalog_markers", "known_markers", "unknown_markers",
                     "revealed_unknown_labels"):
             if type(view.get(key)) is not int or view[key] < 0:

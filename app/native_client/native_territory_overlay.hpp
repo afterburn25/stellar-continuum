@@ -21,6 +21,10 @@ struct NativeTerritoryDrawStats final {
   std::size_t fog_images{};
 };
 
+struct NativeTerritoryRenderStyle final {
+  bool draw_labels{true};
+};
+
 // Presentation cache mirroring Main.StrategicTerritory.cs: the projection and
 // its rasterized fill/fog images are rebuilt only when the observer-visible
 // inputs change (fingerprint), never per frame. Drawing emits world-layer
@@ -69,7 +73,8 @@ public:
   NativeTerritoryDrawStats append(native_map::DrawList &out,
                                   const native_map::Camera &camera,
                                   int width, int height,
-                                  float fitted_pixels_per_world) const;
+                                  float fitted_pixels_per_world,
+                                  NativeTerritoryRenderStyle style = {}) const;
 
 private:
   struct Preparation;

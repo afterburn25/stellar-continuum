@@ -2,7 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`07d989df`).
+`891fbcb2`).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -13,7 +13,50 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-- Devin/SWE-2 was reviewed through `07d989df`. Territory presentation commit
+### Current readability checkpoint
+
+This native C++ checkpoint builds the full MSVC app with the galaxy-label target at
+`/W4 /WX`. Six focused CTests passed in 1.67 seconds (`native_diplomacy_controller`,
+`native_diplomacy_workspace`, `native_galaxy_backdrop`, `native_galaxy_star_markers`,
+`native_galaxy_labels`, and `native_territory_projection`), recorded in
+`work/native-label-runtime.log`. Ninety-seven Python checks passed in 6.183 seconds
+across the three native diplomacy, galaxy, and client runtime suites
+(`work/native-label-python.log`).
+
+Four relocated real-Vulkan runs passed: 500-system galaxy fresh/reload at 720p and
+1080p, and diplomacy acceptance/reload at 720p and 1080p. The evidence files are
+`work/native-label-galaxy-evidence.json` and `work/native-label-diplomacy-evidence.json`.
+They preserve the complete paused Player17 payload, observer secrecy, unrelated
+acceptance state and claims, and the source-fixture hash. Overview reports 500
+canonical markers with zero label audit counts. Regional 720p and 1080p each report
+6 candidates, 6 measured, 3 placed, and zero collision/offscreen audit counts. Root
+inspection covered overview 1080p, regional 720p/1080p, and diplomacy 720p: Sol and
+empire names are visible, fill is stronger, names do not stack, and the 720p empire
+label leads to territory outside its border.
+
+Placement measures the actual render font and filters invalid/offscreen candidates
+before deterministic sorting. Placements are collision-checked after measurement. It
+prioritizes selected system, empire, then nearby known stars; tests 48 fixed,
+size-aware empire positions nearest first; and keeps an anchor leader line when the
+gap exceeds 32px. HUD, stars, the fleet panel, labels, and viewport bounds are checked.
+The maximum is 128 text measurements, including 32 empires. The 2,500-candidate dense
+test validates that measurement budget only, not 2,500 GPU labels or
+60 FPS. Fill multiplier/contour are `0.16`/`0.72`; known names without a valid place
+are intentionally omitted. Selected priority is unit-covered only. Core, projection
+math, and Player17 remain unchanged.
+
+`43622e72` is the prior checkpoint: its 95 Python checks and CI `34985891256` covered
+seven presentation targets before galaxy labels. Its faint-fill/overlapping-label
+finding is addressed above. Current 97-test and label evidence belongs to this
+checkpoint; new-label CI is pending. `graphicalParity=false`; the Engine 0.1.58 candidate/
+game 0.1.7-alpha is unmerged and unsealed, and clean-machine and broad-hardware 60 FPS
+are unproven. `891fbcb2` and duplicate-audio `dbf07f81` remain unimported; PR #332
+audio is authoritative. Review found callback races, clip-tail looping, non-atomic
+lowercase preferences, and lifecycle conflicts (issue #324 comment `5682904661`).
+`eb1ab876` remains unimported until Core provides a physical-body/system/orbit contract.
+Next: colony buildings/roads and wider casting.
+
+- Devin/SWE-2 was reviewed through `891fbcb2`. Territory presentation commit
   `ef7a4007` was selected: it ports the C# projection's observer-gated anchors,
   smoothed continuous fill geometry, stitched contours, fog mask, unexplored
   dimming and observer-visible claim outlines into a bounded native presentation
@@ -30,7 +73,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   unchanged polls were 0.0432/0.0889/0.4609/0.4915 ms; scheduling-inclusive
   worker completion was 392/479/609/4,985 ms. This is responsiveness/latency
   evidence, not a sustained FPS result.
-- The final full-native MSVC build passed. Five focused CTests passed in 1.79 seconds
+- Earlier territory validation passed a full-native MSVC build. Five focused CTests passed in 1.79 seconds
   (`native_diplomacy_controller`, `native_diplomacy_workspace`,
   `native_galaxy_backdrop`, `native_galaxy_star_markers`,
   `native_territory_projection`). All 95 focused checks passed in 5.778 seconds
@@ -42,7 +85,8 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   `work/native-territory-final-python.log`. Published head `c4744e1c` passed CI
   run `34978964654`; the updated
   GPU-free job compiles the full native app plus territory, star-marker and
-  diplomacy-workspace targets. Exact-head CI is pending.
+  diplomacy-workspace targets. Prior head `43622e72` passed CI `34985891256`;
+  that result predates the galaxy-label target.
 - A closed RELATIONS workspace had retained its view and rendered hidden portrait
   work. Close intentionally retains its view for reopening; visibility-gated
   rendering skips all hidden draw/provider work, and regression coverage verifies
@@ -56,10 +100,9 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   state and claims; paused reload matched the whole Player17 payload and the source
   fixture hash remained unchanged. Evidence:
   `work/native-territory-diplomacy-evidence.json`.
-- The two existing 500-system galaxy runs remain valid, making four territory
-  runtime runs in total; overview and regional images were inspected. Regional
-  fill remains faint and nearby labels overlap. This is polish debt, not graphical
-  parity or a sustained-60-FPS claim. The candidate remains unmerged and unreleased.
+- The `43622e72` predecessor found faint regional fill and overlapping nearby labels.
+  The current readability checkpoint above addresses those findings; the candidate
+  remains unmerged and unreleased.
 - Orbital commit `eb1ab876` was not imported. Its project/state projection follows
   the reference schematic, but its most-populous-colony host and screen position
   are invented presentation values, not persisted physical locations. Input

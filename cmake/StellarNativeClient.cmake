@@ -117,6 +117,7 @@ add_dependencies(stellar-continuum-native stellar_native_startup_art_assets)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_startup_artwork.cpp)
 
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_celestial_appearance.cpp)
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_galaxy_labels.cpp)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeGalaxyArtAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_galaxy_art_assets)

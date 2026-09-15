@@ -51,12 +51,55 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Validation evidence
 
+### Current readability checkpoint (2026-09-15)
+
+This native C++ checkpoint builds the full MSVC app with the galaxy-label target at
+`/W4 /WX`. Six focused CTests passed in 1.67 seconds: `native_diplomacy_controller`,
+`native_diplomacy_workspace`, `native_galaxy_backdrop`, `native_galaxy_star_markers`,
+`native_galaxy_labels`, and `native_territory_projection`
+(`work/native-label-runtime.log`). Ninety-seven Python checks passed in 6.183 seconds
+across `test_native_diplomacy_runtime`, `test_native_galaxy_runtime`, and
+`test_native_client_runtime` (`work/native-label-python.log`).
+
+Four relocated real-Vulkan runs passed: 500-system galaxy fresh/reload at 720p and
+1080p, plus diplomacy acceptance/reload at 720p and 1080p. Evidence is in
+`work/native-label-galaxy-evidence.json` and `work/native-label-diplomacy-evidence.json`.
+The runs preserve complete paused Player17 equality, observer secrecy, unrelated
+acceptance state and claims, and the source-fixture hash. Overview has 500 canonical
+markers and zero label audit counts; it does not have zero markers. Regional 720p and
+1080p each report 6 candidates, 6 measured, 3 placed, and zero collision/offscreen
+audit counts. Root inspection covered overview 1080p, regional 720p/1080p, and
+diplomacy 720p: Sol and empire names are visible, territory fill is stronger, names
+do not stack, and a 720p empire leader line terminates outside its territory border.
+
+The algorithm measures the actual render font, filters invalid/offscreen candidates
+before deterministic sorting, and collision-tests placements after measurement. It
+prioritizes selected system, empire, then nearby known stars; tries 48 fixed,
+size-aware empire positions nearest first; retains an anchor leader line when the gap
+exceeds 32px; and checks HUD, stars, the fleet panel, labels, and viewport bounds. Its
+maximum is 128 measurements, including 32 empires. The 2,500-candidate dense test
+establishes only the measurement budget, not 2,500 GPU labels or
+60 FPS. Fill multiplier/contour are `0.16`/`0.72`; known names with no legal location
+are omitted. Selected priority has unit coverage only, not a selected-runtime capture.
+This is presentation-only: C++ Core, projection math, and Player17 remain unchanged.
+
+`43622e72` is the prior readability checkpoint: 95 Python checks and CI
+`34985891256` covered seven existing presentation targets before galaxy labels. Its
+faint-fill/overlapping-label finding is addressed by this pass. The current 97 tests
+and label evidence belong to this checkpoint; new-label CI is pending. `graphicalParity=false`;
+Engine 0.1.58 candidate/game 0.1.7-alpha is unmerged and unsealed, and clean-machine
+and broad-hardware 60 FPS remain unproven. `891fbcb2` and duplicate-audio `dbf07f81`
+remain unimported: PR #332 audio is authoritative, while review found callback races,
+clip-tail looping, non-atomic lowercase preferences, and lifecycle conflicts (issue
+#324 comment `5682904661`). Orbital `eb1ab876` remains unimported pending Core's
+physical-body/system/orbit contract. Next: colony buildings/roads and wider casting.
+
 Territory preparation measurements for 500 systems/3 empires/6 colonies,
 500/3/100, 2,500/6/30 and 2,500/6/500 were respectively: synchronous cold
 179/347/591/3,915 ms; final owner request 0.0937/0.0948/0.4770/0.4718 ms;
 unchanged poll 0.0432/0.0889/0.4609/0.4915 ms; scheduling-inclusive worker
-completion 392/479/609/4,985 ms. The final full-native MSVC build passed, and
-five focused CTests passed in 1.79 seconds. The suites
+completion 392/479/609/4,985 ms. At the prior territory checkpoint, the full-native
+MSVC build passed and five focused CTests passed in 1.79 seconds. The suites
 `test_native_diplomacy_runtime`, `test_native_galaxy_runtime` and
 `test_native_client_runtime` passed all 95 checks in 5.778 seconds, including 26 diplomacy
 checks and two duplicated-map sidecar rejection cases. A closed RELATIONS workspace
@@ -77,12 +120,12 @@ images were inspected. Evidence: `work/native-territory-diplomacy-evidence.json`
 `work/native-territory-visibility-runtime.log` and
 `work/native-territory-final-python.log`.
 
-The regional fill remains faint and nearby labels overlap, which is polish debt
-rather than graphical-parity evidence. Published head `c4744e1c` passed CI run
-`34978964654`; the updated GPU-free job compiles the full native application plus
-territory, star-marker and diplomacy-workspace targets. Exact-head CI remains
-pending. This is an unmerged local candidate, not a release. The preparation
-timings establish bounded owner responsiveness and background latency, not
+The preceding `43622e72` checkpoint found faint regional fill and overlapping nearby
+labels; the current readability pass above addresses that polish debt. Published head
+`c4744e1c` passed CI run `34978964654`; the updated GPU-free job compiles the full
+native application plus territory, star-marker and diplomacy-workspace targets. The
+new galaxy-label CI remains pending. This is an unmerged local candidate, not a
+release. The preparation timings establish bounded owner responsiveness and background latency, not
 sustained frame rate.
 
 The combined Engine 0.1.58 candidate passed seven focused native CTests, 18 diplomacy-validator Python checks, 45 packaging/checkout checks and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. The diplomacy fixture retains existing contacts and agreements while adding isolated observations and an incoming research exchange. Real UI input changes selection, accepts the proposal, scrolls the new agreement into view, renders the packaged 2172×724 communications scene and hides unidentified identities/metrics/art. Progress validation preserves unrelated state; paused reload compares the complete saved payload except its timestamp. Baseline normalization follows the existing Player17 parity contract for fixture-only metadata and single-precision map coordinates. See the current C++ migration handoff and `work/native-diplomacy-final-*.json`; this is focused candidate evidence, not a new sealed release or full visual parity.

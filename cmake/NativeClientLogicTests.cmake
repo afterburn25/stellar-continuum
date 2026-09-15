@@ -411,6 +411,13 @@ target_include_directories(stellar_galaxy_marker_tests PRIVATE app/native_client
 target_link_libraries(stellar_galaxy_marker_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_star_markers COMMAND stellar_galaxy_marker_tests)
 
+add_executable(stellar_galaxy_label_tests
+  app/native_client/native_galaxy_labels.cpp
+  native-tests/native_galaxy_labels_tests.cpp)
+target_include_directories(stellar_galaxy_label_tests PRIVATE
+  app/native_client engine/include)
+add_test(NAME native_galaxy_labels COMMAND stellar_galaxy_label_tests)
+
 add_executable(stellar_territory_tests
   app/native_client/native_territory_projection.cpp
   app/native_client/native_territory_overlay.cpp
@@ -422,5 +429,6 @@ set_tests_properties(native_territory_projection PROPERTIES TIMEOUT 120)
 if(MSVC)
   target_compile_options(stellar_galaxy_backdrop_tests PRIVATE /W4 /WX /permissive-)
   target_compile_options(stellar_galaxy_marker_tests PRIVATE /W4 /WX /permissive-)
+  target_compile_options(stellar_galaxy_label_tests PRIVATE /W4 /WX /permissive-)
   target_compile_options(stellar_territory_tests PRIVATE /W4 /WX /permissive-)
 endif()

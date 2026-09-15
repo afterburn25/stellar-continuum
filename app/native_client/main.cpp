@@ -6,6 +6,7 @@
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
 #include "native_galaxy_star_markers.hpp"
+#include "native_galaxy_labels.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -435,6 +436,7 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
 
 struct GalaxyArtSceneEvidence {
   GalaxyBackdropRenderStats backdrop;
+  NativeGalaxyLabelLayoutStats labels;
   std::size_t catalog_markers{};
   std::size_t known_markers{};
   std::size_t unknown_markers{};
@@ -466,6 +468,7 @@ class NativeCampaign final {
         ship_art_(std::filesystem::absolute(asset_root)),
         surface_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
+        text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
@@ -518,6 +521,7 @@ class NativeCampaign final {
     galaxy_backdrop_.clear_render_stats();
     const auto draw=scene(width,height);
     evidence.backdrop=galaxy_backdrop_.last_render_stats();
+    evidence.labels=last_galaxy_label_stats_;
     const auto &world=session_->frame().runtime().world().campaign();
     if(!system_workspace_.visible())
       for(const auto &system:world.systems){
@@ -589,7 +593,18 @@ class NativeCampaign final {
          <<",\"catalog_markers\":"<<evidence.catalog_markers
          <<",\"known_markers\":"<<evidence.known_markers
          <<",\"unknown_markers\":"<<evidence.unknown_markers
-         <<",\"revealed_unknown_labels\":"<<evidence.revealed_unknown_labels<<"}";
+         <<",\"revealed_unknown_labels\":"<<evidence.revealed_unknown_labels
+         <<",\"labels\":{\"candidates\":"<<evidence.labels.candidates
+         <<",\"measured\":"<<evidence.labels.measured
+         <<",\"placed\":"<<evidence.labels.placed
+         <<",\"selected_requested\":"<<evidence.labels.selected_requested
+         <<",\"selected_placed\":"<<evidence.labels.selected_placed
+         <<",\"label_overlaps\":"<<evidence.labels.label_overlaps
+         <<",\"obstacle_overlaps\":"<<evidence.labels.obstacle_overlaps
+         <<",\"hud_overlaps\":"<<evidence.labels.hud_overlaps
+         <<",\"star_overlaps\":"<<evidence.labels.star_overlaps
+         <<",\"outside_viewport\":"<<evidence.labels.outside_viewport
+         <<"}}";
       return out.str();
     };
     std::ostringstream out;
@@ -1598,14 +1613,156 @@ class NativeCampaign final {
 
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
+    last_galaxy_label_stats_ = {};
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
     last_territory_draw_=territory_overlay_.append(out,camera_,width,height,
-        static_cast<float>(fitted_pixels_per_world_));
+        static_cast<float>(fitted_pixels_per_world_), {false});
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     galaxy_marker_begin=out.world.size();
-    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)},known?1.f:.28f);if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    std::vector<NativeGalaxyLabelCandidate> label_candidates;
+    std::vector<NativeGalaxyLabelObstacle> label_obstacles;
+    for (const auto &system : world.systems) {
+      const auto point = camera_.project(
+          {system.position.x, system.position.y}, width, height);
+      if (point.x < -14.f || point.y < -14.f || point.x > width + 14.f ||
+          point.y > height + 14.f)
+        continue;
+      const bool known = known_.contains(system.id);
+      const bool selected_system = selected_id_ && *selected_id_ == system.id;
+      const float core_radius = selected_system ? 4.2f : 2.f;
+      NativeGalaxyStarAppearance appearance;
+      const auto survey = world.knowledge.system_survey_level(
+          world.player_civilization_id, system.id);
+      if (survey == SystemSurveyLevel::fully_surveyed) {
+        if (system.primary)
+          appearance.primary = galaxy_star_visual(*system.primary);
+        if (system.secondary)
+          appearance.secondary = galaxy_star_visual(*system.secondary);
+        if (system.tertiary)
+          appearance.tertiary = galaxy_star_visual(*system.tertiary);
+      }
+      galaxy_star_markers_.append(
+          out, point, core_radius, appearance, selected_system,
+          UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)},
+          known ? 1.f : .28f);
+
+      float marker_left = -core_radius * 3.5f;
+      float marker_right = core_radius * 3.5f;
+      float marker_top = marker_left;
+      float marker_bottom = marker_right;
+      const auto include_component = [&](Point offset, float scale) {
+        const float extent = core_radius * 3.5f * scale;
+        marker_left = std::min(marker_left, offset.x - extent);
+        marker_right = std::max(marker_right, offset.x + extent);
+        marker_top = std::min(marker_top, offset.y - extent);
+        marker_bottom = std::max(marker_bottom, offset.y + extent);
+      };
+      if (appearance.secondary)
+        include_component({core_radius * .88f, -core_radius * .48f}, .70f);
+      if (appearance.tertiary)
+        include_component({-core_radius * .82f, core_radius * .54f}, .58f);
+      const float marker_radius = std::max(
+          {std::abs(marker_left), std::abs(marker_right),
+           std::abs(marker_top), std::abs(marker_bottom)});
+      label_obstacles.push_back(
+          {{point.x + marker_left, point.y + marker_top,
+            marker_right - marker_left, marker_bottom - marker_top},
+           NativeGalaxyLabelObstacleKind::star});
+      if (selected_system || (known && camera_.pixels_per_world > 7.)) {
+        const double dx = point.x - static_cast<float>(width) * .5f;
+        const double dy = point.y - static_cast<float>(height) * .5f;
+        label_candidates.push_back(
+            {NativeGalaxyLabelKind::system, system.id, point, marker_radius,
+             Text{{}, known ? system.name : "Unknown", {205, 222, 245, 235},
+                  13},
+             selected_system, -(dx * dx + dy * dy)});
+      }
+    }
+
+    if (const auto *projection = territory_overlay_.projection()) {
+      const float overview = native_territory_overview_blend(
+          static_cast<float>(camera_.pixels_per_world) /
+              NativeTerritoryOverlay::coordinate_scale,
+          static_cast<float>(fitted_pixels_per_world_) /
+              NativeTerritoryOverlay::coordinate_scale);
+      const float detail = native_territory_detail(overview);
+      for (const auto &region : projection->territories) {
+        if (region.anchors.empty() ||
+            (overview > .82f && region.anchors.size() < 2))
+          continue;
+        std::string name = region.civilization_name;
+        for (auto &character : name)
+          character = static_cast<char>(std::toupper(
+              static_cast<unsigned char>(character)));
+        const auto point = camera_.project(
+            {region.label_position.x / NativeTerritoryOverlay::coordinate_scale,
+             region.label_position.y / NativeTerritoryOverlay::coordinate_scale},
+            width, height);
+        if (point.x < 4.f || point.y < 4.f || point.x >= width - 4.f ||
+            point.y >= height - 4.f)
+          continue;
+        auto empire_color = native_territory_color(
+            region.civilization_id, world.player_civilization_id);
+        empire_color.a = static_cast<std::uint8_t>(std::clamp(
+            std::lround(static_cast<float>(empire_color.a) * .82f * detail),
+            0l, 255l));
+        label_candidates.push_back(
+            {NativeGalaxyLabelKind::empire, region.civilization_id, point, 0.f,
+             Text{{}, std::move(name), empire_color, 13},
+             false, static_cast<double>(region.anchors.size())});
+      }
+    }
+
+    const auto ui_layout = NativeUiLayout::for_viewport(width, height);
+    const auto reserve_hud = [&](UiRect bounds) {
+      if (bounds.width > 0.f && bounds.height > 0.f)
+        label_obstacles.push_back(
+            {bounds, NativeGalaxyLabelObstacleKind::hud});
+    };
+    reserve_hud(ui_layout.pause);
+    reserve_hud(ui_layout.speed);
+    reserve_hud(ui_layout.research);
+    reserve_hud(ui_layout.shipyard);
+    reserve_hud(ui_layout.construction);
+    reserve_hud(ui_layout.diplomacy);
+    reserve_hud(ui_layout.day_text);
+    reserve_hud(ui_layout.status_text);
+    if (menu_) reserve_hud(ui_layout.menu_panel);
+    if (selected_id_)
+      reserve_hud({14.f, screen_height - 88.f, 320.f, 74.f});
+    if (fleet_workspace_.view())
+      reserve_hud(FleetWorkspaceLayout::for_viewport(width, height).panel);
+
+    const UiRect label_viewport{4.f, 4.f,
+                                std::max(1.f, static_cast<float>(width) - 8.f),
+                                std::max(1.f, static_cast<float>(height) - 8.f)};
+    auto label_layout = layout_native_galaxy_labels(
+        std::move(label_candidates), label_viewport, label_obstacles,
+        text_measurer_);
+    last_galaxy_label_stats_ = label_layout.stats;
+    for (auto &placement : label_layout.placements) {
+      if (placement.kind == NativeGalaxyLabelKind::empire) {
+        const Point nearest{
+            std::clamp(placement.anchor.x, placement.bounds.x,
+                       placement.bounds.x + placement.bounds.width),
+            std::clamp(placement.anchor.y, placement.bounds.y,
+                       placement.bounds.y + placement.bounds.height)};
+        if (std::hypot(nearest.x - placement.anchor.x,
+                       nearest.y - placement.anchor.y) > 32.f) {
+          auto leader_color = placement.label.color;
+          leader_color.a = std::min<std::uint8_t>(leader_color.a, 90);
+          out.lines.push_back({placement.anchor, nearest, leader_color});
+        }
+        auto shadow = placement.label;
+        shadow.at.x += 1.f;
+        shadow.at.y += 1.f;
+        shadow.color = {5, 11, 18, 230};
+        out.text.push_back(std::move(shadow));
+      }
+      out.text.push_back(std::move(placement.label));
+    }
     if(const auto &fleet_view=fleet_workspace_.view();fleet_view)
       last_route_stats_=append_fleet_route_effects(out,fleet_view->own_fleets,cache.systems_by_id,camera_,width,height);
     else last_route_stats_={};
@@ -2217,6 +2374,7 @@ class NativeCampaign final {
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   NativeTerritoryOverlay territory_overlay_;
   NativeTerritoryDrawStats last_territory_draw_;
+  NativeGalaxyLabelLayoutStats last_galaxy_label_stats_;
   double territory_refresh_elapsed_{.5};
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
@@ -2270,6 +2428,7 @@ class NativeCampaign final {
   NativePlanetDiscAssets planet_discs_;
   NativeShipArtAssets ship_art_;
   stellar::native_surface_ui::NativeSurfaceArtAssets surface_art_;
+  SystemTextMeasurer text_measurer_;
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;

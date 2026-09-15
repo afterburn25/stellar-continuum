@@ -5,7 +5,57 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current territory integration checkpoint (2026-09-15)
 
-- Devin/SWE-2 was reviewed through head `07d989df`. The selected change is
+### Current readability checkpoint (2026-09-15)
+
+This native C++ checkpoint builds the full MSVC native app, including the galaxy-label
+target with `/W4 /WX`. Six focused CTests passed in 1.67 seconds:
+`native_diplomacy_controller`, `native_diplomacy_workspace`,
+`native_galaxy_backdrop`, `native_galaxy_star_markers`, `native_galaxy_labels`, and
+`native_territory_projection` (`work/native-label-runtime.log`). Ninety-seven Python
+checks passed in 6.183 seconds across `test_native_diplomacy_runtime`,
+`test_native_galaxy_runtime`, and `test_native_client_runtime`
+(`work/native-label-python.log`).
+
+All four relocated real-Vulkan runs passed: fresh and paused-reload galaxy captures
+at 500 systems/720p and 1080p, plus diplomacy acceptance and paused reload at 720p
+and 1080p. Evidence is in `work/native-label-galaxy-evidence.json` and
+`work/native-label-diplomacy-evidence.json`. Acceptance preserves unrelated state
+and claims; paused reload preserves the complete Player17 payload; observer secrecy
+and the source-fixture hash remain unchanged. The overview has 500 canonical markers
+and zero label audit counts; this does not mean zero markers. Each regional capture
+reports 6 candidates, 6 measured, 3 placed, and zero collision/offscreen audit counts.
+The root captures were inspected at overview 1080p, regional 720p/1080p, and diplomacy
+720p: Sol and empire names are visible, fill is stronger, names do not stack, and the
+720p empire label has a leader line outside its territory border.
+
+Labels use actual render-font measurements and filter invalid/offscreen candidates
+before deterministic sorting. Placements are collision-tested after measurement.
+Priority is selected system, then empire, then nearby known stars. Empire labels test
+48 fixed, size-aware positions nearest first, retain their anchor leader line when the
+gap exceeds 32px, and check HUD, stars, the fleet panel, other labels, and viewport
+bounds. The 128-measurement budget includes at most 32 empires. A 2,500-candidate
+dense test proves that measurement budget only; it is not a claim
+of 2,500 GPU labels or 60 FPS. Fill uses multiplier `0.16` and contour `0.72`.
+Some known names are intentionally omitted where no valid placement exists. Selected
+priority is unit-covered only, not a selected-runtime-capture claim. This is
+presentation work only: C++ Core, projection math, and Player17 remain unchanged.
+
+`43622e72` is the prior readability checkpoint: it passed 95 Python checks and CI
+`34985891256` for seven existing presentation targets before the galaxy-label target.
+Its faint fill and overlapping-label findings were addressed by this pass. New-label
+CI is pending; do not attribute the current 97 checks or label results to that older
+head. `graphicalParity=false`; Engine 0.1.58 candidate/game 0.1.7-alpha remains
+unmerged and unsealed, with clean-machine and broad-hardware 60 FPS still unproven.
+
+The selective Devin review through `891fbcb2`, including duplicate-audio commit
+`dbf07f81`, was not imported because PR #332's audio is authoritative. Findings were
+callback races, clip-tail looping, non-atomic lowercase preferences, and lifecycle
+conflicts. Existing engine audio/settings and `bf_emma` voice remain authoritative;
+issue #324 comment `5682904661` records the review. Orbital `eb1ab876` also remains
+unimported pending an authoritative Core physical-body/system/orbit contract. Next:
+colony buildings and roads, then wider casting.
+
+- Devin/SWE-2 was reviewed through head `891fbcb2`. The selected change is
   territory presentation commit `ef7a4007`: a reference-shaped port of
   `StrategicTerritoryProjection` with observer-gated anchors, continuous clipped
   fills, stitched contours, fog, unexplored dimming and observer-visible claim
@@ -25,7 +75,8 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   0.0432/0.0889/0.4609/0.4915 ms. Scheduling-inclusive worker completion was
   392/479/609/4,985 ms. These isolate owner responsiveness and background latency;
   they are not sustained-frame-rate results.
-- The final full-native MSVC build passed. Five focused CTests passed in 1.79 seconds:
+- At the prior territory checkpoint, the full-native MSVC build passed and five
+  focused CTests passed in 1.79 seconds:
   `native_diplomacy_controller`, `native_diplomacy_workspace`,
   `native_galaxy_backdrop`, `native_galaxy_star_markers` and
   `native_territory_projection`. All 95 focused Python checks passed in 5.778
@@ -50,11 +101,9 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   Acceptance preserved the entire unrelated payload and claims; paused reload
   matched the whole Player17 payload, and the fixture hash stayed unchanged.
   Evidence: `work/native-territory-diplomacy-evidence.json`.
-- The two existing 500-system galaxy runs remain valid, for four territory runtime
-  runs in total; overview and regional images were inspected. The regional fill is
-  still faint and nearby labels overlap. Treat both as presentation polish debt,
-  not graphical-parity evidence. This remains an unmerged local candidate, not a
-  release.
+- The preceding `43622e72` readability checkpoint found faint regional fill and
+  overlapping nearby labels. The current checkpoint above addresses those findings;
+  it remains an unmerged local candidate, not a release.
 - Orbital commit `eb1ab876` was reviewed but not imported. It reproduces the C#
   schematic project/state list, but infers a physical host from the most populous
   colony and invents screen-space placement without a Core/save location contract.
@@ -67,7 +116,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
 - `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; reviewed through
-  `07d989df`. Territory commit `ef7a4007` was selected; orbital commit `eb1ab876`
+  `891fbcb2`. Territory commit `ef7a4007` was selected; orbital commit `eb1ab876`
   was rejected for this integration checkpoint. Its newer portrait resolution,
   bounded cache and asset declarations are already covered by this branch;
   diplomacy presentation at `410753da` was integrated here as `c9338699`.
