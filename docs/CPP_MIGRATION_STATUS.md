@@ -15,6 +15,24 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
+### Bounded surface building preparation
+
+Devin's building geometry is extracted behind explicit rotation/construction/
+operational-state contracts and the existing Engine image job queue. A new
+surface cache coalesces requests, rejects stale work, caps admissions/memory,
+and latches failures until explicit retry. Canonical catalog footprints and
+Core's hub exclusion radius replace copied visual guesses. The final MSVC
+build and three focused CTests pass, including a 68-variant 256/512 raster
+matrix with maximum 1,932,632 pixel tests under the eight-million limit.
+
+This preparation code is not yet connected to the live surface workspace.
+Existing roads, placement, building meshes and Core/Player17 are unchanged.
+Next: connect grounded image placement and depth ordering, then actual mixed
+720p/1080p captures, preview/state/reload and cold/churn timing. Contracts and
+reproduction are in `engine/NATIVE_SURFACE_BUILDING_PREPARATION.md`; final logs
+are `work/native-surface-building-stage-build.log` and
+`work/native-surface-building-stage-test.log`. The package remains unsealed.
+
 ### Tactical corvette artwork and interaction
 
 The native tactical view now uses a transparent, top-down derivative of the

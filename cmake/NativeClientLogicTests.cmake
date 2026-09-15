@@ -491,3 +491,6 @@ if(MSVC)
   target_compile_options(stellar_galaxy_label_tests PRIVATE /W4 /WX /permissive-)
   target_compile_options(stellar_territory_tests PRIVATE /W4 /WX /permissive-)
 endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceBuildingGeometryTests.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceBuildingAssetsTests.cmake")
