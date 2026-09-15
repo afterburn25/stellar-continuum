@@ -60,6 +60,18 @@ void write(const fs::path &path, const std::string &value) {
   return false;
 }
 
+void wait_for_save(NativeCampaignSession &session) {
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  while (session.notice().kind == SessionNoticeKind::Saving &&
+         std::chrono::steady_clock::now() < deadline) {
+    // Service must consume completion without relying on simulation updates.
+    (void)session.service("2044-05-06T07:08:09Z", false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  require(session.notice().kind != SessionNoticeKind::Saving,
+          "Background manual save did not finish.");
+}
+
 void save_load_and_transactional_failure(const fs::path &research_root,
                                          const std::string &source,
                                          const fs::path &directory) {
@@ -80,6 +92,7 @@ void save_load_and_transactional_failure(const fs::path &research_root,
   (void)session->advance(0., "2044-05-06T07:08:08Z");
   session->request_save();
   (void)session->service("2044-05-06T07:08:09Z", false);
+  wait_for_save(*session);
   require(session->notice().kind == SessionNoticeKind::Saved &&
               fs::is_regular_file(save_path),
           "Manual session save did not succeed.");
@@ -113,6 +126,7 @@ void save_load_and_transactional_failure(const fs::path &research_root,
   (void)session->advance(0., "2044-05-06T07:08:10Z");
   session->request_save();
   (void)session->service("2044-05-06T07:08:11Z", true);
+  wait_for_save(*session);
   require(session->notice().kind == SessionNoticeKind::Saved,
           "Second manual save did not succeed.");
   const auto stable_generation = session->cache().generation;
@@ -171,7 +185,7 @@ void failed_exit_stays_open(const fs::path &research_root,
 
 void pending_save_precedes_load(const fs::path &research_root,
                                 const std::string &source,
-                                const fs::path &directory) {
+                                const fs::path &directory, bool manual) {
   struct Barriers final {
     std::mutex mutex;
     std::condition_variable changed;
@@ -209,13 +223,17 @@ void pending_save_precedes_load(const fs::path &research_root,
         return load_existing_player_campaign_v17(path, factory, progress);
       };
 
-  const auto save_path = directory / "pending-before-load.json";
+  const auto save_path = directory / (manual ? "manual-before-load.json" : "pending-before-load.json");
   write(save_path, source);
   auto session = NativeCampaignSession::load_startup(
       research_root, save_path, "0.1.7-alpha", {}, dependencies);
   const auto original_day = session->frame().clock().simulation_days();
-  session->frame().clock().restore(original_day + 100.);
+  if (!manual) session->frame().clock().restore(original_day + 100.);
   (void)session->advance(0., "2044-05-06T07:08:13Z");
+  if (manual) {
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:13Z", false);
+  }
 
   bool writer_was_entered{};
   bool loader_started_before_release{};
@@ -262,7 +280,7 @@ void pending_save_precedes_load(const fs::path &research_root,
 
 void failed_pending_save_prevents_load(const fs::path &research_root,
                                        const std::string &source,
-                                       const fs::path &directory) {
+                                       const fs::path &directory, bool manual) {
   std::atomic_int loader_calls{};
   NativeCampaignSessionDependencies dependencies;
   dependencies.save_writer = [](const fs::path &,
@@ -276,15 +294,19 @@ void failed_pending_save_prevents_load(const fs::path &research_root,
         ++loader_calls;
         return load_existing_player_campaign_v17(path, factory, progress);
       };
-  const auto save_path = directory / "failed-drain.json";
+  const auto save_path = directory / (manual ? "failed-manual-drain.json" : "failed-drain.json");
   write(save_path, source);
   auto session = NativeCampaignSession::load_startup(
       research_root, save_path, "0.1.7-alpha", {}, dependencies);
   const auto generation = session->cache().generation;
   const auto seed = session->frame().runtime().world().campaign().seed;
-  session->frame().clock().restore(
+  if (!manual) session->frame().clock().restore(
       session->frame().clock().simulation_days() + 100.);
   (void)session->advance(0., "2044-05-06T07:08:15Z");
+  if (manual) {
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:15Z", false);
+  }
   session->request_load();
   require(loader_calls.load() == 1 && !session->load_pending() &&
               session->notice().kind == SessionNoticeKind::Failure &&
@@ -294,6 +316,102 @@ void failed_pending_save_prevents_load(const fs::path &research_root,
   require(session->cache().generation == generation &&
               session->frame().runtime().world().campaign().seed == seed,
           "Failed pre-load drain changed the live campaign.");
+}
+
+void background_manual_save(const fs::path &research_root,
+                            const std::string &source,
+                            const fs::path &directory, bool fail_first) {
+  struct Gate {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool entered{};
+    bool released{};
+    bool timed_out{};
+  } gate;
+  const auto owner = std::this_thread::get_id();
+  std::atomic_int calls{};
+  std::atomic_bool writer_on_owner{};
+  std::string first_capture;
+  NativeCampaignSessionDependencies dependencies;
+  dependencies.save_writer = [&](const fs::path &path,
+                                 const PreparedPlayerCampaignSave &prepared,
+                                 bool preserve) {
+    writer_on_owner = writer_on_owner.load() || std::this_thread::get_id() == owner;
+    if (++calls == 1) {
+      std::unique_lock lock(gate.mutex);
+      gate.entered = true;
+      gate.changed.notify_all();
+      gate.timed_out = !gate.changed.wait_for(lock, std::chrono::seconds(10), [&] {
+        return gate.released;
+      });
+      lock.unlock();
+      if (fail_first) throw std::runtime_error("injected manual write failure");
+      first_capture = encode_player_campaign_v17_json(prepared.payload());
+    }
+    write_prepared_player_campaign(path, prepared, preserve);
+  };
+  const auto path = directory / (fail_first ? "async-failure.json" : "async-manual.json");
+  write(path, source);
+  auto session = NativeCampaignSession::load_startup(
+      research_root, path, "0.1.7-alpha", {}, dependencies);
+  // Release before session destruction even if a subsequent assertion throws.
+  struct Release {
+    Gate &gate;
+    ~Release() {
+      { std::scoped_lock lock(gate.mutex); gate.released = true; }
+      gate.changed.notify_all();
+    }
+  } release{gate};
+  (void)session->advance(0., "2044-05-06T07:08:09Z");
+  const auto generation = session->cache().generation;
+  const auto expected_first = encode_player_campaign_v17_json(capture_player_campaign_v17(
+      session->frame().runtime(),
+      {session->frame().clock().simulation_days(), "0.1.7-alpha", "2044-05-06T07:08:09Z"}));
+  session->request_save();
+  (void)session->service("2044-05-06T07:08:09Z", false);
+  bool entered{};
+  {
+    std::unique_lock lock(gate.mutex);
+    entered = gate.changed.wait_for(lock, std::chrono::seconds(5), [&] { return gate.entered; });
+  }
+  const bool pending_notice = session->notice().kind == SessionNoticeKind::Saving;
+  // Change the live world while the worker owns its immutable first capture.
+  session->frame().runtime().world().campaign().seed += 17;
+  session->request_save();
+  session->request_save();
+  for (int i = 0; i < 3; ++i) {
+    (void)session->service("2044-05-06T07:08:09Z", false);
+    (void)session->advance(0., "2044-05-06T07:08:09Z");
+  }
+  const bool one_writer = calls.load() == 1;
+  {
+    std::scoped_lock lock(gate.mutex);
+    gate.released = true;
+  }
+  gate.changed.notify_all();
+  wait_for_save(*session);
+  require(entered && !gate.timed_out && pending_notice && one_writer && !writer_on_owner,
+          "Manual saving blocked the owner, reported success early, or admitted competing writes.");
+  require(session->cache().generation == generation && !session->exit_ready(),
+          "Manual saving replaced the live campaign or closed it.");
+  if (fail_first) {
+    require(calls.load() == 1 && session->notice().kind == SessionNoticeKind::Failure &&
+                session->notice().message.find("injected manual write failure") != std::string::npos &&
+                read(path) == source,
+            "Queued save hid a failed write, retried automatically, or damaged the primary.");
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:09Z", false);
+    wait_for_save(*session);
+  } else {
+    require(first_capture == expected_first && read(fs::path(path).concat(".bak")) == first_capture,
+            "Worker borrowed live state or queued write bypassed ordered backup rotation.");
+  }
+  const auto expected_latest = encode_player_campaign_v17_json(capture_player_campaign_v17(
+      session->frame().runtime(),
+      {session->frame().clock().simulation_days(), "0.1.7-alpha", "2044-05-06T07:08:09Z"}));
+  require(calls.load() == 2 && session->notice().kind == SessionNoticeKind::Saved &&
+              session->notice().message == "Saved campaign" && read(path) == expected_latest,
+          "Coalesced/retried manual save did not persist the exact latest capture.");
 }
 
 void failed_frame_clears_save_readiness(const fs::path &research_root,
@@ -386,8 +504,12 @@ int main(int argc, char **argv) try {
   require(fs::create_directory(directory), "Cannot claim session test directory.");
   save_load_and_transactional_failure(research_root, source, directory);
   failed_exit_stays_open(research_root, source, directory);
-  pending_save_precedes_load(research_root, source, directory);
-  failed_pending_save_prevents_load(research_root, source, directory);
+  pending_save_precedes_load(research_root, source, directory, false);
+  pending_save_precedes_load(research_root, source, directory, true);
+  failed_pending_save_prevents_load(research_root, source, directory, false);
+  failed_pending_save_prevents_load(research_root, source, directory, true);
+  background_manual_save(research_root, source, directory, false);
+  background_manual_save(research_root, source, directory, true);
   failed_frame_clears_save_readiness(research_root, source, directory);
   wrong_thread_rejected_before_mutation(research_root, source, directory);
   std::cout << "Native session save/load, ordered pending IO, transactional activation, owner-thread enforcement, cache generations and failed Exit passed\n";

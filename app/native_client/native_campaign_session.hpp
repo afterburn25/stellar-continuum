@@ -127,6 +127,8 @@ private:
   void begin_load();
   void publish_save_result(const stellar::core::PlayerCampaignSaveResult &,
                            std::string success_message);
+  void publish_background_save_result(
+      const stellar::core::PlayerCampaignSaveResult &);
   void publish_failure(std::string message);
   void require_owner() const;
   [[nodiscard]] bool drain_live_save();
@@ -142,6 +144,7 @@ private:
   bool exit_requested_{};
   bool exit_ready_{};
   bool manual_capture_ready_{};
+  bool manual_save_pending_{};
 };
 
 [[nodiscard]] std::filesystem::path default_native_campaign_save_path();

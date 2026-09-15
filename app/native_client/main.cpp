@@ -83,6 +83,57 @@ using namespace stellar::native_startup_ui;
 using namespace stellar::native_galaxy_ui;
 using namespace stellar::native_ship_ui;
 
+struct SmokePhaseMaximum {
+  double milliseconds{};
+  int frame{};
+  void observe(double value, int sample_frame) noexcept {
+    if (value > milliseconds) {
+      milliseconds = value;
+      frame = sample_frame;
+    }
+  }
+};
+
+// Retained only by a bounded graphical smoke run. The ordinary client has no
+// frame timing history or classification work beyond the smoke option check.
+struct SmokeTimingSummary {
+  enum class Bucket : std::size_t { cold, save_service, capture_transition, steady, count };
+  std::array<std::array<SmokePhaseMaximum, 3>,
+             static_cast<std::size_t>(Bucket::count)> maxima{};
+  std::array<SmokePhaseMaximum, 3> overall{};
+
+  void observe(int frame, bool capture_or_transition, double update,
+               double scene, double render_present) noexcept {
+    const auto bucket = frame <= 10 ? Bucket::cold : frame == 61 ? Bucket::save_service :
+        capture_or_transition ? Bucket::capture_transition : Bucket::steady;
+    const std::array<double, 3> values{update, scene, render_present};
+    for (std::size_t index = 0; index < values.size(); ++index) {
+      overall[index].observe(values[index], frame);
+      maxima[static_cast<std::size_t>(bucket)][index].observe(values[index], frame);
+    }
+  }
+
+  void write(std::ostream &out) const {
+    const auto write_max = [&](const SmokePhaseMaximum &value) {
+      out << "{\"max_ms\":" << value.milliseconds << ",\"frame\":" << value.frame << '}';
+    };
+    const auto write_bucket = [&](Bucket bucket) {
+      const auto &values = maxima[static_cast<std::size_t>(bucket)];
+      out << "{\"update\":"; write_max(values[0]);
+      out << ",\"scene\":"; write_max(values[1]);
+      out << ",\"render_present\":"; write_max(values[2]); out << '}';
+    };
+    out << " update_max_ms=" << overall[0].milliseconds << " update_max_frame=" << overall[0].frame
+        << " scene_max_ms=" << overall[1].milliseconds << " scene_max_frame=" << overall[1].frame
+        << " render_present_max_ms=" << overall[2].milliseconds
+        << " render_present_max_frame=" << overall[2].frame
+        << " smoke_timing={\"cold\":"; write_bucket(Bucket::cold);
+    out << ",\"save_service\":"; write_bucket(Bucket::save_service);
+    out << ",\"capture_transition\":"; write_bucket(Bucket::capture_transition);
+    out << ",\"steady\":"; write_bucket(Bucket::steady); out << '}';
+  }
+};
+
 struct Options {
   std::filesystem::path asset_root;
   std::optional<std::filesystem::path> smoke_screenshot;
@@ -2097,6 +2148,8 @@ int main(int argc,char **argv){
     // Samples are retained only by the bounded smoke run. Normal play keeps
     // no history; rendering time includes submission and presentation wait.
     std::vector<double> update_ms,scene_ms,render_present_ms;
+    std::unique_ptr<SmokeTimingSummary> smoke_timing;
+    if(options.smoke_screenshot)smoke_timing=std::make_unique<SmokeTimingSummary>();
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
@@ -2141,6 +2194,11 @@ int main(int argc,char **argv){
       const auto scene_end=std::chrono::steady_clock::now();
       window.draw(scene,screenshot);
       const auto render_end=std::chrono::steady_clock::now();
+      if(smoke_timing)
+        smoke_timing->observe(frames,screenshot.has_value()||frames>=120,
+          std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
+          std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),
+          std::chrono::duration<double,std::milli>(render_end-scene_end).count());
       if(options.smoke_screenshot&&!screenshot){
         // GPU readback/file writes deliberately stay out of phase samples.
         update_ms.push_back(std::chrono::duration<double,std::milli>(update_end-update_begin).count());
@@ -2183,6 +2241,7 @@ int main(int argc,char **argv){
         };
         std::cout<<" phase_samples="<<update_ms.size();
         print_phase("update",update_ms);print_phase("scene",scene_ms);print_phase("render_present",render_present_ms);
+        smoke_timing->write(std::cout);
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)

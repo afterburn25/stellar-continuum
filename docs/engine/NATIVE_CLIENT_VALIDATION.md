@@ -43,6 +43,8 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 The combined Engine 0.1.58 candidate passed seven focused native CTests, 18 diplomacy-validator Python checks, 45 packaging/checkout checks and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. The diplomacy fixture retains existing contacts and agreements while adding isolated observations and an incoming research exchange. Real UI input changes selection, accepts the proposal, scrolls the new agreement into view, renders the packaged 2172×724 communications scene and hides unidentified identities/metrics/art. Progress validation preserves unrelated state; paused reload compares the complete saved payload except its timestamp. Baseline normalization follows the existing Player17 parity contract for fixture-only metadata and single-precision map coordinates. See the current C++ migration handoff and `work/native-diplomacy-final-*.json`; this is focused candidate evidence, not a new sealed release or full visual parity.
 
+The async manual-save candidate keeps the existing atomic writer/recovery and save schema: immutable snapshots are captured on the owner thread, encoding/IO runs on the existing worker, and queued requests coalesce. Completion is polled even while minimized; failed completion cancels queued manual save/exit requests so they cannot conceal the error. Autosave retry scheduling is unchanged. Explicit load/exit drains remain synchronous. Nine actual Vulkan map/transit/diplomacy launches passed; focused save/session/JSON/recovery results are in `native-save-background-tests.log`. Manual-save CPU update maxima improved from 130.901/130.302 to 7.272/2.610 ms (system), 130.953/129.773 to 5.080/2.955 ms (galaxy), and 32.392–35.940 to 1.008–1.157 ms (travel). Cold system scene remains ~340–346 ms; frame p95 remains ~33 ms including VSync, so this is not a 60 FPS claim. Evidence: `native-save-background-runtime.log`, `native-save-background-diplomacy.log`, and `work/save-background-diplomacy.json`. Earlier diplomacy head `0e0835ae` passed CI `34934085259`; the save candidate requires its own run.
+
 Smoke diagnostics retain the existing frame-interval mean and p95 and now report
 `phase_samples` plus mean/p95 for `update`, `scene`, and `render_present` in
 milliseconds. These measure campaign update, CPU draw-list preparation, and
@@ -51,6 +53,11 @@ fallback waiting; it is not a GPU-only measurement. Capture frames are excluded
 from phase samples so screenshot readback and file writes do not inflate them.
 Normal play does not retain timing histories. These short checks locate likely
 bottlenecks; they are not sustained-FPS certification.
+
+`smoke_timing` also records phase maxima and frame indices for cold frames 1–10,
+the frame-61 save request service, capture/transition frames 120 onward, and other
+steady frames. Unlike the existing phase means/p95, maxima include capture frames
+in their separate bucket; expensive cold work remains visible in the overall maxima.
 
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 

@@ -71,6 +71,19 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::failure(
   }
   return result;
 }
+void PlayerCampaignSaveController::submit(PreparedPlayerCampaignSave prepared,
+                                          double captured_day, bool preserve) {
+  const auto destination = path_; const auto writer = writer_;
+  // Allocate all pending metadata before submitting. No operation after submit
+  // can throw and lose tracking of an already running immutable write.
+  Pending record{{}, destination, revision_, captured_day, preserve};
+  static_assert(std::is_nothrow_move_constructible_v<Pending>);
+  record.task = jobs_.submit([prepared = std::move(prepared), destination,
+                              preserve, writer] {
+    writer(destination, prepared, preserve);
+  });
+  pending_.emplace(std::move(record));
+}
 std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::complete(
     double current_day, const std::filesystem::path &current_path,
     std::uint64_t current_revision, bool wait) {
@@ -104,15 +117,7 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::after_fram
   const bool preserve = preserve_backup_;
   try {
     auto prepared = PreparedPlayerCampaignSave::capture(frame.runtime(), {day, game_version, saved_at_utc});
-    const auto destination = path_; const auto writer = writer_;
-    // Allocate all pending metadata before submitting. No operation after
-    // submit can throw and lose tracking of an already running write.
-    Pending record{{}, destination, revision_, day, preserve};
-    static_assert(std::is_nothrow_move_constructible_v<Pending>);
-    record.task = jobs_.submit([prepared = std::move(prepared), destination, preserve, writer] {
-      writer(destination, prepared, preserve);
-    });
-    pending_.emplace(std::move(record));
+    submit(std::move(prepared), day, preserve);
   } catch (...) {
     auto failed = failure(std::current_exception(), day, path_, preserve);
     scheduler_.mark_failure(day); return failed;
@@ -134,6 +139,22 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
     auto result = failure(std::current_exception(), options.simulation_days, path_, preserve);
     scheduler_.mark_failure(options.simulation_days); return result;
   }
+}
+std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::begin_manual(
+    IntegratedAdaptiveCampaignRuntime &runtime,
+    const PlayerCampaignCaptureOptions &options) {
+  require_owner();
+  if (!configured_) throw std::logic_error("Configure the campaign save session first.");
+  if (pending_) throw std::logic_error("Consume and report the pending autosave before a manual save.");
+  const bool preserve = preserve_backup_;
+  try {
+    auto prepared = PreparedPlayerCampaignSave::capture(runtime, options);
+    submit(std::move(prepared), options.simulation_days, preserve);
+  } catch (...) {
+    auto result = failure(std::current_exception(), options.simulation_days, path_, preserve);
+    scheduler_.mark_failure(options.simulation_days); return result;
+  }
+  return std::nullopt;
 }
 bool PlayerCampaignSaveController::pending() const noexcept { return pending_.has_value(); }
 bool PlayerCampaignSaveController::preserves_recovered_backup() const noexcept { return preserve_backup_; }

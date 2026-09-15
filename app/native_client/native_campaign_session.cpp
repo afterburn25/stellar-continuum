@@ -279,10 +279,25 @@ void NativeCampaignSession::publish_failure(std::string message) {
   notice_ = {SessionNoticeKind::Failure, std::move(message), 0.};
 }
 
+void NativeCampaignSession::publish_background_save_result(
+    const PlayerCampaignSaveResult &result) {
+  const bool manual = std::exchange(manual_save_pending_, false);
+  if (!result.succeeded) {
+    // A queued action must not conceal a failed write with an immediate retry.
+    // The player can retry explicitly after seeing the original diagnostic.
+    save_requested_ = false;
+    exit_requested_ = false;
+  }
+  publish_save_result(result, manual ? "Saved campaign" : "Autosaved campaign");
+}
+
 bool NativeCampaignSession::drain_live_save() {
   const auto completed = live_->saves.complete(
       live_->frame.clock().simulation_days(), save_path_,
       live_->saves.revision(), true);
+  if (completed) {
+    manual_save_pending_ = false;
+  }
   if (completed && !completed->succeeded) {
     publish_save_result(*completed, "Saved campaign");
     return false;
@@ -303,7 +318,7 @@ CampaignFrameResult NativeCampaignSession::advance(
   try {
     if (const auto completed = live_->saves.after_frame(
             live_->frame, result, game_version_, saved_at_utc)) {
-      publish_save_result(*completed, "Autosaved campaign");
+      publish_background_save_result(*completed);
     } else if (live_->saves.pending() && !pending_load_) {
       notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
     }
@@ -432,8 +447,24 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
     }
   }
 
+  // Poll even when simulation advancement is suspended (for example while the
+  // window is minimized). Ordinary manual saves encode and write on the worker.
+  if (const auto completed = live_->saves.complete(
+          live_->frame.clock().simulation_days(), save_path_,
+          live_->saves.revision())) {
+    publish_background_save_result(*completed);
+    if (!completed->succeeded) {
+      return replaced;
+    }
+  }
+
   if (save_requested_ || exit_requested_) {
     const bool exiting = exit_requested_;
+    // Coalesce clicks while one writer owns the destination. Explicit load and
+    // exit still drain synchronously before replacement or durable shutdown.
+    if (!exiting && live_->saves.pending()) {
+      return replaced;
+    }
     save_requested_ = false;
     exit_requested_ = false;
     if (!manual_capture_ready_) {
@@ -444,13 +475,20 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
       if (!drain_live_save()) {
         return replaced;
       }
-      const auto result = live_->saves.save_manual(
-          live_->frame.runtime(),
-          {live_->frame.clock().simulation_days(), game_version_, saved_at_utc});
-      publish_save_result(result,
-                          exiting ? "Saved campaign; exiting" : "Saved campaign");
-      if (exiting && result.succeeded) {
-        exit_ready_ = true;
+      const PlayerCampaignCaptureOptions options{
+          live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
+      if (exiting) {
+        const auto result = live_->saves.save_manual(live_->frame.runtime(), options);
+        publish_save_result(result, "Saved campaign; exiting");
+        exit_ready_ = result.succeeded;
+      } else {
+        const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
+        if (failed) {
+          publish_save_result(*failed, "Saved campaign");
+        } else {
+          manual_save_pending_ = true;
+          notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
+        }
       }
     } catch (const std::exception &error) {
       publish_failure(std::string("Save failed: ") + error.what());
