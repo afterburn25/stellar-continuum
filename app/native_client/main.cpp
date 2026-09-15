@@ -687,6 +687,20 @@ class NativeCampaign final {
     session_->frame().clock().set_speed(StrategicSpeed::Normal);
   }
 
+  [[nodiscard]] bool send_key(char key,int width,int height){
+    InputSnapshot input;
+    input.drawable_width=width;
+    input.drawable_height=height;
+    InputEvent event{};
+    event.type=InputEventType::KeyPressed;
+    event.key=static_cast<std::uint32_t>(key);
+    input.events.push_back(event);
+    return update(input,width,height,0.,false);
+  }
+  [[nodiscard]] bool shortcut_status_reported()const noexcept{
+    return session_->notice().kind==SessionNoticeKind::Status&&
+           !session_->notice().message.empty();
+  }
   void prepare_research_smoke(int width,int height,bool execute_action){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -717,6 +731,12 @@ class NativeCampaign final {
       if(session_->frame().clock().speed()==StrategicSpeed::Paused)
         click({refreshed_layout.pause.x+refreshed_layout.pause.width*.5f,
                refreshed_layout.pause.y+refreshed_layout.pause.height*.5f});
+      // T/R keyboard parity evidence: candidate cycling and the one-key start
+      // must both surface a status notice. Only exercised on the mutating
+      // launch so the paused-reload payload comparison stays clean.
+      smoke_shortcut_=send_key('t',width,height)&&
+                      send_key('r',width,height)&&
+                      shortcut_status_reported();
     }
     smoke_research_node_=research_workspace_.selected_id();
   }
@@ -1311,6 +1331,11 @@ class NativeCampaign final {
       smoke_construction_paused_for_quote_=
           session_->frame().clock().speed()==StrategicSpeed::Paused;
     }
+    // C/B keyboard parity evidence: the active-project and no-candidate
+    // guards keep these presses status-only on both smoke launches.
+    smoke_shortcut_=send_key('c',width,height)&&
+                    send_key('b',width,height)&&
+                    shortcut_status_reported();
   }
   void capture_surface_smoke_state(){
     if(!smoke_surface_site_id_)return;
@@ -1324,6 +1349,7 @@ class NativeCampaign final {
   }
   void request_smoke_save(){if(smoke_settlement_mode_){session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();}if(smoke_surface_mode_)capture_surface_smoke_state();session_->request_save();}
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
+  [[nodiscard]] bool shortcut_smoke_succeeded()const noexcept{return smoke_shortcut_;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
   [[nodiscard]] std::string player_species_id()const{
     const auto &world=session_->frame().runtime().world().campaign();
@@ -1578,6 +1604,10 @@ class NativeCampaign final {
           case '2':clock.set_speed(StrategicSpeed::Fast);break;
           case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
           case '4':clock.set_speed(StrategicSpeed::Maximum);break;
+          case 't':case 'T':cycle_research_candidate();break;
+          case 'r':case 'R':start_research_candidate();break;
+          case 'c':case 'C':cycle_construction_candidate();break;
+          case 'b':case 'B':start_construction_candidate();break;
           case 0x4000003fu:session_->request_save();break; // SDLK_F6
           default:handled=false;break;
         }
@@ -2189,6 +2219,129 @@ class NativeCampaign final {
     refresh_construction(true);
   }
 
+  // T/R/C/B keyboard parity with the Godot presentation layer: candidate
+  // cycling plus one-key start for research and construction. A candidate is a
+  // project the controller reports as currently startable; the filtered list
+  // ordering follows each view's own ordering rather than the reference's
+  // plan-ranked ordering.
+  [[nodiscard]] std::vector<const NativeResearchNode *>
+  research_candidates(const NativeResearchWindow &view){
+    std::vector<const NativeResearchNode *> candidates;
+    for(const auto &node:view.nodes)
+      if(node.primary_action.enabled&&
+         node.primary_action.intent==NativeResearchIntent::Start)
+        candidates.push_back(&node);
+    return candidates;
+  }
+  void cycle_research_candidate(){
+    const auto view=research_controller_.build(
+        session_->frame(),session_->cache().generation,{});
+    const auto candidates=research_candidates(view);
+    if(candidates.empty()){
+      research_candidate_index_=0;
+      session_->publish_status(
+          "No research choices are currently available. A construction "
+          "prerequisite may be missing.");
+      return;
+    }
+    research_candidate_index_=
+        (research_candidate_index_+1)%
+        static_cast<int>(candidates.size());
+    session_->publish_status("Research candidate: "+
+        candidates[research_candidate_index_]->display_name);
+  }
+  void start_research_candidate(){
+    const auto view=research_controller_.build(
+        session_->frame(),session_->cache().generation,{});
+    const auto candidates=research_candidates(view);
+    if(candidates.empty()){
+      research_candidate_index_=0;
+      session_->publish_status(
+          "No available research project selected. Check construction "
+          "prerequisites.");
+      return;
+    }
+    research_candidate_index_=std::clamp(research_candidate_index_,0,
+        static_cast<int>(candidates.size())-1);
+    const auto *candidate=candidates[research_candidate_index_];
+    const auto outcome=research_controller_.execute(
+        session_->frame(),session_->cache().generation,
+        view.research_revision,view.funding_revision,
+        NativeResearchIntent::Start,candidate->id);
+    session_->publish_status(outcome.message);
+    if(outcome.accepted){
+      session_->publish_notification("Research",outcome.message);
+      research_candidate_index_=0;
+    }
+    if(research_workspace_.visible())refresh_research(true);
+  }
+  [[nodiscard]] std::vector<const NativeConstructionProject *>
+  construction_candidates(const NativeConstructionView &view){
+    std::vector<const NativeConstructionProject *> candidates;
+    for(const auto &project:view.projects)
+      if(project.start.enabled)candidates.push_back(&project);
+    return candidates;
+  }
+  [[nodiscard]] bool construction_project_active(
+      const NativeConstructionView &view){
+    for(const auto &project:view.projects)
+      if(project.active)return true;
+    return false;
+  }
+  void cycle_construction_candidate(){
+    const auto view=construction_controller_.build(
+        session_->frame(),session_->cache().generation);
+    if(construction_project_active(view)){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "Complete the current construction project before selecting "
+          "another.");
+      return;
+    }
+    const auto candidates=construction_candidates(view);
+    if(candidates.empty()){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No construction choices are currently available. Research may be "
+          "required.");
+      return;
+    }
+    construction_candidate_index_=
+        (construction_candidate_index_+1)%
+        static_cast<int>(candidates.size());
+    session_->publish_status("Construction candidate: "+
+        candidates[construction_candidate_index_]->name);
+  }
+  void start_construction_candidate(){
+    const auto view=construction_controller_.build(
+        session_->frame(),session_->cache().generation);
+    if(construction_project_active(view)){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No available construction project selected.");
+      return;
+    }
+    const auto candidates=construction_candidates(view);
+    if(candidates.empty()){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No available construction project selected.");
+      return;
+    }
+    construction_candidate_index_=std::clamp(construction_candidate_index_,0,
+        static_cast<int>(candidates.size())-1);
+    const auto *candidate=candidates[construction_candidate_index_];
+    const auto outcome=construction_controller_.start(
+        session_->frame(),session_->cache().generation,
+        view.construction_revision,candidate->id);
+    session_->publish_status(outcome.message);
+    if(outcome.accepted){
+      session_->publish_notification("Construction",outcome.message);
+      construction_candidate_index_=0;
+    }
+    if(construction_workspace_.visible())refresh_construction(true);
+  }
+
   void refresh_diplomacy(bool force){
     if(!diplomacy_workspace_.visible())return;
     if(!force&&diplomacy_refresh_elapsed_<.2)return;
@@ -2448,6 +2601,9 @@ class NativeCampaign final {
   bool smoke_construction_paused_for_quote_{};
   std::optional<std::string> smoke_construction_project_id_;
   bool last_research_command_accepted_{};
+  int research_candidate_index_{};
+  int construction_candidate_index_{};
+  bool smoke_shortcut_{};
   std::optional<std::string> smoke_research_node_;
   bool last_fleet_command_accepted_{};
   bool last_shipyard_command_accepted_{};
@@ -2695,13 +2851,15 @@ int main(int argc,char **argv){
                  <<utf8_path(*options.smoke_screenshot)
                  <<" territory="<<campaign.territory_smoke_status();
         if(options.research_smoke)
-          std::cout<<" research="<<campaign.research_smoke_status();
+          std::cout<<" research="<<campaign.research_smoke_status()
+                   <<" shortcut="<<(campaign.shortcut_smoke_succeeded()?1:0);
         if(options.fleet_smoke)
           std::cout<<" fleet="<<campaign.fleet_smoke_status();
         if(options.shipyard_smoke)
           std::cout<<" shipyard="<<campaign.shipyard_smoke_status();
         if(options.construction_smoke)
-          std::cout<<" construction="<<campaign.construction_smoke_status();
+          std::cout<<" construction="<<campaign.construction_smoke_status()
+                   <<" shortcut="<<(campaign.shortcut_smoke_succeeded()?1:0);
         if(options.system_smoke)
           std::cout<<" system="<<campaign.system_smoke_status();
         if(options.system_travel_smoke||options.system_travel_reload_smoke)

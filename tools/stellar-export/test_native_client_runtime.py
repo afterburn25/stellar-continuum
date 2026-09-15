@@ -434,7 +434,8 @@ class NativeSessionExportTests(unittest.TestCase):
 
 
 class NativeResearchExportTests(unittest.TestCase):
-    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False):
+    def exercise(self, *, mutate_load=False, funded=True, progressed=True,
+                 skipped_save=False, missing_shortcut=False):
         with tempfile.TemporaryDirectory(prefix="stellar-research-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -466,7 +467,8 @@ class NativeResearchExportTests(unittest.TestCase):
                 save.write_text(json.dumps(payload))
                 capture.write_bytes(b"BM" + bytes(54))
                 saved = "preserved" if skipped_save and "--load" in args else "ok"
-                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1", "")
+                shortcut = "" if missing_shortcut or "--load" in args else " shortcut=1"
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1" + shortcut, "")
 
             with mock.patch("native_research_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_research_export(package, {})
@@ -493,6 +495,10 @@ class NativeResearchExportTests(unittest.TestCase):
     def test_skipping_loaded_save_is_not_a_roundtrip(self):
         with self.assertRaisesRegex(RuntimeError, "actual manual save"):
             self.exercise(skipped_save=True)
+
+    def test_missing_candidate_shortcut_evidence_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "candidate shortcuts"):
+            self.exercise(missing_shortcut=True)
 
 
 if __name__ == "__main__":

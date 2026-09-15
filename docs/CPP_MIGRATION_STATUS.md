@@ -41,7 +41,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (18+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces + recent-events notification feed done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
-| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save) done; T/R/C/B candidate-cycle keys have no native palette equivalent; F8 diagnostics bundle not wired |
+| Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save) done; T/R/C/B candidate-cycle keys cycle/start research and construction candidates through the status line; N mid-session new campaign and F8 diagnostics bundle not wired |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
 | Packaging | export tooling | `tools/stellar-export`, `export/*.json`, `cmake/Native*` | OK | sealed export validators | PARITY VERIFIED | No Godot/.NET/compiler at runtime |
@@ -87,6 +87,15 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   load/activation so only live events publish. `--notification-smoke` +
   `native_notification_runtime.py` (13 mock tests) assert panel, unread
   badge, contact focus and no history flood across a reload.
+- Keyboard candidate shortcuts: T/R and C/B now port the reference
+  `UiCycleResearchCandidate`/`UiStartResearchCandidate` and construction
+  equivalents — each press cycles or starts a currently-startable project
+  reported by the research/construction controllers (view ordering rather
+  than the reference's plan-ranked ordering) and reports through a new
+  `SessionNoticeKind::Status` line (`publish_status` ⇔ `SetStatus`). The
+  active-project guards match the reference ("Complete the current
+  construction project…"). `--research-smoke`/`--construction-smoke` emit
+  `shortcut=1` evidence; both export validators require it.
 - Tactical battle presentation (`357872e8`): `native_battle_workspace` ports the
   reference `MassiveCombatView` — full-screen observer-filtered formation tokens
   (bounded 4096-token pool, zoom-dependent sampling), selection + box-select +

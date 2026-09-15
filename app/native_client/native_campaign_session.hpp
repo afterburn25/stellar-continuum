@@ -30,6 +30,7 @@ enum class SessionNoticeKind {
   Saved,
   Loaded,
   Recovered,
+  Status,
   Failure,
 };
 
@@ -122,6 +123,12 @@ public:
   void publish_notification(std::string category, std::string message,
                             std::optional<int> diplomatic_contact_id =
                                 std::nullopt);
+  // Reference SetStatus: a transient status line for keyboard and
+  // command-driven feedback (candidate cycling, speed changes, rejections).
+  void publish_status(std::string message) {
+    require_owner();
+    notice_ = {SessionNoticeKind::Status, std::move(message), 1.};
+  }
 
 private:
   struct Live;

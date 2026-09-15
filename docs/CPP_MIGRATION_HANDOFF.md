@@ -40,6 +40,27 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   + unengaged foreign picket). `tools/stellar-export/native_battle_runtime.py`
   carries the same authoring for the sealed validator.
 
+## Candidate-shortcut slice (candidate for review)
+
+- `main.cpp` `KeyPressed` dispatch gains T/R/C/B alongside Space, 1–4 and F6 —
+  T cycles the startable research candidates, R starts the current candidate,
+  C/B do the same for construction projects. Candidate sets come from each
+  controller's `primary_action.enabled`/`start.enabled` projection (view
+  ordering; the reference's plan-ranked ordering is not reproduced) and the
+  construction active-project guard matches the reference wording.
+- `NativeCampaignSession::publish_status` adds `SessionNoticeKind::Status` —
+  the reference `SetStatus` equivalent — used by the shortcut paths for
+  candidate names, acceptances and rejections.
+- `--research-smoke` sends T then R after the canonical button start and emits
+  `shortcut=1` when a status notice surfaced; `--construction-smoke` sends C
+  then B (status-only on both launches). `native_research_runtime.py` and the
+  construction path in `native_production_runtime.py` now require the flag,
+  with negative mock tests in `test_native_client_runtime.py` /
+  `test_native_production_runtime.py`.
+- Still unported from the reference key surface: N (mid-session new campaign —
+  the native pause menu has no new-game flow yet) and F8 (`UiExportDiagnostics`
+  support bundle — no native SupportLogger equivalent yet).
+
 ## Notification feed slice (candidate for review)
 
 - `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`
