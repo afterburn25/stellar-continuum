@@ -24,7 +24,27 @@
     "credits": {
       "source": "docs/engine/NATIVE_SPECIES_ART_SOURCES.md",
       "runtimePath": "Licenses/Species-visual-sources.md",
-      "sha256": "57201dc8bc773f76b2f97a4037f9e98cd260e6bf2c15a6269dfe9047e5a2f881"
+      "sha256": "d40e1ce4ac2e04b1e4e2f2843ddee44b28ebc8b11344570d2dfc08a1c0f272e2"
+    },
+    "terran-baseline-communications": {
+      "source": "assets/visual/species/terran-baseline-communications-v2.png",
+      "runtimePath": "assets/visual/species/terran-baseline-communications-v2.png",
+      "sha256": "2e9afac0c08476121b1fc9754560f0dac0e2587f830823618f0b3c9e4cfbfde8"
+    },
+    "pelagic-high-pressure-communications": {
+      "source": "assets/visual/species/pelagic-high-pressure-communications-v2.png",
+      "runtimePath": "assets/visual/species/pelagic-high-pressure-communications-v2.png",
+      "sha256": "a261ea7839d871af2d2357ea4f0130d0058d4d26ac377bb7ffe5cdf200f32d97"
+    },
+    "compact-high-gravity-communications": {
+      "source": "assets/visual/species/compact-high-gravity-communications-v2.png",
+      "runtimePath": "assets/visual/species/compact-high-gravity-communications-v2.png",
+      "sha256": "84cc89cb9c688a576be5a9f2a51219b52a4a35aa7c33e3c57e615f81fec32c02"
+    },
+    "cryogenic-hydrocarbon-communications": {
+      "source": "assets/visual/species/cryogenic-hydrocarbon-communications-v2.png",
+      "runtimePath": "assets/visual/species/cryogenic-hydrocarbon-communications-v2.png",
+      "sha256": "b928358fa92d410fc2dda570fff4fdff63267b5718bff5222ba4952f572cf4cd"
     }
   }
 }
