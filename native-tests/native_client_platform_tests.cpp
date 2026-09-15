@@ -105,7 +105,13 @@ int main(int argc,char **argv){
       layers.overlay.emplace_back(FilledRectangle{{20,110,20,20},{200,20,40,255}});
       const auto before=window.image_upload_count();
       const auto capture=fixtures.path()/L"overlay-order.bmp";
-      window.draw(layers,capture);
+      FrameTiming capture_timing{-1.,-1.,-1.,-1.};
+      window.draw(layers,capture,&capture_timing);
+      const auto valid_timing=[](double value){return std::isfinite(value)&&value>=0.;};
+      check(valid_timing(capture_timing.submission_ms)&&valid_timing(capture_timing.readback_ms)&&valid_timing(capture_timing.throttle_ms)&&valid_timing(capture_timing.present_ms),"frame timing did not reset to finite nonnegative CPU phase values");
+      check(capture_timing.readback_ms>0.,"screenshot frame did not record its readback/write phase");
+      window.draw(layers,std::nullopt,&capture_timing);
+      check(capture_timing.readback_ms==0.,"frame timing retained screenshot readback on a subsequent ordinary draw");
       check(window.image_upload_count()==before+1,"world/UI layers duplicated image uploads");
       window.draw(layers);
       check(window.image_upload_count()==before+1,"stable UI portrait uploaded again");

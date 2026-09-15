@@ -53,10 +53,22 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Smoke timing is ~20.6–21.2 ms mean / ~33.4–33.7 ms p95 for system/galaxy; render-present includes VSync wait, so 60 FPS is not established.
+5. First system entry still takes ~210–213 ms. Longer paused-map sampling shows ~16.7 ms mean and 16.8–17.0 ms p95 after warm-up; busy-campaign and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
+
+Latest Codex performance checkpoint adds opt-in 120–3600-frame native profiling,
+separating CPU submission from screenshot IO, fallback throttle and presentation.
+Four 600-frame Vulkan profiles (system/galaxy at 720p/1080p) passed the existing
+artwork, observer-secrecy, durable-save and exact paused-reload gates. Interval
+means 16.716–16.723 ms and p95 16.834–17.025 ms isolate the remaining cold-entry
+hitch from steady pacing. No normal-play sample history or quality reduction.
+Strict build, platform Vulkan/pixel/timing-reset CTest, 34 Python tests and four
+invalid native CLI cases passed. See `CPP_MIGRATION_HANDOFF.md` and
+`engine/NATIVE_CLIENT_VALIDATION.md` for metrics and next staged-art preparation
+contract. Previous celestial head `c373aed4` passed native CI `34939226242`;
+this new checkpoint needs its own CI. Engine remains 0.1.58 candidate.
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
   144/144 headless CTest baseline, 61 Python export checks.

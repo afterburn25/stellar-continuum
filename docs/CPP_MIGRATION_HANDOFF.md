@@ -146,15 +146,51 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - The saved-game fix at `b110e223` passed the Windows export job of native CI
   `34936942630`. The subsequent celestial candidate needs its own exact-head CI.
 
+## Steady-frame profiling checkpoint
+
+- Native map smoke accepts `--profile-frames N` (120–3600) with an isolated
+  `--system-smoke` or `--galaxy-art-smoke`. The original warm-up/save frames remain;
+  N extra steady frames precede the original screenshot/transition sequence.
+  Normal runs and existing smoke defaults remain unchanged. Minimize/restore
+  interruption cannot silently count a discarded interval as a valid sample.
+- Engine `Window::draw` takes an optional `FrameTiming*`, reset per draw, reporting
+  CPU submission, screenshot readback/write, fallback throttle and present times.
+  No per-phase clocks or timing history are added to normal rendering. Presentation
+  includes driver/display waiting and is not a GPU execution measurement.
+- `steady_profile` reports exact sample count and mean/p50/p95/p99/max for interval,
+  update, scene, submission, readback, throttle and present. The maintained system
+  and galaxy export validators accept `profile_frames=600`, validate the complete
+  diagnostic and still verify artwork, observer secrecy, saves and exact reload.
+  No fixed hardware-independent FPS pass threshold is imposed.
+- Four actual Vulkan runs, each 600 extra frames, passed at 720p and 1080p. Paused
+  500-system campaign interval means were 16.716–16.723 ms; p95 16.834–17.025 ms;
+  p99 17.284–19.705 ms. Update/scene/submission means were respectively
+  0.026–0.033 / 0.053–0.175 / 0.258–0.323 ms. Present means 16.158–16.355 ms
+  dominate; readback and fallback throttle were zero in all steady samples.
+  This supports roughly 60 FPS after warm-up on this host, not busy campaigns,
+  every resolution/hardware, stall-free entry or full visual parity.
+- Strict native build, real Vulkan platform timing/reset/pixel checks, 34 focused
+  Python tests, and four invalid native CLI cases passed. Two default-frame
+  diplomacy Vulkan launches also passed UI/portrait/secrecy and exact reload
+  checks (`native-steady-default-runtime.log`, `work/steady-default-diplomacy.json`). Evidence:
+  `native-steady-profile-{build,tests}.log`, `native-steady-baseline-runtime.log`,
+  `work/steady-baseline-{system,galaxy}.json` and `build-native/preview-*.bmp`.
+- The previous celestial optimization `c373aed4` passed native CI `34939226242`.
+  This profiling checkpoint requires its own exact-head CI; no shared merge.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- First-entry planet/art preparation still contributes to a 210–213 ms scene.
-  Investigate staged preparation from observer-safe data and longer steady-frame
-  sampling to separate CPU/submission from presentation waiting. Final short runs
-  still show frame p95 around 33 ms including VSync; 60 FPS remains unproven.
+- First-entry planet/art preparation still contributes to a 210–213 ms scene;
+  the longer paused-map profile above isolates this from steady display pacing.
+  Next: staged CPU preparation from copied observer-safe appearance data, bounded
+  pending jobs/cache bytes, cancellation or stale-result rejection by generation,
+  and explicit error delivery. Keep Core access and SDL/GDI uploads on the owner
+  thread. Preserve exact final pixels; update screenshot gates to wait for actual
+  asset completion if preparation becomes asynchronous. Profile busy campaigns
+  separately before making a general 60 FPS claim.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.
 - `cleanMachineTest` still needs a separate machine/VM.

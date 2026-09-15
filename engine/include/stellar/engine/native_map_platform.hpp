@@ -61,6 +61,9 @@ struct DrawList {
   // UI overlay remains last, preserving every existing aggregate caller.
   std::vector<WorldCommand> world;
 };
+// Optional CPU wall-clock breakdown for a single draw. Submission and present
+// may include driver or GPU waits; these are not GPU execution measurements.
+struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, TextEntered,
@@ -95,7 +98,8 @@ class Window final {
   void set_text_input(bool enabled);
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
-            const std::optional<std::filesystem::path> &screenshot = std::nullopt);
+            const std::optional<std::filesystem::path> &screenshot = std::nullopt,
+            FrameTiming *timing = nullptr);
   [[nodiscard]] int drawable_width() const noexcept;
   [[nodiscard]] int drawable_height() const noexcept;
   [[nodiscard]] std::string gpu_driver() const;

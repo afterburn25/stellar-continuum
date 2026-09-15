@@ -134,6 +134,50 @@ struct SmokeTimingSummary {
   }
 };
 
+template<class Character>
+[[nodiscard]] int parse_profile_frames(std::basic_string_view<Character> value) {
+  int frames{};
+  if(value.empty())throw std::invalid_argument("--profile-frames requires 120 to 3600 frames.");
+  for(const auto digit:value){
+    if(digit<'0'||digit>'9')throw std::invalid_argument("--profile-frames requires whole decimal frames.");
+    frames=frames*10+static_cast<int>(digit-'0');
+    if(frames>3600)throw std::invalid_argument("--profile-frames must not exceed 3600.");
+  }
+  if(frames<120)throw std::invalid_argument("--profile-frames requires at least 120 steady frames.");
+  return frames;
+}
+
+// Diagnostic-only, bounded samples taken after warm-up and before screenshots.
+// The display interval includes waiting; submission/present are CPU wall times.
+struct SmokeSteadyProfile {
+  std::array<std::vector<double>,7> samples;
+  std::size_t requested{};
+  explicit SmokeSteadyProfile(int frames):requested(static_cast<std::size_t>(frames)){
+    for(auto &phase:samples)phase.reserve(requested);
+  }
+  void observe(double interval,double update,double scene,const FrameTiming &timing){
+    if(samples[0].size()>=requested)throw std::logic_error("Steady profile exceeded its sample budget.");
+    const std::array values{interval,update,scene,timing.submission_ms,timing.readback_ms,timing.throttle_ms,timing.present_ms};
+    for(std::size_t i=0;i<values.size();++i){
+      if(!std::isfinite(values[i])||values[i]<0)throw std::runtime_error("Invalid steady-frame timing.");
+      samples[i].push_back(values[i]);
+    }
+  }
+  void write(std::ostream &out){
+    if(samples[0].size()!=requested)throw std::runtime_error("Steady profiling was interrupted; rerun without minimizing the window.");
+    constexpr std::array names{"interval","update","scene","submission","readback","throttle","present"};
+    out<<" steady_profile={\"samples\":"<<requested;
+    for(std::size_t i=0;i<samples.size();++i){
+      auto &values=samples[i];std::ranges::sort(values);
+      const auto percentile=[&](double p){return values[static_cast<std::size_t>(std::ceil(static_cast<double>(values.size())*p))-1];};
+      out<<",\""<<names[i]<<"\":{\"mean_ms\":"<<std::accumulate(values.begin(),values.end(),0.)/static_cast<double>(values.size())
+         <<",\"p50_ms\":"<<percentile(.5)<<",\"p95_ms\":"<<percentile(.95)
+         <<",\"p99_ms\":"<<percentile(.99)<<",\"max_ms\":"<<values.back()<<'}';
+    }
+    out<<'}';
+  }
+};
+
 struct Options {
   std::filesystem::path asset_root;
   std::optional<std::filesystem::path> smoke_screenshot;
@@ -161,6 +205,7 @@ struct Options {
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
   bool save_path_overridden{};
+  std::optional<int> profile_frames;
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -181,6 +226,7 @@ struct Options {
     else if(arg==L"--load") result.load=true;
     else if(arg==L"--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg==L"--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
+    else if(arg==L"--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::wstring_view(argv[++i]));
     else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.windowed=true;}
     else if(arg==L"--new-game-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
@@ -209,6 +255,7 @@ struct Options {
     else if(arg=="--load") result.load=true;
     else if(arg=="--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg=="--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
+    else if(arg=="--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::string_view(argv[++i]));
     else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.windowed=true;}
     else if(arg=="--new-game-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
@@ -232,6 +279,7 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
+  if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke)throw std::invalid_argument("--profile-frames requires --system-smoke or --galaxy-art-smoke.");
   if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
@@ -2150,6 +2198,10 @@ int main(int argc,char **argv){
     std::vector<double> update_ms,scene_ms,render_present_ms;
     std::unique_ptr<SmokeTimingSummary> smoke_timing;
     if(options.smoke_screenshot)smoke_timing=std::make_unique<SmokeTimingSummary>();
+    const auto capture_frame=120+options.profile_frames.value_or(0);
+    std::unique_ptr<SmokeSteadyProfile> steady_profile;
+    if(options.profile_frames)steady_profile=std::make_unique<SmokeSteadyProfile>(*options.profile_frames);
+    FrameTiming draw_timing;
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
@@ -2163,6 +2215,7 @@ int main(int argc,char **argv){
         continue;
       }
       const auto elapsed=discard_elapsed?0.:measured_elapsed;
+      const bool valid_interval=!discard_elapsed;
       if(frames>0&&!discard_elapsed)frame_ms.push_back(elapsed*1000.);
       discard_elapsed=false;
       const auto update_begin=std::chrono::steady_clock::now();
@@ -2178,27 +2231,31 @@ int main(int argc,char **argv){
       std::optional<std::filesystem::path> screenshot;
       if(options.smoke_screenshot){
         if(options.galaxy_art_smoke){
-          if(frames==120)screenshot=options.smoke_screenshot;
-          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
-          else if(frames==122)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
+          if(frames==capture_frame)screenshot=options.smoke_screenshot;
+          else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
+          else if(frames==capture_frame+2)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
         }else if(options.diplomacy_smoke||options.diplomacy_reload_smoke){
-          if(frames==120)screenshot=options.smoke_screenshot;
-          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-unknown");
+          if(frames==capture_frame)screenshot=options.smoke_screenshot;
+          else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-unknown");
         }else if(options.ship_art_smoke){
-          if(frames==120)screenshot=options.smoke_screenshot;
-          else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
-        }else if(frames>=120)screenshot=options.smoke_screenshot;
+          if(frames==capture_frame)screenshot=options.smoke_screenshot;
+          else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
+        }else if(frames>=capture_frame)screenshot=options.smoke_screenshot;
       }
       const auto scene_begin=std::chrono::steady_clock::now();
       const auto scene=campaign.scene(input.drawable_width,input.drawable_height);
       const auto scene_end=std::chrono::steady_clock::now();
-      window.draw(scene,screenshot);
+      window.draw(scene,screenshot,steady_profile?&draw_timing:nullptr);
       const auto render_end=std::chrono::steady_clock::now();
       if(smoke_timing)
-        smoke_timing->observe(frames,screenshot.has_value()||frames>=120,
+        smoke_timing->observe(frames,screenshot.has_value()||frames>=capture_frame,
           std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
           std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),
           std::chrono::duration<double,std::milli>(render_end-scene_end).count());
+      if(steady_profile&&frames>=120&&frames<capture_frame&&valid_interval)
+        steady_profile->observe(elapsed*1000.,
+          std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
+          std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),draw_timing);
       if(options.smoke_screenshot&&!screenshot){
         // GPU readback/file writes deliberately stay out of phase samples.
         update_ms.push_back(std::chrono::duration<double,std::milli>(update_end-update_begin).count());
@@ -2206,17 +2263,17 @@ int main(int argc,char **argv){
         render_present_ms.push_back(std::chrono::duration<double,std::milli>(render_end-scene_end).count());
       }
       if(options.galaxy_art_smoke){
-        if(frames==120){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
-        else if(frames==121){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
-        else if(frames==122)campaign.capture_galaxy_system(input.drawable_width,input.drawable_height);
+        if(frames==capture_frame){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
+        else if(frames==capture_frame+1){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
+        else if(frames==capture_frame+2)campaign.capture_galaxy_system(input.drawable_width,input.drawable_height);
       }
       if(options.ship_art_smoke){
-        if(frames==120)campaign.capture_ship_art_shipyard();
-        else if(frames==121)campaign.capture_ship_art_map();
+        if(frames==capture_frame)campaign.capture_ship_art_shipyard();
+        else if(frames==capture_frame+1)campaign.capture_ship_art_map();
       }
-      if((options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==120)
+      if((options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame)
         campaign.capture_diplomacy_unknown(input.drawable_width,input.drawable_height);
-      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=122:frames>=120);
+      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame);
       if(capture){
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
@@ -2242,6 +2299,7 @@ int main(int argc,char **argv){
         std::cout<<" phase_samples="<<update_ms.size();
         print_phase("update",update_ms);print_phase("scene",scene_ms);print_phase("render_present",render_present_ms);
         smoke_timing->write(std::cout);
+        if(steady_profile)steady_profile->write(std::cout);
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)

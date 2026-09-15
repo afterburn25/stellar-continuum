@@ -55,7 +55,7 @@ Normal play does not retain timing histories. These short checks locate likely
 bottlenecks; they are not sustained-FPS certification.
 
 `smoke_timing` also records phase maxima and frame indices for cold frames 1–10,
-the frame-61 save request service, capture/transition frames 120 onward, and other
+the frame-61 save request service, capture/transition frames (normally 120 onward), and other
 steady frames. Unlike the existing phase means/p95, maxima include capture frames
 in their separate bucket; expensive cold work remains visible in the overall maxima.
 
@@ -71,7 +71,47 @@ system scene is now 209.7–213.0 ms, and final frame p95 remains about 33 ms in
 VSync. Further entry/pacing work is needed. Evidence: `native-celestial-cold-tests.log`,
 `native-celestial-cold-final-runtime.log`, `work/celestial-pixel-comparison.json`, and
 `work/cold-after-{system,galaxy}.json`. Native CI `34936942630` covers the preceding
-save fix at `b110e223`; this rendering candidate needs its own CI.
+save fix at `b110e223`; the celestial head `c373aed4` subsequently passed native
+CI `34939226242`.
+
+### Optional steady-frame profile
+
+Add `--profile-frames 600` to an isolated `--system-smoke <capture.bmp>` or
+`--galaxy-art-smoke <capture.bmp>` invocation. Only whole numbers 120–3600 are
+accepted. The existing warm-up and frame-60 manual-save request remain; the
+requested extra frames run before screenshot/transition work. Existing smoke
+defaults are unchanged. The helpers `validate_native_system_export` and
+`validate_native_galaxy_export` accept keyword `profile_frames=600`, retain all
+their normal gates and return `systemProfiles` / `galaxyProfiles` respectively.
+
+`steady_profile` contains the exact sample count and mean/p50/p95/p99/max for
+frame interval, update, scene, CPU submission, readback/write, fallback throttle,
+and present. Readback must be zero for these samples. The validator rejects
+missing/duplicate/truncated JSON, nonfinite/negative metrics, invalid counts and
+inconsistent quantiles. A minimize/restore interruption cannot replace a valid
+sample with a discarded interval. No sample history or per-phase draw clocks
+are collected in normal play. CPU presentation time can include GPU/driver/display
+waits; it is not GPU execution time and should not be summed with interval time.
+
+Four 600-frame profiles of a paused 500-system campaign:
+
+| View | Resolution | Interval mean / p95 / p99 (ms) | Update / scene / submission mean (ms) | Present mean (ms) |
+|---|---|---|---|---|
+| Sol | 1280×720 | 16.716 / 16.869 / 17.375 | 0.026 / 0.137 / 0.258 | 16.275 |
+| Sol reload | 1920×1080 | 16.717 / 17.025 / 17.284 | 0.033 / 0.175 / 0.323 | 16.158 |
+| Galaxy overview | 1280×720 | 16.718 / 16.834 / 18.382 | 0.026 / 0.053 / 0.260 | 16.355 |
+| Galaxy overview reload | 1920×1080 | 16.723 / 16.973 / 19.705 | 0.026 / 0.059 / 0.279 | 16.317 |
+
+All four passed actual Vulkan rendering, artwork/observer validation and exact
+paused save/reload. Readback and fallback throttle were zero throughout. Evidence:
+`native-steady-baseline-runtime.log`, `work/steady-baseline-{system,galaxy}.json`.
+The strict build, platform pixel/timing-reset test, 34 Python tests and four
+rejected native CLI cases are recorded in `native-steady-profile-{build,tests}.log`.
+These measurements support roughly 60 FPS after warm-up on this host; they do not
+cover busy campaigns or certify every resolution/GPU. Cold entry still takes
+~210–213 ms and needs staged asset preparation. Screenshot work remains visible
+in the separate timing maxima. No quality, authoritative simulation or save
+contract was changed by profiling.
 
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 

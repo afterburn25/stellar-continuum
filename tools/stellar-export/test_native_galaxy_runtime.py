@@ -26,8 +26,18 @@ def diagnostic(mode="fresh"):
     }
 
 
+def steady_profile(samples):
+    metrics = {"mean_ms": 2.0, "p50_ms": 1.0, "p95_ms": 3.0,
+               "p99_ms": 4.0, "max_ms": 5.0}
+    value = {"samples": samples}
+    for phase in ("interval", "update", "scene", "submission", "throttle", "present"):
+        value[phase] = dict(metrics)
+    value["readback"] = {key: 0.0 for key in metrics}
+    return value
+
+
 class NativeGalaxyRuntimeTests(unittest.TestCase):
-    def exercise(self, fault=None):
+    def exercise(self, fault=None, profile_frames=0):
         with tempfile.TemporaryDirectory(prefix="stellar-galaxy-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -62,8 +72,11 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
                     path = overview.with_name(overview.stem + suffix + overview.suffix)
                     if fault != "capture" or suffix != "-system": path.write_bytes(b"BM")
                 uploads = 0 if fault == "uploads" else 20
-                stdout = (f"gpu_driver=vulkan systems=500 image_uploads={uploads} save=ok "
-                          f"galaxy_art={json.dumps(state, separators=(',', ':'))}")
+                stdout = f"gpu_driver=vulkan systems=500 image_uploads={uploads} save=ok "
+                if profile_frames:
+                    self.assertEqual(args[args.index("--profile-frames") + 1], str(profile_frames))
+                    stdout += " steady_profile=" + json.dumps(steady_profile(profile_frames))
+                stdout += f" galaxy_art={json.dumps(state, separators=(',', ':'))}"
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             def fake_bmp(path, width, height):
@@ -73,14 +86,19 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
 
             with mock.patch("native_galaxy_runtime.subprocess.run", side_effect=launch), \
                  mock.patch("native_galaxy_runtime._bmp", side_effect=fake_bmp):
-                result = validate_native_galaxy_export(package, {})
+                result = validate_native_galaxy_export(package, {}, profile_frames=profile_frames)
             self.assertEqual(len(calls), 2)
             self.assertNotIn("--load", calls[0])
             self.assertIn("--load", calls[1])
             self.assertEqual(len(result["galaxyCaptures"]), 6)
             self.assertTrue(result["nativeGalaxyFittedArtwork"])
+            if profile_frames:
+                self.assertEqual(len(result["galaxyProfiles"]), 2)
+            else:
+                self.assertNotIn("galaxyProfiles", result)
 
     def test_complete_actual_contract(self): self.exercise()
+    def test_requested_steady_profile_is_forwarded_and_validated(self): self.exercise(profile_frames=120)
     def test_missing_overview_art_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("overview")
     def test_missing_regional_nebula_rejected(self):
