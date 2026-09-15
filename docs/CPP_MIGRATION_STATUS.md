@@ -40,7 +40,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (17+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
-| Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` CTest + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp; no settings UI, no voice duck hooks yet |
+| Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
 | Voice | Main.Voice*, CharacterVoiceResolver | `work/voice-engine-tts` (merged) | OK | worker regressions | PARTIAL | Engine-side TTS landed upstream; game hooks not wired |
@@ -51,17 +51,18 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 1. Surface scene renders hub/buildings/roads/ghosts as rasterized sprites, but
    the reference's free camera orbit, terrain relief and settlement overlays
    remain (workspace is a fixed top-down construction view).
-2. Audio settings UI and voice-duck integration are not wired (mixer, playback,
-   event routing, and persisted volumes are implemented).
+2. Voice-duck integration is not wired (mixer, playback, event routing,
+   settings UI, and persisted volumes are implemented).
 3. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
 4. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 155/155 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+- 156/156 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
   `native_orbital_structure`, `native_surface_scene`, `native_audio`,
-  `native_battle_workspace`, extended
-  `native_system_view`/`native_system_workspace`/`native_surface_workspace`),
+  `native_audio_settings`, `native_battle_workspace`, extended
+  `native_system_view`/`native_system_workspace`/`native_surface_workspace`/
+  `native_ui_layout`),
   144/144 headless CTest baseline, all Python export checks.
 - Tactical battle presentation (`357872e8`): `native_battle_workspace` ports the
   reference `MassiveCombatView` — full-screen observer-filtered formation tokens
@@ -103,6 +104,14 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   decodes; audio failure cannot fail the campaign. `--audio-smoke` reports
   decode/voice/bounds evidence; packaging is exact-hash gated (8 files incl.
   `Licenses/dr_mp3-MIT-0.txt`) with an 18-test mock validator.
+- Audio settings UI (`d108435a`): pause-menu AUDIO button opens
+  `native_audio_settings` — master/music/SFX sliders apply live via
+  `apply_volumes`, DEFAULTS restores reference levels, Done/Escape persists to
+  `audio-settings.json` beside the save; drags no longer write per pointer
+  move. `--audio-smoke` exercises menu->AUDIO->drag->defaults->Done and the
+  export validator now requires the `settings` flag plus a persisted settings
+  file with values in [0,1]. `native_ui_layout` grew the menu panel (recentered
+  to stay in-viewport at 640x360) with updated layout tests.
 - Sealed export `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`:
   118 files, 48 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false,
   150/150 CTest, 16/16 diplomacy validator Python tests. The `--diplomacy-smoke`
