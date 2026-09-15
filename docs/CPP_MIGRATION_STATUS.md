@@ -53,22 +53,26 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. First system entry still takes ~210–213 ms. Longer paused-map sampling shows ~16.7 ms mean and 16.8–17.0 ms p95 after warm-up; busy-campaign and broad-hardware 60 FPS remain unproven.
+5. Background system artwork now reduces measured first-scene CPU work from ~211 ms to 2.8–2.9 ms. Initial galaxy scenery still costs 45–46 ms and regional scenery ~20 ms; upload/presentation tails and busy-campaign performance remain to investigate. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
-Latest Codex performance checkpoint adds opt-in 120–3600-frame native profiling,
-separating CPU submission from screenshot IO, fallback throttle and presentation.
-Four 600-frame Vulkan profiles (system/galaxy at 720p/1080p) passed the existing
-artwork, observer-secrecy, durable-save and exact paused-reload gates. Interval
-means 16.716–16.723 ms and p95 16.834–17.025 ms isolate the remaining cold-entry
-hitch from steady pacing. No normal-play sample history or quality reduction.
-Strict build, platform Vulkan/pixel/timing-reset CTest, 34 Python tests and four
-invalid native CLI cases passed. See `CPP_MIGRATION_HANDOFF.md` and
-`engine/NATIVE_CLIENT_VALIDATION.md` for metrics and next staged-art preparation
-contract. Previous celestial head `c373aed4` passed native CI `34939226242`;
-this new checkpoint needs its own CI. Engine remains 0.1.58 candidate.
+Latest Codex checkpoint prepares system stars, rings and planet discs on one
+existing Engine JobSystem worker, using copied observer-safe appearances.
+Admission is bounded to 16 outstanding jobs / 32 MiB reserved output; cache
+budgets remain unchanged. Generation changes cancel obsolete requests without
+waiting, completed results drain on the owner thread, and preparation errors
+retain their cause/path. No simulation, GPU or window access moves to workers.
+Six focused CTests (including exact synchronous/background pixel comparisons),
+a subsequent workspace readiness/input regression, 42 Python export checks and
+seven actual Vulkan runs passed. Four 600-frame profiles at 720p/1080p measured
+Sol first-scene CPU time 2.936/2.807 ms versus 211.452/211.567 ms; final images
+arrive asynchronously in ~213–258 ms. Screenshot gates wait for real artwork.
+Paused-map interval means 16.717–16.722 ms and p95 16.913–17.026 ms preserve warm
+pacing; see the handoff/validation document for remaining stalls and evidence.
+Previous profiling head `b491783c` passed native CI `34942125331`; this new
+checkpoint needs its own CI. Engine remains 0.1.58 candidate.
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
   144/144 headless CTest baseline, 61 Python export checks.

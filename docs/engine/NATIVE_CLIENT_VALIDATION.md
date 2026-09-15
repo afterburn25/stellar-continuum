@@ -74,6 +74,46 @@ VSync. Further entry/pacing work is needed. Evidence: `native-celestial-cold-tes
 save fix at `b110e223`; the celestial head `c373aed4` subsequently passed native
 CI `34939226242`.
 
+### Background system imagery
+
+The native client now shares one Engine `ImagePreparationQueue` between stars,
+rings and planet discs. It uses the existing JobSystem with one worker, a maximum
+of 16 outstanding jobs and 32 MiB of reserved output. Ready results still consume
+capacity until collected. CPU factories capture immutable appearance/root values;
+simulation, image-cache changes and GPU work stay on the owner thread. Existing
+final-image/cache limits remain. Missing/corrupt assets deliver a useful path and
+cause on the owner thread; they do not become silent fallback successes.
+
+While images prepare, navigation and temporary imagery remain available with a
+progress label. Screenshot gates wait for the completed rendered frame (or fail
+after 600 extra frames). Added wait frames never extend the steady sample window.
+Smoke output reports `artwork_pending_frames`, `artwork_prepare_max_ms` and
+`artwork_capture_wait_frames` separately from scene CPU time.
+
+Six focused CTests passed (queue ownership/lifetime/error behavior, complete
+synchronous/background RGBA equality, observer-safe planet requests, workspace,
+colony entry and settlement). An added workspace readiness/progress/mouse-input
+regression and 42 Python system/galaxy/travel export tests then passed. Seven real
+Vulkan launches passed the existing image, travel, secrecy and exact paused
+save/reload gates; finished Sol and galaxy-to-Sol captures were inspected.
+
+| Scene CPU maximum | 720p before | 720p after | 1080p before | 1080p after |
+| --- | ---: | ---: | ---: | ---: |
+| First Sol frame | 211.452 ms | 2.936 ms | 211.567 ms | 2.807 ms |
+| Galaxy capture transitions | 207.769 ms | 19.779 ms | 209.287 ms | 19.577 ms |
+
+Final artwork arrives asynchronously in about 213–258 ms. Galaxy-to-Sol capture
+waits were 15/16 frames, so these images include finished textures, not placeholders.
+Four 600-frame paused-map profiles averaged 16.717–16.722 ms, with p95
+16.913–17.026 ms and p99 17.487–18.950 ms. Galaxy startup still costs 45–46 ms;
+regional scenery and upload/presentation tails remain, and busy campaigns/hardware
+are not certified at 60 FPS. No visual-quality reduction or gameplay rule change.
+
+Evidence: `native-background-art-{tests,capture-tests,owner-tests,runtime}.log`,
+`work/background-art-{system,galaxy,travel}.json`, and `build-native/preview-*.bmp`.
+Baseline: `work/steady-baseline-{system,galaxy}.json`. Previous head `b491783c`
+passed native CI `34942125331`; this background-art candidate needs its own CI.
+
 ### Optional steady-frame profile
 
 Add `--profile-frames 600` to an isolated `--system-smoke <capture.bmp>` or

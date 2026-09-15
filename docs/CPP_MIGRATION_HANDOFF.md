@@ -176,21 +176,58 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   `native-steady-profile-{build,tests}.log`, `native-steady-baseline-runtime.log`,
   `work/steady-baseline-{system,galaxy}.json` and `build-native/preview-*.bmp`.
 - The previous celestial optimization `c373aed4` passed native CI `34939226242`.
-  This profiling checkpoint requires its own exact-head CI; no shared merge.
+  Profiling head `b491783c` also passed native CI `34942125331`; no shared merge.
+
+## Background system-art preparation checkpoint
+
+- Engine `ImagePreparationQueue` wraps one existing `JobSystem` worker. Owner-thread
+  admission returns a move-only ticket or no capacity; polling never waits for
+  rasterization. Defaults: 16 jobs / 32 MiB reserved output, including ready but
+  uncollected results. Decoder scratch is separate (existing WIC bound, one decode
+  at a time). Ticket cancellation drops queued/running results without waiting;
+  explicit queue destruction joins the worker. Ready failures rethrow on `take()`.
+- `NativePlanetDiscAssets::request_image` and celestial
+  `use_background_preparation` opt into this queue. The existing synchronous path
+  remains available for tools and exact pixel comparison. Pure workers own copied
+  appearance keys/root paths, never Core, SDL, GPU or UI references. Only eligible
+  observer-filtered data can request a body asset. Campaign discard cancels old
+  requests; all ready results drain before admitting more work, even after moving
+  away from the body that requested them. Existing cache budgets remain intact.
+- `NativeSystemWorkspace::artwork_ready()` describes the last rendered frame.
+  Temporary discs/progress text keep navigation usable while preparation runs.
+  Smoke capture and multi-screen transitions wait for the actual final artwork,
+  with a bounded failure, without counting extra wait frames in `steady_profile`.
+  Diagnostics expose pending frames, preparation wall time and capture wait frames.
+- Strict native build and six focused CTests passed; the added readiness/visible
+  progress/mouse-navigation regression subsequently passed, as did 42 Python
+  system/galaxy/travel export checks. Celestial and planet tests compare complete
+  final RGBA output with synchronous generation and exercise duplicates, saturation,
+  abandoned requests, generation cancellation, missing assets and worker errors.
+- Seven actual Vulkan launches passed: system/galaxy at 720p and 1080p with 600
+  steady frames each, plus three travel/save/reload runs. System cold scene CPU:
+  211.452/211.567 -> 2.936/2.807 ms. Galaxy capture-transition scene maximum:
+  207.769/209.287 -> 19.779/19.577 ms (remaining regional scenery preparation).
+  Artwork completes asynchronously in 213–258 ms; galaxy captures waited 15/16
+  frames and their completed Sol images were visually inspected. Warm interval
+  mean 16.717–16.722 ms, p95 16.913–17.026 ms, p99 17.487–18.950 ms.
+- Evidence: `native-background-art-tests.log`,
+  `native-background-art-capture-tests.log`, `native-background-art-owner-tests.log`,
+  `native-background-art-runtime.log`,
+  `work/background-art-{system,galaxy,travel}.json`, and `build-native/preview-*.bmp`.
+  Baselines remain `work/steady-baseline-{system,galaxy}.json`. Native CI for this
+  new checkpoint is still required; `b491783c` passed `34942125331`. No release,
+  shared merge, full-suite run or clean-machine certification is claimed.
 
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- First-entry planet/art preparation still contributes to a 210–213 ms scene;
-  the longer paused-map profile above isolates this from steady display pacing.
-  Next: staged CPU preparation from copied observer-safe appearance data, bounded
-  pending jobs/cache bytes, cancellation or stale-result rejection by generation,
-  and explicit error delivery. Keep Core access and SDL/GDI uploads on the owner
-  thread. Preserve exact final pixels; update screenshot gates to wait for actual
-  asset completion if preparation becomes asynchronous. Profile busy campaigns
-  separately before making a general 60 FPS claim.
+- Initial galaxy scenery still costs 45–46 ms, regional scenery about 20 ms;
+  upload/presentation tails also remain. System CPU rasterization is now staged
+  as above. Next inspect these measured remaining stalls, then profile busy
+  campaigns separately before making a general 60 FPS claim. Keep Core access
+  and GPU/window work on the owner thread, preserve final pixels and capture gates.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.
 - `cleanMachineTest` still needs a separate machine/VM.

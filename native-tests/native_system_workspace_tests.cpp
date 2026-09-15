@@ -42,6 +42,19 @@ int main(int argc,char**argv)try{
   NativeSystemViewController controller;auto built=controller.build(campaign,1,sol_system_id);
   require(built.snapshot.has_value(),"fresh Sol view unavailable");
   const auto reference=*built.snapshot;auto display=reference;
+  // Pending body artwork keeps mouse navigation alive but is never capture-ready.
+  bool deferred_ready{};
+  const auto prepared_body=RgbaImage::create(1,1,{120,150,180,255});
+  NativeSystemWorkspace deferred([&](const SystemBodyAppearance&){return deferred_ready?prepared_body:nullptr;});
+  deferred.open(reference,1280,720);
+  DrawList deferred_draw;deferred.render(deferred_draw,1280,720);
+  const auto preparing=[](const DrawList&scene){return std::ranges::any_of(scene.overlay,[](const UiOverlayCommand&item){const auto*label=std::get_if<Text>(&item);return label&&label->value=="Preparing system imagery...";});};
+  require(!deferred.artwork_ready()&&preparing(deferred_draw),"pending body artwork was reported complete or lacked progress feedback");
+  const auto deferred_layout=SystemWorkspaceLayout::for_viewport(1280,720);
+  require(deferred.handle({InputEventType::LeftPressed,center(deferred_layout.reset)},1280,720).captured,"pending artwork blocked mouse navigation");
+  deferred_ready=true;deferred_draw={};deferred.render(deferred_draw,1280,720);
+  require(deferred.artwork_ready()&&!preparing(deferred_draw),"finished body artwork retained a pending capture or loading indicator");
+  deferred.close();require(deferred.artwork_ready(),"closed workspace retained a pending capture");
   const auto display_earth=std::ranges::find(display.bodies,earth_body_id,&NativeSystemBody::id);
   require(display_earth!=display.bodies.end(),"Sol view lacks Earth");
   display_earth->positive_signatures={NativePositiveSignature::rare_resource,NativePositiveSignature::anomaly,NativePositiveSignature::activity};

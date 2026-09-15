@@ -352,6 +352,11 @@ target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_image)
 target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_image)
 
 if(BUILD_TESTING)
+  add_executable(stellar_native_image_preparation_tests
+    native-tests/native_image_preparation_tests.cpp)
+  target_link_libraries(stellar_native_image_preparation_tests PRIVATE stellar_native_image)
+  add_test(NAME native_image_preparation COMMAND stellar_native_image_preparation_tests)
+  set_tests_properties(native_image_preparation PROPERTIES TIMEOUT 30)
   add_executable(stellar_celestial_tests
     native-tests/native_celestial_appearance_tests.cpp
     app/native_client/native_celestial_appearance.cpp)
@@ -373,6 +378,7 @@ if(BUILD_TESTING)
     stellar_native_image)
   target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_image)
   if(MSVC)
+    target_compile_options(stellar_native_image_preparation_tests PRIVATE /W4 /WX /permissive-)
     target_compile_options(stellar_celestial_tests PRIVATE /W4 /WX /permissive-)
   endif()
 endif()

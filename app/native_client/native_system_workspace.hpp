@@ -56,6 +56,8 @@ struct SystemWorkspaceLayout {
 class NativeSystemWorkspace final {
 public:
   explicit NativeSystemWorkspace(SystemImageProvider provider={},SystemTextMeasurer measurer={});
+  void use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
+  [[nodiscard]] bool artwork_ready() const noexcept{return artwork_ready_;}
   void open(stellar::native_system::NativeSystemSnapshot,int width,int height);
   void refresh(stellar::native_system::NativeSystemSnapshot);
   void refresh_travel(stellar::native_system_travel::NativeSystemTravelSnapshot,
@@ -106,6 +108,7 @@ private:
   stellar::native_map::Point pointer_{};
   InspectorFocus inspector_focus_{InspectorFocus::automatic};
   bool dragging_{},pending_initial_travel_fit_{};
+  bool artwork_ready_{true};
   int width_{},height_{};
 };
 } // namespace stellar::native_system_ui

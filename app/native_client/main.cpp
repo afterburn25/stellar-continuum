@@ -424,7 +424,9 @@ class NativeCampaign final {
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         ship_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
-        system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
+        system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
+    planet_discs_.use_background_preparation(image_preparation_);
+    system_workspace_.use_background_preparation(image_preparation_);
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
@@ -1431,6 +1433,8 @@ class NativeCampaign final {
     return true;
   }
 
+  [[nodiscard]] bool artwork_ready()const noexcept{return !system_workspace_.visible()||system_workspace_.artwork_ready();}
+
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
@@ -2059,6 +2063,7 @@ class NativeCampaign final {
   NativeGalaxyBackdropAssets galaxy_assets_;
   NativeGalaxyBackdrop galaxy_backdrop_;
   double fitted_pixels_per_world_{.01};
+  std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>()};
   NativePlanetDiscAssets planet_discs_;
   NativeShipArtAssets ship_art_;
   NativeSystemWorkspace system_workspace_;
@@ -2198,7 +2203,11 @@ int main(int argc,char **argv){
     std::vector<double> update_ms,scene_ms,render_present_ms;
     std::unique_ptr<SmokeTimingSummary> smoke_timing;
     if(options.smoke_screenshot)smoke_timing=std::make_unique<SmokeTimingSummary>();
-    const auto capture_frame=120+options.profile_frames.value_or(0);
+    const auto steady_end_frame=120+options.profile_frames.value_or(0);
+    auto capture_frame=steady_end_frame;
+    int artwork_wait_frames{},artwork_pending_frames{};
+    double artwork_prepare_max_ms{};
+    std::optional<std::chrono::steady_clock::time_point> artwork_pending_since;
     std::unique_ptr<SmokeSteadyProfile> steady_profile;
     if(options.profile_frames)steady_profile=std::make_unique<SmokeSteadyProfile>(*options.profile_frames);
     FrameTiming draw_timing;
@@ -2245,6 +2254,13 @@ int main(int argc,char **argv){
       const auto scene_begin=std::chrono::steady_clock::now();
       const auto scene=campaign.scene(input.drawable_width,input.drawable_height);
       const auto scene_end=std::chrono::steady_clock::now();
+      const bool artwork_ready=campaign.artwork_ready();
+      const bool waiting_for_artwork=options.smoke_screenshot&&frames>=capture_frame&&!artwork_ready;
+      if(options.smoke_screenshot){
+        if(!artwork_ready){++artwork_pending_frames;if(!artwork_pending_since)artwork_pending_since=scene_begin;}
+        else if(artwork_pending_since){artwork_prepare_max_ms=std::max(artwork_prepare_max_ms,std::chrono::duration<double,std::milli>(scene_end-*artwork_pending_since).count());artwork_pending_since.reset();}
+      }
+      if(waiting_for_artwork){screenshot.reset();if(++artwork_wait_frames>600)throw std::runtime_error("System artwork did not finish preparation before capture.");}
       window.draw(scene,screenshot,steady_profile?&draw_timing:nullptr);
       const auto render_end=std::chrono::steady_clock::now();
       if(smoke_timing)
@@ -2252,7 +2268,7 @@ int main(int argc,char **argv){
           std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
           std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),
           std::chrono::duration<double,std::milli>(render_end-scene_end).count());
-      if(steady_profile&&frames>=120&&frames<capture_frame&&valid_interval)
+      if(steady_profile&&frames>=120&&frames<steady_end_frame&&valid_interval)
         steady_profile->observe(elapsed*1000.,
           std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
           std::chrono::duration<double,std::milli>(scene_end-scene_begin).count(),draw_timing);
@@ -2262,18 +2278,18 @@ int main(int argc,char **argv){
         scene_ms.push_back(std::chrono::duration<double,std::milli>(scene_end-scene_begin).count());
         render_present_ms.push_back(std::chrono::duration<double,std::milli>(render_end-scene_end).count());
       }
-      if(options.galaxy_art_smoke){
+      if(!waiting_for_artwork&&options.galaxy_art_smoke){
         if(frames==capture_frame){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
         else if(frames==capture_frame+1){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
         else if(frames==capture_frame+2)campaign.capture_galaxy_system(input.drawable_width,input.drawable_height);
       }
-      if(options.ship_art_smoke){
+      if(!waiting_for_artwork&&options.ship_art_smoke){
         if(frames==capture_frame)campaign.capture_ship_art_shipyard();
         else if(frames==capture_frame+1)campaign.capture_ship_art_map();
       }
-      if((options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame)
+      if(!waiting_for_artwork&&(options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame)
         campaign.capture_diplomacy_unknown(input.drawable_width,input.drawable_height);
-      const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame);
+      const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame);
       if(capture){
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
@@ -2286,6 +2302,8 @@ int main(int argc,char **argv){
                  <<" presentation="<<window.presentation_mode()
                  <<" systems="<<campaign.system_count()<<" frames="<<frames
                  <<" startup_ms="<<startup_ms
+                 <<" artwork_pending_frames="<<artwork_pending_frames<<" artwork_prepare_max_ms="<<artwork_prepare_max_ms
+                 <<" artwork_capture_wait_frames="<<artwork_wait_frames
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
                  <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
                  <<utf8_path(*options.smoke_screenshot);
@@ -2339,6 +2357,7 @@ int main(int argc,char **argv){
         std::cout<<'\n';
         break;
       }
+      if(waiting_for_artwork)++capture_frame;
     }
     return 0;
   }catch(const std::exception &error){std::cerr<<"Stellar Continuum native client failed: "<<error.what()<<'\n';return 1;}catch(...){std::cerr<<"Stellar Continuum native client failed: unknown fatal error\n";return 1;}
