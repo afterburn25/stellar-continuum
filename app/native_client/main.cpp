@@ -2423,7 +2423,7 @@ int main(int argc,char **argv){
     }
     const auto startup_ms=std::chrono::duration<double,std::milli>(
         std::chrono::steady_clock::now()-startup_begin).count();
-    auto prior=std::chrono::steady_clock::now();int frames=0;std::vector<double> frame_ms;bool discard_elapsed{};
+    auto prior=std::chrono::steady_clock::now();int frames=0;std::vector<double> frame_ms;std::vector<double> cpu_ms;std::vector<double> draw_ms;bool discard_elapsed{};
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
@@ -2439,6 +2439,7 @@ int main(int argc,char **argv){
       const auto elapsed=discard_elapsed?0.:measured_elapsed;
       if(frames>0&&!discard_elapsed)frame_ms.push_back(elapsed*1000.);
       discard_elapsed=false;
+      const auto cpu_begin=std::chrono::steady_clock::now();
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
                           elapsed))break;
       window.set_text_input(campaign.wants_text_input());
@@ -2461,7 +2462,13 @@ int main(int argc,char **argv){
           else if(frames==121)screenshot=sidecar_path(*options.smoke_screenshot,L"-proposals");
         }else if(frames>=120)screenshot=options.smoke_screenshot;
       }
-      window.draw(campaign.scene(input.drawable_width,input.drawable_height),screenshot);
+      auto draw_list=campaign.scene(input.drawable_width,input.drawable_height);
+      const auto cpu_end=std::chrono::steady_clock::now();
+      window.draw(draw_list,screenshot);
+      if(frames>0){
+        cpu_ms.push_back(std::chrono::duration<double,std::milli>(cpu_end-cpu_begin).count());
+        draw_ms.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpu_begin).count());
+      }
       if(options.galaxy_art_smoke){
         if(frames==120){campaign.capture_galaxy_overview(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_regional(input.drawable_width,input.drawable_height);}
         else if(frames==121){campaign.capture_galaxy_regional(input.drawable_width,input.drawable_height);campaign.prepare_galaxy_system(input.drawable_width,input.drawable_height);}
@@ -2486,13 +2493,26 @@ int main(int argc,char **argv){
         const auto total=std::accumulate(frame_ms.begin(),frame_ms.end(),0.);
         const auto p95=frame_ms[static_cast<std::size_t>(
             std::ceil(static_cast<double>(frame_ms.size())*.95))-1];
+        std::ranges::sort(cpu_ms);
+        const auto cpu_total=std::accumulate(cpu_ms.begin(),cpu_ms.end(),0.);
+        const auto cpu_p95=cpu_ms[static_cast<std::size_t>(
+            std::ceil(static_cast<double>(cpu_ms.size())*.95))-1];
+        std::ranges::sort(draw_ms);
+        const auto draw_total=std::accumulate(draw_ms.begin(),draw_ms.end(),0.);
+        const auto draw_p95=draw_ms[static_cast<std::size_t>(
+            std::ceil(static_cast<double>(draw_ms.size())*.95))-1];
         std::cout<<std::fixed<<std::setprecision(3)
                  <<"native-map smoke ok: gpu_driver="<<window.gpu_driver()
                  <<" presentation="<<window.presentation_mode()
                  <<" systems="<<campaign.system_count()<<" frames="<<frames
                  <<" startup_ms="<<startup_ms
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
-                 <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
+                 <<" frame_p95_ms="<<p95
+                 <<" cpu_mean_ms="<<cpu_total/static_cast<double>(cpu_ms.size())
+                 <<" cpu_p95_ms="<<cpu_p95
+                 <<" draw_mean_ms="<<draw_total/static_cast<double>(draw_ms.size())
+                 <<" draw_p95_ms="<<draw_p95
+                 <<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
                  <<utf8_path(*options.smoke_screenshot)
                  <<" territory="<<campaign.territory_smoke_status();
         if(options.research_smoke)

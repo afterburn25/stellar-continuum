@@ -53,7 +53,11 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
    remain (workspace is a fixed top-down construction view).
 2. Voice-duck integration is not wired (mixer, playback, event routing,
    settings UI, and persisted volumes are implemented).
-3. Frame pacing measured ~17–21 ms mean / ~33 ms p95 under smoke — 60 FPS not established.
+3. Frame pacing is present-bound on the measurement host: smoke now reports
+   `cpu_mean/p95` (update+scene build ≈ 2.3 ms mean / 0.14 ms p95) separately
+   from `draw_mean/p95` (≈ 18.9 ms — the vsync interval of the ~53 Hz Meta
+   Virtual Monitor the host displays through). CPU headroom for 60 FPS is
+   established; a native-refresh measurement needs a physical 60 Hz display.
 4. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
