@@ -107,7 +107,7 @@ jobs:
       - name: Build, test and export native foundation
         shell: pwsh
         run: python tools/stellar-export/stellar.py export windows-benchmark
-      - name: Build and check native audio without a graphics device
+      - name: Check native audio and surface artwork without a graphics device
         shell: pwsh
         run: |
           @'
@@ -118,10 +118,10 @@ jobs:
           stellar.run(['cmake', '--preset', 'windows-native-preview'], env=env)
           stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4',
                        '--target', 'stellar_native_audio_tests', 'stellar_native_audio_director_tests',
-                       'stellar_native_audio_settings_tests'],
+                       'stellar_native_audio_settings_tests', 'stellar_native_surface_art_tests'],
                       env=env, timeout=600)
           stellar.run(['ctest', '--preset', 'windows-native-preview', '-R',
-                       '^(native_audio|native_audio_director|native_audio_settings)$', '--output-on-failure'], env=env)
+                       '^(native_audio|native_audio_director|native_audio_settings|native_surface_art)$', '--output-on-failure'], env=env)
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report

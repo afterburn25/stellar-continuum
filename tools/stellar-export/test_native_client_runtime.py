@@ -16,6 +16,7 @@ from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
+from native_surface_art_assets import NATIVE_SURFACE_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -29,7 +30,7 @@ class NativeAssetCheckoutTests(unittest.TestCase):
             if isinstance(value, dict):
                 if "source" in value and "sha256" in value:
                     path = value["source"]
-                    if Path(path).suffix in (".md", ".txt"):
+                    if Path(path).suffix in (".md", ".txt", ".json"):
                         sources[path] = value["sha256"]
                 for child in value.values():
                     collect(child)
@@ -165,6 +166,15 @@ class NativeClientDependencyTests(unittest.TestCase):
                                   "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.audio_declaration = self.root / "export/native-audio-assets.json"
         self.audio_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": audio_records}))
+        surface_art_records = {}
+        for key, (source, destination) in NATIVE_SURFACE_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("fixture surface art " + key).encode())
+            surface_art_records[key] = {"source": source, "runtimePath": destination,
+                                        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.surface_art_declaration = self.root / "export/native-surface-art-assets.json"
+        self.surface_art_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": surface_art_records}))
 
 
 

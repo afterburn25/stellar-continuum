@@ -5,6 +5,7 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <optional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <variant>
@@ -56,6 +57,10 @@ struct SurfaceWorkspaceCommand {
 
 class NativeSurfaceWorkspace final {
 public:
+  // The app prepares this immutable image outside the workspace and supplies
+  // only the ready result, keeping the UI headless and dependency-free.
+  void set_terrain_image(
+      std::shared_ptr<const stellar::native_map::RgbaImage>) noexcept;
   void open(stellar::native_colony::NativeColonyView, int width, int height);
   void set_view(stellar::native_colony::NativeColonyView);
   void close() noexcept;
@@ -120,6 +125,7 @@ private:
       confirmation_;
   std::string notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
+  std::shared_ptr<const stellar::native_map::RgbaImage> terrain_image_;
 };
 
 } // namespace stellar::native_colony_ui

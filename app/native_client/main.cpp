@@ -1,6 +1,7 @@
 #include "map_camera.hpp"
 #include "native_audio_director.hpp"
 #include "native_campaign_feedback.hpp"
+#include "native_surface_art_assets.hpp"
 #include "native_audio_settings.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
@@ -460,11 +461,13 @@ class NativeCampaign final {
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         ship_art_(std::filesystem::absolute(asset_root)),
+        surface_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
     system_workspace_.use_background_preparation(image_preparation_);
+    surface_art_.use_background_preparation(image_preparation_);
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
@@ -1287,6 +1290,7 @@ class NativeCampaign final {
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     feedback_.advance(elapsed);
+    if(surface_workspace_.visible())surface_workspace_.set_terrain_image(surface_art_.request_image());
     pointer_=input.pointer;
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
@@ -1521,7 +1525,7 @@ class NativeCampaign final {
     return true;
   }
 
-  [[nodiscard]] bool artwork_ready()const noexcept{return system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready();}
+  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0:system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready();}
 
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
@@ -1737,6 +1741,7 @@ class NativeCampaign final {
       return;
     }
     surface_workspace_.open(*colony_workspace_.view(),width,height);
+    surface_workspace_.set_terrain_image(surface_art_.request_image());
     gesture_.capture_for_ui();
   }
 
@@ -2189,6 +2194,7 @@ class NativeCampaign final {
   std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>()};
   NativePlanetDiscAssets planet_discs_;
   NativeShipArtAssets ship_art_;
+  stellar::native_surface_ui::NativeSurfaceArtAssets surface_art_;
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;

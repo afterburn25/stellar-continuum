@@ -94,6 +94,7 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)

@@ -16,6 +16,7 @@ from native_startup_art_runtime import native_startup_art_asset_files
 from native_galaxy_art_runtime import native_galaxy_art_asset_files
 from native_ship_art_runtime import native_ship_art_asset_files
 from native_audio_assets import native_audio_asset_files
+from native_surface_art_assets import native_surface_art_asset_files
 
 
 def _verified_file(path: Path, expected_hash: str) -> Path:
@@ -54,6 +55,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_galaxy_art_asset_files(root))
     files.update(native_ship_art_asset_files(root))
     files.update(native_audio_asset_files(root))
+    files.update(native_surface_art_asset_files(root))
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)

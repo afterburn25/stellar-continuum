@@ -27,6 +27,7 @@ constexpr Color muted{151, 180, 207, 245};
 constexpr Color good{94, 229, 157, 255};
 constexpr Color warning{245, 177, 82, 255};
 constexpr float palette_pitch = 78.f;
+constexpr double terrain_art_tile_world_units = 512.;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -194,6 +195,11 @@ void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
   dragging_ = false;
   last_preview_position_.reset();
   fit(width, height);
+}
+
+void NativeSurfaceWorkspace::set_terrain_image(
+    std::shared_ptr<const RgbaImage> value) noexcept {
+  terrain_image_ = std::move(value);
 }
 
 void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
@@ -532,6 +538,50 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   }
 
   fill(out, layout.terrain, {3, 18, 20, 255});
+  if (terrain_image_) {
+    const auto& image = terrain_image_;
+    const auto upper_left = viewport_.screen_to_world(
+        {layout.terrain.x, layout.terrain.y}, layout.terrain);
+    const auto lower_right = viewport_.screen_to_world(
+        {layout.terrain.x + layout.terrain.width,
+         layout.terrain.y + layout.terrain.height}, layout.terrain);
+    const auto low_x = std::min(upper_left.first, lower_right.first);
+    const auto high_x = std::max(upper_left.first, lower_right.first);
+    const auto low_z = std::min(upper_left.second, lower_right.second);
+    const auto high_z = std::max(upper_left.second, lower_right.second);
+    auto tile_units = terrain_art_tile_world_units;
+    auto columns = static_cast<std::size_t>(
+        std::ceil((high_x - low_x) / tile_units)) + 2u;
+    auto rows = static_cast<std::size_t>(
+        std::ceil((high_z - low_z) / tile_units)) + 2u;
+    while (columns * rows > 64u) {
+      tile_units *= 2.;
+      columns = static_cast<std::size_t>(
+          std::ceil((high_x - low_x) / tile_units)) + 2u;
+      rows = static_cast<std::size_t>(
+          std::ceil((high_z - low_z) / tile_units)) + 2u;
+    }
+    const auto first_x = std::floor(low_x / tile_units) * tile_units;
+    const auto first_z = std::floor(low_z / tile_units) * tile_units;
+    for (std::size_t row_index = 0; row_index < rows; ++row_index)
+      for (std::size_t column_index = 0; column_index < columns; ++column_index) {
+        const auto x = first_x + static_cast<double>(column_index) * tile_units;
+        const auto z = first_z + static_cast<double>(row_index) * tile_units;
+        const auto top_left = viewport_.world_to_screen(x, z, layout.terrain);
+        const auto bottom_right = viewport_.world_to_screen(
+            x + tile_units, z + tile_units, layout.terrain);
+        const UiRect bounds{std::min(top_left.x, bottom_right.x),
+                            std::min(top_left.y, bottom_right.y),
+                            std::abs(bottom_right.x - top_left.x),
+                            std::abs(bottom_right.y - top_left.y)};
+        if (intersection(bounds, layout.terrain))
+          out.overlay.emplace_back(Image{image, bounds, std::nullopt,
+                                         {178, 184, 184, 255}, layout.terrain});
+      }
+  }
+  // The approved source has visible soil and grass hues. A translucent neutral
+  // overlay actually reduces that chroma; multiplying a tint alone would not.
+  if (terrain_image_) fill(out, layout.terrain, {92, 106, 108, 82});
   stroke(out, layout.terrain, border);
   const auto world_min = viewport_.world_to_screen(-surface_area_half_size,
                                                     -surface_area_half_size,

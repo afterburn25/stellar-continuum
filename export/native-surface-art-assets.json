@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "temperate-ground-albedo-v1": {
+      "source": "assets/visual/surface/temperate-ground-albedo-v1.png",
+      "runtimePath": "assets/visual/surface/temperate-ground-albedo-v1.png",
+      "sha256": "5f3870b4868e029ab1aa3c622c85eccd5e34d4baa57a34df5e523360340d38a2"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_SURFACE_ART_SOURCES.md",
+      "runtimePath": "Licenses/Surface-art-sources.md",
+      "sha256": "ac70f9714e6d879a7d653a81b601ca5a132628509486791a12f06c0f5b07abb3"
+    }
+  }
+}

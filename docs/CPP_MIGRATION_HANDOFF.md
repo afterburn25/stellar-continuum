@@ -488,6 +488,50 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   `graphicalParity=false` remain. The next bounded implementation is native
   surface terrain/art support without changing placement or costs.
 
+## Native surface ground checkpoint (2026-09-15, candidate)
+
+- Integrated the existing approved ground albedo into the native operational
+  surface view, without changing its canonical placement coordinates, costs,
+  construction, removal or saved state. This is generic top-down ground detail;
+  the inspected scene still uses placeholder hub/building markers. It does not
+  complete realistic colony graphics, roads, environment-specific terrain or 3D.
+- The app submits one image through the shared background preparation queue,
+  then injects an immutable image into the pure surface workspace. One cached
+  decode is capped at 16 MiB. Camera-aligned tiles use a 512-unit base span and
+  adaptive powers of two at extreme zoom-out, capped at 64 clipped images.
+- Review caught a cleanup defect that could resubmit a failed image job after
+  its future was cleared. The asset owner now caches and rethrows the original
+  exception; repeated requests cannot admit another job. Explicit queue
+  reinitialization is the recovery boundary. The new test enforces four identical
+  repeat failures with zero outstanding jobs or reserved memory.
+- Both surface CTests and all 105 related Python/export checks pass. The new
+  artwork test also covers source decode,
+  cache identity, owner-thread access, 720p/1080p/4K, pan, anchored zoom, extreme
+  zoom-out and tile coverage. The initial fixed-size test assumption was wrong
+  at adaptive detail levels; the final assertion verifies power-of-two world
+  span, alignment and projected size with float tolerance.
+- Three actual relocated Vulkan launches passed: fresh standard 500-system Earth,
+  mouse placement/cancel/refund at 720p, and paused reload at 1080p. The entire
+  paused Player17 payload matches except its timestamp, including the unfinished
+  site and exact treasury/progress. Both surface captures were inspected.
+  Frame means were 17.051/17.106 ms for the two surface runs; these short checks
+  do not establish sustained 60 FPS. The previously observed cold presentation
+  tail remains (~67 ms).
+- Export pins the unchanged image and its provenance note, with LF preserved for
+  the note on Windows checkout. The maintained exporter runs the new asset tests;
+  Windows CI also builds/runs `native_surface_art` without a GPU.
+- Evidence: `native-surface-art-build.log` (diagnosed first test failure),
+  `native-surface-art-final-build.log`, `native-surface-art-final-python.log`,
+  `native-surface-art-runtime.log`, `work/native-surface-art-evidence.json` and
+  `work/native-audio-validation/package-surface-*.bmp`. This folder is local
+  validation, not a sealed new release. Engine remains 0.1.58 candidate / game
+  0.1.7-alpha, with `graphicalParity=false`.
+- Next orbital work needs a canonical placement contract first: current
+  `ShipyardState` is empire-level and has no system/body ID; the native system
+  snapshot contains no structures. Completed empire-level orbital construction
+  capability is insufficient evidence to invent a station orbiting a body.
+  Coordinate this association with the Core owner before rendering stations.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
