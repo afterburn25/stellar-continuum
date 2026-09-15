@@ -31,6 +31,45 @@ constexpr float palette_pitch = 78.f;
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
 }
+// Overlay lines carry no clip; Liang–Barsky against the terrain rect.
+void clipped_line(DrawList &out, Point a, Point b, Color color,
+                  const UiRect &clip) {
+  const auto dx = b.x - a.x, dy = b.y - a.y;
+  float t0 = 0.f, t1 = 1.f;
+  const auto clip_edge = [&](float p, float q) {
+    if (p == 0.f) return q >= 0.f;
+    const auto r = q / p;
+    if (p < 0.f) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  if (!clip_edge(-dx, a.x - clip.x) ||
+      !clip_edge(dx, clip.x + clip.width - a.x) ||
+      !clip_edge(-dy, a.y - clip.y) ||
+      !clip_edge(dy, clip.y + clip.height - a.y))
+    return;
+  if (t0 >= t1) return;
+  out.overlay.emplace_back(Line{{a.x + t0 * dx, a.y + t0 * dy},
+                                {a.x + t1 * dx, a.y + t1 * dy}, color});
+}
+void clipped_ring(DrawList &out, Point center, float radius, Color color,
+                  const UiRect &clip) {
+  constexpr int segments = 48;
+  Point previous{center.x + radius, center.y};
+  for (int i = 1; i <= segments; ++i) {
+    const auto angle =
+        6.283185307179586f * static_cast<float>(i) / segments;
+    const Point next{center.x + std::cos(angle) * radius,
+                     center.y + std::sin(angle) * radius};
+    clipped_line(out, previous, next, color, clip);
+    previous = next;
+  }
+}
 void stroke(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(StrokedRectangle{bounds, color});
 }
@@ -298,8 +337,13 @@ std::optional<int> NativeSurfaceWorkspace::site_hit(
   for (auto it = view_->construction_sites.rbegin();
        it != view_->construction_sites.rend(); ++it) {
     const auto center = viewport_.world_to_screen(it->x, it->z, layout.terrain);
-    const auto radius = std::max(7.f, 12.f * layout.scale);
-    const UiRect bounds{center.x-radius,center.y-radius,2.f*radius,2.f*radius};
+    const auto footprint = std::max(
+        14.f, 34.f * static_cast<float>(viewport_.pixels_per_unit));
+    // The sprite rises above the anchor while the ground plot stays below it;
+    // cover both so clicks on either select the site.
+    const auto side = footprint * 1.55f;
+    const UiRect bounds{center.x - side * .5f, center.y - side * .8f, side,
+                        side * .8f + std::max(footprint * .5f, 14.f)};
     const auto visible=intersection(bounds,layout.terrain);
     if (visible&&visible->contains(point))
       return it->building_id;
@@ -531,7 +575,20 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                  muted, layout.small_font);
   }
 
-  fill(out, layout.terrain, {3, 18, 20, 255});
+  const auto terrain_tint = [&] {
+    using native_system::NativeSystemBodyVisualClass;
+    switch (view.surface_visual_class) {
+      case NativeSystemBodyVisualClass::rocky: return Color{38, 30, 24, 255};
+      case NativeSystemBodyVisualClass::oceanic: return Color{10, 32, 44, 255};
+      case NativeSystemBodyVisualClass::frozen: return Color{28, 44, 54, 255};
+      case NativeSystemBodyVisualClass::hot_rocky: return Color{48, 24, 18, 255};
+      case NativeSystemBodyVisualClass::moon: return Color{30, 30, 34, 255};
+      case NativeSystemBodyVisualClass::unknown_moon:
+        return Color{22, 30, 38, 255};
+      default: return Color{3, 18, 20, 255};
+    }
+  }();
+  fill(out, layout.terrain, terrain_tint);
   stroke(out, layout.terrain, border);
   const auto world_min = viewport_.world_to_screen(-surface_area_half_size,
                                                     -surface_area_half_size,
@@ -564,34 +621,65 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   const auto hub = viewport_.world_to_screen(0., 0., layout.terrain);
   const auto hub_radius = static_cast<float>(surface_hub_radius *
                                               viewport_.pixels_per_unit);
-  if (const auto visible = intersection(
-          {hub.x - hub_radius, hub.y - hub_radius, 2.f * hub_radius,
-           2.f * hub_radius}, layout.terrain)) {
-    fill(out, *visible, {38, 91, 104, 230});
-    stroke(out, *visible, {114, 208, 223, 255});
-  }
+  // Reference street layout: a civic ring road around the hub and a connector
+  // from each established site back to the plaza.
+  if (hub.x >= layout.terrain.x - hub_radius &&
+      hub.x <= layout.terrain.x + layout.terrain.width + hub_radius &&
+      hub.y >= layout.terrain.y - hub_radius &&
+      hub.y <= layout.terrain.y + layout.terrain.height + hub_radius)
+    clipped_ring(out, hub, hub_radius * 1.25f, {44, 68, 66, 190},
+                 layout.terrain);
   for (const auto &site : view.construction_sites) {
-    const auto center = viewport_.world_to_screen(site.x, site.z, layout.terrain);
-    const auto radius = std::max(7.f, 12.f * layout.scale);
-    const UiRect bounds{center.x - radius, center.y - radius, radius * 2.f,
-                        radius * 2.f};
-    if (const auto visible = intersection(bounds, layout.terrain)) {
-      fill(out, *visible, site.complete ? Color{38, 126, 91, 245}
-                                       : Color{154, 105, 37, 245});
-      stroke(out, *visible,
-             selected_building_id_ && *selected_building_id_ == site.building_id
-                 ? Color{245, 221, 114, 255}
-                 : border);
-      if (!site.complete) {
-        const UiRect bar{bounds.x, bounds.y + bounds.height - 4.f,
-                         bounds.width, 3.f};
-        if (const auto track = intersection(bar, layout.terrain))
-          fill(out, *track, {22, 31, 39, 255});
-        if (const auto progress = intersection(
-                {bar.x, bar.y, safe_progress(site.progress_fraction, bar.width),
-                 bar.height}, layout.terrain))
-          fill(out, *progress, good);
-      }
+    if (!site.complete) continue;
+    const auto end =
+        viewport_.world_to_screen(site.x, site.z, layout.terrain);
+    clipped_line(out, hub, end, {44, 68, 66, 170}, layout.terrain);
+  }
+  if (const auto hub_sprite =
+          scene_.hub_image(view.surface_hub_level, false, view.resource_outpost)) {
+    const auto side = std::max(10.f, hub_radius * 3.4f);
+    out.overlay.emplace_back(
+        Image{hub_sprite,
+              {hub.x - side * .5f, hub.y - side * .82f, side, side},
+              std::nullopt, {255, 255, 255, 255}, layout.terrain});
+  }
+  // Buildings draw south-to-north so taller sprites overlap correctly.
+  std::vector<const NativeSurfaceSite *> ordered;
+  ordered.reserve(view.construction_sites.size());
+  for (const auto &site : view.construction_sites) ordered.push_back(&site);
+  std::ranges::sort(ordered, {}, &NativeSurfaceSite::z);
+  for (const auto *site : ordered) {
+    const auto center =
+        viewport_.world_to_screen(site->x, site->z, layout.terrain);
+    const auto footprint = std::max(
+        14.f, 34.f * static_cast<float>(viewport_.pixels_per_unit));
+    const auto side = footprint * 1.55f;
+    const UiRect bounds{center.x - footprint * .5f,
+                        center.y - footprint * .5f, footprint, footprint};
+    if (!intersection(bounds, layout.terrain)) continue;
+    const auto phase = site->complete
+                           ? 3
+                           : native_surface::NativeSurfaceSceneRenderer::
+                                 phase_for_progress(site->progress_fraction);
+    if (const auto sprite = scene_.image(site->type_id, phase, site->powered,
+                                         site->prioritized))
+      out.overlay.emplace_back(
+          Image{sprite,
+                {center.x - side * .5f, center.y - side * .8f, side, side},
+                std::nullopt, {255, 255, 255, 255}, layout.terrain});
+    stroke(out, bounds,
+           selected_building_id_ && *selected_building_id_ == site->building_id
+               ? Color{245, 221, 114, 255}
+               : Color{82, 148, 195, 130});
+    if (!site->complete) {
+      const UiRect bar{bounds.x, bounds.y + bounds.height - 4.f,
+                       bounds.width, 3.f};
+      if (const auto track = intersection(bar, layout.terrain))
+        fill(out, *track, {22, 31, 39, 255});
+      if (const auto progress = intersection(
+              {bar.x, bar.y, safe_progress(site->progress_fraction, bar.width),
+               bar.height}, layout.terrain))
+        fill(out, *progress, good);
     }
   }
   if (selected_type_id_ && placement_quote_) {
@@ -603,6 +691,14 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
           placement_quote_->x, placement_quote_->z, layout.terrain);
       const auto radius = std::max(6.f, option->footprint_radius *
                                             static_cast<float>(viewport_.pixels_per_unit));
+      if (const auto ghost =
+              scene_.image(option->type_id, 2, true, false)) {
+        const auto side = radius * 2.f * 1.55f;
+        out.overlay.emplace_back(
+            Image{ghost,
+                  {center.x - side * .5f, center.y - side * .8f, side, side},
+                  std::nullopt, {255, 255, 255, 110}, layout.terrain});
+      }
       if (const auto visible = intersection(
               {center.x - radius, center.y - radius, 2.f * radius,
                2.f * radius}, layout.terrain)) {

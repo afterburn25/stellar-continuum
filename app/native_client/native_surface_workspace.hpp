@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_scene.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -84,6 +85,9 @@ public:
   [[nodiscard]] const SurfaceViewport& viewport() const noexcept {
     return viewport_;
   }
+  [[nodiscard]] std::size_t scene_cached_images() const noexcept {
+    return scene_.cached_images();
+  }
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -120,6 +124,7 @@ private:
       confirmation_;
   std::string notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
+  mutable stellar::native_surface::NativeSurfaceSceneRenderer scene_;
 };
 
 } // namespace stellar::native_colony_ui

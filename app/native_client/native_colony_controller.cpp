@@ -250,6 +250,7 @@ NativeColonyViewResult NativeColonyController::build(
   view.population_species_id = colony->population_species_id;
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   view.solid_surface = shown_body->details && shown_body->details->has_solid_surface;
+  view.surface_visual_class = shown_body->visual_class;
   view.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);
   view.treasury_budget_units = current.economy.credits;

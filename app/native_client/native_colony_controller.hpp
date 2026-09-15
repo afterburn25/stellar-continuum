@@ -42,6 +42,8 @@ struct NativeColonyView {
   int player_civilization_id{}, system_id{}, body_id{}, colony_id{};
   std::string colony_name, body_display_name, population_species_id;
   bool resource_outpost{}, solid_surface{};
+  native_system::NativeSystemBodyVisualClass surface_visual_class{
+      native_system::NativeSystemBodyVisualClass::unknown_planet};
   stellar::core::SovereignCurrencyDefinition currency;
   double treasury_budget_units{}, stored_industry{};
   std::string formatted_treasury;
