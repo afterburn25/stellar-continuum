@@ -10,4 +10,7 @@ docs/engine/NATIVE_SPECIES_ART_SOURCES.md text eol=crlf
 docs/engine/NATIVE_STARTUP_ART_SOURCES.md text eol=crlf
 docs/engine/NATIVE_SHIP_ART_SOURCES.md text eol=lf
 docs/engine/NATIVE_AUDIO_SOURCES.md text eol=crlf
+docs/engine/NATIVE_SCIENTIST_VOICE.md text eol=lf
+assets/audio/voice/scientist-cues.json text eol=lf
+assets/audio/voice/Kokoro-Apache-2.0.txt text eol=lf
 assets/visual/fonts/OFL-Rajdhani.txt text eol=crlf

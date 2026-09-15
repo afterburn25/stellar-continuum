@@ -12,6 +12,8 @@ import subprocess
 import tempfile
 
 from native_fleet_runtime import _source_row, _fleet, _diagnostic
+from native_audio_runtime import parse_native_audio_check
+from native_voice_runtime import parse_native_voice_check
 
 
 def _finite(value, label):
@@ -55,7 +57,8 @@ def _normalized(payload):
     return result
 
 
-def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixture: Path):
+def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixture: Path,
+                                         *, voice_check=False):
     source = _source_row(fixture)
     count = len(source.get("Galaxy", {}).get("Systems", []))
     if source.get("FormatVersion") != 17 or not count:
@@ -68,11 +71,15 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
         save = work / "local-travel.player17.json"
         save.write_text(json.dumps(source, ensure_ascii=False), encoding="utf-8")
 
-        def launch(mode, label, width=1280, height=720):
+        def launch(mode, label, width=1280, height=720, check_voice=False):
             capture = work / (label + ".bmp")
             args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                     "--save-path", str(save), "--load", "--width", str(width), "--height", str(height),
                     mode, str(capture)]
+            if check_voice:
+                # Voice smoke also proves the ordinary audio director diagnostic.
+                # Keep preparation free of either check: it establishes the route.
+                args[-2:-2] = ["--audio-check", "--voice-check"]
             result = subprocess.run(args, cwd=work, env=clean, capture_output=True, text=True, timeout=120)
             if result.returncode != 0:
                 raise RuntimeError(f"Native local travel {label} failed ({result.returncode}): {result.stderr}")
@@ -123,7 +130,9 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
             observer["SystemSurveys"].append({"SystemId": first_hop, "Level": 2, "Progress": .35})
         save.write_text(json.dumps(prepared, ensure_ascii=False), encoding="utf-8")
 
-        stdout, moved = launch("--system-travel-smoke", "moved")
+        stdout, moved = launch("--system-travel-smoke", "moved", check_voice=voice_check)
+        moved_audio = parse_native_audio_check(stdout, fresh=False) if voice_check else None
+        moved_voice = parse_native_voice_check(stdout) if voice_check else None
         state = _state(stdout)
         actual, _ = _fleet(moved, fleet_id)
         if (state["fleet_id"] != fleet_id or state["system_id"] != routed["CurrentSystemId"] or
@@ -138,7 +147,10 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
                               ("after_days", moved.get("SimulationDays"))):
             if not math.isclose(state[key], _finite(expected, key), rel_tol=1e-6, abs_tol=1e-6):
                 raise RuntimeError("Native local travel diagnostic differs from the saved canonical state")
-        reload_stdout, reloaded = launch("--system-travel-reload-smoke", "paused-reload", 1920, 1080)
+        reload_stdout, reloaded = launch("--system-travel-reload-smoke", "paused-reload", 1920, 1080,
+                                         check_voice=voice_check)
+        reload_audio = parse_native_audio_check(reload_stdout, fresh=False) if voice_check else None
+        reload_voice = parse_native_voice_check(reload_stdout) if voice_check else None
         restored = _state(reload_stdout, moving=False)
         for key in ("fleet_id", "system_id", "destination_id", "order_revision"):
             if restored[key] != state[key]:
@@ -148,6 +160,13 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
                 raise RuntimeError("Native paused local travel restored different coordinates or time")
         if _normalized(moved) != _normalized(reloaded):
             raise RuntimeError("Native local travel paused reload changed the campaign")
-    return {"nativeSystemTravelInput": True, "nativeSystemLocalTransit": True,
+    result = {"nativeSystemTravelInput": True, "nativeSystemLocalTransit": True,
             "nativeSystemTravelPausedReload": True, "systemTravelCaptures": captures,
             "systemTravelDiagnostics": diagnostics}
+    if voice_check:
+        result["nativeScientistVoice"] = True
+        result["nativeScientistVoiceDiagnostics"] = {
+            "moved": {"audio": moved_audio, "voice": moved_voice},
+            "pausedReload": {"audio": reload_audio, "voice": reload_voice},
+        }
+    return result

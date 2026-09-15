@@ -447,6 +447,47 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   0.1.7-alpha, and `graphicalParity=false`. Keep work on the Codex branch; do not
   merge shared branches or duplicate the audited Devin changes.
 
+## Native scientist and owned action feedback checkpoint (2026-09-15)
+
+- The prior settings commit `de65ce7b` passed Windows CI run `34972936916`,
+  including export and all three dummy audio/settings tests. Devin `8a3b71c9`
+  adds sealed-validator documentation only; no new source overlap to import.
+- Added three fixed, dry British human scientist cues from the existing `bf_emma`
+  profile. Installed, hash-verified Kokoro generated the WAV files locally;
+  the exported native player needs no Python, model, SAPI, Godot or .NET.
+  Native dynamic TTS is still absent; the previously described upstream
+  optional TTS path belongs to the C#/Godot reference.
+- Dedicated finite speech playback: 8 MiB per decoded clip / 16 MiB total,
+  288000-byte input queue, one speaking line, three coalesced pending cues,
+  eight-second cooldown, Master x Effects volume and temporary 55% music duck.
+  All 14 audio/credits files are pinned in both build and export paths.
+- Fixed queue accounting discovered by the new tests: SDL available output
+  includes sound convertible from queued input, so adding the two double-counts
+  buffered sound. They are now reported separately; both must drain before
+  finite speech/effects retire. No error suppression or retry loop was added.
+- Actual CampaignFrame results now feed observer-filtered notices and bounded
+  completion sounds. No raw event text/IDs escape into this presentation summary.
+  Failed research is a report; outpost completion says settlement established.
+  Six-second notices coalesce; load activation clears notices/pending speech.
+  Human casting does not silently replace alien advisors.
+- Validation: nine distinct native CTests passed (audio, director, settings,
+  feedback, system workspace/travel, startup, UI layout, campaign session).
+  128 focused Python/export-integrity checks passed. Real Vulkan runs exercised
+  route preparation plus 720p moving-system and 1080p paused-reload windows;
+  the latter two each played one scientist line after unknown-arrow input,
+  rejected four rapid repeat requests, kept the input queue bounded and stopped
+  cleanly. Connected-lane knowledge and full paused Player17 equality passed.
+  Captures were inspected; audible voice quality still needs listening acceptance.
+- Evidence: `native-scientist-build.log`, `native-scientist-final-build.log`,
+  `native-scientist-tests.log` (includes the diagnosed first failure),
+  `native-scientist-python.log`, `native-scientist-integration-python.log`,
+  `native-scientist-runtime.log`, `work/native-scientist-evidence.json` and
+  `work/native-audio-validation/package-local-travel-*.bmp`.
+- This is a local validated checkpoint on the Codex candidate, not a new sealed
+  downloadable release. Engine 0.1.58 candidate / game 0.1.7-alpha and
+  `graphicalParity=false` remain. The next bounded implementation is native
+  surface terrain/art support without changing placement or costs.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
@@ -458,8 +499,8 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   larger fleet/combat workloads, not repeated unchanged maps or speculative
   renderer settings. Keep Core access and GPU/window work on the owner thread.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
-- Native scientist/character voice and full event wiring; playback, main score,
-  navigation confirmation and persisted audio settings are now integrated.
+- Full character/species casting and dynamic speech remain. Fixed human
+  scientist cues, owned action feedback, main score and persisted settings work.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
 

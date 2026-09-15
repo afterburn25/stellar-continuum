@@ -857,6 +857,7 @@ if(BUILD_TESTING)
   set_tests_properties(foundation legacy_distance_parity headless_smoke campaign_simulation_smoke headless_rejects_bad_arguments PROPERTIES TIMEOUT 30)
 endif()
 
+include(cmake/NativeCampaignFeedback.cmake)
 option(STELLAR_BUILD_NATIVE_CLIENT "Build the SDL3/Vulkan native galaxy preview" OFF)
 if(STELLAR_BUILD_NATIVE_CLIENT)
   include(cmake/StellarNativeClient.cmake)

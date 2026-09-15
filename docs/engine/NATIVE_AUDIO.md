@@ -9,12 +9,13 @@ Runtime codec/device failures disable audio with one terminal diagnostic.
 
 The decoder requests normalized 48 kHz stereo float PCM from MF. Source files
 must be non-empty and at most 16 MiB. Each decoded clip is limited to 96 MiB.
-The director accepts the seven approved clips only when their combined decoded
+The director accepts the seven required music/SFX clips only when their combined decoded
 size is at most 104 MiB: the supplied `claimed-by-the-void-loop.mp3` score and
 six SFX (`ui-hover`, `ui-confirm`, `discovery-reveal`,
 `construction-complete`, `ship-launch`, and `strategic-alert`). The complete
-runtime asset whitelist and source provenance remain in
-`NATIVE_AUDIO_SOURCES.md`; this document does not alter that credited payload.
+music/SFX provenance remains in `NATIVE_AUDIO_SOURCES.md`. The three added
+scientist clips have a separate 16 MiB budget and credits as documented below;
+`export/native-audio-assets.json` pins the complete runtime whitelist.
 
 Playback is owner-thread-only. A single background job decodes the clips while
 the UI owner thread continues startup, then the owner thread collects the
@@ -65,8 +66,9 @@ CI explicitly builds and runs both audio test targets with SDL's dummy output,
 independent of the headless export build. Twelve exporter integrity tests pass;
 17 unrelated headless runtime tests were skipped without their opt-in binary.
 
-Remaining work includes the UK-female scientist voice path, complete event
-wiring, and playback-device loss/recovery.
+Remaining work includes full character/species casting, dynamic speech and
+playback-device loss/recovery. The native fixed human scientist channel is
+documented below; the older optional TTS worker belongs to C#/Godot.
 
 ## Volume settings
 
@@ -96,3 +98,36 @@ focused CTests and 97 Python tests pass; the actual Vulkan startup/reload pair
 passed again after the final text contrast correction. Windows CI runs the
 settings CTest alongside the two audio tests with dummy output; it does not
 claim hardware playback or speaker verification.
+
+## Fixed scientist speech and campaign feedback
+
+Three packaged dry PCM lines use `bf_emma` (en-GB) from the existing human
+scientist profile: reconnaissance guidance, a research report and a completed
+survey. Native playback requires no Python/model/.NET runtime. The source and
+exact synthesis/output hashes are recorded in `NATIVE_SCIENTIST_VOICE.md` and
+`assets/audio/voice/scientist-cues.json`; export verifies all 14 audio/notice files.
+
+A dedicated finite voice stream shares the SDL device. Clips are limited to
+8 MiB decoded each (16 MiB total), streaming stays bounded to 288000 bytes,
+speech uses Master x Effects, and music ducks to 55% until the line drains or
+is stopped. One line plays at a time; at most three unique cues wait, and an
+8-second per-cue cooldown coalesces repeated requests. Missing voice data emits
+one diagnostic while leaving required music/SFX operational. Alien players
+retain visual guidance; their voices are not replaced by the human scientist.
+
+The actual `CampaignFrameResult` feeds an observer-filtered, category-only
+presentation summary. Owned research reports, construction, ship launches,
+surveys, contacts, settlements and involved combat produce at most seven
+coalesced notices; the newest three appear in the map's upper center and expire
+after six real seconds. At most one prioritized event sound plays per two
+seconds. Research failures are described as reports; outpost completion is a
+settlement. No foreign names, messages, system IDs or hidden state enter the
+notice summary. Campaign activation resets notices and pending speech.
+
+For actual window/arrow validation, call `validate_native_system_travel_export`
+with `voice_check=True`. This enables `--audio-check --voice-check` only on the
+moving and paused-reload runs. Tests click an actual connected unknown arrow,
+repeat that input during speech, prove that only one voice starts, bound its
+queue, stop it before teardown and compare the complete paused Player17 state.
+The strict exporter rejects missing/duplicate/malformed evidence. Ordinary
+export runs stay silent; the opted-in run opens a visible Vulkan window.

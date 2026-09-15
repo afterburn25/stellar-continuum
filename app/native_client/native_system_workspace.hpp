@@ -29,6 +29,7 @@ enum class SystemWorkspaceCommandKind {
   close,
   select_fleet,
   open_destination,
+  reconnaissance_required,
   open_colony,
   settlement_target
 };

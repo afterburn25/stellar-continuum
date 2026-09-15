@@ -1,5 +1,6 @@
 #include "map_camera.hpp"
 #include "native_audio_director.hpp"
+#include "native_campaign_feedback.hpp"
 #include "native_audio_settings.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
@@ -223,7 +224,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
-  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{};
+  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},voice_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -243,6 +244,7 @@ struct Options {
     else if(arg==L"--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg==L"--windowed") result.windowed=true;
     else if(arg==L"--audio-check") result.audio_check=true;
+    else if(arg==L"--voice-check") result.voice_check=true;
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg==L"--load") result.load=true;
@@ -275,6 +277,7 @@ struct Options {
     else if(arg=="--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg=="--windowed") result.windowed=true;
     else if(arg=="--audio-check") result.audio_check=true;
+    else if(arg=="--voice-check") result.voice_check=true;
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg=="--load") result.load=true;
@@ -305,7 +308,8 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--audio-check requires an isolated --new-game-smoke or --smoke invocation.");
+  if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
+  if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
@@ -449,7 +453,8 @@ class NativeCampaign final {
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,int width,int height,
                  const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer,
                  std::function<void()> audio_confirm={},
-                 stellar::native_audio::NativeAudioSettings* audio_settings=nullptr)
+                 stellar::native_audio::NativeAudioSettings* audio_settings=nullptr,
+                 stellar::native_audio::NativeAudioDirector* presentation_audio=nullptr)
       : session_(std::move(session)),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
@@ -466,9 +471,32 @@ class NativeCampaign final {
     refresh_fleets(true);
     audio_confirm_=std::move(audio_confirm);
     audio_settings_=audio_settings;
+    presentation_audio_=presentation_audio;
   }
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  void repeat_unknown_lane_voice_input(int width,int height){
+    if(!smoke_system_travel_unknown_denied_||!system_workspace_.travel_snapshot())
+      throw std::runtime_error("Scientist check requires an observer-denied connected lane.");
+    const auto& travel=*system_workspace_.travel_snapshot();
+    for(const auto& geometry:system_workspace_.lane_geometry()){
+      const auto lane=std::ranges::find(travel.lanes,geometry.destination_system_id,&NativeLocalLaneMarker::destination_system_id);
+      if(lane==travel.lanes.end()||lane->known_label)continue;
+      const auto before=system_workspace_.system_id();
+      const auto day=session_->frame().clock().simulation_days();
+      const auto speed=session_->frame().clock().speed();
+      for(int repeat=0;repeat<4;++repeat){
+        InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=geometry.center;
+        input.events={{InputEventType::LeftPressed,geometry.center},{InputEventType::LeftReleased,geometry.center}};
+        if(!update(input,width,height,0.,false))throw std::runtime_error("Scientist input unexpectedly exited campaign.");
+      }
+      if(system_workspace_.system_id()!=before||session_->frame().clock().simulation_days()!=day||
+         session_->frame().clock().speed()!=speed||system_workspace_.notice().find("Telemetry unavailable")==std::string::npos)
+        throw std::runtime_error("Repeated scientist guidance changed the paused observer state.");
+      return;
+    }
+    throw std::runtime_error("Scientist check could not find a connected unknown lane.");
+  }
   [[nodiscard]] bool paused_menu_visible()const{return menu_&&session_->frame().clock().speed()==StrategicSpeed::Paused;}
   void prepare_galaxy_art_smoke(int width,int height,bool reload){
     smoke_galaxy_mode_=true;smoke_galaxy_reload_=reload;
@@ -1258,9 +1286,13 @@ class NativeCampaign final {
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
+    feedback_.advance(elapsed);
     pointer_=input.pointer;
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
+      feedback_.reset();
+      last_event_sound_={};
+      if(presentation_audio_)presentation_audio_->stop_voice();
       selected_id_.reset();
       pre_menu_speed_=StrategicSpeed::Normal;
       fit_camera(width,height);
@@ -1335,6 +1367,7 @@ class NativeCampaign final {
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::select_fleet){const auto selected=fleet_controller_.select_next_hit(session_->frame(),session_->cache().generation,command.hit_fleet_ids);system_workspace_.set_notice(selected.message);refresh_fleets(true);refresh_system_travel(true);}
           else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice("Destination details are not available to this observer.");}
+          else if(command.kind==SystemWorkspaceCommandKind::reconnaissance_required){scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);}
            else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
            else if(command.kind==SystemWorkspaceCommandKind::settlement_target){preview_settlement(command.target_id,width,height);}
           refresh_colony_entry(false);
@@ -1466,6 +1499,7 @@ class NativeCampaign final {
     if(research_workspace_.take_refresh_request())refresh_research(true);
     if(advance_simulation){
       const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp);
+      publish_feedback(frame_result);
       research_refresh_elapsed_+=elapsed;
       refresh_research(false);
       fleet_refresh_elapsed_+=elapsed;
@@ -1617,10 +1651,40 @@ class NativeCampaign final {
     if(!surface_workspace_.visible())colony_workspace_.render(out, width, height);
     surface_workspace_.render(out,width,height);
     settlement_workspace_.render(out,width,height);
+    if(!menu_&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
+       !construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&
+       !colony_workspace_.visible()&&!surface_workspace_.visible()&&!settlement_workspace_.visible())
+      feedback_.render(out,width,height);
     if(audio_settings_)audio_settings_->render(out,width,height);
     return out;
   }
  private:
+  void scientist_voice(stellar::native_audio::VoiceCue cue){
+    // Human casting must not silently replace another species' advisor.
+    if(presentation_audio_&&player_species_id()=="terran_baseline")presentation_audio_->speak(cue);
+  }
+  void publish_feedback(const CampaignFrameResult& frame){
+    using namespace stellar::native_campaign_feedback;
+    using stellar::native_audio::Cue;
+    using stellar::native_audio::VoiceCue;
+    const auto observer=session_->frame().runtime().world().campaign().player_civilization_id;
+    const auto summary=collect_campaign_feedback(frame,observer);
+    if(summary.empty())return;
+    feedback_.publish(summary);
+    if(summary.count(FeedbackKind::ResearchReport))scientist_voice(VoiceCue::ResearchReport);
+    if(summary.count(FeedbackKind::SurveyComplete))scientist_voice(VoiceCue::SurveyComplete);
+    // Coalesce accelerated simulation bursts into a single highest-priority cue.
+    // Notices retain all categories/counts; no event history is re-read on load.
+    if(!presentation_audio_)return;
+    const auto now=std::chrono::steady_clock::now();
+    if(now-last_event_sound_<std::chrono::seconds(2))return;
+    Cue cue=Cue::Discovery;
+    if(summary.count(FeedbackKind::CombatAlert))cue=Cue::Alert;
+    else if(summary.count(FeedbackKind::ShipComplete))cue=Cue::Ship;
+    else if(summary.count(FeedbackKind::ConstructionComplete)||summary.count(FeedbackKind::ColonyFounded))cue=Cue::Construction;
+    presentation_audio_->play_event(cue);
+    last_event_sound_=now;
+  }
   [[nodiscard]] bool enter_system(int system_id,int width,int height){
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
@@ -2175,6 +2239,9 @@ class NativeCampaign final {
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
   std::function<void()> audio_confirm_;
+  stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
+  stellar::native_audio::NativeAudioDirector* presentation_audio_{};
+  std::chrono::steady_clock::time_point last_event_sound_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
@@ -2236,7 +2303,7 @@ int main(int argc,char **argv){
     }
     audio_menu_ready=true;audio.menu_ready();
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings);
+                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio);
     if(options.smoke_screenshot){
       if(options.research_smoke)
         campaign.prepare_research_smoke(window.drawable_width(),
@@ -2255,9 +2322,10 @@ int main(int argc,char **argv){
                                       window.drawable_height());
       else if(options.campaign_profile)
         campaign.prepare_campaign_profile(window.drawable_width(),window.drawable_height());
-      else if(options.system_travel_smoke||options.system_travel_reload_smoke)
-        campaign.prepare_system_travel_smoke(window.drawable_width(),
+      else if(options.system_travel_smoke||options.system_travel_reload_smoke){
+        if(!options.voice_check)campaign.prepare_system_travel_smoke(window.drawable_width(),
                                              window.drawable_height(),options.system_travel_reload_smoke);
+      }
       else if(options.colony_smoke||options.colony_reload_smoke)
         campaign.prepare_colony_smoke(window.drawable_width(),
                                        window.drawable_height(),options.colony_reload_smoke);
@@ -2297,6 +2365,9 @@ int main(int argc,char **argv){
     std::unique_ptr<SmokeColdProfile> cold_profile;
     if(options.profile_frames)cold_profile=std::make_unique<SmokeColdProfile>();
     FrameTiming draw_timing;
+    bool voice_prepared{},voice_repeated{},voice_queue_bounded=true;
+    std::uint64_t voice_first_count{};
+    const auto voice_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
     const int campaign_active_first=120;
     const int campaign_active_last=119+options.profile_frames.value_or(0);
     bool campaign_started{},campaign_pause_requested{},campaign_final_requested{},campaign_mid_requested{},campaign_mid_saved{},campaign_advanced_after_mid{};int campaign_wait_frames{};
@@ -2308,6 +2379,23 @@ int main(int argc,char **argv){
       auto input=window.poll();
       audio.service();
       audio_settings.set_device_status(audio.failure_message());
+      if(options.voice_check){
+        const auto state=audio.stats();
+        if(state.failed||std::chrono::steady_clock::now()>voice_deadline)
+          throw std::runtime_error("Scientist playback check failed or timed out: "+audio.failure_message());
+        if(input.renderable()&&state.assets_loaded&&!voice_prepared){
+          if(!state.voice_available)throw std::runtime_error("Packaged British scientist cues did not load.");
+          campaign.prepare_system_travel_smoke(input.drawable_width,input.drawable_height,options.system_travel_reload_smoke);
+          voice_prepared=true;capture_frame=frames+120;
+        }
+        if(state.voice_active&&!voice_repeated){
+          voice_first_count=state.voice_play_count;
+          campaign.repeat_unknown_lane_voice_input(input.drawable_width,input.drawable_height);
+          voice_repeated=true;
+        }
+        voice_queue_bounded=voice_queue_bounded&&state.queued_voice_bytes<=288000;
+        if(!voice_prepared||!voice_repeated)capture_frame=frames+120;
+      }
       if(!input.renderable()){
         discard_elapsed=true;
         if(!campaign.update(input,input.drawable_width,input.drawable_height,0.,false))break;
@@ -2325,7 +2413,7 @@ int main(int argc,char **argv){
       discard_elapsed=false;
       const auto update_begin=std::chrono::steady_clock::now();
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
-                          elapsed))break;
+                          elapsed,!options.voice_check||voice_prepared))break;
       const auto update_end=std::chrono::steady_clock::now();
       if(options.campaign_profile&&campaign.campaign_profile_notice()==SessionNoticeKind::Failure)throw std::runtime_error("Campaign profile encountered a session/save failure.");
       if(options.campaign_profile&&campaign_started&&frames==119&&campaign.campaign_profile_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile resume UI input did not select 8X.");
@@ -2335,7 +2423,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&((!options.voice_check&&frames==60)||(options.voice_check&&voice_prepared&&frames==capture_frame-60)))
           campaign.request_smoke_save();
       }
       if(options.campaign_profile&&frames>=campaign_active_first&&frames<=campaign_active_last){
@@ -2428,6 +2516,11 @@ int main(int argc,char **argv){
             throw std::runtime_error("Native audio startup/playback proof failed: "+audio.failure_message());
           audio.stop();const auto stopped=audio.stats();
           if(!stopped.stopped||stopped.music_started||stopped.queued_music_bytes!=0)throw std::runtime_error("Native audio did not stop before window teardown.");
+          if(options.voice_check){
+            if(!voice_repeated||!voice_queue_bounded||voice_first_count!=1||state.voice_play_count!=voice_first_count||stopped.voice_active||stopped.queued_voice_bytes!=0)
+              throw std::runtime_error("Scientist guidance did not coalesce, bound its queue, or stop cleanly.");
+            std::cout<<"voice_check={\"available\":true,\"played\":"<<state.voice_play_count<<",\"unknown_denied\":true,\"overlap_prevented\":true,\"queue_bounded\":true,\"stopped\":true}\n";
+          }
           std::cout<<"audio_check={\"assets_loaded\":true,\"music_starts\":"<<state.music_start_count<<",\"confirm_count\":"<<state.confirm_count<<",\"queued_music_bytes\":"<<state.queued_music_bytes<<",\"boot_services\":"<<audio_boot_services<<",\"stopped\":true}\n";
         }
         if(options.campaign_profile&&(!campaign_started||!campaign_mid_requested||!campaign_mid_saved||!campaign_advanced_after_mid||!campaign_final_requested||campaign.campaign_profile_notice()!=SessionNoticeKind::Saved||campaign.campaign_profile_speed()!=StrategicSpeed::Paused))throw std::runtime_error("Campaign profile did not complete active simulation, saves, and final UI pause.");

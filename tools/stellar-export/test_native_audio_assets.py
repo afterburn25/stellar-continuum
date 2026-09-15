@@ -15,7 +15,7 @@ class NativeAudioAssetTests(unittest.TestCase):
     def test_repository_declaration_whitelists_exact_reviewed_files(self):
         files = native_audio_asset_files(ROOT)
         self.assertEqual(set(files), {destination for _, destination in NATIVE_AUDIO_SOURCES.values()})
-        self.assertEqual(len(files), 8)
+        self.assertEqual(len(files), 14)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="stellar-native-audio-")

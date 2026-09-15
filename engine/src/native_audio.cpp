@@ -28,7 +28,9 @@ namespace stellar::engine::audio {
 namespace {
 constexpr std::size_t bytes_per_frame = sizeof(float) * audio_channels;
 constexpr std::size_t music_queue_limit = static_cast<std::size_t>(audio_sample_rate) * bytes_per_frame * 3u / 4u;
+constexpr std::size_t voice_queue_limit = music_queue_limit;
 constexpr std::size_t music_chunk_bytes = 32u * 1024u;
+constexpr float voice_music_duck = 0.55f;
 constexpr std::size_t maximum_effect_voices = 8;
 
 [[nodiscard]] std::string utf8_path(const std::filesystem::path& path) {
@@ -214,17 +216,22 @@ struct AudioOutput::Storage {
   struct Voice { SDL_AudioStream* stream{}; std::shared_ptr<const AudioClip> clip; std::uint64_t age{}; };
   SDL_AudioDeviceID device{};
   SDL_AudioStream* music_stream{};
+  SDL_AudioStream* voice_stream{};
   std::array<Voice, maximum_effect_voices> effects{};
   std::shared_ptr<const AudioClip> music_clip;
+  std::shared_ptr<const AudioClip> voice_clip;
   std::size_t music_offset{};
+  std::size_t voice_offset{};
   std::uint64_t next_age{};
   std::uint64_t effect_play_count{};
+  std::uint64_t voice_play_count{};
   std::array<std::byte, music_chunk_bytes> music_scratch{};
   float master{0.78f};
   float music{0.64f};
   float effects_gain{0.82f};
   bool audio_initialized{};
   bool music_started{};
+  bool voice_flushed{};
 };
 
 void AudioOutput::require_owner() const {
@@ -239,6 +246,7 @@ AudioOutput::AudioOutput() : owner_(std::this_thread::get_id()), storage_(std::m
     storage_->device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
     if (!storage_->device) throw sdl_error("SDL default playback device open failed");
     storage_->music_stream = make_stream(storage_->device);
+    storage_->voice_stream = make_stream(storage_->device);
     for (auto& voice : storage_->effects) voice.stream = make_stream(storage_->device);
     set_volumes(storage_->master, storage_->music, storage_->effects_gain);
   } catch (...) {
@@ -255,6 +263,8 @@ void AudioOutput::cleanup_unchecked() noexcept {
     voice.clip.reset();
     if (voice.stream) { SDL_ClearAudioStream(voice.stream); SDL_DestroyAudioStream(voice.stream); voice.stream = nullptr; }
   }
+  storage_->voice_clip.reset();
+  if (storage_->voice_stream) { SDL_ClearAudioStream(storage_->voice_stream); SDL_DestroyAudioStream(storage_->voice_stream); storage_->voice_stream = nullptr; }
   storage_->music_clip.reset();
   if (storage_->music_stream) { SDL_ClearAudioStream(storage_->music_stream); SDL_DestroyAudioStream(storage_->music_stream); storage_->music_stream = nullptr; }
   if (storage_->device) { SDL_CloseAudioDevice(storage_->device); storage_->device = 0; }
@@ -266,8 +276,19 @@ void AudioOutput::set_volumes(float master, float music, float effects) {
   const auto valid = [](float value) { return std::isfinite(value) && value >= 0.0f && value <= 1.0f; };
   if (!valid(master) || !valid(music) || !valid(effects)) throw std::invalid_argument("Audio gains must be finite values in [0, 1].");
   storage_->master = master; storage_->music = music; storage_->effects_gain = effects;
-  require_sdl(SDL_SetAudioStreamGain(storage_->music_stream, master * music), "SDL music gain setup failed");
-  for (const auto& voice : storage_->effects) require_sdl(SDL_SetAudioStreamGain(voice.stream, master * effects), "SDL effect gain setup failed");
+  apply_gains();
+}
+
+void AudioOutput::apply_gains() {
+  const auto music_duck = storage_->voice_clip ? voice_music_duck : 1.0f;
+  require_sdl(SDL_SetAudioStreamGain(storage_->music_stream, storage_->master * storage_->music * music_duck),
+              "SDL music gain setup failed");
+  require_sdl(SDL_SetAudioStreamGain(storage_->voice_stream, storage_->master * storage_->effects_gain),
+              "SDL voice gain setup failed");
+  for (const auto& voice : storage_->effects) {
+    require_sdl(SDL_SetAudioStreamGain(voice.stream, storage_->master * storage_->effects_gain),
+                "SDL effect gain setup failed");
+  }
 }
 
 void AudioOutput::play_music(std::shared_ptr<const AudioClip> clip) {
@@ -303,12 +324,69 @@ void AudioOutput::play_effect(std::shared_ptr<const AudioClip> clip) {
   selected->clip = std::move(clip); selected->age = ++storage_->next_age; ++storage_->effect_play_count;
 }
 
+void AudioOutput::play_voice(std::shared_ptr<const AudioClip> clip) {
+  require_owner();
+  if (!clip) throw std::invalid_argument("Voice playback requires an audio clip.");
+  if (clip->byte_size() > maximum_voice_audio_bytes) {
+    throw std::length_error("Voice clip exceeds the 8 MiB decoded PCM limit.");
+  }
+  require_sdl(SDL_ClearAudioStream(storage_->voice_stream), "SDL voice queue clear failed");
+  storage_->voice_clip = std::move(clip);
+  storage_->voice_offset = 0;
+  storage_->voice_flushed = false;
+  ++storage_->voice_play_count;
+  apply_gains();
+  service();
+}
+
+void AudioOutput::stop_voice() {
+  require_owner();
+  require_sdl(SDL_ClearAudioStream(storage_->voice_stream), "SDL voice queue clear failed");
+  storage_->voice_clip.reset();
+  storage_->voice_offset = 0;
+  storage_->voice_flushed = false;
+  apply_gains();
+}
+
 void AudioOutput::service() {
   require_owner();
   for (auto& voice : storage_->effects) {
     const auto queued = SDL_GetAudioStreamQueued(voice.stream);
-    if (queued < 0) throw sdl_error("SDL effect queue inspection failed");
-    if (queued == 0) voice.clip.reset();
+    const auto available = SDL_GetAudioStreamAvailable(voice.stream);
+    if (queued < 0 || available < 0) throw sdl_error("SDL effect queue inspection failed");
+    if (queued == 0 && available == 0) voice.clip.reset();
+  }
+  if (storage_->voice_clip) {
+    auto queued = SDL_GetAudioStreamQueued(storage_->voice_stream);
+    auto available = SDL_GetAudioStreamAvailable(storage_->voice_stream);
+    if (queued < 0 || available < 0) throw sdl_error("SDL voice queue inspection failed");
+    const auto clip_bytes = storage_->voice_clip->byte_size();
+    const auto* clip_data = reinterpret_cast<const std::byte*>(storage_->voice_clip->samples().data());
+    while (!storage_->voice_flushed && static_cast<std::size_t>(queued) < voice_queue_limit) {
+      const auto remaining = clip_bytes - storage_->voice_offset;
+      const auto amount = std::min({voice_queue_limit - static_cast<std::size_t>(queued),
+                                    music_chunk_bytes, remaining});
+      if (amount == 0 || amount % bytes_per_frame != 0) {
+        throw std::logic_error("Audio voice clip has invalid frame alignment.");
+      }
+      require_sdl(SDL_PutAudioStreamData(storage_->voice_stream, clip_data + storage_->voice_offset,
+                                         static_cast<int>(amount)), "SDL voice queue failed");
+      storage_->voice_offset += amount;
+      queued += static_cast<int>(amount);
+      if (storage_->voice_offset == clip_bytes) {
+        require_sdl(SDL_FlushAudioStream(storage_->voice_stream), "SDL voice queue flush failed");
+        storage_->voice_flushed = true;
+      }
+    }
+    queued = SDL_GetAudioStreamQueued(storage_->voice_stream);
+    available = SDL_GetAudioStreamAvailable(storage_->voice_stream);
+    if (queued < 0 || available < 0) throw sdl_error("SDL voice queue inspection failed");
+    if (storage_->voice_flushed && queued == 0 && available == 0) {
+      storage_->voice_clip.reset();
+      storage_->voice_offset = 0;
+      storage_->voice_flushed = false;
+      apply_gains();
+    }
   }
   if (!storage_->music_started || !storage_->music_clip) return;
   auto queued = SDL_GetAudioStreamQueued(storage_->music_stream);
@@ -337,6 +415,7 @@ void AudioOutput::service() {
 void AudioOutput::stop_all() {
   require_owner();
   stop_music();
+  stop_voice();
   for (auto& voice : storage_->effects) {
     require_sdl(SDL_ClearAudioStream(voice.stream), "SDL effect queue clear failed");
     voice.clip.reset(); voice.age = 0;
@@ -349,7 +428,14 @@ AudioDiagnostics AudioOutput::diagnostics() const {
   if (queued < 0) throw sdl_error("SDL music queue inspection failed");
   std::size_t active{};
   for (const auto& voice : storage_->effects) if (voice.clip) ++active;
-  return {static_cast<std::size_t>(queued), music_queue_limit, active, storage_->effect_play_count, storage_->music_started};
+  const auto queued_voice = SDL_GetAudioStreamQueued(storage_->voice_stream);
+  const auto available_voice = SDL_GetAudioStreamAvailable(storage_->voice_stream);
+  if (queued_voice < 0 || available_voice < 0) throw sdl_error("SDL voice queue inspection failed");
+  return {static_cast<std::size_t>(queued), music_queue_limit, active, storage_->effect_play_count,
+          storage_->music_started, storage_->voice_clip != nullptr,
+          static_cast<std::size_t>(queued_voice), static_cast<std::size_t>(available_voice),
+          voice_queue_limit, storage_->voice_play_count, SDL_GetAudioStreamGain(storage_->music_stream),
+          SDL_GetAudioStreamGain(storage_->voice_stream)};
 }
 
 } // namespace stellar::engine::audio

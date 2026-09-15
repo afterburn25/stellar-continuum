@@ -126,7 +126,9 @@ int main(int argc, char** argv) {
     const auto short_loop = AudioClip::create({0.f, 0.f, 0.25f, -0.25f});
     AudioOutput output;
     const auto idle = output.diagnostics();
-    check(!idle.music_started && idle.queued_music_bytes == 0, "audio output started music before play_music");
+    check(!idle.music_started && idle.queued_music_bytes == 0 && !idle.voice_active &&
+              idle.queued_voice_bytes == 0 && idle.voice_play_count == 0,
+          "audio output started music or voice before playback was requested");
     output.play_music(short_loop);
     const auto started = output.diagnostics();
     check(started.music_started && started.queued_music_bytes > 0 &&
@@ -149,9 +151,72 @@ int main(int argc, char** argv) {
           "music loop did not refill after drain within its queue cap");
 
     output.set_volumes(1.f, 0.5f, 0.25f);
+    auto gains = output.diagnostics();
+    check(std::abs(gains.applied_music_gain - 0.5f) < 0.0001f &&
+              std::abs(gains.applied_voice_gain - 0.25f) < 0.0001f,
+          "saved music/effects gains were not applied to the music and voice streams");
     check(rejects([&] { output.set_volumes(-0.1f, 0.5f, 0.5f); }), "negative gain was accepted");
     check(rejects([&] { output.set_volumes(std::numeric_limits<float>::infinity(), 0.5f, 0.5f); }),
           "non-finite gain was accepted");
+
+    std::vector<float> maximum_voice_samples(maximum_voice_audio_bytes / sizeof(float), 0.125f);
+    const auto maximum_voice = AudioClip::create(std::move(maximum_voice_samples));
+    output.play_voice(maximum_voice);
+    auto speaking = output.diagnostics();
+    const auto maximum_voice_started = speaking.voice_active && speaking.voice_play_count == 1 &&
+        speaking.queued_voice_bytes > 0 && speaking.queued_voice_bytes <= speaking.voice_queue_limit_bytes &&
+        speaking.voice_queue_limit_bytes == started.music_queue_limit_bytes;
+    if (!maximum_voice_started) {
+      std::cerr << "voice queue observed queued=" << speaking.queued_voice_bytes
+                << " available=" << speaking.available_voice_bytes
+                << " limit=" << speaking.voice_queue_limit_bytes
+                << " active=" << speaking.voice_active << " plays=" << speaking.voice_play_count << '\n';
+    }
+    check(maximum_voice_started, "maximum-size voice did not start through the bounded dedicated queue");
+    check(maximum_voice.use_count() >= 2, "active voice did not retain its immutable decoded clip");
+    check(std::abs(speaking.applied_music_gain - 0.275f) < 0.0001f &&
+              std::abs(speaking.applied_voice_gain - 0.25f) < 0.0001f,
+          "active voice did not duck music while following the effects gain");
+    output.set_volumes(0.8f, 0.25f, 0.5f);
+    gains = output.diagnostics();
+    check(std::abs(gains.applied_music_gain - 0.11f) < 0.0001f &&
+              std::abs(gains.applied_voice_gain - 0.4f) < 0.0001f,
+          "volume changes did not preserve voice ducking and voice effects gain");
+    std::vector<float> oversized_voice(maximum_voice_audio_bytes / sizeof(float) + audio_channels, 0.f);
+    const auto too_large_voice = AudioClip::create(std::move(oversized_voice));
+    check(rejects([&] { output.play_voice(too_large_voice); }), "oversized voice was accepted");
+    const auto voice_preserved = output.diagnostics();
+    const auto oversized_preserved = voice_preserved.voice_active &&
+        voice_preserved.voice_play_count == speaking.voice_play_count &&
+        voice_preserved.queued_voice_bytes <= voice_preserved.voice_queue_limit_bytes;
+    if (!oversized_preserved) {
+      std::cerr << "preserved voice observed queued=" << voice_preserved.queued_voice_bytes
+                << " available=" << voice_preserved.available_voice_bytes
+                << " limit=" << voice_preserved.voice_queue_limit_bytes
+                << " active=" << voice_preserved.voice_active << " plays=" << voice_preserved.voice_play_count << '\n';
+    }
+    check(oversized_preserved, "oversized voice disturbed the active bounded voice channel");
+    output.stop_voice();
+    const auto voice_stopped = output.diagnostics();
+    check(!voice_stopped.voice_active && voice_stopped.queued_voice_bytes == 0 &&
+              std::abs(voice_stopped.applied_music_gain - 0.2f) < 0.0001f && maximum_voice.use_count() == 1,
+          "stop_voice did not clear voice state, release its clip, and restore music gain");
+    check(rejects([&] { output.play_voice(nullptr); }), "null voice was accepted");
+
+    std::vector<float> finite_voice_samples(static_cast<std::size_t>(audio_sample_rate) * audio_channels / 4u, 0.1f);
+    const auto finite_voice = AudioClip::create(std::move(finite_voice_samples));
+    output.play_voice(finite_voice);
+    const auto finite_started = output.diagnostics();
+    const auto voice_retired = wait_until([&] {
+      output.service();
+      return !output.diagnostics().voice_active;
+    });
+    const auto finite_finished = output.diagnostics();
+    check(finite_started.voice_active && finite_started.voice_play_count == 2 && voice_retired &&
+              finite_finished.queued_voice_bytes == 0 &&
+              std::abs(finite_finished.applied_music_gain - 0.2f) < 0.0001f,
+          "finite flushed voice did not drain, retire, and restore music before the deadline");
+
     for (int voice = 0; voice < 8; ++voice) output.play_effect(short_loop);
     const auto eight = output.diagnostics();
     check(eight.active_effects <= 8 && eight.effect_play_count == 8, "effect voices did not honor the eight-voice bound");
@@ -174,11 +239,13 @@ int main(int argc, char** argv) {
       output.service();
       return output.diagnostics().active_effects == 0;
     });
-    check(effects_retired, "finite flushed effects did not drain and retire before the 2-second deadline");
+    check(effects_retired,
+          "finite flushed effects did not drain queued input and converted output before retiring");
     output.stop_all();
     const auto stopped = output.diagnostics();
-    check(!stopped.music_started && stopped.queued_music_bytes == 0 && stopped.active_effects == 0,
-          "stop_all did not clear music and effects");
+    check(!stopped.music_started && stopped.queued_music_bytes == 0 && stopped.active_effects == 0 &&
+              !stopped.voice_active && stopped.queued_voice_bytes == 0,
+          "stop_all did not clear music, effects, and voice");
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

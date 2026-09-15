@@ -40,6 +40,36 @@
       "source": "docs/engine/NATIVE_AUDIO_SOURCES.md",
       "runtimePath": "Licenses/Audio-sources.md",
       "sha256": "62f59c33aff70b5eb570a0224db676f27f5fa8e1c02b09c22a492ce675a3eb10"
+    },
+    "scientist-reconnaissance": {
+      "source": "assets/audio/voice/scientist-reconnaissance.wav",
+      "runtimePath": "assets/audio/voice/scientist-reconnaissance.wav",
+      "sha256": "56369c6d0d23bb57c5c54ce44f2063693b8d8e50d1597bd55f3e78eb2c7c1541"
+    },
+    "scientist-research-report": {
+      "source": "assets/audio/voice/scientist-research-report.wav",
+      "runtimePath": "assets/audio/voice/scientist-research-report.wav",
+      "sha256": "704f5681d7453720946352e22759e1bec0e2cbdcfb212325b2da3750141a0e46"
+    },
+    "scientist-survey-complete": {
+      "source": "assets/audio/voice/scientist-survey-complete.wav",
+      "runtimePath": "assets/audio/voice/scientist-survey-complete.wav",
+      "sha256": "331b99bebf9895c5d7c0164738de015ffaeed15f264e0d51ff7bcdb29393b3a4"
+    },
+    "scientist-manifest": {
+      "source": "assets/audio/voice/scientist-cues.json",
+      "runtimePath": "Licenses/Scientist-cues.json",
+      "sha256": "166d2c7d873fd28a217f5b73422f7802524791e7622c6cc6c39d6e80542ba912"
+    },
+    "scientist-credits": {
+      "source": "docs/engine/NATIVE_SCIENTIST_VOICE.md",
+      "runtimePath": "Licenses/Scientist-voice.md",
+      "sha256": "7dbd8b0f8e1dd07a88493384737b0d7444a1faa75ce55b216aa7689515ab6f33"
+    },
+    "scientist-license": {
+      "source": "assets/audio/voice/Kokoro-Apache-2.0.txt",
+      "runtimePath": "Licenses/Scientist-Kokoro-Apache-2.0.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
     }
   }
 }

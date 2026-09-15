@@ -15,6 +15,12 @@ NATIVE_AUDIO_SOURCES = {
     "ship-launch": ("assets/audio/sfx/ship-launch.wav", "assets/audio/sfx/ship-launch.wav"),
     "strategic-alert": ("assets/audio/sfx/strategic-alert.wav", "assets/audio/sfx/strategic-alert.wav"),
     "credits": ("docs/engine/NATIVE_AUDIO_SOURCES.md", "Licenses/Audio-sources.md"),
+    "scientist-reconnaissance": ("assets/audio/voice/scientist-reconnaissance.wav", "assets/audio/voice/scientist-reconnaissance.wav"),
+    "scientist-research-report": ("assets/audio/voice/scientist-research-report.wav", "assets/audio/voice/scientist-research-report.wav"),
+    "scientist-survey-complete": ("assets/audio/voice/scientist-survey-complete.wav", "assets/audio/voice/scientist-survey-complete.wav"),
+    "scientist-manifest": ("assets/audio/voice/scientist-cues.json", "Licenses/Scientist-cues.json"),
+    "scientist-credits": ("docs/engine/NATIVE_SCIENTIST_VOICE.md", "Licenses/Scientist-voice.md"),
+    "scientist-license": ("assets/audio/voice/Kokoro-Apache-2.0.txt", "Licenses/Scientist-Kokoro-Apache-2.0.txt"),
 }
 
 
