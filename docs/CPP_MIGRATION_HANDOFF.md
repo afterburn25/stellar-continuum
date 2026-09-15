@@ -6,9 +6,39 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: docs commit `8c48a6c7` + diplomacy presentation slice (engine 0.1.58), pending PR into the migration branch.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: head `357872e8` — diplomacy, territory, orbital, surface, audio and tactical battle slices (engine 0.1.58), pending PR into the migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
+
+## Battle presentation slice (`357872e8`, candidate for review)
+
+- `app/native_client/native_battle_workspace.{hpp,cpp}` — `NativeBattleWorkspace`:
+  full-screen tactical overlay ported from `MassiveCombatView`. Renders only the
+  observer-filtered `MassiveCombatSnapshot` it is handed; owns no battle state.
+  `handle` emits `IssueOrder`, `TogglePause`, `CycleSpeed`, `Fit`, `Menu`;
+  selection, box-select, targeting pick, pan/zoom and the event feed are
+  internal. `project()` is exposed for tests/smoke diagnostics.
+- `CampaignFrame`: `begin_tactical(fleet_id)`, `issue_tactical_order(order)`,
+  `tactical_snapshot()`; `CampaignMassiveCombat` gained the order forward.
+- `NativeFleetWorkspace` details panel: ENGAGE button on armed fleets →
+  `FleetWorkspaceCommand::Engage` → `begin_tactical`.
+- `main.cpp`: the update loop detects `world.active_combat_encounter`, opens
+  the workspace with the player observer id, refreshes it every 0.1 s of real
+  time, routes `BattleWorkspaceCommand`s via `execute_battle`, and renders the
+  battle last so it overlays other workspaces.
+- `NativeCampaignSession`: manual saves are now allowed after tactical frames
+  (`manual_capture_ready_` covers `CampaignFrameRoute::Tactical`), matching the
+  reference which captures mid-battle state directly. Autosave scheduling stays
+  strategic-only inside `PlayerCampaignSaveController::after_frame`.
+- `stellar-continuum-native.exe --battle-smoke <bmp>` (requires `--load` with an
+  active-encounter save): selects the owned formation, issues Hold, resumes the
+  tactical clock, saves mid-battle, prints `battle={formations, own, foreign,
+  redacted, vessels_hidden, own_inexact, selected, tokens, events, salvos,
+  tick, order_accepted}`.
+- `tools/author_battle_save.py` — dev helper authoring a two-front encounter
+  onto the Player17 row (war contact basis + at-war relationship + bound fleets
+  + unengaged foreign picket). `tools/stellar-export/native_battle_runtime.py`
+  carries the same authoring for the sealed validator.
 
 ## Interfaces added in 0.1.58 (candidate for review)
 
@@ -75,8 +105,9 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   grievance display, demand/trade composer, or claims panel; claims render as dashed
   arcs on the strategic map (ported in `ef7a4007`) and the native workspace covers
   every section the reference renders. No further diplomacy port is currently owed.
-- Surface colony visuals (buildings/roads) — the surface workspace is a construction
-  grid, not the reference's rendered colony view.
+- Surface colony visuals — hub/buildings/roads/ghosts now render as rasterized
+  sprites (`58aaf475`); the remaining gap is the reference's free camera orbit
+  and terrain relief, not building art.
 - Audio settings UI + voice-duck hooks — mixer/playback/persistence shipped in
   `dbf07f81` (`native_audio*` + `--audio-smoke` + exact-hash packaging); the
   remaining work is a volume-settings screen and wiring ducking to voice playback.

@@ -34,11 +34,11 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
-| Combat | Combat*, MassiveCombat* | `core/combat_*`, `massive_combat_*`, `campaign_massive_combat` | OK | `combat_*_parity`, `massive_combat_*` | PARITY VERIFIED | Engine resolution; native battle view not started |
+| Combat | Combat*, MassiveCombat* | `core/combat_*`, `massive_combat_*`, `campaign_massive_combat`, `native_battle_workspace` | OK | `combat_*_parity`, `massive_combat_*`, `native_battle_workspace`, `--battle-smoke` validator | PARITY VERIFIED | Engine resolution + observer-filtered tactical presentation, orders, secrecy |
 | Events | none in C# | none | — | — | N/A | No event subsystem exists in reference |
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
-| UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
+| UI (native) | Main.*, panels | `app/native_client/*_workspace` (17+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` CTest + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp; no settings UI, no voice duck hooks yet |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
@@ -58,10 +58,34 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 154/154 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
-  `native_orbital_structure`, `native_surface_scene`, `native_audio`, extended
+- 155/155 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+  `native_orbital_structure`, `native_surface_scene`, `native_audio`,
+  `native_battle_workspace`, extended
   `native_system_view`/`native_system_workspace`/`native_surface_workspace`),
   144/144 headless CTest baseline, all Python export checks.
+- Tactical battle presentation (`357872e8`): `native_battle_workspace` ports the
+  reference `MassiveCombatView` — full-screen observer-filtered formation tokens
+  (bounded 4096-token pool, zoom-dependent sampling), selection + box-select +
+  hover, right-drag pan / wheel zoom / FIT, tactical pause/speed chrome, the
+  nine-order bar (Hold/Defend/Advance/FocusFire/FlankL/FlankR/Intercept/
+  BreakContact/Retreat) with a targeting pick state, context engage/advance on
+  right-click, combat-event beam/volley/salvo effects and an event feed.
+  `CampaignFrame` exposes `begin_tactical`, `issue_tactical_order` and
+  `tactical_snapshot`; the frame loop detects `active_combat_encounter`, opens
+  the workspace and routes its commands through `execute_battle`. The fleet
+  workspace gains an ENGAGE affordance on armed fleets. Secrecy is preserved:
+  the workspace renders only the observer snapshot — foreign formations carry
+  inexact ship-count ranges, hidden cohort/vessel detail and
+  "Unidentified formation" labels when confidence is low; unengaged hostile
+  formations stay out of the snapshot entirely. Manual saves now work after
+  tactical frames (matching the reference's direct runtime capture), so
+  mid-battle state persists and reload re-enters the encounter. Chrome
+  clicks no longer clear selection on release, and a release over an armed
+  targeted-order button keeps the pick state. `--battle-smoke` authors a
+  two-front encounter from the Player17 fixture (`tools/author_battle_save.py`),
+  drives selection + a real order + pause/resume, and the export validator
+  (`native_battle_runtime.py`, 18 mock tests) asserts redaction, order
+  acceptance, capture variance and encounter persistence across reload.
 - Surface colony scene (`58aaf475`): the orbital rasterizer core moved to
   `native_scene_raster.hpp`; `native_surface_scene` ports the
   `SurfaceBuildingVisuals` silhouette grammar — per-type cylinder/box/sphere
