@@ -256,6 +256,7 @@ foreach(STELLAR_RESEARCH_FILE IN LISTS STELLAR_RESEARCH_RUNTIME_FILES)
 endforeach()
 install(FILES third_party/nlohmann/LICENSE.MIT DESTINATION Licenses RENAME nlohmann-JSON-MIT.txt)
 install(FILES third_party/dotnet/LICENSE.TXT DESTINATION Licenses RENAME dotnet-MIT.txt)
+install(FILES third_party/dr_mp3/LICENSE.txt DESTINATION Licenses RENAME dr_mp3-MIT-0.txt)
 if(BUILD_TESTING)
   if(WIN32)
     # Compile the isolated fault-injection variant separately; no hooks enter

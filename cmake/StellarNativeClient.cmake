@@ -18,7 +18,7 @@ add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_nativ
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
-target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core SDL3::SDL3 Shell32 Ole32)
 add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
@@ -48,6 +48,15 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/assets/visual/sol/earth.jpg"
     "${CMAKE_SOURCE_DIR}/assets/visual/space/campaign-galaxy-four-arm-v1.png")
   set_tests_properties(native_client_platform PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+  add_executable(stellar_native_audio_tests
+    native-tests/native_audio_tests.cpp app/native_client/native_audio.cpp)
+  target_include_directories(stellar_native_audio_tests PRIVATE app/native_client third_party)
+  add_test(NAME native_audio COMMAND stellar_native_audio_tests
+    "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/native-audio-cases")
+  set_tests_properties(native_audio PROPERTIES TIMEOUT 60)
+  if(MSVC)
+    target_compile_options(stellar_native_audio_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_campaign_session_tests
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp)
   target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client)
@@ -115,3 +124,10 @@ target_sources(stellar-continuum-native PRIVATE
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_diplomacy_controller.cpp
   app/native_client/native_diplomacy_workspace.cpp)
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_audio_assets)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_audio.cpp
+  app/native_client/native_audio_device.cpp)
+target_include_directories(stellar-continuum-native PRIVATE third_party)

@@ -1,5 +1,6 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
+#include "native_audio_device.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
@@ -77,6 +78,7 @@ using namespace stellar::native_research;
 using namespace stellar::native_research_ui;
 using namespace stellar::native_shipyard;
 using namespace stellar::native_shipyard_ui;
+namespace native_audio = stellar::native_audio;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
@@ -111,6 +113,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{};
+  bool audio_smoke{};
   bool save_path_overridden{};
 };
 
@@ -150,6 +153,7 @@ struct Options {
     else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
     else if(arg==L"--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_smoke=true;result.windowed=true;}
+    else if(arg==L"--audio-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.audio_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -177,11 +181,12 @@ struct Options {
     else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
     else if(arg=="--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_smoke=true;result.windowed=true;}
+    else if(arg=="--audio-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.audio_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.audio_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -325,7 +330,10 @@ class NativeCampaign final {
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
         ship_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
+        audio_mixer_(session_->save_path().parent_path()/"audio-settings.json"),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
+    if(audio_mixer_.load_assets(asset_root_))audio_device_.open(audio_mixer_);
+    audio_mixer_.complete_startup_loading();
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
@@ -1005,6 +1013,39 @@ class NativeCampaign final {
        <<"}";
     return out.str();
   }
+  [[nodiscard]] std::string audio_smoke_status(){
+    // Mix bounded chunks on the caller thread so the smoke reports real decode,
+    // voice and gain evidence without depending on an attached audio device.
+    audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
+    audio_mixer_.play_event("exploration");
+    float buffer[native_audio::output_channels*240]{};
+    std::size_t voiced_chunks=0,clipped=0;
+    double peak=0;
+    for(int chunk=0;chunk<12;++chunk){
+      audio_mixer_.mix(buffer,240);
+      bool voiced=false;
+      for(const float sample:buffer){
+        peak=std::max(peak,std::abs(static_cast<double>(sample)));
+        if(sample!=0.f)voiced=true;
+        if(sample<-1.f||sample>1.f)++clipped;
+      }
+      if(voiced)++voiced_chunks;
+    }
+    const auto settings=audio_mixer_.settings();
+    std::ostringstream out;
+    out<<"{\"required\":"<<(audio_mixer_.has_required_audio()?1:0)
+       <<",\"music\":"<<(audio_mixer_.music_playing()?1:0)
+       <<",\"music_frames\":"<<audio_mixer_.music_frame_count()
+       <<",\"device\":"<<(audio_device_.is_open()?1:0)
+       <<",\"voices\":"<<audio_mixer_.active_voices()
+       <<",\"voiced_chunks\":"<<voiced_chunks
+       <<",\"clipped_samples\":"<<clipped
+       <<",\"peak\":"<<std::fixed<<std::setprecision(4)<<peak
+       <<std::defaultfloat
+       <<",\"master\":"<<settings.master<<",\"music_gain\":"<<settings.music
+       <<",\"sfx_gain\":"<<settings.sfx<<"}";
+    return out.str();
+  }
   void prepare_construction_smoke(int width,int height){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -1183,6 +1224,8 @@ class NativeCampaign final {
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     pointer_=input.pointer;
+    const auto hovered_action=NativeUiLayout::for_viewport(width,height).hit(pointer_,menu_);
+    if(hovered_action!=hovered_action_){if(hovered_action!=UiAction::None)audio_mixer_.play_hover();hovered_action_=hovered_action;}
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
       selected_id_.reset();
@@ -1372,6 +1415,7 @@ class NativeCampaign final {
           captured=true;
         }
         if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
+        if(action!=UiAction::None)audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
         gesture_.begin(captured);continue;
       }
       if(event.type==InputEventType::PointerMove){if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
@@ -2001,6 +2045,8 @@ class NativeCampaign final {
   NativeDiplomacyController diplomacy_controller_;
   NativeDiplomacyWorkspace diplomacy_workspace_;
   std::filesystem::path asset_root_;
+  native_audio::NativeAudioMixer audio_mixer_;
+  native_audio::NativeAudioDevice audio_device_;
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
       [this](std::string_view relative){
@@ -2084,6 +2130,7 @@ class NativeCampaign final {
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  UiAction hovered_action_{UiAction::None};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
   GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};
@@ -2261,6 +2308,8 @@ int main(int argc,char **argv){
           std::cout<<" ship_art="<<campaign.ship_art_smoke_status();
         if(options.diplomacy_smoke)
           std::cout<<" diplomacy="<<campaign.diplomacy_smoke_status();
+        if(options.audio_smoke)
+          std::cout<<" audio="<<campaign.audio_smoke_status();
         if(options.new_game_smoke){
           std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")

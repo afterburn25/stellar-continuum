@@ -28,6 +28,7 @@ from native_new_game_runtime import validate_native_new_game_export
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
 from native_diplomacy_runtime import validate_native_diplomacy_export
+from native_audio_runtime import validate_native_audio_export
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
@@ -96,6 +97,7 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
@@ -480,6 +482,7 @@ def export(preset_name):
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_diplomacy_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_audio_export(output, env))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]
             smoke["stellarGenerationBenchmarks"]=[json.loads(run([output/"stellar-continuum.exe","--headless","--generate-galaxy","--systems",count,"--repeat",10],env=env,capture=True)) for count in (250,500,1000,2500)]
