@@ -14,6 +14,7 @@ from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
+from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -98,6 +99,15 @@ class NativeClientDependencyTests(unittest.TestCase):
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.galaxy_art_declaration = self.root / "export/native-galaxy-art-assets.json"
         self.galaxy_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":galaxy_art_records}))
+        ship_art_records = {}
+        for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only ship art " + key).encode())
+            ship_art_records[key] = {"source": source, "runtimePath": destination,
+                                      "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
+        self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
 
 
 
@@ -244,6 +254,50 @@ class NativeClientDependencyTests(unittest.TestCase):
         declaration = json.loads(original)
         declaration["assets"]["extra"] = declaration["assets"]["deep-field-v2"]
         self.galaxy_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
+    def test_missing_ship_art_blocks_package(self):
+        for source, destination in NATIVE_SHIP_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native ship art"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_ship_art_blocks_package(self):
+        for source, destination in NATIVE_SHIP_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_ship_art_paths_cannot_expand_package_scope(self):
+        original = self.ship_art_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["pathfinder-scout"][field] = "../outside.png"
+                self.ship_art_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native ship art"):
+                    self.copy()
+        self.ship_art_declaration.write_text(original)
+
+    def test_ship_art_manifest_schema_and_set_are_strict(self):
+        original = self.ship_art_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.ship_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native ship art"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["pathfinder-scout"]
+        self.ship_art_declaration.write_text(json.dumps(declaration))
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 
