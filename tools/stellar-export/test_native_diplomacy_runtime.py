@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_diplomacy_runtime import validate_native_diplomacy_export
+from native_diplomacy_runtime import validate_native_diplomacy_export, _notifications
 
 
 def source():
@@ -89,6 +89,9 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                     if fault != "map_capture":
                         marker = 1 if fault == "map_same_known" else 2 if fault == "map_same_unknown" else 3
                         bmp(capture.with_name(capture.stem + "-map.bmp"), width, height, marker)
+                    bmp(capture.with_name(capture.stem + "-events.bmp"), width, height, 4)
+                    bmp(capture.with_name(capture.stem + "-events-contact.bmp"), width, height,
+                        4 if fault == "events_duplicate" else 5)
                 state = {"mode": "paused_reload" if reload else "progress",
                          "selection_changed": True, "unknown_redacted": True,
                          "portrait_visible": fault != "portrait", "accepted": not reload,
@@ -109,7 +112,17 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 else:
                     territory_encoded = json.dumps(territory)
                 encoded = "{malformed" if fault == "malformed" else json.dumps(state)
-                stdout = "gpu_driver=vulkan systems=1 save=ok territory=" + territory_encoded + " diplomacy=" + encoded
+                notifications = {"mode": "paused_reload" if reload else "progress",
+                                 "opened": True, "closed": True,
+                                 "items": 0 if reload else 2, "unread_before": 0 if reload else 2,
+                                 "unread_after": 0, "focused_target": -1 if reload else 1,
+                                 "canonical_unchanged": True, "paused": True}
+                if fault == "notifications_missing": notification_line = ""
+                elif fault == "notifications_bad":
+                    notifications["opened"] = False
+                    notification_line = "\nnotifications=" + json.dumps(notifications)
+                else: notification_line = "\nnotifications=" + json.dumps(notifications)
+                stdout = "gpu_driver=vulkan systems=1 save=ok territory=" + territory_encoded + notification_line + "\ndiplomacy=" + encoded
                 calls.append(args)
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
@@ -122,6 +135,7 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
             self.assertTrue(result["nativeTerritory"])
             self.assertEqual(result["territoryChecks"]["reload"]["claim_segments"], 1)
             self.assertEqual(len(result["diplomacyCaptures"]), 6)
+            self.assertEqual(len(result["notificationCaptures"]), 4)
 
     def test_progress_and_paused_reload(self): self.exercise()
     def test_rejects_spoofed_reload_claim(self):
@@ -136,6 +150,15 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("portrait")
     def test_rejects_missing_capture(self):
         with self.assertRaises(RuntimeError): self.exercise("capture")
+    def test_rejects_missing_notifications(self):
+        with self.assertRaisesRegex(RuntimeError, "notification"):
+            self.exercise("notifications_missing")
+    def test_rejects_invalid_notifications(self):
+        with self.assertRaisesRegex(RuntimeError, "notification"):
+            self.exercise("notifications_bad")
+    def test_rejects_duplicate_notification_capture(self):
+        with self.assertRaisesRegex(RuntimeError, "notification"):
+            self.exercise("events_duplicate")
     def test_rejects_missing_regional_map_capture(self):
         with self.assertRaises(RuntimeError): self.exercise("map_capture")
     def test_rejects_map_capture_identical_to_known_view(self):
@@ -175,5 +198,32 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
     def test_rejects_duplicate_territory_field(self):
         with self.assertRaises(RuntimeError): self.exercise("territory_duplicate")
 
+
+
+class NotificationProofTests(unittest.TestCase):
+    def test_rejects_false_or_mistyped_claims_and_wrong_target(self):
+        valid = {"mode": "progress", "opened": True, "closed": True, "items": 2,
+                 "unread_before": 2, "unread_after": 0, "focused_target": 7,
+                 "canonical_unchanged": True, "paused": True}
+        self.assertEqual(_notifications("notifications=" + json.dumps(valid), "progress", 7), valid)
+        for key, value in (("canonical_unchanged", False), ("paused", 1), ("items", True),
+                           ("focused_target", 8), ("unread_after", 2), ("extra", True)):
+            with self.subTest(field=key):
+                bad = dict(valid, **{key: value})
+                with self.assertRaises(RuntimeError):
+                    _notifications("notifications=" + json.dumps(bad), "progress", 7)
+
+    def test_rejects_retained_alerts_on_reload(self):
+        proof = {"mode": "paused_reload", "opened": True, "closed": True, "items": 2,
+                 "unread_before": 2, "unread_after": 0, "focused_target": -1,
+                 "canonical_unchanged": True, "paused": True}
+        with self.assertRaises(RuntimeError):
+            _notifications("notifications=" + json.dumps(proof), "paused_reload", 7)
+
+    def test_rejects_malformed_duplicate_or_nonobject_proof(self):
+        for value in ('{bad}', '{"opened":true,"opened":false}', '[]', 'null',
+                      '{}\nnotifications={}'):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                _notifications("notifications=" + value, "progress", 7)
 
 if __name__ == "__main__": unittest.main()

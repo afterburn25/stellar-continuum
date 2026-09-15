@@ -9,6 +9,8 @@
 #include "native_navigation_art.hpp"
 #include "native_galaxy_labels.hpp"
 #include "native_campaign_session.hpp"
+#include "native_notification_events.hpp"
+#include "native_campaign_calendar.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
 #include "native_settlement_mission_controller.hpp"
@@ -503,6 +505,8 @@ class NativeCampaign final {
         text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
     research_workspace_.set_text_measurer(text_measurer_);
+    notification_view_.set_text_measurer(text_measurer_);
+    seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
     system_workspace_.use_background_preparation(image_preparation_);
@@ -1379,6 +1383,8 @@ class NativeCampaign final {
     if(primary==contacts.end()||unknown==contacts.end()||other==contacts.end())
       throw std::runtime_error("Diplomacy smoke requires two identified contacts and one unknown signal.");
     smoke_diplomacy_unknown_=unknown->contact_id;
+    smoke_diplomacy_other_=other->contact_id;
+    smoke_diplomacy_target_=target;
     diplomacy_smoke_select(primary->contact_id,width,height);
     capture_diplomacy_unknown(width,height);
     diplomacy_smoke_select(other->contact_id,width,height);
@@ -1410,6 +1416,65 @@ class NativeCampaign final {
     smoke_diplomacy_status_=evidence.str();
   }
   [[nodiscard]] const std::string&diplomacy_smoke_status()const noexcept{return smoke_diplomacy_status_;}
+  void notification_smoke(int width,int height,bool reload,
+      const std::function<void(const DrawList&,bool)>& capture){
+    const auto day=session_->frame().clock().simulation_days();
+    const PlayerCampaignCaptureOptions options{day,STELLAR_GAME_VERSION,utc_timestamp()};
+    const auto canonical=[&]{return encode_player_campaign_v17_json(
+        capture_player_campaign_v17(session_->frame().runtime(),options));};
+    const auto before=canonical();
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    // Start on a different identified contact, so following an event must
+    // change selection rather than merely reopen an already selected empire.
+    diplomacy_smoke_click(center(main_layout.diplomacy),width,height);
+    if(!diplomacy_workspace_.visible())
+      throw std::runtime_error("Notification replay could not open Relations.");
+    diplomacy_smoke_select(smoke_diplomacy_other_,width,height);
+    const auto items=notifications_.items().size();
+    const auto unread_before=notifications_.unread_count(notification_view_.last_read());
+    if(items!=(reload?0u:2u)||unread_before!=(reload?0:2))
+      throw std::runtime_error("Notifications replayed retained history or lost new agreement reports.");
+    diplomacy_smoke_click(center(main_layout.notifications),width,height);
+    const bool opened=notification_view_.visible();
+    const auto unread_after=notifications_.unread_count(notification_view_.last_read());
+    if(!opened||unread_after!=0)
+      throw std::runtime_error("Events button did not open and acknowledge the retained feed.");
+    capture(scene(width,height),false);
+    const auto layout=stellar::native_notifications::notification_layout_for(
+        notifications_.items(),width,height,text_measurer_,notification_view_.scroll_offset());
+    int focused_target=-1;
+    if(reload){
+      diplomacy_smoke_click(center(layout.close_button),width,height);
+    }else{
+      const auto entry=std::ranges::find_if(layout.entries,[&](const auto& item){
+        return item.contact_button&&
+            layout.list_viewport.contains(center(*item.contact_button));
+      });
+      if(entry==layout.entries.end()||
+          notifications_.items()[entry->item_index].diplomatic_contact_id!=smoke_diplomacy_target_)
+        throw std::runtime_error("New agreement report lacks its identified contact link.");
+      diplomacy_smoke_click(center(*entry->contact_button),width,height);
+      if(!diplomacy_workspace_.visible()||!diplomacy_workspace_.view())
+        throw std::runtime_error("Event contact link did not open Relations.");
+      focused_target=diplomacy_workspace_.view()->selected.target_civilization_id.value_or(-1);
+      if(focused_target!=smoke_diplomacy_target_)
+        throw std::runtime_error("Event contact link opened the wrong empire.");
+    }
+    const bool closed=!notification_view_.visible();
+    const bool unchanged=before==canonical();
+    const bool paused=session_->frame().clock().speed()==StrategicSpeed::Paused&&
+        session_->frame().clock().simulation_days()==day;
+    if(!closed||!unchanged||!paused)
+      throw std::runtime_error("Reading notifications changed the campaign or failed to dismiss the panel.");
+    capture(scene(width,height),true);
+    std::cout<<"notifications={\"mode\":\""<<(reload?"paused_reload":"progress")
+      <<"\",\"opened\":"<<(opened?"true":"false")
+      <<",\"closed\":"<<(closed?"true":"false")<<",\"items\":"<<items
+      <<",\"unread_before\":"<<unread_before<<",\"unread_after\":"<<unread_after
+      <<",\"focused_target\":"<<focused_target
+      <<",\"canonical_unchanged\":"<<(unchanged?"true":"false")
+      <<",\"paused\":"<<(paused?"true":"false")<<"}\n";
+  }
   void capture_ship_art_shipyard(){
     smoke_shipyard_art_rows_=shipyard_workspace_.last_ship_art_rows();
     smoke_ship_art_decoded_=ship_art_.decoded_count();
@@ -1659,6 +1724,9 @@ class NativeCampaign final {
       last_territory_draw_={};
       territory_refresh_elapsed_=.5;
       feedback_.reset();
+      notifications_.clear();
+      notification_view_.close();
+      seed_notifications();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
       selected_id_.reset();
@@ -1691,6 +1759,7 @@ class NativeCampaign final {
     if(input.quit_requested)session_->request_exit();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
+      notification_view_.close();
       system_workspace_.close();
       colony_workspace_.close();
       surface_workspace_.close();
@@ -1710,9 +1779,30 @@ class NativeCampaign final {
     };
     for(const auto &event:input.events){
       if(audio_settings_&&audio_settings_->visible()){
+        notification_view_.close();
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
+      }
+      const bool can_notify=notifications_available();
+      if(!can_notify)notification_view_.close();
+      if(can_notify&&notification_view_.visible()){
+        const auto command=notification_view_.handle(event,notifications_.items(),width,height);
+        if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
+          system_workspace_.close();colony_workspace_.close();surface_workspace_.close();
+          research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+          diplomacy_workspace_.open();refresh_diplomacy(true);
+          if(!diplomacy_workspace_.select_contact_civilization(command.civilization_id))
+            diplomacy_workspace_.set_notice("This contact is no longer identified. Review the contact list.",false);
+          refresh_diplomacy(true);
+        }
+        if(command.captured){gesture_.capture_for_ui();continue;}
+      }
+      if(can_notify&&event.type==InputEventType::LeftPressed&&
+         layout.notifications.contains(event.position)){
+        notification_view_.toggle(notifications_.latest_sequence());
+        if(audio_confirm_)audio_confirm_();
+        gesture_.begin(true);continue;
       }
       // Strategic shortcuts precede system-view capture, but never take keys
       // from text entry, a confirmation or a legacy gameplay-blocking view.
@@ -1923,6 +2013,8 @@ class NativeCampaign final {
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
       if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
     }
+    notification_refresh_elapsed_+=std::max(0.,elapsed);
+    if(notification_refresh_elapsed_>=1.)refresh_notifications();
     refresh_knowledge();
     territory_overlay_.poll();
     territory_refresh_elapsed_+=std::max(0.,elapsed);
@@ -2055,6 +2147,7 @@ class NativeCampaign final {
     };
     reserve_hud(ui_layout.pause);
     reserve_hud(ui_layout.speed);
+    reserve_hud(ui_layout.notifications);
     reserve_hud(ui_layout.research);
     reserve_hud(ui_layout.shipyard);
     reserve_hud(ui_layout.construction);
@@ -2135,6 +2228,13 @@ class NativeCampaign final {
     panel(out, layout.speed, layout.speed.contains(pointer_), false);
     control_label(out, layout.speed, speed_text(), {225, 238, 250, 255},
           layout.control_font_pixels, layout.scale,text_measurer_);
+    if(notifications_available()){
+      panel(out,layout.notifications,layout.notifications.contains(pointer_),notification_view_.visible());
+      const auto unread=notifications_.unread_count(notification_view_.last_read());
+      control_label(out,layout.notifications,"EVENTS "+std::to_string(unread),
+          unread?Color{240,197,106,255}:Color{225,238,250,255},
+          layout.control_font_pixels,layout.scale,text_measurer_);
+    }
     const auto draw_navigation=[&](UiRect bounds,UiAction action,bool active,std::string_view tip){
       panel(out,bounds,bounds.contains(pointer_),active);
       if(const auto image=navigation_art_.image(action))out.overlay.emplace_back(Image{image,{bounds.x+7.f*layout.scale,bounds.y+7.f*layout.scale,bounds.width-14.f*layout.scale,bounds.height-14.f*layout.scale}});
@@ -2210,10 +2310,34 @@ class NativeCampaign final {
       draw_button(layout.settings_button, "SETTINGS");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
     }
+    if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(audio_settings_)audio_settings_->render(out,width,height);
     return out;
   }
  private:
+  [[nodiscard]] bool notifications_available()const noexcept{
+    return native_navigation_available(menu_,settlement_workspace_.visible(),
+        diplomacy_workspace_.modal_open(),surface_workspace_.modal_open(),
+        audio_settings_&&audio_settings_->visible())&&
+        !shipyard_workspace_.confirmation_open()&&!construction_workspace_.confirmation_open()&&
+        !fleet_workspace_.preview();
+  }
+  void seed_notifications(){
+    auto& runtime=session_->frame().runtime();
+    diplomatic_notifications_.seed(runtime.diplomacy().build_view_for(
+        runtime.world().campaign().player_civilization_id));
+    notification_refresh_elapsed_=0.;
+  }
+  void refresh_notifications(){
+    auto& runtime=session_->frame().runtime();
+    diplomatic_notifications_.harvest(notifications_,runtime.diplomacy().build_view_for(
+        runtime.world().campaign().player_civilization_id));
+    notification_refresh_elapsed_=0.;
+  }
+  void publish_notification(std::string category,std::string message){
+    notifications_.publish(std::move(category),stellar::native_campaign::format_campaign_date(
+        session_->frame().clock().simulation_days()),std::move(message));
+  }
   void scientist_voice(stellar::native_audio::VoiceCue cue){
     // Human casting must not silently replace another species' advisor.
     if(presentation_audio_&&player_species_id()=="terran_baseline")presentation_audio_->speak(cue);
@@ -2226,6 +2350,8 @@ class NativeCampaign final {
     const auto summary=collect_campaign_feedback(frame,observer);
     if(summary.empty())return;
     feedback_.publish(summary);
+    stellar::native_notifications::publish_campaign_notifications(
+        notifications_,summary,session_->frame().clock().simulation_days());
     if(summary.count(FeedbackKind::ResearchReport))scientist_voice(VoiceCue::ResearchReport);
     if(summary.count(FeedbackKind::SurveyComplete))scientist_voice(VoiceCue::SurveyComplete);
     // Coalesce accelerated simulation bursts into a single highest-priority cue.
@@ -2457,7 +2583,7 @@ class NativeCampaign final {
         command.intent,command.node_id);
     research_workspace_.set_notice(outcome.message,outcome.accepted);
     last_research_command_accepted_=outcome.accepted;
-    if(outcome.accepted)smoke_research_node_=command.node_id;
+    if(outcome.accepted){smoke_research_node_=command.node_id;publish_notification("Research",outcome.message);}
     refresh_research(true);
   }
 
@@ -2495,6 +2621,7 @@ class NativeCampaign final {
     else return;
     shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
     last_shipyard_command_accepted_=outcome.accepted;
+    if(outcome.accepted)publish_notification("Ships",outcome.message);
     refresh_shipyard(true);
   }
 
@@ -2540,6 +2667,7 @@ class NativeCampaign final {
     else return;
     construction_workspace_.set_notice(outcome.message,outcome.accepted);
     last_construction_command_accepted_=outcome.accepted;
+    if(outcome.accepted)publish_notification("Construction",outcome.message);
     refresh_construction(true);
   }
 
@@ -2569,6 +2697,7 @@ class NativeCampaign final {
         session_->frame(),command.campaign_generation,command.diplomacy_revision,
         command.action,command.target_civilization_id,command.proposal_id);
     diplomacy_workspace_.set_notice(outcome.message,outcome.accepted);
+    if(outcome.accepted)refresh_notifications();
     refresh_diplomacy(true);
   }
 
@@ -2685,7 +2814,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
@@ -2715,6 +2844,8 @@ class NativeCampaign final {
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
   std::size_t diplomacy_portrait_bytes_{};
   std::string smoke_diplomacy_unknown_,smoke_diplomacy_status_;
+  std::string smoke_diplomacy_other_;
+  int smoke_diplomacy_target_{-1};
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
       [this](std::string_view relative){
         static constexpr std::array<std::string_view,4> approved{
@@ -2813,6 +2944,10 @@ class NativeCampaign final {
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
   std::function<void()> audio_confirm_;
   stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
+  stellar::native_notifications::NativeNotificationFeed notifications_;
+  stellar::native_notifications::NativeNotificationView notification_view_;
+  stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
+  double notification_refresh_elapsed_{};
   stellar::native_audio::NativeAudioDirector* presentation_audio_{};
   std::chrono::steady_clock::time_point last_event_sound_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
@@ -3078,6 +3213,13 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.diplomacy_smoke||options.diplomacy_reload_smoke){
+          campaign.notification_smoke(window.drawable_width(),window.drawable_height(),
+              options.diplomacy_reload_smoke,[&](const DrawList& draw,bool contact){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,
+                    contact?L"-events-contact":L"-events"));
+              });
+        }
         if(options.research_smoke){
           window.draw(campaign.research_inspector_end_smoke(
               window.drawable_width(),window.drawable_height()),

@@ -14,6 +14,7 @@ import tempfile
 
 from native_fleet_runtime import _source_row
 from native_galaxy_runtime import _bmp
+from native_client_runtime import _validate_capture
 
 
 _TERRITORY_FIELDS = {"valid", "regions", "claims", "fill_runs", "contour_points",
@@ -191,6 +192,23 @@ def _territory(stdout: str) -> dict:
         raise RuntimeError(f"Native territory diagnostic did not prove its rendered claim overlay: {state!r}")
     return state
 
+def _notifications(stdout: str, mode: str, target_id: int) -> dict:
+    rows = re.findall(r"(?m)^notifications=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1:
+        raise RuntimeError("Native diplomacy did not report exactly one notification diagnostic")
+    try:
+        state = json.loads(rows[0], object_pairs_hook=_without_duplicate_keys)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("Native diplomacy notification diagnostic is malformed") from error
+    expected = {"mode": mode, "opened": True, "closed": True, "items": 2 if mode == "progress" else 0,
+                "unread_before": 2 if mode == "progress" else 0, "unread_after": 0,
+                "focused_target": target_id if mode == "progress" else -1,
+                "canonical_unchanged": True, "paused": True}
+    if (not isinstance(state, dict) or set(state) != set(expected) or
+            any(type(state[k]) is not type(v) or state[k] != v for k, v in expected.items())):
+        raise RuntimeError("Native diplomacy notification diagnostic is invalid")
+    return state
+
 
 def _verify_progress(before: dict, after: dict, proposal_id: int, target_id: int) -> None:
     if _normalized(before) == _normalized(after):
@@ -263,12 +281,13 @@ def _verify_progress(before: dict, after: dict, proposal_id: int, target_id: int
 
 @_preserve_fixture
 def validate_native_diplomacy_export(folder: Path, env: dict[str, str], fixture: Path):
+    folder, fixture = folder.resolve(), fixture.resolve()
     source = _source_row(fixture)
     authored, proposal_id, target_id = author_diplomacy_fixture(source)
     systems = source.get("Galaxy", {}).get("Systems", [])
     system_root = Path(os.environ.get("SystemRoot", r"C:\\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics = [], []
+    captures, notification_captures, notification_checks, diagnostics = [], [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-diplomacy-") as temporary:
         work = Path(temporary)
         save = work / "diplomacy.player17.json"
@@ -287,13 +306,21 @@ def validate_native_diplomacy_export(folder: Path, env: dict[str, str], fixture:
                 raise RuntimeError("Native diplomacy did not confirm Vulkan, campaign and save")
             state = _state(result.stdout, mode)
             territory = _territory(result.stdout)
+            notifications = _notifications(result.stdout, mode, target_id)
             if state["proposal_id"] != proposal_id or state["target_id"] != target_id:
                 raise RuntimeError("Native diplomacy diagnostic selected the wrong proposal or counterpart")
             _bmp(capture, width, height)
             sidecar = capture.with_name(capture.stem + "-unknown.bmp")
             map_capture = capture.with_name(capture.stem + "-map.bmp")
+            events_capture = capture.with_name(capture.stem + "-events.bmp")
+            contact_capture = capture.with_name(capture.stem + "-events-contact.bmp")
+            _validate_capture(events_capture, width, height)
+            _validate_capture(contact_capture, width, height)
             _bmp(sidecar, width, height)
             _bmp(map_capture, width, height)
+            if (events_capture.read_bytes() == contact_capture.read_bytes() or
+                    events_capture.read_bytes() == map_capture.read_bytes()):
+                raise RuntimeError("Native diplomacy notification capture duplicated another view")
             map_bytes = map_capture.read_bytes()
             if map_bytes == capture.read_bytes() or map_bytes == sidecar.read_bytes():
                 raise RuntimeError("Native diplomacy regional map capture duplicated a diplomacy view")
@@ -312,8 +339,14 @@ def validate_native_diplomacy_export(folder: Path, env: dict[str, str], fixture:
                 evidence = folder.parent / f"{folder.name}-diplomacy-{image.name}"
                 shutil.copy2(image, evidence)
                 captures.append(str(evidence))
+            for image in (events_capture, contact_capture):
+                evidence = folder.parent / f"{folder.name}-diplomacy-{image.name}"
+                shutil.copy2(image, evidence)
+                notification_captures.append(str(evidence))
+            notification_checks.append(notifications)
             diagnostics.append(result.stdout.strip())
     return {"nativeDiplomacy": True, "nativeDiplomacyPausedReload": True,
             "nativeTerritory": True, "territoryChecks": {"known": territory_progress,
                                                              "reload": territory_reload},
-            "diplomacyCaptures": captures, "diplomacyDiagnostics": diagnostics}
+            "diplomacyCaptures": captures, "notificationCaptures": notification_captures,
+            "notificationChecks": notification_checks, "diplomacyDiagnostics": diagnostics}

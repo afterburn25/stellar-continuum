@@ -50,6 +50,7 @@ void verify(int width, int height, float expected_scale) {
           "Viewport produced the wrong UI scale.");
   require(contains_rect(viewport, layout.pause) &&
               contains_rect(viewport, layout.speed) &&
+              contains_rect(viewport, layout.notifications) &&
               contains_rect(viewport, layout.research) &&
               contains_rect(viewport, layout.shipyard) &&
               contains_rect(viewport, layout.construction) &&
@@ -59,6 +60,9 @@ void verify(int width, int height, float expected_scale) {
               contains_rect(layout.menu_panel, layout.menu_heading),
           "A UI rectangle escaped the drawable viewport.");
   require(!overlaps(layout.pause, layout.speed) &&
+              !overlaps(layout.notifications, layout.pause) &&
+              !overlaps(layout.notifications, layout.speed) &&
+              !overlaps(layout.notifications, layout.status_text) &&
               !overlaps(layout.research, layout.shipyard) &&
               !overlaps(layout.shipyard, layout.construction) &&
               !overlaps(layout.construction, layout.diplomacy),
@@ -117,6 +121,12 @@ void verify(int width, int height, float expected_scale) {
   for (const auto point : interior_points(layout.construction)) {
     require(layout.hit(point, false) == UiAction::Construction,
             "A point inside Construction missed its action.");
+  }
+  for (const auto point : interior_points(layout.notifications)) {
+    require(layout.hit(point, false) == UiAction::Notifications,
+            "A point inside Events missed its action.");
+    require(layout.hit(point, true) == UiAction::None,
+            "The pause menu admitted a hidden Events button.");
   }
   for (const auto point : interior_points(layout.diplomacy)) {
     require(layout.hit(point, false) == UiAction::Diplomacy,

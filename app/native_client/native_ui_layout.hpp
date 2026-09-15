@@ -28,6 +28,7 @@ enum class UiAction {
   Save,
   Load,
   Settings,
+  Notifications,
   Exit
 };
 
@@ -51,6 +52,7 @@ struct NativeUiLayout {
   UiRect load_button;
   UiRect exit_button;
   UiRect settings_button;
+  UiRect notifications;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
@@ -73,7 +75,7 @@ struct NativeUiLayout {
                        324.f * scale};
     const auto status_x = inset + 200.f * scale;
     const auto status_width = std::max(
-        0.f, std::min(720.f * scale, screen_width - status_x - inset));
+        0.f, std::min(720.f * scale, screen_width - status_x - inset - 114.f * scale));
     const auto rail_size = std::max(40.f, 44.f * scale);
     const auto rail_y = 138.f * scale;
     const auto rail_gap = 8.f * scale;
@@ -103,7 +105,8 @@ struct NativeUiLayout {
         {center_x - button_width * .5f,
          first_y + (button_height + gap) * 4.f, button_width, button_height},
         {center_x - button_width * .5f,
-         first_y + (button_height + gap) * 3.f, button_width, button_height}};
+         first_y + (button_height + gap) * 3.f, button_width, button_height},
+        {screen_width - inset - 96.f * scale, inset, 96.f * scale, 32.f * scale}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -117,6 +120,7 @@ struct NativeUiLayout {
     }
     if (pause.contains(point)) return UiAction::Pause;
     if (speed.contains(point)) return UiAction::Speed;
+    if (notifications.contains(point)) return UiAction::Notifications;
     if (research.contains(point)) return UiAction::Research;
     if (shipyard.contains(point)) return UiAction::Shipyard;
     if (construction.contains(point)) return UiAction::Construction;

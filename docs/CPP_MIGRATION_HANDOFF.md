@@ -5,6 +5,36 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Native recent-events integration
+
+The top-right Events button now opens a scrollable, dated history of the last
+32 reports. It shares the existing observer-filtered campaign summaries and
+retains accepted research, shipbuilding and construction outcomes. Diplomatic
+reports use Core's audience view, require identified counterparts for links,
+and use player-facing messages without internal IDs or enum names. Following
+OPEN RELATIONS selects the identified empire through the existing workspace.
+
+This selectively adapts Devin `8f6b720a`; its raw session event harvesting,
+separate audio loop and notification-only smoke mode are not imported. There
+is one existing audio path. Admission/load seeds retained diplomatic history
+silently; this session-local feed is cleared on activation and is not persisted
+into Player17. All 32 items are scrollable, text uses measured wrapping, and
+matching press/release ownership prevents stray clicks from activating links.
+See `engine/NATIVE_NOTIFICATIONS.md` for contract, review and validation.
+
+Final MSVC build and five focused CTests pass. Thirty-eight Python diplomacy
+and navigation checks pass. Two relocated Vulkan diplomacy launches verify
+fresh acceptance, event opening/acknowledgement, a link changing the selected
+empire, full canonical state preservation, and silent paused reload. Two
+neighboring 500-system navigation launches verify the existing input/save
+contract. Final panel captures at 720p and 1080p were inspected. Evidence is
+`work/native-notification-runtime.json`,
+`work/native-notification-navigation-runtime.json`,
+`work/native-notification-final-build.log` and
+`work/native-notification-focused.log`. The previous keyboard head `830e7907`
+passed Windows CI `35015114001`; that CI result belongs to the previous head.
+The package remains unsealed and PR #332 remains unmerged.
+
 ### Strategic keyboard integration
 
 Space, keys 1 through 4 and F6 now follow the legacy strategic pause/speed/save

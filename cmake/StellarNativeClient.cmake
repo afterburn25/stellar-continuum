@@ -27,6 +27,8 @@ target_link_libraries(stellar-continuum-native PRIVATE stellar_native_navigation
 add_dependencies(stellar-continuum-native stellar_native_navigation_assets)
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings stellar_native_campaign_feedback)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_surface_art_assets.cpp)
 add_dependencies(stellar-continuum-native stellar_native_surface_art_assets)
 add_dependencies(stellar-continuum-native stellar_native_audio_assets)

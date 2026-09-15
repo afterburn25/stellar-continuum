@@ -1,4 +1,18 @@
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
+add_executable(stellar_native_notification_tests
+  native-tests/native_notification_tests.cpp app/native_client/native_notifications.cpp)
+target_include_directories(stellar_native_notification_tests PRIVATE app/native_client engine/include)
+add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
+add_executable(stellar_native_notification_events_tests
+  native-tests/native_notification_events_tests.cpp
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp)
+target_include_directories(stellar_native_notification_events_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_core stellar_native_campaign_feedback)
+add_test(NAME native_notification_events COMMAND stellar_native_notification_events_tests)
+if(MSVC)
+  target_compile_options(stellar_native_notification_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_notification_events_tests PRIVATE /W4 /WX)
+endif()
 add_executable(stellar_native_system_travel_tests
   native-tests/native_system_travel_tests.cpp
   app/native_client/native_system_travel.cpp app/native_client/native_system_view.cpp)

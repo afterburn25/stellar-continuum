@@ -88,6 +88,7 @@ public:
       stellar::native_diplomacy::NativeDiplomacyView> &
   view() const noexcept;
   [[nodiscard]] std::size_t selected_contact_index() const noexcept;
+  [[nodiscard]] bool select_contact_civilization(int civilization_id);
   [[nodiscard]] const std::string &notice() const noexcept;
 
   [[nodiscard]] DiplomacyWorkspaceCommand
