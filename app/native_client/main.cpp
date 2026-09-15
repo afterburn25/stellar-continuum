@@ -425,6 +425,7 @@ class NativeCampaign final {
         ship_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
+    galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
     system_workspace_.use_background_preparation(image_preparation_);
     refresh_knowledge();
@@ -1433,7 +1434,7 @@ class NativeCampaign final {
     return true;
   }
 
-  [[nodiscard]] bool artwork_ready()const noexcept{return !system_workspace_.visible()||system_workspace_.artwork_ready();}
+  [[nodiscard]] bool artwork_ready()const noexcept{return system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready();}
 
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
@@ -1515,8 +1516,11 @@ class NativeCampaign final {
         layout.day_text.width, layout.day_text});
     if(selected_id_){const auto found=cache.systems_by_id.find(*selected_id_);if(found!=cache.systems_by_id.end()){const bool known=known_.contains(*selected_id_);const float x=18,y=screen_height-82;out.text.push_back({{x,y},known?found->second->name:"Unknown system",{238,244,255,255}});out.text.push_back({{x,y+18},known?spectral_name(found->second->primary):"No survey data",{154,181,211,235}});}}
     const auto &notice = session_->notice();
-    if (notice.kind != SessionNoticeKind::None) {
+    const bool preparing_galaxy=!system_workspace_.visible()&&!galaxy_backdrop_.artwork_ready();
+    if (notice.kind != SessionNoticeKind::None || preparing_galaxy) {
       auto message = notice.message;
+      if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
+        message="Preparing galaxy imagery...";
       if (notice.kind == SessionNoticeKind::Loading) {
         message += " " +
                    std::to_string(static_cast<int>(notice.progress * 100.)) +
@@ -2260,7 +2264,7 @@ int main(int argc,char **argv){
         if(!artwork_ready){++artwork_pending_frames;if(!artwork_pending_since)artwork_pending_since=scene_begin;}
         else if(artwork_pending_since){artwork_prepare_max_ms=std::max(artwork_prepare_max_ms,std::chrono::duration<double,std::milli>(scene_end-*artwork_pending_since).count());artwork_pending_since.reset();}
       }
-      if(waiting_for_artwork){screenshot.reset();if(++artwork_wait_frames>600)throw std::runtime_error("System artwork did not finish preparation before capture.");}
+      if(waiting_for_artwork){screenshot.reset();if(++artwork_wait_frames>600)throw std::runtime_error("Map artwork did not finish preparation before capture.");}
       window.draw(scene,screenshot,steady_profile?&draw_timing:nullptr);
       const auto render_end=std::chrono::steady_clock::now();
       if(smoke_timing)

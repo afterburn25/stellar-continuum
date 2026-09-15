@@ -112,7 +112,45 @@ are not certified at 60 FPS. No visual-quality reduction or gameplay rule change
 Evidence: `native-background-art-{tests,capture-tests,owner-tests,runtime}.log`,
 `work/background-art-{system,galaxy,travel}.json`, and `build-native/preview-*.bmp`.
 Baseline: `work/steady-baseline-{system,galaxy}.json`. Previous head `b491783c`
-passed native CI `34942125331`; this background-art candidate needs its own CI.
+passed native CI `34942125331`; system-art head `96b83092` passed `34946960470`.
+
+### Background galaxy imagery
+
+Deep-field, galaxy-layer and regional-nebula decoding now shares the same bounded
+Engine queue as system imagery. Three cache slots allow at most 8 MiB per image;
+the existing WIC decode scratch bound is separate. Completed layers retain their
+original pixels, order and geometry. Central secrecy fog is present even while
+scenery is pending. Main keeps navigation active, shows preparation in the existing
+status region and waits for final galaxy imagery before smoke screenshots.
+
+The strict build, three focused CTests and 46 Python galaxy/system/diplomacy export
+checks passed. Backdrop tests exercise a deliberately blocked worker, saturation,
+duplicate requests, view changes, cancellation, owner-thread violations, missing
+paths and an oversized WIC-readable source. Repeated synchronous and asynchronous
+oversize attempts fail with the path/cause and leave the cache empty. Final RGBA
+bytes match the synchronous path, including the secrecy fog.
+
+Six real Vulkan launches at 720p/1080p passed existing galaxy/system/diplomacy
+artwork, UI, observer and exact paused Player17 save/reload checks. Galaxy and Sol
+each included 600 steady frames per resolution. Four completed overview/regional
+BMP files are byte-identical to the preceding `96b83092` captures.
+
+| Scene CPU maximum | 720p before | 720p after | 1080p before | 1080p after |
+| --- | ---: | ---: | ---: | ---: |
+| First galaxy frame | 45.432 ms | 3.163 ms | 46.248 ms | 2.695 ms |
+| Regional capture transitions | 19.779 ms | 1.027 ms | 19.577 ms | 0.833 ms |
+
+Sol cold scene remains 2.907/2.867 ms. Across all four profiles, steady interval
+means were 16.716–16.721 ms, p95 16.935–17.087 ms and p99 17.338–19.141 ms. A cold
+render/present maximum of about 67 ms at frame 7 remains to investigate; these
+measurements do not certify every frame, busy campaigns or other hardware at
+60 FPS. There is no visual-quality reduction or authoritative simulation change.
+
+Evidence: `native-galaxy-background-{tests,runtime}.log`,
+`work/galaxy-background-{galaxy,system,diplomacy}.json`,
+`work/galaxy-background-pixel-comparison.json`, and `build-native/preview-*.bmp`.
+Previous head `96b83092` passed native CI `34946960470`; the galaxy checkpoint
+requires its own run. It remains an unmerged Engine 0.1.58 candidate.
 
 ### Optional steady-frame profile
 

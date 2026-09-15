@@ -214,18 +214,56 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   `native-background-art-capture-tests.log`, `native-background-art-owner-tests.log`,
   `native-background-art-runtime.log`,
   `work/background-art-{system,galaxy,travel}.json`, and `build-native/preview-*.bmp`.
-  Baselines remain `work/steady-baseline-{system,galaxy}.json`. Native CI for this
-  new checkpoint is still required; `b491783c` passed `34942125331`. No release,
+  Baselines remain `work/steady-baseline-{system,galaxy}.json`. System-art head
+  `96b83092` passed native CI `34946960470`; `b491783c` passed `34942125331`. No release,
   shared merge, full-suite run or clean-machine certification is claimed.
+
+## Background galaxy-art preparation checkpoint
+
+- `NativeGalaxyBackdropAssets` now offers `request_deep_field`,
+  `request_galaxy_layer`, `request_regional_nebula`, `pending_count` and
+  `cancel_preparation`, using the same Engine queue as system artwork. Sources
+  use absolute paths; workers own copied paths/labels only. Owner-thread polling
+  drains all ready results, including abandoned-view requests. Queue saturation
+  returns pending and is retried; campaign discard cancels outstanding tickets.
+  The synchronous API remains for tools and exact comparisons.
+- Each source is decoded and validated locally before cache assignment, with an
+  8 MiB per-image limit and three cache slots (24 MiB maximum). Errors preserve
+  source label, full path and underlying cause. Failed/oversized results never
+  populate the cache. Existing decoder scratch bounds remain separate.
+- `NativeGalaxyBackdrop::artwork_ready()` covers the last appended frame. Missing
+  layers wait independently; the central secrecy fog remains drawn throughout.
+  Main uses the existing status region for preparation feedback and applies the
+  existing bounded final-art capture gate to galaxy views too. Finished artwork,
+  geometry, colors and rendering order are unchanged.
+- Strict native build, three focused CTests and 46 Python export checks passed.
+  Tests cover blocked/saturated queues, no duplicate work, view changes, discard,
+  owner guards, missing/oversized sources and exact final RGBA equality. The
+  maintained backdrop test has a 45-second timeout and cleans only its own
+  verified temporary fixture directory.
+- Six actual Vulkan launches passed at 720p/1080p: galaxy and Sol with 600 steady
+  frames each, plus default diplomacy checks. Existing artwork, input, secrecy,
+  save and exact paused Player17 reload gates remain intact. Galaxy first-scene
+  CPU maxima: 45.432/46.248 -> 3.163/2.695 ms; regional capture transitions:
+  19.779/19.577 -> 1.027/0.833 ms. Sol remains 2.907/2.867 ms. All four completed
+  overview/regional BMP files match `96b83092` byte for byte.
+- Steady interval means were 16.716–16.721 ms, p95 16.935–17.087 ms and p99
+  17.338–19.141 ms. Cold render/present still reaches ~67 ms at frame 7; its
+  submission/driver/display contribution is not yet isolated. No broad 60 FPS
+  certification, visual-parity, sealed-release or shared-merge claim is made.
+- Evidence: `native-galaxy-background-tests.log`,
+  `native-galaxy-background-runtime.log`, `work/galaxy-background-{galaxy,system,diplomacy}.json`,
+  `work/galaxy-background-pixel-comparison.json`, and `build-native/preview-*.bmp`.
+  Previous system-art head `96b83092` passed native CI `34946960470`; this new
+  checkpoint needs its own run.
 
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- Initial galaxy scenery still costs 45–46 ms, regional scenery about 20 ms;
-  upload/presentation tails also remain. System CPU rasterization is now staged
-  as above. Next inspect these measured remaining stalls, then profile busy
+- System and galaxy CPU imagery preparation is now staged as above. Next isolate
+  the remaining ~67 ms cold render/present tail, then profile busy
   campaigns separately before making a general 60 FPS claim. Keep Core access
   and GPU/window work on the owner thread, preserve final pixels and capture gates.
 - Surface colony visuals (buildings/roads), orbital structure rendering.

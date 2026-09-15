@@ -389,6 +389,7 @@ add_executable(stellar_galaxy_backdrop_tests
 target_include_directories(stellar_galaxy_backdrop_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_backdrop COMMAND stellar_galaxy_backdrop_tests "${CMAKE_SOURCE_DIR}")
+set_tests_properties(native_galaxy_backdrop PROPERTIES TIMEOUT 45)
 
 add_executable(stellar_ship_art_tests
   native-tests/native_ship_art_tests.cpp

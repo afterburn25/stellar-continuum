@@ -53,12 +53,24 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Background system artwork now reduces measured first-scene CPU work from ~211 ms to 2.8–2.9 ms. Initial galaxy scenery still costs 45–46 ms and regional scenery ~20 ms; upload/presentation tails and busy-campaign performance remain to investigate. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
+5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. A cold render/present tail of ~67 ms and busy-campaign performance remain to investigate. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
-Latest Codex checkpoint prepares system stars, rings and planet discs on one
+Latest Codex checkpoint also prepares deep-field, galaxy and regional scenery on
+the existing bounded Engine image worker. Each decoded scenery image is limited
+to 8 MiB, with three cache slots; missing/oversized sources retain their path/cause.
+Central fog remains visible while scenery prepares, navigation stays responsive,
+and capture gates wait for finished imagery. Three focused CTests, 46 Python
+checks and six actual Vulkan galaxy/system/diplomacy launches passed. Galaxy cold
+scene CPU time fell from 45.432/46.248 ms to 3.163/2.695 ms at 720p/1080p;
+regional transition maxima fell from 19.779/19.577 ms to 1.027/0.833 ms. All four
+finished galaxy overview/regional BMP captures are byte-identical to the previous
+build. This checkpoint requires its own CI; previous system-art head `96b83092`
+passed native CI `34946960470`. See the handoff and validation document for limits.
+
+The preceding checkpoint prepares system stars, rings and planet discs on one
 existing Engine JobSystem worker, using copied observer-safe appearances.
 Admission is bounded to 16 outstanding jobs / 32 MiB reserved output; cache
 budgets remain unchanged. Generation changes cancel obsolete requests without
@@ -71,8 +83,8 @@ Sol first-scene CPU time 2.936/2.807 ms versus 211.452/211.567 ms; final images
 arrive asynchronously in ~213–258 ms. Screenshot gates wait for real artwork.
 Paused-map interval means 16.717–16.722 ms and p95 16.913–17.026 ms preserve warm
 pacing; see the handoff/validation document for remaining stalls and evidence.
-Previous profiling head `b491783c` passed native CI `34942125331`; this new
-checkpoint needs its own CI. Engine remains 0.1.58 candidate.
+Profiling head `b491783c` passed native CI `34942125331`; system-art head
+`96b83092` passed `34946960470`. Engine remains 0.1.58 candidate.
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
   144/144 headless CTest baseline, 61 Python export checks.
