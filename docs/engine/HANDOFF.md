@@ -5,8 +5,11 @@ observer-safe territory, approved artwork, audio/settings/scientist cues and
 top-down colony buildings with connected cosmetic roads. Surface checkpoint
 `f13192ea` passed Windows CI `34998925922`. See
 `../CPP_MIGRATION_HANDOFF.md` for current validation and next work; the
-milestones below are historical. The surface sprite review through Devin
-`bfc51a23` is in `NATIVE_SURFACE_SPRITE_REVIEW.md`. PR #332 remains unmerged
+milestones below are historical. Research inspector readability is now checked
+with native fonts at 720p/1080p; see `NATIVE_RESEARCH.md`. Devin tactical
+checkpoint `357872e8` and surface sprites remain unimported; see
+`NATIVE_TACTICAL_WORKSPACE_REVIEW.md` and `NATIVE_SURFACE_SPRITE_REVIEW.md`.
+PR #332 remains unmerged
 and unsealed. Full 3D, production HUD styling and sustained 60 FPS are unproven.
 
 Engine 0.1.55 restores the four approved menu/loading artworks in the native C++23 client: application boot, main menu and race setup, new-galaxy generation, and saved-campaign restoration. The application-loading screen lasts at least seven seconds; its displayed progress is bounded by both loaded assets and the minimum presentation time. New/save operations retain real operation progress without an artificial delay. The right artwork survives immediate worker completion because the request origin is recorded explicitly. Responsive translucent controls, complete species portraits and one gameplay tip per operation remain legible at 720p and 1080p.

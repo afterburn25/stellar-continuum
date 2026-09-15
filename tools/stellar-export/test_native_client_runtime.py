@@ -617,7 +617,7 @@ class NativeSessionExportTests(unittest.TestCase):
 
 
 class NativeResearchExportTests(unittest.TestCase):
-    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False):
+    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False, capture_fault=None):
         with tempfile.TemporaryDirectory(prefix="stellar-research-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -627,6 +627,8 @@ class NativeResearchExportTests(unittest.TestCase):
                 self.assertNotEqual(cwd, package)
                 save = Path(args[args.index("--save-path") + 1])
                 capture = Path(args[args.index("--research-smoke") + 1])
+                width = int(args[args.index("--width") + 1]); height = int(args[args.index("--height") + 1])
+                self.assertEqual((width, height), (1920, 1080) if "--load" in args else (1280, 720))
                 self.assertEqual(save.parent, cwd)
                 self.assertEqual(capture.parent, cwd)
                 calls.append(args)
@@ -647,9 +649,25 @@ class NativeResearchExportTests(unittest.TestCase):
                         "AdaptiveResearch": {"Civilizations": [{"CivilizationId": 7,
                                                                   "Research": research}]}}
                 save.write_text(json.dumps(payload))
-                capture.write_bytes(b"BM" + bytes(54))
+                if capture_fault == "missing" and "--load" in args:
+                    pass
+                else:
+                    stride = (width * 3 + 3) & ~3
+                    pixels = bytes(range(251)) * (stride * height // 251 + 1)
+                    data = (b"BM" + struct.pack("<IHHI", 54 + stride * height, 0, 0, 54) +
+                            struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
+                                        stride * height, 2835, 2835, 0, 0) + pixels[:stride * height])
+                    if capture_fault == "wrong_size" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<i", data, 18, width - 1); data = bytes(data)
+                    if capture_fault == "truncated" and "--load" in args: data = data[:-20]
+                    capture.write_bytes(data)
+                    sidecar = capture.with_name(capture.stem + "-inspector-end.bmp")
+                    if capture_fault != "sidecar_missing" or "--load" not in args:
+                        sidecar.write_bytes(data)
                 saved = "preserved" if skipped_save and "--load" in args else "ok"
-                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1", "")
+                marker = "" if capture_fault == "marker_missing" and "--load" in args else "\nresearch_inspector={\"final_line_visible\":true,\"graph_stationary\":true}"
+                if capture_fault == "marker_malformed" and "--load" in args: marker = "\nresearch_inspector={bad}"
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1" + marker, "")
 
             with mock.patch("native_research_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_research_export(package, {})
@@ -676,6 +694,23 @@ class NativeResearchExportTests(unittest.TestCase):
     def test_skipping_loaded_save_is_not_a_roundtrip(self):
         with self.assertRaisesRegex(RuntimeError, "actual manual save"):
             self.exercise(skipped_save=True)
+
+    def test_research_reload_capture_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="missing")
+
+    def test_research_reload_capture_dimensions_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="wrong_size")
+
+    def test_research_reload_capture_payload_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="truncated")
+
+    def test_research_inspector_sidecars_required(self):
+        for fault in ("sidecar_missing", "marker_missing", "marker_malformed"):
+            with self.subTest(fault=fault), self.assertRaisesRegex(RuntimeError, "inspector"):
+                self.exercise(capture_fault=fault)
 
 
 if __name__ == "__main__":

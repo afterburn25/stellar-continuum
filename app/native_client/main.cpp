@@ -496,6 +496,7 @@ class NativeCampaign final {
         asset_root_(std::filesystem::absolute(asset_root)),
         text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
+    research_workspace_.set_text_measurer(text_measurer_);
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
     system_workspace_.use_background_preparation(image_preparation_);
@@ -912,6 +913,51 @@ class NativeCampaign final {
                refreshed_layout.pause.y+refreshed_layout.pause.height*.5f});
     }
     smoke_research_node_=research_workspace_.selected_id();
+  }
+  [[nodiscard]] DrawList research_inspector_end_smoke(int width,int height){
+    if(!research_workspace_.visible()||!research_workspace_.window()||
+       !research_workspace_.selected_id()||!text_measurer_)
+      throw std::runtime_error("Research inspector replay requires a selected program and the native font renderer.");
+    const auto selected=*research_workspace_.selected_id();
+    const auto layout=ResearchWorkspaceLayout::for_viewport(
+        width,height,research_workspace_.window()->domain_tabs.size());
+    // Establish the real wrapped-text extent before sending a wheel event.
+    (void)scene(width,height);
+    const auto card_before=research_workspace_.card_bounds(selected,width,height);
+    const auto wheel=[&](float amount){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer={layout.inspector.x+layout.inspector.width*.5f,
+                     layout.inspector.y+layout.inspector.height*.5f};
+      input.events={{InputEventType::Wheel,input.pointer,{},amount}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Research inspector wheel input closed the campaign.");
+    };
+    wheel(-1000.f);
+    auto bottom=scene(width,height);
+    const auto card_after=research_workspace_.card_bounds(selected,width,height);
+    if(!card_before||!card_after||card_before->x!=card_after->x||card_before->y!=card_after->y)
+      throw std::runtime_error("Research inspector wheel moved the graph.");
+    const Text *last_detail=nullptr;
+    for(const auto&command:bottom.overlay){
+      const auto*label=std::get_if<Text>(&command);
+      if(label&&(label->value.starts_with("COST & TIME\n")||
+                 label->value.starts_with("KNOWN CAPABILITIES\n")||
+                 label->value.starts_with("REQUIREMENTS / STATUS\n")||
+                 label->value.starts_with("PROGRAM NOTICE\n")||
+                 label->value.starts_with("ACTION STATUS\n")))
+        last_detail=label;
+    }
+    if(!last_detail||!last_detail->clip)
+      throw std::runtime_error("Research inspector replay found no final detail block.");
+    const auto final_extent=text_measurer_(*last_detail);
+    if(last_detail->at.y+static_cast<float>(final_extent.height)>
+           last_detail->clip->y+last_detail->clip->height+1.f||
+       last_detail->clip->y+last_detail->clip->height>layout.action.y)
+      throw std::runtime_error("Research inspector final line is clipped or covers its action.");
+    wheel(1.f);
+    (void)scene(width,height);
+    wheel(-1000.f);
+    return scene(width,height);
   }
   void prepare_fleet_smoke(int width,int height){
     const auto click=[&](Point point,InputEventType press=InputEventType::LeftPressed){
@@ -2738,6 +2784,12 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.research_smoke){
+          window.draw(campaign.research_inspector_end_smoke(
+              window.drawable_width(),window.drawable_height()),
+              sidecar_path(*options.smoke_screenshot,L"-inspector-end"));
+          std::cout<<"research_inspector={\"final_line_visible\":true,\"graph_stationary\":true}\n";
+        }
         if(options.audio_settings_check&&!options.new_game_smoke){
           const int width=window.drawable_width(),height=window.drawable_height();
           const auto route=[&](const InputEvent& event){

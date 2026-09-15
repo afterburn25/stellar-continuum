@@ -5,6 +5,25 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Research inspector and tactical review
+
+Research details now use native-font measurements and independent bounded
+scrolling with a pinned action/result. Routine simulation refreshes preserve
+the reading position. Focused native build/CTest and 62 Python checks passed;
+two actual Vulkan runs at 720p/1080p produced four inspected captures and proved
+funded progress plus exact paused Player17 recapture. See
+`engine/NATIVE_RESEARCH.md` for evidence and limits.
+
+Devin tactical port `357872e8` is reviewed but not imported. Ship circles are
+covered by its opaque overlay; group orders affect only the first selection;
+gesture ownership, paused speed changes, camera coordinates, bounded drawing
+and tactical-save coverage need correction. See
+`engine/NATIVE_TACTICAL_WORKSPACE_REVIEW.md` and coordination issue #324 comment
+`5685514815`. Keep the existing Core combat owner; do not start a competing port.
+Next: corrected tactical checkpoint review and compact icon navigation using
+approved artwork. PR #332 remains unmerged and unsealed. Prior HUD/surface
+evidence below belongs to its named checkpoint.
+
 ### Native HUD and pause-control checkpoint (2026-09-15)
 
 The six campaign controls and pause-menu buttons share restrained blue panels,

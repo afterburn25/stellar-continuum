@@ -6,6 +6,12 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Research has renderer-measured detail sections, independently bounded scroll,
+  a pinned action/result, and stable reading position during routine simulation
+  updates. Its maintained replay requires 720p fresh and 1080p reload captures
+  plus final-line sidecars, funded progress and exact paused Player17 equality.
+  See `NATIVE_RESEARCH.md` for the focused regression and actual-frame evidence.
+
 - RELATIONS opens an observer-safe contact directory, communications artwork, relationship meters, agreements/proposals/history/intelligence, and canonical negotiation/war/proposal commands. Contact changes refresh while paused; stale confirmations are rejected. Scroll drawing and hit areas are clipped together. The C# workspace has no grievance display or full demand/trade composer, and claims belong on the strategic map, so those are not outstanding native parity gaps.
 
 - The territory candidate preserves the C# strategic smoothing, continuous fills,
