@@ -7,6 +7,7 @@
 #include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_inspection.hpp"
+#include "native_logistics.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -93,6 +94,7 @@ namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_inspection = stellar::native_inspection;
+namespace native_logistics = stellar::native_logistics;
 namespace native_notifications = stellar::native_notifications;
 namespace native_support = stellar::native_support;
 namespace native_voice = stellar::native_voice;
@@ -135,6 +137,7 @@ struct Options {
   bool battle_smoke{};
   bool audio_smoke{};
   bool notification_smoke{};
+  bool logistics_smoke{};
   bool save_path_overridden{};
 };
 
@@ -178,6 +181,7 @@ struct Options {
     else if(arg==L"--battle-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.battle_smoke=true;result.windowed=true;}
     else if(arg==L"--audio-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.audio_smoke=true;result.windowed=true;}
     else if(arg==L"--notification-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.notification_smoke=true;result.windowed=true;}
+    else if(arg==L"--logistics-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.logistics_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -209,17 +213,19 @@ struct Options {
     else if(arg=="--battle-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.battle_smoke=true;result.windowed=true;}
     else if(arg=="--audio-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.audio_smoke=true;result.windowed=true;}
     else if(arg=="--notification-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.notification_smoke=true;result.windowed=true;}
+    else if(arg=="--logistics-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.logistics_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)+static_cast<int>(result.logistics_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
   if(result.diplomacy_smoke&&!result.load)throw std::invalid_argument("--diplomacy-smoke requires --load with a diplomacy-bearing player campaign fixture.");
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires --load with an active tactical encounter save.");
   if(result.notification_smoke&&!result.load)throw std::invalid_argument("--notification-smoke requires --load with a diplomacy-bearing player campaign fixture.");
+  if(result.logistics_smoke&&!result.load)throw std::invalid_argument("--logistics-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
@@ -1260,6 +1266,52 @@ class NativeCampaign final {
        <<"}";
     return out.str();
   }
+  void prepare_logistics_smoke(int width,int height){
+    // The top-rail SUPPLY button toggles the panel (reference CampaignSidebar
+    // LOGISTICS section).
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    InputSnapshot input;
+    input.drawable_width=width;
+    input.drawable_height=height;
+    input.pointer=center(main_layout.logistics);
+    input.events={{InputEventType::LeftPressed,input.pointer},
+                  {InputEventType::LeftReleased,input.pointer}};
+    if(!update(input,width,height,0.,false))
+      throw std::runtime_error(
+          "Logistics smoke input closed the campaign.");
+    if(!logistics_view_.visible())
+      throw std::runtime_error(
+          "Logistics smoke could not open the supply network panel.");
+    smoke_logistics_panel_=true;
+  }
+  void capture_logistics_panel(){
+    const auto &campaign=session_->frame().runtime().world().campaign();
+    const auto logistics=native_logistics::build_home_logistics(
+        campaign,campaign.player_civilization_id);
+    smoke_logistics_ready_=logistics.ready?1:0;
+    smoke_logistics_nodes_=static_cast<int>(logistics.nodes.size());
+    smoke_logistics_corridors_=logistics.corridor_count;
+    smoke_logistics_supply_=logistics.supply_per_day;
+    smoke_logistics_demand_=logistics.demand_per_day;
+    smoke_logistics_delivered_=logistics.delivered_per_day;
+    smoke_logistics_shortfall_=logistics.shortfall_per_day;
+    if(smoke_logistics_ready_==0)
+      throw std::runtime_error(
+          "Logistics smoke found no resolvable home-system network.");
+  }
+  [[nodiscard]] std::string logistics_smoke_status()const{
+    std::ostringstream out;
+    out<<"{\"panel\":"<<(smoke_logistics_panel_?1:0)
+       <<",\"ready\":"<<smoke_logistics_ready_
+       <<",\"nodes\":"<<smoke_logistics_nodes_
+       <<",\"corridors\":"<<smoke_logistics_corridors_
+       <<",\"supply\":"<<smoke_logistics_supply_
+       <<",\"demand\":"<<smoke_logistics_demand_
+       <<",\"delivered\":"<<smoke_logistics_delivered_
+       <<",\"shortfall\":"<<smoke_logistics_shortfall_
+       <<"}";
+    return out.str();
+  }
   void prepare_battle_smoke(int width,int height){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -1779,6 +1831,14 @@ class NativeCampaign final {
         }
         if(result.captured)continue;
       }
+      if(logistics_view_.visible()&&!menu_){
+        const auto &campaign=session_->frame().runtime().world().campaign();
+        if(logistics_view_.handle(
+               event,native_logistics::build_home_logistics(
+                        campaign,campaign.player_civilization_id),
+               width,height))
+          continue;
+      }
       if(event.type==InputEventType::EscapePressed){
         if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
@@ -1925,6 +1985,10 @@ class NativeCampaign final {
           notification_view_.toggle(session_->notifications().latest_sequence());
           captured=true;
         }
+        else if(action==UiAction::Logistics){
+          logistics_view_.toggle();
+          captured=true;
+        }
         if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         if(action!=UiAction::None)audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
         gesture_.begin(captured);continue;
@@ -2066,6 +2130,14 @@ class NativeCampaign final {
           unread > 99 ? "99+" : std::to_string(unread),
           unread > 0 ? Color{240, 197, 106, 255} : Color{225, 238, 250, 255},
           layout.control_font_pixels, layout.scale);
+    fill(out, layout.logistics,
+         logistics_view_.visible()
+             ? selected
+             : layout.logistics.contains(pointer_) ? hover : button);
+    stroke(out, layout.logistics,
+           logistics_view_.visible() ? Color{154, 225, 188, 255} : border);
+    label(out, layout.logistics, "SUPPLY", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -2134,6 +2206,13 @@ class NativeCampaign final {
     if(!menu_)
       notification_view_.render(out,session_->notifications().items(),width,
                               height);
+    if(!menu_&&logistics_view_.visible()){
+      const auto &campaign=session_->frame().runtime().world().campaign();
+      logistics_view_.render(
+          out,native_logistics::build_home_logistics(
+                  campaign,campaign.player_civilization_id),
+          width,height);
+    }
     // Voice captions (reference VoiceCaptionDock): hidden while the menu or
     // diplomacy surface is open.
     if(voice_playback_&&voice_playback_->has_active_subtitle()&&!menu_&&
@@ -2710,6 +2789,7 @@ class NativeCampaign final {
         colony_workspace_.visible()||research_workspace_.visible()||
         shipyard_workspace_.visible()||construction_workspace_.visible()||
         diplomacy_workspace_.visible()||notification_view_.visible()||
+        logistics_view_.visible()||
         gesture_.captured_by_ui()||gesture_.allows_world_drag()||
         !fleet_workspace_.selected_fleet_id();
     const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
@@ -2877,6 +2957,7 @@ class NativeCampaign final {
   std::optional<native_voice::NativeGameplayVoiceBridge> voice_bridge_;
   native_audio_settings::NativeAudioSettingsView audio_settings_;
   native_notifications::NativeNotificationView notification_view_;
+  native_logistics::NativeLogisticsView logistics_view_;
   std::int64_t last_played_notification_{};
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
@@ -2958,6 +3039,11 @@ class NativeCampaign final {
   std::int64_t smoke_diplomacy_proposal_id_{-1};
   bool smoke_diplomacy_portrait_{};
   bool smoke_notification_panel_{};
+  bool smoke_logistics_panel_{};
+  int smoke_logistics_ready_{},smoke_logistics_nodes_{},
+      smoke_logistics_corridors_{};
+  double smoke_logistics_supply_{},smoke_logistics_demand_{},
+      smoke_logistics_delivered_{},smoke_logistics_shortfall_{};
   int smoke_notification_items_{},smoke_notification_unread_{},
       smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
       smoke_notification_focused_{-1};
@@ -3071,6 +3157,9 @@ int main(int argc,char **argv){
       else if(options.notification_smoke)
         campaign.prepare_notification_smoke(window.drawable_width(),
                                             window.drawable_height());
+      else if(options.logistics_smoke)
+        campaign.prepare_logistics_smoke(window.drawable_width(),
+                                         window.drawable_height());
       else if(options.battle_smoke)
         campaign.prepare_battle_smoke(window.drawable_width(),
                                       window.drawable_height());
@@ -3113,7 +3202,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke||options.logistics_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       std::optional<std::filesystem::path> screenshot;
@@ -3161,6 +3250,8 @@ int main(int argc,char **argv){
                                                 input.drawable_height);}
         else if(frames==121)campaign.capture_notification_contact();
       }
+      if(options.logistics_smoke&&frames==120)
+        campaign.capture_logistics_panel();
       if(options.battle_smoke&&frames==120)campaign.capture_battle_workspace();
       const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:options.ship_art_smoke?frames>=122:options.diplomacy_smoke?frames>=122:options.notification_smoke?frames>=122:frames>=120);
       if(capture){
@@ -3220,6 +3311,8 @@ int main(int argc,char **argv){
           std::cout<<" diplomacy="<<campaign.diplomacy_smoke_status();
         if(options.notification_smoke)
           std::cout<<" notifications="<<campaign.notification_smoke_status();
+        if(options.logistics_smoke)
+          std::cout<<" logistics="<<campaign.logistics_smoke_status();
         if(options.battle_smoke)
           std::cout<<" battle="<<campaign.battle_smoke_status();
         if(options.audio_smoke)

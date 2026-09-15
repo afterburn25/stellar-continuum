@@ -180,6 +180,32 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `native_inspection` CTest covers unknown, detected, fully surveyed,
   foreign-redacted, own-colony, and rendering/bounds cases.
 
+## Logistics panel slice (candidate for review)
+
+- `app/native_client/native_logistics.{hpp,cpp}` — ports
+  `Main.Logistics`/`LogisticsNetworkPanel`: `build_home_logistics` returns the
+  player civilization's home-system `HomeSystemLogisticsNetwork` as a
+  read-only view (system name, corridor count, supply/demand/delivered/
+  shortfall totals, up to eight node rows with reference kind labels and
+  Supply node/Fully supplied/Shortfall status), `logistics_summary_line` is
+  the `UiLogisticsSummary` status string, and `NativeLogisticsView` is a
+  toggleable SUPPLY NETWORK panel (2×2 metric tiles, guidance, node cards)
+  that contains its own pointer input like the notification panel.
+- Campaigns without a resolvable player economy row render the reference
+  "initializing" state instead of throwing; sparse fixtures omit the network.
+- `NativeUiLayout` gained `UiAction::Logistics` + the top-rail SUPPLY button
+  (inset +798·scale).
+- `stellar-continuum-native.exe --logistics-smoke <bmp>` (requires `--load`):
+  clicks the rail button, verifies the panel opened, captures the rendered
+  network and reports `logistics={panel,ready,nodes,corridors,supply,demand,
+  delivered,shortfall}`.
+- `tools/stellar-export/native_logistics_runtime.py` —
+  `validate_native_logistics_export(folder, env, player17_fixture)` runs the
+  smoke twice (fresh + reload) and asserts the ready network, node rows,
+  payload integrity and a non-blank capture.
+- `native_logistics` CTest covers the initializing state, home-network build,
+  kind labels, panel containment/close, and rendering.
+
 ## Notification feed slice (candidate for review)
 
 - `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`
