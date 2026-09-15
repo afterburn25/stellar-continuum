@@ -287,13 +287,57 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   `work/cold-queue-one-{system,galaxy}.json`. Galaxy head `63d62d31` has native CI
   `34950285134` in progress; the new diagnostic needs its own run. No shared merge.
 
+## Running-campaign performance checkpoint
+
+- New opt-in `--campaign-profile <capture.bmp>` requires an isolated `--save-path`
+  and `--profile-frames 120..3600`; it is exclusive with other graphical modes.
+  Optional `--load` resumes an existing Player17 campaign. Normal smoke defaults
+  and normal gameplay are unchanged; no simulation rules or fake fleets are added.
+- Warm-up is paused through frame 119. UI speed clicks select Maximum (8X),
+  then UI resume/pause clicks bracket the exact requested active frames. Real
+  elapsed time goes through normal Player CampaignFrame policy. A manual save
+  is requested midway; completion and subsequent time advancement must both be
+  observed. Final UI pause freezes the day while the last save and artwork finish.
+  Session/save failures fail the check instead of being retried.
+- `native_campaign_profile.py` runs active 720p fresh and active 1080p reload,
+  each followed by an independent paused reload/resave. Entire Player17 payloads
+  must match except SavedAtUtc, including the frozen day; the active source copy
+  must remain unchanged. Strict parsing rejects wrong speed/count/flags,
+  unordered/nonfinite days and malformed/duplicate metrics. See the validation
+  document for invocation and explicit early-campaign scope.
+- Evidence: strict native build; four CTests (native_campaign_session,
+  native_client_input, campaign_frame_parity, strategic_clock_parity); 88 Python
+  checks; four invalid CLI cases; four active/paused Vulkan launches and two
+  unchanged default system launches. The first CTest attempt found two unbuilt
+  test executables; building their canonical targets resolved it and all four
+  passed. No scratch checker or .NET process is involved.
+- 600 measured frames per active run: day 0 -> 80.2483424 -> 160.514568.
+  Interval mean/p95/p99: 720p 16.718/16.917/18.181 ms; 1080p
+  16.722/17.113/18.817 ms. Update means 0.305/0.359 ms, maxima 5.941/4.434 ms;
+  readback and fallback throttle are zero. This does not prove late-game workload
+  or every frame/hardware configuration at 60 FPS.
+- Logs: `native-active-campaign-{build,unit,runtime,validation}.log`;
+  JSON: `work/active-campaign-baseline.json`,
+  `work/active-profile-default-system.json`; screenshots:
+  `build-native/preview-active-{1280x720,1920x1080}.bmp`. The 1080p capture was
+  visually inspected: completed galaxy artwork, secrecy fog, final pause/day/save.
+- Previous cold diagnostic `86445dde` passed native CI `34952179710`.
+  This checkpoint needs its own CI; Engine 0.1.58 remains a candidate in PR #332.
+- Read-only audit found known-system vector/set rebuilding every frame and fleet
+  projection every 0.1 seconds even when its workspace is hidden. Early active
+  timings do not justify speculative changes. First reproduce a developed
+  campaign workload with real fleets/colonies using existing progression or an
+  explicitly documented fixture, then optimize measured costs with observer and
+  whole save/reload checks. Keep required simulation steps authoritative.
+
 ## Remaining blockers / next work
 
 - Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
   proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
   no grievance display.
-- System and galaxy CPU imagery preparation is now staged as above. Next profile
-  active/busy campaigns; avoid repeatedly profiling the same paused maps or
+- System and galaxy CPU imagery preparation is now staged as above. Early active
+  campaigns have a baseline; next profile developed/busy campaigns with real
+  fleet/colony workloads. Avoid repeatedly profiling the same maps or
   changing renderer settings for an unproven cold-tail cause. Keep Core access
   and GPU/window work on the owner thread, preserve final pixels and capture gates.
 - Surface colony visuals (buildings/roads), orbital structure rendering.

@@ -152,6 +152,59 @@ Evidence: `native-galaxy-background-{tests,runtime}.log`,
 Previous head `96b83092` passed native CI `34946960470`; the galaxy checkpoint
 requires its own run. It remains an unmerged Engine 0.1.58 candidate.
 
+### Optional running-campaign profile
+
+Use `--campaign-profile <capture.bmp> --save-path <isolated.player17.json>
+--profile-frames 600` to run the canonical 500-system Player campaign at 8X.
+`--load` resumes a provided save; omitting it creates a fresh campaign. The
+profiler selects speed, resumes and pauses using real UI inputs. Frames 120
+through 119+N advance the existing simulation with real elapsed time, including
+ordinary autosave and AI scheduling. Manual saving is requested halfway through.
+The check requires save completion and further time advancement, then freezes the
+clock with UI pause and completes a final save. Bounded final waiting cannot
+silently replace active samples; any session/save failure fails the process.
+
+`campaign_profile` adds exact start, mid-save request/completion and final days,
+8X speed, requested sample count and UI/save completion flags. `steady_profile`
+and `cold_profile` retain their strict contracts. The older `smoke_timing`
+frame-61 save-service bucket is a legacy fixed-frame label; it does not describe
+this mode's mid-run save. Use active `steady_profile` for campaign performance.
+
+Maintained helper (after a preview build):
+
+```python
+import sys
+sys.path.insert(0, 'tools/stellar-export')
+import stellar
+from native_campaign_profile import validate_native_campaign_profile
+result = validate_native_campaign_profile(
+    stellar.ROOT / 'build-native/preview', stellar.build_environment(),
+    profile_frames=600)
+```
+
+The helper runs active 720p fresh, paused reload of a separate copy, active 1080p
+from the prior save, and another independent paused reload. It requires Vulkan,
+finished artwork/BMPs, exact days, whole Player17 equality except SavedAtUtc, and
+an unchanged active-source payload. No user saves are modified.
+`native_build` runs both frame-profile and campaign-profile Python fault tests;
+actual performance runs remain opt-in rather than altering sealed export defaults.
+
+Initial 600-frame active results on this host:
+
+| Resolution | Start / final game day | Interval mean / p95 / p99 (ms) | Update mean / max (ms) |
+|---|---|---|---|
+| 1280x720 | 0 / 80.2483424 | 16.718 / 16.917 / 18.181 | 0.305 / 5.941 |
+| 1920x1080 reload | 80.2483424 / 160.514568 | 16.722 / 17.113 / 18.817 | 0.359 / 4.434 |
+
+Mid-save request/completion days: 40.2683928/41.4707128 and
+120.5386096/121.7399. Readback and fallback throttle are zero during measurement.
+Four actual active/paused Vulkan launches passed, plus two default system runs,
+four focused CTests, 88 Python checks and four invalid CLI cases. The strict
+native build passed. See `native-active-campaign-{build,unit,runtime,validation}.log`,
+`work/active-campaign-baseline.json`, and `work/active-profile-default-system.json`.
+This is an early campaign baseline with no developed player fleet, not a late-game
+benchmark, all-hardware 60 FPS certification or a fix for the separate cold tail.
+
 ### Optional steady-frame profile
 
 Add `--profile-frames 600` to an isolated `--system-smoke <capture.bmp>` or

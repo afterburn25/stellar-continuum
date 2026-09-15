@@ -96,6 +96,8 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_frame_profile.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_campaign_profile.py", "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):

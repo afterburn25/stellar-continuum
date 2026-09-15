@@ -53,12 +53,24 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 2. Surface scene is a construction workspace, not the reference's rendered colony view.
 3. No orbital structure rendering.
 4. No audio of any kind in the native client/engine.
-5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. Next prioritize active-campaign performance. Paused warm maps average ~16.7 ms on this host; broad-hardware 60 FPS is unproven.
+5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. An early 500-system campaign running at 8X now averages ~16.7 ms on this host through day 160, including manual saves and exact paused reloads. Busy developed campaigns and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Upstream evidence (engine 0.1.58, Devin branch `cpp/devin-swe2-native-conversion`)
 
-Latest Codex checkpoint adds an opt-in ten-frame cold profile to the existing
+Latest Codex checkpoint adds a separate opt-in running-campaign profiler. The
+canonical 500-system Player campaign runs 600 measured frames at 8X using real
+elapsed time and UI speed/resume/pause input, with a manual save during play.
+It proves time advances after that save completes, pauses for the final save,
+and checks the whole Player17 payload through an independent paused reload.
+Actual 720p/1080p runs advanced day 0 to 80.2483424 to 160.514568; interval means
+were 16.718/16.722 ms, p95 16.917/17.113 ms, update maxima 5.941/4.434 ms.
+Strict native build, four focused CTests, 88 Python checks, four rejected CLI
+cases and six Vulkan launches passed. This is early-campaign evidence, not a
+busy-fleet benchmark or a universal 60 FPS claim. Previous cold diagnostic head
+`86445dde` passed native CI `34952179710`; the new checkpoint needs its own run.
+
+The preceding Codex checkpoint adds an opt-in ten-frame cold profile to the existing
 bounded map profiler. The strict native build, 57 Python checks, four 600-frame
 Vulkan map profiles and two default diplomacy launches passed. Frame 7 spends
 65.471–66.460 ms inside presentation; Sol's submission takes 0.236/0.258 ms and

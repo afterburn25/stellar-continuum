@@ -220,6 +220,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
+  bool campaign_profile{},menu_smoke{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -243,7 +244,8 @@ struct Options {
     else if(arg==L"--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg==L"--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg==L"--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::wstring_view(argv[++i]));
-    else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.windowed=true;}
+    else if(arg==L"--campaign-profile"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.campaign_profile=true;result.windowed=true;}
+    else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.menu_smoke=true;result.windowed=true;}
     else if(arg==L"--new-game-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
     else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
@@ -272,7 +274,8 @@ struct Options {
     else if(arg=="--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
     else if(arg=="--height"&&i+1<argc) result.window_height=std::stoi(argv[++i]);
     else if(arg=="--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::string_view(argv[++i]));
-    else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.windowed=true;}
+    else if(arg=="--campaign-profile"&&i+1<argc){result.smoke_screenshot=argv[++i];result.campaign_profile=true;result.windowed=true;}
+    else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.menu_smoke=true;result.windowed=true;}
     else if(arg=="--new-game-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
     else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
@@ -295,8 +298,10 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke)throw std::invalid_argument("--profile-frames requires --system-smoke or --galaxy-art-smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
+  if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
+  if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -1120,6 +1125,17 @@ class NativeCampaign final {
     smoke_surface_x_=site->x;smoke_surface_z_=site->z;smoke_surface_rotation_=site->rotation_degrees;smoke_surface_progress_=site->industry_progress;smoke_surface_site_count_saved_=view.construction_sites.size();smoke_surface_treasury_saved_=view.treasury_budget_units;smoke_surface_saved_day_=session_->frame().clock().simulation_days();smoke_surface_persisted_site_=true;
   }
   void request_smoke_save(){if(smoke_settlement_mode_){session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();}if(smoke_surface_mode_)capture_surface_smoke_state();session_->request_save();}
+  [[nodiscard]] double campaign_profile_days()const{return session_->frame().clock().simulation_days();}
+  [[nodiscard]] StrategicSpeed campaign_profile_speed()const{return session_->frame().clock().speed();}
+  [[nodiscard]] SessionNoticeKind campaign_profile_notice()const{return session_->notice().kind;}
+  void campaign_profile_request_save(){session_->request_save();}
+  void prepare_campaign_profile(int width,int height){
+    const auto click=[&](UiRect bounds){const auto point=center(bounds);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Campaign profile UI input closed the campaign.");};
+    const auto layout=NativeUiLayout::for_viewport(width,height);
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused)click(layout.pause);
+    for(int index=0;index<4&&session_->frame().clock().resume_speed()!=StrategicSpeed::Maximum;++index)click(layout.speed);
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused||session_->frame().clock().resume_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile did not select 8X through UI input.");
+  }
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
   [[nodiscard]] std::string player_species_id()const{
@@ -2192,6 +2208,8 @@ int main(int argc,char **argv){
       else if(options.system_smoke)
         campaign.prepare_system_smoke(window.drawable_width(),
                                       window.drawable_height());
+      else if(options.campaign_profile)
+        campaign.prepare_campaign_profile(window.drawable_width(),window.drawable_height());
       else if(options.system_travel_smoke||options.system_travel_reload_smoke)
         campaign.prepare_system_travel_smoke(window.drawable_width(),
                                              window.drawable_height(),options.system_travel_reload_smoke);
@@ -2233,11 +2251,15 @@ int main(int argc,char **argv){
     std::unique_ptr<SmokeColdProfile> cold_profile;
     if(options.profile_frames)cold_profile=std::make_unique<SmokeColdProfile>();
     FrameTiming draw_timing;
+    const int campaign_active_first=120;
+    const int campaign_active_last=119+options.profile_frames.value_or(0);
+    bool campaign_started{},campaign_pause_requested{},campaign_final_requested{},campaign_mid_requested{},campaign_mid_saved{},campaign_advanced_after_mid{};int campaign_wait_frames{};
+    double campaign_before_days{},campaign_after_days{},campaign_mid_save_day{},campaign_mid_save_completed_day{},campaign_frozen_days{};
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
       prior=now;
-      const auto input=window.poll();
+      auto input=window.poll();
       if(!input.renderable()){
         discard_elapsed=true;
         if(!campaign.update(input,input.drawable_width,input.drawable_height,0.,false))break;
@@ -2247,21 +2269,42 @@ int main(int argc,char **argv){
       }
       const auto elapsed=discard_elapsed?0.:measured_elapsed;
       const bool valid_interval=!discard_elapsed;
+      if(options.campaign_profile&&(frames==119||(campaign_pause_requested&&!campaign_final_requested))){
+        const auto bounds=NativeUiLayout::for_viewport(input.drawable_width,input.drawable_height).pause;const auto point=center(bounds);input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};
+        if(frames==119){campaign_before_days=campaign.campaign_profile_days();campaign_started=true;}
+      }
       if(frames>0&&!discard_elapsed)frame_ms.push_back(elapsed*1000.);
       discard_elapsed=false;
       const auto update_begin=std::chrono::steady_clock::now();
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
                           elapsed))break;
       const auto update_end=std::chrono::steady_clock::now();
+      if(options.campaign_profile&&campaign.campaign_profile_notice()==SessionNoticeKind::Failure)throw std::runtime_error("Campaign profile encountered a session/save failure.");
+      if(options.campaign_profile&&campaign_started&&frames==119&&campaign.campaign_profile_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile resume UI input did not select 8X.");
+      if(options.campaign_profile&&campaign_pause_requested&&!campaign_final_requested){
+        if(campaign.campaign_profile_speed()!=StrategicSpeed::Paused)throw std::runtime_error("Campaign profile pause UI input did not pause the clock.");campaign_after_days=campaign.campaign_profile_days();campaign_frozen_days=campaign_after_days;campaign.campaign_profile_request_save();campaign_final_requested=true;
+      }
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
         if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
+      if(options.campaign_profile&&frames>=campaign_active_first&&frames<=campaign_active_last){
+        if(campaign.campaign_profile_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile clock left 8X during active measurement.");
+        if(!campaign_mid_requested&&frames==campaign_active_first+*options.profile_frames/2){campaign_mid_save_day=campaign.campaign_profile_days();campaign.campaign_profile_request_save();campaign_mid_requested=true;}
+        if(campaign_mid_requested&&!campaign_mid_saved&&campaign.campaign_profile_notice()==SessionNoticeKind::Saved){campaign_mid_saved=true;campaign_mid_save_completed_day=campaign.campaign_profile_days();}
+        if(campaign_mid_saved&&campaign.campaign_profile_days()>campaign_mid_save_completed_day)campaign_advanced_after_mid=true;
+        if(frames==campaign_active_last)campaign_pause_requested=true;
+      }
       std::optional<std::filesystem::path> screenshot;
       if(options.smoke_screenshot){
-        if(options.galaxy_art_smoke){
+        if(options.campaign_profile){
+          if(campaign_final_requested&&campaign.campaign_profile_notice()==SessionNoticeKind::Failure)throw std::runtime_error("Campaign profile final save failed.");
+          if(campaign_final_requested&&campaign.campaign_profile_days()!=campaign_frozen_days)throw std::runtime_error("Campaign profile clock advanced after its final UI pause.");
+          if(campaign_final_requested&&campaign.campaign_profile_notice()==SessionNoticeKind::Saved&&campaign.artwork_ready())screenshot=options.smoke_screenshot;
+          else if(campaign_final_requested&&++campaign_wait_frames>600)throw std::runtime_error("Campaign profile final save or artwork did not complete.");
+        }else if(options.galaxy_art_smoke){
           if(frames==capture_frame)screenshot=options.smoke_screenshot;
           else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-regional");
           else if(frames==capture_frame+2)screenshot=sidecar_path(*options.smoke_screenshot,L"-system");
@@ -2317,8 +2360,9 @@ int main(int argc,char **argv){
       }
       if(!waiting_for_artwork&&(options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame)
         campaign.capture_diplomacy_unknown(input.drawable_width,input.drawable_height);
-      const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame);
+      const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.campaign_profile&&(!campaign_started||!campaign_mid_requested||!campaign_mid_saved||!campaign_advanced_after_mid||!campaign_final_requested||campaign.campaign_profile_notice()!=SessionNoticeKind::Saved||campaign.campaign_profile_speed()!=StrategicSpeed::Paused))throw std::runtime_error("Campaign profile did not complete active simulation, saves, and final UI pause.");
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
         std::ranges::sort(frame_ms);
@@ -2347,6 +2391,7 @@ int main(int argc,char **argv){
         smoke_timing->write(std::cout);
         if(steady_profile)steady_profile->write(std::cout);
         if(cold_profile)cold_profile->write(std::cout);
+        if(options.campaign_profile)std::cout<<" campaign_profile={\"samples\":"<<*options.profile_frames<<",\"speed_multiplier\":8,\"before_days\":"<<std::setprecision(std::numeric_limits<double>::max_digits10)<<campaign_before_days<<",\"after_days\":"<<campaign_after_days<<",\"mid_save_day\":"<<campaign_mid_save_day<<",\"mid_save_completed_day\":"<<campaign_mid_save_completed_day<<",\"mid_save_completed\":"<<(campaign_mid_saved?"true":"false")<<",\"advanced_after_mid_save\":"<<(campaign_advanced_after_mid?"true":"false")<<",\"speed_input\":true,\"resume_input\":true,\"pause_input\":true,\"final_saved\":true}";
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)
