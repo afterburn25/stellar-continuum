@@ -645,7 +645,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
 void NativeDiplomacyWorkspace::render(
     DrawList &out, int width, int height,
     const PortraitProvider *portrait_provider) const {
-  if (!view_) return;
+  if (!visible_ || !view_) return;
   const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
   const auto s = layout.scale;
   fill(out, layout.surface, panel);

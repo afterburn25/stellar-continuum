@@ -1,7 +1,8 @@
 # C++ migration status
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
-Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion`.
+Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
+`07d989df`).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -9,6 +10,62 @@ Evidence basis: states below cite real artifacts — `core/` parity CTests (`*_p
 145+ cases), `app/native_client/` presentation modules, `tools/stellar-export/` sealed
 validators, and `docs/engine/*_VALIDATION.md` contracts. "PARITY VERIFIED" means the
 subsystem has a maintained parity/validation gate that runs in the sealed export.
+
+## Current integration checkpoint (2026-09-15)
+
+- Devin/SWE-2 was reviewed through `07d989df`. Territory presentation commit
+  `ef7a4007` was selected: it ports the C# projection's observer-gated anchors,
+  smoothed continuous fill geometry, stitched contours, fog mask, unexplored
+  dimming and observer-visible claim outlines into a bounded native presentation
+  cache. Core behavior and the Player17 schema/payload are unchanged.
+- Projection now runs from an observer-filtered DTO on one Engine `JobSystem`
+  worker. At most one request is admitted; newer input coalesces. Owner polling
+  accepts only the matching generation, fingerprint and clear epoch. Current
+  terminal errors report once without retry, and stale results/errors are dropped.
+  Snapshot requests are capped at 2 Hz and 2,500 systems, 4,096 visible anchors,
+  4,096 claims and 256-byte names. The fill atlas plus fog remains below 2.1 MiB.
+- Synchronous cold projection measured 179/347/591/3,915 ms for workloads
+  500 systems/3 empires/6 colonies, 500/3/100, 2,500/6/30 and 2,500/6/500.
+  Corresponding final owner requests were 0.0937/0.0948/0.4770/0.4718 ms;
+  unchanged polls were 0.0432/0.0889/0.4609/0.4915 ms; scheduling-inclusive
+  worker completion was 392/479/609/4,985 ms. This is responsiveness/latency
+  evidence, not a sustained FPS result.
+- The final full-native MSVC build passed. Five focused CTests passed in 1.79 seconds
+  (`native_diplomacy_controller`, `native_diplomacy_workspace`,
+  `native_galaxy_backdrop`, `native_galaxy_star_markers`,
+  `native_territory_projection`). All 95 focused checks passed in 5.778 seconds
+  across
+  `test_native_diplomacy_runtime`, `test_native_galaxy_runtime` and
+  `test_native_client_runtime`; these include 26 diplomacy checks and two
+  duplicated-map sidecar rejection cases. Logs:
+  `work/native-territory-visibility-runtime.log` and
+  `work/native-territory-final-python.log`. Published head `c4744e1c` passed CI
+  run `34978964654`; the updated
+  GPU-free job compiles the full native app plus territory, star-marker and
+  diplomacy-workspace targets. Exact-head CI is pending.
+- A closed RELATIONS workspace had retained its view and rendered hidden portrait
+  work. Close intentionally retains its view for reopening; visibility-gated
+  rendering skips all hidden draw/provider work, and regression coverage verifies
+  a clean reopen. Relations Escape/Close
+  also cancels the stale map gesture, so the next wheel input reaches map zoom.
+- Two repaired Vulkan diplomacy runs passed at acceptance 720p and paused reload
+  1080p. Both inspected map BMPs show the rounded cyan home border, purple dashed
+  foreign claim, original nebula and no hidden RELATIONS panel. Each reports one
+  region/claim, 14 contour and 36 claim draws, one fill atlas, one fog image,
+  1,998,656 cached bytes and 19 unknown systems. Acceptance preserved unrelated
+  state and claims; paused reload matched the whole Player17 payload and the source
+  fixture hash remained unchanged. Evidence:
+  `work/native-territory-diplomacy-evidence.json`.
+- The two existing 500-system galaxy runs remain valid, making four territory
+  runtime runs in total; overview and regional images were inspected. Regional
+  fill remains faint and nearby labels overlap. This is polish debt, not graphical
+  parity or a sustained-60-FPS claim. The candidate remains unmerged and unreleased.
+- Orbital commit `eb1ab876` was not imported. Its project/state projection follows
+  the reference schematic, but its most-populous-colony host and screen position
+  are invented presentation values, not persisted physical locations. Input
+  overlap, synchronous rasterization and cache/thread issues also need redesign.
+  Its geometry is suitable only for an explicitly labeled construction preview
+  until Core/save data defines physical orbital sites.
 
 ## Subsystem matrix
 
@@ -31,8 +88,8 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Legacy research | Technology* | `core/legacy_research`, `legacy_technology` | OK | `legacy_*_parity` | PARITY VERIFIED | Superseded path, kept for saves |
 | Adaptive Research | AdaptiveResearch* (~40 files) | `core/adaptive_research_*` (~25 modules) | OK | 10+ adaptive parity tests | PARITY VERIFIED | Authoritative research; integrated host |
 | Diplomacy (simulation) | Diplomacy*, Diplomatic* | `core/diplomacy_*` | OK | diplomacy parity/persistence tests | PARITY VERIFIED | Observer-safe commands preserved |
-| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | focused C++/Python checks + Vulkan smoke | PARTIAL | Observer-safe RELATIONS workspace; claims/composer/grievance remain partial |
-| Territory / exploration | Exploration* | `core/exploration_*`, `survey_operations`, `knowledge` | OK | `exploration_*_parity`, `knowledge_parity` | PARITY VERIFIED | Survey secrecy preserved |
+| Diplomacy (presentation) | DiplomacyRelationsPresenter, ObserverDiplomacyCommandService | `native_diplomacy_controller`, `native_diplomacy_workspace` | OK | focused C++/Python checks + Vulkan smoke | PARTIAL | Observer-safe RELATIONS workspace covers the reference sections; strategic claims are map presentation |
+| Territory / exploration | Exploration*, StrategicTerritoryProjection | `core/exploration_*`, `survey_operations`, `knowledge`, `native_territory_projection`, `native_territory_overlay` | OK | exploration/knowledge parity + focused territory checks | PARTIAL | Survey secrecy preserved; reference-shaped native overlay selected, Vulkan/performance proof pending |
 | Strategic AI | CivilizationStrategic* | `core/strategic_*` (6 modules) | OK | `strategic_*_parity` | PARITY VERIFIED | Scheduled reviews, bounded work |
 | Fleets | Fleet*, FleetTransit | `core/fleet_*`, `fleet_transit`, `fleet_reach` | OK | `fleet_*_parity` | PARITY VERIFIED | `design_id` now in native presentation |
 | Combat | Combat*, MassiveCombat* | `core/combat_*`, `massive_combat_*`, `campaign_massive_combat` | OK | `combat_*_parity`, `massive_combat_*` | PARITY VERIFIED | Engine resolution; native battle view not started |
@@ -40,7 +97,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
 | UI (native) | Main.*, panels | `app/native_client/*_workspace` (16+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy workspaces done |
-| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ships, route effects and textured surface ground; detailed colony buildings/roads and orbital scene art remain |
+| Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ships, route effects, textured surface ground and selected territory overlay; detailed colony buildings/roads remain, physical orbital sites deferred |
 | Audio | AudioDirector | `engine/native_audio`, `app/native_client/native_audio_director` | OK | audio/director CTest + relocated audio startup/reload | PARTIAL | Score, settings, completion cues and bounded fixed scientist speech; broader casting/device recovery remain |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows done |
 | Assets | asset library | `assets/` + exact-hash declarations | OK | packaging rejection tests | PARITY VERIFIED | Explicit reviewed manifests only |
@@ -49,10 +106,10 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## What blocks "fully playable native"
 
-1. Diplomacy presentation remains partial: no claims/border warnings, demand/trade composer, or grievance display.
-2. Surface construction now has textured ground with bounded asynchronous loading. Detailed colony buildings, roads, environment-specific scenery and full 3D remain.
-3. No orbital structure rendering.
-4. The human scientist now has three fixed British cues, and owned simulation events produce bounded notices/sounds. Full character/species casting, dynamic speech and playback-device recovery remain.
+1. Surface construction now has textured ground with bounded asynchronous loading. Detailed colony buildings, roads, environment-specific scenery and full 3D remain.
+2. Physical orbital sites need an authoritative Core/save host and location contract. A labeled construction schematic can be ported without claiming physical placement.
+3. The human scientist now has three fixed British cues, and owned simulation events produce bounded notices/sounds. Full character/species casting, dynamic speech and playback-device recovery remain.
+4. The selected territory overlay still needs actual Vulkan/runtime and performance validation. Existing background-art measurements do not establish its cost or complete graphical parity.
 5. Background artwork reduces first-scene CPU work to about 3 ms in both Sol and the galaxy; regional scenery transitions now cost about 1 ms. Cold profiling locates the ~67 ms tail inside presentation, even with no image uploads; its precise driver/display cause remains unproven. A developed 500-system campaign with 24 paid ships and nine total colonies averages ~16.7 ms on this host at 8X, including manual saves and exact paused reloads. Combat, much larger fleets and broad-hardware 60 FPS remain unproven.
 6. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 

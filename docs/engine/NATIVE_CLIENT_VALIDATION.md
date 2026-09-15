@@ -6,7 +6,17 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
-- RELATIONS opens an observer-safe contact directory, communications artwork, relationship meters, agreements/proposals/history/intelligence, and canonical negotiation/war/proposal commands. Contact changes refresh while paused; stale confirmations are rejected. Scroll drawing and hit areas are clipped together. Claims, grievances and a full demand/trade composer remain in migration.
+- RELATIONS opens an observer-safe contact directory, communications artwork, relationship meters, agreements/proposals/history/intelligence, and canonical negotiation/war/proposal commands. Contact changes refresh while paused; stale confirmations are rejected. Scroll drawing and hit areas are clipped together. The C# workspace has no grievance display or full demand/trade composer, and claims belong on the strategic map, so those are not outstanding native parity gaps.
+
+- The territory candidate preserves the C# strategic smoothing, continuous fills,
+  stitched contours, fog, unexplored dimming and observer-visible claim outlines.
+  It consumes an observer-filtered DTO and prepares on one Engine `JobSystem`
+  worker; the owner admits at most one job, coalesces the newest input, and accepts
+  only the current generation/fingerprint/clear epoch. Current terminal failures
+  report once without retry; stale results and failures are discarded. Requests
+  are capped at 2 Hz, 2,500 systems, 4,096 visible anchors, 4,096 claims and
+  256-byte names. The fill atlas plus fog is below 2.1 MiB. This changes no Core
+  rule or Player17 field.
 
 - Approved main-menu and loading artwork uses immutable cached images, responsive translucent controls and the requested seven-second application boot. Generation/save artwork follows the request through activation; each operation displays a gameplay tip. See NATIVE_STARTUP_ARTWORK.md.
 
@@ -40,6 +50,40 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+Territory preparation measurements for 500 systems/3 empires/6 colonies,
+500/3/100, 2,500/6/30 and 2,500/6/500 were respectively: synchronous cold
+179/347/591/3,915 ms; final owner request 0.0937/0.0948/0.4770/0.4718 ms;
+unchanged poll 0.0432/0.0889/0.4609/0.4915 ms; scheduling-inclusive worker
+completion 392/479/609/4,985 ms. The final full-native MSVC build passed, and
+five focused CTests passed in 1.79 seconds. The suites
+`test_native_diplomacy_runtime`, `test_native_galaxy_runtime` and
+`test_native_client_runtime` passed all 95 checks in 5.778 seconds, including 26 diplomacy
+checks and two duplicated-map sidecar rejection cases. A closed RELATIONS workspace
+had retained its view and performed hidden drawing/portrait work. Close intentionally
+retains its view for reopening; visibility-gated rendering skips all hidden
+draw/provider work, and regression coverage verifies a clean reopen. Relations Escape/Close also cancels its
+stale map gesture so the next wheel event zooms immediately.
+
+Two repaired real-Vulkan diplomacy runs passed at acceptance 720p and paused
+reload 1080p. Both inspected BMPs show the map, rounded cyan home border, purple
+dashed foreign claim, original nebula art and no hidden RELATIONS panel. Each
+reports one region/claim, 14 contour and 36 claim draws, one fill atlas, one fog
+image, 1,998,656 cached bytes and 19 unknown systems. Acceptance preserved the
+entire unrelated payload and claims; paused reload matched the whole Player17
+payload, and the fixture hash was unchanged. The two existing 500-system galaxy
+runs remain valid, making four territory runtime runs in total; overview/regional
+images were inspected. Evidence: `work/native-territory-diplomacy-evidence.json`,
+`work/native-territory-visibility-runtime.log` and
+`work/native-territory-final-python.log`.
+
+The regional fill remains faint and nearby labels overlap, which is polish debt
+rather than graphical-parity evidence. Published head `c4744e1c` passed CI run
+`34978964654`; the updated GPU-free job compiles the full native application plus
+territory, star-marker and diplomacy-workspace targets. Exact-head CI remains
+pending. This is an unmerged local candidate, not a release. The preparation
+timings establish bounded owner responsiveness and background latency, not
+sustained frame rate.
 
 The combined Engine 0.1.58 candidate passed seven focused native CTests, 18 diplomacy-validator Python checks, 45 packaging/checkout checks and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. The diplomacy fixture retains existing contacts and agreements while adding isolated observations and an incoming research exchange. Real UI input changes selection, accepts the proposal, scrolls the new agreement into view, renders the packaged 2172×724 communications scene and hides unidentified identities/metrics/art. Progress validation preserves unrelated state; paused reload compares the complete saved payload except its timestamp. Baseline normalization follows the existing Player17 parity contract for fixture-only metadata and single-precision map coordinates. See the current C++ migration handoff and `work/native-diplomacy-final-*.json`; this is focused candidate evidence, not a new sealed release or full visual parity.
 
@@ -349,4 +393,4 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, full construction/unlock progression, remaining diplomacy commands, 3D planet/surface views, orbital structures, tactical presentation and audio remain. Native new-game selection/generation, orbital browsing, owned-colony telemetry, ship-delivered settlement, operational surface placement/cancellation and basic diplomacy are integrated. These are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, full construction/unlock progression, detailed 3D planet/surface views, authoritative physical orbital sites, tactical presentation, broader character casting and dynamic speech remain. The native RELATIONS workspace covers the sections present in its C# reference; grievances and a demand/trade composer would be new product work rather than an unported reference gap. Native new-game selection/generation, orbital browsing, owned-colony telemetry, ship-delivered settlement, operational surface placement/cancellation, fixed audio/voice cues and diplomacy are integrated. These are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.

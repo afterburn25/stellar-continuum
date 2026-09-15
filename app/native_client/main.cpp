@@ -33,6 +33,8 @@
 #include "native_ui_layout.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
+#include "native_territory_overlay.hpp"
+#include <stellar/core/diplomacy_observer_commands.hpp>
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
@@ -86,6 +88,7 @@ using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
 using namespace stellar::native_startup_ui;
 using namespace stellar::native_galaxy_ui;
+using namespace stellar::native_territory;
 using namespace stellar::native_ship_ui;
 
 struct SmokePhaseMaximum {
@@ -551,6 +554,29 @@ class NativeCampaign final {
     smoke_galaxy_system_entry_=true;
   }
   void capture_galaxy_system(int width,int height){smoke_galaxy_system_=galaxy_scene_evidence(width,height);}
+  [[nodiscard]] std::string territory_smoke_status()const {
+    const auto *projection=territory_overlay_.projection();
+    std::size_t contour_points=0,fill_runs=0;
+    if(projection)for(const auto &region:projection->territories) {
+      fill_runs+=region.fill_runs.size();
+      for(const auto &contour:region.contours)contour_points+=contour.size();
+    }
+    std::ostringstream out;
+    out<<"{\"valid\":"<<(projection?"true":"false")
+       <<",\"regions\":"<<(projection?projection->territories.size():0)
+       <<",\"claims\":"<<(projection?projection->claims.size():0)
+       <<",\"fill_runs\":"<<fill_runs
+       <<",\"contour_points\":"<<contour_points
+       <<",\"fog_texels\":"<<(projection?projection->fog.alpha.size():0)
+       <<",\"unexplored\":"<<(projection?projection->unexplored_system_ids.size():0)
+       <<",\"fill_images\":"<<last_territory_draw_.fill_images
+       <<",\"contour_segments\":"<<last_territory_draw_.contour_segments
+       <<",\"claim_segments\":"<<last_territory_draw_.claim_segments
+       <<",\"fog_images\":"<<last_territory_draw_.fog_images
+       <<",\"cached_image_bytes\":"<<territory_overlay_.cached_image_bytes()
+       <<"}";
+    return out.str();
+  }
   [[nodiscard]] std::string galaxy_art_smoke_status()const{
     const auto view=[&](const GalaxyArtSceneEvidence &evidence,bool system){
       std::ostringstream out;
@@ -1021,6 +1047,30 @@ class NativeCampaign final {
     if(std::ranges::any_of(draw.overlay,[](const auto&item){return std::holds_alternative<Image>(item);}))
       throw std::runtime_error("Unidentified diplomacy contact disclosed a portrait.");
   }
+  void prepare_diplomacy_map_capture(int width,int height){
+    InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+    input.events={{InputEventType::EscapePressed}};
+    if(!update(input,width,height,0.,false)||diplomacy_workspace_.visible()||menu_)
+      throw std::runtime_error("Diplomacy capture could not return to the galaxy map.");
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,
+                                       &Civilization::id);
+    if(player==world.civilizations.end())throw std::runtime_error("Territory capture needs the player's home.");
+    const auto home=session_->cache().systems_by_id.find(player->home_system_id);
+    if(home==session_->cache().systems_by_id.end())throw std::runtime_error("Territory capture home is missing.");
+    // Frame the player's own holding, then exercise the real wheel route. This
+    // exposes claim dashes culled below five pixels in the overview, without
+    // modifying ownership, survey state, or the paused simulation.
+    camera_.center={home->second->position.x,home->second->position.y};
+    input.pointer={static_cast<float>(width)*.5f,static_cast<float>(height)*.5f};
+    const double target=std::clamp(fitted_pixels_per_world_*8.,3.,100.);
+    for(int wheel=0;wheel<64&&camera_.pixels_per_world<target;++wheel){
+      input.events={{InputEventType::Wheel,input.pointer,{},1.f}};
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Territory capture zoom closed the game.");
+    }
+    if(camera_.pixels_per_world<target||session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("Territory capture failed its paused regional framing.");
+  }
   void prepare_diplomacy_smoke(int width,int height,bool reload){
     const auto main_layout=NativeUiLayout::for_viewport(width,height);
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)
@@ -1294,6 +1344,9 @@ class NativeCampaign final {
     pointer_=input.pointer;
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
+      territory_overlay_.clear();
+      last_territory_draw_={};
+      territory_refresh_elapsed_=.5;
       feedback_.reset();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
@@ -1387,6 +1440,7 @@ class NativeCampaign final {
         else if(shipyard_workspace_.visible())shipyard_workspace_.close();
         else if(research_workspace_.visible())research_workspace_.close();
         else toggle_menu();
+        gesture_.cancel();
         continue;
       }
       if(event.type==InputEventType::PointerCancelled){
@@ -1401,9 +1455,10 @@ class NativeCampaign final {
       }
       if(diplomacy_workspace_.visible()){
         const auto command=diplomacy_workspace_.handle(event,width,height);
-        if(command.kind==DiplomacyWorkspaceCommandKind::Close)
+        if(command.kind==DiplomacyWorkspaceCommandKind::Close){
           diplomacy_workspace_.close();
-        else if(command.kind==DiplomacyWorkspaceCommandKind::SelectContact)
+          gesture_.cancel();
+        }else if(command.kind==DiplomacyWorkspaceCommandKind::SelectContact)
           refresh_diplomacy(true);
         else if(command.kind==DiplomacyWorkspaceCommandKind::Action||
                 command.kind==DiplomacyWorkspaceCommandKind::ProposalAction)
@@ -1522,19 +1577,35 @@ class NativeCampaign final {
       if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
     }
     refresh_knowledge();
+    territory_overlay_.poll();
+    territory_refresh_elapsed_+=std::max(0.,elapsed);
+    if(!system_workspace_.visible() &&
+       ((!territory_overlay_.valid()&&!territory_overlay_.pending()) ||
+        territory_refresh_elapsed_>=.5)) {
+      const auto &territory_world=session_->frame().runtime().world().campaign();
+      const auto diplomacy_view=stellar::core::ObserverDiplomacyCommandService(
+          session_->frame().runtime().diplomacy()).build_view(
+              territory_world.player_civilization_id);
+      territory_overlay_.request_update(territory_world,
+          territory_world.player_civilization_id,diplomacy_view.claims,
+          session_->cache().generation);
+      territory_refresh_elapsed_=0.;
+    }
     return true;
   }
 
-  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0:system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready();}
+  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0:system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();}
 
   [[nodiscard]] DrawList scene(int width,int height){
     const auto screen_height=static_cast<float>(height);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
+    last_territory_draw_=territory_overlay_.append(out,camera_,width,height,
+        static_cast<float>(fitted_pixels_per_world_));
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     galaxy_marker_begin=out.world.size();
-    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)},known?1.f:.28f);if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
     if(const auto &fleet_view=fleet_workspace_.view();fleet_view)
       last_route_stats_=append_fleet_route_effects(out,fleet_view->own_fleets,cache.systems_by_id,camera_,width,height);
     else last_route_stats_={};
@@ -1607,11 +1678,12 @@ class NativeCampaign final {
         layout.day_text.width, layout.day_text});
     if(selected_id_){const auto found=cache.systems_by_id.find(*selected_id_);if(found!=cache.systems_by_id.end()){const bool known=known_.contains(*selected_id_);const float x=18,y=screen_height-82;out.text.push_back({{x,y},known?found->second->name:"Unknown system",{238,244,255,255}});out.text.push_back({{x,y+18},known?spectral_name(found->second->primary):"No survey data",{154,181,211,235}});}}
     const auto &notice = session_->notice();
-    const bool preparing_galaxy=!system_workspace_.visible()&&!galaxy_backdrop_.artwork_ready();
+    const bool preparing_galaxy=!system_workspace_.visible()&&
+        (!galaxy_backdrop_.artwork_ready()||!territory_overlay_.valid()||territory_overlay_.pending());
     if (notice.kind != SessionNoticeKind::None || preparing_galaxy) {
       auto message = notice.message;
       if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
-        message="Preparing galaxy imagery...";
+        message="Updating star chart...";
       if (notice.kind == SessionNoticeKind::Loading) {
         message += " " +
                    std::to_string(static_cast<int>(notice.progress * 100.)) +
@@ -2143,6 +2215,9 @@ class NativeCampaign final {
   std::unique_ptr<NativeCampaignSession> session_;
   Camera camera_;
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
+  NativeTerritoryOverlay territory_overlay_;
+  NativeTerritoryDrawStats last_territory_draw_;
+  double territory_refresh_elapsed_{.5};
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
   NativeResearchController research_controller_;
@@ -2453,6 +2528,7 @@ int main(int argc,char **argv){
         }else if(options.diplomacy_smoke||options.diplomacy_reload_smoke){
           if(frames==capture_frame)screenshot=options.smoke_screenshot;
           else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-unknown");
+          else if(frames==capture_frame+2)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
         }else if(options.ship_art_smoke){
           if(frames==capture_frame)screenshot=options.smoke_screenshot;
           else if(frames==capture_frame+1)screenshot=sidecar_path(*options.smoke_screenshot,L"-map");
@@ -2502,7 +2578,9 @@ int main(int argc,char **argv){
       }
       if(!waiting_for_artwork&&(options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame)
         campaign.capture_diplomacy_unknown(input.drawable_width,input.drawable_height);
-      const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():(options.galaxy_art_smoke?frames>=capture_frame+3:(options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+2:frames>=capture_frame));
+      if(!waiting_for_artwork&&(options.diplomacy_smoke||options.diplomacy_reload_smoke)&&frames==capture_frame+1)
+        campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
+      const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
         if(options.audio_settings_check&&!options.new_game_smoke){
           const int width=window.drawable_width(),height=window.drawable_height();
@@ -2545,7 +2623,7 @@ int main(int argc,char **argv){
                  <<" artwork_capture_wait_frames="<<artwork_wait_frames
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
                  <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
-                 <<utf8_path(*options.smoke_screenshot);
+                 <<utf8_path(*options.smoke_screenshot)<<" territory="<<campaign.territory_smoke_status();
         const auto print_phase=[&](const char* name,std::vector<double>&samples){
           if(samples.empty())throw std::runtime_error("Native smoke has no frame phase samples.");
           std::ranges::sort(samples);

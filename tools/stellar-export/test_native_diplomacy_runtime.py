@@ -15,7 +15,9 @@ def source():
             "Control": {"FixtureOnly": True},
             "Galaxy": {"PlayerCivilizationId": 0,
                        "Systems": [{"Id": 0, "X": .123456789, "Y": -.987654321}],
-                       "Civilizations": [{"Id": 0}, {"Id": 1}, {"Id": 2}]},
+                       "Civilizations": [{"Id": 0, "HomeSystemId": 0}, {"Id": 1}, {"Id": 2}],
+                       "Knowledge": [{"CivilizationId": 0, "KnownCivilizationIds": [],
+                                      "SystemSurveys": [{"SystemId": 0, "Level": 3}]}]},
             "Diplomacy": {"Contacts": [
                 {"ObserverCivilizationId": 0, "ContactId": "known", "TargetCivilizationId": 1,
                 "CommunicationAvailable": True}], "Relationships": [], "AccessPermissions": [],
@@ -26,10 +28,10 @@ def source():
                 "NextProposalId": 8, "NextEventId": 1}}
 
 
-def bmp(path: Path, width: int, height: int):
+def bmp(path: Path, width: int, height: int, marker=1):
     stride = ((width * 24 + 31) // 32) * 4
     pixels = bytearray(stride * height)
-    pixels[0] = 1
+    pixels[0] = marker
     size = 54 + len(pixels)
     header = b"BM" + struct.pack("<I", size) + b"\0\0\0\0" + struct.pack("<I", 54)
     header += struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
@@ -82,8 +84,11 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 capture = Path(args[args.index(flag) + 1])
                 width, height = int(args[args.index("--width") + 1]), int(args[args.index("--height") + 1])
                 if fault != "capture":
-                    bmp(capture, width, height)
-                    bmp(capture.with_name(capture.stem + "-unknown.bmp"), width, height)
+                    bmp(capture, width, height, 1)
+                    bmp(capture.with_name(capture.stem + "-unknown.bmp"), width, height, 2)
+                    if fault != "map_capture":
+                        marker = 1 if fault == "map_same_known" else 2 if fault == "map_same_unknown" else 3
+                        bmp(capture.with_name(capture.stem + "-map.bmp"), width, height, marker)
                 state = {"mode": "paused_reload" if reload else "progress",
                          "selection_changed": True, "unknown_redacted": True,
                          "portrait_visible": fault != "portrait", "accepted": not reload,
@@ -91,8 +96,20 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 if fault == "spoof": state["accepted"] = True
                 if fault == "numeric_flag": state["paused"] = 1
                 if fault == "wrong_target": state["target_id"] = 2
+                territory = {"valid": True, "regions": 1, "claims": 1, "fill_runs": 1,
+                             "contour_points": 4, "fog_texels": 32, "unexplored": 1,
+                             "fill_images": 1, "contour_segments": 1, "claim_segments": 1,
+                             "fog_images": 1, "cached_image_bytes": 4096}
+                if fault == "territory_missing": territory["claims"] = 0
+                if fault == "territory_boolean": territory["regions"] = True
+                if fault == "territory_extra": territory["extra"] = 1
+                if fault == "territory_budget": territory["cached_image_bytes"] = 16 * 1024 * 1024 + 1
+                if fault == "territory_duplicate":
+                    territory_encoded = '{"valid":true,"valid":true}'
+                else:
+                    territory_encoded = json.dumps(territory)
                 encoded = "{malformed" if fault == "malformed" else json.dumps(state)
-                stdout = "gpu_driver=vulkan systems=1 save=ok  diplomacy=" + encoded
+                stdout = "gpu_driver=vulkan systems=1 save=ok territory=" + territory_encoded + " diplomacy=" + encoded
                 calls.append(args)
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
@@ -102,7 +119,9 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
             self.assertEqual(len(calls), 2)
             self.assertTrue(result["nativeDiplomacy"])
             self.assertTrue(result["nativeDiplomacyPausedReload"])
-            self.assertEqual(len(result["diplomacyCaptures"]), 4)
+            self.assertTrue(result["nativeTerritory"])
+            self.assertEqual(result["territoryChecks"]["reload"]["claim_segments"], 1)
+            self.assertEqual(len(result["diplomacyCaptures"]), 6)
 
     def test_progress_and_paused_reload(self): self.exercise()
     def test_rejects_spoofed_reload_claim(self):
@@ -117,6 +136,12 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("portrait")
     def test_rejects_missing_capture(self):
         with self.assertRaises(RuntimeError): self.exercise("capture")
+    def test_rejects_missing_regional_map_capture(self):
+        with self.assertRaises(RuntimeError): self.exercise("map_capture")
+    def test_rejects_map_capture_identical_to_known_view(self):
+        with self.assertRaises(RuntimeError): self.exercise("map_same_known")
+    def test_rejects_map_capture_identical_to_unknown_view(self):
+        with self.assertRaises(RuntimeError): self.exercise("map_same_unknown")
     def test_rejects_unresolved_proposal(self):
         with self.assertRaises(RuntimeError): self.exercise("bad_proposal")
     def test_rejects_wrong_proposal_owner(self):
@@ -139,6 +164,16 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("diplomacy_root")
     def test_rejects_changed_reload_payload(self):
         with self.assertRaises(RuntimeError): self.exercise("reload")
+    def test_rejects_missing_territory_claim(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_missing")
+    def test_rejects_boolean_territory_counter(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_boolean")
+    def test_rejects_extra_territory_field(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_extra")
+    def test_rejects_oversized_territory_cache(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_budget")
+    def test_rejects_duplicate_territory_field(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_duplicate")
 
 
 if __name__ == "__main__": unittest.main()

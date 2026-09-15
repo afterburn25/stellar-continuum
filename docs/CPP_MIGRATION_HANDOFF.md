@@ -3,10 +3,74 @@
 Concise cross-agent notes. Full milestone history lives in `docs/engine/MIGRATION_STATUS.md`;
 subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
+## Current territory integration checkpoint (2026-09-15)
+
+- Devin/SWE-2 was reviewed through head `07d989df`. The selected change is
+  territory presentation commit `ef7a4007`: a reference-shaped port of
+  `StrategicTerritoryProjection` with observer-gated anchors, continuous clipped
+  fills, stitched contours, fog, unexplored dimming and observer-visible claim
+  outlines. It is a presentation cache only; Core rules and the Player17 save
+  payload are unchanged.
+- Territory preparation now accepts only an observer-filtered DTO on one Engine
+  `JobSystem` worker. Owner-thread polling binds results to generation,
+  fingerprint and an internal clear epoch. Admission is limited to one job and
+  coalesces newer input; a current terminal error is reported once without retry,
+  while stale errors/results are discarded. Snapshot requests are capped at 2 Hz;
+  DTO limits are 2,500 systems, 4,096 visible anchors, 4,096 claims and 256-byte
+  names. One fill atlas plus fog stays below 2.1 MiB and preserves the reference
+  smoothing algorithm.
+- Synchronous cold preparation measured 179/347/591/3,915 ms across 500 systems
+  with 3 empires/6 colonies, 500/3/100, 2,500/6/30 and 2,500/6/500. Final owner
+  request times were 0.0937/0.0948/0.4770/0.4718 ms; unchanged polls were
+  0.0432/0.0889/0.4609/0.4915 ms. Scheduling-inclusive worker completion was
+  392/479/609/4,985 ms. These isolate owner responsiveness and background latency;
+  they are not sustained-frame-rate results.
+- The final full-native MSVC build passed. Five focused CTests passed in 1.79 seconds:
+  `native_diplomacy_controller`, `native_diplomacy_workspace`,
+  `native_galaxy_backdrop`, `native_galaxy_star_markers` and
+  `native_territory_projection`. All 95 focused Python checks passed in 5.778
+  seconds across
+  `test_native_diplomacy_runtime`, `test_native_galaxy_runtime` and
+  `test_native_client_runtime`, including 26 diplomacy checks and two
+  duplicated-map sidecar rejection cases. Logs are
+  `work/native-territory-visibility-runtime.log` and
+  `work/native-territory-final-python.log`. Published head `c4744e1c` passed CI
+  run `34978964654`; the updated GPU-free job compiles the full native app plus
+  territory, star-marker and diplomacy-workspace targets. New-head CI is pending.
+- Review found that a closed RELATIONS workspace retained its view and `render`
+  ignored visibility, allowing hidden drawing and portrait work. Close intentionally
+  retains its view for reopening; visibility-gated rendering skips all hidden
+  draw/provider work, and regression coverage proves a clean reopen. Main also cancels the stale map
+  gesture on Relations Escape/Close, so the next real wheel event zooms immediately.
+- Two repaired real-Vulkan diplomacy runs passed at acceptance 720p and paused
+  reload 1080p. Both BMPs were inspected and show the map, rounded cyan home
+  border, purple dashed foreign claim and original nebula art, with no hidden
+  RELATIONS panel. Each reports one region/claim, 14 contour and 36 claim draws,
+  one fill atlas, one fog image, 1,998,656 cached bytes and 19 unknown systems.
+  Acceptance preserved the entire unrelated payload and claims; paused reload
+  matched the whole Player17 payload, and the fixture hash stayed unchanged.
+  Evidence: `work/native-territory-diplomacy-evidence.json`.
+- The two existing 500-system galaxy runs remain valid, for four territory runtime
+  runs in total; overview and regional images were inspected. The regional fill is
+  still faint and nearby labels overlap. Treat both as presentation polish debt,
+  not graphical-parity evidence. This remains an unmerged local candidate, not a
+  release.
+- Orbital commit `eb1ab876` was reviewed but not imported. It reproduces the C#
+  schematic project/state list, but infers a physical host from the most populous
+  colony and invents screen-space placement without a Core/save location contract.
+  The review also found marker/body/fleet hit conflicts, orbit/label overlap,
+  synchronous rasterization on the UI path and weak cache/thread guards. Reuse of
+  its geometry should be limited to an explicitly labeled construction preview;
+  physical orbital sites remain deferred until their host/location is authoritative.
+
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `7a04c0bc`. Its newer portrait resolution, bounded cache and asset declarations are already covered by this branch; audit found no missing code to duplicate. Diplomacy presentation at `410753da` was integrated here as `c9338699`. The candidate remains under review.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; reviewed through
+  `07d989df`. Territory commit `ef7a4007` was selected; orbital commit `eb1ab876`
+  was rejected for this integration checkpoint. Its newer portrait resolution,
+  bounded cache and asset declarations are already covered by this branch;
+  diplomacy presentation at `410753da` was integrated here as `c9338699`.
 - `cpp/codex-native-architecture-integration` — Codex architecture/integration branch, based on `ac45d958`. Carries Devin's existing coordination documents forward; changes go through a PR to the shared migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
@@ -534,15 +598,18 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Remaining blockers / next work
 
-- Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
-  proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
-  no grievance display.
+- Diplomacy presentation has been audited against the C# reference. That workspace
+  does not contain a grievance display, demand/trade composer or claims panel;
+  claims belong on the strategic map and are covered by the selected territory
+  port. Do not track those absent reference features as native parity gaps.
 - System and galaxy CPU imagery preparation is staged; early and developed
   24-ship campaigns now have measured baselines. Prioritize the missing native
   presentation/audio below. Revisit timing for new failures or substantially
   larger fleet/combat workloads, not repeated unchanged maps or speculative
   renderer settings. Keep Core access and GPU/window work on the owner thread.
-- Surface colony visuals (buildings/roads), orbital structure rendering.
+- Surface colony visuals (buildings/roads) remain. Orbital construction geometry
+  may be added as a labeled schematic preview, but physical station placement waits
+  for an authoritative Core/save host and location contract.
 - Full character/species casting and dynamic speech remain. Fixed human
   scientist cues, owned action feedback, main score and persisted settings work.
 - `cleanMachineTest` still needs a separate machine/VM.

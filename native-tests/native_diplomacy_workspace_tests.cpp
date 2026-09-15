@@ -425,6 +425,19 @@ int main() try {
               closed.captured,
           "Return button did not emit Close.");
 
+  // Closing hides all workspace paint work but retains the latest view for reopen.
+  workspace.close();
+  portrait_path.clear();
+  DrawList closed_draw;
+  workspace.render(closed_draw, 1280, 720, &portrait_provider);
+  require(closed_draw.overlay.empty() && portrait_path.empty() && workspace.view().has_value(),
+          "Closed diplomacy workspace still rendered or discarded its retained view.");
+  workspace.open();
+  DrawList reopened_draw;
+  workspace.render(reopened_draw, 1280, 720, &portrait_provider);
+  require(has_text(reopened_draw, "RELATIONS") && !portrait_path.empty(),
+          "Reopened diplomacy workspace did not render its retained view.");
+
   workspace.set_notice("The diplomacy state changed; review the current terms.",
                        false);
   DrawList notice_draw;

@@ -16,6 +16,11 @@ from native_fleet_runtime import _source_row
 from native_galaxy_runtime import _bmp
 
 
+_TERRITORY_FIELDS = {"valid", "regions", "claims", "fill_runs", "contour_points",
+                     "fog_texels", "unexplored", "fill_images", "contour_segments",
+                     "claim_segments", "fog_images", "cached_image_bytes"}
+
+
 def _normalized(payload: dict) -> dict:
     result = copy.deepcopy(payload)
     result.pop("SavedAtUtc", None)
@@ -104,6 +109,34 @@ def author_diplomacy_fixture(source: dict) -> tuple[dict, int, int]:
                       "Status": 0, "CreatedAtTick": 22, "ResolvedAtTick": None,
                       "Summary": "Native smoke research exchange", "ExternalTermsReference": None})
     diplomacy["NextProposalId"] = proposal_id + 1
+    homes = [row.get("HomeSystemId") for row in galaxy.get("Civilizations", [])
+             if isinstance(row, dict) and row.get("Id") == player]
+    if len(homes) != 1 or type(homes[0]) is not int:
+        raise RuntimeError("Native diplomacy fixture lacks a player home system")
+    home = homes[0]
+    knowledge_rows = [row for row in galaxy.get("Knowledge", []) if isinstance(row, dict) and
+                      row.get("CivilizationId") == player]
+    if len(knowledge_rows) != 1:
+        raise RuntimeError("Native diplomacy fixture lacks player knowledge")
+    knowledge = knowledge_rows[0]
+    surveys = knowledge.get("SystemSurveys")
+    if not isinstance(surveys, list) or not any(isinstance(row, dict) and row.get("SystemId") == home and
+                                                row.get("Level") == 3 for row in surveys):
+        raise RuntimeError("Native diplomacy fixture needs a fully surveyed player home")
+    known_civilizations = knowledge.get("KnownCivilizationIds")
+    if not isinstance(known_civilizations, list) or any(type(value) is not int for value in known_civilizations):
+        raise RuntimeError("Native diplomacy fixture has malformed known civilizations")
+    if partner not in known_civilizations:
+        known_civilizations.append(partner)
+    claims = diplomacy.get("Claims")
+    claim_id = diplomacy.get("NextClaimId")
+    if (not isinstance(claims, list) or type(claim_id) is not int or claim_id < 1 or
+            any(isinstance(row, dict) and row.get("ClaimId") == claim_id for row in claims)):
+        raise RuntimeError("Native diplomacy fixture has no usable next claim id")
+    claims.append({"ClaimId": claim_id, "ClaimantCivilizationId": partner, "SystemId": home,
+                   "AssertedAtTick": 20, "Active": True,
+                   "KnownToCivilizationIds": [player, partner]})
+    diplomacy["NextClaimId"] = claim_id + 1
     return authored, proposal_id, partner
 
 
@@ -125,6 +158,37 @@ def _state(stdout: str, mode: str) -> dict:
     for key in ("proposal_id", "target_id"):
         if type(state.get(key)) is not int or state[key] < 0:
             raise RuntimeError(f"Native diplomacy diagnostic has invalid {key}")
+    return state
+
+
+def _without_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate object field")
+        result[key] = value
+    return result
+
+
+def _territory(stdout: str) -> dict:
+    rows = re.findall(r"(?:^|\s)territory=(\{[^{}\n]*\})(?=\s|$)", stdout)
+    if len(rows) != 1:
+        raise RuntimeError("Native territory did not report exactly one diagnostic")
+    try:
+        state = json.loads(rows[0], object_pairs_hook=_without_duplicate_keys)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("Native territory diagnostic is malformed") from error
+    if not isinstance(state, dict) or set(state) != _TERRITORY_FIELDS or state.get("valid") is not True:
+        raise RuntimeError(f"Native territory diagnostic has an unexpected schema: {state!r}")
+    for field in _TERRITORY_FIELDS - {"valid"}:
+        value = state.get(field)
+        if type(value) is not int or value < 0:
+            raise RuntimeError(f"Native territory diagnostic has invalid {field}: {state!r}")
+    if state["cached_image_bytes"] > 16 * 1024 * 1024:
+        raise RuntimeError(f"Native territory diagnostic exceeded its image cache budget: {state!r}")
+    if any(state[field] < 1 for field in ("regions", "claims", "fill_images", "fog_images",
+                                          "contour_segments", "claim_segments")):
+        raise RuntimeError(f"Native territory diagnostic did not prove its rendered claim overlay: {state!r}")
     return state
 
 
@@ -222,23 +286,34 @@ def validate_native_diplomacy_export(folder: Path, env: dict[str, str], fixture:
             if any(token not in result.stdout for token in ("gpu_driver=vulkan ", f"systems={len(systems)} ", "save=ok ")):
                 raise RuntimeError("Native diplomacy did not confirm Vulkan, campaign and save")
             state = _state(result.stdout, mode)
+            territory = _territory(result.stdout)
             if state["proposal_id"] != proposal_id or state["target_id"] != target_id:
                 raise RuntimeError("Native diplomacy diagnostic selected the wrong proposal or counterpart")
             _bmp(capture, width, height)
             sidecar = capture.with_name(capture.stem + "-unknown.bmp")
+            map_capture = capture.with_name(capture.stem + "-map.bmp")
             _bmp(sidecar, width, height)
+            _bmp(map_capture, width, height)
+            map_bytes = map_capture.read_bytes()
+            if map_bytes == capture.read_bytes() or map_bytes == sidecar.read_bytes():
+                raise RuntimeError("Native diplomacy regional map capture duplicated a diplomacy view")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17 or not payload.get("SavedAtUtc"):
                 raise RuntimeError("Native diplomacy did not save a current timestamped Player17 campaign")
             if mode == "progress":
                 _verify_progress(before, payload, proposal_id, target_id)
                 progress = payload
+                territory_progress = territory
             elif _normalized(payload) != _normalized(progress):
                 raise RuntimeError("Native diplomacy paused reload changed the Player17 payload")
-            for image in (capture, sidecar):
+            else:
+                territory_reload = territory
+            for image in (capture, sidecar, map_capture):
                 evidence = folder.parent / f"{folder.name}-diplomacy-{image.name}"
                 shutil.copy2(image, evidence)
                 captures.append(str(evidence))
             diagnostics.append(result.stdout.strip())
     return {"nativeDiplomacy": True, "nativeDiplomacyPausedReload": True,
+            "nativeTerritory": True, "territoryChecks": {"known": territory_progress,
+                                                             "reload": territory_reload},
             "diplomacyCaptures": captures, "diplomacyDiagnostics": diagnostics}

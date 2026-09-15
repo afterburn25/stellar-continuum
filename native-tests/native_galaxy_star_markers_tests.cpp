@@ -19,6 +19,11 @@ const Image &image_at(const DrawList &draw, std::size_t index) {
   if (!image) throw std::runtime_error("expected ordered galaxy marker image");
   return *image;
 }
+const Circle &circle_at(const DrawList &draw, std::size_t index) {
+  const auto *circle = std::get_if<Circle>(&draw.world.at(index));
+  if (!circle) throw std::runtime_error("expected ordered galaxy marker circle");
+  return *circle;
+}
 std::uint8_t alpha(const RgbaImage &image, int x, int y) {
   return image.pixels().at(
       static_cast<std::size_t>((y * image.width() + x) * 4 + 3));
@@ -144,12 +149,52 @@ void hard_budget_and_validation() {
           "marker cache clear retained resources");
 }
 
+void unexplored_alpha_preserves_resources_and_dims_every_component() {
+  NativeGalaxyStarMarkerRenderer renderer;
+  const NativeGalaxyStarAppearance appearance{
+      GalaxyStarVisualClass::g_yellow_dwarf, GalaxyStarVisualClass::m_red_dwarf,
+      GalaxyStarVisualClass::white_dwarf};
+  DrawList visible;
+  renderer.append(visible, {100, 100}, 4.f, appearance, true);
+  DrawList dimmed;
+  renderer.append(dimmed, {100, 100}, 4.f, appearance, true, std::nullopt, .4f);
+  require(visible.world.size() == 5 && dimmed.world.size() == 5,
+          "selected triple marker did not retain every visual component while dimmed");
+  require(circle_at(dimmed, 0).color.a == 21 && circle_at(dimmed, 1).color.a == 62,
+          "selection or contrast disc ignored unexplored alpha");
+  for (std::size_t index = 2; index != 5; ++index) {
+    const auto &full = image_at(visible, index);
+    const auto &dim = image_at(dimmed, index);
+    require(dim.resource == full.resource && dim.tint.a == 102,
+            "primary, secondary, or tertiary marker did not share and dim its immutable image");
+    require_transparent_border(*dim.resource);
+  }
+  require(renderer.stats().generated_resources == 3,
+          "unexplored alpha regenerated marker resources");
+
+  DrawList invisible;
+  renderer.append(invisible, {100, 100}, 4.f, appearance, true, std::nullopt, 0.f);
+  require(std::ranges::all_of(invisible.world, [](const WorldCommand &command) {
+    if (const auto *circle = std::get_if<Circle>(&command)) return circle->color.a == 0;
+    if (const auto *image = std::get_if<Image>(&command)) return image->tint.a == 0;
+    return false;
+  }), "zero unexplored alpha emitted a visible marker primitive");
+
+  for (const float invalid : {std::numeric_limits<float>::quiet_NaN(), -.01f}) {
+    bool rejected{};
+    try { renderer.append(invisible, {100, 100}, 4.f, appearance, false, std::nullopt, invalid); }
+    catch (const std::invalid_argument &) { rejected = true; }
+    require(rejected, "invalid unexplored alpha was accepted");
+  }
+}
+
 } // namespace
 
 int main() try {
   shared_discrete_resources();
   compact_and_multiplicity_cues();
   hard_budget_and_validation();
+  unexplored_alpha_preserves_resources_and_dims_every_component();
   std::cout << "native galaxy star marker tests passed\n";
   return 0;
 } catch (const std::exception &error) {
