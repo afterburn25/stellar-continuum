@@ -58,9 +58,16 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 - 150/150 graphical CTest (incl. `native_diplomacy_controller`, `native_diplomacy_workspace`),
   144/144 headless CTest baseline, all Python export checks.
-- Sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`:
-  113 files, 39 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false.
-  A reseal covering the `--diplomacy-smoke` validator follows commit `30e1d49b`.
+- Sealed export `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`:
+  118 files, 48 MB ZIP, every relocated/Vulkan smoke flag true, sourceDirty=false,
+  150/150 CTest, 16/16 diplomacy validator Python tests. The `--diplomacy-smoke`
+  validator ran in the seal: `nativeDiplomacyContacts`, `nativeDiplomacyObserverRedaction`,
+  `nativeDiplomacyCommand`, `nativeDiplomacyReload` all true with four BMP captures
+  (ordered/proposals × fresh/paused-reload). The run proved the sealed package decodes
+  the communications portraits (`portrait=1`, real command `command_accepted=1`,
+  unidentified-contact redaction verified).
+- Prior sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`
+  (113 files) remains the baseline for the pre-diplomacy slice.
 - Diplomacy presentation: `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`
   over `DiplomaticStateView` only — unidentified contacts carry no civ id/name/species/
   metrics. Revision+signature stale-command guard covers relationship drift and

@@ -39,7 +39,12 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   unresolved-signal contact + pending incoming access petition onto the
   fixture (tick = SimulationDays × 1000), runs the smoke twice (fresh +
   paused reload), and verifies redaction, portrait, command acceptance,
-  proposal persistence and capture variance.
+  proposal persistence and capture variance. Sealed in export
+  `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`
+  (118 files, all four diplomacy flags true, `portrait=1`).
+- The communications portraits are now declared+packaged: nine entries in
+  `NATIVE_SPECIES_SOURCES`/`cmake/NativeSpeciesAssets.cmake` (four base JPGs,
+  four `*-communications-v2.png`, credits doc), all exact-hash.
 
 ## Interfaces added in 0.1.57 (candidate for review)
 
