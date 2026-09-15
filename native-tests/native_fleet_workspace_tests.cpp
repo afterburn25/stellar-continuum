@@ -180,6 +180,47 @@ int main() try {
               confirm.kind == FleetWorkspaceCommandKind::Confirm,
           "Explicit travel confirmation was not routed.");
 
+  NativeFleetWorkspace engagement;
+  auto armed = player_view(true);
+  auto &warship = armed.own_fleets.front();
+  warship.role = stellar::core::FleetRole::Military;
+  warship.current_system_id = 0;
+  warship.combat_status = stellar::core::OwnCombatFleetStatus{};
+  warship.combat_status->is_armed = true;
+  const auto engage_click = [&] {
+    return engagement.handle({InputEventType::LeftPressed, center(layout.confirm)},
+                             1280, 720, markers, std::nullopt).kind;
+  };
+  engagement.set_view(armed);
+  DrawList engage_draw;
+  engagement.render(engage_draw, 1280, 720, markers);
+  require(has_text(engage_draw, "ENGAGE HOSTILES") &&
+              engage_click() == FleetWorkspaceCommandKind::Engage,
+          "Stationed armed fleet did not expose the authoritative engagement command.");
+  for (int unavailable = 0; unavailable < 4; ++unavailable) {
+    auto view = armed;
+    auto &fleet = view.own_fleets.front();
+    if (unavailable == 0) fleet.role = stellar::core::FleetRole::Scout;
+    if (unavailable == 1) fleet.current_system_id.reset();
+    if (unavailable == 2) fleet.destination_system_id = 42;
+    if (unavailable == 3) fleet.combat_status->is_armed = false;
+    engagement.set_view(std::move(view));
+    DrawList unavailable_draw;
+    engagement.render(unavailable_draw, 1280, 720, markers);
+    require(!has_text(unavailable_draw, "ENGAGE HOSTILES") &&
+                engage_click() != FleetWorkspaceCommandKind::Engage,
+            "Ineligible fleet exposed a tactical engagement action.");
+  }
+  engagement.set_view(armed);
+  engagement.set_preview(blocked, "Unknown system");
+  require(engage_click() != FleetWorkspaceCommandKind::Engage,
+          "Blocked travel preview accidentally started combat.");
+  auto ready = blocked;
+  ready.route_supported = ready.route_authoritative = ready.command_available = true;
+  engagement.set_preview(ready, "Unknown system");
+  require(engage_click() == FleetWorkspaceCommandKind::Confirm,
+          "Engagement replaced an explicit travel confirmation.");
+
   auto revised = player_view(true);
   revised.own_fleets.front().mission_order_revision = 1;
   workspace.set_view(std::move(revised));

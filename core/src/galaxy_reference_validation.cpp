@@ -241,7 +241,8 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
   for (const auto &fleet : world.fleets) {
     if (fleet.tactical_loadout) validate_loadout(*fleet.tactical_loadout);
     if (fleet.tactical_vessel) validate_vessel(*fleet.tactical_vessel);
-    if (fleet.tactical_vessel && fleet.tactical_vessel->id != fleet.id)
+    if (fleet.tactical_vessel &&
+        fleet.tactical_vessel->id != campaign_vessel_id_for_fleet(fleet.id))
       data_error("Fleet " + std::to_string(fleet.id) +
                  " has tactical state for a different vessel identity.");
     if (fleet.design_id) {

@@ -39,7 +39,8 @@ enum class FleetWorkspaceCommandKind {
   Select,
   SelectHits,
   Preview,
-  Confirm
+  Confirm,
+  Engage
 };
 
 struct FleetWorkspaceCommand {

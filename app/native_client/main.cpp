@@ -11,6 +11,7 @@
 #include "native_campaign_session.hpp"
 #include "native_notification_events.hpp"
 #include "native_support_service.hpp"
+#include "native_battle_workspace.hpp"
 #include "native_campaign_calendar.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -98,6 +99,7 @@ using namespace stellar::native_startup_ui;
 using namespace stellar::native_galaxy_ui;
 using namespace stellar::native_territory;
 using namespace stellar::native_ship_ui;
+namespace native_battle_ui = stellar::native_battle_ui;
 
 struct SmokePhaseMaximum {
   double milliseconds{};
@@ -222,6 +224,7 @@ struct Options {
   bool research_smoke{};
   bool navigation_smoke{};
   bool support_check{},support_failure_check{};
+  bool battle_smoke{},battle_reload_smoke{};
   bool fleet_smoke{};
   bool shipyard_smoke{};
   bool construction_smoke{};
@@ -259,6 +262,7 @@ struct Options {
     else if(arg==L"--windowed") result.windowed=true;
     else if(arg==L"--audio-check") result.audio_check=true;
     else if(arg==L"--support-check") result.support_check=true;
+    else if((arg==L"--battle-smoke"||arg==L"--battle-reload-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.battle_smoke=true;result.battle_reload_smoke=arg==L"--battle-reload-smoke";result.windowed=true;}
     else if(arg==L"--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg==L"--voice-check") result.voice_check=true;
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
@@ -295,6 +299,7 @@ struct Options {
     else if(arg=="--windowed") result.windowed=true;
     else if(arg=="--audio-check") result.audio_check=true;
     else if(arg=="--support-check") result.support_check=true;
+    else if((arg=="--battle-smoke"||arg=="--battle-reload-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.battle_smoke=true;result.battle_reload_smoke=arg=="--battle-reload-smoke";result.windowed=true;}
     else if(arg=="--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg=="--voice-check") result.voice_check=true;
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
@@ -329,13 +334,14 @@ struct Options {
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
   if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
+  if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires an isolated active-encounter save and --load.");
   if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
   if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -1432,6 +1438,80 @@ class NativeCampaign final {
 #endif
     support_.record("session",utc_timestamp()+" Native campaign admitted.");
   }
+  void prepare_battle_smoke(int width,int height,bool reload){
+    smoke_battle_reload_=reload;
+    const auto send=[&](InputEvent event,double delta=0.){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=event.position;input.events.push_back(std::move(event));
+      if(!update(input,width,height,delta,true))throw std::runtime_error("Battle replay closed the campaign.");
+    };
+    refresh_battle(width,height,0.);
+    if(!battle_workspace_.visible()||!battle_workspace_.snapshot())
+      throw std::runtime_error("Battle replay needs an unreconciled encounter.");
+    auto& frame=session_->frame();
+    smoke_battle_day_=frame.clock().simulation_days();smoke_battle_utc_=utc_timestamp();
+    const auto canonical=[&]{return encode_player_campaign_v17_json(capture_player_campaign_v17(
+        frame.runtime(),{smoke_battle_day_,STELLAR_GAME_VERSION,smoke_battle_utc_}));};
+    const auto before=canonical();
+    const auto own=std::ranges::find_if(battle_workspace_.snapshot()->formations,[&](const auto& f){
+      return f.civilization_id==frame.runtime().world().campaign().player_civilization_id;});
+    if(own==battle_workspace_.snapshot()->formations.end())throw std::runtime_error("Battle replay lacks an owned formation.");
+    diplomacy_smoke_click(battle_workspace_.project(own->position,width,height),width,height);
+    if(battle_workspace_.selection().empty())throw std::runtime_error("Battle replay did not select the owned formation.");
+    const auto layout=native_battle_ui::BattleWorkspaceLayout::for_viewport(width,height);
+    diplomacy_smoke_click(center(layout.speed),width,height);
+    send({InputEventType::PointerMove,center(layout.speed)},.25);
+    smoke_battle_paused_speed_=frame.tactical_clock().speed_multiplier()==0.&&canonical()==before;
+    diplomacy_smoke_click(center(layout.menu),width,height);
+    if(!menu_)throw std::runtime_error("Battle menu did not open.");
+    send({InputEventType::PointerMove,{}},.25);
+    smoke_battle_menu_pause_=frame.tactical_clock().speed_multiplier()==0.&&canonical()==before;
+    diplomacy_smoke_click(center(NativeUiLayout::for_viewport(width,height).continue_button),width,height);
+    if(menu_||!smoke_battle_paused_speed_||!smoke_battle_menu_pause_)
+      throw std::runtime_error("Battle speed/menu controls changed the paused campaign.");
+    if(!reload){
+      diplomacy_smoke_click(center(layout.order_buttons.front()),width,height);
+      if(!last_battle_order_accepted_)throw std::runtime_error("Battle order was rejected by Core.");
+      diplomacy_smoke_click(center(layout.play),width,height);
+      for(int i=0;i<16;++i)send({InputEventType::PointerMove,{}},.25);
+      diplomacy_smoke_click(center(layout.play),width,height);
+      if(frame.tactical_clock().speed_multiplier()!=0.)throw std::runtime_error("Battle replay could not pause after advancement.");
+    }
+    refresh_battle(width,height,.1);
+    smoke_battle_canonical_=canonical();
+    if(reload&&smoke_battle_canonical_!=before)throw std::runtime_error("Paused tactical reload changed canonical state.");
+    // Save through the real tactical F6 route; the frame loop has no fallback.
+    send({InputEventType::KeyPressed,{},{},0.f,{},0,0x4000003fu});
+  }
+  [[nodiscard]] std::string battle_smoke_status(int width,int height)const{
+    const auto* snapshot=battle_workspace_.snapshot();
+    if(!snapshot)throw std::runtime_error("Battle capture lost its observer snapshot.");
+    auto& frame=session_->frame();const auto& world=frame.runtime().world().campaign();
+    std::size_t own=0,foreign=0,foreign_exact=0;Point sample{};
+    for(const auto& formation:snapshot->formations){
+      if(formation.civilization_id==world.player_civilization_id){
+        if(own++==0)sample=battle_workspace_.project(formation.position,width,height);
+        if(!formation.is_exact)throw std::runtime_error("Own battle formation lost exact information.");
+      }else{++foreign;if(formation.is_exact)++foreign_exact;}
+    }
+    const auto canonical=encode_player_campaign_v17_json(capture_player_campaign_v17(
+        frame.runtime(),{smoke_battle_day_,STELLAR_GAME_VERSION,smoke_battle_utc_}));
+    const bool unchanged=canonical==smoke_battle_canonical_;
+    const bool paused=frame.tactical_clock().speed_multiplier()==0.;
+    const bool day=frame.clock().simulation_days()==smoke_battle_day_;
+    if(!unchanged||!paused||!day)throw std::runtime_error("Battle changed while paused before capture.");
+    std::ostringstream out;out<<"{\"reload\":"<<(smoke_battle_reload_?"true":"false")
+        <<",\"paused_speed\":"<<(smoke_battle_paused_speed_?"true":"false")
+        <<",\"menu_pause\":"<<(smoke_battle_menu_pause_?"true":"false")
+        <<",\"canonical_unchanged\":"<<(unchanged?"true":"false")
+        <<",\"day_unchanged\":"<<(day?"true":"false")
+        <<",\"order_accepted\":"<<(last_battle_order_accepted_?"true":"false")
+        <<",\"own\":"<<own<<",\"foreign\":"<<foreign<<",\"foreign_exact\":"<<foreign_exact
+        <<",\"hidden_formations\":"<<(world.active_combat_encounter->battle.formations.size()-snapshot->formations.size())
+        <<",\"tick\":"<<snapshot->tick<<",\"tokens\":"<<battle_workspace_.rendered_tokens()
+        <<",\"sample_x\":"<<sample.x<<",\"sample_y\":"<<sample.y<<"}";
+    return out.str();
+  }
   void support_smoke(int width,int height,bool expect_failure,
       const std::function<void(const DrawList&,bool)>& draw){
     using stellar::native_support::SupportExportState;
@@ -1809,7 +1889,7 @@ class NativeCampaign final {
   [[nodiscard]] std::string surface_smoke_status()const{const auto render=surface_workspace_.scene_diagnostics();std::ostringstream out;out<<std::fixed<<std::setprecision(6)<<std::boolalpha<<"{\"mode\":\""<<(smoke_surface_reload_?"paused_reload":"ordered")<<"\",\"system_id\":"<<smoke_surface_system_id_<<",\"body_id\":"<<smoke_surface_body_id_<<",\"colony_id\":"<<smoke_surface_colony_id_<<",\"type_id\":\""<<smoke_surface_type_id_<<"\",\"site_id\":"<<smoke_surface_site_id_.value_or(-1)<<",\"x\":"<<smoke_surface_x_<<",\"z\":"<<smoke_surface_z_<<",\"rotation\":"<<smoke_surface_rotation_<<",\"authorization\":"<<smoke_surface_authorization_<<",\"refund\":"<<smoke_surface_refund_<<",\"treasury_before\":"<<smoke_surface_treasury_before_<<",\"treasury_after_cancel\":"<<smoke_surface_treasury_before_<<",\"treasury_after_place\":"<<smoke_surface_treasury_after_place_<<",\"treasury_after_refund\":"<<smoke_surface_treasury_after_refund_<<",\"treasury_saved\":"<<smoke_surface_treasury_saved_<<",\"site_count_before\":"<<smoke_surface_site_count_before_<<",\"site_count_saved\":"<<smoke_surface_site_count_saved_<<",\"progress\":"<<smoke_surface_progress_<<",\"before_days\":"<<smoke_surface_before_day_<<",\"saved_days\":"<<smoke_surface_saved_day_<<",\"palette_selected\":"<<smoke_surface_palette_selected_<<",\"ghost_previewed\":"<<smoke_surface_ghost_previewed_<<",\"placement_cancelled\":"<<smoke_surface_placement_cancelled_<<",\"cancel_no_change\":"<<smoke_surface_cancel_no_change_<<",\"placement_confirmed\":"<<smoke_surface_placement_confirmed_<<",\"removal_previewed\":"<<smoke_surface_removal_previewed_<<",\"removal_confirmed\":"<<smoke_surface_removal_confirmed_<<",\"refund_exact\":"<<smoke_surface_refund_exact_<<",\"persisted_site\":"<<smoke_surface_persisted_site_<<",\"paused\":"<<(session_->frame().clock().speed()==StrategicSpeed::Paused)<<",\"render\":{\"sites\":"<<render.sites<<",\"meshes\":"<<render.meshes<<",\"triangles\":"<<render.triangles<<",\"road_segments\":"<<render.road_segments<<"}}";return out.str();}
   [[nodiscard]] std::string system_travel_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(9)<<std::boolalpha<<"{\"mode\":\""<<(smoke_system_travel_reload_?"paused_reload":"progress")<<"\",\"fleet_id\":"<<smoke_system_travel_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_system_travel_system_id_.value_or(-1)<<",\"destination_id\":"<<smoke_system_travel_destination_id_.value_or(-1)<<",\"order_revision\":"<<smoke_system_travel_mission_revision_<<",\"lane_count\":"<<smoke_system_travel_lane_count_<<",\"before_x\":"<<smoke_system_travel_before_x_<<",\"before_y\":"<<smoke_system_travel_before_y_<<",\"after_x\":"<<smoke_system_travel_after_x_<<",\"after_y\":"<<smoke_system_travel_after_y_<<",\"before_days\":"<<smoke_system_travel_before_day_<<",\"after_days\":"<<smoke_system_travel_after_day_<<",\"selected\":"<<smoke_system_travel_selected_<<",\"canonical_moved\":"<<smoke_system_travel_canonical_moved_<<",\"rendered_moved\":"<<smoke_system_travel_rendered_moved_<<",\"paused_stable\":"<<smoke_system_travel_paused_stable_<<",\"pause_retained\":"<<smoke_system_travel_pause_retained_<<",\"known_arrow\":"<<smoke_system_travel_known_opened_<<",\"unknown_denied\":"<<smoke_system_travel_unknown_denied_<<",\"knowledge_unchanged\":"<<smoke_system_travel_knowledge_unchanged_<<",\"lanes_connected\":"<<smoke_system_travel_lanes_connected_<<'}';return out.str();}
   [[nodiscard]] bool wants_text_input() const noexcept {
-    return !menu_ && research_workspace_.wants_text_input() &&
+    return !menu_ && !battle_workspace_.visible() && research_workspace_.wants_text_input() &&
            !shipyard_workspace_.visible() &&
            !construction_workspace_.visible();
   }
@@ -1847,6 +1927,7 @@ class NativeCampaign final {
       diplomacy_portraits_.clear();
       colony_workspace_.discard_campaign();
       surface_workspace_.discard_campaign();
+      battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;
       settlement_workspace_.discard_campaign();
       colony_entry_view_.reset();
       system_workspace_.discard_campaign();
@@ -1865,6 +1946,7 @@ class NativeCampaign final {
       if(!session_notice.message.empty())support_.record("session",timestamp+" "+session_notice.message);
     }
     if(input.quit_requested)session_->request_exit();
+    refresh_battle(width,height,elapsed);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
       notification_view_.close();
@@ -1891,6 +1973,12 @@ class NativeCampaign final {
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
+      }
+      if(battle_workspace_.visible()&&!menu_){
+        if(event.type==InputEventType::KeyPressed&&event.key==0x4000003fu&&
+           input.focused&&input.renderable())session_->request_save();
+        else execute_battle(battle_workspace_.handle(event,width,height));
+        gesture_.capture_for_ui();continue;
       }
       if(event.type==InputEventType::KeyPressed&&event.key==0x40000041u&&
          input.focused&&input.renderable()&&!wants_text_input()&&
@@ -2153,6 +2241,9 @@ class NativeCampaign final {
   [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0:system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();}
 
   [[nodiscard]] DrawList scene(int width,int height){
+    if(battle_workspace_.visible()&&!menu_){
+      DrawList tactical;battle_workspace_.render(tactical,width,height);return tactical;
+    }
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
@@ -2454,6 +2545,63 @@ class NativeCampaign final {
     return out;
   }
  private:
+  void refresh_battle(int width,int height,double elapsed){
+    auto& frame=session_->frame();
+    const auto& world=frame.runtime().world().campaign();
+    const bool active=world.active_combat_encounter&&!world.active_combat_encounter->reconciled;
+    if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;return;}
+    if(!battle_workspace_.visible()){
+      notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
+      construction_workspace_.close();diplomacy_workspace_.close();system_workspace_.close();
+      colony_workspace_.close();surface_workspace_.close();
+      battle_workspace_.open(frame.tactical_snapshot(),world.player_civilization_id,width,height);
+      battle_refresh_elapsed_=0.;
+    }else{
+      battle_refresh_elapsed_+=std::max(0.,elapsed);
+      if(battle_refresh_elapsed_>=.1){
+        battle_workspace_.set_snapshot(frame.tactical_snapshot(),battle_refresh_elapsed_);
+        battle_refresh_elapsed_=0.;
+      }
+    }
+    battle_workspace_.set_tactical_speed(frame.tactical_clock().speed_multiplier(),frame.tactical_resume_speed());
+  }
+  void execute_battle(const native_battle_ui::BattleWorkspaceCommand& command){
+    using native_battle_ui::BattleWorkspaceCommandKind;
+    auto& frame=session_->frame();
+    const auto change_speed=[&](double speed){
+      if(frame.tactical_clock().speed_multiplier()>0.)frame.set_tactical_speed(speed);
+      else frame.set_tactical_resume_speed(speed);
+      battle_workspace_.set_tactical_speed(frame.tactical_clock().speed_multiplier(),frame.tactical_resume_speed());
+    };
+    switch(command.kind){
+    case BattleWorkspaceCommandKind::IssueOrder:{
+      std::size_t accepted=0;
+      std::string message="Select a friendly formation before issuing an order.";
+      for(const auto& order:command.orders){
+        const auto result=frame.issue_tactical_order(order);
+        accepted+=result.accepted?1u:0u;message=result.message;
+      }
+      if(command.orders.size()>1)message="Orders accepted for "+std::to_string(accepted)+" of "+std::to_string(command.orders.size())+" formations.";
+      last_battle_order_accepted_=accepted>0&&accepted==command.orders.size();
+      battle_workspace_.set_status(message,!last_battle_order_accepted_);
+      support_.record("combat",utc_timestamp()+" "+message);
+      if(presentation_audio_){if(last_battle_order_accepted_)presentation_audio_->confirm();else presentation_audio_->play_event(stellar::native_audio::Cue::Alert);}
+      battle_workspace_.set_snapshot(frame.tactical_snapshot(),0.);
+      return;
+    }
+    case BattleWorkspaceCommandKind::TogglePause:
+      frame.set_tactical_speed(frame.tactical_clock().speed_multiplier()>0.?0.:frame.tactical_resume_speed());
+      battle_workspace_.set_tactical_speed(frame.tactical_clock().speed_multiplier(),frame.tactical_resume_speed());return;
+    case BattleWorkspaceCommandKind::CycleSpeed:{
+      const auto current=frame.tactical_resume_speed();double next=.25;
+      for(const auto speed:MassiveCombatClock::allowed_speeds())if(speed>current+1e-9){next=speed;break;}
+      change_speed(next);return;
+    }
+    case BattleWorkspaceCommandKind::SetTacticalSpeed:change_speed(command.speed);return;
+    case BattleWorkspaceCommandKind::Menu:toggle_menu();return;
+    case BattleWorkspaceCommandKind::Fit:case BattleWorkspaceCommandKind::None:return;
+    }
+  }
   void request_support(int width,int height){
     if(support_.busy())return;
     support_.record("support",utc_timestamp()+" Local diagnostic export requested.");
@@ -2468,7 +2616,7 @@ class NativeCampaign final {
     support_notice_seconds_=20.;
   }
   [[nodiscard]] bool notifications_available()const noexcept{
-    return native_navigation_available(menu_,settlement_workspace_.visible(),
+    return !battle_workspace_.visible()&&native_navigation_available(menu_,settlement_workspace_.visible(),
         diplomacy_workspace_.modal_open(),surface_workspace_.modal_open(),
         audio_settings_&&audio_settings_->visible())&&
         !shipyard_workspace_.confirmation_open()&&!construction_workspace_.confirmation_open()&&
@@ -2925,6 +3073,12 @@ class NativeCampaign final {
 
   void handle_fleet_command(const FleetWorkspaceCommand &command){
     if(command.kind==FleetWorkspaceCommandKind::None)return;
+    if(command.kind==FleetWorkspaceCommandKind::Engage){
+      const auto outcome=session_->frame().begin_tactical(command.fleet_id);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      if(outcome.accepted)publish_notification("Combat",outcome.message);
+      refresh_fleets(true);return;
+    }
     NativeFleetSelectionOutcome selection;
     if(command.kind==FleetWorkspaceCommandKind::Select)
       selection=fleet_controller_.select(session_->frame(),
@@ -3099,6 +3253,12 @@ class NativeCampaign final {
   stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
   stellar::native_notifications::NativeNotificationFeed notifications_;
   stellar::native_support::NativeSupportService support_;
+  native_battle_ui::NativeBattleWorkspace battle_workspace_;
+  double battle_refresh_elapsed_{};
+  bool last_battle_order_accepted_{};
+  std::string smoke_battle_canonical_,smoke_battle_utc_;
+  double smoke_battle_day_{};
+  bool smoke_battle_reload_{},smoke_battle_paused_speed_{},smoke_battle_menu_pause_{};
   std::string support_environment_,last_support_notice_;
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
@@ -3209,6 +3369,8 @@ int main(int argc,char **argv){
                                           window.drawable_height(),options.load);
       else if(options.diplomacy_smoke||options.diplomacy_reload_smoke)
         campaign.prepare_diplomacy_smoke(window.drawable_width(),window.drawable_height(),options.diplomacy_reload_smoke);
+      else if(options.battle_smoke)
+        campaign.prepare_battle_smoke(window.drawable_width(),window.drawable_height(),options.battle_reload_smoke);
       else if(options.ship_art_smoke)
         campaign.prepare_ship_art_smoke(window.drawable_width(),
                                         window.drawable_height());
@@ -3471,6 +3633,7 @@ int main(int argc,char **argv){
           std::cout<<" ship_art="<<campaign.ship_art_smoke_status();
         if(options.diplomacy_smoke||options.diplomacy_reload_smoke)
           std::cout<<" diplomacy="<<campaign.diplomacy_smoke_status();
+        if(options.battle_smoke)std::cout<<" battle="<<campaign.battle_smoke_status(input.drawable_width,input.drawable_height);
         if(options.new_game_smoke){
           std::cout<<" new_game={\"mode\":\"fresh\",\"entry_opened\":"<<(startup_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(startup_evidence.setup_opened?"true":"false")<<",\"species_selected\":"<<(startup_evidence.species_selected?"true":"false")

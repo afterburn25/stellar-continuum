@@ -5,6 +5,54 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Native tactical battle integration
+
+The native client now opens an observer-filtered tactical workspace for active
+encounters. Stationed armed fleets expose ENGAGE HOSTILES through the existing
+fleet action slot; Core validates participation and hostility. Formation picking,
+box selection, group orders, targeted orders, pan/zoom, fit, pause/resume, separate
+speed control, menu and F6 save route through the existing campaign owner.
+Changing speed while paused changes only the resume speed. Ordinary strategic
+workspaces cannot receive hidden input during battle.
+
+This selectively adapts Devin `357872e8`. Ordered clipped geometry repairs ships
+hidden beneath the incoming opaque backdrop; owned context/non-targeted orders
+apply to the whole selection. Cancelled/orphan/cross-panel gestures cannot issue
+orders. Camera initialization is explicit, fit reserves control space, and dash,
+token and effect work is bounded. Rendered captures exposed and corrected clipped
+formation text and overlapping event rows. Tactical ships remain schematic;
+this does not complete detailed ship artwork fighting in a solar-system scene.
+
+Manual saves now accept a successfully completed tactical frame. Player17 shape
+and Core clock/save flags remain unchanged, and strategic autosave policy is
+unchanged. Paused/running capture, exact reload, matched continuation, completed
+encounter reconciliation and failed-load recovery have maintained session tests.
+The lifecycle tests exposed a separate zero-fleet identity defect: native fleet
+0 uses reserved tactical vessel ID 2^32, while nonzero identities remain unchanged.
+Begin, observer bindings, encounter validation, reconcile and reference validation
+agree. Legacy C# still has this defect and cannot read that new zero-fleet tactical
+identity; see `engine/NATIVE_TACTICAL_WORKSPACE.md` for the explicit parity exception.
+
+Final MSVC build, twelve affected CTests and five Python evidence tests pass.
+Two relocated Vulkan tactical replays at 720p/1080p select an owned formation,
+issue a Core order, run eight tactical seconds, pause and save through actual F6
+routing with no fallback. Reload preserves the entire canonical payload apart
+from SavedAtUtc. An unobserved picket stays hidden and persisted; enemy detail
+remains inexact; actual green token pixels are checked. Four neighboring fleet
+and 500-system navigation replays also pass. See `work/native-battle-focused.log`,
+`work/native-battle-runtime.json`, `work/native-battle-neighbor-runtime.json`,
+`work/native-battle-python.log` and `work/native-battle-final-build.log`.
+Final label-layout edits additionally passed `work/native-battle-final-workspace.log`
+and regenerated both tactical Vulkan captures; neighboring checks preceded only
+those isolated battle label changes.
+
+The local package is unsealed; PR #332 remains unmerged. No 3D, graphical-parity,
+release or sustained-60-FPS claim is made. Next: carry approved ship/system art
+into tactical presentation, then address the remaining surface sprite contract
+or stable quoted-action shortcuts. Devin is reviewed through `22cff368`; support
+and tactical are now selectively adapted, surface `58aaf475` and shortcuts
+`31a28e3c` remain unimported. Shared base remains `ac45d958`.
+
 ### Native diagnostic export integration
 
 F8 and the pause menu now export a local support ZIP through one bounded

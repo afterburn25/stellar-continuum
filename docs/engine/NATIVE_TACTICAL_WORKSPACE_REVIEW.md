@@ -2,14 +2,16 @@
 
 Reviewed 2026-09-15: Devin `357872e87c3882211f1940f82160cb6acccb51fa`
 against Codex `c398a539` and the retained C# `MassiveCombatView.cs`.
-This is a source review. The proposed port has not been imported, rendered or
-benchmarked here. It is not part of PR #332's playable preview.
+Historical source review at that checkpoint. The port has since been selectively
+adapted and tested in PR #332; see `NATIVE_TACTICAL_WORKSPACE.md` for the current
+corrections, actual rendering evidence and remaining visual work. Findings below
+describe the original incoming code, not the repaired implementation.
 
 The Core order/snapshot adapters are useful: observed combat data and scanner
 knowledge remain authoritative. Reuse those contracts while correcting the
 presentation and input issues below; do not create another combat simulation.
 
-## Corrections needed before integration
+## Incoming defects corrected in the integration
 
 | Finding at reviewed commit | Player consequence | Required correction and evidence |
 | --- | --- | --- |
@@ -23,8 +25,8 @@ presentation and input issues below; do not create another combat simulation.
 
 ## Scope of the next checkpoint
 
-Keep the port on Devin's branch until these corrections have a validated
-checkpoint. Preserve the existing campaign input, observer secrecy, Core combat
+The original integration gate required these corrections and a validated
+checkpoint; that functional gate now passes. Preserve the existing campaign input, observer secrecy, Core combat
 rules and Player17 recovery. The current tactical grid and schematic circles do
 not establish the requested detailed ships battling inside the system scene.
 Approved ship/system art and appropriate effects remain presentation work after

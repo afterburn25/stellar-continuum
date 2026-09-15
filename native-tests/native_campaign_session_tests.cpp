@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -441,7 +442,7 @@ void failed_frame_clears_save_readiness(const fs::path &research_root,
   require(failed, "Injected invalid strategic frame unexpectedly completed.");
   require(writer_calls.load() == 0 && !session->exit_ready() &&
               session->notice().kind == SessionNoticeKind::Failure &&
-              session->notice().message.find("until a strategic frame completes") !=
+              session->notice().message.find("until a campaign frame completes") !=
                   std::string::npos,
           "Failed frame retained stale manual save readiness.");
 }
@@ -482,6 +483,94 @@ void wrong_thread_rejected_before_mutation(const fs::path &research_root,
               !session->load_pending(),
           "Wrong-thread session calls mutated state before rejection.");
 }
+
+void tactical_save_reload_and_continuation(const fs::path &research_root,
+                                         const std::string &source,
+                                         const fs::path &directory) {
+  auto fixture=Json::parse(source);
+  // Arrange an encounter through the production begin command, not a second
+  // hand-authored battle representation. The fixture supplies two military
+  // fleets and existing civilians at one system, with an identified war.
+  for(auto& fleet:fixture["Galaxy"]["Fleets"]){
+    const auto id=fleet["Id"].get<int>();
+    if(id!=0&&id!=6&&id!=7)continue;
+    fleet["CurrentSystemId"]=0;fleet["X"]=0;fleet["Y"]=0;
+    if(id==7)continue;
+    fleet["Role"]=static_cast<int>(FleetRole::Military);
+    fleet["DesignId"]="patrol_corvette";
+    fleet["Combat"]["ProfileId"]="patrol_corvette_mk1";
+    fleet["Combat"]["Shields"]=35;fleet["Combat"]["Armor"]=45;
+    fleet["Combat"]["Hull"]=95;
+  }
+  const auto tick=static_cast<std::int64_t>(fixture["SimulationDays"].get<double>()*1000.);
+  fixture["Diplomacy"]["Contacts"].push_back({
+      {"ObserverCivilizationId",0},{"ContactId","native-tactical-contact"},
+      {"TargetCivilizationId",3},{"FirstObservedTick",tick-8},{"LastObservedTick",tick},
+      {"LastObservedSystemId",0},{"Awareness",2},{"Condition",1},
+      {"CommunicationAvailable",false},{"Confidence",.9}});
+  fixture["Diplomacy"]["Relationships"].push_back({
+      {"CivilizationAId",0},{"CivilizationBId",3},{"PoliticalState",3},
+      {"Trust",0.},{"Hostility",.9},{"Fear",.2},{"Respect",0.},
+      {"Cooperation",0.},{"Grievances",Json::array()}});
+  const auto path=directory/"tactical.json";write(path,fixture.dump());
+  auto session=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  auto& frame=session->frame();
+  require(frame.tactical_snapshot().formations.empty()&&
+      !frame.issue_tactical_order({1,MassiveCombatOrderType::Hold}).accepted,
+      "Tactical adapter fabricated a battle without an encounter.");
+  const auto begun=frame.begin_tactical(0);
+  require(begun.accepted,"Production tactical begin rejected the arranged opposing fleets.");
+  auto& encounter=*frame.runtime().world().campaign().active_combat_encounter;
+  const auto own=std::ranges::find_if(encounter.battle.formations,[](const auto& f){return f.civilization_id==0;});
+  const auto foreign=std::ranges::find_if(encounter.battle.formations,[](const auto& f){return f.civilization_id!=0;});
+  require(own!=encounter.battle.formations.end()&&foreign!=encounter.battle.formations.end(),
+      "Canonical begin did not create both participants.");
+  require(!frame.issue_tactical_order({foreign->id,MassiveCombatOrderType::Hold}).accepted,
+      "Native tactical adapter accepted a foreign formation order.");
+  require(frame.issue_tactical_order({own->id,MassiveCombatOrderType::Hold}).accepted,
+      "Native tactical adapter rejected its owned formation order.");
+  frame.set_tactical_speed(0.);frame.set_tactical_resume_speed(2.);
+  const auto starting_tick=encounter.battle.tick;
+  const auto step=session->advance(.5,"2044-05-06T07:08:20Z");
+  require(step.route==CampaignFrameRoute::Tactical&&encounter.battle.tick==starting_tick&&
+      frame.tactical_clock().speed_multiplier()==0.,"Changing resume speed advanced a paused battle.");
+  const auto capture=[](NativeCampaignSession& value){
+    return encode_player_campaign_v17_json(capture_player_campaign_v17(value.frame().runtime(),
+      {value.frame().clock().simulation_days(),"0.1.7-alpha","2044-05-06T07:08:20Z"}));
+  };
+  const auto paused=capture(*session);
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",false);wait_for_save(*session);
+  require(session->notice().kind==SessionNoticeKind::Saved&&read(path)==paused,
+      "Paused tactical save did not retain the complete canonical state.");
+  auto loaded=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  require(capture(*loaded)==paused&&loaded->frame().tactical_clock().speed_multiplier()==0.,
+      "Tactical startup reload changed its save or resumed the encounter.");
+  frame.set_tactical_speed(2.);loaded->frame().set_tactical_speed(2.);
+  for(const auto delta:{.13,.017,.25}){
+    (void)session->advance(delta,"2044-05-06T07:08:20Z");
+    (void)loaded->advance(delta,"2044-05-06T07:08:20Z");
+    require(capture(*session)==capture(*loaded),"Tactical reload diverged during matched continuation.");
+  }
+  const auto running=capture(*session);
+  require(running!=paused,"Matched tactical continuation did not advance.");
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",false);wait_for_save(*session);
+  require(session->notice().kind==SessionNoticeKind::Saved&&read(path)==running,
+      "Running tactical capture lost its orders, pending time or combat events.");
+  // Failed activation keeps this live encounter and its clock untouched.
+  write(path,"broken tactical save");write(fs::path(path.string()+".bak"),"broken backup");
+  session->request_load();require(!wait_for_load(*session,false),"Broken tactical save replaced live state.");
+  require(session->notice().kind==SessionNoticeKind::Failure&&capture(*session)==running,
+      "Failed tactical load damaged the running campaign.");
+  // Reconciliation remains canonical and idempotent after surrender.
+  for(auto& f:encounter.battle.formations)if(f.civilization_id!=0)f.surrendered=true;
+  frame.set_tactical_speed(0.);
+  const auto ended=session->advance(0.,"2044-05-06T07:08:20Z");
+  require(ended.tactical_completed&&encounter.reconciled&&frame.tactical_snapshot().formations.empty(),
+      "Completed encounter did not reconcile and relinquish tactical presentation.");
+  const auto completed=capture(*session);
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",true);wait_for_save(*session);
+  require(read(path)==completed,"Completion-frame tactical save was not durable.");
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -512,6 +601,7 @@ int main(int argc, char **argv) try {
   background_manual_save(research_root, source, directory, true);
   failed_frame_clears_save_readiness(research_root, source, directory);
   wrong_thread_rejected_before_mutation(research_root, source, directory);
+  tactical_save_reload_and_continuation(research_root, source, directory);
   std::cout << "Native session save/load, ordered pending IO, transactional activation, owner-thread enforcement, cache generations and failed Exit passed\n";
   return 0;
 } catch (const std::exception &error) {

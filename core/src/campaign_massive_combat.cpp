@@ -329,6 +329,7 @@ CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
     auto tactical = fleet->tactical_vessel
                         ? clone_vessel(*fleet->tactical_vessel)
                         : vessel(*fleet, combat, profile_value);
+    tactical.id = campaign_vessel_id_for_fleet(fleet->id);
     tactical.name = fleet->name;
     tactical.hull_fraction = static_cast<float>(std::clamp(
         combat.hull / std::max(1.0, profile_value.max_hull), 0.0, 1.0));
@@ -515,9 +516,19 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
     for (const auto &[id, vessel_value] : tracked) {
       if (vessel_value.destroyed)
         continue;
+      if (id == campaign_zero_fleet_vessel_id) {
+        const auto binding = std::ranges::find(bound, 0,
+                                               &CampaignCombatBinding::fleet_id);
+        if (binding == bound.end())
+          throw std::invalid_argument(
+              "Campaign combat participant does not match its persistent vessel.");
+        survivors.push_back(0);
+        continue;
+      }
       if (id < std::numeric_limits<int>::min() ||
           id > std::numeric_limits<int>::max())
-        throw std::overflow_error("Arithmetic operation resulted in an overflow.");
+        throw std::overflow_error(
+            "Arithmetic operation resulted in an overflow.");
       survivors.push_back(static_cast<int>(id));
     }
     int cohort_survivors = 0;
@@ -531,7 +542,8 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
       cohort_survivors = static_cast<int>(next);
     }
     for (const auto &binding : bound)
-      if (!tracked.contains(binding.fleet_id) && cohort_survivors > 0) {
+      if (!tracked.contains(campaign_vessel_id_for_fleet(binding.fleet_id)) &&
+          cohort_survivors > 0) {
         survivors.push_back(binding.fleet_id);
         --cohort_survivors;
       }
@@ -554,13 +566,15 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
       const auto &profile_value = profile(fleet);
       auto &combat = ensure_fleet_combat_state(fleet);
       const auto alive = survived(fleet.id);
-      auto vessel_value = tracked.contains(fleet.id)
-                              ? clone_vessel(tracked.at(fleet.id))
+      const auto tactical_vessel_id = campaign_vessel_id_for_fleet(fleet.id);
+      auto vessel_value = tracked.contains(tactical_vessel_id)
+                              ? clone_vessel(tracked.at(tactical_vessel_id))
                               : (fleet.tactical_vessel
                                      ? clone_vessel(*fleet.tactical_vessel)
                                      : clone_vessel(
                                            vessel(fleet, combat, profile_value)));
       vessel_value.name = fleet.name;
+      vessel_value.id = tactical_vessel_id;
       vessel_value.destroyed = !alive;
       vessel_value.escaped = alive && formation.escaped;
       vessel_value.battles_fought =
@@ -622,6 +636,18 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
                     0,
                     "Tactical encounter concluded. Damage and losses are persistent."});
   return events;
+}
+
+MassiveCombatOrderResult CampaignMassiveCombat::issue_order(
+    FreshCampaignState &galaxy, int civilization_id,
+    MassiveCombatOrder order) {
+  auto *encounter = galaxy.active_combat_encounter
+                        ? &*galaxy.active_combat_encounter
+                        : nullptr;
+  if (!encounter || encounter->reconciled)
+    return {false, "There is no active tactical encounter."};
+  return storage_->engine.issue_order(encounter->battle, civilization_id,
+                                      std::move(order));
 }
 
 MassiveCombatSnapshot CampaignMassiveCombat::observe(

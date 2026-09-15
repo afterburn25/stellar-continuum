@@ -218,6 +218,11 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
+    if (const auto* fleet=selected_fleet(); !preview_&&fleet&&
+        fleet->role==stellar::core::FleetRole::Military&&fleet->current_system_id&&
+        !fleet->destination_system_id&&fleet->combat_status&&fleet->combat_status->is_armed&&
+        layout.confirm.contains(event.position))
+      return {FleetWorkspaceCommandKind::Engage,true,fleet->id};
     if (view_) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
@@ -389,7 +394,11 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     text(out, layout.feedback, visible_message(feedback),
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
-  if (preview_ && preview_->command_available) {
+  const auto* selected=selected_fleet();
+  const bool engage=!preview_&&selected&&selected->role==stellar::core::FleetRole::Military&&
+      selected->current_system_id&&!selected->destination_system_id&&
+      selected->combat_status&&selected->combat_status->is_armed;
+  if ((preview_ && preview_->command_available)||engage) {
     fill(out, layout.confirm,
          layout.confirm.contains(pointer_) ? hover_color : selected_color);
     stroke(out, layout.confirm, own_color);
@@ -397,7 +406,7 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
                layout.confirm.y + 9.f * layout.scale,
                layout.confirm.width - 12.f * layout.scale,
                layout.confirm.height - 12.f * layout.scale},
-         "CONFIRM TRAVEL", bright, layout.body_font_pixels,
+         engage?"ENGAGE HOSTILES":"CONFIRM TRAVEL", bright, layout.body_font_pixels,
          FontFace::Interface, TextAlign::Center);
   }
 }
