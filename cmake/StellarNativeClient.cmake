@@ -134,5 +134,6 @@ add_dependencies(stellar-continuum-native stellar_native_audio_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio.cpp
   app/native_client/native_audio_device.cpp
-  app/native_client/native_audio_settings.cpp)
+  app/native_client/native_audio_settings.cpp
+  app/native_client/native_notifications.cpp)
 target_include_directories(stellar-continuum-native PRIVATE third_party)

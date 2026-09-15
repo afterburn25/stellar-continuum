@@ -38,7 +38,7 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 | Events | none in C# | none | — | — | N/A | No event subsystem exists in reference |
 | Save/Load | Game/Persistence | `core/player_campaign_*`, `galaxy_payload_*`, `*_persistence` | OK | `player_campaign_*` parity + reload validators | PARITY VERIFIED | Player17 format; paused reload equality |
 | Time simulation | SimulationClock, GalaxySimulationStepCoordinator | `core/campaign_frame`, `strategic_clock`, `campaign_coordinator` | OK | `campaign_frame_parity`, `strategic_clock_parity` | PARITY VERIFIED | Deterministic stepping |
-| UI (native) | Main.*, panels | `app/native_client/*_workspace` (17+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces done |
+| UI (native) | Main.*, panels | `app/native_client/*_workspace` (18+ modules) | OK | workspace + input tests + smoke validators | PARTIAL | Fleet/shipyard/research/construction/colony/surface/settlement/system/startup/diplomacy/battle workspaces + recent-events notification feed done |
 | Rendering (native) | Main.VisualMap, renderers | `engine/native_map_platform`, `app/native_client` scene | OK | Vulkan smoke + capture validators | PARTIAL | Galaxy art, star markers, ship art, route effects, strategic territory overlay (fills, contours, labels, fog, claim arcs, unexplored dimming), orbital construction markers + software-rasterized staged structures, surface colony scene (hub, per-type building sprites, construction phases, roads, ghost previews) done |
 | Audio | AudioDirector, voice | `native_audio*` mixer + SDL3 stream device | OK | `native_audio` + `native_audio_settings` CTests + `--audio-smoke` validator | PARTIAL | Music loop + 6 SFX + hover/confirm + event routing + persistent volumes + duck ramp + settings UI (pause-menu AUDIO button, sliders, defaults, persisted) done; no voice duck hooks yet |
 | Input | Main.PlayerCommands, input actions | `native_client_input`, `map_interaction` | OK | input tests | PARTIAL | Map/fleet/confirm flows + keyboard shortcuts (Space, 1-4/1-5, F fit, F6 save) done; T/R/C/B candidate-cycle keys have no native palette equivalent; F8 diagnostics bundle not wired |
@@ -62,12 +62,31 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
 
-- 156/156 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
+- 157/157 graphical CTest (incl. `native_diplomacy_*`, `native_territory_projection`,
   `native_orbital_structure`, `native_surface_scene`, `native_audio`,
-  `native_audio_settings`, `native_battle_workspace`, extended
-  `native_system_view`/`native_system_workspace`/`native_surface_workspace`/
+  `native_audio_settings`, `native_battle_workspace`, `native_notifications`,
+  extended `native_system_view`/`native_system_workspace`/`native_surface_workspace`/
   `native_ui_layout`),
   144/144 headless CTest baseline, all Python export checks.
+- Notification feed (`native_notifications` + session harvest): ports the
+  reference `PlayerNotificationFeed`/`NotificationCenter`/`PlayerControls`
+  surface — bounded 32-item session history, newest-first 16-card
+  "RECENT EVENTS" panel, category palette, unread badge (gold/"99+") on a new
+  top-bar button, X/Escape dismissal, and the card-level OPEN RELATIONS
+  shortcut that focuses the counterpart in the relations workspace
+  (`select_contact_civilization` ⇔ `UiOpenDiplomaticContact`). The session
+  publishes step events the reference publishes (research, construction,
+  ships, exploration, colony, player-involved combat, the funding transition)
+  plus accepted command outcomes, and additionally harvests observer-filtered
+  diplomatic bulletins (`proposal_*`, `agreement_*`, `war_declared`,
+  `contact_established`, `communication_available`) — completing the
+  reference's dormant `DiplomaticContactId`/`OPEN RELATIONS` path. Diplomatic
+  bulletins carry a contact id only when the counterpart is an identified
+  contact; the audience-gated `recent_events` view keeps unidentified
+  identities out of the feed. Retained history is seeded as seen on
+  load/activation so only live events publish. `--notification-smoke` +
+  `native_notification_runtime.py` (13 mock tests) assert panel, unread
+  badge, contact focus and no history flood across a reload.
 - Tactical battle presentation (`357872e8`): `native_battle_workspace` ports the
   reference `MassiveCombatView` — full-screen observer-filtered formation tokens
   (bounded 4096-token pool, zoom-dependent sampling), selection + box-select +

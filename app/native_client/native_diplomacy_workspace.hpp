@@ -86,6 +86,9 @@ public:
       stellar::native_diplomacy::NativeDiplomacyView> &
   view() const noexcept;
   [[nodiscard]] std::size_t selected_contact_index() const noexcept;
+  // Selects the first contact matching the civilization id (notification
+  // OPEN RELATIONS shortcut). No-op when no contact matches.
+  void select_contact_civilization(int civilization_id);
   [[nodiscard]] const std::string &notice() const noexcept;
 
   [[nodiscard]] DiplomacyWorkspaceCommand

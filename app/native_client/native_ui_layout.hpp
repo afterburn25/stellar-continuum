@@ -15,6 +15,7 @@ enum class UiAction {
   Shipyard,
   Construction,
   Diplomacy,
+  Notifications,
   Continue,
   Save,
   Load,
@@ -33,6 +34,7 @@ struct NativeUiLayout {
   UiRect shipyard;
   UiRect construction;
   UiRect diplomacy;
+  UiRect notifications;
   UiRect day_text;
   UiRect status_text;
   UiRect menu_panel;
@@ -76,6 +78,7 @@ struct NativeUiLayout {
         {inset + 322.f * scale, inset, 112.f * scale, 32.f * scale},
         {inset + 444.f * scale, inset, 140.f * scale, 32.f * scale},
         {inset + 594.f * scale, inset, 128.f * scale, 32.f * scale},
+        {inset + 732.f * scale, inset, 56.f * scale, 32.f * scale},
         {inset, 56.f * scale, 230.f * scale, 22.f * scale},
         {inset, 80.f * scale, status_width, 44.f * scale},
         panel,
@@ -108,6 +111,7 @@ struct NativeUiLayout {
     if (shipyard.contains(point)) return UiAction::Shipyard;
     if (construction.contains(point)) return UiAction::Construction;
     if (diplomacy.contains(point)) return UiAction::Diplomacy;
+    if (notifications.contains(point)) return UiAction::Notifications;
     return UiAction::None;
   }
 };

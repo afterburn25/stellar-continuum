@@ -309,6 +309,17 @@ NativeDiplomacyWorkspace::view() const noexcept {
 std::size_t NativeDiplomacyWorkspace::selected_contact_index() const noexcept {
   return selected_contact_index_;
 }
+void NativeDiplomacyWorkspace::select_contact_civilization(int civilization_id) {
+  if (!view_) return;
+  const auto found = std::ranges::find_if(
+      view_->contacts, [&](const auto &contact) {
+        return contact.civilization_id == civilization_id;
+      });
+  if (found == view_->contacts.end()) return;
+  filter_ = NativeDiplomacyContactFilter::all;
+  selected_contact_index_ = found->source_index;
+  reconcile_selection();
+}
 const std::string &NativeDiplomacyWorkspace::notice() const noexcept {
   return notice_;
 }

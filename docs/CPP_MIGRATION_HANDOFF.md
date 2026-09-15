@@ -6,7 +6,7 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: head `357872e8` — diplomacy, territory, orbital, surface, audio and tactical battle slices (engine 0.1.58), pending PR into the migration branch.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: diplomacy, territory, orbital, surface, audio, tactical battle, audio-settings, keyboard-parity and notification-feed slices (engine 0.1.58), pending PR into the migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
 
@@ -39,6 +39,37 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   onto the Player17 row (war contact basis + at-war relationship + bound fleets
   + unengaged foreign picket). `tools/stellar-export/native_battle_runtime.py`
   carries the same authoring for the sealed validator.
+
+## Notification feed slice (candidate for review)
+
+- `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`
+  (bounded 32 items, `publish(category, date, message, contact_id)`,
+  `unread_count(last_read)`, sequences survive `clear()`) and
+  `NativeNotificationView` (RECENT EVENTS panel; `handle` returns
+  `None`/`Close`/`OpenDiplomaticContact` commands and captures only input that
+  lands on the panel — reference `ContainPointerInput` behavior, no
+  outside-click dismiss). `NotificationLayout`/`notification_layout_for` are
+  public for tests and smoke drivers.
+- `NativeCampaignSession::notifications()` + `publish_notification(...)`;
+  `advance()` harvests the same step-event kinds the reference publishes plus
+  observer-filtered `recent_events` diplomacy bulletins (audience-gated;
+  contact id attached only for identified contacts). `seed_notification_history`
+  marks retained history seen on activation/load so stale events never
+  republish — the feed is session-scoped like the reference.
+- `NativeUiLayout` gained `UiAction::Notifications` + `notifications` rect;
+  the button shows the unread badge (gold when >0, "99+" cap). New items play
+  `NativeSfx::ui_confirm`-routed event audio via `play_event(category)`.
+- `NativeDiplomacyWorkspace::select_contact_civilization(int)` — the native
+  `UiOpenDiplomaticContact` equivalent.
+- `stellar-continuum-native.exe --notification-smoke <bmp>` (requires `--load`
+  with a diplomacy-bearing fixture): submits a proposal through RELATIONS,
+  opens the panel, captures it plus a `-contact` sidecar after OPEN RELATIONS
+  focuses the counterpart, prints `notifications={panel, items, unread,
+  diplomacy, contact, focused_civ}`.
+- `tools/stellar-export/native_notification_runtime.py` —
+  `validate_native_notification_export(folder, env, player17_fixture)` reuses
+  the diplomacy source authoring and asserts panel/unread/contact focus,
+  distinct captures, payload integrity and no retained-history flood.
 
 ## Interfaces added in 0.1.58 (candidate for review)
 
@@ -108,9 +139,9 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - Surface colony visuals — hub/buildings/roads/ghosts now render as rasterized
   sprites (`58aaf475`); the remaining gap is the reference's free camera orbit
   and terrain relief, not building art.
-- Audio settings UI + voice-duck hooks — mixer/playback/persistence shipped in
-  `dbf07f81` (`native_audio*` + `--audio-smoke` + exact-hash packaging); the
-  remaining work is a volume-settings screen and wiring ducking to voice playback.
+- Voice-duck hooks — mixer/playback/persistence/settings UI shipped
+  (`dbf07f81`, `d108435a`); the remaining work is wiring the duck ramp to real
+  voice playback once voice lands.
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
