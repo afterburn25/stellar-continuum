@@ -9,8 +9,9 @@ milestones below are historical. Research inspector readability is now checked
 with native fonts at 720p/1080p; see `NATIVE_RESEARCH.md`. Devin tactical
 checkpoint `357872e8` and surface sprites remain unimported; see
 `NATIVE_TACTICAL_WORKSPACE_REVIEW.md` and `NATIVE_SURFACE_SPRITE_REVIEW.md`.
-PR #332 remains unmerged
-and unsealed. Full 3D, production HUD styling and sustained 60 FPS are unproven.
+F8/pause-menu diagnostics now use a bounded background writer with unique ZIPs,
+explicit file-error feedback and unchanged-save runtime proof; see `NATIVE_SUPPORT.md`.
+PR #332 remains unmerged and unsealed. Full 3D, production HUD styling and sustained 60 FPS are unproven.
 
 Engine 0.1.58 adds the native observer-safe diplomacy presentation on `cpp/devin-swe2-native-conversion` (pending merge into this branch). `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`: a `DiplomaticStateView`-filtered projection of contacts, channels, relationships, access, agreements, proposals and three-event history with selection clamping, latest-tick access and the 2050 epoch calendar. Commands route through `ObserverDiplomacyCommandService` only after generation, revision and signature revalidation; relationship drift and identification changes bump the revision so stale quotes are rejected. `native_diplomacy_workspace` adds the RELATIONS top-bar workspace: contact directory with nine filters, transmission stage (species communications portrait or signal waveform), five relationship meters, negotiation/declaration modals and agreements/proposals/history/intelligence/overview tabs. Unidentified contacts expose no civilization id, name, species or metrics. Maintained validation passed 150/150 graphical CTest including two new diplomacy suites; full interactive playthrough evidence remains pending.
 

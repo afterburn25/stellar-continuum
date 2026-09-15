@@ -18,6 +18,7 @@ from research_runtime_files import copy_research_runtime_files
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_research_runtime import validate_native_research_export
 from native_navigation_runtime import validate_native_navigation_export
+from native_support_runtime import validate_native_support_export
 from native_fleet_runtime import validate_native_fleet_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
@@ -98,6 +99,7 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
@@ -472,6 +474,7 @@ def export(preset_name):
         if native_client:
             smoke.update(validate_native_client_export(output, env))
             smoke.update(validate_native_navigation_export(output, env))
+            smoke.update(validate_native_support_export(output, env))
             smoke.update(validate_native_research_export(output, env))
             smoke.update(validate_native_fleet_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))

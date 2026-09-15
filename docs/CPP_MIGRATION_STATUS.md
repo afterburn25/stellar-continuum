@@ -2,7 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`8f6b720a`; notifications selectively adapted; tactical workspace `357872e8`, surface sprites `58aaf475`,
+`22cff368`; support and notifications selectively adapted; candidate shortcuts reviewed but not imported; tactical workspace `357872e8`, surface sprites `58aaf475`,
 duplicate audio settings and timing changes reviewed and not imported).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
@@ -13,6 +13,32 @@ validators, and `docs/engine/*_VALIDATION.md` contracts. "PARITY VERIFIED" means
 subsystem has a maintained parity/validation gate that runs in the sealed export.
 
 ## Current integration checkpoint (2026-09-15)
+
+### Native diagnostic export integration
+
+F8 and the pause menu now export a local support ZIP through one bounded
+background worker. Repeated requests do not queue; existing exports are never
+overwritten. The archive contains a bounded recent log, truthful native runtime
+metadata and the last completed save. Read/write/publication failures remain
+in the UI while the campaign stays open. No save request, simulation change,
+Player17 field or upload is introduced. See `engine/NATIVE_SUPPORT.md`.
+
+This selectively adapts Devin `22cff368`. Its eager disk writes, synchronous
+UI-thread work, overwrite risk and uncaught file errors were corrected. Candidate
+shortcuts `31a28e3c` were reviewed but not imported pending stable selection,
+quoted-action integration and successful-command evidence. Existing navigation,
+research, production and Core authority remain in their established paths.
+
+MSVC build, four focused CTests and six Python validator tests pass. Two
+relocated Vulkan support runs exercise menu/F8 exports and an actual blocked
+destination, prove unique valid ZIPs, unchanged save bytes and full canonical
+state, and show success/failure panels at 720p/1080p. Two neighboring navigation
+runs retain paused fresh/reload and keyboard/modal behavior. Evidence:
+`work/native-support-build.log`, `work/native-support-focused.log`,
+`work/native-support-python.log`, `work/native-support-runtime.json` and
+`work/native-support-navigation-runtime.json`. No sealed release is claimed;
+PR #332 remains unmerged. Previous notification-head CI `35019577587` was still
+in progress at review; no CI result is attributed to this new checkpoint.
 
 ### Native recent-events integration
 

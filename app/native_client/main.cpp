@@ -10,6 +10,7 @@
 #include "native_galaxy_labels.hpp"
 #include "native_campaign_session.hpp"
 #include "native_notification_events.hpp"
+#include "native_support_service.hpp"
 #include "native_campaign_calendar.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -58,6 +59,7 @@
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -219,6 +221,7 @@ struct Options {
   bool load{};
   bool research_smoke{};
   bool navigation_smoke{};
+  bool support_check{},support_failure_check{};
   bool fleet_smoke{};
   bool shipyard_smoke{};
   bool construction_smoke{};
@@ -255,6 +258,8 @@ struct Options {
     else if(arg==L"--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg==L"--windowed") result.windowed=true;
     else if(arg==L"--audio-check") result.audio_check=true;
+    else if(arg==L"--support-check") result.support_check=true;
+    else if(arg==L"--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg==L"--voice-check") result.voice_check=true;
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
@@ -289,6 +294,8 @@ struct Options {
     else if(arg=="--seed"&&i+1<argc) result.seed=std::stoll(argv[++i]);
     else if(arg=="--windowed") result.windowed=true;
     else if(arg=="--audio-check") result.audio_check=true;
+    else if(arg=="--support-check") result.support_check=true;
+    else if(arg=="--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg=="--voice-check") result.voice_check=true;
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
@@ -321,6 +328,7 @@ struct Options {
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
+  if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
   if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
   if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
@@ -1416,6 +1424,98 @@ class NativeCampaign final {
     smoke_diplomacy_status_=evidence.str();
   }
   [[nodiscard]] const std::string&diplomacy_smoke_status()const noexcept{return smoke_diplomacy_status_;}
+  void configure_support(std::string backend,std::string presentation){
+    support_environment_="GameVersion="+std::string(STELLAR_GAME_VERSION)+
+        "\nRuntime=native-c++23\nRendererBackend="+backend+"\nPresentation="+presentation+"\n";
+#ifdef _WIN32
+    support_environment_+="Platform=Windows\n";
+#endif
+    support_.record("session",utc_timestamp()+" Native campaign admitted.");
+  }
+  void support_smoke(int width,int height,bool expect_failure,
+      const std::function<void(const DrawList&,bool)>& draw){
+    using stellar::native_support::SupportExportState;
+    if(!menu_||!smoke_save_succeeded())
+      throw std::runtime_error("Support replay requires a paused saved campaign.");
+    const auto day=session_->frame().clock().simulation_days();
+    const PlayerCampaignCaptureOptions options{day,STELLAR_GAME_VERSION,utc_timestamp()};
+    const auto canonical=[&]{return encode_player_campaign_v17_json(
+        capture_player_campaign_v17(session_->frame().runtime(),options));};
+    const auto before=canonical();
+    const auto saved_bytes=[&]{
+      const auto& path=session_->save_path();
+      const auto size=std::filesystem::file_size(path);
+      if(size>64u*1024u*1024u)throw std::runtime_error("Support replay save exceeds its read limit.");
+      std::ifstream input(path,std::ios::binary);
+      std::string bytes(static_cast<std::size_t>(size),'\0');
+      if(!input||!input.read(bytes.data(),static_cast<std::streamsize>(size)))
+        throw std::runtime_error("Support replay could not read the completed save.");
+      return bytes;
+    };
+    const auto save_before=saved_bytes();
+    const auto layout=NativeUiLayout::for_viewport(width,height);
+    const auto send=[&](InputEvent event){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.events.push_back(std::move(event));
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Support replay closed the campaign.");
+    };
+    if(!audio_settings_)throw std::runtime_error("Support replay lacks the settings guard.");
+    diplomacy_smoke_click(center(layout.settings_button),width,height);
+    if(!audio_settings_->visible())throw std::runtime_error("Support replay did not open settings.");
+    send({InputEventType::KeyPressed,{},{},0.f,{},0,0x40000041u});
+    const bool blocked=support_.state()==SupportExportState::Idle;
+    send({InputEventType::EscapePressed});
+    if(!blocked||audio_settings_->visible()||!menu_)
+      throw std::runtime_error("F8 escaped settings ownership.");
+    const auto finish=[&]{
+      const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(10);
+      while(support_.busy()&&std::chrono::steady_clock::now()<deadline){
+        draw(scene(width,height),false);
+        InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+        if(!update(input,width,height,0.,false))throw std::runtime_error("Support export exited the campaign.");
+        std::this_thread::yield();
+      }
+      const auto expected=expect_failure?SupportExportState::Failed:SupportExportState::Succeeded;
+      if(support_.state()!=expected)throw std::runtime_error("Support export timed out or returned an unexpected result: "+support_.error());
+    };
+    // Two presses while the immutable request is running must not queue jobs.
+    InputSnapshot repeated;repeated.drawable_width=width;repeated.drawable_height=height;
+    repeated.pointer=center(layout.support_button);
+    repeated.events={{InputEventType::LeftPressed,repeated.pointer},
+        {InputEventType::LeftReleased,repeated.pointer},
+        {InputEventType::LeftPressed,repeated.pointer},
+        {InputEventType::LeftReleased,repeated.pointer}};
+    if(!update(repeated,width,height,0.,false))throw std::runtime_error("Support replay closed the campaign.");
+    const bool menu_started=support_.busy();
+    finish();
+    const auto first=support_.result();
+    diplomacy_smoke_click(center(layout.continue_button),width,height);
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      diplomacy_smoke_click(center(layout.pause),width,height);
+    send({InputEventType::KeyPressed,{},{},0.f,{},0,0x40000041u});
+    const bool key_started=support_.busy();
+    finish();
+    const auto second=support_.result();
+    send({InputEventType::EscapePressed});
+    const bool paused=menu_&&session_->frame().clock().speed()==StrategicSpeed::Paused&&
+        session_->frame().clock().simulation_days()==day;
+    const bool unchanged=canonical()==before;
+    const bool save_unchanged=saved_bytes()==save_before;
+    const bool distinct=expect_failure?(first.empty()&&second.empty()):(!first.empty()&&first!=second);
+    if(!menu_started||!key_started||!paused||!unchanged||!save_unchanged||!distinct)
+      throw std::runtime_error("Support replay did not preserve its UI, unique destination or campaign contract.");
+    draw(scene(width,height),true);
+    std::cout<<"support={\"mode\":\""<<(expect_failure?"failure":"success")
+      <<"\",\"menu_started\":"<<(menu_started?"true":"false")
+      <<",\"key_started\":"<<(key_started?"true":"false")
+      <<",\"settings_blocked\":"<<(blocked?"true":"false")
+      <<",\"canonical_unchanged\":"<<(unchanged?"true":"false")
+      <<",\"save_unchanged\":"<<(save_unchanged?"true":"false")
+      <<",\"paused\":"<<(paused?"true":"false")
+      <<",\"first\":"<<json_string(utf8_path(first))
+      <<",\"second\":"<<json_string(utf8_path(second))
+      <<",\"error\":"<<json_string(support_.error())<<"}\n";
+  }
   void notification_smoke(int width,int height,bool reload,
       const std::function<void(const DrawList&,bool)>& capture){
     const auto day=session_->frame().clock().simulation_days();
@@ -1715,11 +1815,14 @@ class NativeCampaign final {
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
+    support_notice_seconds_=std::max(0.,support_notice_seconds_-std::max(0.,elapsed));
+    if(support_.poll())support_notice_seconds_=20.;
     feedback_.advance(elapsed);
     if(surface_workspace_.visible())surface_workspace_.set_terrain_image(surface_art_.request_image());
     pointer_=input.pointer;
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
+      support_.record("session",timestamp+" Campaign activated.");
       territory_overlay_.clear();
       last_territory_draw_={};
       territory_refresh_elapsed_=.5;
@@ -1756,6 +1859,11 @@ class NativeCampaign final {
       if(construction_workspace_.visible())refresh_construction(true);
     }
     if(session_->exit_ready())return false;
+    const auto& session_notice=session_->notice();
+    if(session_notice.kind!=last_support_notice_kind_||session_notice.message!=last_support_notice_){
+      last_support_notice_kind_=session_notice.kind;last_support_notice_=session_notice.message;
+      if(!session_notice.message.empty())support_.record("session",timestamp+" "+session_notice.message);
+    }
     if(input.quit_requested)session_->request_exit();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
@@ -1782,6 +1890,14 @@ class NativeCampaign final {
         notification_view_.close();
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
+        continue;
+      }
+      if(event.type==InputEventType::KeyPressed&&event.key==0x40000041u&&
+         input.focused&&input.renderable()&&!wants_text_input()&&
+         !settlement_workspace_.visible()&&!surface_workspace_.modal_open()&&
+         !diplomacy_workspace_.modal_open()&&!shipyard_workspace_.confirmation_open()&&
+         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
+        request_support(width,height);
         continue;
       }
       const bool can_notify=notifications_available();
@@ -1981,6 +2097,7 @@ class NativeCampaign final {
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::Settings&&audio_settings_)audio_settings_->open();
+        else if(action==UiAction::Support)request_support(width,height);
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
@@ -2276,7 +2393,10 @@ class NativeCampaign final {
     const auto &notice = session_->notice();
     const bool preparing_galaxy=!system_workspace_.visible()&&
         (!galaxy_backdrop_.artwork_ready()||!territory_overlay_.valid()||territory_overlay_.pending());
-    if (notice.kind != SessionNoticeKind::None || preparing_galaxy) {
+    const bool support_notice=(support_.busy()||support_notice_seconds_>0.)&&
+        notice.kind!=SessionNoticeKind::Failure&&notice.kind!=SessionNoticeKind::Loading&&
+        notice.kind!=SessionNoticeKind::Saving;
+    if (notice.kind != SessionNoticeKind::None || preparing_galaxy || support_notice) {
       auto message = notice.message;
       if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
         message="Updating star chart...";
@@ -2285,11 +2405,16 @@ class NativeCampaign final {
                    std::to_string(static_cast<int>(notice.progress * 100.)) +
                    "%";
       }
+      if(support_notice)message=support_.busy()?"Preparing local diagnostics...":
+          support_.state()==stellar::native_support::SupportExportState::Succeeded?
+          "Diagnostics exported. See the location in the pause menu.":
+          "Diagnostic export failed. Open the pause menu for details.";
       out.overlay.emplace_back(Text{
           {layout.status_text.x,
            layout.status_text.y + 2.f * layout.scale},
           visible_notice(std::move(message)),
-          notice.kind == SessionNoticeKind::Failure
+          (notice.kind == SessionNoticeKind::Failure||
+           (support_notice&&support_.state()==stellar::native_support::SupportExportState::Failed))
               ? Color{255, 133, 123, 255}
               : Color{154, 211, 183, 255},
           layout.metric_font_pixels, layout.status_text.width,
@@ -2308,13 +2433,40 @@ class NativeCampaign final {
       draw_button(layout.save_button, "SAVE");
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.settings_button, "SETTINGS");
+      draw_button(layout.support_button, support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
+      const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
+      const UiRect footer{36.f*layout.scale,footer_y,
+          static_cast<float>(width)-72.f*layout.scale,
+          std::max(0.f,static_cast<float>(height)-footer_y-12.f*layout.scale)};
+      if(footer.height>=32.f*layout.scale){
+        std::string detail="Export diagnostics (F8) includes your last completed save and recent session reports.";
+        if(support_.state()==stellar::native_support::SupportExportState::Succeeded)
+          detail="Diagnostics saved: "+utf8_path(support_.result());
+        else if(support_.state()==stellar::native_support::SupportExportState::Failed)
+          detail="Could not export diagnostics: "+support_.error()+" Your campaign is still open.";
+        out.overlay.emplace_back(Text{{footer.x,footer.y},std::move(detail),
+            {194,218,238,255},layout.metric_font_pixels,footer.width,footer});
+      }
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(audio_settings_)audio_settings_->render(out,width,height);
     return out;
   }
  private:
+  void request_support(int width,int height){
+    if(support_.busy())return;
+    support_.record("support",utc_timestamp()+" Local diagnostic export requested.");
+    std::ostringstream info;
+    info<<support_environment_<<"Viewport="<<width<<'x'<<height<<'\n'
+        <<"Systems="<<system_count()<<"\nSimulationDays="
+        <<session_->frame().clock().simulation_days()<<'\n'
+        <<"SaveFormat=Player17\nSavePolicy=Last completed save; no save requested by export\n";
+    auto root=session_->save_path().parent_path();
+    if(root.empty())root=".";
+    (void)support_.request({std::move(root),session_->save_path(),info.str(),{}});
+    support_notice_seconds_=20.;
+  }
   [[nodiscard]] bool notifications_available()const noexcept{
     return native_navigation_available(menu_,settlement_workspace_.visible(),
         diplomacy_workspace_.modal_open(),surface_workspace_.modal_open(),
@@ -2335,6 +2487,7 @@ class NativeCampaign final {
     notification_refresh_elapsed_=0.;
   }
   void publish_notification(std::string category,std::string message){
+    support_.record(category,utc_timestamp()+" "+message);
     notifications_.publish(std::move(category),stellar::native_campaign::format_campaign_date(
         session_->frame().clock().simulation_days()),std::move(message));
   }
@@ -2945,6 +3098,10 @@ class NativeCampaign final {
   std::function<void()> audio_confirm_;
   stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
   stellar::native_notifications::NativeNotificationFeed notifications_;
+  stellar::native_support::NativeSupportService support_;
+  std::string support_environment_,last_support_notice_;
+  SessionNoticeKind last_support_notice_kind_{};
+  double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;
   stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
   double notification_refresh_elapsed_{};
@@ -3012,6 +3169,7 @@ int main(int argc,char **argv){
     audio_menu_ready=true;audio.menu_ready();
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio);
+    campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     if(options.smoke_screenshot){
       if(options.research_smoke)
         campaign.prepare_research_smoke(window.drawable_width(),
@@ -3213,6 +3371,12 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.support_check)
+          campaign.support_smoke(window.drawable_width(),window.drawable_height(),
+              options.support_failure_check,[&](const DrawList& draw,bool capture_result){
+                window.draw(draw,capture_result?
+                    std::optional{sidecar_path(*options.smoke_screenshot,L"-support")}:std::nullopt);
+              });
         if(options.diplomacy_smoke||options.diplomacy_reload_smoke){
           campaign.notification_smoke(window.drawable_width(),window.drawable_height(),
               options.diplomacy_reload_smoke,[&](const DrawList& draw,bool contact){
