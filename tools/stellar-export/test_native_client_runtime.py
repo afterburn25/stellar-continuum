@@ -9,7 +9,8 @@ import unittest
 from unittest import mock
 
 import stellar as exporter
-from native_client_runtime import copy_native_client_runtime, validate_native_client_export
+from native_client_runtime import (_validate_capture, copy_native_client_runtime,
+                                   validate_native_client_export)
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
@@ -519,7 +520,19 @@ class NativeClientDependencyTests(unittest.TestCase):
 
 
 class NativeSessionExportTests(unittest.TestCase):
-    def exercise(self, mutate_load=False):
+    def test_vertical_stripes_are_rendered_variation(self):
+        with tempfile.TemporaryDirectory(prefix="stellar-bmp-") as temporary:
+            path = Path(temporary) / "stripes.bmp"
+            width, height = 4, 3
+            row = bytes([0, 0, 0, 255, 255, 255, 255, 255]) * 2
+            pixels = row * height
+            path.write_bytes(
+                b"BM" + struct.pack("<IHHI", 54 + len(pixels), 0, 0, 54) +
+                struct.pack("<IiiHHIIiiII", 40, width, height, 1, 32, 0,
+                            len(pixels), 2835, 2835, 0, 0) + pixels)
+            _validate_capture(path, width, height)
+
+    def exercise(self, mutate_load=False, capture_fault=None):
         with tempfile.TemporaryDirectory(prefix="stellar-session-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -527,6 +540,8 @@ class NativeSessionExportTests(unittest.TestCase):
             def launch(args, *, cwd, env, **unused):
                 save = Path(args[args.index("--save-path") + 1])
                 capture = Path(args[args.index("--smoke") + 1])
+                width = int(args[args.index("--width") + 1]); height = int(args[args.index("--height") + 1])
+                self.assertEqual((width, height), (1920, 1080) if "--load" in args else (1280, 720))
                 self.assertEqual(save.parent, cwd)
                 self.assertNotEqual(cwd, package)
                 self.assertEqual(capture.parent, cwd)
@@ -541,7 +556,27 @@ class NativeSessionExportTests(unittest.TestCase):
                     payload = {"FormatVersion": 17, "SavedAtUtc": "earlier", "SimulationDays": 42.25,
                                "Galaxy": {"Systems": list(range(500))}}
                 save.write_text(json.dumps(payload))
-                capture.write_bytes(b"BM" + bytes(54))
+                if capture_fault == "missing" and "--load" in args:
+                    pass
+                else:
+                    actual_width = width - 1 if capture_fault == "wrong_size" and "--load" in args else width
+                    stride = (actual_width * 3 + 3) & ~3
+                    pixels = bytes(range(251)) * (stride * height // 251 + 1)
+                    data = (b"BM" + struct.pack("<IHHI", 54 + stride * height, 0, 0, 54) +
+                            struct.pack("<IiiHHIIiiII", 40, actual_width, height, 1, 24, 0,
+                                        stride * height, 2835, 2835, 0, 0) + pixels[:stride * height])
+                    if capture_fault == "uniform" and "--load" in args:
+                        stride = actual_width * 4
+                        pixels = bytes([0, 0, 0, 255]) * actual_width * height
+                        data = (b"BM" + struct.pack("<IHHI", 54 + len(pixels), 0, 0, 54) +
+                                struct.pack("<IiiHHIIiiII", 40, actual_width, height, 1, 32, 0,
+                                            len(pixels), 2835, 2835, 0, 0) + pixels)
+                    if capture_fault == "malformed" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<I", data, 14, 16); data = bytes(data)
+                    if capture_fault == "overlap" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<I", data, 10, 20); data = bytes(data)
+                    if capture_fault == "truncated" and "--load" in args: data = data[:-20]
+                    capture.write_bytes(data)
                 return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 ", "")
             with mock.patch("native_client_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_client_export(package, {})
@@ -555,6 +590,30 @@ class NativeSessionExportTests(unittest.TestCase):
     def test_load_cannot_silently_change_the_saved_world(self):
         with self.assertRaisesRegex(RuntimeError, "changed during paused load"):
             self.exercise(mutate_load=True)
+
+    def test_reload_capture_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="missing")
+
+    def test_reload_capture_dimensions_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="wrong_size")
+
+    def test_reload_capture_payload_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="truncated")
+
+    def test_reload_capture_uniform_pixels_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "variation"):
+            self.exercise(capture_fault="uniform")
+
+    def test_reload_capture_malformed_dib_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "geometry"):
+            self.exercise(capture_fault="malformed")
+
+    def test_reload_capture_pixel_offset_cannot_overlap_dib(self):
+        with self.assertRaisesRegex(RuntimeError, "geometry"):
+            self.exercise(capture_fault="overlap")
 
 
 class NativeResearchExportTests(unittest.TestCase):

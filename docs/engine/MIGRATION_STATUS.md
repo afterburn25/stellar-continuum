@@ -1,14 +1,13 @@
 # Stellar Engine migration status
 
-Current Codex candidate (2026-09-15) integrates native Engine audio using SDL3
-and Windows Media Foundation. The existing main score starts at menu admission,
-continues into the campaign, and stops before window teardown. A worker stages
-the seven immutable clips; music/SFX queues are bounded. Boot remains silent.
-Application imports and exact-hash audio assets are reviewed independently of
-SDL's pinned dependencies. New-game/reload Vulkan audio checks and an
-unavailable-device failure check pass; save state is preserved. Settings, voice
-and full event wiring remain partial. See `NATIVE_AUDIO.md` and the current
-`../CPP_MIGRATION_HANDOFF.md`. Candidate remains in PR #332 with no shared merge.
+Current Codex candidate (2026-09-15): PR #332 integrates native diplomacy,
+observer-safe territory, approved artwork, audio/settings/scientist cues and
+top-down colony buildings with connected cosmetic roads. Surface checkpoint
+`f13192ea` passed Windows CI `34998925922`. See
+`../CPP_MIGRATION_HANDOFF.md` for current validation and next work; the
+milestones below are historical. The surface sprite review through Devin
+`bfc51a23` is in `NATIVE_SURFACE_SPRITE_REVIEW.md`. PR #332 remains unmerged
+and unsealed. Full 3D, production HUD styling and sustained 60 FPS are unproven.
 
 Engine 0.1.58 adds the native observer-safe diplomacy presentation on `cpp/devin-swe2-native-conversion` (pending merge into this branch). `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`: a `DiplomaticStateView`-filtered projection of contacts, channels, relationships, access, agreements, proposals and three-event history with selection clamping, latest-tick access and the 2050 epoch calendar. Commands route through `ObserverDiplomacyCommandService` only after generation, revision and signature revalidation; relationship drift and identification changes bump the revision so stale quotes are rejected. `native_diplomacy_workspace` adds the RELATIONS top-bar workspace: contact directory with nine filters, transmission stage (species communications portrait or signal waveform), five relationship meters, negotiation/declaration modals and agreements/proposals/history/intelligence/overview tabs. Unidentified contacts expose no civilization id, name, species or metrics. Maintained validation passed 150/150 graphical CTest including two new diplomacy suites; full interactive playthrough evidence remains pending.
 

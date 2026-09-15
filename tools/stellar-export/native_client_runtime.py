@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import struct
 
 from native_ui_runtime import native_ui_asset_files
 from native_celestial_runtime import native_celestial_asset_files
@@ -72,27 +73,55 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
                                  "source": lock["releaseUrl"], "license": "Licenses/SDL3-zlib.txt"}],
     }
 
+def _validate_capture(path: Path, width: int, height: int):
+    data = path.read_bytes() if path.is_file() else b""
+    if len(data) < 54 or data[:2] != b"BM":
+        raise RuntimeError("Native client did not capture its rendered frame")
+    declared = struct.unpack_from("<I", data, 2)[0]
+    offset = struct.unpack_from("<I", data, 10)[0]
+    dib_size = struct.unpack_from("<I", data, 14)[0]
+    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
+    compression = struct.unpack_from("<I", data, 30)[0]
+    row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
+    required = row * abs(actual_height)
+    if (declared != len(data) or dib_size not in (40, 108, 124) or
+            actual_width != width or abs(actual_height) != height or
+            planes != 1 or bits not in (24, 32) or compression not in (0, 3) or
+            offset < 14 + dib_size or required <= 0 or offset + required > len(data)):
+        raise RuntimeError("Native client capture has invalid renderer geometry")
+    pixel_width = actual_width * (bits // 8)
+    row_stride = ((actual_width * bits + 31) // 32) * 4
+    if pixel_width <= 0 or offset + pixel_width > len(data):
+        raise RuntimeError("Native client capture has invalid renderer geometry")
+    first_pixel = data[offset:offset + bits // 8]
+    uniform_row = first_pixel * actual_width
+    if all(data[offset + index * row_stride:offset + index * row_stride + pixel_width]
+           == uniform_row for index in range(abs(actual_height))):
+        raise RuntimeError("Native client capture contains no rendered variation")
+
 
 def validate_native_client_export(folder: Path, env: dict[str, str]):
+    folder = folder.resolve()
     # This is an explicit local GPU preview check, never part of a headless
     # preset. A working installed Vulkan graphics driver is required.
     with tempfile.TemporaryDirectory(prefix="stellar-native-client-") as temporary:
         work = Path(temporary)
-        screenshot = work / "native-preview.bmp"
+        screenshot = work / "native-preview-1280x720.bmp"
+        loaded_screenshot = work / "native-preview-1920x1080.bmp"
         save = work / "campaign.player17.json"
         clean_env = dict(env)
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
         clean_env["PATH"] = str(system_root / "System32") + os.pathsep + str(system_root)
         result = subprocess.run(
             [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
-             "--save-path", str(save), "--smoke", str(screenshot)],
+             "--save-path", str(save), "--width", "1280", "--height", "720",
+             "--smoke", str(screenshot)],
             cwd=work, env=clean_env, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
             raise RuntimeError(f"Relocated native client failed ({result.returncode}): {result.stderr}")
         if "gpu_driver=vulkan" not in result.stdout or "systems=500 " not in result.stdout:
             raise RuntimeError(f"Native client did not confirm its renderer/campaign: {result.stdout}")
-        if not screenshot.is_file() or screenshot.stat().st_size < 54 or screenshot.read_bytes()[:2] != b"BM":
-            raise RuntimeError("Native client did not capture its rendered frame")
+        _validate_capture(screenshot, 1280, 720)
         if not save.is_file() or save.stat().st_size == 0:
             raise RuntimeError("Native client did not complete its isolated manual save")
         before = json.loads(save.read_text(encoding="utf-8"))
@@ -100,20 +129,24 @@ def validate_native_client_export(folder: Path, env: dict[str, str]):
             raise RuntimeError("Native client save does not contain its Player17 500-system campaign")
         loaded = subprocess.run(
             [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
-             "--save-path", str(save), "--load", "--smoke", str(screenshot)],
+             "--save-path", str(save), "--width", "1920", "--height", "1080",
+             "--load", "--smoke", str(loaded_screenshot)],
             cwd=work, env=clean_env, capture_output=True, text=True, timeout=60)
         if loaded.returncode != 0 or "gpu_driver=vulkan" not in loaded.stdout:
             raise RuntimeError(f"Relocated native saved campaign failed to load: {loaded.stderr}")
+        _validate_capture(loaded_screenshot, 1920, 1080)
         after = json.loads(save.read_text(encoding="utf-8"))
         before.pop("SavedAtUtc", None)
         after.pop("SavedAtUtc", None)
         if before != after:
             raise RuntimeError("Native saved campaign changed during paused load/recapture")
         evidence = folder.parent / (folder.name + "-native-preview.bmp")
-        shutil.copy2(screenshot, evidence)
+        shutil.copy2(loaded_screenshot, evidence)
+        fresh_evidence = folder.parent / (folder.name + "-native-preview-fresh.bmp")
+        shutil.copy2(screenshot, fresh_evidence)
         return {"nativeClientRelocatedLaunch": True, "nativeClientRestrictedPath": True,
                 "nativeClientIsolatedManualSave": True,
                 "nativeClientPlayer17Reload": True,
-                "renderer": "Vulkan", "capture": str(evidence),
+                "renderer": "Vulkan", "capture": str(evidence), "freshCapture": str(fresh_evidence),
                 "diagnostics": result.stdout.strip(), "loadDiagnostics": loaded.stdout.strip(),
                 "graphicalParity": False}

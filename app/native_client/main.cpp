@@ -32,6 +32,7 @@
 #include "native_fleet_route_effects.hpp"
 #include "native_ship_art_assets.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_style.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
 #include "native_territory_overlay.hpp"
@@ -416,6 +417,31 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
        bounds.y + (bounds.height - static_cast<float>(size)) * .5f},
       std::move(value), color, size, bounds.width - 12.f * scale, bounds,
       TextAlign::Center, face});
+}
+void control_label(DrawList &out, UiRect bounds, std::string value, Color color,
+                   int preferred_size, float scale,
+                   const SystemTextMeasurer &measure) {
+  const float padding = std::max(6.f, 8.f * scale);
+  const UiRect clip{bounds.x + padding, bounds.y + 2.f * scale,
+                    std::max(1.f, bounds.width - 2.f * padding),
+                    std::max(1.f, bounds.height - 4.f * scale)};
+  int size = std::max(10, preferred_size);
+  TextExtent extent{};
+  // At most five cached measurements fit the control without wrapping.
+  // The final extent must describe the same size submitted for drawing.
+  for (int attempt = 0; attempt < 5; ++attempt) {
+    const Text probe{{}, value, color, size, 0.f, std::nullopt,
+                     TextAlign::Center, FontFace::Interface};
+    extent = measure ? measure(probe)
+                     : TextExtent{static_cast<int>(value.size() * size * .58f), size};
+    if ((extent.width <= clip.width && extent.height <= clip.height) ||
+        size == 10 || attempt == 4) break;
+    size = std::max(10, size - 2);
+  }
+  out.overlay.emplace_back(Text{{bounds.x + bounds.width * .5f,
+      bounds.y + (bounds.height - static_cast<float>(extent.height)) * .5f},
+      std::move(value), color, size, 0.f, clip, TextAlign::Center,
+      FontFace::Interface});
 }
 
 [[nodiscard]] std::unique_ptr<NativeCampaignSession> make_session(const Options &options){
@@ -1778,55 +1804,28 @@ class NativeCampaign final {
     }
     }
     const auto layout = NativeUiLayout::for_viewport(width, height);
-    const Color panel{7, 17, 32, 238};
-    const Color button{12, 31, 54, 245};
-    const Color hover{24, 61, 94, 250};
-    const Color selected{23, 67, 102, 255};
-    const Color border{91, 151, 205, 235};
-    fill(out, layout.pause, layout.pause.contains(pointer_) ? hover : button);
-    stroke(out, layout.pause, border);
-    label(out, layout.pause,
+    using stellar::native_ui_style::panel;
+    panel(out, layout.pause, layout.pause.contains(pointer_), false);
+    control_label(out, layout.pause,
           session_->frame().clock().speed() == StrategicSpeed::Paused
               ? "PLAY"
               : "PAUSE",
-          {225, 238, 250, 255}, layout.control_font_pixels, layout.scale);
-    fill(out, layout.speed, layout.speed.contains(pointer_) ? hover : button);
-    stroke(out, layout.speed, border);
-    label(out, layout.speed, speed_text(), {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale);
-    fill(out, layout.research,
-         research_workspace_.visible()
-             ? selected
-             : layout.research.contains(pointer_) ? hover : button);
-    stroke(out, layout.research,
-           research_workspace_.visible() ? Color{154, 225, 188, 255} : border);
-    label(out, layout.research, "RESEARCH", {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale);
-    fill(out, layout.shipyard,
-         shipyard_workspace_.visible()
-             ? selected
-             : layout.shipyard.contains(pointer_) ? hover : button);
-    stroke(out, layout.shipyard,
-           shipyard_workspace_.visible() ? Color{154, 225, 188, 255} : border);
-    label(out, layout.shipyard, "SHIPYARD", {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale);
-    fill(out, layout.construction,
-         construction_workspace_.visible()
-             ? selected
-             : layout.construction.contains(pointer_) ? hover : button);
-    stroke(out, layout.construction,
-           construction_workspace_.visible() ? Color{154, 225, 188, 255}
-                                             : border);
-    label(out, layout.construction, "CONSTRUCTION", {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale);
-    fill(out, layout.diplomacy,
-         diplomacy_workspace_.visible()
-             ? selected
-             : layout.diplomacy.contains(pointer_) ? hover : button);
-    stroke(out, layout.diplomacy,
-           diplomacy_workspace_.visible() ? Color{154, 225, 188, 255} : border);
-    label(out, layout.diplomacy, "RELATIONS", {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale);
+          {225, 238, 250, 255}, layout.control_font_pixels, layout.scale,text_measurer_);
+    panel(out, layout.speed, layout.speed.contains(pointer_), false);
+    control_label(out, layout.speed, speed_text(), {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale,text_measurer_);
+    panel(out, layout.research, layout.research.contains(pointer_), research_workspace_.visible());
+    control_label(out, layout.research, "RESEARCH", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale,text_measurer_);
+    panel(out, layout.shipyard, layout.shipyard.contains(pointer_), shipyard_workspace_.visible());
+    control_label(out, layout.shipyard, "SHIPYARD", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale,text_measurer_);
+    panel(out, layout.construction, layout.construction.contains(pointer_), construction_workspace_.visible());
+    control_label(out, layout.construction, "CONSTRUCTION", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale,text_measurer_);
+    panel(out, layout.diplomacy, layout.diplomacy.contains(pointer_), diplomacy_workspace_.visible());
+    control_label(out, layout.diplomacy, "RELATIONS", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale,text_measurer_);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -1857,15 +1856,13 @@ class NativeCampaign final {
           layout.status_text});
     }
     if (menu_) {
-      fill(out, layout.menu_panel, panel);
-      stroke(out, layout.menu_panel, {116, 174, 225, 255});
+      stellar::native_ui_style::menu_panel(out, layout.menu_panel);
       label(out, layout.menu_heading, "PAUSED", {238, 244, 255, 255},
             layout.heading_font_pixels, layout.scale, FontFace::Heading);
       const auto draw_button = [&](UiRect bounds, std::string text) {
-        fill(out, bounds, bounds.contains(pointer_) ? hover : button);
-        stroke(out, bounds, border);
-        label(out, bounds, std::move(text), {238, 244, 255, 255},
-              layout.control_font_pixels, layout.scale);
+        panel(out, bounds, bounds.contains(pointer_), false);
+        control_label(out, bounds, std::move(text), {238, 244, 255, 255},
+              layout.control_font_pixels, layout.scale,text_measurer_);
       };
       draw_button(layout.continue_button, "CONTINUE");
       draw_button(layout.save_button, "SAVE");

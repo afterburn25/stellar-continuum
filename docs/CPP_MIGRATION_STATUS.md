@@ -2,7 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`891fbcb2`).
+`bfc51a23`; surface sprite port `58aaf475` reviewed and not imported).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -12,6 +12,46 @@ validators, and `docs/engine/*_VALIDATION.md` contracts. "PARITY VERIFIED" means
 subsystem has a maintained parity/validation gate that runs in the sealed export.
 
 ## Current integration checkpoint (2026-09-15)
+
+### Native HUD and pause-control checkpoint (2026-09-15)
+
+The six campaign controls and pause-menu buttons share restrained blue panels,
+hover/active accents, padded text clipping and measured font fitting. Label
+height comes from the actual render font so text stays centered. At most five
+cached measurements fit each label; the last measured size is also the drawn
+size. Existing hit rectangles, workspace routing and simulation rules are
+unchanged. This is a small visual pass: the compact icon navigation requested
+for final HUD parity is still outstanding.
+
+Final MSVC native build passed (`work/native-hud-final-build.log`), as did
+`native_ui_layout` and `native_client_input` (2/2 CTests). The focused
+`test_native_client_runtime.py` suite passes 58 checks, including missing,
+wrong-size, truncated, uniform and malformed reload capture rejection, plus
+acceptance of valid vertical stripes. Three final Vulkan
+launches passed: fresh pause menu at 1280x720, paused Player17 reload at
+1920x1080, and active research at 1280x720. Both menu captures and the research
+capture were inspected after the measured-text correction. Complete paused
+save equality excludes only `SavedAtUtc`. Evidence:
+`work/native-hud-validation/native-client-validator.json`,
+`work/native-audio-validation/package-native-preview-fresh.bmp`,
+`work/native-audio-validation/package-native-preview.bmp`, and
+`work/native-hud-validation/research-final-1280x720.bmp`.
+
+The maintained export check now requires separate fresh/reload images at those
+exact dimensions, valid BMP structure and a complete nonuniform pixel payload.
+It preserves both captures and resolves the package path before changing the
+working directory. This closes a false-positive gap where a missing reload
+image could reuse the fresh image. These checks establish captured output, not
+artistic quality. Research inspector spacing/status clipping at 720p remains
+a follow-up alongside compact icon navigation.
+
+Devin was reviewed through `bfc51a23`. Surface sprites `58aaf475` are not imported:
+rotation, canonical footprint, completion-state, road and bounded preparation
+contracts need correction before the useful geometry can be integrated. See
+`docs/engine/NATIVE_SURFACE_SPRITE_REVIEW.md` and issue #324 comment `5684977733`.
+Surface head `f13192ea` passed Windows CI `34998925922`; that result does not
+apply automatically to this new HUD checkpoint. PR #332 remains unmerged and
+unsealed, with full 3D and sustained 60 FPS unproven.
 
 ### Native top-down surface checkpoint (validated, 2026-09-15)
 
@@ -42,8 +82,9 @@ triangle-mesh safety, image preparation and terrain assets. Python evidence is
 captures and the separately labeled 14-type presentation gallery were inspected.
 The gallery is not proof of a naturally developed 14-building campaign.
 
-Prior published head `884accb2` passed Windows CI `34992777279`. This surface
-checkpoint still needs its own CI result after publication. Core, legacy C#,
+Surface head `f13192ea` passed Windows CI `34998925922`, including foundation
+build/test/export and native client/presentation checks. Prior readability head
+`884accb2` passed Windows CI `34992777279`. Core, legacy C#,
 Player17 and approved terrain artwork are preserved. Next work should improve
 native HUD styling and detailed colony presentation toward the legacy reference;
 3D surfaces, manual roads and broader character casting remain incomplete.

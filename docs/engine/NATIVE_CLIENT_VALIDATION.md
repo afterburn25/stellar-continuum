@@ -51,6 +51,17 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Validation evidence
 
+### HUD/pause capture gate (2026-09-15)
+
+The native client validator now runs fresh pause-menu capture at 1280x720
+and paused reload capture at 1920x1080 with separate output paths. Both
+BMPs must have the requested dimensions, a complete pixel payload and
+nonuniform rendered pixels. It retains both images for inspection and
+preserves complete Player17 equality apart from the save timestamp.
+Package paths are resolved before entering the isolated working directory.
+This prevents a stale fresh screenshot from satisfying a reload check.
+See `../CPP_MIGRATION_HANDOFF.md` for current runtime evidence.
+
 ### Current readability checkpoint (2026-09-15)
 
 This native C++ checkpoint builds the full MSVC app with the galaxy-label target at
