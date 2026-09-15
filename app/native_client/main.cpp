@@ -28,10 +28,12 @@
 #include "native_ui_layout.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
+#include "native_territory_overlay.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/lane_network.hpp>
@@ -80,6 +82,7 @@ using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
 using namespace stellar::native_startup_ui;
 using namespace stellar::native_galaxy_ui;
+using namespace stellar::native_territory;
 using namespace stellar::native_ship_ui;
 
 struct Options {
@@ -380,6 +383,26 @@ class NativeCampaign final {
     smoke_galaxy_system_entry_=true;
   }
   void capture_galaxy_system(int width,int height){smoke_galaxy_system_=galaxy_scene_evidence(width,height);}
+  [[nodiscard]] std::string territory_smoke_status()const{
+    std::ostringstream out;
+    const auto *projection=territory_overlay_.projection();
+    if(!projection){out<<"{\"valid\":false}";return out.str();}
+    std::size_t contour_points=0,fill_runs=0;
+    for(const auto &region:projection->territories){
+      fill_runs+=region.fill_runs.size();
+      for(const auto &contour:region.contours)contour_points+=contour.size();
+    }
+    out<<"{\"valid\":true,\"regions\":"<<projection->territories.size()
+       <<",\"claims\":"<<projection->claims.size()
+       <<",\"fill_runs\":"<<fill_runs
+       <<",\"contour_points\":"<<contour_points
+       <<",\"fill_images\":"<<projection->territories.size()
+       <<",\"fog_texels\":"<<projection->fog.alpha.size()
+       <<",\"unexplored\":"<<projection->unexplored_system_ids.size()
+       <<"}";
+    return out.str();
+  }
+
   [[nodiscard]] std::string galaxy_art_smoke_status()const{
     const auto view=[&](const GalaxyArtSceneEvidence &evidence,bool system){
       std::ostringstream out;
@@ -1384,9 +1407,11 @@ class NativeCampaign final {
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
+    if(territory_check_counter_--<=0){territory_check_counter_=30;const auto diplomacy_view=ObserverDiplomacyCommandService(session_->frame().runtime().diplomacy()).build_view(world.player_civilization_id);territory_overlay_.update(world,world.player_civilization_id,diplomacy_view.claims);}
+    territory_overlay_.append(out,camera_,width,height,static_cast<float>(fitted_pixels_per_world_));
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     galaxy_marker_begin=out.world.size();
-    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
+    for(const auto &system:world.systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);if(p.x<-14||p.y<-14||p.x>width+14||p.y>height+14)continue;const bool known=known_.contains(system.id),selected=selected_id_&&*selected_id_==system.id;NativeGalaxyStarAppearance appearance;const auto survey=world.knowledge.system_survey_level(world.player_civilization_id,system.id);if(survey==SystemSurveyLevel::fully_surveyed){if(system.primary)appearance.primary=galaxy_star_visual(*system.primary);if(system.secondary)appearance.secondary=galaxy_star_visual(*system.secondary);if(system.tertiary)appearance.tertiary=galaxy_star_visual(*system.tertiary);}galaxy_star_markers_.append(out,p,selected?4.2f:2.f,appearance,selected,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)},known?1.f:.28f);if(selected||(known&&camera_.pixels_per_world>7.f))out.text.push_back({{p.x+8,p.y-4},known?system.name:"Unknown",{205,222,245,235}});}
     if(const auto &fleet_view=fleet_workspace_.view();fleet_view)
       last_route_stats_=append_fleet_route_effects(out,fleet_view->own_fleets,cache.systems_by_id,camera_,width,height);
     else last_route_stats_={};
@@ -1960,6 +1985,8 @@ class NativeCampaign final {
   std::unique_ptr<NativeCampaignSession> session_;
   Camera camera_;
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
+  NativeTerritoryOverlay territory_overlay_;
+  int territory_check_counter_{};
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
   NativeResearchController research_controller_;
@@ -2207,7 +2234,8 @@ int main(int argc,char **argv){
                  <<" startup_ms="<<startup_ms
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
                  <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
-                 <<utf8_path(*options.smoke_screenshot);
+                 <<utf8_path(*options.smoke_screenshot)
+                 <<" territory="<<campaign.territory_smoke_status();
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status();
         if(options.fleet_smoke)

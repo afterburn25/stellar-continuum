@@ -18,9 +18,14 @@ def fixture_payload():
             "PlayerCivilizationId": 0,
             "Civilizations": [
                 {"Id": 0, "Name": "Human Commonwealth",
-                 "SpeciesId": "terran_baseline"},
+                 "SpeciesId": "terran_baseline", "HomeSystemId": 0},
                 {"Id": 1, "Name": "Kesh Exchange",
-                 "SpeciesId": "pelagic_high_pressure"}],
+                 "SpeciesId": "pelagic_high_pressure", "HomeSystemId": 2}],
+            "Knowledge": [
+                {"CivilizationId": 0, "KnownSystemIds": [0],
+                 "KnownCivilizationIds": [],
+                 "SystemSurveys": [
+                     {"SystemId": 0, "Level": 3, "Progress": 1}]}],
         },
         "Diplomacy": {
             "Contacts": [
@@ -113,6 +118,12 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 self.assertEqual(cwd, save.parent)
                 calls.append(args)
                 state = diagnostic()
+                territory = {"valid": True, "regions": 1, "claims": 1,
+                             "fill_runs": 0, "contour_points": 14,
+                             "fill_images": 1, "fog_texels": 100,
+                             "unexplored": 19}
+                if fault == "claims": territory["claims"] = 0
+                if fault == "territory_invalid": territory["valid"] = False
                 if fault == "redacted": state["redacted"] = 0
                 if fault == "channel": state["channels"] = 0
                 if fault == "portrait": state["portrait"] = 0
@@ -139,6 +150,7 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     args, 0,
                     f"gpu_driver=vulkan systems=20 image_uploads=5 save=ok "
+                    f"territory={json.dumps(territory, separators=(',', ':'))} "
                     f"diplomacy={json.dumps(state, separators=(',', ':'))}", "")
 
             with mock.patch("native_diplomacy_runtime.subprocess.run",
@@ -178,6 +190,10 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("same_capture")
     def test_blank_capture_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("blank")
+    def test_missing_claim_arc_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("claims")
+    def test_invalid_territory_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("territory_invalid")
 
 
 class NativeDiplomacyAuthoringTests(unittest.TestCase):
@@ -195,6 +211,27 @@ class NativeDiplomacyAuthoringTests(unittest.TestCase):
         self.assertEqual(petition["Status"], 0)
         self.assertEqual(petition["CreatedAtTick"], 42250)
         self.assertEqual(diplomacy["NextProposalId"], 3)
+
+    def test_authors_communicated_claim(self):
+        authored, counterpart = _author_diplomacy_source(fixture_payload())
+        diplomacy = authored["Diplomacy"]
+        self.assertEqual(len(diplomacy["Claims"]), 1)
+        claim = diplomacy["Claims"][0]
+        self.assertEqual(claim["ClaimId"], 1)
+        self.assertEqual(claim["ClaimantCivilizationId"], counterpart)
+        self.assertEqual(claim["SystemId"], 0)
+        self.assertTrue(claim["Active"])
+        self.assertIn(0, claim["KnownToCivilizationIds"])
+        self.assertIn(counterpart, claim["KnownToCivilizationIds"])
+        self.assertEqual(diplomacy["NextClaimId"], 2)
+        observer = authored["Galaxy"]["Knowledge"][0]
+        self.assertIn(counterpart, observer["KnownCivilizationIds"])
+
+    def test_unsurveyed_home_rejected(self):
+        broken = fixture_payload()
+        broken["Galaxy"]["Knowledge"][0]["SystemSurveys"][0]["Level"] = 1
+        with self.assertRaises(RuntimeError):
+            _author_diplomacy_source(broken)
 
     def test_missing_channel_rejected(self):
         broken = fixture_payload()

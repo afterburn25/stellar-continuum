@@ -88,11 +88,46 @@ def _author_diplomacy_source(source: dict) -> tuple[dict, int]:
         "ExternalTermsReference": None,
     })
     diplomacy["NextProposalId"] = proposal_id + 1
+    # A communicated foreign territorial claim over the player's home system so
+    # the strategic territory overlay proves its dashed-arc rendering path.
+    home = next((civ.get("HomeSystemId") for civ in galaxy.get(
+        "Civilizations", []) if civ.get("Id") == player), None)
+    if not isinstance(home, int) or isinstance(home, bool):
+        raise RuntimeError("Diplomacy fixture has no player home system")
+    surveys = next((entry.get("SystemSurveys") for entry in
+                    galaxy.get("Knowledge", [])
+                    if entry.get("CivilizationId") == player), None)
+    if not isinstance(surveys, list) or not any(
+            survey.get("SystemId") == home and survey.get("Level") == 3
+            for survey in surveys):
+        raise RuntimeError("Player home system is not fully surveyed")
+    observer_knowledge = next(
+        entry for entry in galaxy["Knowledge"]
+        if entry.get("CivilizationId") == player)
+    known_civilizations = observer_knowledge.setdefault(
+        "KnownCivilizationIds", [])
+    if counterpart not in known_civilizations:
+        known_civilizations.append(counterpart)
+    claims = diplomacy.setdefault("Claims", [])
+    if not isinstance(claims, list):
+        raise RuntimeError("Diplomacy claims payload is malformed")
+    claim_id = diplomacy.get("NextClaimId", 1)
+    if isinstance(claim_id, bool) or not isinstance(claim_id, int):
+        raise RuntimeError("Diplomacy fixture has no valid next claim id")
+    claims.append({
+        "ClaimId": claim_id,
+        "ClaimantCivilizationId": counterpart,
+        "SystemId": home,
+        "AssertedAtTick": tick - 2,
+        "Active": True,
+        "KnownToCivilizationIds": [player, counterpart],
+    })
+    diplomacy["NextClaimId"] = claim_id + 1
     return authored, counterpart
 
 
 def _diagnostic(stdout: str) -> dict:
-    match = re.search(r"(?:^|\s)diplomacy=(\{[^\n]+\})(?:\s|$)", stdout)
+    match = re.search(r"(?:^|\s)diplomacy=(\{[^{}]*\})(?:\s|$)", stdout)
     if not match:
         raise RuntimeError("Native diplomacy smoke did not report its evidence")
     try:
@@ -127,6 +162,23 @@ def _diagnostic(stdout: str) -> dict:
         raise RuntimeError("Proposals tab did not show the sent proposal")
     if state["incoming_pending"] < 1:
         raise RuntimeError("Proposals tab did not show the incoming petition")
+    return state
+
+
+def _territory(stdout: str) -> dict:
+    match = re.search(r"(?:^|\s)territory=(\{[^{}]*\})(?:\s|$)", stdout)
+    if not match:
+        raise RuntimeError("Native smoke did not report territory evidence")
+    try:
+        state = json.loads(match.group(1))
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("Native territory diagnostic is malformed") from error
+    if not state.get("valid"):
+        raise RuntimeError("Territory overlay did not build its projection")
+    if state.get("claims", 0) < 1:
+        raise RuntimeError("Territorial claim arc did not reach the render list")
+    if state.get("regions", 0) < 1:
+        raise RuntimeError("Territory regions did not reach the render list")
     return state
 
 
@@ -195,6 +247,7 @@ def validate_native_diplomacy_export(folder: Path, env: dict[str, str],
                 raise RuntimeError(
                     "Native diplomacy did not confirm Vulkan, campaign and save")
             state = _diagnostic(result.stdout)
+            _territory(result.stdout)
             if state["selected_civ"] != counterpart:
                 raise RuntimeError("Native diplomacy selected the wrong contact")
             proposals_capture = capture.with_name(
