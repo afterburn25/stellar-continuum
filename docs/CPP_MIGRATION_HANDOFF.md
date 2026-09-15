@@ -6,10 +6,30 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 ## Active branches
 
 - `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
-- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `06b2b802`, with diplomacy presentation at `410753da` and sealed-export evidence. It is pending review/integration.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch; observed at `06b2b802`, with diplomacy presentation at `410753da` and sealed-export evidence. Its code slice is integrated in this candidate; review and combined validation are in progress.
 - `cpp/codex-native-architecture-integration` — Codex architecture/integration branch, based on `ac45d958`. Carries Devin's existing coordination documents forward; changes go through a PR to the shared migration branch.
 - `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
 - `work/voice-engine-tts` — fully merged ancestor of migration head.
+
+## Interfaces added in 0.1.58 (candidate for review)
+
+- `app/native_client/native_diplomacy_controller.{hpp,cpp}` — `NativeDiplomacyController`:
+  `build(frame, generation, contact_index)` returns `NativeDiplomacyView` (contacts,
+  selected details, proposals, agreements, history + `diplomacy_revision`);
+  `execute(frame, generation, revision, action, target, proposal_id)` revalidates the
+  quoted revision against a fresh signature before calling
+  `ObserverDiplomacyCommandService`. Signature covers contact awareness/identity,
+  relationship metrics, access, agreements, proposals and event ids — selection moves
+  never bump it. Owner-thread pinned like other controllers.
+- `app/native_client/native_diplomacy_workspace.{hpp,cpp}` — fullscreen RELATIONS
+  workspace. `handle` emits `SelectContact`, `Action`, `ProposalAction`,
+  `FocusSystem`, `Close`; `set_view` preserves selection by civilization id across
+  contact reordering (main re-projects once if the index shifted).
+- `NativeUiLayout` gained `UiAction::Diplomacy` + `diplomacy` rect (top bar, RELATIONS).
+- `NativeDiplomacyWorkspace::render` takes an optional `PortraitProvider`
+  (`string_view relative_asset_path -> shared_ptr<const RgbaImage>`); `nullptr` draws
+  the signal-waveform fallback. `main.cpp` resolves
+  `assets/visual/species/<id>-communications-v2.png` (underscores→hyphens).
 
 ## Interfaces added in 0.1.57 (candidate for review)
 
@@ -36,8 +56,13 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Remaining blockers / next work
 
-- Review and integrate Devin's existing diplomacy controller/workspace slice; do not re-port it. Current limits: no real-campaign or graphical diplomacy smoke (Player17 has no contacts), and no claims/border warnings, demand/trade composer, or grievance UI.
-- Investigate cold-entry versus steady-state CPU update/scene construction spikes. Smoke timing separates bounded update, scene, and render-present phases, but render-present includes VSync wait and is not GPU-only; 60 FPS remains unproven.
+- Diplomacy workspace has no graphical/real-campaign smoke evidence yet — the
+  Player17 fixture has no diplomacy contacts; a validator save with authored
+  contacts would exercise the real path (controller test covers authored state).
+- Diplomacy presentation gaps vs C#: no claims/border-warnings UI, no demand/trade
+  proposal composer (terms list covers non-aggression/access/peace/ceasefire only),
+  no grievance display.
+- Investigate cold-entry versus steady-state CPU update/scene construction spikes. Smoke phase metrics include VSync wait; 60 FPS remains unproven.
 - Surface colony visuals (buildings/roads), orbital structure rendering.
 - Native audio — engine has no audio module at all; needs design before code.
 - Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
