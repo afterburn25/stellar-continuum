@@ -172,12 +172,14 @@ ColonyWorkspaceLayout ColonyWorkspaceLayout::for_viewport(int width,
 void NativeColonyWorkspace::open(NativeColonyView view) {
   cancel_freight(); freight_notice_.clear();
   visible_ = true;
+  planetary_.reset();planetary_.set_view(view);
   site_scroll_ = 0.f;
   detail_scroll_ = 0.f;
   view_ = std::move(view);
 }
 
 void NativeColonyWorkspace::set_view(NativeColonyView view) {
+  planetary_.set_view(view);
   if (view_ && (view_->campaign_generation != view.campaign_generation ||
                 view_->player_civilization_id != view.player_civilization_id ||
                 view_->colony_id != view.colony_id || view_->body_id != view.body_id ||
@@ -190,7 +192,7 @@ void NativeColonyWorkspace::set_view(NativeColonyView view) {
   view_ = std::move(view);
 }
 
-void NativeColonyWorkspace::close() noexcept { cancel_freight(); visible_ = false; }
+void NativeColonyWorkspace::close() noexcept { cancel_freight(); planetary_.reset(); visible_ = false; }
 
 void NativeColonyWorkspace::discard_campaign() noexcept {
   cancel_freight(); freight_notice_.clear();
@@ -257,6 +259,12 @@ void NativeColonyWorkspace::clamp_scroll(
 ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
                                                        int width, int height) {
   if (!visible_) return {};
+  if(planetary_enabled_&&!freight_preview_){
+    auto command=planetary_.handle(event,width,height);
+    if(command.action==PlanetaryAction::Back){close();return {ColonyWorkspaceCommandKind::Close,true};}
+    if(command.action==PlanetaryAction::Freight)return {ColonyWorkspaceCommandKind::ReviewFreight,true};
+    return {ColonyWorkspaceCommandKind::Planetary,true,0,std::move(command)};
+  }
   pointer_ = event.position;
   const auto layout = ColonyWorkspaceLayout::for_viewport(width, height, view_ && view_->resource_outpost);
   clamp_scroll(layout);
@@ -324,6 +332,17 @@ ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
 
 void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
   if (!visible_ || !view_) return;
+  if(planetary_enabled_){
+    planetary_.render(out,*view_,width,height);
+    if(freight_preview_){
+      const auto l=ColonyWorkspaceLayout::for_viewport(width,height,true);
+      fill(out,l.surface,{0,4,10,185});stellar::native_menu_style::panel(out,l.freight_review,l.scale);
+      const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y+freight_scroll_,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
+      stellar::native_menu_style::button(out,l.freight_cancel,"Cancel",l.body_font_pixels,l.freight_cancel.contains(pointer_));
+      stellar::native_menu_style::button(out,l.freight_confirm,"Confirm dispatch",l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
+    }
+    return;
+  }
   const auto layout = ColonyWorkspaceLayout::for_viewport(width, height, view_ && view_->resource_outpost);
   const auto &view = *view_;
   const auto operation_height =

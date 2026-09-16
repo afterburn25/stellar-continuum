@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_colony_controller.hpp"
+#include "native_planetary_screen.hpp"
 #include "native_outpost_freight_controller.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
@@ -23,21 +24,26 @@ struct ColonyWorkspaceLayout {
                                                            int height, bool outpost = false) noexcept;
 };
 
-enum class ColonyWorkspaceCommandKind { None, Close, OpenSurface, ReviewFreight, ConfirmFreight, CancelFreight };
+enum class ColonyWorkspaceCommandKind { None, Close, OpenSurface, ReviewFreight, ConfirmFreight, CancelFreight, Planetary };
 
 struct ColonyWorkspaceCommand {
   ColonyWorkspaceCommandKind kind{ColonyWorkspaceCommandKind::None};
   bool captured{};
   std::uint64_t quote_revision{};
+  PlanetaryCommand planetary;
 };
 
 class NativeColonyWorkspace final {
 public:
   void open(stellar::native_colony::NativeColonyView);
+  void use_planetary_screen(bool enabled=true){planetary_enabled_=enabled;}
+  bool planetary_enabled()const{return planetary_enabled_;}
+  bool planetary_modal()const{return visible_&&planetary_enabled_&&planetary_.modal();}
+  NativePlanetaryScreen& planetary(){return planetary_;}
   void set_view(stellar::native_colony::NativeColonyView);
   void close() noexcept;
   void discard_campaign() noexcept;
-  void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure) { measure_ = std::move(measure); }
+  void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure) { planetary_.set_measurer(measure); measure_ = std::move(measure); }
   void set_freight_preview(stellar::native_colony::NativeOutpostFreightPreview);
   void cancel_freight() noexcept;
   void set_freight_notice(std::string notice) { freight_notice_ = std::move(notice); }
@@ -56,6 +62,8 @@ private:
   void clamp_scroll(const ColonyWorkspaceLayout &) noexcept;
 
   bool visible_{};
+  bool planetary_enabled_{}; // Host enables the player replacement. Legacy layout remains for migration regression probes.
+  NativePlanetaryScreen planetary_;
   std::optional<stellar::native_colony::NativeColonyView> view_;
   stellar::native_map::Point pointer_{};
   float site_scroll_{};

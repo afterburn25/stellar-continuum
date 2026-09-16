@@ -3,6 +3,7 @@
 #include "native_system_view.hpp"
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/colony_biology.hpp>
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -36,6 +37,7 @@ struct NativeSurfaceSite {
   double repair_industry_cost{};
   bool can_afford_repair{};
   bool essential_service{};
+  int slot_index{};
 };
 
 struct NativeSurfaceBuildOption {
@@ -90,6 +92,10 @@ struct NativeColonyView {
       extraction_yield_multiplier{};
   std::string deposit_material_name, deposit_grade, outpost_status;
 
+  std::string system_name, population_species_name;
+  stellar::native_system::NativeSystemBody planet;
+  stellar::core::CreditFlowSnapshot local_credit_flow;
+  double operating_funding{}, operating_arrears{}, empire_credit_flow{}, empire_industry_flow{}, construction_multiplier{};
   std::vector<NativeSurfaceSite> construction_sites;
   std::vector<NativeSurfaceBuildOption> available_buildings;
 };

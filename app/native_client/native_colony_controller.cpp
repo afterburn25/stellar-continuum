@@ -75,6 +75,20 @@ std::string signature(const NativeColonyView &view) {
   append(out, view.colony_id);
   append(out, view.colony_name);
   append(out, view.body_display_name);
+  append(out, view.system_name);
+  append(out, view.operating_funding);
+  append(out, view.operating_arrears);
+  append(out, view.empire_credit_flow);
+  append(out, view.empire_industry_flow);
+  append(out, view.construction_multiplier);
+  append(out, view.local_credit_flow.net_credits_per_day);
+  append(out, view.local_credit_flow.colony_revenue_per_day);
+  append(out, view.local_credit_flow.trade_revenue_per_day);
+  append(out, view.local_credit_flow.operating_costs_per_day);
+  append(out, view.local_credit_flow.colony_administration_per_day);
+  append(out, view.local_credit_flow.population_services_per_day);
+  append(out, view.local_credit_flow.habitat_support_per_day);
+  append(out, view.local_credit_flow.surface_maintenance_per_day);
   append(out, view.population_species_id);
   append(out, view.resource_outpost);
   append(out, view.solid_surface);
@@ -144,6 +158,7 @@ std::string signature(const NativeColonyView &view) {
   append(out, view.outpost_status);
   for (const auto &site : view.construction_sites) {
     append(out, site.building_id);
+    append(out, site.slot_index);
     append(out, site.type_id);
     append(out, site.name);
     append(out, site.x);
@@ -266,9 +281,20 @@ NativeColonyViewResult NativeColonyController::build(
   view.system_id = system.system_id;
   view.body_id = selected_body_id;
   view.colony_id = colony->id;
+  view.system_name=system.catalog_name;view.planet=*shown_body;
+  std::vector<EconomyConstructionState> econ_construction;
+  for(const auto& state:current.world.construction)econ_construction.push_back({state.civilization_id,state.completed_project_ids});
+  auto flow=economy_credit_flow({current.world.civilizations,current.world.bodies,econ_construction,{}},std::span<const Colony>(&*colony,1),current.world.economies,current.player.id,false);
+  flow.operating_costs_per_day-=flow.orbital_maintenance_per_day;flow.orbital_maintenance_per_day=0;flow.net_credits_per_day=flow.gross_income_per_day-flow.operating_costs_per_day;
+  view.local_credit_flow=flow;
+  view.operating_funding=current.economy.last_base_operations_funding_fraction;
+  view.operating_arrears=current.economy.operating_arrears;
+  view.empire_credit_flow=current.economy.last_credits_per_second;view.empire_industry_flow=current.economy.last_industry_per_second;
+  view.construction_multiplier=surface_construction_cost_multiplier(current.construction,*colony);
   view.colony_name = colony->name;
   view.body_display_name = shown_body->name;
   view.population_species_id = colony->population_species_id;
+  view.population_species_name = species_environment_profile(colony->population_species_id).display_name;
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   if (system.system_id == current.player.home_system_id) {
     // Use the same Core body resolution as campaign seeding, never display names.
@@ -402,6 +428,7 @@ NativeColonyViewResult NativeColonyController::build(
       current.economy.industry + .0001 >= hub_upgrade->industry_cost;
   view.hub_upgrade_days_remaining =
       colony->surface_hub_upgrade_days_remaining;
+  const auto slots=planetary_building_slots(*colony);
   for (const auto &building : colony->surface_buildings) {
     const auto *definition = find_surface_building(building.type_id);
     if (!definition)
@@ -458,7 +485,8 @@ NativeColonyViewResult NativeColonyController::build(
          .can_afford_repair = repair_cost > 0. &&
              current.economy.industry + .0001 >= repair_cost,
          .essential_service =
-             surface_essential_service_priority(building.type_id) > 0});
+             surface_essential_service_priority(building.type_id) > 0,
+         .slot_index = slots.at(building.id)});
   }
   std::ranges::sort(view.construction_sites, {}, &NativeSurfaceSite::building_id);
   for (const auto &definition : surface_building_catalog()) {

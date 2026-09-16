@@ -158,7 +158,7 @@ void NativeSystemWorkspace::render(DrawList &out,int width,int height){artwork_r
   overlay_stroke(out,layout.focus_action,{102,205,224,255});
   overlay_text(out,layout.focus_action.x+10.f,layout.focus_action.y+9.f,"FOCUS PLANET",text,14,layout.focus_action.width-20.f,layout.focus_action);
 }
-if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"OPEN COLONY",text,14,layout.colony_action.width-20,layout.colony_action);}else if(preparation_&&selected_body()){
+if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"MANAGE PLANET",text,14,layout.colony_action.width-20,layout.colony_action);}else if(preparation_&&selected_body()){
 overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
 overlay_stroke(out,layout.colony_action,{102,232,164,255});
 overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"VIEW SHIPYARD",text,14,layout.colony_action.width-20,layout.colony_action);

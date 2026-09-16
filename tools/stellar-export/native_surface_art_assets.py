@@ -6,6 +6,10 @@ import json
 
 
 NATIVE_SURFACE_ART_SOURCES = {
+    'planetary-panorama': ('assets/visual/planetary/colony-panorama-v1.png', 'assets/visual/planetary/colony-panorama-v1.png'),
+    'planetary-buildings': ('assets/visual/planetary/building-portraits-v1.png', 'assets/visual/planetary/building-portraits-v1.png'),
+    'planetary-credits': ('assets/visual/planetary/ARTWORK.md', 'Licenses/Planetary-art-sources.md'),
+
     "temperate-ground-albedo-v1": (
         "assets/visual/surface/temperate-ground-albedo-v1.png",
         "assets/visual/surface/temperate-ground-albedo-v1.png"),

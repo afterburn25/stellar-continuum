@@ -6,6 +6,7 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
+#include <stellar/core/player_campaign_json.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -524,6 +525,62 @@ void paused_reload_test(const fs::path &research_root,
               sites_before,
           "paused reloaded campaign changed surface construction state");
 }
+
+void planetary_slot_tests(const fs::path& research_root,const fs::path& catalog){
+  auto frame=make_frame(research_root,catalog);
+  NativeSystemViewController systems;NativeColonyController colonies;
+  auto selected=select_home(frame,42,systems,colonies);
+  auto& owned=colony(frame,selected.colony.colony_id);
+  NativeSurfaceConstructionController controller;
+  const auto legacy_seed=accepted_quote(controller,frame,42,selected.colony,selected.colony.available_buildings.front().type_id);
+  require(controller.confirm_placement(frame,42,legacy_seed).accepted,"Unable to seed legacy building");
+  for(auto& b:owned.surface_buildings)b.slot_index.reset();
+  const auto legacy=planetary_building_slots(owned);
+  require(!legacy.empty(),"Legacy homeworld lost its buildings");
+  for(const auto& b:owned.surface_buildings)require(!b.slot_index,"Read-only legacy projection assigned persisted slots");
+  const auto type=selected.colony.available_buildings.front().type_id;
+  const int slot=selected.colony.building_capacity-1;
+  auto quote=controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot);
+  require(quote.accepted&&quote.slot_index==slot,"Explicit empty slot rejected");
+  const auto before=economy(frame).credits;
+  require(controller.cancel_quote(42,quote.quote_revision),"Slot review did not cancel");
+  require(!controller.confirm_placement(frame,42,quote).accepted&&economy(frame).credits==before,"Cancelled slot quote spent credits");
+  quote=controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot);
+  require(controller.confirm_placement(frame,42,quote).accepted,"Slot construction failed");
+  require(owned.surface_buildings.back().slot_index==slot&&!owned.surface_buildings.back().is_complete,"Slot was not reserved for timed construction");
+  for(const auto& b:owned.surface_buildings)if(legacy.contains(b.id))require(b.slot_index==legacy.at(b.id),"Legacy building moved slots");
+  require(!controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot).accepted,"Reserved slot accepted duplicate construction");
+  auto collision=owned;collision.surface_buildings[0].slot_index=slot;
+  bool rejected=false;try{validate_surface_construction(collision);}catch(const std::exception&){rejected=true;}
+  require(rejected,"Duplicate saved slots passed validation");
+  frame.clock().set_speed(StrategicSpeed::Paused);
+  const auto encoded=encode_player_campaign_v17_json(capture_player_campaign_v17(frame.runtime(),{0,"test","2044-05-06T07:08:09Z"}));
+  auto restored=restore_player_campaign_v17_json(load_adaptive_research_strategic_runtime(research_root),encoded);
+  StrategicClock clock;clock.set_speed(StrategicSpeed::Paused);
+  CampaignFrame loaded(std::move(restored).activate(),std::move(clock),CampaignFramePolicy::Player);
+  const auto& loaded_colony=colony(loaded,owned.id);
+  require(planetary_building_slots(loaded_colony)==planetary_building_slots(owned),"Slots changed after JSON save/reload");
+  (void)loaded.advance(.25);
+  require(loaded_colony.surface_buildings.back().industry_progress==0,"Paused load advanced construction");
+  frame.clock().set_speed(StrategicSpeed::Demo);(void)frame.advance(1.);
+  require(owned.surface_buildings.back().industry_progress>0,"Timed slot did not progress");
+
+  // A newly settled world must construct its own Command Center, without
+  // changing established worlds or granting a completed hub instantly.
+  owned.surface_buildings.clear();owned.surface_hub_level=0;owned.surface_hub_upgrade_days_remaining=0;
+  economy(frame).credits=10000;economy(frame).industry=10000;
+  selected=select_home(frame,42,systems,colonies);
+  require(selected.colony.building_capacity==0,"Foundation exposed unlocked slots");
+  require(!controller.preview_placement(frame,42,selected.colony,type,0,0,0,0).accepted,"Hub-free world allowed a building");
+  const auto hub=controller.preview_management(frame,42,selected.colony,NativeSurfaceManagementAction::UpgradeHub);
+  require(hub.accepted&&hub.industry_cost>0,"Command Center foundation could not be quoted");
+  require(controller.confirm_management(frame,42,hub).accepted&&owned.surface_hub_level==0&&owned.surface_hub_upgrade_days_remaining>0,"Foundation completed instantly");
+  frame.clock().set_speed(StrategicSpeed::Paused);const auto remaining=owned.surface_hub_upgrade_days_remaining;
+  (void)frame.advance(1.);require(owned.surface_hub_upgrade_days_remaining==remaining,"Paused foundation progressed");
+  frame.clock().set_speed(StrategicSpeed::Demo);
+  for(int i=0;i<10&&owned.surface_hub_level==0;++i)(void)frame.advance(1.);
+  require(owned.surface_hub_level==1&&surface_building_capacity(owned)==16,"Funded Command Center did not unlock 16 slots");
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -536,7 +593,8 @@ int main(int argc, char **argv) try {
   management_quote_tests(research_root, catalog);
   body_membership_tests(research_root, catalog);
   paused_reload_test(research_root, catalog);
-  std::cout << "native surface controller: 5/5 bounded cases passed\n";
+  planetary_slot_tests(research_root,catalog);
+  std::cout << "native surface controller: 6/6 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native surface controller failed: " << error.what() << '\n';

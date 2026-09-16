@@ -25,4 +25,30 @@ Native unit tests cover save/Continue routing, automatic/randomized setup, copie
 
 Actual application captures, including all settings categories, main menu, mode cards and species setup, are reviewed at 1280×720 and 1920×1080. Layout tests also exercise 1440p and 4K. Package validation additionally launches the relocated runtime, generates a new native campaign, saves/reloads it and checks gameplay workspaces. Export logs and the sealed package's validation sidecar record the final results.
 
-No source saves are migrated or overwritten by this menu restoration. Native Player17 saves continue to use the existing isolated native save location.
+## Planetary management replacement
+
+Manage Planet now opens the unified planetary operations screen, replacing the
+player-facing free terrain-placement workspace. It uses the original colony
+panorama and nine building-family illustrations recovered from
+`work/planetary-command-window`, with grouped environment, population, resource,
+power, economy and research-lab facts, building slots, and a visible queue.
+Building reviews show actual prices and material requirements. Placement,
+upgrade, repair, enable/disable, priority, cancellation and demolition use the
+existing authoritative commands; construction advances only with simulation time
+and available funding. Established colony and new-settlement starting conditions
+retain the native game's existing balance.
+
+Older native buildings receive a stable read-only slot projection. A successful
+placement or removal persists those slots without moving terrain coordinates;
+rejected and cancelled reviews do not mutate them. Native Player17 adds an
+optional SlotIndex per building. Native save/reload is verified; this does not
+implement import of the separate Godot version-19 planetary save format. Source
+saves are not overwritten. Use this version for saves containing the new slots.
+
+Checks include legacy-slot preservation, duplicate-slot rejection, cancellation,
+timed construction and foundation support, JSON reload, and pause behavior.
+Actual Vulkan runs select a slot, review/cancel/confirm through mouse events,
+verify modal isolation, and reload the reserved building at 720p and 1080p.
+Geometry/input checks additionally cover 1440p and 4K. Earlier terrain-rendering
+smokes remain explicitly compatibility probes; a separate planetary smoke tests
+the screen used by players.

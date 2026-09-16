@@ -29,6 +29,7 @@ from native_supply_runtime import validate_native_supply_export
 from native_economy_runtime import validate_native_economy_export
 from native_system_travel_runtime import validate_native_system_travel_export
 from native_colony_runtime import validate_native_colony_export
+from native_planetary_runtime import validate_native_planetary_export
 from native_freight_runtime import validate_native_freight_export
 from native_fresh_progression_runtime import validate_native_fresh_progression_export
 from native_first_exploration_runtime import validate_native_first_exploration_export
@@ -476,7 +477,8 @@ def export(preset_name):
                 "Video offers Windowed, Borderless Fullscreen and Exclusive Fullscreen, with resolution and refresh options where supported.\n"
                 "Press F12 to save a PNG screenshot. The default folder is Pictures/Stellar Continuum/Screenshots.\n"
                 "Choose General > Browse, select a screenshot folder, then Save to remember it across restarts.\n"
-                "Voice & Subtitles provides volume, subtitle size/background/speaker labels, announcement frequency, replay/stop and an optional dry radio filter. Three scientist cues are integrated. The original title logo and Windows emblem are restored. Development offers diagnostics; the separate Godot Developer world and editing tools are not yet ported. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
+                "Voice & Subtitles provides volume, subtitle size/background/speaker labels, announcement frequency, replay/stop and an optional dry radio filter. Three scientist cues are integrated. The original title logo and Windows emblem are restored. Development offers diagnostics; the separate Godot Developer world and editing tools are not yet ported. Broader casting and full gameplay controls remain in migration.\n"
+                "Manage Planet replaces terrain placement with organized planet statistics, illustrated building slots, construction reviews and a timed queue. Native Player17 saves retain buildings and add optional slot indices; use this build for the new slots. Godot version-19 planetary saves are not imported.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
@@ -511,6 +513,7 @@ def export(preset_name):
             smoke.update(validate_native_supply_export(output, env))
             smoke.update(validate_native_economy_export(output, env))
             smoke.update(validate_native_colony_export(output, env))
+            smoke.update(validate_native_planetary_export(output, env))
             smoke.update(validate_native_freight_export(output, env))
             smoke.update(validate_native_fresh_progression_export(output, env))
             smoke.update(validate_native_first_exploration_export(

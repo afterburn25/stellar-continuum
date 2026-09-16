@@ -121,9 +121,10 @@ double surface_upgrade_authorization_cost(ConstructionReadView w,
 }
 std::optional<ConstructionCost> surface_hub_upgrade_cost(ConstructionReadView w,
                                                          const Colony &c) {
-  if (c.kind == SettlementKind::ResourceOutpost || c.surface_hub_level >= 3)
+  if ((c.kind == SettlementKind::ResourceOutpost && c.surface_hub_level > 0) || c.surface_hub_level >= 3)
     return {};
   auto [cr, in] =
+      c.surface_hub_level == 0 ? std::pair{25., 120.} :
       c.surface_hub_level == 1 ? std::pair{60., 250.} : std::pair{140., 600.};
   auto m = surface_construction_cost_multiplier(w, c);
   return ConstructionCost{away2(cr * m), std::ceil(in * m)};
@@ -235,6 +236,8 @@ SurfaceBuildingPlacementAssessment assess_surface_building_placement(
                   "hub. Deliver extracted material by freighter.");
     return deny("That building type is available only as an upgrade.");
   }
+  if (c->surface_hub_level <= 0)
+    return deny("Complete the Command Center before constructing planetary buildings.");
   const auto capacity = surface_building_capacity(*c);
   if (c->surface_buildings.size() >= static_cast<std::size_t>(capacity))
     return deny("This settlement hub has reached its " +
@@ -282,6 +285,7 @@ bool same_placement_quote(const SurfaceBuildingPlacementAssessment &left,
          left.normalized_rotation_degrees ==
              right.normalized_rotation_degrees &&
          left.prepared_building_id == right.prepared_building_id &&
+         left.slot_index == right.slot_index &&
          left.authorization_cost == right.authorization_cost &&
          left.industry_cost == right.industry_cost &&
          left.formatted_authorization == right.formatted_authorization &&
@@ -293,20 +297,26 @@ ConstructionOrderResult apply_surface_building_placement(
   auto *e = economy_for(w, prepared.civilization_id);
   if (!c || !e)
     throw std::logic_error("Prepared surface placement lost its owner.");
+  const auto slots = planetary_building_slots(*c);
   e->credits -= prepared.authorization_cost;
+  for (auto& building : c->surface_buildings) building.slot_index = slots.at(building.id);
   c->surface_buildings.push_back(
       {prepared.prepared_building_id, prepared.type_id, prepared.x, prepared.z,
        prepared.normalized_rotation_degrees});
+  auto& placed = c->surface_buildings.back();
+  if (prepared.slot_index) placed.slot_index = prepared.slot_index;
+  else for(int slot=0;slot<surface_building_capacity(*c);++slot) {
+    if(std::none_of(slots.begin(),slots.end(),[&](const auto& pair){return pair.second==slot;})){placed.slot_index=slot;break;}
+  }
   return {true, prepared.message};
 }
 } // namespace
 ConstructionOrderResult commit_surface_building_placement(
     ConstructionWorld w,
     const SurfaceBuildingPlacementAssessment &assessment) {
-  const auto current = assess_surface_building_placement(
-      w.read(), assessment.civilization_id, assessment.colony_id,
-      assessment.type_id, assessment.x, assessment.z,
-      assessment.normalized_rotation_degrees);
+  const auto current = assessment.slot_index
+      ? assess_planetary_building_slot(w.read(), assessment.civilization_id, assessment.colony_id, *assessment.slot_index, assessment.type_id)
+      : assess_surface_building_placement(w.read(), assessment.civilization_id, assessment.colony_id, assessment.type_id, assessment.x, assessment.z, assessment.normalized_rotation_degrees);
   if (!current.accepted)
     return {false, current.message};
   if (!assessment.accepted || !same_placement_quote(assessment, current))
@@ -399,6 +409,8 @@ ConstructionOrderResult apply_surface_building_removal(
       [&](const auto &candidate) { return candidate.id == prepared.building_id; });
   if (site == c->surface_buildings.end())
     throw std::logic_error("Prepared surface removal lost its building.");
+  const auto slots=planetary_building_slots(*c);
+  for(auto& building:c->surface_buildings)building.slot_index=slots.at(building.id);
   c->surface_buildings.erase(site);
   if (prepared.cancellation) {
     e->credits += prepared.refund;
@@ -484,6 +496,8 @@ ConstructionOrderResult upgrade_surface_hub(ConstructionWorld w, int civ,
   auto *c = colony_for(w, civ, id);
   if (!c)
     return {false, "You can upgrade only a colony you own."};
+  if (const auto* body=body_for(w.read(),*c); !body || !body->environment.has_solid_surface)
+    return {false,"A Command Center requires an owned settlement on a solid surface."};
   if (c->surface_hub_upgrade_days_remaining > 0)
     return {false, "The hub expansion is already under construction."};
   auto cost = surface_hub_upgrade_cost(w.read(), *c);
@@ -692,10 +706,15 @@ void advance_surface_construction(ConstructionWorld w, int civ, double budget,
   e->industry = std::max(0., e->industry - spent);
 }
 void validate_surface_construction(const Colony &c) {
+  if(c.surface_hub_level<0 || c.surface_hub_level>3)
+    throw std::runtime_error("Invalid planetary Command Center capacity.");
+  if(c.surface_buildings.size()>static_cast<std::size_t>(surface_building_capacity(c)))
+    throw std::runtime_error("Settlement " + std::to_string(c.id) + " exceeds its represented hub module capacity.");
+  (void)planetary_building_slots(c);
   if (!std::isfinite(c.surface_hub_upgrade_days_remaining) ||
       c.surface_hub_upgrade_days_remaining < 0 ||
       (c.surface_hub_upgrade_days_remaining > 0 &&
-       (c.surface_hub_level >= 3 || c.kind == SettlementKind::ResourceOutpost)))
+       (c.surface_hub_level >= 3 || (c.kind == SettlementKind::ResourceOutpost && c.surface_hub_level > 0))))
     throw std::runtime_error("Colony " + std::to_string(c.id) +
                              " has invalid hub expansion progress.");
   std::vector<SurfaceBuilding> ok;
@@ -741,4 +760,46 @@ void validate_surface_construction(const Colony &c) {
     ok.push_back(b);
   }
 }
+
+std::map<int,int> planetary_building_slots(const Colony& colony) {
+  std::map<int,int> result;
+  std::unordered_set<int> occupied;
+  const int capacity=surface_building_capacity(colony);
+  std::vector<int> legacy;
+  for(const auto& building:colony.surface_buildings){
+    if(building.slot_index){
+      const int slot=*building.slot_index;
+      if(slot<0||slot>=capacity||!occupied.insert(slot).second)
+        throw std::runtime_error("Invalid or duplicate planetary building slot.");
+      result.emplace(building.id,slot);
+    }else legacy.push_back(building.id);
+  }
+  std::sort(legacy.begin(),legacy.end());
+  for(const int id:legacy){
+    int slot=0;while(occupied.contains(slot))++slot;
+    if(slot>=capacity)throw std::runtime_error("Planetary buildings exceed Command Center capacity.");
+    occupied.insert(slot);result.emplace(id,slot);
+  }
+  return result;
+}
+SurfaceBuildingPlacementAssessment assess_planetary_building_slot(
+    ConstructionReadView world,int civ,int id,int slot,std::string_view type){
+  SurfaceBuildingPlacementAssessment denied;
+  denied.civilization_id=civ;denied.colony_id=id;denied.type_id=std::string(type);denied.slot_index=slot;
+  const auto* colony=colony_for(world,civ,id);
+  if(!colony){denied.message="You can build only on a planet you own.";return denied;}
+  if(colony->surface_hub_level<=0){denied.message="Complete the Command Center to unlock building slots.";return denied;}
+  if(slot<0||slot>=surface_building_capacity(*colony)){denied.message="Upgrade the Command Center to unlock this slot.";return denied;}
+  const auto slots=planetary_building_slots(*colony);
+  if(std::any_of(slots.begin(),slots.end(),[&](const auto& pair){return pair.second==slot;})){denied.message="This slot is occupied or reserved by construction.";return denied;}
+  for(int ring=1;ring<=7;++ring)for(int n=0;n<ring*12;++n){
+    const double angle=n*6.283185307179586/(ring*12);
+    const float x=static_cast<float>(std::cos(angle)*ring*60),z=static_cast<float>(std::sin(angle)*ring*60);
+    if(surface_placement_error(colony->surface_buildings,type,x,z,0))continue;
+    auto result=assess_surface_building_placement(world,civ,id,type,x,z,0);
+    result.slot_index=slot;return result;
+  }
+  denied.message="No compatible site is available for this building.";return denied;
+}
+
 } // namespace stellar::core

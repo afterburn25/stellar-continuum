@@ -14,7 +14,7 @@ class SurfaceArtAssetTests(unittest.TestCase):
     def test_exact_packaged_art_and_credits(self):
         files = native_surface_art_asset_files(ROOT)
         self.assertEqual(set(files), {"assets/visual/surface/temperate-ground-albedo-v1.png",
-                                     "Licenses/Surface-art-sources.md"})
+                                     "Licenses/Surface-art-sources.md", "assets/visual/planetary/colony-panorama-v1.png", "assets/visual/planetary/building-portraits-v1.png", "Licenses/Planetary-art-sources.md"})
 
     def test_tamper_missing_and_redirect_rejected(self):
         with tempfile.TemporaryDirectory(prefix="stellar-surface-assets-") as temporary:

@@ -359,7 +359,7 @@ NativeSurfacePlacementQuote
 NativeSurfaceConstructionController::preview_placement(
     CampaignFrame &frame, const std::uint64_t generation,
     const NativeColonyView &view, const std::string_view type_id, const float x,
-    const float z, const float rotation_degrees) {
+    const float z, const float rotation_degrees, const std::optional<int> slot) {
   require_owner();
   bind_generation(generation);
   quotes_.clear();
@@ -379,9 +379,9 @@ NativeSurfaceConstructionController::preview_placement(
         "The owned known settlement changed; refresh it before placement.";
     return result;
   }
-  auto assessment = assess_surface_building_placement(
-      current.command.read(), current.player.id, view.colony_id, type_id, x, z,
-      rotation_degrees);
+  auto assessment = slot ? assess_planetary_building_slot(current.command.read(),current.player.id,view.colony_id,*slot,type_id)
+      : assess_surface_building_placement(current.command.read(), current.player.id, view.colony_id, type_id, x, z, rotation_degrees);
+  result.slot_index = assessment.slot_index;
   result.type_id = assessment.type_id;
   result.building_name = assessment.building_name;
   result.x = assessment.x;
@@ -463,6 +463,7 @@ NativeSurfaceConstructionController::confirm_placement(
       quote.z != assessment.z ||
       quote.normalized_rotation_degrees != assessment.normalized_rotation_degrees ||
       quote.prepared_building_id != assessment.prepared_building_id ||
+      quote.slot_index != assessment.slot_index ||
       quote.authorization_budget_units != assessment.authorization_cost ||
       quote.industry_cost != assessment.industry_cost ||
       quote.formatted_authorization != assessment.formatted_authorization ||

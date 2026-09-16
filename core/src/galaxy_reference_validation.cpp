@@ -179,7 +179,7 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
          *colony.remaining_extractable_materials < 0))
       data_error("Settlement " + std::to_string(colony.id) +
                  " has an invalid remaining resource deposit.");
-    if (colony.surface_hub_level < 1 || colony.surface_hub_level > 3)
+    if (colony.surface_hub_level < 0 || colony.surface_hub_level > 3)
       data_error("Settlement " + std::to_string(colony.id) +
                  " has an invalid surface hub level.");
     if (!std::isfinite(colony.stored_food_population_days_millions) ||

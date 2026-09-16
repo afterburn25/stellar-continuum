@@ -23,3 +23,5 @@ assets/visual/ui/navigation/nav_relations.svg text eol=lf
 assets/audio/voice/scientist-cues.json text eol=lf
 assets/audio/voice/Kokoro-Apache-2.0.txt text eol=lf
 assets/visual/fonts/OFL-Rajdhani.txt text eol=crlf
+
+assets/visual/planetary/ARTWORK.md text eol=lf

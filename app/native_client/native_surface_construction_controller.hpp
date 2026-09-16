@@ -20,6 +20,7 @@ struct NativeSurfacePlacementQuote {
   std::string type_id, building_name;
   float x{}, z{}, normalized_rotation_degrees{};
   int prepared_building_id{};
+  std::optional<int> slot_index;
   double authorization_budget_units{}, industry_cost{};
   std::string formatted_authorization;
   bool accepted{};
@@ -65,7 +66,7 @@ public:
   [[nodiscard]] NativeSurfacePlacementQuote preview_placement(
       stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
       const NativeColonyView &, std::string_view type_id, float x, float z,
-      float rotation_degrees);
+      float rotation_degrees, std::optional<int> slot = std::nullopt);
   [[nodiscard]] NativeSurfaceRemovalQuote preview_removal(
       stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
       const NativeColonyView &, int building_id);

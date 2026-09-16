@@ -1,6 +1,7 @@
 #pragma once
 #include <stellar/core/construction_state.hpp>
 #include <limits>
+#include <map>
 #include <string>
 
 namespace stellar::core {
@@ -14,6 +15,7 @@ struct SurfaceBuildingPlacementAssessment {
     std::string type_id, building_name;
     float x{}, z{}, normalized_rotation_degrees{};
     int prepared_building_id{};
+    std::optional<int> slot_index;
     double authorization_cost{}, industry_cost{};
     std::string formatted_authorization;
 };
@@ -26,6 +28,9 @@ struct SurfaceBuildingRemovalAssessment {
     double refund{};
     std::string formatted_refund;
 };
+std::map<int,int> planetary_building_slots(const Colony& colony);
+SurfaceBuildingPlacementAssessment assess_planetary_building_slot(ConstructionReadView world, int civilization_id, int colony_id, int slot, std::string_view type_id);
+
 double surface_construction_cost_multiplier(ConstructionReadView world, const Colony& colony);
 double surface_authorization_cost(ConstructionReadView world, const Colony& colony, const SurfaceBuildingDefinition& definition);
 double surface_upgrade_authorization_cost(ConstructionReadView world, const Colony& colony, const SurfaceBuildingDefinition& definition);
