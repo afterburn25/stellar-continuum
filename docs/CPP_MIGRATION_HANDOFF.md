@@ -5,17 +5,33 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
-### Alpha 0.1.9 release preparation
+### Alpha 0.1.9 delivered
 
 Native game version is now `0.1.9-alpha` (engine remains `0.1.58`). This release
 includes the display modes, player PNG screenshots and persistent General
 settings screenshot-folder browser described below. The packaged README now
 explains the display choices, F12 and folder selection. Native version metadata
 comes from `export/runtime-config.json`; the preserved C# reference is unchanged.
-Delivery requires a clean-source `windows-native-preview` export, its complete
-build/test/runtime gates, manifest/hash verification and a separate versioned ZIP
-in `D:/StellarContinuum/Downloads`. Until those finish, 0.1.8 remains the last
-delivered download.
+Delivered ZIP: `D:/StellarContinuum/Downloads/StellarContinuum-Cpp-0.1.9-alpha-1ffe85fe.zip`
+(82,933,554 bytes). SHA-256:
+`f2e85c4cac6a2ab3d1cec38b837944d6cd5158935ba5de768e3d9f6937db0f9c`.
+Exported source: `1ffe85feea97ffbbb728d24518ea034c0607d14c`, `sourceDirty=false`.
+The prior 0.1.8 download remains intact.
+
+Official export completed 187/187 CTests (145.83 seconds), 466 Python checks
+across 24 suites, and all maintained relocated native runtime gates. Separate
+startup/pause audio and video settings acceptance passed against that exact
+sealed package. Actual F12 captures of its 1080p main menu and General settings
+were visually reviewed; normal Exit to Windows returned 0. All 182 manifest
+file hashes, ZIP contents and copied download hash were verified, and the
+packaged executable reports 0.1.9-alpha with the correct source commit.
+
+Evidence: `work/alpha-019-export.log`, `work/alpha-019-settings-result.json`,
+`work/alpha-019-capture/result.json`, and `work/alpha-019-delivery.json`.
+Export/validation prefix:
+`Builds/Windows/StellarContinuum-windows-native-preview-1ffe85fe-20260916T210531709076Z`.
+This is still the native Alpha migration build. The relocated launch checks do
+not establish clean-machine certification or physical mixed-DPI coverage.
 
 ### General settings screenshot folder
 
