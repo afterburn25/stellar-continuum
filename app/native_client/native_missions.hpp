@@ -63,10 +63,20 @@ struct NativeMissionColonyRow {
   int colony_id{}, planetary_body_id{};
   std::string name, planet_name, system_name;
   double population_millions{};
+  // Reference UiOwnedColonySnapshot: the Land affordance requires a solid
+  // surface and the outpost Collect action is gated by freight availability.
+  bool is_resource_outpost{}, can_land{};
+  bool can_request_freight{};
+  std::string freight_reason;
 };
 
 [[nodiscard]] std::vector<NativeMissionColonyRow>
 build_owned_colony_rows(const core::FreshCampaignState &campaign);
+
+// Reference FindAvailableFreighter: the lowest-id idle player bulk freighter
+// stationed at one of the player's developed colonies.
+[[nodiscard]] const core::FleetState *
+find_available_freighter(const core::FreshCampaignState &campaign);
 
 struct MissionLayout {
   float scale{};
@@ -77,7 +87,8 @@ struct MissionLayout {
       select_ship;
   native_map::UiRect details, action_status;
   std::vector<native_map::UiRect> cards;
-  std::vector<native_map::UiRect> colony_rows, colony_view_buttons;
+  std::vector<native_map::UiRect> colony_rows, colony_view_buttons,
+      colony_land_buttons, colony_collect_buttons;
 };
 
 [[nodiscard]] MissionLayout
@@ -86,7 +97,9 @@ mission_layout_for(const NativeMissionBoard &board,
                    std::size_t colony_rows, int width, int height,
                    bool show_sites);
 
-enum class MissionViewCommandKind { None, Close, FocusFleet, OpenColony };
+enum class MissionViewCommandKind {
+  None, Close, FocusFleet, OpenColony, LandColony, CollectOutpostFreight
+};
 
 struct MissionViewCommand {
   MissionViewCommandKind kind{MissionViewCommandKind::None};

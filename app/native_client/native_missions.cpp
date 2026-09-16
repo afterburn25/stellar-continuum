@@ -2,9 +2,11 @@
 #include <algorithm>
 #include <cmath>
 #include <ranges>
+#include <unordered_set>
 #include "stellar/core/colonization_runtime.hpp"
 #include "stellar/core/colony_biology.hpp"
 #include "stellar/core/colony_economy.hpp"
+#include "stellar/core/colony_operations.hpp"
 #include "stellar/core/detail/legacy_number_format.hpp"
 #include "stellar/core/exploration_advance.hpp"
 #include "stellar/core/fleet_transit.hpp"
@@ -520,6 +522,28 @@ NativeColonySiteSelection colony_site_selection(
   return selection;
 }
 
+const FleetState *find_available_freighter(const FreshCampaignState &campaign) {
+  // Reference FindAvailableFreighter (Main.Surface.cs).
+  std::unordered_set<int> developed;
+  for (const auto &colony : campaign.colonies)
+    if (colony.civilization_id == campaign.player_civilization_id &&
+        colony.kind == SettlementKind::Colony)
+      developed.insert(colony.system_id);
+  const FleetState *best = nullptr;
+  for (const auto &fleet : campaign.fleets) {
+    if (!fleet.is_active ||
+        fleet.civilization_id != campaign.player_civilization_id ||
+        fleet.role != FleetRole::Logistics ||
+        fleet.design_id != "bulk_freighter" || fleet.destination_system_id ||
+        fleet.freight_home_colony_id || fleet.freight_target_outpost_id ||
+        fleet.cargo_materials > 0.0 || !fleet.current_system_id ||
+        !developed.contains(*fleet.current_system_id))
+      continue;
+    if (!best || fleet.id < best->id) best = &fleet;
+  }
+  return best;
+}
+
 std::vector<NativeMissionColonyRow>
 build_owned_colony_rows(const FreshCampaignState &campaign) {
   std::vector<const Colony *> owned;
@@ -527,6 +551,7 @@ build_owned_colony_rows(const FreshCampaignState &campaign) {
     if (colony.civilization_id == campaign.player_civilization_id)
       owned.push_back(&colony);
   std::ranges::sort(owned, {}, &Colony::id);
+  const auto *freighter = find_available_freighter(campaign);
   std::vector<NativeMissionColonyRow> rows;
   for (const auto *colony : owned) {
     NativeMissionColonyRow row;
@@ -541,6 +566,29 @@ build_owned_colony_rows(const FreshCampaignState &campaign) {
     const auto *system = find_system(campaign, colony->system_id);
     row.system_name = system ? system->name : "Deep space";
     row.population_millions = colony->population_millions;
+    row.is_resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
+    row.can_land = body && body->environment.has_solid_surface;
+    // Reference UiOwnedColonySnapshot freight gating.
+    const auto outpost =
+        resource_outpost_snapshot(campaign.bodies, campaign.economies,
+                                  *colony);
+    const bool has_material =
+        outpost.stored_materials > 0.0 || outpost.extraction_per_day > 0.0;
+    row.can_request_freight =
+        outpost.is_resource_outpost && freighter && has_material;
+    if (outpost.is_resource_outpost) {
+      if (!freighter)
+        row.freight_reason =
+            "Build an Interstellar Bulk Freighter and station it at a "
+            "developed colony.";
+      else if (!has_material)
+        row.freight_reason = outpost.status;
+      else
+        row.freight_reason =
+            "Dispatch " + freighter->name + " to collect up to " +
+            fixed(freighter->cargo_material_capacity, 0, 1) +
+            " material units.";
+    }
     rows.push_back(std::move(row));
   }
   return rows;
@@ -713,9 +761,16 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
         layout.panel.y + layout.panel.height - pad)
       break;
     layout.colony_rows.push_back(row);
+    // Reference owned-colony card header actions: View, Land, Collect.
+    const auto button_h = 26.f * scale, button_y = row.y + 13.f * scale,
+               gap = 6.f * scale, narrow = 56.f * scale;
+    UiRect collect{row.x + row.width - 6.f * scale - 68.f * scale, button_y,
+                   68.f * scale, button_h};
+    UiRect land{collect.x - gap - narrow, button_y, narrow, button_h};
     layout.colony_view_buttons.push_back(
-        {row.x + row.width - 64.f * scale, row.y + 13.f * scale,
-         56.f * scale, 26.f * scale});
+        {land.x - gap - narrow, button_y, narrow, button_h});
+    layout.colony_land_buttons.push_back(land);
+    layout.colony_collect_buttons.push_back(collect);
     top += row_height + 6.f * scale;
   }
   (void)selection;
@@ -796,6 +851,20 @@ MissionViewCommand NativeMissionView::handle(
          i < layout.colony_view_buttons.size() && i < colonies.size(); ++i) {
       if (layout.colony_view_buttons[i].contains(event.position)) {
         command.kind = MissionViewCommandKind::OpenColony;
+        command.colony_id = colonies[i].colony_id;
+        return command;
+      }
+      if (colonies[i].can_land &&
+          layout.colony_land_buttons[i].contains(event.position)) {
+        command.kind = MissionViewCommandKind::LandColony;
+        command.colony_id = colonies[i].colony_id;
+        return command;
+      }
+      // Reference Collect: always clickable on outposts — a denied request
+      // surfaces its reason through the status channel.
+      if (colonies[i].is_resource_outpost &&
+          layout.colony_collect_buttons[i].contains(event.position)) {
+        command.kind = MissionViewCommandKind::CollectOutpostFreight;
         command.colony_id = colonies[i].colony_id;
         return command;
       }
@@ -959,6 +1028,10 @@ void NativeMissionView::render(
     out.overlay.emplace_back(
         Text{{button.x + 10.f * scale, button.y + 6.f * scale}, "View",
              body, layout.small_font_pixels});
+    nav(layout.colony_land_buttons[i], "Land", row.can_land);
+    if (row.is_resource_outpost)
+      nav(layout.colony_collect_buttons[i], "Collect",
+          row.can_request_freight);
   }
 }
 

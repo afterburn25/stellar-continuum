@@ -2021,6 +2021,42 @@ class NativeCampaign final {
           missions_view_.close();
           open_overview_colony(command.colony_id,width,height);
         }
+        else if(command.kind==native_missions::MissionViewCommandKind::
+                    LandColony){
+          // Reference UiOpenOwnedColony(colonyId, land:true).
+          missions_view_.close();
+          open_overview_colony(command.colony_id,width,height);
+          open_surface(width,height);
+        }
+        else if(command.kind==native_missions::MissionViewCommandKind::
+                    CollectOutpostFreight){
+          // Reference UiRequestOutpostFreight: rescan for an idle freighter,
+          // then issue the collection order through the coordinator.
+          const auto row=std::ranges::find(
+              colony_rows,command.colony_id,
+              &native_missions::NativeMissionColonyRow::colony_id);
+          if(row!=colony_rows.end()&&!row->can_request_freight)
+            session_->publish_status(row->freight_reason.empty()
+                ?"That outpost cannot receive a freight run."
+                :row->freight_reason);
+          else{
+            auto &runtime=session_->frame().runtime();
+            auto &simulation=runtime.world();
+            const auto *freighter=native_missions::find_available_freighter(
+                simulation.campaign());
+            if(!freighter)
+              session_->publish_status(
+                  "No idle Interstellar Bulk Freighter is stationed at one "
+                  "of your developed colonies.");
+            else{
+              const auto outcome=runtime.core().issue_freight_collection_order(
+                  &simulation,simulation.campaign().player_civilization_id,
+                  freighter->id,command.colony_id);
+              session_->publish_status(outcome.message);
+              if(outcome.accepted)refresh_fleets(true);
+            }
+          }
+        }
         if(command.captured)continue;
       }
 

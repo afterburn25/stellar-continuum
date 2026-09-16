@@ -360,6 +360,141 @@ int main() {
               rows.front().system_name == "Sol" &&
               rows.front().planet_name == "Orbital habitat",
           "owned colony rows must filter foreign colonies");
+    check(!rows.front().is_resource_outpost && !rows.front().can_land &&
+              !rows.front().can_request_freight &&
+              rows.front().freight_reason.empty(),
+          "a colony without a body offers no land or freight actions");
+  }
+  {
+    // Owned colony actions: Land gating and the outpost Collect flow
+    // (reference UiOwnedColonySnapshot + FindAvailableFreighter).
+    auto campaign = campaign_fixture();
+    PlanetaryBody solid;
+    solid.id = 9;
+    solid.system_id = 1;
+    solid.name = "Meridian";
+    solid.environment.has_solid_surface = true;
+    campaign.bodies = {solid};
+
+    Colony home;
+    home.id = 30;
+    home.civilization_id = 1;
+    home.system_id = 1;
+    home.name = "Landing";
+    home.planetary_body_id = 9;
+    Colony outpost;
+    outpost.id = 31;
+    outpost.civilization_id = 1;
+    outpost.system_id = 2;
+    outpost.name = "Pit 7";
+    outpost.kind = SettlementKind::ResourceOutpost;
+    outpost.planetary_body_id = 9;
+    outpost.stored_extracted_materials = 40.0;
+    campaign.colonies = {home, outpost};
+
+    // No idle freighter → Collect gated with the reference reason.
+    auto rows = build_owned_colony_rows(campaign);
+    check(rows.size() == 2 && rows.front().can_land,
+          "a solid-surface colony must allow landing");
+    check(rows.back().is_resource_outpost &&
+              !rows.back().can_request_freight &&
+              rows.back().freight_reason.find(
+                  "Build an Interstellar Bulk Freighter") !=
+                  std::string::npos,
+          "a freighter-less outpost must report the build-a-freighter reason");
+
+    // An idle bulk freighter at a developed colony unlocks Collect.
+    FleetState freighter;
+    freighter.id = 44;
+    freighter.civilization_id = 1;
+    freighter.name = "FTL Meridian";
+    freighter.role = FleetRole::Logistics;
+    freighter.design_id = "bulk_freighter";
+    freighter.is_active = true;
+    freighter.current_system_id = 1;
+    freighter.cargo_material_capacity = 85;
+    campaign.fleets = {freighter};
+    rows = build_owned_colony_rows(campaign);
+    check(rows.back().can_request_freight &&
+              rows.back().freight_reason.find(
+                  "Dispatch FTL Meridian to collect up to 85 material units") !=
+                  std::string::npos,
+          "an idle freighter must unlock Collect with the dispatch reason");
+    check(find_available_freighter(campaign) &&
+              find_available_freighter(campaign)->id == 44,
+          "the freighter scan must return the idle bulk freighter");
+
+    // A committed freighter (destination assigned) is not available.
+    campaign.fleets.front().destination_system_id = 2;
+    check(!find_available_freighter(campaign),
+          "an assigned freighter must not satisfy the availability scan");
+  }
+  {
+    // Collect/Land clicks issue the new commands from the sites tab.
+    auto campaign = campaign_fixture();
+    PlanetaryBody solid;
+    solid.id = 9;
+    solid.system_id = 1;
+    solid.environment.has_solid_surface = true;
+    campaign.bodies = {solid};
+    Colony outpost;
+    outpost.id = 31;
+    outpost.civilization_id = 1;
+    outpost.system_id = 1;
+    outpost.name = "Pit 7";
+    outpost.kind = SettlementKind::ResourceOutpost;
+    outpost.planetary_body_id = 9;
+    outpost.stored_extracted_materials = 40.0;
+    Colony home;
+    home.id = 30;
+    home.civilization_id = 1;
+    home.system_id = 1;
+    home.planetary_body_id = 9;
+    campaign.colonies = {home, outpost};
+    const auto colonies = build_owned_colony_rows(campaign);
+    const auto board = build_mission_board(campaign);
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{};
+
+    NativeMissionView panel;
+    panel.open();
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                           1600, 900, true);
+    native_map::InputEvent tab;
+    tab.type = native_map::InputEventType::LeftReleased;
+    tab.position = {layout.sites_tab.x + 4.f, layout.sites_tab.y + 4.f};
+    (void)panel.handle(tab, board, fleets, colonies, 1600, 900);
+
+    native_map::InputEvent collect;
+    collect.type = native_map::InputEventType::LeftReleased;
+    collect.position = {layout.colony_collect_buttons[1].x + 4.f,
+                        layout.colony_collect_buttons[1].y + 4.f};
+    const auto collect_command =
+        panel.handle(collect, board, fleets, colonies, 1600, 900);
+    check(collect_command.kind ==
+              MissionViewCommandKind::CollectOutpostFreight &&
+              collect_command.colony_id == 31,
+          "an outpost Collect button must issue CollectOutpostFreight");
+
+    // A non-outpost row has no clickable Collect affordance.
+    native_map::InputEvent collect_home;
+    collect_home.type = native_map::InputEventType::LeftReleased;
+    collect_home.position = {layout.colony_collect_buttons[0].x + 4.f,
+                             layout.colony_collect_buttons[0].y + 4.f};
+    const auto declined =
+        panel.handle(collect_home, board, fleets, colonies, 1600, 900);
+    check(declined.kind == MissionViewCommandKind::None && declined.captured,
+          "a non-outpost row must not issue a freight command");
+
+    native_map::InputEvent land;
+    land.type = native_map::InputEventType::LeftReleased;
+    land.position = {layout.colony_land_buttons[0].x + 4.f,
+                     layout.colony_land_buttons[0].y + 4.f};
+    const auto land_command =
+        panel.handle(land, board, fleets, colonies, 1600, 900);
+    check(land_command.kind == MissionViewCommandKind::LandColony &&
+              land_command.colony_id == 30,
+          "a solid-surface colony Land button must issue LandColony");
   }
   {
     // Sites tab interaction: tab switch, select-ship focus, colony View.
