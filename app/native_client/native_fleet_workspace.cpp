@@ -605,6 +605,23 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
              reconnaissance.held ? muted : own_color);
         stroke(out, bar, border_color);
       }
+    } else if (fleet->science_survey) {
+      const auto &survey = *fleet->science_survey;
+      if (survey.completed) {
+        route = "SCIENCE SURVEY\nSystem fully surveyed\nSelect a planet to review findings.";
+      } else {
+        route = "SCIENCE SURVEY\n" +
+                std::string(survey.held ? "Held; work paused\nFull survey "
+                                         : "Detailed local work\nFull survey ") +
+                number(survey.progress * 100., 1) + "%";
+        const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
+                             7.f * layout.scale,
+                         layout.route.width, 4.f * layout.scale};
+        fill(out, bar, row_color);
+        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(survey.progress),
+                   bar.height}, survey.held ? muted : own_color);
+        stroke(out, bar, border_color);
+      }
     } else {
       route = "ROUTE PREVIEW\nRight-click a system to preview travel.";
     }

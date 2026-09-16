@@ -151,7 +151,7 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
     result.name = system->name;
     result.guidance = level == SystemSurveyLevel::detected
         ? "Planet, resource, anomaly and civilization data remain unknown. Send a scout for reconnaissance or a science vessel for a detailed survey."
-        : "Reconnaissance is incomplete. A science vessel must finish the detailed survey before settlement-grade facts are available.";
+        : "Detailed survey is incomplete. A science vessel must finish its work before planetary measurements are confirmed.";
     return result;
   }
   result.name = system->name;

@@ -32,6 +32,7 @@ from native_colony_runtime import validate_native_colony_export
 from native_freight_runtime import validate_native_freight_export
 from native_fresh_progression_runtime import validate_native_fresh_progression_export
 from native_first_exploration_runtime import validate_native_first_exploration_export
+from native_first_survey_runtime import validate_native_first_survey_export
 from native_settlement_runtime import validate_native_settlement_export
 from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
@@ -506,6 +507,8 @@ def export(preset_name):
             smoke.update(validate_native_fresh_progression_export(output, env))
             smoke.update(validate_native_first_exploration_export(
                 output, env, Path(smoke["freshProgressionSaveCaptures"][0])))
+            smoke.update(validate_native_first_survey_export(
+                output, env, Path(smoke["firstExplorationSaveCaptures"][-1])))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_surface_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,

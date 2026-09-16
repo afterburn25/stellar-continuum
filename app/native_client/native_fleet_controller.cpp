@@ -125,6 +125,22 @@ scout_reconnaissance(const PlayerContext &player, const FleetState &fleet) {
       true, level >= SystemSurveyLevel::fully_surveyed};
 }
 
+[[nodiscard]] std::optional<NativeScienceSurveyStatus>
+science_survey(const PlayerContext &player, const FleetState &fleet) {
+  if (fleet.role != FleetRole::Science || !fleet.current_system_id ||
+      fleet.transit_phase != FleetTransitPhase::None ||
+      fleet.destination_system_id)
+    return std::nullopt;
+  const auto system_id = *fleet.current_system_id;
+  const auto level = player.world.knowledge.system_survey_level(
+      player.player_id, system_id);
+  return NativeScienceSurveyStatus{
+      std::clamp(player.world.knowledge.system_survey_progress(
+                     player.player_id, system_id),
+                 0., 1.),
+      fleet.hold_requested, level >= SystemSurveyLevel::fully_surveyed};
+}
+
 } // namespace
 
 void NativeFleetController::require_owner() const {
@@ -183,6 +199,7 @@ NativeFleetMapView NativeFleetController::build(
         status != status_by_id.end())
       item.combat_status = status->second;
     item.reconnaissance = scout_reconnaissance(player, fleet);
+    item.science_survey = science_survey(player, fleet);
     result.own_fleets.push_back(std::move(item));
   }
   std::ranges::sort(result.own_fleets, {}, &NativeOwnFleet::id);

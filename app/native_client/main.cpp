@@ -63,6 +63,7 @@
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/player_campaign_save.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/survey_operations.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <nlohmann/json.hpp>
 
@@ -259,6 +260,8 @@ struct Options {
   bool fresh_progression_smoke{},fresh_progression_reload_smoke{};
   enum class FirstExplorationMode { Depart, Paused, Resume };
   std::optional<FirstExplorationMode> first_exploration_mode;
+  enum class FirstSurveyMode { Depart, Paused, Resume };
+  std::optional<FirstSurveyMode> first_survey_mode;
   bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
@@ -318,6 +321,7 @@ struct Options {
     else if(arg==L"--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg==L"--fresh-progression-smoke"||arg==L"--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fresh_progression_smoke=arg==L"--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg==L"--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg==L"--first-exploration-smoke"||arg==L"--first-exploration-paused-smoke"||arg==L"--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_exploration_mode=arg==L"--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg==L"--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -363,6 +367,7 @@ struct Options {
     else if(arg=="--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg=="--fresh-progression-smoke"||arg=="--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.fresh_progression_smoke=arg=="--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg=="--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg=="--first-exploration-smoke"||arg=="--first-exploration-paused-smoke"||arg=="--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=argv[++i];result.first_exploration_mode=arg=="--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg=="--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -380,12 +385,14 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
   if(result.first_exploration_mode&&!result.load)throw std::invalid_argument("First exploration smoke requires --load with the earned first-ships save.");
   if(result.first_exploration_mode&&result.seed!=115501)throw std::invalid_argument("First exploration smoke requires --seed 115501.");
+  if(result.first_survey_mode&&!result.load)throw std::invalid_argument("First survey smoke requires --load with the completed scout save.");
+  if(result.first_survey_mode&&result.seed!=115501)throw std::invalid_argument("First survey smoke requires --seed 115501.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -3310,17 +3317,701 @@ class NativeCampaign final {
         << ",\"save_roundtrip\":" << first_exploration_roundtrip_ << '}';
     return out.str();
   }
-  void capture_surface_smoke_state(){
-    if(!smoke_surface_site_id_)return;
+  void prepare_first_survey_smoke(
+      int width, int height, Options::FirstSurveyMode mode,
+      const std::function<void()> &pump,
+      const std::function<void(std::string_view)> &capture) {
+    constexpr double step_days = 1. / 64.;
+    constexpr std::uint64_t maximum_steps = 256u * 64u;
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    auto &frame = session_->frame();
+    auto &world = frame.runtime().world().campaign();
+    first_survey_mode_ = mode;
+    first_survey_seen_phases_.clear();
+    first_survey_steps_ = 0;
+    first_survey_input_orders_ = 0;
+    first_survey_body_id_ = -1;
+    first_survey_preview_read_only_ = false;
+    first_survey_inspection_read_only_ = false;
+    first_survey_facts_visible_ = false;
+    first_survey_player_id_ = world.player_civilization_id;
+    const auto player = std::ranges::find(
+        world.civilizations, first_survey_player_id_, &Civilization::id);
+    if (player == world.civilizations.end())
+      throw std::runtime_error(
+          "First survey could not identify the player civilization.");
+    first_survey_origin_id_ = player->home_system_id;
+
+    std::vector<const FleetState *> owned;
+    for (const auto &fleet : world.fleets)
+      if (fleet.civilization_id == first_survey_player_id_)
+        owned.push_back(&fleet);
+    if (owned.size() != 2 ||
+        std::ranges::count_if(
+            owned, [](const FleetState *fleet) { return fleet->is_active; }) !=
+            2 ||
+        std::ranges::count_if(owned,
+                              [](const FleetState *fleet) {
+                                return fleet->design_id ==
+                                       std::optional<std::string>{"warp_scout"};
+                              }) != 1 ||
+        std::ranges::count_if(owned, [](const FleetState *fleet) {
+          return fleet->design_id ==
+                 std::optional<std::string>{"science_vessel"};
+        }) != 1)
+      throw std::runtime_error(
+          "First survey requires exactly the two active earned first ships.");
+    const auto science_source =
+        std::ranges::find_if(owned, [](const FleetState *fleet) {
+          return fleet->design_id ==
+                     std::optional<std::string>{"science_vessel"} &&
+                 fleet->role == FleetRole::Science;
+        });
+    const auto scout_source =
+        std::ranges::find_if(owned, [](const FleetState *fleet) {
+          return fleet->design_id == std::optional<std::string>{"warp_scout"} &&
+                 fleet->role == FleetRole::Scout;
+        });
+    if (science_source == owned.end() || scout_source == owned.end())
+      throw std::runtime_error("First survey could not identify the earned "
+                               "science vessel and scout.");
+    first_survey_fleet_id_ = (*science_source)->id;
+    first_survey_scout_id_ = (*scout_source)->id;
+    const auto live_science = [&]() -> FleetState & {
+      const auto found = std::ranges::find(world.fleets, first_survey_fleet_id_,
+                                           &FleetState::id);
+      if (found == world.fleets.end() || !found->is_active ||
+          found->civilization_id != first_survey_player_id_ ||
+          found->role != FleetRole::Science ||
+          found->design_id != std::optional<std::string>{"science_vessel"})
+        throw std::runtime_error(
+            "First survey lost the selected earned science vessel.");
+      return *found;
+    };
+    const auto live_scout = [&]() -> const FleetState & {
+      const auto found = std::ranges::find(world.fleets, first_survey_scout_id_,
+                                           &FleetState::id);
+      if (found == world.fleets.end() || !found->is_active ||
+          found->civilization_id != first_survey_player_id_ ||
+          found->role != FleetRole::Scout ||
+          found->design_id != std::optional<std::string>{"warp_scout"})
+        throw std::runtime_error("First survey lost the earned scout.");
+      return *found;
+    };
+    auto &initial_science = live_science();
+    const auto &initial_scout = live_scout();
+    first_survey_target_id_ = initial_scout.current_system_id.value_or(-1);
+    if (first_survey_target_id_ < 0 ||
+        first_survey_target_id_ == first_survey_origin_id_ ||
+        initial_scout.destination_system_id ||
+        initial_scout.transit_phase != FleetTransitPhase::None ||
+        initial_scout.reconnaissance_system_id != first_survey_target_id_ ||
+        initial_scout.reconnaissance_days_completed + 1e-9 <
+            ExplorationSimulation::scout_reconnaissance_days)
+      throw std::runtime_error(
+          "First survey requires the naturally completed scout at its target.");
+    if (mode == Options::FirstSurveyMode::Depart &&
+        (initial_science.current_system_id != first_survey_origin_id_ ||
+         initial_science.destination_system_id ||
+         initial_science.transit_phase != FleetTransitPhase::None))
+      throw std::runtime_error(
+          "First survey departure requires the idle science vessel at home.");
+    if (mode != Options::FirstSurveyMode::Depart &&
+        (initial_science.current_system_id != first_survey_target_id_ ||
+         initial_science.destination_system_id ||
+         initial_science.transit_phase != FleetTransitPhase::None))
+      throw std::runtime_error("First survey continuation requires the science "
+                               "vessel at the scout target.");
+
+    first_survey_lane_connected_ = std::ranges::any_of(
+        frame.runtime().world().lanes().build(),
+        [&](const InterstellarLane &lane) {
+          return lane.connects(first_survey_origin_id_) &&
+                 lane.other(first_survey_origin_id_) == first_survey_target_id_;
+        });
+    if (!first_survey_lane_connected_)
+      throw std::runtime_error(
+          "First survey target is not the direct home-system neighbor.");
+    const auto operations = SurveyOperationsProfiler{}.build(
+        world.systems, world.bodies, first_survey_target_id_);
+    if (operations.system_id != first_survey_target_id_ ||
+        operations.estimated_science_survey_days <
+            SurveyOperationsProfiler::minimum_survey_days ||
+        operations.estimated_science_survey_days >
+            SurveyOperationsProfiler::maximum_survey_days ||
+        operations.progress_per_day() <= 0.)
+      throw std::runtime_error(
+          "First survey target lacks a canonical operations profile.");
+
+    const PlayerCampaignCaptureOptions before_capture{
+        frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+        "2044-05-06T07:08:15Z"};
+    const auto captured = [&](const PlayerCampaignCaptureOptions &options) {
+      return encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(frame.runtime(), options)
+              .payload());
+    };
+    const auto fleet_object = [&](std::string_view payload, int fleet_id) {
+      const auto parsed = nlohmann::json::parse(payload);
+      const auto &fleets = parsed.at("Galaxy").at("Fleets");
+      const auto found =
+          std::ranges::find_if(fleets, [&](const nlohmann::json &fleet) {
+            return fleet.at("Id").get<int>() == fleet_id;
+          });
+      if (found == fleets.end())
+        throw std::runtime_error(
+            "First survey could not capture its invariant scout.");
+      return *found;
+    };
+    const auto before_selection = captured(before_capture);
+    const auto scout_before =
+        fleet_object(before_selection, first_survey_scout_id_);
+    const auto route = [&](std::vector<InputEvent> events) {
+      InputSnapshot input;
+      input.drawable_width = width;
+      input.drawable_height = height;
+      input.pointer = events.empty() ? Point{} : events.back().position;
+      input.events = std::move(events);
+      if (!update(input, width, height, 0., false))
+        throw std::runtime_error("First survey UI input closed the campaign.");
+    };
+    const auto click = [&](Point point, InputEventType pressed =
+                                            InputEventType::LeftPressed) {
+      route({{pressed, point},
+             {pressed == InputEventType::LeftPressed
+                  ? InputEventType::LeftReleased
+                  : InputEventType::RightReleased,
+              point}});
+    };
+    refresh_fleets(true);
+    if (!fleet_workspace_.view())
+      throw std::runtime_error(
+          "First survey did not receive its owned fleet view.");
+    const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+    const auto science_row =
+        std::ranges::find(fleet_workspace_.view()->own_fleets,
+                          first_survey_fleet_id_, &NativeOwnFleet::id);
+    if (science_row == fleet_workspace_.view()->own_fleets.end())
+      throw std::runtime_error(
+          "First survey science vessel was absent from the outliner.");
+    const auto science_index = static_cast<std::size_t>(
+        science_row - fleet_workspace_.view()->own_fleets.begin());
+    const auto select_science = [&] {
+      click({layout.list.x + 12.f * layout.scale,
+             layout.list.y + (static_cast<float>(science_index) * 45.f + 20.f) *
+                                 layout.scale});
+    };
+    select_science();
+    first_survey_selected_ =
+        fleet_controller_.selection() == first_survey_fleet_id_;
+    first_survey_selection_read_only_ =
+        captured(before_capture) == before_selection;
+    if (!first_survey_selected_ || !first_survey_selection_read_only_)
+      throw std::runtime_error(
+          "First survey outliner selection was rejected or changed Player17.");
+
+    click(center(layout.civilian_locate));
+    if (!last_fleet_command_accepted_)
+      throw std::runtime_error("First survey Locate input was rejected.");
+    Point zoom_anchor{static_cast<float>(width) * .5f,
+                      static_cast<float>(height) * .5f};
+    const auto before_zoom = camera_.pixels_per_world;
+    for (int index = 0; index < 96 && camera_.pixels_per_world < 70.; ++index)
+      route({{InputEventType::Wheel, zoom_anchor, {}, 1.f}});
+    if (camera_.pixels_per_world <= before_zoom ||
+        camera_.pixels_per_world < 70. || system_workspace_.visible())
+      throw std::runtime_error(
+          "First survey map zoom remained captured after Locate.");
+    const Point drag_start{static_cast<float>(width) * .34f,
+                           static_cast<float>(height) * .72f};
+    const Point drag_delta{40.f, -24.f};
+    const Point drag_end{drag_start.x + drag_delta.x,
+                         drag_start.y + drag_delta.y};
+    route({{InputEventType::LeftPressed, drag_start},
+           {InputEventType::PointerMove, drag_end, drag_delta},
+           {InputEventType::LeftReleased, drag_end}});
+
+    first_survey_before_days_ = frame.clock().simulation_days();
+    first_survey_revision_before_ = initial_science.mission_order_revision;
+    first_survey_phase_before_ = initial_science.transit_phase;
+    first_survey_survey_before_ =
+        static_cast<int>(world.knowledge.system_survey_level(
+            first_survey_player_id_, first_survey_target_id_));
+    first_survey_survey_progress_before_ =
+        world.knowledge.system_survey_progress(first_survey_player_id_,
+                                               first_survey_target_id_);
+    first_survey_transit_progress_before_ = initial_science.transit_progress;
+    if (first_survey_survey_before_ <
+            static_cast<int>(SystemSurveyLevel::partially_surveyed) ||
+        first_survey_survey_progress_before_ + 1e-9 <
+            ExplorationSimulation::scout_reconnaissance_progress)
+      throw std::runtime_error(
+          "First survey source lacks the natural scout reconnaissance.");
+    if (mode == Options::FirstSurveyMode::Depart &&
+        (first_survey_survey_before_ !=
+             static_cast<int>(SystemSurveyLevel::partially_surveyed) ||
+         std::abs(first_survey_survey_progress_before_ -
+                  ExplorationSimulation::scout_reconnaissance_progress) > 1e-9))
+      throw std::runtime_error("First survey departure requires the untouched "
+                               "partial scout survey.");
+    if (mode == Options::FirstSurveyMode::Resume &&
+        (first_survey_survey_before_ !=
+             static_cast<int>(SystemSurveyLevel::partially_surveyed) ||
+         first_survey_survey_progress_before_ <=
+             ExplorationSimulation::scout_reconnaissance_progress ||
+         first_survey_survey_progress_before_ >= 1.))
+      throw std::runtime_error(
+          "First survey resume requires the saved ongoing science survey.");
+
+    const auto observe_phase = [&] {
+      const auto value = static_cast<int>(live_science().transit_phase);
+      if (std::ranges::find(first_survey_seen_phases_, value) ==
+          first_survey_seen_phases_.end())
+        first_survey_seen_phases_.push_back(value);
+    };
+    observe_phase();
+    const auto ui = NativeUiLayout::for_viewport(width, height);
+    const auto pause = [&] {
+      if (frame.clock().speed() != StrategicSpeed::Paused)
+        click(center(ui.pause));
+      if (frame.clock().speed() != StrategicSpeed::Paused)
+        throw std::runtime_error("First survey pause input was rejected.");
+    };
+    const auto resume_normal = [&] {
+      if (frame.clock().speed() == StrategicSpeed::Paused)
+        click(center(ui.pause));
+      if (frame.clock().speed() != StrategicSpeed::Normal)
+        route({{InputEventType::KeyPressed, {}, {}, 0.f, {}, 0, '1'}});
+      if (frame.clock().speed() != StrategicSpeed::Normal ||
+          frame.clock().effective_multiplier() != 1.)
+        throw std::runtime_error(
+            "First survey requires the ordinary Normal clock.");
+    };
+    const auto capture_phase = [&](std::string_view tag) {
+      pause();
+      refresh_fleets(true);
+      refresh_system_travel(true);
+      for (int frame_index = 0; frame_index < 4; ++frame_index)
+        pump();
+      capture(tag);
+      resume_normal();
+    };
+    const auto step = [&] {
+      if (std::chrono::steady_clock::now() > deadline)
+        throw std::runtime_error(
+            "First survey exceeded its 300-second wall bound.");
+      if (first_survey_steps_ >= maximum_steps)
+        throw std::runtime_error(
+            "First survey exceeded its 256-day step bound.");
+      if (frame.clock().speed() != StrategicSpeed::Normal ||
+          frame.clock().backlog_days() != 0.)
+        throw std::runtime_error(
+            "First survey left Normal speed or accumulated backlog.");
+      const auto before = frame.clock().simulation_days();
+      const auto result = frame.advance(step_days);
+      const auto after = frame.clock().simulation_days();
+      if (result.route != CampaignFrameRoute::Strategic ||
+          result.completed_substeps.size() != 1 ||
+          result.completed_substeps.front() != step_days ||
+          after - before != step_days || frame.clock().backlog_days() != 0.)
+        throw std::runtime_error(
+            "First survey left exact single-frame 1/64-day stepping.");
+      publish_feedback(result);
+      ++first_survey_steps_;
+      observe_phase();
+      if (first_survey_steps_ % 64 == 0) {
+        refresh_fleets(true);
+        refresh_system_travel(true);
+        pump();
+      }
+    };
+
+    const auto target = std::ranges::find(
+        world.systems, first_survey_target_id_, &StellarSystem::id);
+    if (target == world.systems.end())
+      throw std::runtime_error("First survey target disappeared.");
+    const auto target_point = [&] {
+      return camera_.project({target->position.x, target->position.y}, width,
+                             height);
+    };
+    if (mode == Options::FirstSurveyMode::Depart) {
+      const auto preview_before = captured(before_capture);
+      const auto point = target_point();
+      if (layout.panel.contains(point) || point.x < 0.f || point.y < 0.f ||
+          point.x >= width || point.y >= height)
+        throw std::runtime_error(
+            "First survey camera input did not expose the destination.");
+      click(point, InputEventType::RightPressed);
+      const auto &preview = fleet_workspace_.preview();
+      first_survey_preview_read_only_ =
+          captured(before_capture) == preview_before;
+      if (!preview || preview->fleet_id != first_survey_fleet_id_ ||
+          preview->target_system_id != first_survey_target_id_ ||
+          preview->expected_mission_order_revision !=
+              first_survey_revision_before_ ||
+          !preview->command_available || !preview->route_supported ||
+          !preview->route_authoritative ||
+          preview->route_system_ids !=
+              std::vector<int>{first_survey_origin_id_,
+                               first_survey_target_id_} ||
+          !first_survey_preview_read_only_)
+        throw std::runtime_error(
+            "First survey right-click preview lost identity or authority.");
+      click(center(layout.confirm));
+      ++first_survey_input_orders_;
+      if (!last_fleet_command_accepted_ ||
+          live_science().mission_order_revision !=
+              first_survey_revision_before_ + 1 ||
+          live_science().destination_system_id != first_survey_target_id_ ||
+          live_science().transit_phase != FleetTransitPhase::None)
+        throw std::runtime_error(
+            "First survey confirmation did not create only the pending route.");
+      resume_normal();
+      while (live_science().transit_phase == FleetTransitPhase::None)
+        step();
+      if (live_science().transit_phase != FleetTransitPhase::LocalDeparture)
+        throw std::runtime_error(
+            "First survey did not observe timed local departure.");
+      capture_phase("departure");
+      while (live_science().transit_phase != FleetTransitPhase::None ||
+             live_science().destination_system_id ||
+             live_science().current_system_id != first_survey_target_id_)
+        step();
+      const auto arrival_progress = world.knowledge.system_survey_progress(
+          first_survey_player_id_, first_survey_target_id_);
+      step();
+      const auto ongoing_progress = world.knowledge.system_survey_progress(
+          first_survey_player_id_, first_survey_target_id_);
+      if (ongoing_progress <= arrival_progress ||
+          ongoing_progress <=
+              ExplorationSimulation::scout_reconnaissance_progress ||
+          ongoing_progress >= 1. ||
+          world.knowledge.system_survey_level(first_survey_player_id_,
+                                              first_survey_target_id_) !=
+              SystemSurveyLevel::partially_surveyed)
+        throw std::runtime_error(
+            "First survey did not stop during the natural local survey.");
+    } else if (mode == Options::FirstSurveyMode::Resume) {
+      using stellar::native_campaign_feedback::FeedbackKind;
+      const auto feedback_before =
+          feedback_.counts().count(FeedbackKind::SurveyComplete);
+      resume_normal();
+      while (world.knowledge.system_survey_level(first_survey_player_id_,
+                                                 first_survey_target_id_) !=
+                 SystemSurveyLevel::fully_surveyed ||
+             world.knowledge.system_survey_progress(
+                 first_survey_player_id_, first_survey_target_id_) < 1.)
+        step();
+      const auto feedback_after =
+          feedback_.counts().count(FeedbackKind::SurveyComplete);
+      const auto recent = feedback_.recent();
+      if (feedback_after != feedback_before + 1 ||
+          std::ranges::find(recent, FeedbackKind::SurveyComplete,
+                            &stellar::native_campaign_feedback::
+                                CampaignFeedbackNotice::kind) == recent.end())
+        throw std::runtime_error(
+            "First survey completion did not reach normal campaign feedback.");
+    }
+
+    pause();
+    const PlayerCampaignCaptureOptions inspection_capture{
+        frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+        "2044-05-06T07:08:15Z"};
+    const auto before_inspection = captured(inspection_capture);
+    refresh_fleets(true);
+    select_science();
+    click(center(layout.civilian_locate));
+    const auto point = target_point();
+    route({{InputEventType::LeftPressed, point, {}, 0.f, {}, 2},
+           {InputEventType::LeftReleased, point}});
+    if (!system_workspace_.visible() ||
+        system_workspace_.system_id() != first_survey_target_id_ ||
+        !system_workspace_.snapshot() || !system_workspace_.viewport())
+      throw std::runtime_error(
+          "First survey could not enter the target through UI input.");
+    const auto spatial = project_system(*system_workspace_.snapshot());
+    const auto system_layout =
+        SystemWorkspaceLayout::for_viewport(width, height);
+    std::vector<int> planet_ids;
+    for (const auto &body : system_workspace_.snapshot()->bodies)
+      if (body.kind == PlanetaryBodyKind::Planet)
+        planet_ids.push_back(body.id);
+    std::ranges::sort(planet_ids);
+    if (planet_ids.empty())
+      throw std::runtime_error(
+          "First survey target has no real non-moon planet.");
+    first_survey_body_id_ = planet_ids.front();
+    const auto marker = std::ranges::find(spatial.bodies, first_survey_body_id_,
+                                          &SystemSpatialBodyMarker::body_id);
+    if (marker == spatial.bodies.end())
+      throw std::runtime_error(
+          "First survey target planet is absent from the spatial snapshot.");
+    const auto screen = system_workspace_.viewport()->world_to_screen(
+        marker->offset_x, marker->offset_y);
+    const Point body_point{screen.x, screen.y};
+    if (!system_layout.world_field.contains(body_point) ||
+        system_workspace_.viewport()->hit_body(spatial, screen.x, screen.y) !=
+            first_survey_body_id_)
+      throw std::runtime_error(
+          "First survey target planet is not independently hittable.");
+    click(body_point);
+    if (system_workspace_.selected_body_id() != first_survey_body_id_)
+      throw std::runtime_error(
+          "First survey could not select the target planet through UI input.");
+    const auto inspection = build_body_inspection(*system_workspace_.snapshot(),
+                                                  first_survey_body_id_);
+    if (!inspection)
+      throw std::runtime_error(
+          "First survey selected planet has no observer-safe inspection.");
+    const auto physical = std::ranges::find(
+        inspection->sections, std::string{"Physical"}, &BodySection::heading);
+    const auto environment =
+        std::ranges::find(inspection->sections, std::string{"Environment"},
+                          &BodySection::heading);
+    const bool fully_surveyed = system_workspace_.snapshot()->survey_level ==
+                                SystemSurveyLevel::fully_surveyed;
+    first_survey_facts_visible_ =
+        inspection->confirmed && physical != inspection->sections.end() &&
+        environment != inspection->sections.end() && !physical->facts.empty() &&
+        !environment->facts.empty() &&
+        std::ranges::none_of(
+            physical->facts,
+            [](const BodyFact &fact) { return fact.value == "Unconfirmed"; }) &&
+        std::ranges::none_of(environment->facts, [](const BodyFact &fact) {
+          return fact.value == "Unconfirmed";
+        });
+    const bool partial_facts_private =
+        !inspection->confirmed && physical != inspection->sections.end() &&
+        environment != inspection->sections.end() &&
+        std::ranges::all_of(physical->facts,
+                            [](const BodyFact &fact) {
+                              // Reconnaissance identifies the broad body type;
+                              // measured physical values remain hidden until
+                              // the science survey completes.
+                              return fact.label == "Type" ||
+                                     fact.value == "Unconfirmed";
+                            }) &&
+        std::ranges::all_of(environment->facts, [](const BodyFact &fact) {
+          return fact.value == "Unconfirmed";
+        });
+    if (first_survey_facts_visible_ != fully_surveyed)
+      throw std::runtime_error(
+          "First survey body facts did not match canonical survey knowledge.");
+    if (!fully_surveyed && !partial_facts_private)
+      throw std::runtime_error("First survey body inspection leaked "
+                               "measurements before full survey.");
+    route({{InputEventType::Wheel, center(system_layout.inspector), {}, -1.f},
+           {InputEventType::Wheel, center(system_layout.inspector), {}, -1.f}});
+    for (int frame_index = 0; frame_index < 4; ++frame_index)
+      pump();
+    first_survey_inspection_read_only_ =
+        captured(inspection_capture) == before_inspection;
+    if (!first_survey_inspection_read_only_)
+      throw std::runtime_error(
+          "First survey body inspection changed the full Player17 payload.");
+    if (mode == Options::FirstSurveyMode::Resume) {
+      for (int input_count = 0;
+           system_workspace_.inspection_scroll() > 0.f && input_count < 128;
+           ++input_count)
+        route({{InputEventType::Wheel,
+                center(system_layout.inspector),
+                {},
+                1.f}});
+      if (system_workspace_.inspection_scroll() != 0.f)
+        throw std::runtime_error("First survey could not return the completed "
+                                 "facts to the Physical heading.");
+      std::uint32_t artwork_frames{};
+      while (!artwork_ready()) {
+        if (std::chrono::steady_clock::now() > deadline ||
+            ++artwork_frames > 600)
+          throw std::runtime_error("First survey system imagery did not become "
+                                   "ready before capture.");
+        pump();
+      }
+      first_survey_inspection_read_only_ =
+          first_survey_inspection_read_only_ &&
+          captured(inspection_capture) == before_inspection;
+      if (!first_survey_inspection_read_only_)
+        throw std::runtime_error(
+            "First survey inspection reset changed the full Player17 payload.");
+      capture("inspection");
+    }
+    if (mode != Options::FirstSurveyMode::Paused) {
+      click(center(system_layout.back));
+      refresh_fleets(true);
+      select_science();
+      pause();
+    }
+
+    first_survey_after_days_ = frame.clock().simulation_days();
+    first_survey_revision_after_ = live_science().mission_order_revision;
+    first_survey_phase_after_ = live_science().transit_phase;
+    first_survey_survey_after_ =
+        static_cast<int>(world.knowledge.system_survey_level(
+            first_survey_player_id_, first_survey_target_id_));
+    first_survey_survey_progress_after_ =
+        world.knowledge.system_survey_progress(first_survey_player_id_,
+                                               first_survey_target_id_);
+    first_survey_transit_progress_after_ = live_science().transit_progress;
+    if (first_survey_after_days_ !=
+            first_survey_before_days_ +
+                static_cast<double>(first_survey_steps_) * step_days ||
+        frame.clock().backlog_days() != 0.)
+      throw std::runtime_error(
+          "First survey final time did not match its exact step count.");
+    if (fleet_controller_.selection() != first_survey_fleet_id_)
+      throw std::runtime_error(
+          "First survey lost the science-vessel selection.");
+    if (mode == Options::FirstSurveyMode::Depart &&
+        (first_survey_revision_after_ != first_survey_revision_before_ + 1 ||
+         first_survey_phase_after_ != FleetTransitPhase::None ||
+         first_survey_survey_after_ !=
+             static_cast<int>(SystemSurveyLevel::partially_surveyed) ||
+         first_survey_survey_progress_after_ <=
+             first_survey_survey_progress_before_ ||
+         first_survey_survey_progress_after_ >= 1. ||
+         first_survey_seen_phases_ != std::vector<int>{0, 1, 2, 3}))
+      throw std::runtime_error(
+          "First survey departure evidence is not an ongoing local survey.");
+    if (mode != Options::FirstSurveyMode::Depart &&
+        first_survey_revision_after_ != first_survey_revision_before_)
+      throw std::runtime_error(
+          "First survey continuation changed the persisted mission revision.");
+    if (mode == Options::FirstSurveyMode::Paused &&
+        (first_survey_steps_ != 0 || first_survey_input_orders_ != 0 ||
+         first_survey_after_days_ != first_survey_before_days_ ||
+         captured(inspection_capture) != before_inspection))
+      throw std::runtime_error(
+          "First survey paused mode advanced, ordered or changed Player17.");
+    if (mode == Options::FirstSurveyMode::Resume &&
+        (first_survey_phase_after_ != FleetTransitPhase::None ||
+         first_survey_survey_after_ !=
+             static_cast<int>(SystemSurveyLevel::fully_surveyed) ||
+         first_survey_survey_progress_after_ != 1. ||
+         first_survey_seen_phases_ != std::vector<int>{0} ||
+         !first_survey_facts_visible_))
+      throw std::runtime_error(
+          "First survey resume did not finish the natural science survey.");
+    if (mode == Options::FirstSurveyMode::Depart && first_survey_facts_visible_)
+      throw std::runtime_error(
+          "First survey exposed confirmed facts before full survey.");
+
+    pause();
+    const PlayerCampaignCaptureOptions final_capture{
+        frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+        "2044-05-06T07:08:15Z"};
+    const auto bytes = captured(final_capture);
+    if (fleet_object(bytes, first_survey_scout_id_) != scout_before)
+      throw std::runtime_error(
+          "First survey changed the completed scout fleet object.");
+    auto restored = restore_player_campaign_v17_json(
+        load_adaptive_research_strategic_runtime(asset_root_ /
+                                                 "Data/research/v1"),
+        bytes);
+    if (restored.simulation_days() != final_capture.simulation_days)
+      throw std::runtime_error(
+          "First survey Player17 restore changed the clock.");
+    auto resumed = std::move(restored).activate();
+    const auto recaptured = encode_player_campaign_v17_json(
+        PreparedPlayerCampaignSave::capture(resumed, final_capture).payload());
+    const auto first = nlohmann::json::parse(bytes);
+    const auto second = nlohmann::json::parse(recaptured);
+    if (first != second)
+      throw std::runtime_error(
+          "First survey Player17 roundtrip changed the campaign: " +
+          nlohmann::json::diff(first, second).dump().substr(0, 4000));
+    first_survey_roundtrip_ = true;
+    InputSnapshot ready;
+    ready.drawable_width = width;
+    ready.drawable_height = height;
+    if (!update(ready, width, height, 0., true))
+      throw std::runtime_error(
+          "First survey could not establish its save boundary.");
+    session_->request_save();
+  }
+  [[nodiscard]] std::string first_survey_smoke_status() const {
+    const auto mode =
+        first_survey_mode_ == Options::FirstSurveyMode::Depart   ? "depart"
+        : first_survey_mode_ == Options::FirstSurveyMode::Paused ? "paused"
+                                                                 : "resume";
+    std::ostringstream out;
+    out << std::setprecision(std::numeric_limits<double>::max_digits10)
+        << std::boolalpha << "{\"mode\":\"" << mode
+        << "\",\"seed\":115501,\"player_id\":" << first_survey_player_id_
+        << ",\"fleet_id\":" << first_survey_fleet_id_
+        << ",\"scout_id\":" << first_survey_scout_id_
+        << ",\"body_id\":" << first_survey_body_id_
+        << ",\"origin_id\":" << first_survey_origin_id_
+        << ",\"target_id\":" << first_survey_target_id_
+        << ",\"before_days\":" << first_survey_before_days_
+        << ",\"after_days\":" << first_survey_after_days_
+        << ",\"input_orders\":" << first_survey_input_orders_
+        << ",\"steps\":" << first_survey_steps_
+        << ",\"step_days\":" << (1. / 64.)
+        << ",\"revision_before\":" << first_survey_revision_before_
+        << ",\"revision_after\":" << first_survey_revision_after_
+        << ",\"phase_before\":" << static_cast<int>(first_survey_phase_before_)
+        << ",\"phase_after\":" << static_cast<int>(first_survey_phase_after_)
+        << ",\"survey_before\":" << first_survey_survey_before_
+        << ",\"survey_after\":" << first_survey_survey_after_
+        << ",\"survey_progress_before\":"
+        << first_survey_survey_progress_before_
+        << ",\"survey_progress_after\":" << first_survey_survey_progress_after_
+        << ",\"transit_progress_before\":"
+        << first_survey_transit_progress_before_
+        << ",\"transit_progress_after\":"
+        << first_survey_transit_progress_after_ << ",\"seen_phases\":[";
+    for (std::size_t index = 0; index < first_survey_seen_phases_.size();
+         ++index) {
+      if (index)
+        out << ',';
+      out << first_survey_seen_phases_[index];
+    }
+    out << "],\"selected\":" << first_survey_selected_
+        << ",\"selection_read_only\":" << first_survey_selection_read_only_
+        << ",\"preview_read_only\":" << first_survey_preview_read_only_
+        << ",\"lane_connected\":" << first_survey_lane_connected_
+        << ",\"inspection_read_only\":" << first_survey_inspection_read_only_
+        << ",\"facts_visible\":" << first_survey_facts_visible_
+        << ",\"paused\":"
+        << (session_->frame().clock().speed() == StrategicSpeed::Paused)
+        << ",\"save_roundtrip\":" << first_survey_roundtrip_ << '}';
+    return out.str();
+  }
+  void capture_surface_smoke_state() {
+    if (!smoke_surface_site_id_)
+      return;
     session_->frame().clock().set_speed(StrategicSpeed::Paused);
     refresh_surface(true);
-    if(!surface_workspace_.view())throw std::runtime_error("Surface smoke lost its observer-safe colony view before save.");
-    const auto&view=*surface_workspace_.view();
-    const auto site=std::ranges::find(view.construction_sites,*smoke_surface_site_id_,&NativeSurfaceSite::building_id);
-    if(site==view.construction_sites.end()||site->complete)throw std::runtime_error("Surface smoke lost its unfinished canonical site before save.");
-    smoke_surface_x_=site->x;smoke_surface_z_=site->z;smoke_surface_rotation_=site->rotation_degrees;smoke_surface_progress_=site->industry_progress;smoke_surface_site_count_saved_=view.construction_sites.size();smoke_surface_treasury_saved_=view.treasury_budget_units;smoke_surface_saved_day_=session_->frame().clock().simulation_days();smoke_surface_persisted_site_=true;
+    if (!surface_workspace_.view())
+      throw std::runtime_error(
+          "Surface smoke lost its observer-safe colony view before save.");
+    const auto &view = *surface_workspace_.view();
+    const auto site =
+        std::ranges::find(view.construction_sites, *smoke_surface_site_id_,
+                          &NativeSurfaceSite::building_id);
+    if (site == view.construction_sites.end() || site->complete)
+      throw std::runtime_error(
+          "Surface smoke lost its unfinished canonical site before save.");
+    smoke_surface_x_ = site->x;
+    smoke_surface_z_ = site->z;
+    smoke_surface_rotation_ = site->rotation_degrees;
+    smoke_surface_progress_ = site->industry_progress;
+    smoke_surface_site_count_saved_ = view.construction_sites.size();
+    smoke_surface_treasury_saved_ = view.treasury_budget_units;
+    smoke_surface_saved_day_ = session_->frame().clock().simulation_days();
+    smoke_surface_persisted_site_ = true;
   }
-  void request_smoke_save(){if(smoke_settlement_mode_){session_->frame().clock().set_speed(StrategicSpeed::Paused);capture_settlement_smoke_state();}if(smoke_surface_mode_)capture_surface_smoke_state();session_->request_save();}
+  void request_smoke_save() {
+    if (smoke_settlement_mode_) {
+      session_->frame().clock().set_speed(StrategicSpeed::Paused);
+      capture_settlement_smoke_state();
+    }
+    if (smoke_surface_mode_)
+      capture_surface_smoke_state();
+    session_->request_save();
+  }
   [[nodiscard]] double campaign_profile_days()const{return session_->frame().clock().simulation_days();}
   [[nodiscard]] StrategicSpeed campaign_profile_speed()const{return session_->frame().clock().speed();}
   [[nodiscard]] SessionNoticeKind campaign_profile_notice()const{return session_->notice().kind;}
@@ -5349,6 +6040,14 @@ class NativeCampaign final {
   double first_exploration_before_days_{},first_exploration_after_days_{},first_exploration_survey_progress_before_{},first_exploration_survey_progress_after_{},first_exploration_transit_progress_before_{},first_exploration_transit_progress_after_{};
   std::vector<int> first_exploration_seen_phases_;
   bool first_exploration_selected_{},first_exploration_selection_read_only_{},first_exploration_preview_read_only_{},first_exploration_lane_connected_{},first_exploration_roundtrip_{};
+  Options::FirstSurveyMode first_survey_mode_{Options::FirstSurveyMode::Depart};
+  int first_survey_player_id_{-1},first_survey_fleet_id_{-1},first_survey_scout_id_{-1},first_survey_body_id_{-1},first_survey_origin_id_{-1},first_survey_target_id_{-1};
+  int first_survey_input_orders_{},first_survey_revision_before_{},first_survey_revision_after_{},first_survey_survey_before_{},first_survey_survey_after_{};
+  std::uint64_t first_survey_steps_{};
+  FleetTransitPhase first_survey_phase_before_{FleetTransitPhase::None},first_survey_phase_after_{FleetTransitPhase::None};
+  double first_survey_before_days_{},first_survey_after_days_{},first_survey_survey_progress_before_{},first_survey_survey_progress_after_{},first_survey_transit_progress_before_{},first_survey_transit_progress_after_{};
+  std::vector<int> first_survey_seen_phases_;
+  bool first_survey_selected_{},first_survey_selection_read_only_{},first_survey_preview_read_only_{},first_survey_lane_connected_{},first_survey_inspection_read_only_{},first_survey_facts_visible_{},first_survey_roundtrip_{};
   std::optional<std::string> smoke_research_node_;
   int smoke_navigation_switches_{};
   double smoke_navigation_credits_before_{},smoke_navigation_credits_after_{};
@@ -5555,6 +6254,12 @@ int main(int argc,char **argv){
             *options.first_exploration_mode,
             [&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("First exploration window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
             [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="departure"?L"-departure":L"-arrival"));});
+      else if(options.first_survey_mode)
+        campaign.prepare_first_survey_smoke(
+            window.drawable_width(),window.drawable_height(),
+            *options.first_survey_mode,
+            [&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("First survey window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
+            [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="departure"?L"-departure":L"-inspection"));});
       else if(options.fresh_progression_smoke||options.fresh_progression_reload_smoke)
         campaign.prepare_fresh_progression_smoke(window.drawable_width(),window.drawable_height(),options.fresh_progression_reload_smoke,[&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("Fresh progression window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));});
       else
@@ -5914,6 +6619,8 @@ int main(int argc,char **argv){
           std::cout<<"fresh_progression="<<campaign.fresh_progression_smoke_status()<<'\n';
         if(options.first_exploration_mode)
           std::cout<<"first_exploration="<<campaign.first_exploration_smoke_status()<<'\n';
+        if(options.first_survey_mode)
+          std::cout<<"first_survey="<<campaign.first_survey_smoke_status()<<'\n';
         std::ranges::sort(frame_ms);
         const auto total=std::accumulate(frame_ms.begin(),frame_ms.end(),0.);
         const auto p95=frame_ms[static_cast<std::size_t>(

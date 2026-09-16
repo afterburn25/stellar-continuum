@@ -1,5 +1,36 @@
 # Stellar Engine migration status
 
+### First earned science survey
+
+The paid science vessel now has local survey progress, Hold and completion
+feedback. The system card correctly distinguishes completed reconnaissance from
+an unfinished detailed survey. The native replay continues the earned scout save:
+one actual UI travel order, departure/warp/arrival, partial survey, paused reload,
+completion and another paused reload. Core, C#, Player17 and approved art remain
+unchanged. Planet readings stay Unconfirmed until full survey; selection and
+scrolling are read-only. Completion uses normal notification/voice dispatch.
+
+Sol-to-Proxima science vessel 1 advances day 6572.359375 to 6574.84375 in 159
+exact 1/64-day steps, then finishes at 6587.15625 in 788 further steps. Revision
+0→1 changes only once; scout 0 remains unchanged. Both paused reloads preserve
+the complete Player17 payload except SavedAtUtc. Six inspected images and four
+distinct saves are retained. The inspector sidecar now waits for artwork readiness.
+
+Final MSVC build passes; 10 affected CTests pass (seven rerun after the last UI
+changes); Python 552 checks, 535 pass/17 optional skips. Relocated four-process
+survey and navigation/fleet/system/earned-scout graphical regressions pass.
+Three malformed command lines fail cleanly. Evidence: work/native-first-survey-*
+logs and JSON. Contract: `NATIVE_FIRST_SURVEY_UI.md`.
+PR332 stays unmerged; the local package is UNSEALED, not a release download.
+Shared base/Devin remain ac45d958/b023e384.
+
+Next: turn confirmed survey findings into the first earned settlement decision
+and ship/facility preparation, exposing actual costs and blockers. Continue from
+work/native-audio-validation/package-first-survey-paused-full.player17.json;
+never grant prerequisites or silently rebalance Core. Native system artwork,
+readable map scale and broader visual finish remain open; these captures prove
+the gameplay path, not final graphics or sustained 60 FPS.
+
 First earned scout exploration checkpoint (2026-09-16):
 
 The fresh seed-115501 scout now receives its first direct Sol-to-Proxima order

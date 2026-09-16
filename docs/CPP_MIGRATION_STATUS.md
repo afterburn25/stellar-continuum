@@ -16,36 +16,36 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
-### First earned scout exploration
+### First earned science survey
 
-The fresh seed-115501 scout now receives its first direct Sol-to-Proxima order
-through native outliner selection, Locate, map zoom/drag, right-click preview and
-Confirm. Core starts departure on the next step; acceptance alone is not motion.
-The replay observes departure, partial warp, local arrival and automatic two-work-
-day reconnaissance. The only order raises mission revision 0 to 1; resuming
-never reissues it. Day 6568.5 reaches partial warp at 6569.34375 (54 exact 1/64-day
-steps), then reconnaissance completes at 6572.359375 (193 further steps), with
-survey knowledge advancing from detected/0 to partial/0.35.
+The paid science vessel now has local survey progress, Hold and completion
+feedback. The system card correctly distinguishes completed reconnaissance from
+an unfinished detailed survey. The native replay continues the earned scout save:
+one actual UI travel order, departure/warp/arrival, partial survey, paused reload,
+completion and another paused reload. Core, C#, Player17 and approved art remain
+unchanged. Planet readings stay Unconfirmed until full survey; selection and
+scrolling are read-only. Completion uses normal notification/voice dispatch.
 
-Owned scout feedback now shows local work, Hold status, completion and the next
-science-survey decision. Review found that a consumed fleet-button release left
-the map gesture captured: releasing the UI gesture now restores immediate wheel
-zoom after Locate. The replay asserts real zoom and exact scout selection.
-Validation: final MSVC build; 8 affected CTests; Python 532 checks (515 pass,
-17 optional executable skips). The relocated four-process Vulkan journey passes
-at 720p/1080p, preserving the complete Player17 payload across both paused reloads
-except SavedAtUtc. Six exact-dimension captures and four distinct saves are
-retained; departure, arrival and completed scout feedback were inspected. Existing
-navigation, fleet, local-system travel and fresh first-ships graphical regressions
-pass. Missing load, wrong seed and conflicting modes exit nonzero in the terminal.
-Evidence: work/native-first-exploration-{build-final,ctest-final,python,runtime,
-regressions,cli}.log and work/native-first-exploration-{runtime,regressions}.json.
-The shared base and Devin head remain ac45d958 / b023e384.
+Sol-to-Proxima science vessel 1 advances day 6572.359375 to 6574.84375 in 159
+exact 1/64-day steps, then finishes at 6587.15625 in 788 further steps. Revision
+0→1 changes only once; scout 0 remains unchanged. Both paused reloads preserve
+the complete Player17 payload except SavedAtUtc. Six inspected images and four
+distinct saves are retained. The inspector sidecar now waits for artwork readiness.
 
-No Core, C#, Player17 schema or approved-art changes. Contract:
-`engine/NATIVE_FIRST_EXPLORATION_UI.md`. PR332 remains unmerged, and the local
-package remains UNSEALED. Next: extend this earned campaign through the science
-vessel's full survey, including actionable discoveries and save/recovery.
+Final MSVC build passes; 10 affected CTests pass (seven rerun after the last UI
+changes); Python 552 checks, 535 pass/17 optional skips. Relocated four-process
+survey and navigation/fleet/system/earned-scout graphical regressions pass.
+Three malformed command lines fail cleanly. Evidence: work/native-first-survey-*
+logs and JSON. Contract: `engine/NATIVE_FIRST_SURVEY_UI.md` (from docs root).
+PR332 stays unmerged; the local package is UNSEALED, not a release download.
+Shared base/Devin remain ac45d958/b023e384.
+
+Next: turn confirmed survey findings into the first earned settlement decision
+and ship/facility preparation, exposing actual costs and blockers. Continue from
+work/native-audio-validation/package-first-survey-paused-full.player17.json;
+never grant prerequisites or silently rebalance Core. Native system artwork,
+readable map scale and broader visual finish remain open; these captures prove
+the gameplay path, not final graphics or sustained 60 FPS.
 
 ### Previous checkpoint: First-ships graphical progression
 

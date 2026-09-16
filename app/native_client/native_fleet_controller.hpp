@@ -76,6 +76,15 @@ struct NativeScoutReconnaissanceStatus {
   bool operator==(const NativeScoutReconnaissanceStatus &) const = default;
 };
 
+// Detached progress for the automatic detailed survey of the science fleet's
+// current system. No system/body details or duration estimate cross this seam.
+struct NativeScienceSurveyStatus {
+  double progress{};
+  bool held{};
+  bool completed{};
+  bool operator==(const NativeScienceSurveyStatus &) const = default;
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -98,6 +107,7 @@ struct NativeOwnFleet {
   std::optional<NativeMilitaryOrderQuote> military_order_quote;
   std::optional<NativeFleetLocateQuote> locate;
   std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
+  std::optional<NativeScienceSurveyStatus> science_survey;
   std::string recovery_message;
 };
 

@@ -230,6 +230,39 @@ int main() try {
               !has_text(fully_surveyed_draw, "Send a science vessel"),
           "Fully surveyed system encouraged redundant science work.");
 
+  NativeFleetWorkspace science_survey;
+  auto science_view = player_view(true);
+  science_view.own_fleets.front().role = stellar::core::FleetRole::Science;
+  science_view.own_fleets.front().science_survey = NativeScienceSurveyStatus{
+      .progress = .55, .held = false, .completed = false};
+  science_survey.set_view(science_view);
+  DrawList science_draw;
+  science_survey.render(science_draw, 1280, 720, markers);
+  require(has_text(science_draw, "SCIENCE SURVEY") &&
+              has_text(science_draw, "Full survey 55.0%") &&
+              !has_text(science_draw, "Right-click a system"),
+          "Science survey progress did not replace idle travel guidance.");
+  const auto science_bar = std::ranges::find_if(science_draw.overlay, [&](const auto &command) {
+    const auto *fill = std::get_if<FilledRectangle>(&command);
+    return fill && fill->bounds.height == 4.f && contained(layout.route, fill->bounds);
+  });
+  require(science_bar != science_draw.overlay.end(),
+          "Science survey bar escaped the fixed 720p route area.");
+  science_view.own_fleets.front().science_survey->held = true;
+  science_survey.set_view(science_view);
+  DrawList held_science_draw;
+  science_survey.render(held_science_draw, 1280, 720, markers);
+  require(has_text(held_science_draw, "Held; work paused"),
+          "Held science survey did not explain its paused state.");
+  science_view.own_fleets.front().science_survey = NativeScienceSurveyStatus{
+      .progress = 1., .held = false, .completed = true};
+  science_survey.set_view(science_view);
+  DrawList complete_science_draw;
+  science_survey.render(complete_science_draw, 1280, 720, markers);
+  require(has_text(complete_science_draw, "System fully surveyed") &&
+              has_text(complete_science_draw, "Select a planet to review findings."),
+          "Completed science survey did not direct the player to observed findings.");
+
   NativeFleetWorkspace engagement;
   auto armed = player_view(true);
   auto &warship = armed.own_fleets.front();

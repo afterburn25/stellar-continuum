@@ -145,6 +145,74 @@ void reconnaissance_projection(CampaignFrame &frame) {
   *scout = original;
 }
 
+void science_survey_projection(CampaignFrame &frame) {
+  NativeFleetController controller;
+  constexpr std::uint64_t generation = 74;
+  const auto initial = controller.build(frame, generation);
+  auto &world = frame.runtime().world().campaign();
+  require(!initial.own_fleets.empty(), "Authored fixture lacks an owned fleet.");
+  auto science = std::ranges::find(world.fleets, initial.own_fleets.front().id,
+                                 &FleetState::id);
+  require(science != world.fleets.end(), "Science vessel disappeared.");
+  const auto system = std::ranges::find_if(world.systems, [&](const auto &candidate) {
+    return world.knowledge.system_survey_level(world.player_civilization_id, candidate.id) <
+           SystemSurveyLevel::fully_surveyed;
+  });
+  require(system != world.systems.end(), "Fixture lacks a surveyable system.");
+  const auto original = *science;
+  // This projection fixture predates science vessels; the earned runtime replay
+  // separately validates a science ship built through ordinary player actions.
+  science->role = FleetRole::Science;
+  world.knowledge.record_reconnaissance(world.player_civilization_id, system->id);
+  world.knowledge.advance_system_survey(world.player_civilization_id, system->id, .2);
+  science->current_system_id = system->id;
+  science->destination_system_id.reset();
+  science->transit_phase = FleetTransitPhase::None;
+  science->hold_requested = false;
+  const auto work = controller.build(frame, generation);
+  const auto work_row = std::ranges::find(work.own_fleets, science->id, &NativeOwnFleet::id);
+  require(work_row != work.own_fleets.end() && work_row->science_survey &&
+              !work_row->science_survey->completed &&
+              work_row->science_survey->progress > 0. &&
+              work_row->science_survey->progress < 1.,
+          "Stationed science vessel did not project authoritative survey progress.");
+  require(science->current_system_id == system->id && !science->destination_system_id &&
+              science->transit_phase == FleetTransitPhase::None,
+          "Science survey projection mutated authoritative fleet state.");
+  science->hold_requested = true;
+  const auto held = controller.build(frame, generation);
+  const auto held_row = std::ranges::find(held.own_fleets, science->id, &NativeOwnFleet::id);
+  require(held_row != held.own_fleets.end() && held_row->science_survey &&
+              held_row->science_survey->held,
+          "Held science survey did not retain canonical hold state.");
+  science->transit_phase = FleetTransitPhase::LocalDeparture;
+  const auto moving = controller.build(frame, generation);
+  const auto moving_row = std::ranges::find(moving.own_fleets, science->id, &NativeOwnFleet::id);
+  require(moving_row != moving.own_fleets.end() && !moving_row->science_survey,
+          "Moving science vessel exposed local survey work.");
+  science->transit_phase = FleetTransitPhase::None;
+  science->destination_system_id = system->id;
+  const auto travelling = controller.build(frame, generation);
+  const auto travelling_row = std::ranges::find(travelling.own_fleets, science->id, &NativeOwnFleet::id);
+  require(travelling_row != travelling.own_fleets.end() && !travelling_row->science_survey,
+          "Travelling science vessel exposed local survey work.");
+  science->destination_system_id.reset();
+  science->civilization_id = world.player_civilization_id + 1;
+  const auto foreign = controller.build(frame, generation);
+  require(std::ranges::find(foreign.own_fleets, science->id, &NativeOwnFleet::id) ==
+              foreign.own_fleets.end(),
+          "Foreign science survey was exposed to the player.");
+  science->civilization_id = world.player_civilization_id;
+  world.knowledge.mark_system_fully_surveyed(world.player_civilization_id, system->id);
+  const auto complete = controller.build(frame, generation);
+  const auto complete_row = std::ranges::find(complete.own_fleets, science->id, &NativeOwnFleet::id);
+  require(complete_row != complete.own_fleets.end() && complete_row->science_survey &&
+              complete_row->science_survey->completed &&
+              complete_row->science_survey->progress == 1.,
+          "Fully surveyed science mission was not projected as complete.");
+  *science = original;
+}
+
 void observer_and_commands(CampaignFrame &frame) {
   NativeFleetController controller;
   constexpr std::uint64_t generation = 11;
@@ -558,6 +626,9 @@ int main(int argc, char **argv) try {
   auto reconnaissance_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                                            fs::absolute(argv[4]));
   reconnaissance_projection(reconnaissance_frame);
+  auto science_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
+                                    fs::absolute(argv[4]));
+  science_survey_projection(science_frame);
   observer_and_commands(frame);
   auto recovery_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                                     fs::absolute(argv[4]));
