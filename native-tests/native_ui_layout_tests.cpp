@@ -124,7 +124,7 @@ void verify_developer_menu(int width, int height) {
   const auto layout = NativeUiLayout::for_viewport(width, height, true);
   const std::array<std::pair<UiRect, UiAction>, 11> menu{{
       {layout.continue_button, UiAction::Continue},
-      {layout.dev_tools_button, UiAction::DevTools},
+      {layout.development_button, UiAction::Development},
       {layout.save_button, UiAction::Save},
       {layout.load_button, UiAction::Load},
       {layout.new_game_button, UiAction::NewGame},
@@ -150,12 +150,10 @@ void verify_developer_menu(int width, int height) {
               "Closed Developer menu accepted a hidden button.");
     }
   }
-  // The player-mode menu must never route a click to the Developer
-  // controls, even inside the shared mode-button slot.
+  // The player-mode menu must never route a click to the Player-mode
+  // control, even inside the shared mode-button slot.
   const auto player_layout = NativeUiLayout::for_viewport(width, height);
-  for (const auto point : interior_points(layout.dev_tools_button)) {
-    require(player_layout.hit(point, true) != UiAction::DevTools,
-            "Player menu leaked the Developer tools action.");
+  for (const auto point : interior_points(layout.development_button)) {
     require(player_layout.hit(point, true) != UiAction::PlayerMode,
             "Player menu leaked the mode-switch action.");
   }

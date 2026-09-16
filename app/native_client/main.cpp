@@ -4,6 +4,7 @@
 #include "native_audio_settings.hpp"
 #include "native_battle_workspace.hpp"
 #include "native_developer_tools.hpp"
+#include "native_development_menu.hpp"
 #include "native_notifications.hpp"
 #include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
@@ -102,6 +103,7 @@ namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_developer = stellar::native_developer;
+namespace native_development = stellar::native_development;
 namespace native_inspection = stellar::native_inspection;
 namespace native_economy = stellar::native_economy;
 namespace native_logistics = stellar::native_logistics;
@@ -374,7 +376,8 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
 [[nodiscard]] std::unique_ptr<NativeCampaignSession> build_switched_session(
     const bool to_developer, const std::filesystem::path &research_root,
     const std::filesystem::path &catalog_path,
-    const std::filesystem::path &player_save_path) {
+    const std::filesystem::path &player_save_path,
+    const std::optional<std::int64_t> new_developer_seed = std::nullopt) {
   const PlayerCampaignRuntimeFactory make_runtime = [&research_root] {
     return load_adaptive_research_strategic_runtime(research_root);
   };
@@ -403,6 +406,17 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
               std::move(bootstrap.prior_attempts)};
         };
     const auto catalog = load_nearby_catalog(catalog_path);
+    // Reference UiNewDeveloperCampaign: a caller seed always spawns a fresh
+    // Developer world; the previous Developer save is kept as its .bak.
+    if (new_developer_seed)
+      return NativeCampaignSession::create_fresh(
+          IntegratedAdaptiveCampaignRuntime::create_fresh(
+              make_runtime(),
+              create_developer_campaign(
+                  *new_developer_seed, catalog,
+                  {utc_timestamp(), 250, 6, 1, "terran_baseline"})),
+          research_root, save_path, STELLAR_GAME_VERSION,
+          std::move(dependencies));
     auto bootstrap = load_or_create_developer_campaign(
         save_path, playable_demo_seed, catalog,
         {utc_timestamp(), 250, 6, 1, "terran_baseline"}, make_runtime);
@@ -464,6 +478,12 @@ struct ResearchStamp {
   double total_labs{};
   std::string player_species_id;
   bool operator==(const ResearchStamp &) const = default;
+};
+
+// --developer-smoke evidence accumulates across the per-session
+// NativeCampaign rebuilds that Player/Developer mode switching performs.
+struct DeveloperSmokeEvidence {
+  bool mode{}, demo{}, tools{}, command{}, save{}, fresh{}, backup{};
 };
 
 class NativeCampaign final {
@@ -1952,6 +1972,7 @@ class NativeCampaign final {
   // runs; the outer loop only exits once that save lands.
   void request_new_game(){if(!new_game_requested_){new_game_requested_=true;session_->request_save();}}
   [[nodiscard]] bool new_game_ready()const{return new_game_requested_&&session_->notice().kind==SessionNoticeKind::Saved;}
+  void adopt_developer_smoke_evidence(DeveloperSmokeEvidence &evidence){developer_smoke_=&evidence;}
   [[nodiscard]] bool developer_mode()const{return session_->developer_mode();}
   [[nodiscard]] bool developer_tools_used()const{return session_->developer_tools_used();}
   [[nodiscard]] std::filesystem::path player_save_path()const{
@@ -1973,13 +1994,27 @@ class NativeCampaign final {
   // checkpoints to its own slot, then the outer loop replaces the session.
   void request_developer_switch(){if(!mode_switch_requested_&&session_->checkpoint_now(utc_timestamp()))mode_switch_requested_=true;}
   void request_player_switch(){request_developer_switch();}
+  // Reference UiNewDeveloperCampaign: the outgoing Player campaign checkpoints
+  // first, then the outer loop builds a fresh seeded Developer world. From
+  // Developer mode the current save stays untouched so the fresh campaign's
+  // first write preserves it as the slot's .bak.
+  void request_new_developer_campaign(std::int64_t seed){
+    if(mode_switch_requested_)return;
+    if(!session_->developer_mode()&&
+       !session_->checkpoint_now(utc_timestamp()))
+      return;
+    new_developer_seed_=seed;
+    mode_switch_requested_=true;
+  }
   [[nodiscard]] bool mode_switch_ready()const{return mode_switch_requested_;}
+  [[nodiscard]] std::optional<std::int64_t> new_developer_seed()const{return new_developer_seed_;}
   void run_developer_command(std::string_view command_id){
     const auto outcome=session_->run_developer_command(command_id,utc_timestamp());
     developer_result_=outcome.message;developer_result_accepted_=outcome.accepted;
   }
-  // --developer-smoke phase A (player session): open the campaign menu and
-  // click the DEVELOPMENT row; the outer loop then replaces the session.
+  // --developer-smoke phase A (player session): open the campaign menu, open
+  // the DEVELOPMENT submenu and click its OPEN row; the outer loop then
+  // replaces the session.
   void prepare_developer_smoke(int width,int height){
     if(session_->developer_mode())
       throw std::runtime_error("Developer smoke must start from a player campaign.");
@@ -1988,26 +2023,35 @@ class NativeCampaign final {
     if(!update(escape,width,height,0.,false))
       throw std::runtime_error("Developer smoke Escape closed the campaign.");
     if(!menu_)throw std::runtime_error("Developer smoke Escape did not open the menu.");
+    const auto click=[&](Point at){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=at;
+      input.events={{InputEventType::LeftPressed,at},
+                    {InputEventType::LeftReleased,at}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Developer smoke input closed the campaign.");
+    };
     const auto layout=NativeUiLayout::for_viewport(width,height,false);
-    InputSnapshot click;click.drawable_width=width;click.drawable_height=height;
-    const Point at{layout.developer_button.x+layout.developer_button.width*.5f,
-                   layout.developer_button.y+layout.developer_button.height*.5f};
-    click.pointer=at;
-    click.events={{InputEventType::LeftPressed,at},
-                  {InputEventType::LeftReleased,at}};
-    if(!update(click,width,height,0.,false))
-      throw std::runtime_error("Developer smoke mode row closed the campaign.");
+    click({layout.developer_button.x+layout.developer_button.width*.5f,
+           layout.developer_button.y+layout.developer_button.height*.5f});
+    if(!development_menu_.visible())
+      throw std::runtime_error("The DEVELOPMENT menu row did not open the submenu.");
+    const auto submenu=
+        native_development::development_menu_layout_for(width,height);
+    click({submenu.open_button.x+submenu.open_button.width*.5f,
+           submenu.open_button.y+submenu.open_button.height*.5f});
     if(!mode_switch_ready())
-      throw std::runtime_error("The DEVELOPMENT menu row did not request the mode switch.");
+      throw std::runtime_error("The submenu open row did not request the mode switch.");
   }
   // --developer-smoke phase B (Developer session): verify the Demo resume
-  // speed, open DEV TOOLS through the menu row, run grant_resources through
-  // the panel and confirm the Developer envelope landed on its own slot.
+  // speed, open DEV TOOLS through the DEVELOPMENT submenu, run grant_resources
+  // through the panel and confirm the Developer envelope landed on its own
+  // slot.
   void prepare_developer_tools_smoke(int width,int height){
     if(!session_->developer_mode())
       throw std::runtime_error("Developer smoke switched to a non-Developer session.");
-    smoke_developer_mode_=true;
-    smoke_developer_demo_=
+    developer_smoke_->mode=true;
+    developer_smoke_->demo=
         session_->frame().clock().speed()==StrategicSpeed::Demo;
     InputSnapshot escape;escape.drawable_width=width;escape.drawable_height=height;
     escape.events={{InputEventType::EscapePressed}};
@@ -2023,11 +2067,17 @@ class NativeCampaign final {
         throw std::runtime_error("Developer smoke input closed the campaign.");
     };
     const auto menu_layout=NativeUiLayout::for_viewport(width,height,true);
-    click({menu_layout.dev_tools_button.x+menu_layout.dev_tools_button.width*.5f,
-           menu_layout.dev_tools_button.y+menu_layout.dev_tools_button.height*.5f});
+    click({menu_layout.development_button.x+menu_layout.development_button.width*.5f,
+           menu_layout.development_button.y+menu_layout.development_button.height*.5f});
+    if(!development_menu_.visible())
+      throw std::runtime_error("The DEVELOPMENT row did not open the submenu.");
+    const auto submenu=
+        native_development::development_menu_layout_for(width,height);
+    click({submenu.tools_button.x+submenu.tools_button.width*.5f,
+           submenu.tools_button.y+submenu.tools_button.height*.5f});
     if(!developer_tools_.visible()||menu_)
-      throw std::runtime_error("The DEV TOOLS menu row did not open the tools panel.");
-    smoke_developer_tools_=true;
+      throw std::runtime_error("The submenu DEVELOPER TOOLS row did not open the tools panel.");
+    developer_smoke_->tools=true;
     const auto commands=developer_command_catalog();
     std::size_t row=commands.size();
     for(std::size_t i=0;i<commands.size();++i)
@@ -2039,18 +2089,83 @@ class NativeCampaign final {
            tools.command_rows[row].y+tools.command_rows[row].height*.5f});
     if(!developer_result_accepted_||!session_->developer_tools_used())
       throw std::runtime_error("The DEV TOOLS grant_resources run was not accepted.");
-    smoke_developer_command_=true;
+    developer_smoke_->command=true;
     if(!developer_save_exists())
       throw std::runtime_error("The Developer command wrote no envelope save.");
-    smoke_developer_save_=true;
+    developer_smoke_->save=true;
+  }
+  // --developer-smoke phase C (Developer session): re-open the DEVELOPMENT
+  // submenu and arm + confirm NEW DEVELOPER CAMPAIGN; the outer loop then
+  // replaces the session with a fresh seeded world.
+  void prepare_developer_fresh_smoke(int width,int height){
+    if(!session_->developer_mode())
+      throw std::runtime_error("Developer fresh-campaign smoke lost Developer mode.");
+    // Phase B left the tools panel open; the first Escape closes it, the
+    // second opens the campaign menu.
+    InputSnapshot escape;escape.drawable_width=width;escape.drawable_height=height;
+    escape.events={{InputEventType::EscapePressed}};
+    if(!update(escape,width,height,0.,false))
+      throw std::runtime_error("Developer smoke Escape closed the campaign.");
+    if(developer_tools_.visible())
+      throw std::runtime_error("Developer smoke Escape did not close the tools panel.");
+    if(!menu_){
+      if(!update(escape,width,height,0.,false))
+        throw std::runtime_error("Developer smoke Escape closed the campaign.");
+      if(!menu_)
+        throw std::runtime_error("Developer smoke Escape did not reopen the menu.");
+    }
+    const auto click=[&](Point at){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=at;
+      input.events={{InputEventType::LeftPressed,at},
+                    {InputEventType::LeftReleased,at}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Developer smoke input closed the campaign.");
+    };
+    const auto menu_layout=NativeUiLayout::for_viewport(width,height,true);
+    click({menu_layout.development_button.x+menu_layout.development_button.width*.5f,
+           menu_layout.development_button.y+menu_layout.development_button.height*.5f});
+    if(!development_menu_.visible())
+      throw std::runtime_error("The DEVELOPMENT row did not reopen the submenu.");
+    const auto submenu=
+        native_development::development_menu_layout_for(width,height);
+    click({submenu.new_button.x+submenu.new_button.width*.5f,
+           submenu.new_button.y+submenu.new_button.height*.5f});
+    if(mode_switch_ready())
+      throw std::runtime_error("NEW DEVELOPER CAMPAIGN skipped its confirmation.");
+    click({submenu.new_button.x+submenu.new_button.width*.5f,
+           submenu.new_button.y+submenu.new_button.height*.5f});
+    if(!mode_switch_ready()||!new_developer_seed_||*new_developer_seed_!=playable_demo_seed)
+      throw std::runtime_error("The confirmed NEW DEVELOPER CAMPAIGN did not request the seeded world.");
+  }
+  // --developer-smoke phase D (fresh Developer session): the seeded world
+  // activated with fresh provenance while the previous Developer save was
+  // kept as the slot's .bak.
+  void verify_developer_fresh_smoke(int width,int height){
+    (void)width;(void)height;
+    if(!session_->developer_mode())
+      throw std::runtime_error("The fresh-campaign switch left Developer mode.");
+    if(session_->frame().clock().speed()!=StrategicSpeed::Demo)
+      throw std::runtime_error("The fresh Developer campaign did not resume at Demo speed.");
+    if(session_->developer_tools_used())
+      throw std::runtime_error("The fresh Developer campaign kept tools-used provenance.");
+    if(!developer_save_exists())
+      throw std::runtime_error("The fresh Developer campaign wrote no envelope save.");
+    auto backup=developer_save_path();backup+=".bak";
+    std::error_code error{};
+    if(!std::filesystem::is_regular_file(backup,error))
+      throw std::runtime_error("The previous Developer save was not kept as the slot backup.");
+    developer_smoke_->fresh=true;developer_smoke_->backup=true;
   }
   [[nodiscard]] std::string developer_smoke_status()const{
     std::ostringstream out;
-    out<<"{\"mode\":"<<(smoke_developer_mode_?1:0)
-       <<",\"demo_speed\":"<<(smoke_developer_demo_?1:0)
-       <<",\"tools_panel\":"<<(smoke_developer_tools_?1:0)
-       <<",\"command\":"<<(smoke_developer_command_?1:0)
-       <<",\"envelope_save\":"<<(smoke_developer_save_?1:0)<<"}";
+    out<<"{\"mode\":"<<(developer_smoke_->mode?1:0)
+       <<",\"demo_speed\":"<<(developer_smoke_->demo?1:0)
+       <<",\"tools_panel\":"<<(developer_smoke_->tools?1:0)
+       <<",\"command\":"<<(developer_smoke_->command?1:0)
+       <<",\"envelope_save\":"<<(developer_smoke_->save?1:0)
+       <<",\"fresh_campaign\":"<<(developer_smoke_->fresh?1:0)
+       <<",\"backup_kept\":"<<(developer_smoke_->backup?1:0)<<"}";
     return out.str();
   }
   // Mid-session setup cancellation hands the (already saved) session back so
@@ -2167,9 +2282,10 @@ class NativeCampaign final {
   [[nodiscard]] std::string surface_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(6)<<std::boolalpha<<"{\"mode\":\""<<(smoke_surface_reload_?"paused_reload":"ordered")<<"\",\"system_id\":"<<smoke_surface_system_id_<<",\"body_id\":"<<smoke_surface_body_id_<<",\"colony_id\":"<<smoke_surface_colony_id_<<",\"type_id\":\""<<smoke_surface_type_id_<<"\",\"site_id\":"<<smoke_surface_site_id_.value_or(-1)<<",\"x\":"<<smoke_surface_x_<<",\"z\":"<<smoke_surface_z_<<",\"rotation\":"<<smoke_surface_rotation_<<",\"authorization\":"<<smoke_surface_authorization_<<",\"refund\":"<<smoke_surface_refund_<<",\"treasury_before\":"<<smoke_surface_treasury_before_<<",\"treasury_after_cancel\":"<<smoke_surface_treasury_before_<<",\"treasury_after_place\":"<<smoke_surface_treasury_after_place_<<",\"treasury_after_refund\":"<<smoke_surface_treasury_after_refund_<<",\"treasury_saved\":"<<smoke_surface_treasury_saved_<<",\"site_count_before\":"<<smoke_surface_site_count_before_<<",\"site_count_saved\":"<<smoke_surface_site_count_saved_<<",\"progress\":"<<smoke_surface_progress_<<",\"before_days\":"<<smoke_surface_before_day_<<",\"saved_days\":"<<smoke_surface_saved_day_<<",\"palette_selected\":"<<smoke_surface_palette_selected_<<",\"ghost_previewed\":"<<smoke_surface_ghost_previewed_<<",\"placement_cancelled\":"<<smoke_surface_placement_cancelled_<<",\"cancel_no_change\":"<<smoke_surface_cancel_no_change_<<",\"placement_confirmed\":"<<smoke_surface_placement_confirmed_<<",\"removal_previewed\":"<<smoke_surface_removal_previewed_<<",\"removal_confirmed\":"<<smoke_surface_removal_confirmed_<<",\"refund_exact\":"<<smoke_surface_refund_exact_<<",\"managed\":"<<smoke_surface_managed_<<",\"persisted_site\":"<<smoke_surface_persisted_site_<<",\"scene_sprites\":"<<surface_workspace_.scene_cached_images()<<",\"relief_images\":"<<surface_workspace_.relief_cached_images()<<",\"paused\":"<<(session_->frame().clock().speed()==StrategicSpeed::Paused)<<'}';return out.str();}
   [[nodiscard]] std::string system_travel_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(9)<<std::boolalpha<<"{\"mode\":\""<<(smoke_system_travel_reload_?"paused_reload":"progress")<<"\",\"fleet_id\":"<<smoke_system_travel_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_system_travel_system_id_.value_or(-1)<<",\"destination_id\":"<<smoke_system_travel_destination_id_.value_or(-1)<<",\"order_revision\":"<<smoke_system_travel_mission_revision_<<",\"lane_count\":"<<smoke_system_travel_lane_count_<<",\"before_x\":"<<smoke_system_travel_before_x_<<",\"before_y\":"<<smoke_system_travel_before_y_<<",\"after_x\":"<<smoke_system_travel_after_x_<<",\"after_y\":"<<smoke_system_travel_after_y_<<",\"before_days\":"<<smoke_system_travel_before_day_<<",\"after_days\":"<<smoke_system_travel_after_day_<<",\"selected\":"<<smoke_system_travel_selected_<<",\"canonical_moved\":"<<smoke_system_travel_canonical_moved_<<",\"rendered_moved\":"<<smoke_system_travel_rendered_moved_<<",\"paused_stable\":"<<smoke_system_travel_paused_stable_<<",\"pause_retained\":"<<smoke_system_travel_pause_retained_<<",\"known_arrow\":"<<smoke_system_travel_known_opened_<<",\"unknown_denied\":"<<smoke_system_travel_unknown_denied_<<",\"knowledge_unchanged\":"<<smoke_system_travel_knowledge_unchanged_<<",\"lanes_connected\":"<<smoke_system_travel_lanes_connected_<<'}';return out.str();}
   [[nodiscard]] bool wants_text_input() const noexcept {
-    return research_workspace_.wants_text_input() &&
-           !shipyard_workspace_.visible() &&
-           !construction_workspace_.visible();
+    return (research_workspace_.wants_text_input() &&
+            !shipyard_workspace_.visible() &&
+            !construction_workspace_.visible()) ||
+           development_menu_.wants_text_input();
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
@@ -2316,6 +2432,23 @@ class NativeCampaign final {
           refresh_diplomacy(true);
         }
         if(result.captured)continue;
+      }
+      if(menu_&&development_menu_.visible()){
+        const auto command=development_menu_.handle(event,width,height);
+        using DevelopmentCommand=
+            native_development::DevelopmentMenuCommandKind;
+        if(command.kind==DevelopmentCommand::OpenDeveloper){
+          if(session_->developer_mode())session_->request_load();
+          else request_developer_switch();
+        }
+        else if(command.kind==DevelopmentCommand::NewDeveloperCampaign)
+          request_new_developer_campaign(command.seed);
+        else if(command.kind==DevelopmentCommand::OpenTools){
+          development_menu_.close();
+          if(menu_)toggle_menu();
+          if(session_->developer_mode())developer_tools_.open();
+        }
+        if(command.captured)continue;
       }
       if(developer_tools_.visible()&&!menu_){
         const auto command=developer_tools_.handle(event,width,height);
@@ -2547,9 +2680,8 @@ class NativeCampaign final {
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::NewGame)request_new_game();
-        else if(action==UiAction::Developer)request_developer_switch();
+        else if(action==UiAction::Development)development_menu_.open();
         else if(action==UiAction::PlayerMode)request_player_switch();
-        else if(action==UiAction::DevTools){if(menu_)toggle_menu();developer_tools_.open();}
         else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
         else if(action==UiAction::Voice){audio_settings_.close();voice_settings_view_.open(voice_settings_);}
         else if(action==UiAction::Video){audio_settings_.close();voice_settings_view_.close();video_settings_view_.open(video_settings_);}
@@ -2800,6 +2932,16 @@ class NativeCampaign final {
       } else if (video_settings_view_.visible()) {
         video_settings_view_.render(out, width, height,
                                     video_rollback_remaining());
+      } else if (development_menu_.visible()) {
+        // Source: MainMenuLayer DevelopmentPanel — the menu body is replaced
+        // by the Development submenu rather than floating above it.
+        development_menu_.render(
+            out,
+            {session_->developer_mode(), developer_save_exists(),
+             session_->notice().kind == SessionNoticeKind::Failure
+                 ? std::string(session_->notice().message)
+                 : std::string{}},
+            width, height, &pointer_);
       } else {
       fill(out, layout.menu_panel, panel);
       stroke(out, layout.menu_panel, {116, 174, 225, 255});
@@ -2816,13 +2958,11 @@ class NativeCampaign final {
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.new_game_button, "NEW GAME");
       if (layout.developer_menu) {
-        draw_button(layout.dev_tools_button, "DEV TOOLS");
+        draw_button(layout.development_button, "DEVELOPMENT");
         draw_button(layout.player_button,
                     player_save_exists() ? "RESUME PLAYER" : "START PLAYER");
       } else {
-        draw_button(layout.developer_button,
-                    developer_save_exists() ? "RESUME DEVELOPER"
-                                            : "START DEVELOPER");
+        draw_button(layout.developer_button, "DEVELOPMENT");
       }
       draw_button(layout.audio_button, "AUDIO");
       draw_button(layout.voice_button, "VOICE");
@@ -3679,7 +3819,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();video_settings_view_.close();notification_view_.close();developer_tools_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();video_settings_view_.close();notification_view_.close();development_menu_.close();developer_tools_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   // Reference UiResumeAtSpeed: Demo is reachable only in Developer mode;
@@ -3879,7 +4019,8 @@ class NativeCampaign final {
   std::int64_t smoke_diplomacy_proposal_id_{-1};
   bool smoke_diplomacy_portrait_{};
   bool smoke_notification_panel_{};
-  bool smoke_developer_mode_{},smoke_developer_demo_{},smoke_developer_tools_{},smoke_developer_command_{},smoke_developer_save_{};
+  DeveloperSmokeEvidence developer_smoke_owned_{};
+  DeveloperSmokeEvidence *developer_smoke_{&developer_smoke_owned_};
   bool smoke_logistics_panel_{},smoke_economy_panel_{},
       smoke_economy_toggled_{};
   int smoke_logistics_ready_{},smoke_logistics_nodes_{},
@@ -3916,6 +4057,8 @@ class NativeCampaign final {
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{},smoke_surface_managed_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
   bool menu_{};bool new_game_requested_{};bool mode_switch_requested_{};bool smoke_save_pending_{};int smoke_audio_settings_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  std::optional<std::int64_t> new_developer_seed_{};
+  native_development::NativeDevelopmentMenu development_menu_;
   native_developer::NativeDeveloperToolsPanel developer_tools_;
   std::string developer_result_{};bool developer_result_accepted_{};
   std::filesystem::path player_save_path_{};
@@ -3943,7 +4086,8 @@ int main(int argc,char **argv){
     StartupEntryEvidence startup_evidence,restart_evidence;
     std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot,restart_save_path;
     bool new_game_restart{};
-    bool developer_switched{};
+    bool developer_switched{},developer_fresh{};
+    DeveloperSmokeEvidence developer_evidence;
     if(options.new_game_restart_smoke&&!std::filesystem::is_regular_file(options.save_path))
       throw std::invalid_argument("--new-game-restart-smoke requires a preexisting save-path anchor.");
     if(options.new_game_smoke){
@@ -3967,6 +4111,7 @@ int main(int argc,char **argv){
     NativeCampaign campaign(std::move(session),window,window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},
                              options.save_path);
+    campaign.adopt_developer_smoke_evidence(developer_evidence);
     campaign.enable_support_log({STELLAR_GAME_VERSION,SDL_GetPlatform(),
                                  window.gpu_driver(),
                                  SDL_GetNumLogicalCPUCores(),
@@ -4024,10 +4169,15 @@ int main(int argc,char **argv){
         campaign.prepare_audio_smoke(window.drawable_width(),
                                      window.drawable_height());
       else if(options.developer_smoke){
-        if(developer_switched)
+        if(developer_fresh)
+          campaign.verify_developer_fresh_smoke(window.drawable_width(),
+                                              window.drawable_height());
+        else if(developer_switched){
           campaign.prepare_developer_tools_smoke(window.drawable_width(),
                                                  window.drawable_height());
-        else
+          campaign.prepare_developer_fresh_smoke(window.drawable_width(),
+                                                 window.drawable_height());
+        }else
           campaign.prepare_developer_smoke(window.drawable_width(),
                                            window.drawable_height());
       }
@@ -4227,18 +4377,24 @@ int main(int argc,char **argv){
       // Source UiSwitchToDeveloperMode/UiSwitchToPlayerMode: the outgoing
       // campaign already checkpointed; the target loads-or-creates against
       // its own slot, resumes at its mode speed, then checkpoints itself.
-      const bool to_developer=!campaign.developer_mode();
+      // A pending world seed means NEW DEVELOPER CAMPAIGN: always switch to a
+      // fresh Developer world, even when the current session is Developer.
+      const auto fresh_seed=campaign.new_developer_seed();
+      const bool to_developer=fresh_seed||!campaign.developer_mode();
       const auto player_path=campaign.player_save_path();
       auto previous=campaign.release_session();
       try{
         auto next=build_switched_session(
             to_developer,startup_config.host.research_root,
-            startup_config.host.catalog_path,player_path);
+            startup_config.host.catalog_path,player_path,fresh_seed);
         next->frame().clock().set_speed(to_developer?StrategicSpeed::Demo
                                                     :StrategicSpeed::Normal);
         (void)next->checkpoint_now(utc_timestamp());
         session=std::move(next);
-        if(to_developer)developer_switched=true;
+        if(to_developer){
+          if(developer_switched)developer_fresh=true;
+          developer_switched=true;
+        }
       }catch(const std::exception &error){
         std::cerr<<"Stellar Continuum native client: mode switch failed: "
                  <<error.what()<<'\n';

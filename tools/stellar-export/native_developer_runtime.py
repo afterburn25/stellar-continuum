@@ -33,7 +33,7 @@ def _diagnostic(stdout: str) -> dict:
     except (TypeError, ValueError) as error:
         raise RuntimeError("Native developer diagnostic is malformed") from error
     for key in ("mode", "demo_speed", "tools_panel", "command",
-                "envelope_save"):
+                "envelope_save", "fresh_campaign", "backup_kept"):
         value = state.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
             raise RuntimeError(f"Native developer reported invalid {key}")
@@ -52,10 +52,10 @@ def _capture(path: Path) -> None:
             "Native developer capture contains no rendered variation")
 
 
-def _developer_envelope(save: Path) -> dict:
-    envelope = save.parent / "developer-autosave.json"
+def _developer_envelope(envelope: Path, tools_used: bool | None) -> dict:
     if not envelope.is_file():
-        raise RuntimeError("Developer smoke wrote no developer-autosave.json")
+        raise RuntimeError(
+            f"Developer smoke wrote no {envelope.name}")
     try:
         payload = json.loads(envelope.read_text(encoding="utf-8"))
     except (TypeError, ValueError) as error:
@@ -63,9 +63,9 @@ def _developer_envelope(save: Path) -> dict:
     if (payload.get("DeveloperFormatVersion") != 1 or
             payload.get("Mode") != "Developer"):
         raise RuntimeError("Developer envelope lost its mode markers")
-    if payload.get("ToolsUsed") is not True:
+    if tools_used is not None and payload.get("ToolsUsed") is not tools_used:
         raise RuntimeError(
-            "Developer envelope did not persist the ToolsUsed flag")
+            "Developer envelope did not persist the expected ToolsUsed flag")
     campaign = payload.get("Campaign")
     if not isinstance(campaign, dict) or campaign.get("FormatVersion") != 17:
         raise RuntimeError("Developer envelope lost its Player17 payload")
@@ -120,7 +120,13 @@ def validate_native_developer_export(folder: Path, env: dict[str, str],
                     not math.isfinite(days)):
                 raise RuntimeError(
                     "Developer smoke damaged the player campaign payload")
-            _developer_envelope(save)
+            # The primary slot holds the fresh seeded campaign (tools
+            # unused); the previous save must survive as a valid .bak
+            # envelope — later autosaves rotate which snapshot it holds.
+            _developer_envelope(save.parent / "developer-autosave.json",
+                                tools_used=False)
+            _developer_envelope(save.parent / "developer-autosave.json.bak",
+                                tools_used=None)
             evidence = folder.parent / f"{folder.name}-{capture.name}"
             shutil.copy2(capture, evidence)
             captures.append(str(evidence))

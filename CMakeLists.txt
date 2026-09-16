@@ -811,6 +811,9 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(legacy_galaxy_payload_persistence_parity PROPERTIES TIMEOUT 300)
   add_executable(stellar_player_campaign_persistence_tests native-tests/player_campaign_persistence_tests.cpp)
+  if(MSVC)
+    target_compile_options(stellar_player_campaign_persistence_tests PRIVATE /bigobj)
+  endif()
   target_link_libraries(stellar_player_campaign_persistence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME player_campaign_persistence_parity COMMAND stellar_player_campaign_persistence_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-persistence.json"

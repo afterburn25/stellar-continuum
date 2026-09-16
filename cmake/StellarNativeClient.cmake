@@ -237,6 +237,7 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio_device.cpp
   app/native_client/native_audio_settings.cpp
   app/native_client/native_developer_tools.cpp
+  app/native_client/native_development_menu.cpp
   app/native_client/native_inspection.cpp
   app/native_client/native_economy.cpp
   app/native_client/native_logistics.cpp

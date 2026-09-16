@@ -11,12 +11,12 @@ from test_native_diplomacy_runtime import FIXTURE, payload
 
 def diagnostic():
     return {"mode": 1, "demo_speed": 1, "tools_panel": 1, "command": 1,
-            "envelope_save": 1}
+            "envelope_save": 1, "fresh_campaign": 1, "backup_kept": 1}
 
 
-def envelope():
+def envelope(tools_used=True):
     return {"DeveloperFormatVersion": 1, "Mode": "Developer",
-            "ToolsUsed": True, "Campaign": payload(3)}
+            "ToolsUsed": tools_used, "Campaign": payload(3)}
 
 
 class NativeDeveloperRuntimeTests(unittest.TestCase):
@@ -41,18 +41,27 @@ class NativeDeveloperRuntimeTests(unittest.TestCase):
                 if fault == "demo_speed": state["demo_speed"] = 0
                 if fault == "tools": state["tools_panel"] = 0
                 if fault == "command": state["command"] = 0
+                if fault == "fresh": state["fresh_campaign"] = 0
+                if fault == "backup": state["backup_kept"] = 0
                 if fault == "malformed": state["mode"] = "yes"
                 record = payload(3)
                 if fault == "save": record["Galaxy"]["Systems"] = [1]
                 if fault == "envelope_marker": record["Mode"] = "Developer"
                 save.write_text(json.dumps(record), encoding="utf-8")
                 if fault != "envelope":
-                    dev = envelope()
-                    if fault == "tools_used": dev["ToolsUsed"] = False
+                    primary = envelope(tools_used=False)
+                    backup = envelope(tools_used=True)
+                    if fault == "tools_used": primary["ToolsUsed"] = True
                     if fault == "envelope_payload":
-                        dev["Campaign"]["FormatVersion"] = 16
+                        primary["Campaign"]["FormatVersion"] = 16
+                    if fault == "backup_payload":
+                        backup["Campaign"]["FormatVersion"] = 16
                     (save.parent / "developer-autosave.json").write_text(
-                        json.dumps(dev), encoding="utf-8")
+                        json.dumps(primary), encoding="utf-8")
+                    if fault != "backup_missing":
+                        (save.parent /
+                         "developer-autosave.json.bak").write_text(
+                             json.dumps(backup), encoding="utf-8")
                 varied = bytes(range(256)) if fault != "blank" else bytes(200)
                 if fault != "capture":
                     shot.write_bytes(b"BM" + b"\0" * 52 + varied * 40)
@@ -82,6 +91,14 @@ class NativeDeveloperRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("tools")
     def test_command_required(self):
         with self.assertRaises(RuntimeError): self.exercise("command")
+    def test_fresh_campaign_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("fresh")
+    def test_backup_kept_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("backup")
+    def test_backup_missing_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("backup_missing")
+    def test_backup_payload_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("backup_payload")
     def test_malformed_metric_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("malformed")
     def test_damaged_payload_rejected(self):

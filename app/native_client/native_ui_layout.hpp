@@ -23,8 +23,7 @@ enum class UiAction {
   Save,
   Load,
   NewGame,
-  Developer,
-  DevTools,
+  Development,
   PlayerMode,
   Audio,
   Voice,
@@ -57,7 +56,7 @@ struct NativeUiLayout {
   UiRect load_button;
   UiRect new_game_button;
   UiRect developer_button;
-  UiRect dev_tools_button;
+  UiRect development_button;
   UiRect player_button;
   UiRect audio_button;
   UiRect voice_button;
@@ -67,9 +66,9 @@ struct NativeUiLayout {
   UiRect mode_text;
   bool developer_menu{};
 
-  // Source: MainMenuLayer campaign menu. Developer mode inserts a DEV TOOLS
-  // row and a PLAYER CAMPAIGN row; Player mode shows a single DEVELOPMENT
-  // row. The panel grows by the inserted rows.
+  // Source: MainMenuLayer campaign menu. Player mode shows a single
+  // DEVELOPMENT row; Developer mode inserts a DEVELOPMENT row and a PLAYER
+  // CAMPAIGN row. The panel grows by the inserted rows.
   [[nodiscard]] static NativeUiLayout for_viewport(int width, int height,
                                                     bool developer = false) noexcept {
     const auto screen_width = static_cast<float>(width);
@@ -148,10 +147,11 @@ struct NativeUiLayout {
       if (load_button.contains(point)) return UiAction::Load;
       if (new_game_button.contains(point)) return UiAction::NewGame;
       if (developer_menu) {
-        if (dev_tools_button.contains(point)) return UiAction::DevTools;
+        if (development_button.contains(point))
+          return UiAction::Development;
         if (player_button.contains(point)) return UiAction::PlayerMode;
       } else if (developer_button.contains(point)) {
-        return UiAction::Developer;
+        return UiAction::Development;
       }
       if (audio_button.contains(point)) return UiAction::Audio;
       if (voice_button.contains(point)) return UiAction::Voice;
