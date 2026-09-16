@@ -1,5 +1,11 @@
 # Stellar Engine migration handoff
 
+Celestial detail checkpoint (2026-09-16): approved source planet discs are 512px,
+procedural discs 256px within the original 16 MiB cache and asynchronous queue.
+Capture evidence now binds each screenshot to its exact readback dimensions.
+Reviewed generated-art replacements remain excluded; see `NATIVE_CELESTIAL_ART_REVIEW.md`
+and the latest checkpoint in `../CPP_MIGRATION_HANDOFF.md` for validation and limits.
+
 Current Codex candidate (2026-09-16): PR #332 integrates native diplomacy,
 observer-safe territory, approved artwork, audio/settings/scientist cues,
 strategic fleet orders/Locate, the sovereign economy/industry workspace, top-down colony construction and reviewed building management, grouped survey-gated planet inspection and focus, recent events, bounded diagnostic exports and

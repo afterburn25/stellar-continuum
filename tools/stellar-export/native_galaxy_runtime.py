@@ -12,6 +12,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_bmp import validate_bmp
 
 from native_frame_profile import validate_cold_profile, validate_profile_frames, validate_steady_profile
 
@@ -109,25 +110,8 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native galaxy did not capture a BMP frame")
-    declared_size, pixel_offset = struct.unpack_from("<II", data, 2)[0], struct.unpack_from("<I", data, 10)[0]
-    header_size = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row_bytes = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required = row_bytes * abs(actual_height)
-    if (declared_size != len(data) or pixel_offset < 54 or header_size < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
-            pixel_offset + required > len(data)):
-        raise RuntimeError("Native galaxy capture has invalid renderer geometry")
-    pixels = data[pixel_offset:pixel_offset + required]
-    if min(pixels) == max(pixels):
-        raise RuntimeError("Native galaxy capture contains no rendered variation")
-    return pixels
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "galaxy", stdout=stdout)
 
 
 def _normalized(payload):
@@ -185,7 +169,7 @@ def validate_native_galaxy_export(folder: Path, env: dict[str, str], *, profile_
             if profile_frames:
                 profiles.append(validate_steady_profile(result.stdout, profile_frames))
                 cold_profiles.append(validate_cold_profile(result.stdout))
-            pixels = [_bmp(path, width, height) for path in (overview, regional, system)]
+            pixels = [_bmp(path, width, height, result.stdout) for path in (overview, regional, system)]
             if len({hashlib.sha256(value).digest() for value in pixels}) != 3:
                 raise RuntimeError("Native galaxy smoke captures do not show three distinct views")
             if not save.is_file():

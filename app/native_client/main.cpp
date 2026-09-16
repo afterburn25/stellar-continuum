@@ -4553,45 +4553,59 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
-        if(options.system_smoke)
-          std::cout<<"body_inspection="<<campaign.body_inspection_smoke(
+        if(options.system_smoke){
+          const auto evidence=campaign.body_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-body-details"));
-              })<<'\n';
-        if(options.military_check)
-          std::cout<<"military_inspection="<<campaign.military_smoke(
+              });
+          std::cout<<"body_inspection="<<evidence<<'\n';
+        }
+        if(options.military_check){
+          const auto evidence=campaign.military_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="ready"?L"-military-ready":stage=="retreat"?L"-military-retreat":L"-military-located"));
-              })<<'\n';
-        if(options.economy_check)
-          std::cout<<"economy_inspection="<<campaign.economy_smoke(
+              });
+          std::cout<<"military_inspection="<<evidence<<'\n';
+        }
+        if(options.economy_check){
+          const auto evidence=campaign.economy_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="ready"?L"-economy-ready":stage=="end"?L"-economy-end":L"-economy-priority"));
-              })<<'\n';
-        if(options.logistics_check)
-          std::cout<<"supply_inspection="<<campaign.supply_smoke(
+              });
+          std::cout<<"economy_inspection="<<evidence<<'\n';
+        }
+        if(options.logistics_check){
+          const auto evidence=campaign.supply_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool end){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,end?L"-supply-end":L"-supply-ready"));
-              })<<'\n';
-        if(options.inspection_check)
-          std::cout<<"system_inspection="<<campaign.system_inspection_smoke(
+              });
+          std::cout<<"supply_inspection="<<evidence<<'\n';
+        }
+        if(options.inspection_check){
+          const auto evidence=campaign.system_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="known"?L"-inspection-known":stage=="end"?L"-inspection-end":L"-inspection-unknown"));
-              })<<'\n';
-        if(options.surface_reload_smoke)
-          std::cout<<"surface_inspection="<<campaign.surface_inspection_smoke(
+              });
+          std::cout<<"system_inspection="<<evidence<<'\n';
+        }
+        if(options.surface_reload_smoke){
+          const auto evidence=campaign.surface_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool capture_detail){
                 window.draw(draw,capture_detail?std::optional{sidecar_path(*options.smoke_screenshot,L"-focus")}:std::nullopt);
-              })<<'\n';
+              });
+          std::cout<<"surface_inspection="<<evidence<<'\n';
+        }
         if(options.surface_smoke||options.surface_reload_smoke)
           campaign.surface_building_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-buildings"));
           });
-        if(options.surface_reload_smoke)
-          std::cout<<"surface_management="<<campaign.surface_management_smoke(
+        if(options.surface_reload_smoke){
+          const auto evidence=campaign.surface_management_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool review){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,review?L"-management-review":L"-management-result"));
-              })<<'\n';
+              });
+          std::cout<<"surface_management="<<evidence<<'\n';
+        }
         if(options.battle_smoke)
           campaign.battle_art_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-ships"));
@@ -4663,6 +4677,7 @@ int main(int argc,char **argv){
         std::cout<<std::fixed<<std::setprecision(3)
                  <<"native-map smoke ok: gpu_driver="<<window.gpu_driver()
                  <<" presentation="<<window.presentation_mode()
+                 <<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()
                  <<" systems="<<campaign.system_count()<<" frames="<<frames
                  <<" startup_ms="<<startup_ms
                  <<" artwork_pending_frames="<<artwork_pending_frames<<" artwork_prepare_max_ms="<<artwork_prepare_max_ms

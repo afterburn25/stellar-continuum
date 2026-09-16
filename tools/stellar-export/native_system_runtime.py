@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 from native_frame_profile import validate_cold_profile, validate_profile_frames, validate_steady_profile
+from native_bmp import validate_bmp
 
 
 def _system_diagnostic(stdout):
@@ -73,16 +74,14 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
                 raise RuntimeError("Native body inspection did not prove fields, focus and bounded scrolling")
             inspections.append(inspection)
             detail = capture.with_name(capture.stem + "-body-details.bmp")
-            if not detail.is_file() or detail.stat().st_size < 54 or detail.read_bytes()[:2] != b"BM":
-                raise RuntimeError("Native body inspection did not capture its final details")
+            validate_bmp(detail, width, height, "body inspection", stdout=result.stdout)
             detail_evidence = folder.parent / f"{folder.name}-system-{width}x{height}-body-details.bmp"
             shutil.copy2(detail, detail_evidence)
             details.append(str(detail_evidence))
             if profile_frames:
                 profiles.append(validate_steady_profile(result.stdout, profile_frames))
                 cold_profiles.append(validate_cold_profile(result.stdout))
-            if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
-                raise RuntimeError("Native orbital view did not capture the rendered frame")
+            validate_bmp(capture, width, height, "orbital view", stdout=result.stdout)
             if not save.is_file():
                 raise RuntimeError("Native orbital view did not write its isolated Player17 save")
             payload = json.loads(save.read_text(encoding="utf-8"))

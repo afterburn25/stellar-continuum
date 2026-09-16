@@ -8,6 +8,7 @@ from unittest import mock
 
 from native_system_runtime import validate_native_system_export
 from test_native_frame_profile import cold_profile
+from test_native_bmp import bmp
 
 
 def steady_profile(samples):
@@ -47,10 +48,13 @@ class NativeSystemExportTests(unittest.TestCase):
                     payload["SimulationDays"] = 1
                 if fault != "save":
                     save.write_text(json.dumps(payload))
+                width = int(args[args.index("--width") + 1])
+                height = int(args[args.index("--height") + 1])
+                image = bmp(width, height)
                 if fault != "capture":
-                    capture.write_bytes(b"BM" + bytes(54))
+                    capture.write_bytes(image if fault != "invalid_capture" else b"BM" + bytes(54))
                 if fault != "detail_capture":
-                    capture.with_name(capture.stem + "-body-details.bmp").write_bytes(b"BM" + bytes(54))
+                    capture.with_name(capture.stem + "-body-details.bmp").write_bytes(image if fault != "invalid_detail" else b"BM" + bytes(54))
                 body = 4 if fault == "body" else 3
                 images = 0 if fault == "images" else 9
                 scale = "nan" if fault == "scale" else "0.025"
@@ -130,6 +134,11 @@ class NativeSystemExportTests(unittest.TestCase):
         for fault in ("physical", "environment", "bounded", "camera_unchanged", "focused",
                       "no_scroll", "nan_scroll", "not_reset", "no_body_proof", "detail_capture"):
             with self.subTest(fault=fault), self.assertRaises(RuntimeError): self.exercise(fault)
+
+    def test_invalid_bmp_payload_is_rejected(self):
+        for fault in ("invalid_capture", "invalid_detail"):
+            with self.subTest(fault=fault), self.assertRaisesRegex(RuntimeError, "geometry"):
+                self.exercise(fault)
 
     def test_missing_capture_is_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("capture")

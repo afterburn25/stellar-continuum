@@ -12,6 +12,7 @@ import struct
 import subprocess
 import tempfile
 from native_client_runtime import _validate_capture
+from native_bmp import capture_dimensions, validate_bmp
 
 _FIELDS = {
     "mode", "system_id", "body_id", "colony_id", "type_id", "site_id",
@@ -127,25 +128,8 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native surface did not capture a BMP frame")
-    declared = struct.unpack_from("<I", data, 2)[0]
-    offset = struct.unpack_from("<I", data, 10)[0]
-    header = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required = row * abs(actual_height)
-    if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
-            offset + required > len(data)):
-        raise RuntimeError("Native surface capture has invalid renderer geometry")
-    pixels = data[offset:offset + required]
-    if not pixels or min(pixels) == max(pixels):
-        raise RuntimeError("Native surface capture contains no rendered variation")
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "surface", stdout=stdout)
 
 def _surface_art(stdout: str) -> dict:
     rows = re.findall(r"(?m)^surface_art=(\{[^\n]+\})$", stdout)
@@ -203,9 +187,19 @@ def _surface_inspection(stdout, colony, required_statuses=()):
     return state
 
 
-def _validate_surface_focus(capture, focus, width, height, terrain):
-    _validate_capture(focus, width, height)
-    base_rows, focused_rows = _bmp_rgb_rows(capture, width, height), _bmp_rgb_rows(focus, width, height)
+def _surface_capture_size(path, width, height, stdout):
+    return capture_dimensions(path, stdout, "surface") or (width, height)
+
+
+def _validate_surface_focus(capture, focus, width, height, terrain, stdout=None):
+    actual = _surface_capture_size(capture, width, height, stdout)
+    focused = _surface_capture_size(focus, width, height, stdout)
+    if actual != focused:
+        raise RuntimeError("Native surface focus captures have different renderer geometry")
+    _bmp(focus, *actual, stdout)
+    base_rows = _bmp_rgb_rows(capture, *actual)
+    focused_rows = _bmp_rgb_rows(focus, *actual)
+    width, height = actual
     x, y, w, h = terrain
     changes = 0
     for py in range(max(0, math.ceil(y)), min(height, math.floor(y+h))):
@@ -246,11 +240,17 @@ def _bmp_rgb_rows(path: Path, width: int, height: int):
     return rows
 
 
-def _validate_surface_art_pixels(capture: Path, fallback: Path, width: int, height: int, terrain):
-    _validate_capture(capture, width, height)
-    _validate_capture(fallback, width, height)
-    base_rows = _bmp_rgb_rows(capture, width, height)
-    alt_rows = _bmp_rgb_rows(fallback, width, height)
+def _validate_surface_art_pixels(capture: Path, fallback: Path, width: int, height: int,
+                                 terrain, stdout=None):
+    actual = _surface_capture_size(capture, width, height, stdout)
+    alternate = _surface_capture_size(fallback, width, height, stdout)
+    if actual != alternate:
+        raise RuntimeError("Native surface art captures have different renderer geometry")
+    _bmp(capture, *actual, stdout)
+    _bmp(fallback, *actual, stdout)
+    base_rows = _bmp_rgb_rows(capture, *actual)
+    alt_rows = _bmp_rgb_rows(fallback, *actual)
+    width, height = actual
     x, y, w, h = terrain
     if w <= 0 or h <= 0 or x < -2 or y < -2 or x + w > width + 2 or y + h > height + 2: raise RuntimeError("Native surface art terrain is outside the capture")
     inside = outside = 0
@@ -490,7 +490,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
         result, _ = _launch(common + ["--width", "1280", "--height", "720",
                                       "--smoke", str(base_capture)], work, clean,
                             "fresh-base launch")
-        _bmp(base_capture, 1280, 720)
+        _bmp(base_capture, 1280, 720, result.stdout)
         if not save.is_file():
             raise RuntimeError("Native surface fresh-base launch wrote no Player17 save")
         base = json.loads(save.read_text(encoding="utf-8-sig"))
@@ -512,10 +512,10 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
             art_diagnostics.append(_surface_art(result.stdout))
-            _bmp(capture, width, height)
+            _bmp(capture, width, height, result.stdout)
             sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
-            _validate_capture(sidecar, width, height)
-            _validate_surface_art_pixels(capture, sidecar, width, height, art_diagnostics[-1]["terrain"])
+            _validate_surface_art_pixels(capture, sidecar, width, height,
+                                         art_diagnostics[-1]["terrain"], result.stdout)
             (folder.parent / f"{folder.name}-surface-{width}x{height}.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
@@ -527,7 +527,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 _surface_inspection(result.stdout, _base_colony(payload), {"CONSTRUCTION"})
                 _surface_management(result.stdout, _base_colony(payload))
                 _validate_surface_focus(capture, capture.with_name(capture.stem + "-focus.bmp"),
-                                        width, height, art_diagnostics[-1]["terrain"])
+                                        width, height, art_diagnostics[-1]["terrain"], result.stdout)
                 if _normalized(payload) != _normalized(ordered_payload):
                     raise RuntimeError("Paused surface reload changed the Player17 payload")
                 for key in ("system_id", "body_id", "colony_id", "type_id", "site_id",
@@ -561,10 +561,10 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError("Populated surface did not prove image uploads")
             state = _diagnostic(result.stdout, "paused_reload")
             art = _surface_art(result.stdout)
-            _bmp(capture, width, height)
+            _bmp(capture, width, height, result.stdout)
             sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
             _validate_surface_art_pixels(capture, sidecar, width, height,
-                                         art["terrain"])
+                                         art["terrain"], result.stdout)
             after = json.loads(save.read_text(encoding="utf-8-sig"))
             _verify_populated_surface(fixture, after, state, art)
             required = {"OPERATING", "DISABLED", "CONSTRUCTION", "NO WORKERS" if low_workforce else "NO POWER"}
@@ -572,12 +572,12 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             management = _surface_management(result.stdout, _base_colony(after))
             for stage in ("review", "result"):
                 source = capture.with_name(capture.stem + "-management-" + stage + ".bmp")
-                _bmp(source, width, height)
+                _bmp(source, width, height, result.stdout)
                 target = folder.parent / f"{folder.name}-surface-{variant}-{width}x{height}-management-{stage}.bmp"
                 shutil.copy2(source, target)
                 management_captures.append(str(target))
             focus = capture.with_name(capture.stem + "-focus.bmp")
-            _validate_surface_focus(capture, focus, width, height, art["terrain"])
+            _validate_surface_focus(capture, focus, width, height, art["terrain"], result.stdout)
             stem = f"{folder.name}-surface-{variant}-{width}x{height}"
             evidence = folder.parent / f"{stem}.bmp"
             sidecar_evidence = folder.parent / f"{stem}-without-buildings.bmp"

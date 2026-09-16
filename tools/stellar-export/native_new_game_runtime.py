@@ -15,6 +15,7 @@ import tempfile
 from native_audio_runtime import parse_native_audio_check
 from native_audio_settings_runtime import (parse_native_audio_settings_check,
                                            verify_native_audio_settings_file)
+from native_bmp import validate_bmp
 
 _FIELDS = {
     "mode", "entry_opened", "setup_opened", "species_selected",
@@ -47,25 +48,8 @@ def _source_payload(fixture: Path) -> dict:
     return payload
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native New Game did not capture a BMP frame")
-    declared = struct.unpack_from("<I", data, 2)[0]
-    offset = struct.unpack_from("<I", data, 10)[0]
-    header = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required = row * abs(actual_height)
-    if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
-            offset + required > len(data)):
-        raise RuntimeError("Native New Game capture has invalid renderer geometry")
-    pixels = data[offset:offset + required]
-    if not pixels or min(pixels) == max(pixels):
-        raise RuntimeError("Native New Game capture contains no rendered variation")
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "New Game", stdout=stdout)
 
 
 def _diagnostic(stdout: str) -> dict:
@@ -235,10 +219,10 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if not generated.is_file():
             raise RuntimeError("New Game did not create its reported independent save")
         for path in (setup_capture, loading_capture, final_capture):
-            _bmp(path, 1280, 720)
+            _bmp(path, 1280, 720, fresh.stdout)
         settings_bytes = None
         if audio_settings_check:
-            _bmp(fresh_settings_capture, 1280, 720)
+            _bmp(fresh_settings_capture, 1280, 720, fresh.stdout)
             settings_bytes = verify_native_audio_settings_file(settings_path)
         video_bytes = (anchor.parent / "video-settings.json").read_bytes() if video_settings_check else None
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
@@ -260,9 +244,9 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         reload_audio = parse_native_audio_check(loaded.stdout, fresh=False) if audio_check else None
         reload_audio_settings = (parse_native_audio_settings_check(loaded.stdout, fresh=False)
                                  if audio_settings_check else None)
-        _bmp(reload_capture, 1920, 1080)
+        _bmp(reload_capture, 1920, 1080, loaded.stdout)
         if audio_settings_check:
-            _bmp(reload_settings_capture, 1920, 1080)
+            _bmp(reload_settings_capture, 1920, 1080, loaded.stdout)
             if verify_native_audio_settings_file(settings_path) != settings_bytes:
                 raise RuntimeError("Native audio settings changed during paused reload")
         if anchor.read_bytes() != anchor_bytes or not generated.is_file():
@@ -283,10 +267,11 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
                 video_checks[location] = _video_diagnostic(process.stdout, location)
         capture_paths = [setup_capture, loading_capture, final_capture, reload_capture]
         if video_settings_check:
-            for base, dimensions in ((final_capture, (1280, 720)), (reload_capture, (1920, 1080))):
+            for base, dimensions, stdout in ((final_capture, (1280, 720), fresh.stdout),
+                                              (reload_capture, (1920, 1080), loaded.stdout)):
                 for suffix in ("-video-settings", "-video-confirm"):
                     path = base.with_stem(base.stem + suffix)
-                    _bmp(path, *dimensions)
+                    _bmp(path, *dimensions, stdout)
                     capture_paths.append(path)
         if audio_settings_check:
             capture_paths.extend((fresh_settings_capture, reload_settings_capture))

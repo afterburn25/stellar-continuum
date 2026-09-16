@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <numbers>
@@ -31,6 +32,15 @@ namespace {
 [[nodiscard]] std::runtime_error sdl_error(const char *operation){return std::runtime_error(std::string(operation)+": "+SDL_GetError());}
 void require(bool success,const char *operation){if(!success)throw sdl_error(operation);}
 [[nodiscard]] std::string utf8_path(const std::filesystem::path &path){const auto value=path.u8string();return {reinterpret_cast<const char*>(value.data()),value.size()};}
+void report_capture(const std::filesystem::path &path,int width,int height){
+  std::string escaped;
+  for(const unsigned char value:utf8_path(std::filesystem::absolute(path).lexically_normal())){
+    if(value=='"'||value=='\\'){escaped+='\\';escaped+=static_cast<char>(value);}
+    else if(value<32){constexpr char hex[]="0123456789abcdef";escaped+="\\u00";escaped+=hex[value>>4];escaped+=hex[value&15];}
+    else escaped+=static_cast<char>(value);
+  }
+  std::cout<<"native_capture={\"path\":\""<<escaped<<"\",\"width\":"<<width<<",\"height\":"<<height<<"}\n";
+}
 [[nodiscard]] std::wstring utf16(std::string_view value){
   if(value.empty())return {};
   if(value.size()>static_cast<std::size_t>(std::numeric_limits<int>::max()))throw std::length_error("Text is too long for the Windows rasterizer.");
@@ -293,7 +303,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
   for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
   if(timing)timing->submission_ms=elapsed_ms(*submission_started);
-  if(screenshot){const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");if(timing)timing->readback_ms=elapsed_ms(*readback_started);}
+  if(screenshot){const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");if(timing)timing->readback_ms=elapsed_ms(*readback_started);report_capture(*screenshot,surface->w,surface->h);}
   const auto pace=std::max(storage_->frame_cap_interval_ns,storage_->vsync?Uint64{0}:storage_->fallback_interval_ns);
   if(pace){const auto throttle_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<pace)SDL_DelayPrecise(pace-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();if(timing)timing->throttle_ms=elapsed_ms(*throttle_started);}
   const auto present_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;require(SDL_RenderPresent(storage_->renderer),"SDL present failed");if(timing)timing->present_ms=elapsed_ms(*present_started);

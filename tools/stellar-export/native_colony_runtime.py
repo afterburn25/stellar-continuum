@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_bmp import validate_bmp
 
 
 def _finite(value, label):
@@ -46,24 +47,8 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native colony did not capture a BMP frame")
-    declared_size, pixel_offset = struct.unpack_from("<II", data, 2)[0], struct.unpack_from("<I", data, 10)[0]
-    header_size = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row_bytes = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required_pixels = row_bytes * abs(actual_height)
-    if (declared_size != len(data) or pixel_offset < 54 or header_size < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or
-            required_pixels <= 0 or pixel_offset + required_pixels > len(data)):
-        raise RuntimeError("Native colony capture has invalid renderer geometry")
-    pixels = data[pixel_offset:]
-    if not pixels or min(pixels) == max(pixels):
-        raise RuntimeError("Native colony capture contains no rendered variation")
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "colony", stdout=stdout)
 
 
 def _owned_colony(payload, state):
@@ -145,7 +130,7 @@ def validate_native_colony_export(folder: Path, env: dict[str, str]):
             if not uploads or int(uploads.group(1)) < 1:
                 raise RuntimeError("Native colony did not prove rendered orbital image uploads")
             state = _diagnostic(result.stdout, label)
-            _bmp(capture, width, height)
+            _bmp(capture, width, height, result.stdout)
             if not save.is_file():
                 raise RuntimeError("Native colony did not write its isolated Player17 save")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))

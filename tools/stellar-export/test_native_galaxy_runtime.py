@@ -108,7 +108,7 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
                 stdout += f" galaxy_art={json.dumps(state, separators=(',', ':'))}"
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
-            def fake_bmp(path, width, height):
+            def fake_bmp(path, width, height, stdout=None):
                 if not path.is_file(): raise RuntimeError("missing capture")
                 if fault == "same_capture": return b"same"
                 return (path.name + str(width) + str(height)).encode()

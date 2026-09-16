@@ -403,6 +403,19 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
             fallback.write_bytes(logical_bmp(20, 20, bits=32, top_down=True,
                                              offset=70, changed=changed))
             _validate_surface_art_pixels(capture, fallback, 20, 20, [0, 0, 20, 20])
+    def test_surface_art_comparison_uses_matching_drawable_geometry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            capture = root / "capture.bmp"
+            fallback = root / "fallback.bmp"
+            capture.write_bytes(logical_bmp(40, 40, bits=24, top_down=False, offset=54))
+            fallback.write_bytes(logical_bmp(40, 40, bits=24, top_down=False,
+                                             offset=54, changed={(x, y) for y in range(20) for x in range(20)}))
+            stdout = "\n".join(
+                "native_capture=" + json.dumps({"path": str(path), "width": 40, "height": 40},
+                                                separators=(",", ":"))
+                for path in (capture, fallback))
+            _validate_surface_art_pixels(capture, fallback, 20, 20, [0, 0, 40, 40], stdout)
     def test_populated_reload_mutation_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("populated_payload")
     def test_populated_family_mutation_rejected(self):

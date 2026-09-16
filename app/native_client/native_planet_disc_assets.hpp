@@ -13,6 +13,10 @@ namespace stellar::native_map { class ImagePreparationQueue; }
 namespace stellar::native_system_ui {
 inline constexpr std::size_t maximum_planet_disc_entries=96;
 inline constexpr std::size_t maximum_planet_disc_bytes=16u*1024u*1024u;
+inline constexpr int source_planet_disc_resolution=512;
+inline constexpr int procedural_planet_disc_resolution=256;
+inline constexpr std::size_t source_planet_disc_bytes=static_cast<std::size_t>(source_planet_disc_resolution)*source_planet_disc_resolution*4u;
+inline constexpr std::size_t procedural_planet_disc_bytes=static_cast<std::size_t>(procedural_planet_disc_resolution)*procedural_planet_disc_resolution*4u;
 
 // Application asset adapter. It consumes only observer-safe appearance data and
 // returns immutable Engine image resources; neither Engine nor Core knows paths.

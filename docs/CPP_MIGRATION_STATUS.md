@@ -2,7 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`e8672801` inventoried; support, notifications, tactical, strategic fleet orders/Locate, civilian recovery,
+`88de7e38` inventoried; support, notifications, tactical, strategic fleet orders/Locate, civilian recovery,
 safe video settings, observer-safe system/planet inspection, home-system supply, surface management, sovereign economy and
 save-gated New Game selectively adapted. New voice and newest empire/mission
 boards remain unimported pending review).
@@ -16,7 +16,45 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
-### Strategic fleet orders and Locate
+### Celestial detail and capture validation
+
+Approved Sol/Earth imagery is retained. Source-backed planet discs now render at
+512x512 and surveyed procedural bodies at 256x256, with the same 16 MiB cache.
+Asynchronous jobs reserve their real output size; queue saturation, cancellation,
+observer privacy and camera-only image reuse remain enforced. The pending generated
+planet/star replacements were reviewed rather than imported: they replace restored
+Earth, introduce presentation-only rings and bypass the bounded asynchronous cache.
+Review and contracts: `docs/engine/NATIVE_CELESTIAL_ART_REVIEW.md`.
+
+Native readback reports each BMP's absolute UTF-8 path and actual pixel geometry.
+The shared validator requires unique matching capture evidence and exact dimensions,
+including separate startup/settings/final phases. Headers, masks, payload and true
+RGB variation are checked; alpha/padding do not prove a rendered frame. Surface
+building/focus comparisons use actual capture dimensions. Legacy evidence without
+records must match requested geometry. This addresses Devin a0f3b102's high-DPI goal
+without accepting either logical or drawable size indiscriminately.
+
+Validation: final MSVC build and 11 affected CTests; Python export discovery 480
+(463 passed / 17 optional executable checks skipped). Relocated Vulkan system,
+New Game with audio/video settings, galaxy, military, economy, supply, inspection
+and surface suites pass. System browsing preserves the complete paused Player17
+payload across reload. Source-disc, loading, galaxy and system captures inspected.
+Synthetic 2x capture tests cover per-phase geometry; this session's physical display
+runs were 720p/1080p, not a claim of testing Windows at 200% scaling. Short system
+profiles measured mean intervals 16.683/16.728 ms; this is not sustained 60 FPS proof.
+Evidence: work/native-detail-{build,final-build,ctest,python}.log,
+work/native-detail-{system,new-game,galaxy,military,economy,supply,inspection,surface}.json,
+and work/native-detail-discs/.
+
+Latest inventoried Devin head is 88de7e38 (shared base remains ac45d958). Next:
+selectively adapt f0567489/88de7e38 terrain relief while retaining approved terrain
+art, using bounded asynchronous world-space preparation rather than synchronous
+viewport-sized regeneration on every pan. Generated celestial replacements,
+Land/Collect d9d23f57 and colony sites e49f4df0 remain unimported. No Core/C#/Player17
+schema change. PR332 remains unmerged; the local validation package is UNSEALED,
+not a release download. Full 3D visuals and sustained performance remain unfinished.
+
+### Previous checkpoint: Strategic fleet orders and Locate
 
 Native fleet controls selectively adapt Devin `e8672801`: owned armed fleets
 receive Hold, Defend and Retreat controls with current order and pre-action hover
