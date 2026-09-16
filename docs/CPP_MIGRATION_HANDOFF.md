@@ -5,7 +5,43 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
-### Outpost freight collection
+### Owned-colony navigation
+
+A compact planet icon now opens the player's colonies and resource outposts.
+Rows group colony/kind, world/system and population; View reuses the existing
+owned-colony screen and its surface/freight controls. The roster scrolls at 720p,
+1080p and 4K without losing its position when population updates. Hover feedback,
+matched press/release, viewport/focus/menu cancellation and current-ownership
+revalidation prevent stray or stale actions. Unsurveyed location names stay
+hidden. The old system inspector is suppressed while this workspace is open.
+No Core, C#, Player17 schema or approved-artwork changes.
+
+Validation: MSVC native build; 14 affected CTests pass. Python discovery: 492
+checks, 475 passed and 17 optional executable checks skipped. Relocated Vulkan
+roster navigation and full paused reload pass at 720p/1080p; both roster captures
+were visually inspected after correcting an inspector overlap. Whole canonical
+Player17, fleet selection and strategic camera stay unchanged when browsing.
+Freight dispatch/reload, surface construction/management/relief, both settlement
+kinds and navigation regression suites also pass on the final executable.
+Evidence: work/native-roster-{build-final,ctest,python,runtime}.log and
+work/native-roster-{runtime,freight,surface,settlement,navigation}.json.
+Contract: `docs/engine/NATIVE_COLONY_ROSTER.md`.
+
+This selectively addresses the discoverability need in Devin e49f4df0 through
+existing navigation; its separate mission board remains unimported. Devin head
+b023e384 and shared base ac45d958 are unchanged; PR332 remains unmerged. The test
+package is UNSEALED and is not a release download or final visual-quality claim.
+
+Next playthrough gap: prove the ordinary fresh-campaign path to the first scout
+and science vessel through native graphical input. Existing shipyard/fleet
+runtime checks author prerequisites or ships; the maintained fresh progression
+test proves the paid Core/controller chain without grants but not the complete
+mouse-driven path. Seed 115501 succeeds; seed 115500 exposes the already-documented
+canonical warp-research dead end. Preserve that rule and record the limitation;
+do not grant capabilities or call the missing graphical evidence a proven UI bug.
+See `docs/engine/NATIVE_FRESH_PROGRESSION.md`.
+
+### Previous checkpoint: Outpost freight collection
 
 Owned resource outposts now expose Collect materials from their existing colony
 screen. A paused review identifies the exact freighter, home, destination, cargo

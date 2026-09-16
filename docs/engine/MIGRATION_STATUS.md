@@ -1,5 +1,15 @@
 # Stellar Engine migration status
 
+Owned-colony roster checkpoint (2026-09-16): the compact navigation icon opens
+owned colonies/outposts with grouped identity/location/population and direct View
+entry. Survey privacy, live ownership and matched-input gates remain required;
+refresh preserves scroll and the inspector no longer overlaps the list. MSVC,
+14 CTests, Python492 (475 pass / 17 optional skips), 720p/1080p Vulkan roster and
+paused reload plus freight/surface/settlement/navigation regressions pass.
+See `NATIVE_COLONY_ROSTER.md` and `../CPP_MIGRATION_HANDOFF.md`. No Core/C#/schema
+or approved-art changes. UNSEALED local package; PR332 unmerged. Next: graphical
+fresh-campaign-to-first-ship proof using the existing no-grant progression recipe.
+
 Outpost freight checkpoint (2026-09-16): owned outposts expose a paused Collect
 materials review and exact-ship dispatch through existing Core. Copied-state
 preflight skips unreachable ships and catches invalid orders before live mutation;

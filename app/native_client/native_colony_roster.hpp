@@ -1,0 +1,81 @@
+#pragma once
+
+#include <stellar/core/fresh_campaign.hpp>
+#include <stellar/engine/native_map_platform.hpp>
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace stellar::native_colony_roster {
+
+struct Row {
+  int colony_id{}, body_id{}, system_id{};
+  std::string name, body_name, system_name, kind_label, population;
+  bool can_open{};
+  std::string reason;
+  bool operator==(const Row &) const = default;
+};
+
+struct View {
+  std::uint64_t generation{};
+  int player_id{};
+  std::vector<Row> rows;
+  std::string message;
+  bool available{};
+};
+
+[[nodiscard]] View build(const stellar::core::FreshCampaignState &,
+                         std::uint64_t generation);
+
+struct RosterLayout {
+  stellar::native_map::UiRect panel, list, close, refresh;
+  float scale{}, row_height{};
+  [[nodiscard]] static RosterLayout for_viewport(int width,
+                                                 int height) noexcept;
+};
+
+struct RosterCommand {
+  bool captured{}, refresh{};
+  std::optional<int> open_colony_id;
+  std::uint64_t generation{};
+  int player_id{}, body_id{}, system_id{};
+};
+
+class RosterWorkspace final {
+public:
+  void set_view(View);
+  [[nodiscard]] const View &view() const noexcept { return view_; }
+  void open() noexcept;
+  void close() noexcept;
+  void discard_campaign() noexcept;
+  void cancel_pending_input() noexcept { clear_press(); }
+  [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  void set_notice(std::string value) { notice_ = std::move(value); }
+  [[nodiscard]] RosterCommand handle(const stellar::native_map::InputEvent &,
+                                     int width, int height);
+  void render(stellar::native_map::DrawList &, int width, int height) const;
+  [[nodiscard]] stellar::native_map::UiRect
+  row_button(int row_index, int width, int height) const noexcept;
+
+private:
+  enum class PressTarget { none, close, refresh, row };
+  void clear_press() noexcept;
+  [[nodiscard]] float maximum_scroll(const RosterLayout &) const noexcept;
+  View view_;
+  bool visible_{};
+  mutable float scroll_{};
+  std::string notice_;
+  std::optional<int> pressed_row_;
+  PressTarget pressed_target_{PressTarget::none};
+  bool pointer_owned_{};
+  stellar::native_map::Point pointer_{};
+  int viewport_width_{}, viewport_height_{};
+  std::uint64_t pressed_generation_{};
+  int pressed_player_id_{};
+};
+
+} // namespace stellar::native_colony_roster

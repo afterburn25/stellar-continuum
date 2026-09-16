@@ -33,7 +33,8 @@ enum class UiAction {
   Notifications,
   Exit,
   Supply,
-  Economy
+  Economy,
+  Colonies
 };
 
 struct NativeUiLayout {
@@ -61,6 +62,7 @@ struct NativeUiLayout {
   UiRect new_game_button;
   UiRect supply;
   UiRect economy;
+  UiRect colonies;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
@@ -85,8 +87,8 @@ struct NativeUiLayout {
     const auto status_width = std::max(
         0.f, std::min(720.f * scale, screen_width - status_x - inset - 114.f * scale));
     const auto rail_size = 44.f * scale;
-    const auto rail_y = 138.f * scale;
     const auto rail_gap = 8.f * scale;
+    const auto rail_y = std::min(138.f * scale, screen_height - inset - 7.f * rail_size - 6.f * rail_gap);
 
     return {
         scale,
@@ -120,7 +122,8 @@ struct NativeUiLayout {
         {center_x - button_width * .5f,
          first_y + (button_height + gap) * 5.f, button_width, button_height},
         {inset, rail_y + (rail_size + rail_gap) * 4.f, rail_size, rail_size},
-        {inset, rail_y + (rail_size + rail_gap) * 5.f, rail_size, rail_size}};
+        {inset, rail_y + (rail_size + rail_gap) * 5.f, rail_size, rail_size},
+        {inset, rail_y + (rail_size + rail_gap) * 6.f, rail_size, rail_size}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -143,6 +146,7 @@ struct NativeUiLayout {
     if (diplomacy.contains(point)) return UiAction::Diplomacy;
     if (supply.contains(point)) return UiAction::Supply;
     if (economy.contains(point)) return UiAction::Economy;
+    if (colonies.contains(point)) return UiAction::Colonies;
     return UiAction::None;
   }
 };
