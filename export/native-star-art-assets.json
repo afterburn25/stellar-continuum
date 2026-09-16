@@ -4,37 +4,37 @@
     "star-a-white": {
       "source": "assets/visual/stars/star-a-white.png",
       "runtimePath": "assets/visual/stars/star-a-white.png",
-      "sha256": "a847b123aac30ffa73c099d69b89d15fdac97d1748a31ed5eea07929479bbe31"
+      "sha256": "d78305289c43d3d713e81b959e797801d9c36907bb45ae3bdc0e60df5750a672"
     },
     "star-f-dwarf": {
       "source": "assets/visual/stars/star-f-dwarf.png",
       "runtimePath": "assets/visual/stars/star-f-dwarf.png",
-      "sha256": "e94140f5194b196e2a978f96b2507ebb64f6b19fc751f4b27f607ca81e6739e8"
+      "sha256": "e5ccc40b63abcb16e111c4a7a8195815c2c8c1f0543c545c9dd9f8d908c48120"
     },
     "star-g-dwarf": {
       "source": "assets/visual/stars/star-g-dwarf.png",
       "runtimePath": "assets/visual/stars/star-g-dwarf.png",
-      "sha256": "5fbf7359b278c34590334d9a3a16145b343aabb97261d585ca6efadf8f4c1a1c"
+      "sha256": "53197625b375a1f5ea3427e76e9567929289336e397b3de6bd9abe1447919177"
     },
     "star-giant": {
       "source": "assets/visual/stars/star-giant.png",
       "runtimePath": "assets/visual/stars/star-giant.png",
-      "sha256": "8f6723d06fb164aaa29d8b53279e206006a1ceac2a34302d132363bf609a02c7"
+      "sha256": "03f48eed604488a07fa514edb1c9dff3fb3e496d8aeaceb16bcbc329a629f7ba"
     },
     "star-hot-blue": {
       "source": "assets/visual/stars/star-hot-blue.png",
       "runtimePath": "assets/visual/stars/star-hot-blue.png",
-      "sha256": "881cb7ed0413a80a67d1bdb242188aaca1e55613ae82e73c5575bf2ec89dddca"
+      "sha256": "8c7ba2579fa2119186e1d0e95bd2769b0a019ed5978e0c9ce26d2de42b7ece4b"
     },
     "star-k-dwarf": {
       "source": "assets/visual/stars/star-k-dwarf.png",
       "runtimePath": "assets/visual/stars/star-k-dwarf.png",
-      "sha256": "aad5c6b39610c945548d1834d99ef24d246dd59e875a50df5c782057245bf18a"
+      "sha256": "12b6e7a8540cf936e26c4fe933657d024197e6fd781062776fdceeaf384e36cc"
     },
     "star-m-dwarf": {
       "source": "assets/visual/stars/star-m-dwarf.png",
       "runtimePath": "assets/visual/stars/star-m-dwarf.png",
-      "sha256": "5ce7baee14d5ef74d6108409d23a7a1e17cefaee6673f22aa914522830f18852"
+      "sha256": "9afffc6573ce7ea60ccb8295d5e7b3be3d2e0d70979583fa807823820a9d50f4"
     },
     "star-neutron": {
       "source": "assets/visual/stars/star-neutron.png",
@@ -54,12 +54,12 @@
     "star-white-dwarf": {
       "source": "assets/visual/stars/star-white-dwarf.png",
       "runtimePath": "assets/visual/stars/star-white-dwarf.png",
-      "sha256": "397e4582e8e6aee624b6d086a7cbb41cc1a2320f4df72b488ff41b9e52f17bef"
+      "sha256": "3627cb59b56f484734ae981711ff3ab9485b7f301a327808b94a101dd45833e1"
     },
     "credits": {
       "source": "docs/engine/NATIVE_STAR_ART_SOURCES.md",
       "runtimePath": "Licenses/Star-art-sources.md",
-      "sha256": "1e36932155efd2eb8a5761a292590eca9b3eab562e63156d2f0b75685ae8a868"
+      "sha256": "4c450de9bf667dc443afadc649706955f3d5b667a771e996adee5a053c2ffd44"
     }
   }
 }

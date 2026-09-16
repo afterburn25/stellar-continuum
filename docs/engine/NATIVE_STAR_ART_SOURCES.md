@@ -1,56 +1,63 @@
 # Native star artwork sources
 
-The C++ client ships this approved generated star-disc set. All files are
+The C++ client ships this approved star-disc set. All files are
 1024x1024 RGBA PNGs on transparent backgrounds; each photosphere disc is
-centered with a 233 px radius (0.455 of the texture half-width, matching
-`stellar_texture_size` geometry in `native_celestial_appearance.cpp`) and a
-luminance-driven corona fades to fully transparent before the canvas edge.
-Eleven sprites cover every `StellarClass` except `BlackHole`, which stays
-procedural (lensed horizon + accretion disc).
+centered with a ~230 px radius (matching `stellar_texture_size` geometry
+in `native_celestial_appearance.cpp`) and a soft corona rim fades to
+fully transparent ~60 px past the limb. Eleven sprites cover every
+`StellarClass` except `BlackHole`, which stays procedural (lensed
+horizon + accretion disc).
 
-## Generation provenance
+## Source imagery: NASA SDO/AIA (public domain)
 
-All eleven discs were rendered locally with **FLUX.1-schnell**
-(`black-forest-labs/FLUX.1-schnell`, Apache-2.0 license — the dev variant
-was avoided because it is non-commercial). The pipeline ran the
-`city96/FLUX.1-schnell-gguf` Q5_K_S transformer, the
-`mcmonkey/google_t5-v1_1-xxl_encoderonly` T5 encoder (4-bit NF4),
-`openai/clip-vit-large-patch14` and the `nerualdreming/flux_vae` VAE, all
-through a locally assembled Diffusers `FluxPipeline` (4 inference steps,
-guidance 0). The deterministic script is `D:\gen-venv\gen_stars.py`
-(`regen_fdwarf.py` for the F-class reroll); each render used a
-"photorealistic astronomy photograph" wrapper with "glowing circular disc
-centered on pure black space background, soft thin corona glow, no lens
-flare streaks, no planets, no text".
+Eight of the eleven sprites are derived from real Solar Dynamics
+Observatory Atmospheric Imaging Assembly full-disc images
+(sdo.gsfc.nasa.gov — NASA data is public domain). The deterministic
+bake script is `D:\gen-venv\bake_stars.py`; per class it:
 
-## Post-processing (deterministic, `D:\gen-venv\finalize_stars.py`)
+1. Erases the SDO timestamp strip, then rotates/mirrors the disc by a
+   per-class deterministic angle so each sprite has unique surface
+   structure.
+2. Fits the photosphere limb as the steepest descent of the radial
+   luminance profile and rescales the disc onto the 1024 px canvas.
+3. Bakes deterministic umbra/penumbra starspot groups (foreshortened
+   near the limb) whose count/size scale with class activity.
+4. Compresses local luminance detail for hot stars (they are nearly
+   featureless), applies a mild per-channel hue gain toward the engine
+   spectral palette (`star_color` in `native_system_workspace.cpp`)
+   inside the disc, and tints the corona rim by the class color.
+5. Alpha: opaque disc with a soft limb rolloff, corona alpha capped at
+   0.30 and fading to zero within ~60 px of the limb; a global radial
+   window guarantees fully transparent canvas edges.
 
-1. Radial luminance profile disc fit (`fit_disc`, 0.30*peak threshold).
-2. Centered rescale onto the 1024 px canvas at the engine's 233 px disc.
-3. Per-class hue alignment: each channel is scaled so the inner-disc mean
-   hue matches the engine spectral palette (`star_color` in
-   `native_system_workspace.cpp`) while preserving the render's own
-   luminance structure. `star-f-dwarf` additionally receives a luminance
-   unsharp mask because the F-class render is nearly featureless.
-4. Alpha: opaque disc with a 4 px rolloff, corona alpha = clamped
-   luminance outside the disc, and a radial window forcing alpha to zero
-   before the canvas edge so nothing hard-clips the texture.
+| Asset | AIA channel | Notes |
+|---|---|---|
+| star-m-dwarf | 0304 | 12 large spot groups, deep red |
+| star-k-dwarf | 0304 | 8 spot groups, orange-red |
+| star-g-dwarf | 0171 | 5 spot groups, golden |
+| star-f-dwarf | 0171 | 3 spot groups, pale gold |
+| star-a-white | 0193 | 2 small groups, blue-white |
+| star-hot-blue | 0193 | 1 small group, flattened detail |
+| star-giant | 0304 | 9 large groups, deep orange-red |
+| star-white-dwarf | 0193 | no spots, smooth silver-white |
 
-## Per-asset seeds
+## FLUX.1-schnell renders (compact/exotic objects)
 
-| Asset | Script | Variant | Seed |
-|---|---|---|---|
-| star-m-dwarf | `gen_stars.py` | v1 | `0x622B + 0*617` |
-| star-k-dwarf | `gen_stars.py` | v1 | `0x622B + 1*617` |
-| star-g-dwarf | `gen_stars.py` | v2 | `0x633C + 2*617` |
-| star-f-dwarf | `regen_fdwarf.py` | r2v1 | `0x722B` |
-| star-a-white | `gen_stars.py` | v2 | `0x633C + 4*617` |
-| star-hot-blue | `gen_stars.py` | v2 | `0x633C + 5*617` |
-| star-giant | `gen_stars.py` | v1 | `0x622B + 6*617` |
-| star-white-dwarf | `gen_stars.py` | v2 | `0x633C + 7*617` |
-| star-neutron | `gen_stars.py` | v0 | `0x611A + 8*617` |
-| star-protostar | `gen_stars.py` | v1 | `0x622B + 9*617` |
-| star-pulsar | `gen_stars.py` | v2 | `0x633C + 10*617` |
+No real photosphere imagery exists for the remaining classes, so
+`star-neutron`, `star-protostar`, and `star-pulsar` keep the earlier
+FLUX.1-schnell renders (`black-forest-labs/FLUX.1-schnell`, Apache-2.0;
+the non-commercial dev variant was avoided). Pipeline: Diffusers
+`FluxPipeline` with the `city96/FLUX.1-schnell-gguf` Q5_K_S transformer,
+`mcmonkey/google_t5-v1_1-xxl_encoderonly` T5 encoder,
+`openai/clip-vit-large-patch14`, `nerualdreming/flux_vae` VAE; 4 steps,
+guidance 0. Generator: `D:\gen-venv\gen_stars.py`; normalization:
+`D:\gen-venv\finalize_stars.py`.
+
+| Asset | Variant | Seed |
+|---|---|---|
+| star-neutron | v0 | `0x611A + 8*617` |
+| star-protostar | v1 | `0x622B + 9*617` |
+| star-pulsar | v2 | `0x633C + 10*617` |
 
 ## Observer rules
 
