@@ -47,24 +47,35 @@ void verify(int width, int height, float expected_scale) {
       {layout.new_game_button, UiAction::NewGame},
       {layout.exit_button, UiAction::Exit},
   }};
+  const std::array<std::pair<UiRect, UiAction>, 14> navigation{{
+      {layout.map, UiAction::Map}, {layout.home, UiAction::Home},
+      {layout.inspect, UiAction::Inspect}, {layout.zoom_in, UiAction::ZoomIn},
+      {layout.zoom_out, UiAction::ZoomOut}, {layout.economy, UiAction::Economy},
+      {layout.research, UiAction::Research}, {layout.construction, UiAction::Construction},
+      {layout.shipyard, UiAction::Shipyard}, {layout.explore, UiAction::Explore},
+      {layout.colonies, UiAction::Colonies}, {layout.supply, UiAction::Supply},
+      {layout.diplomacy, UiAction::Diplomacy}, {layout.menu, UiAction::Menu},
+  }};
 
   require(std::abs(layout.scale - expected_scale) < .001f,
           "Viewport produced the wrong UI scale.");
   require(contains_rect(viewport, layout.pause) &&
               contains_rect(viewport, layout.speed) &&
               contains_rect(viewport, layout.notifications) &&
-              contains_rect(viewport, layout.research) &&
-              contains_rect(viewport, layout.shipyard) &&
-              contains_rect(viewport, layout.construction) &&
-              contains_rect(viewport, layout.diplomacy) &&
-              contains_rect(viewport, layout.supply) &&
-              contains_rect(viewport, layout.economy) &&
-              contains_rect(viewport, layout.colonies) &&
               contains_rect(viewport, layout.day_text) &&
               contains_rect(viewport, layout.status_text) &&
               contains_rect(viewport, layout.menu_panel) &&
               contains_rect(layout.menu_panel, layout.menu_heading),
           "A UI rectangle escaped the drawable viewport.");
+  for (const auto [bounds, action] : navigation) {
+    (void)action;
+    require(contains_rect(viewport, bounds),
+            "A navigation button escaped the drawable viewport.");
+  }
+  for (std::size_t left = 0; left < navigation.size(); ++left)
+    for (std::size_t right = left + 1; right < navigation.size(); ++right)
+      require(!overlaps(navigation[left].first, navigation[right].first),
+              "Navigation buttons overlap.");
   require(!overlaps(layout.pause, layout.speed) &&
               !overlaps(layout.notifications, layout.pause) &&
               !overlaps(layout.notifications, layout.speed) &&
@@ -122,43 +133,19 @@ void verify(int width, int height, float expected_scale) {
     require(layout.hit(point, false) == UiAction::Speed,
             "A point inside Speed missed its action.");
   }
-  for (const auto point : interior_points(layout.research)) {
-    require(layout.hit(point, false) == UiAction::Research,
-            "A point inside Research missed its action.");
-  }
-  for (const auto point : interior_points(layout.shipyard)) {
-    require(layout.hit(point, false) == UiAction::Shipyard,
-            "A point inside Shipyard missed its action.");
-  }
-  for (const auto point : interior_points(layout.construction)) {
-    require(layout.hit(point, false) == UiAction::Construction,
-            "A point inside Construction missed its action.");
-  }
   for (const auto point : interior_points(layout.notifications)) {
     require(layout.hit(point, false) == UiAction::Notifications,
             "A point inside Events missed its action.");
     require(layout.hit(point, true) == UiAction::None,
             "The pause menu admitted a hidden Events button.");
   }
-  for (const auto point : interior_points(layout.diplomacy)) {
-    require(layout.hit(point, false) == UiAction::Diplomacy,
-            "A point inside Relations missed its action.");
-  }
-  for (const auto point : interior_points(layout.supply))
-    require(layout.hit(point, false) == UiAction::Supply,
-            "A point inside Supply missed its action.");
-  for (const auto point : interior_points(layout.economy))
-    require(layout.hit(point, false) == UiAction::Economy,
-            "A point inside Economy missed its action.");
-  for (const auto point : interior_points(layout.colonies))
-    require(layout.hit(point, false) == UiAction::Colonies,
-            "A point inside Colonies missed its action.");
-  for (const auto bounds : {layout.research, layout.shipyard,
-                            layout.construction, layout.diplomacy,
-                            layout.supply, layout.economy, layout.colonies})
-    for (const auto point : interior_points(bounds))
+  for (const auto [bounds, action] : navigation)
+    for (const auto point : interior_points(bounds)) {
+      require(layout.hit(point, false) == action,
+              "A point inside a navigation button missed its action.");
       require(layout.hit(point, true) == UiAction::None,
-              "Pause menu accepted a hidden navigation-rail action.");
+              "Pause menu accepted a hidden navigation action.");
+    }
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,
           "Outside point activated the menu.");

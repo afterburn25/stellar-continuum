@@ -9,6 +9,7 @@
 #include <iostream>
 #include <ranges>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -21,6 +22,20 @@ using namespace stellar::native_setup;
 namespace {
 Point center(UiRect value) {
   return {value.x + value.width * .5f, value.y + value.height * .5f};
+}
+
+std::filesystem::path startup_capture_path(
+    const std::filesystem::path &setup_capture, std::string_view suffix) {
+  auto filename = setup_capture.stem().native();
+  const auto setup_suffix = std::filesystem::path{"-setup"}.native();
+  if (filename.size() >= setup_suffix.size() &&
+      filename.compare(filename.size() - setup_suffix.size(),
+                       setup_suffix.size(), setup_suffix) == 0)
+    filename.erase(filename.size() - setup_suffix.size());
+  filename += std::filesystem::path{std::string(suffix)}.native();
+  auto result = setup_capture;
+  result.replace_filename(filename + setup_capture.extension().native());
+  return result;
 }
 } // namespace
 
@@ -134,7 +149,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
     case StartupIntentKind::Create: {
       const auto started = host.start_new(
           {intent.seed_text, intent.system_count, intent.species_id,
-           config.utc_timestamp()});
+           config.utc_timestamp(), intent.pre_warp_civilization_count,
+           intent.ancient_civilization_count});
       if (started.accepted)
         workspace.begin_operation(host.poll(),
                                   StartupOperationOrigin::NewCampaign);
@@ -201,6 +217,12 @@ StartupEntryResult run_native_startup_entry(Window &window,
         const auto back = workspace.handle({InputEventType::EscapePressed},
                                            width, height, measure);
         if (back.kind != StartupIntentKind::Back ||
+            workspace.screen() != StartupScreen::ModeSelection)
+          throw std::runtime_error(
+              "Startup lifecycle automation could not return to game type selection.");
+        const auto entry = workspace.handle({InputEventType::EscapePressed},
+                                            width, height, measure);
+        if (entry.kind != StartupIntentKind::Back ||
             workspace.screen() != StartupScreen::Entry)
           throw std::runtime_error(
               "Startup lifecycle automation could not return to Entry.");
@@ -237,8 +259,24 @@ StartupEntryResult run_native_startup_entry(Window &window,
 
     StartupIntent intent;
     if (workspace.screen() == StartupScreen::Entry) {
+      DrawList menu_draw;
+      workspace.render(menu_draw, width, height, measure, &portrait_provider,
+                       &artwork_provider);
+      window.draw(menu_draw, startup_capture_path(automation->setup_screenshot,
+                                                  "-menu"));
       intent = workspace.handle(
           {InputEventType::LeftPressed, center(entry_layout.new_campaign)},
+          width, height, measure);
+      if (intent.kind != StartupIntentKind::OpenModeSelection ||
+          workspace.screen() != StartupScreen::ModeSelection)
+        throw std::runtime_error("Startup automation could not open game type selection.");
+      DrawList modes_draw;
+      workspace.render(modes_draw, width, height, measure, &portrait_provider,
+                       &artwork_provider);
+      window.draw(modes_draw, startup_capture_path(automation->setup_screenshot,
+                                                   "-modes"));
+      intent = workspace.handle(
+          {InputEventType::LeftPressed, center(entry_layout.sandbox_campaign)},
           width, height, measure);
       evidence.setup_opened = intent.kind == StartupIntentKind::OpenSetup &&
                               workspace.screen() == StartupScreen::Setup;

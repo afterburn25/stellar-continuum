@@ -176,6 +176,8 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         anchor.write_text(json.dumps(anchor_payload, ensure_ascii=False), encoding="utf-8")
         anchor_bytes = anchor.read_bytes()
         final_capture = work / "new-game-1280x720.bmp"
+        menu_capture = work / "new-game-1280x720-menu.bmp"
+        modes_capture = work / "new-game-1280x720-modes.bmp"
         setup_capture = work / "new-game-1280x720-setup.bmp"
         loading_capture = work / "new-game-1280x720-loading.bmp"
         fresh_settings_capture = work / "new-game-1280x720-audio-settings.bmp"
@@ -218,7 +220,8 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             raise RuntimeError("New Game overwrote the pre-existing requested campaign")
         if not generated.is_file():
             raise RuntimeError("New Game did not create its reported independent save")
-        for path in (setup_capture, loading_capture, final_capture):
+        for path in (menu_capture, modes_capture, setup_capture, loading_capture,
+                     final_capture):
             _bmp(path, 1280, 720, fresh.stdout)
         settings_bytes = None
         if audio_settings_check:
@@ -265,7 +268,8 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
                 raise RuntimeError("Video preferences changed across cold campaign reload")
             for location, process in (("startup", fresh), ("pause", loaded)):
                 video_checks[location] = _video_diagnostic(process.stdout, location)
-        capture_paths = [setup_capture, loading_capture, final_capture, reload_capture]
+        capture_paths = [menu_capture, modes_capture, setup_capture,
+                         loading_capture, final_capture, reload_capture]
         if video_settings_check:
             for base, dimensions, stdout in ((final_capture, (1280, 720), fresh.stdout),
                                               (reload_capture, (1920, 1080), loaded.stdout)):

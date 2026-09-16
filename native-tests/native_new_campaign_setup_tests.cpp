@@ -24,9 +24,11 @@ void require(const bool condition, const std::string &message) {
 NativeNewCampaignSetupAssessment prepare(
     const NativeNewCampaignSetupController &controller, std::string seed,
     const int count = 500,
-    std::string species = "terran_baseline") {
+    std::string species = "terran_baseline", const int pre_warp = 6,
+    const int ancient = 1) {
   return controller.prepare(
-      {std::move(seed), count, std::move(species), "2044-05-06T07:08:09Z"});
+      {std::move(seed), count, std::move(species), "2044-05-06T07:08:09Z",
+       pre_warp, ancient});
 }
 
 IntegratedAdaptiveCampaignRuntime create(
@@ -89,6 +91,13 @@ void catalog_view_test() {
               first.size_presets[3].label == "Huge - 2,500 systems" &&
               first.size_presets[1].recommended,
           "setup did not expose the canonical size choices");
+  require(first.pre_warp_civilization_presets.size() == 5 &&
+              first.pre_warp_civilization_presets[0].count == 1 &&
+              first.pre_warp_civilization_presets[4].count == 13 &&
+              first.ancient_civilization_presets.size() == 3 &&
+              first.ancient_civilization_presets[0].count == 0 &&
+              first.ancient_civilization_presets[2].count == 2,
+          "setup did not expose the supported civilization counts");
   for (std::size_t index = 0; index < first.species.size(); ++index) {
     const auto &actual = species_environment_profiles()[index];
     const auto &copy = first.species[index];
@@ -126,6 +135,8 @@ void validation_and_detachment_test() {
           "valid signed int64 boundary seed was rejected");
   require(!prepare(controller, "1", 123).accepted &&
               !prepare(controller, "1", 500, "unknown_species").accepted &&
+              !prepare(controller, "1", 500, "terran_baseline", 2, 1).accepted &&
+              !prepare(controller, "1", 500, "terran_baseline", 6, 3).accepted &&
               !controller.prepare({"1", 500, "terran_baseline", " \t"})
                    .accepted,
           "invalid campaign setup option was accepted");
@@ -135,6 +146,11 @@ void validation_and_detachment_test() {
               ready.prepared->options().pre_warp_civilization_count == 6 &&
               ready.prepared->options().ancient_civilization_count == 1,
           "valid setup did not create canonical immutable options");
+  auto varied = prepare(controller, "43", 500, "terran_baseline", 13, 2);
+  require(varied.accepted && varied.prepared &&
+              varied.prepared->options().pre_warp_civilization_count == 13 &&
+              varied.prepared->options().ancient_civilization_count == 2,
+          "supported civilization counts did not reach immutable options");
   const auto original = ready.prepared->options();
   (void)prepare(controller, "bad", 2500, "pelagic_high_pressure");
   require(ready.prepared->options().created_at_utc == original.created_at_utc &&

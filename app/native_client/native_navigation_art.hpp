@@ -12,6 +12,6 @@ class NativeNavigationArt final {
   [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage> image(
       stellar::native_map::UiAction action) const noexcept;
  private:
-  std::shared_ptr<const stellar::native_map::RgbaImage> research_, shipyard_, construction_, relations_;
+  std::shared_ptr<const stellar::native_map::RgbaImage> map_, home_, inspect_, zoom_in_, zoom_out_, economy_, research_, shipyard_, construction_, explore_, colonies_, logistics_, relations_, menu_;
 };
 }

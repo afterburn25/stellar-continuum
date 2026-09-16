@@ -103,6 +103,8 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
                     return subprocess.CompletedProcess(args, 9, "startup-output", "terminal-error")
                 if "--new-game-smoke" in args:
                     capture = Path(args[args.index("--new-game-smoke") + 1])
+                    menu = capture.with_name(capture.stem + "-menu.bmp")
+                    modes = capture.with_name(capture.stem + "-modes.bmp")
                     setup = capture.with_name(capture.stem + "-setup.bmp")
                     loading = capture.with_name(capture.stem + "-loading.bmp")
                     generated = save.with_name(save.name.removesuffix(".player17.json") +
@@ -133,7 +135,9 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
                     if fault == "setup_path": state["setup_screenshot"] = str(capture)
                     if fault != "missing_save": generated.write_text(json.dumps(data), encoding="utf-8")
                     if fault == "overwrite": save.write_text("changed", encoding="utf-8")
-                    for name, image_path in (("setup", setup), ("loading", loading), ("final", capture)):
+                    for name, image_path in (("menu", menu), ("modes", modes),
+                                             ("setup", setup), ("loading", loading),
+                                             ("final", capture)):
                         if fault == "missing_capture" and name == "final": continue
                         image = bmp(width - 1 if fault == "geometry" and name == "final" else width, height)
                         if fault == "blank" and name == "setup": image = image[:54] + bytes(len(image) - 54)
@@ -171,7 +175,7 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
             self.assertTrue(result["nativeNewGamePlayerInput"])
             self.assertTrue(result["nativeNewGameIndependentSave"])
             self.assertTrue(result["nativeNewGamePausedReload"])
-            self.assertEqual(len(result["newGameCaptures"]), 4)
+            self.assertEqual(len(result["newGameCaptures"]), 6)
             if audio_check:
                 self.assertIn("--audio-check", calls[0])
                 self.assertIn("--audio-check", calls[1])

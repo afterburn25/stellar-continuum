@@ -5,6 +5,47 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Native presentation restoration / Alpha 0.1.8
+
+The current priority is repairing the player-facing regressions reported after
+the C++ conversion. The full-art main menu now leads to separate Story Campaign
+(Coming Soon) and Sandbox image cards. Sandbox starts with a fresh random numeric
+seed, species selection, four galaxy sizes, rival counts and ancient counts.
+The first-visit ancient default now correctly comes from the configured setup.
+
+Fourteen compact navigation entries reuse existing photographic artwork. Map,
+Home, inspection and zoom operate on the visible workspace; Explore selects an
+existing scout/science vessel without issuing a mission. Playback uses one
+Play/Pause icon control and separate speed chevrons with the actual multiplier.
+System stars retain the detailed renderer even when their classification is
+unknown. Lane arrows use forest green, orange hover and labels beyond the base.
+
+Research now has eight subject tabs plus All, known-only search, illustrated
+cards, selected portraits, purpose/benefits, canonical work/cost estimates,
+pan/zoom, measured scrolling and a fixed action button. Long titles fit at 720p.
+Reused catalog source: `work/module-research-thumbnails` at `411910f1`, definitions
+pinned there to `3aeeb9a4`. Its 370 current research bindings share 21 family
+illustrations. All 99 prepared image pairs and provenance are preserved; the
+other module images and 42 reserved research bindings do not add playable content.
+Exports declare only used research/navigation dependencies, with exact hashes.
+
+MSVC builds successfully; the final complete serial CTest run passes 186/186.
+Final Python validation: 598 checks, 581 pass and
+17 optional skips. Actual relocated Vulkan research, navigation, system and
+startup flows pass at 720p/1080p, including paused save recovery and startup
+audio. Menu, mode cards, species setup, research and system captures were reviewed.
+Evidence: `work/ui-restoration-*.log`, `work/ui-restoration-runtime/*-result.json`
+and package BMP sidecars. Native test details and remaining limitations are in
+`engine/NATIVE_PRESENTATION_RESTORATION.md`.
+
+Game version is now `0.1.8-alpha`; engine remains `0.1.58`. The staged validation
+package is unsealed and must not be presented as a release download. Core, C# and
+Player17 rules/schema are unchanged. Next: complete the remaining native visual
+parity, then resume earned colony operations below. Text-seed compatibility,
+additional canonical generation options, construction/diplomacy/surface finish,
+sustained performance and real-time pacing remain open. Do not substitute a
+simulation rewrite or newly invented artwork for the preserved reference.
+
 ### Earned colony power and research
 
 Continue from `work/native-audio-validation/package-earned-surface-expansion-paused.player17.json`:

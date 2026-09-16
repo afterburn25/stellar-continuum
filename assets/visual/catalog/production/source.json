@@ -1,0 +1,6 @@
+{
+  "contentCommit": "3aeeb9a4",
+  "stationSource": "docs/content/HUMAN_STATION_DESIGN.json",
+  "fleetSource": "assets/models/alien-fleet-v2/fleet-manifest.json",
+  "note": "Committed content only. No balance or research unlocks are added by this presentation catalog."
+}

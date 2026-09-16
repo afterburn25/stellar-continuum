@@ -13,17 +13,17 @@
 
 namespace stellar::native_startup_ui {
 
-enum class StartupScreen { Entry, Setup, LoadSlots, Busy, Failure };
+enum class StartupScreen { Entry, ModeSelection, Setup, LoadSlots, Busy, Failure };
 enum class StartupOperationOrigin { NewCampaign, SavedCampaign };
 enum class StartupIntentKind {
-  None, OpenSetup, OpenLoad, OpenSettings, Back, Exit, ReturnToCampaign,
+  None, OpenSetup, OpenModeSelection, OpenLoad, OpenSettings, Back, Exit, ReturnToCampaign,
   Create, LoadSelected, CancelOperation
 };
 struct StartupIntent {
   StartupIntentKind kind{StartupIntentKind::None};
   bool captured{};
   std::string seed_text, species_id;
-  int system_count{};
+  int system_count{}, pre_warp_civilization_count{6}, ancient_civilization_count{1};
   std::filesystem::path save_path;
 };
 struct StartupLayout {
@@ -31,7 +31,7 @@ struct StartupLayout {
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, title, subtitle, new_campaign,
       load_campaign, exit, list, back, primary, status, settings,
-      return_to_campaign;
+      return_to_campaign, story_campaign, sandbox_campaign;
   [[nodiscard]] static StartupLayout for_viewport(int width,
                                                    int height) noexcept;
 };

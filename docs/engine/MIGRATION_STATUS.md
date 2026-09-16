@@ -1,5 +1,18 @@
 # Stellar Engine migration status
 
+### Native presentation restoration checkpoint (2026-09-16)
+
+Alpha 0.1.8 restores the full-art startup/menu flow, separate game-mode image
+cards, random numeric seeds and supported sandbox options. Fourteen photographic
+navigation entries, icon playback controls, detailed system stars, forest-green
+arrows and illustrated, explanatory research improve the native presentation.
+The existing 99-image catalog is preserved with provenance; current research
+bindings and explicit navigation images alone enter the package. Core, C# and
+Player17 are unchanged. MSVC, all 186 CTests, Python (581 pass / 17 optional skips), and relocated
+720p/1080p research/navigation/system/startup-audio checks pass. Native test details,
+actual visual review and remaining parity limits are documented in
+`NATIVE_PRESENTATION_RESTORATION.md`. No sealed download is claimed here.
+
 ### Earned power and research checkpoint (2026-09-16)
 
 The actual earned colony now advances from its completed fabricator to a paid

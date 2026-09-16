@@ -1,0 +1,83 @@
+# Native presentation restoration
+
+This pass repairs presentation lost during the C++ conversion. Core simulation,
+research unlocks, strategic speed multipliers and Player17 persistence remain
+authoritative. This is not a claim that every legacy screen has reached parity.
+
+## Player-facing changes
+
+- The main menu leaves the cinematic background unframed. New Game opens a
+  separate pair of large image cards. Story Campaign is marked Coming Soon;
+  Sandbox opens species selection and generation settings.
+- Every fresh setup receives a random numeric seed. Players may replace or
+  randomize it. The four galaxy sizes remain available, and rival/ancient
+  civilization selectors now pass reviewed counts to the existing seeder.
+- Fourteen compact navigation destinations use existing photographic artwork,
+  consistent hover/active framing and matching pointer hit areas. Home and Map
+  leave a workspace coherently; system zoom affects the visible system camera.
+  Exploration selects a vessel and never silently issues a mission.
+- Play/Pause and speed remain separate controls. Detailed system star rendering
+  also applies to stars whose classification is unknown to the observer.
+  Forest-green lane arrows have orange hover and labels outside their wide base.
+- Research has eight subject categories plus All, search across known names and
+  explanations, illustrated cards, a selected portrait, visible purpose/benefits,
+  canonical research work and monetary estimates. The graph pans and zooms;
+  inspector details scroll above a fixed action button.
+
+## Existing artwork reused
+
+The portable catalog comes from `work/module-research-thumbnails` commit
+`411910f1` (content definitions pinned there to `3aeeb9a4`). All 99 original
+illustrations and their 128/512-pixel deliveries are retained under
+`assets/visual/catalog`, with their original generation/render provenance.
+The current 370 research bindings share 21 family illustrations. The other
+78 images illustrate station/alien modules. Those images do not add functional
+modules or promote the 42 reserved research bindings into playable technology.
+
+The native loader reads only current research bindings. The workspace resolves
+images only for observer-projected nodes. Thumbnails share immutable image
+identity by family; selected portraits use a 12-entry cache. Missing or malformed
+declared assets fail build/package checks. Export includes the current research
+images and explicit navigation dependencies, not the entire concept library.
+`export/native-research-assets.json` pins catalog, provenance and image hashes.
+
+## Remaining differences
+
+Native seed entry accepts signed numeric seeds. The preserved client also
+supports normalized text seeds; its exact normalization/hash contract has not
+been ported. Galaxy-shape, density and other advanced generation controls must
+be connected to canonical C++ options before becoming selectable. Richer
+construction, diplomacy and surface presentation remains migration work.
+This pass does not establish a sustained 60 FPS performance guarantee.
+
+## Validation
+
+Validated on Windows with MSVC and the native SDL3/Vulkan renderer:
+
+- Complete native build passed. Final serial CTest run: **186/186 passed** in
+  132.62 seconds (`work/ui-restoration-ctest-final.log`).
+- Export/packaging Python suite: **598 checks; 581 passed, 17 optional skips**
+  (`work/ui-restoration-python-final.log`). Missing/tampered artwork and Windows
+  checkout line-ending checks are included.
+- Relocated research, navigation, system and startup validators passed at 720p
+  and 1080p. They exercise real input, research work, modal guards, camera input,
+  independent new-game generation and paused save recovery. Startup audio passed.
+  Results and captures are retained in `work/ui-restoration-runtime/`.
+- Actual menu, separate mode cards, species setup, research and system BMPs were
+  visually reviewed. Research titles fit, artwork remains contained and the
+  primary action stays above the inspector's lower edge. The new-game validator
+  requires menu and mode captures in addition to its prior four images.
+- Known-only artwork lookup, immutable family caching, portrait cache bounds,
+  navigation hit areas through 4K, graph pan/zoom and inspector scrolling have
+  maintained native checks. A short 60 Hz smoke is not a sustained FPS claim.
+
+Earlier combined testing exposed three UI/default/test-assumption failures,
+which were corrected, plus an audio asset-read timeout and a platform test exit
+`0xc000041d`. Audio/platform passed isolated reruns and the final complete serial
+run. Their initial intermittent cause is unconfirmed; no suppression or audio
+disable was added. Preserve that history if either failure recurs.
+
+Game version is `0.1.8-alpha`; engine version remains `0.1.58`. The local runtime
+under `work/ui-restoration-runtime/package` is an **unsealed validation package**.
+This milestone has not produced a new release ZIP. Run the established complete
+export/sealing pipeline before handing out a download.

@@ -1,15 +1,19 @@
 # Native navigation rail
 
-The native C++ client uses four approved icons for Research, Shipyard,
-Construction and Relations. The compact rail stays at the left while the
-chosen workspace opens. Hover labels name each destination, and the current
-workspace has an active accent. Clicking its icon again closes it.
+The native C++ client uses fourteen approved photo thumbnails in its left rail.
+The compact rail stays at the left while the chosen workspace opens. Each photo
+uses a three-pixel inset so it remains legible inside a 38px control; hover
+labels name each destination, and the current workspace has an active accent.
+Clicking its icon again closes it.
 
 `NativeUiLayout` owns the exact drawn and hit-tested rectangles. The shared
 `native_navigation_content_left` gutter reserves room in research, production,
 relations, colony, surface and system layouts. Workspace content must remain
 outside that gutter; changing the rail requires checking those layouts together.
-Pause/play and speed stay in the top strip.
+Pause/play and speed stay in the top strip. The pause control draws a play
+triangle while paused and two pause bars while simulation is running. The
+separate speed control draws one through four right chevrons and the active
+actual rate (1×, 2×, 3×, or 8×); it does not change Core speed rules.
 
 Strategic keyboard controls follow the legacy player commands: Space toggles
 pause while retaining the selected speed, keys 1 through 4 select Normal,
@@ -35,11 +39,21 @@ The pause menu, settings and confirmation dialogs keep input ownership while
 open. An icon switches presentation only: it does not issue a research,
 production, diplomatic or travel command. Core owns all gameplay state.
 
-The four 256 x 256 transparent PNGs come from the approved SVG designs. They
-are decoded once using the existing Engine image loader, share stable image
-identity and occupy 1 MiB in total. Build and export require the exact reviewed
-paths and source/runtime hashes. See `NATIVE_NAVIGATION_ART_SOURCES.md` for
-regeneration and provenance. No SVG renderer or Python package is shipped.
+Map closes navigation workspaces and returns to the galaxy. Home closes them,
+centers the galaxy view on the player home system, and opens its inspection
+card. Inspect retains a visible system view and tells the player to select a
+body; from the galaxy it selects the home system when nothing is selected.
+Zoom controls the visible system viewport when a system is open, otherwise the
+visible galaxy camera. Explore closes other workspaces and presents the fleet
+map; it may select an existing scout or science ship, but never creates a
+mission. When none exists it gives map guidance.
+
+The fourteen 256 x 256 opaque photo thumbnails are decoded once using the
+existing Engine image loader, share stable image identity and occupy 3.5 MiB in
+total. Build and export require the exact reviewed paths and source/runtime
+hashes. See `NATIVE_NAVIGATION_ART_SOURCES.md` for provenance. Zoom labels are
+the only procedural navigation overlay; economy, colony, and supply glyphs
+were removed so the photos stay visible.
 
 The maintained `--navigation-smoke <capture.bmp>` path uses normal native
 pointer input to exercise workspace switching. It opens a real surface

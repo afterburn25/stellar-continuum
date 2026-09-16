@@ -1,4 +1,5 @@
 #include "native_research_controller.hpp"
+#include "native_research_presentation.hpp"
 
 #include <stellar/core/adaptive_research_funding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -227,7 +228,7 @@ struct PlayerContext {
                            const std::string &folded_query) {
   if (folded_query.empty()) return true;
   std::string text = node.display_name + " " + node.domain_label + " " +
-                     node.solution_family;
+                     node.solution_family + " " + node.purpose + " " + node.benefits;
   for (const auto &capability : node.known_capabilities)
     text += " " + capability.display_name;
   return fold_ascii(std::move(text)).contains(folded_query);
@@ -316,6 +317,9 @@ NativeResearchWindow NativeResearchController::build(
           {capability_id, definition ? definition->name : "Known capability"});
     }
     projected.primary_action = primary_action(player, view, node, project, cost);
+    projected.purpose = research_purpose(node.node_id, projected.domain_label, label(node.solution_family));
+    projected.benefits = research_benefit(node.node_id);
+    projected.research_points = player.authority.catalog().get_node(node.node_id).project_requirements.base_research_points;
     all_nodes.push_back(std::move(projected));
   }
 
@@ -332,13 +336,14 @@ NativeResearchWindow NativeResearchController::build(
   result.free_effective_labs = view.directed_program_capacity.free_effective_labs;
   result.total_effective_labs = player.state.total_effective_research_labs();
   result.domain_tabs.push_back({{}, "All Research", all_nodes.size()});
-  std::vector<std::string> domains;
-  for (const auto &[domain, count] : domain_counts) domains.push_back(domain);
-  std::ranges::sort(domains);
-  for (const auto &domain : domains)
-    result.domain_tabs.push_back({domain, label(domain), domain_counts.at(domain)});
+  for (const auto &[category, title] : research_categories) {
+    std::size_t count{};
+    for (const auto &[domain, known] : domain_counts)
+      if (research_category_matches(category, domain)) count += known;
+    result.domain_tabs.push_back({category, title, count});
+  }
   for (auto &node : all_nodes) {
-    if (query.domain_id && node.domain_id != *query.domain_id) continue;
+    if (query.domain_id && !research_category_matches(*query.domain_id, node.domain_id)) continue;
     if (!matches(node, folded_search)) continue;
     result.nodes.push_back(std::move(node));
   }

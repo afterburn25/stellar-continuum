@@ -1,4 +1,5 @@
 #include "native_research_controller.hpp"
+#include "native_research_presentation.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
@@ -200,9 +201,9 @@ recognized_undetailed_node(CampaignFrame &frame) {
       controller.build(frame, generation, {domain.id, {}});
   require(!domain_result.nodes.empty() &&
               std::ranges::all_of(domain_result.nodes, [&](const auto &node) {
-                return node.domain_id == domain.id;
+                return research_category_matches(domain.id, node.domain_id);
               }),
-          "Domain filtering escaped its observer-safe domain.");
+          "Category filtering escaped its observer-safe known domains.");
 
   bool invalid_utf8_rejected{};
   try {
@@ -394,6 +395,9 @@ int main(int argc, char **argv) try {
     throw std::invalid_argument(
         "Usage: native_research_controller_tests <research-root> <stellar-catalog> <Player17-fixture> <scratch>");
   const auto research_root = fs::absolute(argv[1]);
+  require(research_purpose("unlisted", "Life Medicine", "Public Purpose") ==
+              "Explores a practical Life Medicine approach in the Public Purpose field.",
+          "Fallback research explanation retained debug identifiers instead of player-facing labels.");
   const auto catalog = fs::absolute(argv[2]);
   const auto player_fixture = fs::absolute(argv[3]);
   const auto scratch = fs::absolute(argv[4]);

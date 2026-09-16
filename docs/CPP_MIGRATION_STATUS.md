@@ -16,6 +16,23 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
+### Native presentation restoration / Alpha 0.1.8
+
+The C++ client restores the full-art main menu, separate image-led game-mode
+selection, random numeric seeds, supported sandbox options, fourteen photographic
+navigation entries, separate icon playback controls, detailed unknown-class suns
+and forest-green lane arrows. Research gains existing illustrations, categories,
+known-only search, explanatory details, readable cards, pan/zoom and a fixed action.
+The restored image catalog comes from `411910f1`; it does not unlock reserved
+research or add functional station modules. Core, C# and Player17 are unchanged.
+
+MSVC, 186/186 native CTests and 598 Python checks (581 pass, 17 optional skips)
+pass. Relocated Vulkan
+research, navigation, system and startup/audio checks pass at 720p/1080p with
+paused recovery. See the handoff and `engine/NATIVE_PRESENTATION_RESTORATION.md`
+for native test results, asset provenance and remaining parity gaps. This remains
+an unsealed validation package, not a release or sustained-60-FPS claim.
+
 ### Earned colony power and research
 
 The earned Xanthe continuation now pays for and completes a generator and science

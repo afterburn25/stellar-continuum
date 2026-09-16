@@ -19,6 +19,7 @@ from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
 from native_surface_art_assets import NATIVE_SURFACE_ART_SOURCES
 from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
+from native_research_assets import native_research_asset_files
 from native_research_runtime import validate_native_research_export
 
 
@@ -30,12 +31,18 @@ class NativeAssetCheckoutTests(unittest.TestCase):
 
         def collect(value):
             if isinstance(value, dict):
+                if "path" in value and "sha256" in value:
+                    path = value["path"]
+                    if Path(path).suffix in (".md", ".txt", ".json"):
+                        sources[path] = value["sha256"]
                 if "source" in value and "sha256" in value:
                     path = value["source"]
                     if Path(path).suffix in (".md", ".txt", ".json"):
                         sources[path] = value["sha256"]
                 if "source" in value and "sourceSha256" in value:
-                    sources[value["source"]] = value["sourceSha256"].lower()
+                    path = value["source"]
+                    if Path(path).suffix in (".md", ".txt", ".json"):
+                        sources[path] = value["sourceSha256"].lower()
                 for child in value.values():
                     collect(child)
 
@@ -114,11 +121,17 @@ class NativeClientDependencyTests(unittest.TestCase):
             "license": {"source": self.font_license.relative_to(self.root).as_posix(),
                         "runtimePath": "Licenses/OFL-Rajdhani.txt",
                         "sha256": hashlib.sha256(self.font_license.read_bytes()).hexdigest()}}))
+        def fixture_asset(path, label):
+            """Share fixture bytes when approved manifests name the same path."""
+            asset = self.root / path
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            if not asset.exists():
+                asset.write_bytes(("fixture " + label + " " + path).encode())
+            return asset
+
         celestial_records = {}
         for key, (source, runtime_path) in NATIVE_CELESTIAL_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only asset " + key).encode())
+            asset = fixture_asset(source, "celestial " + key)
             celestial_records[key] = {"source": source, "runtimePath": runtime_path,
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.celestial_declaration = self.root / "export/native-celestial-assets.json"
@@ -126,36 +139,28 @@ class NativeClientDependencyTests(unittest.TestCase):
 
         species_records = {}
         for key, (source, runtime_path) in NATIVE_SPECIES_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only species " + key).encode())
+            asset = fixture_asset(source, "species " + key)
             species_records[key] = {"source": source, "runtimePath": runtime_path,
                                     "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.species_declaration = self.root / "export/native-species-assets.json"
         self.species_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": species_records}))
         startup_art_records = {}
         for key, (source, destination) in NATIVE_STARTUP_ART_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only startup art " + key).encode())
+            asset = fixture_asset(source, "startup art " + key)
             startup_art_records[key] = {"source": source, "runtimePath": destination,
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.startup_art_declaration = self.root / "export/native-startup-art-assets.json"
         self.startup_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":startup_art_records}))
         galaxy_art_records = {}
         for key, (source, destination) in NATIVE_GALAXY_ART_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only galaxy art " + key).encode())
+            asset = fixture_asset(source, "galaxy art " + key)
             galaxy_art_records[key] = {"source": source, "runtimePath": destination,
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.galaxy_art_declaration = self.root / "export/native-galaxy-art-assets.json"
         self.galaxy_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":galaxy_art_records}))
         ship_art_records = {}
         for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only ship art " + key).encode())
+            asset = fixture_asset(source, "ship art " + key)
             ship_art_records[key] = {"source": source, "runtimePath": destination,
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
@@ -163,18 +168,14 @@ class NativeClientDependencyTests(unittest.TestCase):
 
         audio_records = {}
         for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("test-only audio " + key).encode())
+            asset = fixture_asset(source, "audio " + key)
             audio_records[key] = {"source": source, "runtimePath": destination,
                                   "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.audio_declaration = self.root / "export/native-audio-assets.json"
         self.audio_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": audio_records}))
         surface_art_records = {}
         for key, (source, destination) in NATIVE_SURFACE_ART_SOURCES.items():
-            asset = self.root / source
-            asset.parent.mkdir(parents=True, exist_ok=True)
-            asset.write_bytes(("fixture surface art " + key).encode())
+            asset = fixture_asset(source, "surface art " + key)
             surface_art_records[key] = {"source": source, "runtimePath": destination,
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.surface_art_declaration = self.root / "export/native-surface-art-assets.json"
@@ -184,13 +185,37 @@ class NativeClientDependencyTests(unittest.TestCase):
         for key, (source, destination) in NATIVE_NAVIGATION_SOURCES.items():
             record = {"source": source, "runtimePath": destination}
             for path, hash_field in ((source, "sourceSha256"), (destination, "runtimeSha256")):
-                asset = self.root / path
-                asset.parent.mkdir(parents=True, exist_ok=True)
-                asset.write_bytes(("fixture navigation " + path).encode())
+                asset = fixture_asset(path, "navigation " + key)
                 record[hash_field] = hashlib.sha256(asset.read_bytes()).hexdigest()
             navigation_records[key] = record
         (self.root / "export/native-navigation-assets.json").write_text(json.dumps(
             {"schemaVersion": 1, "size": 256, "assets": navigation_records}))
+
+        research_art_ids = ("research-foundations", "research-energy")
+        catalog = {"schemaVersion": 1, "research": [
+            {"id": "fixture-" + art.removeprefix("research-"), "art": art}
+            for art in research_art_ids]}
+        research_paths = {
+            "assets/visual/catalog/catalog.json": json.dumps(catalog).encode(),
+            "assets/visual/catalog/production/provenance.json": b'{"schemaVersion":1}',
+        }
+        for path, contents in research_paths.items():
+            asset = self.root / path
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(contents)
+        for size in ("thumbnails", "portraits"):
+            for art in research_art_ids:
+                fixture_asset(f"assets/visual/catalog/{size}/{art}.png", "research art")
+        research_records = []
+        for path in sorted((*research_paths, *(f"assets/visual/catalog/{size}/{art}.png" for size in ("thumbnails", "portraits") for art in research_art_ids))):
+            asset = self.root / path
+            research_records.append({"path": path,
+                                     "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()})
+        self.research_declaration = self.root / "export/native-research-assets.json"
+        self.research_declaration.write_text(json.dumps({"schemaVersion": 1,
+            "sourceCommit": "fixture", "assets": research_records}))
+        self.assertEqual(set(native_research_asset_files(self.root)),
+                         {record["path"] for record in research_records})
 
 
 
@@ -206,8 +231,24 @@ class NativeClientDependencyTests(unittest.TestCase):
         metadata = self.copy()
         self.assertEqual(metadata["entryPoint"], "stellar-continuum-native.exe")
         self.assertFalse(metadata["graphicalParity"])
+        self.assertTrue({"assets/visual/catalog/catalog.json",
+                         "assets/visual/catalog/production/provenance.json",
+                         "assets/visual/catalog/thumbnails/research-foundations.png",
+                         "assets/visual/catalog/portraits/research-foundations.png"}
+                        <= set(metadata["requiredFiles"]))
         self.assertEqual(set(metadata["requiredFiles"]), {p.relative_to(self.output).as_posix()
                          for p in self.output.rglob("*") if p.is_file()})
+
+    def test_missing_research_art_blocks_package(self):
+        (self.root / "assets/visual/catalog/portraits/research-energy.png").unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing or duplicate research artwork"):
+            self.copy()
+
+    def test_tampered_research_art_blocks_package(self):
+        path = self.root / "assets/visual/catalog/portraits/research-energy.png"
+        path.write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError, "Research artwork differs from reviewed content"):
+            self.copy()
 
     def test_missing_species_portrait_blocks_package(self):
         (self.root / NATIVE_SPECIES_SOURCES["terran-baseline"][0]).unlink()

@@ -34,13 +34,20 @@ struct NativeGalaxySizeOption {
   std::string label;
   bool recommended{};
 };
+struct NativeCivilizationCountOption {
+  int count{};
+  std::string label;
+  bool recommended{};
+};
 
 struct NativeNewCampaignSetupView {
   std::vector<NativeSpeciesSetupOption> species;
   std::vector<NativeGalaxySizeOption> size_presets;
+  std::vector<NativeCivilizationCountOption> pre_warp_civilization_presets,
+      ancient_civilization_presets;
   std::string default_species_id;
-  int default_system_count{}, fixed_pre_warp_civilization_count{},
-      fixed_ancient_civilization_count{};
+  int default_system_count{}, default_pre_warp_civilization_count{},
+      default_ancient_civilization_count{};
 };
 
 struct NativeNewCampaignSetupInput {
@@ -48,6 +55,8 @@ struct NativeNewCampaignSetupInput {
   int system_count{500};
   std::string player_species_id{"terran_baseline"};
   std::string created_at_utc;
+  int pre_warp_civilization_count{6};
+  int ancient_civilization_count{1};
 };
 
 class NativePreparedNewCampaign final {

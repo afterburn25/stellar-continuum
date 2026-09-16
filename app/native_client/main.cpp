@@ -33,6 +33,7 @@
 #include "native_fleet_workspace.hpp"
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
+#include "native_research_art.hpp"
 #include "native_shipyard_controller.hpp"
 #include "native_shipyard_workspace.hpp"
 #include "native_system_view.hpp"
@@ -580,6 +581,7 @@ class NativeCampaign final {
                  stellar::native_video_settings::NativeVideoController* video_settings=nullptr)
       : session_(std::move(session)),
         navigation_art_(std::filesystem::absolute(asset_root)),
+        research_art_(std::filesystem::absolute(asset_root)),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
@@ -590,6 +592,9 @@ class NativeCampaign final {
         text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},text_measurer) {
     research_workspace_.set_text_measurer(text_measurer_);
+    research_workspace_.set_artwork_resolver([this](std::string_view id, bool portrait) {
+      return research_art_.image(id, portrait);
+    });
     inspection_card_.set_text_measurer(text_measurer_);
     supply_workspace_.set_text_measurer(text_measurer_);
     economy_workspace_.set_text_measurer(text_measurer_);
@@ -5294,6 +5299,49 @@ class NativeCampaign final {
     refresh_roster(false);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
+      const auto close_navigation_workspaces=[&]{
+        research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+        diplomacy_workspace_.close();colony_roster_.close();economy_workspace_.close();
+        supply_workspace_.close();system_workspace_.close();colony_workspace_.close();
+        surface_workspace_.close();notification_view_.close();
+      };
+      if(action==UiAction::Map){
+        close_navigation_workspaces();selected_id_.reset();refresh_inspection();return;
+      }
+      if(action==UiAction::Home){
+        close_navigation_workspaces();
+        const auto &world=session_->frame().runtime().world().campaign();const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);if(player!=world.civilizations.end()){const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);if(home!=world.systems.end()){camera_.center={home->position.x,home->position.y};camera_.pixels_per_world=std::max(fitted_pixels_per_world_,camera_.pixels_per_world);selected_id_=home->id;refresh_inspection();}}return;
+      }
+      if(action==UiAction::Inspect){
+        if(system_workspace_.visible()){
+          system_workspace_.set_notice("Select a body in this system to inspect its details.");return;
+        }
+        if(!selected_id_){
+          const auto &world=session_->frame().runtime().world().campaign();const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
+          if(player!=world.civilizations.end()){
+            const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
+            if(home!=world.systems.end())selected_id_=home->id;
+          }
+        }
+        close_navigation_workspaces();refresh_inspection();return;
+      }
+      if(action==UiAction::ZoomIn||action==UiAction::ZoomOut){
+        const auto direction=action==UiAction::ZoomIn?1.f:-1.f;
+        if(system_workspace_.visible()){
+          (void)system_workspace_.handle({InputEventType::Wheel,{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},{},direction},width,height);
+        }else if(!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!surface_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
+          camera_.zoom_at(direction,{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},width,height);
+        }
+        return;
+      }
+      if(action==UiAction::Explore){
+        close_navigation_workspaces();refresh_fleets(true);
+        bool selected_scout{};
+        if(fleet_workspace_.view())for(const auto &fleet:fleet_workspace_.view()->own_fleets)if(fleet.role==FleetRole::Scout||fleet.role==FleetRole::Science){(void)fleet_controller_.select(session_->frame(),session_->cache().generation,fleet.id);selected_scout=true;break;}
+        if(!selected_scout)fleet_workspace_.set_notice("No scout or science vessel is available. Select a fleet on the map to plan exploration.",false);
+        return;
+      }
+      if(action==UiAction::Menu){toggle_menu();return;}
       if(action!=UiAction::Supply)supply_workspace_.close();
       if(action!=UiAction::Colonies)colony_roster_.close();
       if(action!=UiAction::Economy)economy_workspace_.close();
@@ -5407,7 +5455,7 @@ class NativeCampaign final {
           settings_visible());
       if(event.type==InputEventType::LeftPressed&&!modal_blocks_navigation){
         const auto action=layout.hit(event.position,false);
-        const auto navigation=action==UiAction::Research||
+        const auto navigation=action==UiAction::Map||action==UiAction::Home||action==UiAction::Inspect||action==UiAction::ZoomIn||action==UiAction::ZoomOut||action==UiAction::Explore||action==UiAction::Menu||action==UiAction::Research||
                               action==UiAction::Shipyard||
                               action==UiAction::Construction||
                               action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy||action==UiAction::Colonies;
@@ -6028,10 +6076,12 @@ class NativeCampaign final {
     reserve_hud(ui_layout.pause);
     reserve_hud(ui_layout.speed);
     reserve_hud(ui_layout.notifications);
+    reserve_hud(ui_layout.map);reserve_hud(ui_layout.home);reserve_hud(ui_layout.inspect);reserve_hud(ui_layout.zoom_in);reserve_hud(ui_layout.zoom_out);
     reserve_hud(ui_layout.research);
     reserve_hud(ui_layout.shipyard);
     reserve_hud(ui_layout.construction);
     reserve_hud(ui_layout.diplomacy);
+    reserve_hud(ui_layout.explore);reserve_hud(ui_layout.menu);
     reserve_hud(ui_layout.day_text);
     reserve_hud(ui_layout.status_text);
     if (menu_) reserve_hud(ui_layout.menu_panel);
@@ -6103,14 +6153,33 @@ class NativeCampaign final {
     const auto layout = NativeUiLayout::for_viewport(width, height);
     using stellar::native_ui_style::panel;
     panel(out, layout.pause, layout.pause.contains(pointer_), false);
-    control_label(out, layout.pause,
-          session_->frame().clock().speed() == StrategicSpeed::Paused
-              ? "PLAY"
-              : "PAUSE",
-          {225, 238, 250, 255}, layout.control_font_pixels, layout.scale,text_measurer_);
+    const auto paused=session_->frame().clock().speed()==StrategicSpeed::Paused;
+    const auto icon_color=Color{225,238,250,255};
+    if(paused){
+      const auto center=Point{layout.pause.x+layout.pause.width*.5f,layout.pause.y+layout.pause.height*.5f};
+      TriangleMesh play;play.color=icon_color;play.clip=layout.pause;
+      play.vertices={{center.x-5.f*layout.scale,center.y-8.f*layout.scale},
+                     {center.x-5.f*layout.scale,center.y+8.f*layout.scale},
+                     {center.x+8.f*layout.scale,center.y}};
+      play.indices={0,1,2};out.overlay.emplace_back(std::move(play));
+    }else{
+      const float bar_width=4.f*layout.scale,bar_height=15.f*layout.scale;
+      const float center_x=layout.pause.x+layout.pause.width*.5f,center_y=layout.pause.y+layout.pause.height*.5f;
+      fill(out,{center_x-bar_width-2.f*layout.scale,center_y-bar_height*.5f,bar_width,bar_height},icon_color);
+      fill(out,{center_x+2.f*layout.scale,center_y-bar_height*.5f,bar_width,bar_height},icon_color);
+    }
     panel(out, layout.speed, layout.speed.contains(pointer_), false);
-    control_label(out, layout.speed, speed_text(), {225, 238, 250, 255},
-          layout.control_font_pixels, layout.scale,text_measurer_);
+    const auto active_speed=paused?session_->frame().clock().resume_speed():session_->frame().clock().speed();
+    const int chevrons=active_speed==StrategicSpeed::Maximum?4:active_speed==StrategicSpeed::VeryFast?3:active_speed==StrategicSpeed::Fast?2:1;
+    const std::string rate=active_speed==StrategicSpeed::Maximum?"8×":active_speed==StrategicSpeed::VeryFast?"3×":active_speed==StrategicSpeed::Fast?"2×":"1×";
+    for(int index=0;index<chevrons;++index){
+      const float x=layout.speed.x+12.f*layout.scale+index*7.f*layout.scale;
+      const float y=layout.speed.y+layout.speed.height*.5f;
+      out.overlay.emplace_back(Line{{x-3.f*layout.scale,y-5.f*layout.scale},{x+2.f*layout.scale,y},icon_color});
+      out.overlay.emplace_back(Line{{x+2.f*layout.scale,y},{x-3.f*layout.scale,y+5.f*layout.scale},icon_color});
+    }
+    out.overlay.emplace_back(Text{{layout.speed.x+47.f*layout.scale,layout.speed.y+8.f*layout.scale},rate,
+        icon_color,layout.metric_font_pixels,layout.speed.width-51.f*layout.scale,layout.speed,TextAlign::Left,FontFace::Heading});
     if(notifications_available()){
       panel(out,layout.notifications,layout.notifications.contains(pointer_),notification_view_.visible());
       const auto unread=notifications_.unread_count(notification_view_.last_read());
@@ -6120,35 +6189,8 @@ class NativeCampaign final {
     }
     const auto draw_navigation=[&](UiRect bounds,UiAction action,bool active,std::string_view tip){
       panel(out,bounds,bounds.contains(pointer_),active);
-      if(const auto image=navigation_art_.image(action))out.overlay.emplace_back(Image{image,{bounds.x+7.f*layout.scale,bounds.y+7.f*layout.scale,bounds.width-14.f*layout.scale,bounds.height-14.f*layout.scale}});
-      if(action==UiAction::Economy){
-        const float u=bounds.width/44.f;const Color gold{242,198,97,255};
-        for(int i=0;i<3;++i){const float x=bounds.x+(10.f+9.f*i)*u;const float h=(10.f+7.f*i)*u;
-          out.overlay.emplace_back(FilledRectangle{{x,bounds.y+34.f*u-h,6.f*u,h},gold});}
-        out.overlay.emplace_back(Line{{bounds.x+8.f*u,bounds.y+35.f*u},{bounds.x+36.f*u,bounds.y+35.f*u},{128,229,201,255}});
-      }
-      if(action==UiAction::Colonies){
-        const float u=bounds.width/44.f;const Point c{bounds.x+22.f*u,bounds.y+22.f*u};
-        const auto disc=[&](Point at,float radius,Color color){
-          TriangleMesh mesh;mesh.color=color;mesh.clip=bounds;mesh.vertices.push_back(at);
-          for(int i=0;i<=24;++i){const float angle=static_cast<float>(i)*6.2831853f/24.f;
-            mesh.vertices.push_back({at.x+radius*std::cos(angle),at.y+radius*std::sin(angle)});
-            if(i>0){mesh.indices.push_back(0);mesh.indices.push_back(i);mesh.indices.push_back(i+1);}}
-          out.overlay.emplace_back(std::move(mesh));
-        };
-        disc(c,13.f*u,{70,162,211,255});
-        disc({c.x-4.f*u,c.y-3.f*u},5.f*u,{115,222,174,255});
-        disc({c.x+5.f*u,c.y+5.f*u},4.f*u,{115,222,174,255});
-        out.overlay.emplace_back(Line{{c.x-17.f*u,c.y+9.f*u},{c.x+17.f*u,c.y-9.f*u},{231,198,126,255}});
-      }
-      if(action==UiAction::Supply){
-        const float u=bounds.width/44.f;
-        const Color network{109,220,195,255}, cargo{241,193,100,255};
-        out.overlay.emplace_back(Line{{bounds.x+12.f*u,bounds.y+12.f*u},{bounds.x+32.f*u,bounds.y+32.f*u},network});
-        out.overlay.emplace_back(Line{{bounds.x+32.f*u,bounds.y+12.f*u},{bounds.x+12.f*u,bounds.y+32.f*u},network});
-        for(const auto point:std::array<Point,4>{{{12,12},{32,12},{12,32},{32,32}}})
-          out.overlay.emplace_back(FilledRectangle{{bounds.x+(point.x-4.f)*u,bounds.y+(point.y-4.f)*u,8.f*u,8.f*u},cargo});
-      }
+      if(const auto image=navigation_art_.image(action))out.overlay.emplace_back(Image{image,{bounds.x+3.f*layout.scale,bounds.y+3.f*layout.scale,bounds.width-6.f*layout.scale,bounds.height-6.f*layout.scale}});
+      if(action==UiAction::ZoomIn||action==UiAction::ZoomOut){const auto glyph=action==UiAction::ZoomIn?"+":"−";out.overlay.emplace_back(Text{{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f-9.f*layout.scale},glyph,{245,250,255,255},static_cast<int>(18.f*layout.scale),0,bounds,TextAlign::Center,FontFace::Heading});}
       if(!bounds.contains(pointer_))return;
       const Color tooltip_text{235,244,255,255};
       const Text probe{{},std::string(tip),tooltip_text,layout.metric_font_pixels};
@@ -6161,13 +6203,20 @@ class NativeCampaign final {
         menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
         surface_workspace_.modal_open(),settings_visible());
     if(navigation_visible){
-      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),"Research");
-      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Shipyard");
-      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
-      draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),"Relations");
-      draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),"Supply network");
+      draw_navigation(layout.map,UiAction::Map,false,"Map");
+      draw_navigation(layout.home,UiAction::Home,false,"Home");
+      draw_navigation(layout.inspect,UiAction::Inspect,inspection_visible(),"Inspect");
+      draw_navigation(layout.zoom_in,UiAction::ZoomIn,false,"Zoom in");
+      draw_navigation(layout.zoom_out,UiAction::ZoomOut,false,"Zoom out");
       draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),"Economy and industry");
+      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),"Research");
+      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
+      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Ships");
+      draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),"Explore");
       draw_navigation(layout.colonies,UiAction::Colonies,colony_roster_.visible(),"Colonies and outposts");
+      draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),"Supply network");
+      draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),"Relations");
+      draw_navigation(layout.menu,UiAction::Menu,false,"Menu");
     }
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
@@ -6997,6 +7046,7 @@ class NativeCampaign final {
   Camera camera_;
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   stellar::native_navigation::NativeNavigationArt navigation_art_;
+  NativeResearchArt research_art_;
   NativeTerritoryOverlay territory_overlay_;
   NativeTerritoryDrawStats last_territory_draw_;
   NativeGalaxyLabelLayoutStats last_galaxy_label_stats_;

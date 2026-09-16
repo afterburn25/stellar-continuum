@@ -2,29 +2,19 @@
   "schemaVersion": 1,
   "size": 256,
   "assets": {
-    "research": {
-      "source": "assets/visual/ui/navigation/nav_research.svg",
-      "runtimePath": "assets/visual/ui/navigation/nav_research.png",
-      "sourceSha256": "78C200C9E25832463C47B30D42364EF567B54534C51448230F7D83FEC69AD7EC",
-      "runtimeSha256": "D6E8D7D9955F6861DF2A6E4F0E16604740C5AFF9F356A29458B3B2807C708981"
-    },
-    "shipyard": {
-      "source": "assets/visual/ui/navigation/nav_shipyard.svg",
-      "runtimePath": "assets/visual/ui/navigation/nav_shipyard.png",
-      "sourceSha256": "EEBB5C342F3840F9F14C99638E74E67FC5D9130925EB001B5D2F617614A018C4",
-      "runtimeSha256": "508B020B58586BCDE46653FB849948E0481E69D54A26A9D98B35EDE9725B3800"
-    },
-    "construction": {
-      "source": "assets/visual/ui/navigation/nav_construction.svg",
-      "runtimePath": "assets/visual/ui/navigation/nav_construction.png",
-      "sourceSha256": "BE1F82114797F811750E52A6FFE8B15C2CC3E9054C18C5EC433956C5CDCDB00E",
-      "runtimeSha256": "1CEB54FAB8C17DF1B4C3D563E30D4C6D3F6B4282998AA111A0C0B2ACD28C33BA"
-    },
-    "relations": {
-      "source": "assets/visual/ui/navigation/nav_relations.svg",
-      "runtimePath": "assets/visual/ui/navigation/nav_relations.png",
-      "sourceSha256": "81AEF6CA97C2461173C79A6716DF63308A0096AE0AA2E0A54C86C189CAFF95C3",
-      "runtimeSha256": "FEBDDF87596181AB1850DF7919325DD01FC4582B4E7EEDF9871E2C5DF8289DD0"
-    }
+    "galaxy": { "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png", "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png", "sourceSha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9", "runtimeSha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9" },
+    "home": { "source": "assets/visual/sol/earth.jpg", "runtimePath": "assets/visual/sol/earth.jpg", "sourceSha256": "12f6c594f6acc769598ae3cb908e9020f7973f2a0b73f7fb75bf3df737fb7b31", "runtimeSha256": "12f6c594f6acc769598ae3cb908e9020f7973f2a0b73f7fb75bf3df737fb7b31" },
+    "inspection": { "source": "assets/visual/sol/earth-map.jpg", "runtimePath": "assets/visual/sol/earth-map.jpg", "sourceSha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d", "runtimeSha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d" },
+    "zoom_in": { "source": "assets/visual/space/deep-field-v2.png", "runtimePath": "assets/visual/space/deep-field-v2.png", "sourceSha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5", "runtimeSha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5" },
+    "zoom_out": { "source": "assets/visual/space/galactic-dust-detail-v1.png", "runtimePath": "assets/visual/space/galactic-dust-detail-v1.png", "sourceSha256": "281662f113633dd807e68bcd97d94a9be0ed48182a4ce9776e6007cd2523ef48", "runtimeSha256": "281662f113633dd807e68bcd97d94a9be0ed48182a4ce9776e6007cd2523ef48" },
+    "economy": { "source": "assets/visual/catalog/portraits/research-economic_trade.png", "runtimePath": "assets/visual/catalog/portraits/research-economic_trade.png", "sourceSha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e", "runtimeSha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e" },
+    "research": { "source": "assets/visual/catalog/portraits/research-foundations.png", "runtimePath": "assets/visual/catalog/portraits/research-foundations.png", "sourceSha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a", "runtimeSha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a" },
+    "shipyard": { "source": "assets/visual/ships/interstellar-bulk-freighter.png", "runtimePath": "assets/visual/ships/interstellar-bulk-freighter.png", "sourceSha256": "1493ee2bc0d3aef47564edd6863ada71c365df2a6207f188007d86eb5901ad39", "runtimeSha256": "1493ee2bc0d3aef47564edd6863ada71c365df2a6207f188007d86eb5901ad39" },
+    "construction": { "source": "assets/visual/catalog/portraits/human_station_industry--l1.png", "runtimePath": "assets/visual/catalog/portraits/human_station_industry--l1.png", "sourceSha256": "ce990da97a5f5aaf10d2c9109397a99179d7d209e2e7f49c65c4b75acd0b0e74", "runtimeSha256": "ce990da97a5f5aaf10d2c9109397a99179d7d209e2e7f49c65c4b75acd0b0e74" },
+    "exploration": { "source": "assets/visual/ships/pathfinder-scout.jpg", "runtimePath": "assets/visual/ships/pathfinder-scout.jpg", "sourceSha256": "b931349492f4bffb081a08538d25ef8774d387bfb6826c2f16c2cfc962a93627", "runtimeSha256": "b931349492f4bffb081a08538d25ef8774d387bfb6826c2f16c2cfc962a93627" },
+    "colonization": { "source": "assets/visual/ships/interstellar-colony-ship.jpg", "runtimePath": "assets/visual/ships/interstellar-colony-ship.jpg", "sourceSha256": "be520ef76f0db63ccadb03861a8af9144fa2a3a5bd1427bfe279b8ea55318f21", "runtimeSha256": "be520ef76f0db63ccadb03861a8af9144fa2a3a5bd1427bfe279b8ea55318f21" },
+    "logistics": { "source": "assets/visual/ships/resource-outpost-ship.png", "runtimePath": "assets/visual/ships/resource-outpost-ship.png", "sourceSha256": "04a7ee3f67e7246b57e252fa13ab26272c3b34589afa397683aabfd0f8064ec7", "runtimeSha256": "04a7ee3f67e7246b57e252fa13ab26272c3b34589afa397683aabfd0f8064ec7" },
+    "relations": { "source": "assets/visual/catalog/portraits/research-social_admin.png", "runtimePath": "assets/visual/catalog/portraits/research-social_admin.png", "sourceSha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789", "runtimeSha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789" },
+    "settings": { "source": "assets/visual/catalog/portraits/research-computing.png", "runtimePath": "assets/visual/catalog/portraits/research-computing.png", "sourceSha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb", "runtimeSha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb" }
   }
 }

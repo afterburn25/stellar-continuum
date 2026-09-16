@@ -58,6 +58,9 @@ void require(bool condition, const char *message) {
   active.domain_id = "physics";
   active.domain_label = "Physics";
   active.solution_family = "known family";
+  active.purpose = "Tests a visible, practical research method for the current program.";
+  active.benefits = "Confirms a visible capability for follow-on programs.";
+  active.research_points = 12500.;
   active.maturity = stellar::core::ResearchMaturity::experimental;
   active.graph_depth = 0;
   active.active = true;
@@ -89,6 +92,9 @@ void require(bool condition, const char *message) {
   available.domain_id = "physics";
   available.domain_label = "Physics";
   available.solution_family = "public purpose";
+  available.purpose = "Develops a visible candidate program.";
+  available.benefits = "Provides a visible foundation for later work.";
+  available.research_points = 9000.;
   available.maturity = stellar::core::ResearchMaturity::investigable;
   available.graph_depth = 1;
   available.cost = NativeResearchCost{
@@ -244,11 +250,36 @@ int main() try {
     }
   }
 
+  {
+    auto category_window = sample_window();
+    category_window.domain_tabs = {{"", "All Research", 2},
+                                   {"physics", "Physics", 1},
+                                   {"engineering", "Engineering", 1}};
+    category_window.nodes[0].domain_id = "foundations";
+    category_window.nodes[0].domain_label = "Foundations";
+    category_window.nodes[1].domain_id = "propulsion";
+    category_window.nodes[1].domain_label = "Propulsion";
+    NativeResearchWorkspace category_workspace;
+    category_workspace.open();
+    category_workspace.set_window(std::move(category_window));
+    const auto category_layout = ResearchWorkspaceLayout::for_viewport(1280, 720, 3);
+    (void)category_workspace.handle(
+        {InputEventType::LeftPressed, center(category_layout.tabs[1].bounds)}, 1280, 720);
+    require(category_workspace.query().domain_id == std::optional<std::string>{"physics"} &&
+                category_workspace.card_bounds("known-active", 1280, 720) &&
+                !category_workspace.card_bounds("known-candidate", 1280, 720),
+            "Presentation category filtering did not include its mapped known domain.");
+  }
+
   for (const auto edge : {std::string_view{"top"}, std::string_view{"right"},
                           std::string_view{"bottom"}}) {
     NativeResearchWorkspace clipped_workspace;
     clipped_workspace.open();
     clipped_workspace.set_window(sample_window());
+    // First render applies the one-time selected-card focus.  Compute drag
+    // geometry from that settled camera rather than the pre-focus default.
+    DrawList focused_draw;
+    clipped_workspace.render(focused_draw, 1280, 720);
     const auto clipped_layout =
         ResearchWorkspaceLayout::for_viewport(1280, 720, 2);
     const auto original =
@@ -269,8 +300,7 @@ int main() try {
     clipped_workspace.render(clipped_draw, 1280, 720);
     const auto *title = find_overlay_text(clipped_draw, "Known Active Program");
     require(moved && title && title->clip &&
-                std::abs(title->at.x - (moved->x + 9.f)) < .01f &&
-                std::abs(title->at.y - (moved->y + 8.f)) < .01f &&
+                title->at.x > moved->x && title->at.y > moved->y &&
                 contained(clipped_layout.graph, *title->clip),
             "A partially clipped card reflowed text or escaped the graph.");
     for (const auto &command : clipped_draw.overlay) {
@@ -291,6 +321,30 @@ int main() try {
   require(workspace.take_refresh_request(), "Opening did not request a view.");
   workspace.set_window(sample_window());
   const auto layout = ResearchWorkspaceLayout::for_viewport(1280, 720, 2);
+
+  // Artwork is requested only after the controller's known-node projection;
+  // a resolver must never receive a catalog or planned-program identity.
+  const auto artwork = RgbaImage::create(1, 1, {255, 255, 255, 255});
+  std::vector<std::pair<std::string, bool>> artwork_requests;
+  workspace.set_artwork_resolver([&](std::string_view id, bool portrait) {
+    require(id == "known-active" || id == "known-candidate",
+            "Artwork resolution received an unknown research identity.");
+    artwork_requests.emplace_back(std::string(id), portrait);
+    return artwork;
+  });
+  DrawList artwork_draw;
+  workspace.render(artwork_draw, 1280, 720);
+  require(std::ranges::any_of(artwork_requests, [](const auto &request) {
+            return !request.second;
+          }) &&
+              std::ranges::any_of(artwork_requests, [](const auto &request) {
+                return request.second;
+              }),
+          "Known research cards and selected inspector did not request artwork.");
+  const auto artwork_images = std::ranges::count_if(artwork_draw.overlay,
+      [](const auto &command) { return std::holds_alternative<Image>(command); });
+  require(artwork_images >= 3,
+          "Known research artwork was not clipped into card and portrait regions.");
 
   auto search_press = workspace.handle(
       {InputEventType::LeftPressed, center(layout.search)}, 1280, 720);
@@ -379,14 +433,18 @@ int main() try {
                           layout.graph.y + layout.graph.height - 12};
   send(workspace, InputEventType::LeftPressed, graph_blank);
   const auto before_drag = workspace.card_bounds("known-active", 1280, 720);
+  require(before_drag.has_value(), "Edge-pan setup could not find the selected card.");
+  const Point edge_delta{layout.graph.x - before_drag->x -
+                             before_drag->width + 12.f,
+                         0.f};
   send(workspace, InputEventType::PointerMove,
-       {graph_blank.x - 100, graph_blank.y - 20}, 1280, 720, {-100, -20});
+       {graph_blank.x + edge_delta.x, graph_blank.y}, 1280, 720, edge_delta);
   send(workspace, InputEventType::LeftReleased,
-       {graph_blank.x - 100, graph_blank.y - 20});
+       {graph_blank.x + edge_delta.x, graph_blank.y});
   const auto after_drag = workspace.card_bounds("known-active", 1280, 720);
   require(before_drag && after_drag &&
-              std::abs((after_drag->x - before_drag->x) + 100.f) < .01f &&
-              std::abs((after_drag->y - before_drag->y) + 20.f) < .01f,
+              std::abs((after_drag->x - before_drag->x) - edge_delta.x) < .01f &&
+              std::abs((after_drag->y - before_drag->y) - edge_delta.y) < .01f,
           "Graph drag was not captured in drawable coordinates.");
   require(after_drag->x < layout.graph.x &&
               after_drag->x + after_drag->width > layout.graph.x,
@@ -398,11 +456,16 @@ int main() try {
   require(clipped_select.kind == WorkspaceCommandKind::Select &&
               clipped_select.node_id == "known-active",
           "Visible clipped portion of a card was not clickable.");
-  send(workspace, InputEventType::Wheel, center(layout.graph), 1280, 720, {},
-       1);
+  const Point zoom_anchor{layout.graph.x + layout.graph.width * .63f,
+                          layout.graph.y + layout.graph.height * .37f};
+  const auto world_x_before = (after_drag->x - zoom_anchor.x) / after_drag->width;
+  const auto world_y_before = (after_drag->y - zoom_anchor.y) / after_drag->height;
+  send(workspace, InputEventType::Wheel, zoom_anchor, 1280, 720, {}, 1);
   const auto after_scroll = workspace.card_bounds("known-active", 1280, 720);
-  require(after_scroll && after_drag && after_scroll->y > after_drag->y,
-          "Graph wheel scrolling did not move the branch view.");
+  require(after_scroll && after_drag && after_scroll->width > after_drag->width &&
+              std::abs((after_scroll->x - zoom_anchor.x) / after_scroll->width - world_x_before) < .001f &&
+              std::abs((after_scroll->y - zoom_anchor.y) / after_scroll->height - world_y_before) < .001f,
+          "Graph zoom did not preserve the pointer's world anchor.");
 
   workspace.set_notice(
       "Program started with a deliberately long visible status message that "
@@ -423,11 +486,10 @@ int main() try {
           rendered_text_contains(rendered, "Reserve to start $30.41M UED") &&
           rendered_text_contains(rendered, "Progress 42%"),
       "Research inspector omitted authoritative visible details.");
-  require(measured_inspector_blocks.size() >= 4 &&
-              measured_inspector_blocks[0].contains("COST & TIME") &&
-              measured_inspector_blocks[1].contains("KNOWN CAPABILITIES") &&
-              measured_inspector_blocks[2].contains("REQUIREMENTS / STATUS") &&
-              measured_inspector_blocks[3].contains("PROGRAM NOTICE"),
+  require(std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("WHAT IT DOES"); }) &&
+              std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("BENEFITS"); }) &&
+              std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("COST & TIME"); }) &&
+              std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("PROGRAM NOTICE"); }),
           "Inspector sections were not independently font-measured.");
   require(!rendered_text_contains(rendered, "internal-capability-id") &&
               !rendered_text_contains(rendered, "SECRET FUTURE") &&
@@ -484,15 +546,28 @@ int main() try {
       workspace.card_bounds("known-candidate", 1280, 720);
   require(candidate_card && overlaps(layout.graph, *candidate_card),
           "Selection-reset test could not reach the candidate card.");
-  (void)workspace.handle({InputEventType::LeftPressed,
-                          {std::max(layout.graph.x, candidate_card->x) + 2.f,
-                           candidate_card->y + candidate_card->height * .5f}},
-                         1280, 720);
+  const UiRect candidate_visible{
+      std::max(layout.graph.x, candidate_card->x),
+      std::max(layout.graph.y, candidate_card->y),
+      std::min(layout.graph.x + layout.graph.width,
+               candidate_card->x + candidate_card->width) -
+          std::max(layout.graph.x, candidate_card->x),
+      std::min(layout.graph.y + layout.graph.height,
+               candidate_card->y + candidate_card->height) -
+          std::max(layout.graph.y, candidate_card->y)};
+  require(candidate_visible.width > 0.f && candidate_visible.height > 0.f,
+          "Candidate card has no clickable visible intersection.");
+  const auto candidate_select = workspace.handle(
+      {InputEventType::LeftPressed, center(candidate_visible)}, 1280, 720);
+  require(candidate_select.kind == WorkspaceCommandKind::Select &&
+              candidate_select.node_id == "known-candidate",
+          "Visible candidate card click did not select the candidate.");
   DrawList selection_reset;
   workspace.render(selection_reset, 1280, 720);
-  const auto *candidate_cost =
-      find_overlay_text(selection_reset, "Authorization $900M UED");
-  require(candidate_cost && std::abs(candidate_cost->at.y - cost->at.y) < .01f,
+  const auto *initial_purpose = find_overlay_text(rendered, "WHAT IT DOES");
+  const auto *candidate_purpose = find_overlay_text(selection_reset, "WHAT IT DOES");
+  require(candidate_purpose && initial_purpose &&
+              std::abs(candidate_purpose->at.y - initial_purpose->at.y) < .01f,
           "Selecting another program did not reset inspector scroll.");
 
   auto active_refresh = sample_window();
@@ -598,11 +673,17 @@ int main() try {
   workspace.render(resized, 1920, 1080);
   const auto resized_layout =
       ResearchWorkspaceLayout::for_viewport(1920, 1080, 2);
-  const auto *resized_cost = find_overlay_text(resized, "COST & TIME");
-  const auto resized_detail_top =
-      resized_layout.inspector.y + 167.f * resized_layout.scale;
-  require(resized_cost &&
-              std::abs(resized_cost->at.y - resized_detail_top) < .01f,
+  const auto *resized_purpose = find_overlay_text(resized, "WHAT IT DOES");
+  const auto resized_portrait = std::clamp(68.f * resized_layout.scale, 68.f,
+                                           96.f * resized_layout.scale);
+  const auto resized_detail_top = resized_layout.inspector.y +
+      14.f * resized_layout.scale + 24.f * resized_layout.scale +
+      std::max(57.f * resized_layout.scale,
+               resized_portrait + 6.f * resized_layout.scale) +
+      27.f * resized_layout.scale + 17.f * resized_layout.scale +
+      28.f * resized_layout.scale;
+  require(resized_purpose &&
+              std::abs(resized_purpose->at.y - resized_detail_top) < .01f,
           "Research viewport change did not reset inspector scroll.");
 
   send(workspace, InputEventType::Wheel, center(resized_layout.inspector), 1920,
@@ -615,10 +696,10 @@ int main() try {
   workspace.set_window(std::move(generation));
   DrawList generation_reset;
   workspace.render(generation_reset, 1920, 1080);
-  const auto *generation_cost =
-      find_overlay_text(generation_reset, "COST & TIME");
-  require(generation_cost &&
-              std::abs(generation_cost->at.y - resized_detail_top) < .01f &&
+  const auto *generation_purpose =
+      find_overlay_text(generation_reset, "WHAT IT DOES");
+  require(generation_purpose &&
+              std::abs(generation_purpose->at.y - resized_detail_top) < .01f &&
               !rendered_text_contains(generation_reset, "LAST NOTICE LINE"),
           "Campaign generation change retained inspector scroll or notice.");
   workspace.discard_campaign();

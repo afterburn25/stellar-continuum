@@ -1,5 +1,7 @@
 #include "native_research_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_research_presentation.hpp"
+#include "native_ui_style.hpp"
 
 #include <algorithm>
 #include <array>
@@ -210,12 +212,13 @@ void erase_last_utf8(std::string &value) {
 
 [[nodiscard]] bool matches_query(const NativeResearchNode &node,
                                  const NativeResearchQuery &query) {
-  if (query.domain_id && node.domain_id != *query.domain_id)
+  if (query.domain_id && !research_category_matches(*query.domain_id, node.domain_id))
     return false;
   if (query.search.empty())
     return true;
   auto visible_text =
-      node.display_name + " " + node.domain_label + " " + node.solution_family;
+      node.display_name + " " + node.domain_label + " " + node.solution_family +
+      " " + node.purpose + " " + node.benefits;
   for (const auto &capability : node.known_capabilities)
     visible_text += " " + capability.display_name;
   return fold_ascii(std::move(visible_text)).contains(fold_ascii(query.search));
@@ -241,7 +244,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   const auto tab_gap = 5.f * scale;
   const auto available = screen_width - content_left - inset;
   const auto columns = std::max<std::size_t>(
-      1, static_cast<std::size_t>(available / (128.f * scale)));
+      1, static_cast<std::size_t>(available / (172.f * scale)));
   const auto rows =
       std::max<std::size_t>(1, (tab_count + columns - 1) / columns);
   const auto tab_width =
@@ -293,6 +296,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
 void NativeResearchWorkspace::open() {
   visible_ = true;
   refresh_requested_ = true;
+  center_selection_ = true;
   inspector_scroll_ = 0.f;
   inspector_scroll_limit_ = 0.f;
 }
@@ -313,6 +317,10 @@ void NativeResearchWorkspace::set_text_measurer(TextMeasurer measure) {
   inspector_scroll_limit_ = 0.f;
 }
 
+void NativeResearchWorkspace::set_artwork_resolver(ArtworkResolver resolve) {
+  artwork_resolver_ = std::move(resolve);
+}
+
 bool NativeResearchWorkspace::wants_text_input() const noexcept {
   return visible_ && search_focused_;
 }
@@ -325,6 +333,7 @@ void NativeResearchWorkspace::set_window(NativeResearchWindow window) {
     selected_node_id_.reset();
     query_.domain_id.reset();
     pan_ = {24.f, 30.f};
+    zoom_ = 1.f;
     notice_.clear();
     notice_accepted_ = false;
     inspector_scroll_ = 0.f;
@@ -359,6 +368,7 @@ void NativeResearchWorkspace::set_window(NativeResearchWindow window) {
   }
   rebuild_topology();
   if (generation_changed || prior_selection != selected_node_id_) {
+    center_selection_ = true;
     inspector_scroll_ = 0.f;
     inspector_scroll_limit_ = 0.f;
   }
@@ -373,6 +383,7 @@ void NativeResearchWorkspace::discard_campaign() {
   topology_signature_.clear();
   query_.domain_id.reset();
   pan_ = {24.f, 30.f};
+  zoom_ = 1.f;
   notice_.clear();
   notice_accepted_ = false;
   inspector_scroll_ = 0.f;
@@ -440,7 +451,7 @@ void NativeResearchWorkspace::rebuild_topology() {
   for (const auto *node : ordered) {
     if (node->domain_id != domain) {
       if (!domain.empty())
-        domain_y += static_cast<float>(maximum_slot + 1) * 102.f + 48.f;
+        domain_y += static_cast<float>(maximum_slot + 1) * 150.f + 48.f;
       domain = node->domain_id;
       slots.clear();
       maximum_slot = 0;
@@ -451,8 +462,8 @@ void NativeResearchWorkspace::rebuild_topology() {
     placements_.push_back(
         {node->id,
          node->domain_id,
-         {30.f + static_cast<float>(node->graph_depth) * 218.f,
-          domain_y + static_cast<float>(slot) * 102.f, 190.f, 82.f}});
+         {30.f + static_cast<float>(node->graph_depth) * 286.f,
+          domain_y + static_cast<float>(slot) * 150.f, 260.f, 128.f}});
   }
   reconcile_selection();
 }
@@ -500,11 +511,11 @@ UiRect NativeResearchWorkspace::transformed_card(
     const NodePlacement &placement,
     const ResearchWorkspaceLayout &layout) const {
   return {layout.graph.x + pan_.x * layout.scale +
-              placement.world_bounds.x * layout.scale,
+              placement.world_bounds.x * layout.scale * zoom_,
           layout.graph.y + pan_.y * layout.scale +
-              placement.world_bounds.y * layout.scale,
-          placement.world_bounds.width * layout.scale,
-          placement.world_bounds.height * layout.scale};
+              placement.world_bounds.y * layout.scale * zoom_,
+          placement.world_bounds.width * layout.scale * zoom_,
+          placement.world_bounds.height * layout.scale * zoom_};
 }
 
 std::optional<UiRect>
@@ -579,7 +590,12 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
   }
   if (event.type == InputEventType::Wheel &&
       layout.graph.contains(event.position)) {
-    pan_.y += event.wheel_y * 52.f;
+    const auto next = std::clamp(zoom_ * std::pow(1.12f, event.wheel_y), .58f, 1.55f);
+    const auto x = (event.position.x - layout.graph.x) / layout.scale;
+    const auto y = (event.position.y - layout.graph.y) / layout.scale;
+    const auto ratio = next / zoom_;
+    pan_ = {x - (x - pan_.x) * ratio, y - (y - pan_.y) * ratio};
+    zoom_ = next;
     return result;
   }
   if (event.type == InputEventType::Wheel &&
@@ -608,7 +624,10 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
       query_.domain_id =
           domain.empty() ? std::nullopt : std::optional<std::string>(domain);
       selected_node_id_.reset();
+      pan_ = {24.f, 30.f};
+      zoom_ = 1.f;
       rebuild_topology();
+      center_selection_ = true;
       return result;
     }
     if (layout.action.contains(event.position)) {
@@ -657,6 +676,21 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   const auto tab_count = window_ ? window_->domain_tabs.size() : 0;
   const auto layout =
       ResearchWorkspaceLayout::for_viewport(width, height, tab_count);
+  if (center_selection_ && selected_node_id_) {
+    const auto selected_placement = std::ranges::find(
+        placements_, *selected_node_id_, &NodePlacement::id);
+    if (selected_placement != placements_.end()) {
+      // Center once when this surface/filter first appears.  Subsequent
+      // progress-only window updates retain the player's camera exactly.
+      pan_.x = layout.graph.width / (2.f * layout.scale) -
+               (selected_placement->world_bounds.x +
+                selected_placement->world_bounds.width * .5f) * zoom_;
+      pan_.y = layout.graph.height / (2.f * layout.scale) -
+               (selected_placement->world_bounds.y +
+                selected_placement->world_bounds.height * .5f) * zoom_;
+    }
+    center_selection_ = false;
+  }
   fill(out, layout.surface, background);
   text(out, layout.title, "RESEARCH NETWORK", bright, layout.title_font_pixels,
        TextAlign::Left, FontFace::Heading);
@@ -750,12 +784,13 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
           Line{segment->first, segment->second, {56, 104, 145, 190}});
   }
   for (const auto &domain : domains_) {
-    const auto y = layout.graph.y + (pan_.y + domain.world_y) * layout.scale;
+    const auto y = layout.graph.y + (pan_.y + domain.world_y * zoom_) * layout.scale;
     clipped_text(out,
                  {layout.graph.x + 14.f * layout.scale, y,
                   layout.graph.width - 28.f * layout.scale,
                   20.f * layout.scale},
-                 layout.graph, domain.label, muted, layout.small_font_pixels);
+                 layout.graph, domain.label, muted,
+                 std::max(8, static_cast<int>(std::lround(layout.small_font_pixels * zoom_))));
   }
   for (const auto &node : window_->nodes) {
     const auto visible = visible_cards.find(node.id);
@@ -769,21 +804,37 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          : clipping.contains(pointer_) ? hover
                                        : raised);
     clipped_stroke(out, bounds, layout.graph, chosen ? positive : border);
+    const auto card_scale = layout.scale * zoom_;
+    const auto thumbnail_side = std::min(bounds.height - 14.f * card_scale,
+                                         76.f * card_scale);
+    const UiRect thumbnail{bounds.x + 8.f * card_scale, bounds.y + 8.f * card_scale,
+                           thumbnail_side, thumbnail_side};
+    if (artwork_resolver_) {
+      // `node` is from the already projected known window; never resolve art
+      // while laying out hidden or filtered-out catalog entries.
+      if (const auto image = artwork_resolver_(node.id, false))
+        out.overlay.emplace_back(Image{image, thumbnail, std::nullopt,
+                                       {255, 255, 255, 235}, clipping});
+    }
     clipped_text(out,
-                 {bounds.x + 9.f * layout.scale, bounds.y + 8.f * layout.scale,
-                  bounds.width - 18.f * layout.scale, 42.f * layout.scale},
-                 clipping, node.display_name, bright, layout.body_font_pixels);
+                 {thumbnail.x + thumbnail.width + 9.f * card_scale,
+                  bounds.y + 9.f * card_scale,
+                  bounds.width - thumbnail.width - 26.f * card_scale,
+                  76.f * card_scale},
+                 clipping, node.display_name, bright,
+                 std::max(9, static_cast<int>(std::lround(layout.body_font_pixels * zoom_))));
     clipped_text(out,
-                 {bounds.x + 9.f * layout.scale, bounds.y + 55.f * layout.scale,
-                  bounds.width - 18.f * layout.scale, 17.f * layout.scale},
+                 {thumbnail.x + thumbnail.width + 9.f * card_scale,
+                  bounds.y + 92.f * card_scale,
+                  bounds.width - thumbnail.width - 26.f * card_scale, 20.f * card_scale},
                  clipping, node_state(node), node.active ? positive : muted,
-                 layout.small_font_pixels);
+                 std::max(8, static_cast<int>(std::lround(layout.small_font_pixels * zoom_))));
     const auto progress =
         static_cast<float>(std::clamp(node.total_progress, 0., 1.));
     const UiRect progress_bounds{
-        bounds.x + 8.f * layout.scale,
-        bounds.y + bounds.height - 6.f * layout.scale,
-        (bounds.width - 16.f * layout.scale) * progress, 2.f * layout.scale};
+        bounds.x + 8.f * card_scale,
+        bounds.y + bounds.height - 6.f * card_scale,
+        (bounds.width - 16.f * card_scale) * progress, 2.f * card_scale};
     if (const auto progress_clip = intersection(progress_bounds, layout.graph))
       fill(out, *progress_clip, positive);
   }
@@ -801,9 +852,17 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          layout.body_font_pixels);
     return;
   }
-  text(out, {inspector_x, inspector_y, inspector_width, 56.f * layout.scale},
+  const auto portrait_side = std::clamp(68.f * layout.scale, 68.f, 96.f * layout.scale);
+  if (artwork_resolver_) {
+    if (const auto image = artwork_resolver_(node->id, true))
+      out.overlay.emplace_back(Image{image, {inspector_x, inspector_y, portrait_side,
+                                               portrait_side}, std::nullopt,
+                                     {255, 255, 255, 255}, layout.inspector});
+  }
+  text(out, {inspector_x + portrait_side + 10.f * layout.scale, inspector_y,
+             inspector_width - portrait_side - 10.f * layout.scale, 56.f * layout.scale},
        node->display_name, bright, layout.title_font_pixels);
-  inspector_y += 57.f * layout.scale;
+  inspector_y += std::max(57.f * layout.scale, portrait_side + 6.f * layout.scale);
   text(out, {inspector_x, inspector_y, inspector_width, 22.f * layout.scale},
        node->domain_label + "  |  " + node_state(*node),
        node->active ? positive : muted, layout.small_font_pixels);
@@ -834,6 +893,12 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     float height{};
   };
   std::vector<InspectorBlock> details;
+  if (!node->purpose.empty()) details.push_back({"WHAT IT DOES\n" + node->purpose, bright});
+  if (!node->benefits.empty()) details.push_back({"BENEFITS\n" + node->benefits, bright});
+  if (node->research_points > 0.)
+    details.push_back({"RESEARCH WORK\n" + fixed(node->research_points, 0) + " RP", muted});
+  if (!node->active && node->maturity >= stellar::core::ResearchMaturity::mature)
+    details.push_back({"COMPLETED\nEstablished knowledge has no ongoing program cost and is not charged again.", positive});
   if (node->cost) {
     const auto &cost = *node->cost;
     auto value = "COST & TIME\nAuthorization " + cost.formatted_authorization +

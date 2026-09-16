@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <functional>
 #include <optional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,7 +52,10 @@ class NativeResearchWorkspace final {
 public:
   using TextMeasurer = std::function<stellar::native_map::TextExtent(
       const stellar::native_map::Text &)>;
+  using ArtworkResolver = std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(
+      std::string_view node_id, bool portrait)>;
   void set_text_measurer(TextMeasurer measure);
+  void set_artwork_resolver(ArtworkResolver resolve);
   void open();
   void close();
   [[nodiscard]] bool visible() const noexcept;
@@ -101,8 +105,10 @@ private:
   bool search_focused_{};
   bool dragging_{};
   bool refresh_requested_{};
+  bool center_selection_{};
   stellar::native_map::Point pointer_{};
   stellar::native_map::Point pan_{24.f, 30.f};
+  float zoom_{1.f};
   stellar::native_research::NativeResearchQuery query_;
   std::optional<stellar::native_research::NativeResearchWindow> window_;
   std::optional<std::string> selected_node_id_;
@@ -115,6 +121,7 @@ private:
   float inspector_scroll_limit_{};
   int inspector_viewport_width_{}, inspector_viewport_height_{};
   TextMeasurer text_measurer_;
+  ArtworkResolver artwork_resolver_;
 };
 
 } // namespace stellar::native_research_ui
