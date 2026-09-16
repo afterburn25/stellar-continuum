@@ -1,20 +1,94 @@
 {
   "schemaVersion": 1,
   "size": 256,
+  "rasterization": {
+    "tool": "Microsoft Edge Chromium 153.0.4234.32",
+    "method": "Existing source SVG rendered at 256x256 on a transparent page, preserving its viewBox and aspect ratio; no icon redesign."
+  },
   "assets": {
-    "galaxy": { "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png", "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png", "sourceSha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9", "runtimeSha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9" },
-    "home": { "source": "assets/visual/sol/earth.jpg", "runtimePath": "assets/visual/sol/earth.jpg", "sourceSha256": "12f6c594f6acc769598ae3cb908e9020f7973f2a0b73f7fb75bf3df737fb7b31", "runtimeSha256": "12f6c594f6acc769598ae3cb908e9020f7973f2a0b73f7fb75bf3df737fb7b31" },
-    "inspection": { "source": "assets/visual/sol/earth-map.jpg", "runtimePath": "assets/visual/sol/earth-map.jpg", "sourceSha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d", "runtimeSha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d" },
-    "zoom_in": { "source": "assets/visual/space/deep-field-v2.png", "runtimePath": "assets/visual/space/deep-field-v2.png", "sourceSha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5", "runtimeSha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5" },
-    "zoom_out": { "source": "assets/visual/space/galactic-dust-detail-v1.png", "runtimePath": "assets/visual/space/galactic-dust-detail-v1.png", "sourceSha256": "281662f113633dd807e68bcd97d94a9be0ed48182a4ce9776e6007cd2523ef48", "runtimeSha256": "281662f113633dd807e68bcd97d94a9be0ed48182a4ce9776e6007cd2523ef48" },
-    "economy": { "source": "assets/visual/catalog/portraits/research-economic_trade.png", "runtimePath": "assets/visual/catalog/portraits/research-economic_trade.png", "sourceSha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e", "runtimeSha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e" },
-    "research": { "source": "assets/visual/catalog/portraits/research-foundations.png", "runtimePath": "assets/visual/catalog/portraits/research-foundations.png", "sourceSha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a", "runtimeSha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a" },
-    "shipyard": { "source": "assets/visual/ships/interstellar-bulk-freighter.png", "runtimePath": "assets/visual/ships/interstellar-bulk-freighter.png", "sourceSha256": "1493ee2bc0d3aef47564edd6863ada71c365df2a6207f188007d86eb5901ad39", "runtimeSha256": "1493ee2bc0d3aef47564edd6863ada71c365df2a6207f188007d86eb5901ad39" },
-    "construction": { "source": "assets/visual/catalog/portraits/human_station_industry--l1.png", "runtimePath": "assets/visual/catalog/portraits/human_station_industry--l1.png", "sourceSha256": "ce990da97a5f5aaf10d2c9109397a99179d7d209e2e7f49c65c4b75acd0b0e74", "runtimeSha256": "ce990da97a5f5aaf10d2c9109397a99179d7d209e2e7f49c65c4b75acd0b0e74" },
-    "exploration": { "source": "assets/visual/ships/pathfinder-scout.jpg", "runtimePath": "assets/visual/ships/pathfinder-scout.jpg", "sourceSha256": "b931349492f4bffb081a08538d25ef8774d387bfb6826c2f16c2cfc962a93627", "runtimeSha256": "b931349492f4bffb081a08538d25ef8774d387bfb6826c2f16c2cfc962a93627" },
-    "colonization": { "source": "assets/visual/ships/interstellar-colony-ship.jpg", "runtimePath": "assets/visual/ships/interstellar-colony-ship.jpg", "sourceSha256": "be520ef76f0db63ccadb03861a8af9144fa2a3a5bd1427bfe279b8ea55318f21", "runtimeSha256": "be520ef76f0db63ccadb03861a8af9144fa2a3a5bd1427bfe279b8ea55318f21" },
-    "logistics": { "source": "assets/visual/ships/resource-outpost-ship.png", "runtimePath": "assets/visual/ships/resource-outpost-ship.png", "sourceSha256": "04a7ee3f67e7246b57e252fa13ab26272c3b34589afa397683aabfd0f8064ec7", "runtimeSha256": "04a7ee3f67e7246b57e252fa13ab26272c3b34589afa397683aabfd0f8064ec7" },
-    "relations": { "source": "assets/visual/catalog/portraits/research-social_admin.png", "runtimePath": "assets/visual/catalog/portraits/research-social_admin.png", "sourceSha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789", "runtimeSha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789" },
-    "settings": { "source": "assets/visual/catalog/portraits/research-computing.png", "runtimePath": "assets/visual/catalog/portraits/research-computing.png", "sourceSha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb", "runtimeSha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb" }
+    "galaxy": {
+      "source": "assets/visual/ui/navigation/nav_galaxy.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_galaxy.png",
+      "sourceSha256": "daf239eca80a8920f31cfb0c77123418044571d1843d8264d4e2f4665a15651a",
+      "runtimeSha256": "bafb3e321a66249ef98628996e0936e5513fe9637fc3c274dba3e2d952c45787"
+    },
+    "home": {
+      "source": "assets/visual/ui/navigation/nav_home.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_home.png",
+      "sourceSha256": "4f9df055562f2a5a0d0ab1df0c90de7c29698c9797a48aeb52b816dc0dccf65c",
+      "runtimeSha256": "376bf14ca54f1e9f19e47ec0c3623c262d090a90eb55d920d4fc544d44c3c668"
+    },
+    "inspection": {
+      "source": "assets/visual/ui/navigation/nav_inspection.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_inspection.png",
+      "sourceSha256": "a456824b3d814b86b3e795d28d70b9a56b6480ca4432d700ea809f4038203ccf",
+      "runtimeSha256": "44bb1e7e50f90255bac777b0bab933f3efe2808262c9b60390d237d46b73bc63"
+    },
+    "zoom_in": {
+      "source": "assets/visual/icons/navigation/nav_zoom_in.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_zoom_in.png",
+      "sourceSha256": "f56808c53044632092cbe77476b85cf54edda7b550ca0d3ebdd350565065d0cd",
+      "runtimeSha256": "788327bae24eb6f45e819d443513fd572132da17621574c0d43b9108348579a6"
+    },
+    "zoom_out": {
+      "source": "assets/visual/icons/navigation/nav_zoom_out.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_zoom_out.png",
+      "sourceSha256": "4185a4e93237aaf045fe56123b5456dc80b8a2e9769e6fbc3a9547af4167e3fe",
+      "runtimeSha256": "a4ad51657dcc2c73a1139980de928460313777e7ccbcd28724cee1fdf7414259"
+    },
+    "economy": {
+      "source": "assets/visual/ui/navigation/nav_economy.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_economy.png",
+      "sourceSha256": "8e0349bb1fbfc76fdca7b0c7e1ac7536ed63778589918c06a2df6cf095d93c65",
+      "runtimeSha256": "84c10f47ba4d699acd01484529b05324f758803daca40a816de0ce5231c71aff"
+    },
+    "research": {
+      "source": "assets/visual/ui/navigation/nav_research.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_research.png",
+      "sourceSha256": "78c200c9e25832463c47b30d42364ef567b54534c51448230f7d83fec69ad7ec",
+      "runtimeSha256": "4ebc0718e10ef044dd63c3c60c67d060134d2ff80b5ca941a7b7ffc397cb405f"
+    },
+    "shipyard": {
+      "source": "assets/visual/ui/navigation/nav_shipyard.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_shipyard.png",
+      "sourceSha256": "eebb5c342f3840f9f14c99638e74e67fc5d9130925eb001b5d2f617614a018c4",
+      "runtimeSha256": "637ceaddcff7917c776ed2df273b4bdb36b79f88667fca31cf61eb83e71e999f"
+    },
+    "construction": {
+      "source": "assets/visual/ui/navigation/nav_construction.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_construction.png",
+      "sourceSha256": "be1f82114797f811750e52a6ffe8b15c2cc3e9054c18c5ec433956c5cdcdb00e",
+      "runtimeSha256": "3e815c0835934781b80c1198540afb77d57c574ad87bc19ec8925876cbcd4dbd"
+    },
+    "exploration": {
+      "source": "assets/visual/ui/navigation/nav_exploration.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_exploration.png",
+      "sourceSha256": "f2ce43bac857d5821a0c695c25975e5f7d500f9bbe25cf64091a5acf93e61cbb",
+      "runtimeSha256": "ac43380c15d0b1460991fa4671284c6a97e0e3b744d40cdd3ab5927732cc3659"
+    },
+    "colonization": {
+      "source": "assets/visual/ui/navigation/nav_colonization.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_colonization.png",
+      "sourceSha256": "4e10e33427c9dc38993dbd5f28de217abf7dc99c8bfb50caf45ceac19b532e66",
+      "runtimeSha256": "5f2c0a95f44906c3e80d73069fa4155d578e1f46e952daa29c6acae2c0bc3127"
+    },
+    "logistics": {
+      "source": "assets/visual/ui/navigation/nav_logistics.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_logistics.png",
+      "sourceSha256": "7f54f9164c3d1a6334b5329a564a34a1c65cfc4466625c97378ffdc889008499",
+      "runtimeSha256": "988d09c1916e4e1fdde8ee1fe223cd627da93a165bafb0374e45ae7d45e824cb"
+    },
+    "relations": {
+      "source": "assets/visual/ui/navigation/nav_relations.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_relations.png",
+      "sourceSha256": "81aef6ca97c2461173c79a6716df63308a0096ae0aa2e0a54c86c189caff95c3",
+      "runtimeSha256": "6305a13103a6dde2e12efa1bdcbacb06f80895e669b1475511b2fa7b26c2a4e1"
+    },
+    "settings": {
+      "source": "assets/visual/ui/navigation/nav_settings.svg",
+      "runtimePath": "assets/visual/native-navigation/nav_settings.png",
+      "sourceSha256": "8cce729857bfbf939147c761d8156e23bad7fea5cf0f3d10a8b9817bc5029a0d",
+      "runtimeSha256": "ba68c69b5aa1c356b75d39882682e4dacd95f3e96e3287e80e5dd2cef9cf2c1c"
+    }
   }
 }

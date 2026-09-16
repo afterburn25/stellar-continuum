@@ -471,12 +471,12 @@ def export(preset_name):
                 "Known systems open orbital maps; owned planets show grouped colony information.\n"
                 "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots.\n"
-                "Settings in the main and pause menus provide Audio, Video and General options.\n"
+                "New Game opens large Campaign/Sandbox cards, then species portraits, biology, galaxy sizes, rival/ancient empires, and an automatic random seed. Copy setup and Restore defaults are available.\n"
+                "Settings in the main and pause menus provide General, Audio, Video, Voice & Subtitles and Controls.\n"
                 "Video offers Windowed, Borderless Fullscreen and Exclusive Fullscreen, with resolution and refresh options where supported.\n"
                 "Press F12 to save a PNG screenshot. The default folder is Pictures/Stellar Continuum/Screenshots.\n"
                 "Choose General > Browse, select a screenshot folder, then Save to remember it across restarts.\n"
-                "Three scientist voice cues are integrated. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
+                "Voice & Subtitles provides volume, subtitle size/background/speaker labels, announcement frequency, replay/stop and an optional dry radio filter. Three scientist cues are integrated. The original title logo and Windows emblem are restored. Development offers diagnostics; the separate Godot Developer world and editing tools are not yet ported. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,

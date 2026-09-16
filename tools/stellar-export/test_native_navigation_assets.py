@@ -21,12 +21,12 @@ class NativeNavigationAssetTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_root / relative, target)
 
-    def test_reviewed_photos_export(self):
+    def test_reviewed_svg_symbols_export_as_png(self):
         files = native_navigation_asset_files(self.root)
         self.assertEqual(set(files), {pair[1] for pair in SOURCES.values()})
-        self.assertTrue(all(path.suffix in {".png", ".jpg"} for path in files.values()))
+        self.assertTrue(all(path.suffix == ".png" for path in files.values()))
 
-    def test_changed_photo_rejected(self):
+    def test_changed_source_or_raster_rejected(self):
         for relative in SOURCES["research"]:
             with self.subTest(path=relative):
                 path = self.root / relative
@@ -36,7 +36,7 @@ class NativeNavigationAssetTests(unittest.TestCase):
                     native_navigation_asset_files(self.root)
                 path.write_bytes(original)
 
-    def test_missing_photo_rejected(self):
+    def test_missing_source_or_raster_rejected(self):
         for relative in SOURCES["shipyard"]:
             with self.subTest(path=relative):
                 path = self.root / relative

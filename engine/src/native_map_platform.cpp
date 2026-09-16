@@ -1,5 +1,6 @@
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
+#include <stellar/engine/windows_resource_ids.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_render.h>
@@ -25,6 +26,8 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <ShlObj.h>
+#include <appmodel.h>
+#include <shellapi.h>
 #else
 #error The native UI preview requires the Windows GDI text rasterizer.
 #endif
@@ -179,7 +182,23 @@ struct Window::Storage {
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::filesystem::path screenshot_directory;std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
+  SDL_Texture* scene_target{};
+  int scene_width{},scene_height{},scene_percent{100},scene_samples{1};
+  void prepare_scene_target(int percent,int samples) {
+    if(percent==100&&samples==1){if(scene_target)SDL_DestroyTexture(scene_target);scene_target=nullptr;scene_width=scene_height=0;return;}
+    const double factor=percent*.01*std::sqrt(static_cast<double>(samples));
+    const int w=std::max(1,static_cast<int>(std::ceil(width*factor))),h=std::max(1,static_cast<int>(std::ceil(height*factor)));
+    if(scene_target&&w==scene_width&&h==scene_height)return;
+    const auto maximum=SDL_GetNumberProperty(SDL_GetRendererProperties(renderer),SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER,8192);
+    if(w>maximum||h>maximum||static_cast<std::uint64_t>(w)*h*4>192u*1024u*1024u)
+      throw std::runtime_error("Selected scene quality exceeds the 192 MiB render-target budget at this resolution.");
+    auto* next=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,w,h);
+    if(!next)throw sdl_error("Scene quality render target could not be created");
+    if(!SDL_SetTextureScaleMode(next,SDL_SCALEMODE_LINEAR)||!SDL_SetTextureBlendMode(next,SDL_BLENDMODE_NONE)){SDL_DestroyTexture(next);throw sdl_error("Scene quality filtering failed");}
+    if(scene_target)SDL_DestroyTexture(scene_target);scene_target=next;scene_width=w;scene_height=h;
+  }
   ~Storage(){
+    if(scene_target)SDL_DestroyTexture(scene_target);
     for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(const auto &[size,font_value]:fonts){(void)size;if(font_value)DeleteObject(font_value);}
@@ -189,7 +208,7 @@ struct Window::Storage {
   [[nodiscard]] HFONT font(int pixel_size,FontFace role){
     pixel_size=std::clamp(pixel_size,8,72);const auto font_key=pixel_size*2+(role==FontFace::Heading?1:0);if(const auto found=fonts.find(font_key);found!=fonts.end())return found->second;
     const auto face=role==FontFace::Heading?L"Rajdhani SemiBold":L"Segoe UI";
-    auto created=CreateFontW(-pixel_size,0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH|FF_DONTCARE,face);
+    auto created=CreateFontW(-pixel_size,0,0,0,role==FontFace::Heading?FW_SEMIBOLD:FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH|FF_DONTCARE,face);
     if(!created)throw std::runtime_error("Windows could not create the UI font.");GdiObjectOwner created_owner(created);
     wchar_t selected[64]{};int count{};{const GdiSelection selection(text_dc,created);count=GetTextFaceW(text_dc,static_cast<int>(std::size(selected)),selected);}
     const auto expected=role==FontFace::Heading?L"Rajdhani":L"Segoe UI";if(count<=0||std::wstring_view(selected).find(expected)==std::wstring_view::npos)throw std::runtime_error(role==FontFace::Heading?"Windows did not select the bundled Rajdhani font.":"Windows did not select the native interface font.");
@@ -281,6 +300,13 @@ struct Window::Storage {
 };
 
 Window::Window(std::string title,int width,int height,bool fullscreen,std::filesystem::path font_path){
+  // SDL reads the Windows application icon hints during video initialization.
+  // Keep test hosts without the game resource on their existing default icon.
+  if(FindResource(GetModuleHandle(nullptr),MAKEINTRESOURCE(STELLAR_APPLICATION_ICON_ID),RT_GROUP_ICON)){
+    const auto icon_id=std::to_string(STELLAR_APPLICATION_ICON_ID);
+    SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON,icon_id.c_str(),SDL_HINT_OVERRIDE);
+    SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL,icon_id.c_str(),SDL_HINT_OVERRIDE);
+  }
   auto candidate=std::make_unique<Storage>();require(SDL_Init(SDL_INIT_VIDEO),"SDL video initialization failed");candidate->initialized=true;const auto flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY|(fullscreen?SDL_WINDOW_FULLSCREEN:0);candidate->window=SDL_CreateWindow(title.c_str(),width,height,flags);if(!candidate->window)throw sdl_error("SDL window creation failed");candidate->device=SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,false,"vulkan");if(!candidate->device)throw sdl_error("Vulkan SDL GPU device creation failed");const char *driver=SDL_GetGPUDeviceDriver(candidate->device);if(!driver||std::string(driver)!="vulkan")throw std::runtime_error("Vulkan SDL GPU device creation returned an unexpected backend");candidate->renderer=SDL_CreateGPURenderer(candidate->device,candidate->window);if(!candidate->renderer)throw sdl_error("Vulkan SDL GPU renderer creation failed");require(SDL_SetRenderDrawBlendMode(candidate->renderer,SDL_BLENDMODE_BLEND),"SDL renderer blend setup failed");
   candidate->text_dc=CreateCompatibleDC(nullptr);if(!candidate->text_dc)throw std::runtime_error("Windows text device creation failed.");if(font_path.empty())throw std::invalid_argument("A bundled native UI font path is required.");candidate->private_font_path=std::filesystem::absolute(std::move(font_path));candidate->private_font_added=AddFontResourceExW(candidate->private_font_path.c_str(),FR_PRIVATE,nullptr)>0;if(!candidate->private_font_added)throw std::runtime_error("Bundled Rajdhani font could not be loaded.");
   candidate->vsync=SDL_SetRenderVSync(candidate->renderer,1);if(!candidate->vsync){const std::string reason=SDL_GetError();float refresh=60.f;const auto display=SDL_GetDisplayForWindow(candidate->window);if(display){if(const auto *mode=SDL_GetDesktopDisplayMode(display);mode&&mode->refresh_rate>1.f)refresh=mode->refresh_rate;}candidate->fallback_interval_ns=static_cast<Uint64>(1000000000./static_cast<double>(refresh));SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,"Renderer VSync unavailable (%s); pacing presents at %.2f Hz",reason.c_str(),static_cast<double>(refresh));}
@@ -465,15 +491,79 @@ void Window::set_auto_frame_cap(){
   const auto hz=display_refresh_hz();storage_->auto_frame_cap=true;
   storage_->frame_cap_interval_ns=static_cast<Uint64>(1000000000./hz);storage_->last_present_ns=0;
 }
+void Window::set_scene_quality(int percent,int samples){
+  if((percent!=50&&percent!=75&&percent!=100)||(samples!=1&&samples!=2&&samples!=4))throw std::invalid_argument("Unsupported scene quality.");
+  storage_->prepare_scene_target(percent,samples);storage_->scene_percent=percent;storage_->scene_samples=samples;
+}
+std::string Window::graphics_adapter()const {
+  const auto props=SDL_GetGPUDeviceProperties(storage_->device);
+  return std::string(SDL_GetStringProperty(props,SDL_PROP_GPU_DEVICE_NAME_STRING,"Graphics device"))+" · "+gpu_driver();
+}
+namespace {
+std::filesystem::path nvidia_panel_path(){
+  PWSTR folder{};if(FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles,0,nullptr,&folder)))return {};
+  const auto path=std::filesystem::path(folder)/"NVIDIA Corporation/Control Panel Client/nvcplui.exe";CoTaskMemFree(folder);
+  std::error_code ec;return std::filesystem::is_regular_file(path,ec)?path:std::filesystem::path{};
+}
+bool nvidia_store_panel_available(){
+  UINT32 count{},length{};
+  const auto result=GetPackagesByPackageFamily(L"NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj",&count,nullptr,&length,nullptr);
+  return result==ERROR_INSUFFICIENT_BUFFER&&count>0;
+}
+}
+bool Window::has_nvidia_control_panel()const{return !nvidia_panel_path().empty()||nvidia_store_panel_available();}
+void Window::open_nvidia_control_panel(){
+  const auto path=nvidia_panel_path();
+  if(path.empty()){
+    if(!nvidia_store_panel_available())throw std::runtime_error("NVIDIA Control Panel was not found.");
+    if(reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"open",L"shell:AppsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel",nullptr,nullptr,SW_SHOWNORMAL))<=32)
+      throw std::runtime_error("Windows could not open NVIDIA Control Panel.");
+    return;
+  }
+  if(reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"open",path.c_str(),nullptr,path.parent_path().c_str(),SW_SHOWNORMAL))<=32)
+    throw std::runtime_error("Windows could not open NVIDIA Control Panel.");
+}
+void Window::set_clipboard_text(const std::string& text){if(text.size()>16384)throw std::invalid_argument("Clipboard text exceeds limit.");require(SDL_SetClipboardText(text.c_str()),"Clipboard copy failed");}
 TextExtent Window::measure_text(const Text &label){if(label.value.empty())return {};const auto &cached=storage_->text(label);return {cached.width,cached.height};}
 void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot,FrameTiming *timing){
   if(timing)*timing={};
   const auto elapsed_ms=[](const auto started){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();};
   const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
-  const auto draw_line=[&](const Line &line){if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");};
+  const auto draw_line=[&](const Line &line){
+    if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");
+    const float dx=line.to.x-line.from.x,dy=line.to.y-line.from.y,length=std::hypot(dx,dy);
+    // Rasterize the geometric line at the scene target's resolution. SDL_RenderLine
+    // rasterizes logical pixels before scaling and otherwise defeats supersampling.
+    if(SDL_GetRenderTarget(storage_->renderer)&&length>.001f){
+      const float nx=-dy/length*.5f,ny=dx/length*.5f;
+      const SDL_FColor color{line.color.r/255.f,line.color.g/255.f,line.color.b/255.f,line.color.a/255.f};
+      const SDL_Vertex vertices[]{{{line.from.x+nx,line.from.y+ny},color,{}},{{line.to.x+nx,line.to.y+ny},color,{}},
+                                  {{line.to.x-nx,line.to.y-ny},color,{}},{{line.from.x-nx,line.from.y-ny},color,{}}};
+      constexpr int indices[]{0,1,2,0,2,3};
+      require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices,4,indices,6),"SDL scene line failed");
+    }else{
+      require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");
+      require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");
+    }
+  };
   const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");std::array<SDL_Vertex,soft_circle_segments+2> vertices{};const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices[0]={{circle.center.x,circle.center.y},center_color,{0,0}};const auto &directions=soft_circle_directions();for(int index=0;index<=soft_circle_segments;++index){const auto direction=directions[static_cast<std::size_t>(index)];const Point edge{circle.center.x+direction.x*circle.radius,circle.center.y+direction.y*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices[static_cast<std::size_t>(index)+1u]={{edge.x,edge.y},edge_color,{0,0}};}const auto &indices=soft_circle_indices();require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
+  // World quality is independent of the native-resolution interface and hit testing.
+  struct RestoreTarget {SDL_Renderer* renderer;~RestoreTarget(){SDL_SetRenderTarget(renderer,nullptr);SDL_SetRenderScale(renderer,1.f,1.f);SDL_SetRenderClipRect(renderer,nullptr);}} restore_target{storage_->renderer};
+  try {storage_->prepare_scene_target(storage_->scene_percent,storage_->scene_samples);}
+  catch(const std::exception& error){
+    storage_->prepare_scene_target(100,1);storage_->scene_percent=100;storage_->scene_samples=1;
+    storage_->screenshot_status=std::string("Scene quality returned to native after resizing: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+8000000000ull;
+  }
+  if(storage_->scene_target){require(SDL_SetRenderTarget(storage_->renderer,storage_->scene_target),"Scene target failed");require(SDL_SetRenderScale(storage_->renderer,static_cast<float>(storage_->scene_width)/storage_->width,static_cast<float>(storage_->scene_height)/storage_->height),"Scene scaling failed");}
   require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
+  if(storage_->scene_target){
+    require(SDL_SetRenderTarget(storage_->renderer,nullptr),"Scene resolve target failed");
+    require(SDL_SetRenderScale(storage_->renderer,1.f,1.f),"Native UI scale reset failed");
+    require(SDL_SetRenderClipRect(storage_->renderer,nullptr),"Scene clip reset failed");
+    const SDL_FRect full{0,0,static_cast<float>(storage_->width),static_cast<float>(storage_->height)};
+    require(SDL_RenderTexture(storage_->renderer,storage_->scene_target,nullptr,&full),"Scene quality resolve failed");
+  }
   for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
   if(timing)timing->submission_ms=elapsed_ms(*submission_started);
   const bool player_capture=!screenshot&&storage_->player_screenshot.has_value();

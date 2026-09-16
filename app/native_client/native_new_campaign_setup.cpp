@@ -1,4 +1,5 @@
 #include "native_new_campaign_setup.hpp"
+#include <stellar/core/colony_biology.hpp>
 
 #include <algorithm>
 #include <array>
@@ -81,6 +82,7 @@ std::string solvent_label(const stellar::core::SpeciesSolvent value) {
 
 NativeSpeciesSetupOption copy_species(
     const stellar::core::SpeciesEnvironmentProfile &source) {
+  const auto& biology=stellar::core::species_biology_profile(source.id);
   return {source.id,
           source.display_name,
           source.biochemistry,
@@ -96,7 +98,7 @@ NativeSpeciesSetupOption copy_species(
           source.compatible_solvents,
           biochemistry_label(source.biochemistry),
           atmosphere_label(source.preferred_atmosphere),
-          solvent_label(source.biological_solvent)};
+          solvent_label(source.biological_solvent),biology.typical_adult_mass_kg,biology.baseline_lifespan_years,biology.reproductive_maturity_years,biology.baseline_metabolic_demand};
 }
 } // namespace
 

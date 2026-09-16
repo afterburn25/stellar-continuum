@@ -13,11 +13,11 @@ std::string panel_notice(const std::string& detail,bool failed){
   return detail;
 }
 }
-NativeVideoController::NativeVideoController(std::filesystem::path path,Apply apply,Now now,Persist persist)
+NativeVideoController::NativeVideoController(std::filesystem::path path,Apply apply,Now now,Persist persist,std::optional<NativeVideoSettings> launch_override)
     :path_(std::move(path)),apply_(std::move(apply)),now_(std::move(now)),persist_(std::move(persist)){
   if(!apply_||!now_)throw std::invalid_argument("Video settings require an owner-thread backend and clock.");
   if(!persist_)persist_=[this](const NativeVideoSettings& values){values.save(path_);};
-  active_=NativeVideoSettings::load(path_);
+  active_=launch_override?launch_override->sanitized():NativeVideoSettings::load(path_);
   try{apply_(active_);}catch(const std::exception& error){recover(std::string("Saved display settings could not be applied: ")+error.what());}
   view_.close();
 }

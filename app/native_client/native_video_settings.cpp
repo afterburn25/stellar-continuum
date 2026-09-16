@@ -1,4 +1,5 @@
 #include "native_video_settings.hpp"
+#include "native_menu_style.hpp"
 
 #include <stellar/engine/atomic_file_write.hpp>
 
@@ -36,8 +37,8 @@ constexpr Color text_error{239, 172, 146, 255};
 constexpr Color gold{230, 190, 105, 255};
 
 constexpr std::size_t maximum_settings_bytes = 64u * 1024u;
-constexpr std::array<std::string_view, 4> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
-                                                        "FRAME CAP"};
+constexpr std::array<std::string_view, 6> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
+                                                        "FRAME CAP", "EDGE SMOOTHING", "SCENE RESOLUTION"};
 constexpr std::array<std::string_view, 3> display_names = {"Borderless fullscreen",
                                                          "Exclusive fullscreen", "Windowed"};
 constexpr std::array<std::string_view, 3> vsync_names = {"Off", "On",
@@ -171,6 +172,8 @@ NativeVideoSettings NativeVideoSettings::sanitized() const noexcept {
        ((copy.width == 0) != (copy.refresh_hz == 0.f))))
     copy.width = copy.height = 0, copy.refresh_hz = 0.f;
   if(copy.display == VideoDisplayMode::Windowed)copy.refresh_hz=0.f;
+  if(copy.scene_resolution_percent!=50&&copy.scene_resolution_percent!=75&&copy.scene_resolution_percent!=100)copy.scene_resolution_percent=100;
+  if(copy.scene_samples!=1&&copy.scene_samples!=2&&copy.scene_samples!=4)copy.scene_samples=1;
   return copy;
 }
 
@@ -204,6 +207,8 @@ NativeVideoSettings::load(const std::filesystem::path &path) {
     settings.width = read_dimension(document, "width");
     settings.height = read_dimension(document, "height");
     settings.refresh_hz = read_refresh(document);
+    settings.scene_resolution_percent=read_dimension(document,"sceneResolutionPercent");
+    settings.scene_samples=read_dimension(document,"sceneSamples");
     return settings.sanitized();
   } catch (const std::exception &) {
     return {};
@@ -219,6 +224,8 @@ void NativeVideoSettings::save(const std::filesystem::path &path) const {
   document["width"] = settings.width;
   document["height"] = settings.height;
   document["refreshHz"] = settings.refresh_hz;
+  document["sceneResolutionPercent"]=settings.scene_resolution_percent;
+  document["sceneSamples"]=settings.scene_samples;
   const auto payload = document.dump(2);
   if (payload.size() > maximum_settings_bytes)
     throw std::runtime_error("video settings payload exceeds 64 KiB");
@@ -229,15 +236,16 @@ void NativeVideoSettings::save(const std::filesystem::path &path) const {
 
 VideoSettingsLayout
 VideoSettingsLayout::for_viewport(const int width, const int height) {
-  const auto scale = std::clamp(static_cast<float>(height) / 720.f, .75f, 2.6f);
   const auto w = static_cast<float>(width), h = static_cast<float>(height);
+  const auto scale = std::max(.01f, std::min({std::clamp(h / 1080.f, .8f, 2.5f),
+                                            (w - 24.f) / 760.f, (h - 24.f) / 660.f}));
   VideoSettingsLayout layout;
   layout.scale = scale;
-  layout.title_font_pixels = static_cast<int>(std::lround(26.f * scale));
-  layout.body_font_pixels = static_cast<int>(std::lround(15.f * scale));
-  layout.small_font_pixels = static_cast<int>(std::lround(12.f * scale));
-  const auto panel_width = std::min(610.f * scale, w - 24.f * scale);
-  const auto panel_height = std::min(400.f * scale, h - 24.f * scale);
+  layout.title_font_pixels = static_cast<int>(std::lround(28.f * scale));
+  layout.body_font_pixels = static_cast<int>(std::lround(18.f * scale));
+  layout.small_font_pixels = static_cast<int>(std::lround(15.f * scale));
+  const auto panel_width = std::min(760.f * scale, w - 24.f * scale);
+  const auto panel_height = std::min(660.f * scale, h - 24.f * scale);
   layout.panel = {(w - panel_width) * .5f, (h - panel_height) * .5f,
                   panel_width, panel_height};
   const auto inset = 26.f * scale;
@@ -250,10 +258,10 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
   layout.adapter = {inner, layout.hint.y + layout.hint.height, inner_width,
                     20.f * scale};
   auto row_y = layout.adapter.y + layout.adapter.height + 12.f * scale;
-  const auto choice_height = 33.f * scale;
-  const auto label_width = std::min(150.f * scale, inner_width * .42f);
-  const auto choice_width = std::min(250.f * scale, inner_width * .54f);
-  for (int index = 0; index < 4; ++index) {
+  const auto choice_height = 53.f * scale;
+  const auto label_width = std::min(200.f * scale, inner_width * .30f);
+  const auto choice_width = std::min(460.f * scale, inner_width * .68f);
+  for (int index = 0; index < 6; ++index) {
     layout.choice_labels.push_back(
         {inner, row_y + 5.f * scale, label_width, 26.f * scale});
     const UiRect choice_rect{inner + inner_width - choice_width, row_y,
@@ -267,7 +275,9 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
          choice_rect.height});
     row_y += choice_height;
   }
-  layout.error = {inner, row_y + 2.f * scale, inner_width, 26.f * scale};
+  layout.quality_hint={inner,row_y+6*scale,inner_width,42*scale};
+  layout.nvidia={inner,row_y+58*scale,inner_width,38*scale};
+  layout.error = {inner, row_y + 102.f * scale, inner_width, 30.f * scale};
   const auto actions_y = layout.panel.y + panel_height - 56.f * scale;
   const auto button_height = 38.f * scale;
   layout.apply = {inner + inner_width - 230.f * scale, actions_y,
@@ -391,6 +401,8 @@ void NativeVideoSettingsView::cycle_choice(const int index,
     }
   } else if (index == 2) cycle(values_.vsync, 3);
   else if (index == 3) cycle(values_.frame_cap, 5);
+  else if (index == 4) {int i=values_.scene_samples==1?0:values_.scene_samples==2?1:2;i=(i+direction+3)%3;values_.scene_samples=i==0?1:i==1?2:4;}
+  else if (index == 5) {int i=(values_.scene_resolution_percent-50)/25;i=(i+direction+3)%3;values_.scene_resolution_percent=50+i*25;}
 }
 
 VideoSettingsResult
@@ -423,6 +435,7 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
     return result;
   }
   if (event.type == InputEventType::LeftPressed) {
+    if (layout.nvidia.contains(event.position) && open_panel_) {try{open_panel_();}catch(const std::exception& e){set_error(e.what());}return result;}
     if (layout.apply.contains(event.position)) {
       result.command = VideoSettingsCommand::Apply;
       return result;
@@ -431,7 +444,7 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
       result.command = VideoSettingsCommand::Cancel;
       return result;
     }
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < 6; ++index) {
       if (!layout.choice_buttons[index].contains(event.position)) continue;
       const auto direction = layout.choice_previous[index].contains(event.position)
                                  ? -1
@@ -451,14 +464,14 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
   if (!visible_) return;
   const auto layout = VideoSettingsLayout::for_viewport(width, height);
   fill(out, {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
-       {4, 9, 18, 160});
-  fill(out, layout.panel, panel);
-  stroke(out, layout.panel, border);
+       {4, 9, 18, 48});
+  native_menu_style::panel(out,layout.panel,layout.scale);
   text(out, layout.title, "VIDEO", text_primary,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   text(out, layout.hint,
-       "Borderless fullscreen is recommended. Use left for previous; the remaining area selects next.",
+       "Detected display modes and graphics controls for this computer.",
        text_muted, layout.small_font_pixels);
+  text(out,layout.adapter,adapter_label_,{112,223,238,255},layout.small_font_pixels);
   const auto draw_button = [&](UiRect bounds, std::string caption, bool enabled = true, float inset = 0.f) {
     fill(out, bounds, enabled && bounds.contains(pointer_) ? hover : button);
     stroke(out, bounds, enabled ? border : text_muted);
@@ -467,11 +480,13 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
          std::move(caption), enabled ? text_primary : text_muted, layout.body_font_pixels,
          TextAlign::Center);
   };
-  const std::array<std::string, 4> choice_values = {
+  const std::array<std::string, 6> choice_values = {
       std::string(display_name(values_.display)),
       resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
-      std::string(frame_cap_name(values_.frame_cap))};
-  for (int index = 0; index < 4; ++index) {
+      std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
+      values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
+      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced")};
+  for (int index = 0; index < 6; ++index) {
     text(out, layout.choice_labels[index],
          std::string(choice_names[static_cast<std::size_t>(index)]), gold,
          layout.small_font_pixels);
@@ -488,6 +503,9 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
            ">",text_primary,layout.small_font_pixels,TextAlign::Center);
     }
   }
+  text(out,layout.quality_hint,"Borderless fullscreen is recommended. Supersampling smooths the scene; interface text stays at native resolution.",text_muted,layout.small_font_pixels);
+  if(open_panel_)draw_button(layout.nvidia,"Open NVIDIA Control Panel");
+  else text(out,layout.nvidia,"NVIDIA Control Panel is not installed on this computer.",text_muted,layout.small_font_pixels);
   if (!error_.empty())
     text(out, layout.error, error_, text_error,
          layout.small_font_pixels);

@@ -45,7 +45,7 @@ NativeNewCampaignSetupView setup(){
 void responsive_layout(){
   for(const auto [w,h]:{std::pair{1280,720},{1920,1080},{2560,1440},{3840,2160},{1280,1080}}){
     NativeNewGameWorkspace workspace;workspace.set_view(setup());const auto measured=workspace.measure_layout(w,h,measure);const auto&l=measured.base;
-    for(const auto r:{l.heading,l.cancel,l.mode_story,l.mode_sandbox,l.species,l.details,l.size_group,l.seed_input,l.randomize_seed,l.create})require(contains(l.panel,r),"setup control escaped its panel");
+    for(const auto r:{l.heading,l.cancel,l.mode_story,l.mode_sandbox,l.species,l.details,l.size_group,l.seed_input,l.randomize_seed,l.restore_defaults,l.create})require(contains(l.panel,r),"setup control escaped its panel");
     require(l.mode_story.x+l.mode_story.width<=l.mode_sandbox.x,"campaign mode cards overlap");
     require(l.species.x+l.species.width<=l.details.x,"species list overlaps details");
     require(l.species.y<l.mode_story.y&&l.details.y<l.mode_sandbox.y,"species selection is not the first setup decision");
@@ -77,12 +77,20 @@ void mouse_and_text(){
   require(intent.kind==NativeNewGameIntentKind::SelectSpecies&&intent.species_id=="pelagic_high_pressure","mouse species selection failed");
   intent=w.handle({InputEventType::LeftPressed,center(l.size_buttons[3])},1280,720,measure);
   require(intent.kind==NativeNewGameIntentKind::SelectSize&&intent.system_count==2500,"mouse size selection failed");
+  intent=w.handle({InputEventType::LeftPressed,center(l.restore_defaults)},1280,720,measure);
+  require(intent.kind==NativeNewGameIntentKind::RestoreDefaults&&intent.system_count==500&&intent.pre_warp_civilization_count==6&&intent.ancient_civilization_count==1&&intent.species_id.empty(),"Restore defaults did not return canonical selections");
+  (void)w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
+  (void)w.handle({InputEventType::LeftPressed,center(l.size_buttons[3])},1280,720,measure);
+  (void)w.handle({InputEventType::LeftPressed,center(l.mode_story)},1280,720,measure);
+  (void)w.handle({InputEventType::LeftPressed,center(l.mode_sandbox)},1280,720,measure);
   (void)w.handle({InputEventType::LeftPressed,center(l.seed_input)},1280,720,measure);
   require(w.seed_focused(),"seed field did not focus");
   (void)w.handle({InputEventType::TextEntered,{}, {},0,"-9223372036854775808"},1280,720,measure);
   (void)w.handle({InputEventType::BackspacePressed},1280,720,measure);
   (void)w.handle({InputEventType::TextEntered,{}, {},0,"8"},1280,720,measure);
   require(w.seed_text()=="-9223372036854775808","seed editing was not exact");
+  intent=w.handle({InputEventType::LeftPressed,center(l.copy_setup)},1280,720,measure);
+  require(intent.kind==NativeNewGameIntentKind::CopySetup&&intent.species_id=="pelagic_high_pressure"&&intent.system_count==2500&&intent.seed_text==w.seed_text()&&intent.pre_warp_civilization_count==9&&intent.ancient_civilization_count==2,"Copy setup omitted selected values");
   intent=w.handle({InputEventType::LeftPressed,center(l.create)},1280,720,measure);
   require(intent.kind==NativeNewGameIntentKind::Create&&intent.species_id=="pelagic_high_pressure"&&intent.system_count==2500&&intent.seed_text==w.seed_text()&&intent.pre_warp_civilization_count==9&&intent.ancient_civilization_count==2,"Create omitted setup input");
   require(w.handle({InputEventType::EscapePressed},1280,720,measure).kind==NativeNewGameIntentKind::Cancel&&!w.seed_focused(),"Escape did not cancel and clear focus");
@@ -98,7 +106,7 @@ void rendered_facts(){
   DrawList draw;w.render(draw,1280,720,measure);const auto l=NativeNewGameLayout::for_viewport(1280,720);
   bool rivals=false,ancients=false,gravity=false,survival=false,size=false,bio=false,hint=false;
   for(const auto &c:draw.overlay)if(const auto *t=std::get_if<Text>(&c)){
-    rivals|=t->value=="RIVAL EMPIRES";ancients|=t->value=="ANCIENT EMPIRES";gravity|=t->value.find("Comfortable gravity")!=std::string::npos;survival|=t->value.find("Survival gravity")!=std::string::npos;size|=t->value=="Huge\n2,500 systems";bio|=t->value.find("oxygen-breathing")!=std::string::npos;hint|=t->value=="SCROLL FOR MORE";
+    rivals|=t->value=="RIVAL EMPIRES";ancients|=t->value=="ANCIENT EMPIRES";gravity|=t->value.find("Comfortable gravity")!=std::string::npos;survival|=t->value.find("Survival gravity")!=std::string::npos;size|=t->value=="Huge · 2,500";bio|=t->value.find("oxygen-breathing")!=std::string::npos;hint|=t->value=="SCROLL FOR MORE";
     if(t->value.find("Comfortable ")!=std::string::npos||t->value.find("Radiation tolerance")!=std::string::npos)require(t->clip&&contains(l.details,*t->clip),"species fact escaped details clip");
   }
   require(rivals&&ancients&&gravity&&survival&&size&&bio&&hint,"render omitted an authoritative field or scroll affordance");

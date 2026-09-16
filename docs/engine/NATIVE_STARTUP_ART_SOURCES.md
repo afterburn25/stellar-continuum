@@ -9,4 +9,6 @@ These are the existing approved Stellar Continuum images, reused unchanged by th
 
 No external creator or license is inferred for the user-supplied images. Original source filenames, exact edit prompts and image fingerprints are retained in `docs/art/LOADING_SPLASH_PROVENANCE.md`. The application renders live controls, loading status and progress separately; no image contains a fake operational progress bar. This native integration does not modify the artwork.
 
-Only these four PNGs and this scoped source note are included by `export/native-startup-art-assets.json`. SHA-256 verification fails packaging if an approved asset is missing or altered.
+The recovered `stellar-continuum-title-v1.png` is the exact approved generated title image (SHA-256 `9040a67106ccd463fb81af97b7d07ead79559347e80763bbe028aea2277eb124`), recovered from the generation archive recorded by `assets/visual/branding/icon-provenance-v1.json`. The existing `campaign-galaxy-four-arm-v1.png` supplies the Sandbox card without loading-screen text.
+
+These six PNGs and this scoped source note are included by `export/native-startup-art-assets.json`. SHA-256 verification fails packaging if an approved asset is missing or altered.

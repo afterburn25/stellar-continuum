@@ -1,4 +1,6 @@
 #include "native_audio_director.hpp"
+#include "native_voice_filter.hpp"
+#include <cmath>
 
 #include <chrono>
 #include <filesystem>
@@ -171,6 +173,27 @@ void invalid_gain_is_rejected(const fs::path& root) {
   require(rejected, "non-finite audio gain was accepted");
 }
 
+void voice_preferences_and_filter(const fs::path& root) {
+  using namespace stellar::native_audio;
+  using stellar::engine::audio::AudioClip;
+  std::vector<float> pcm(9600);for(std::size_t i=0;i<pcm.size();++i)pcm[i]=std::sin(static_cast<float>(i/2)*.12f)*.5f;
+  const auto dry=AudioClip::create(pcm),wet=communication_clip(dry,1.f);
+  require(communication_clip(dry,0.f)==dry,"Dry voice allocated or altered PCM.");
+  require(wet->sample_frames()==dry->sample_frames()&&wet->samples()[100]!=dry->samples()[100],"Radio blend was inert or changed clip duration.");
+  for(float sample:wet->samples())require(std::isfinite(sample)&&std::abs(sample)<=1.f,"Radio filter produced invalid PCM.");
+  NativeAudioDirector director(root);wait_until_ready(director);director.menu_ready();
+  auto prefs=director.voice_preferences();prefs.communication_filter=.75f;director.set_voice_preferences(prefs);
+  director.speak(VoiceCue::ReconnaissanceRequired);director.service();
+  require(director.caption()&&director.caption()->text.find("Long-range telemetry is incomplete.")==0,"Subtitle does not match the recorded scientist line.");
+  const auto first=director.stats().voice_play_count;require(director.replay_last_voice(),"Replay rejected previous line.");director.service();
+  require(director.stats().voice_play_count==first+1,"Replay was incorrectly blocked by automatic cooldown.");
+  prefs.enabled=false;director.set_voice_preferences(prefs);require(!director.stats().voice_active,"Disable voices left speech active.");
+  director.speak(VoiceCue::SurveyComplete);require(director.caption().has_value(),"Disabling speech also disabled subtitles.");
+  prefs.subtitles=false;director.set_voice_preferences(prefs);require(!director.caption(),"Subtitle toggle was ignored.");
+  prefs.volume=std::numeric_limits<float>::quiet_NaN();bool rejected{};try{director.set_voice_preferences(prefs);}catch(const std::invalid_argument&){rejected=true;}require(rejected,"Non-finite voice gain was accepted.");
+  director.stop();require(!director.caption(),"Stopped director retained a caption.");
+}
+
 void owner_guard(const fs::path& root) {
   NativeAudioDirector director(root, false);
   bool rejected{};
@@ -190,6 +213,7 @@ int main(int argc, char** argv) try {
   stop_before_decode_completion(root);
   invalid_gain_is_rejected(root);
   owner_guard(root);
+  voice_preferences_and_filter(root);
   std::cout << "Native audio director lifecycle tests passed\n";
   return 0;
 } catch (const std::exception& error) {

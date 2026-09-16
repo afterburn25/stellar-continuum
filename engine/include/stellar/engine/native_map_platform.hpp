@@ -125,6 +125,11 @@ class Window final {
   void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);
   void set_fullscreen_mode(bool exclusive,int width=0,int height=0,float refresh_hz=0);
   void set_vsync(int mode);
+  void set_scene_quality(int resolution_percent, int samples);
+  [[nodiscard]] std::string graphics_adapter() const;
+  [[nodiscard]] bool has_nvidia_control_panel() const;
+  void open_nvidia_control_panel();
+  void set_clipboard_text(const std::string& text);
   void set_frame_cap(double hz);
   void set_auto_frame_cap();
   // Queues at most one player capture. F12/PrintScreen call this internally;

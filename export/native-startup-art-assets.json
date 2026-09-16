@@ -24,7 +24,17 @@
     "credits": {
       "source": "docs/engine/NATIVE_STARTUP_ART_SOURCES.md",
       "runtimePath": "Licenses/Startup-art-sources.md",
-      "sha256": "db174db14ea396c28286d381cd905c9a43f62f9fd9dbb61a094e19daa1ea51a4"
+      "sha256": "b7c6a450fbc998a4be24dcc63ba7704d3b88385775311d3369077d8f2307b393"
+    },
+    "title-logo": {
+      "source": "assets/visual/branding/stellar-continuum-title-v1.png",
+      "runtimePath": "assets/visual/branding/stellar-continuum-title-v1.png",
+      "sha256": "9040a67106ccd463fb81af97b7d07ead79559347e80763bbe028aea2277eb124"
+    },
+    "galaxy-card": {
+      "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "sha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9"
     }
   }
 }

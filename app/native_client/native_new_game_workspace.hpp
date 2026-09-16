@@ -27,8 +27,9 @@ struct NativeNewGameLayout {
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, heading, cancel, mode_story, mode_sandbox,
       species, species_rows, details, details_content, size_group, seed_label,
-      seed_input, randomize_seed, create, portrait;
+      seed_input, randomize_seed, restore_defaults, create, portrait;
   std::array<stellar::native_map::UiRect, 4> size_buttons{};
+  stellar::native_map::UiRect copy_setup;
   [[nodiscard]] static NativeNewGameLayout for_viewport(int width,
                                                          int height) noexcept;
 };
@@ -49,6 +50,8 @@ enum class NativeNewGameIntentKind {
   SelectAncients,
   SeedEdited,
   RandomizeSeed,
+  RestoreDefaults,
+  CopySetup,
   Create
 };
 
@@ -112,6 +115,7 @@ private:
   [[nodiscard]] std::optional<std::size_t> size_hit(
       stellar::native_map::Point, const NativeNewGameLayout &) const noexcept;
   void reconcile();
+  void restore_defaults();
   void reset_interaction() noexcept;
 
   std::optional<stellar::native_setup::NativeNewCampaignSetupView> view_;

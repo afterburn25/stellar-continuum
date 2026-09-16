@@ -13,11 +13,11 @@
 
 namespace stellar::native_startup_ui {
 
-enum class StartupScreen { Entry, ModeSelection, Setup, LoadSlots, Busy, Failure };
+enum class StartupScreen { Entry, ModeSelection, Setup, LoadSlots, Busy, Failure, Development };
 enum class StartupOperationOrigin { NewCampaign, SavedCampaign };
 enum class StartupIntentKind {
   None, OpenSetup, OpenModeSelection, OpenLoad, OpenSettings, Back, Exit, ReturnToCampaign,
-  Create, LoadSelected, CancelOperation
+  Create, LoadSelected, CancelOperation, CopySetup, CopyDiagnostics
 };
 struct StartupIntent {
   StartupIntentKind kind{StartupIntentKind::None};
@@ -31,7 +31,7 @@ struct StartupLayout {
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, title, subtitle, new_campaign,
       load_campaign, exit, list, back, primary, status, settings,
-      return_to_campaign, story_campaign, sandbox_campaign;
+      return_to_campaign, story_campaign, sandbox_campaign, development;
   [[nodiscard]] static StartupLayout for_viewport(int width,
                                                    int height) noexcept;
 };
@@ -44,7 +44,12 @@ public:
       stellar::native_setup_ui::NativeNewGameWorkspace::PortraitProvider;
 
   void set_setup(stellar::native_setup::NativeNewCampaignSetupView);
+  // The executable owns the generated build identity; the workspace only
+  // presents the value it is given.
+  void set_build_label(std::string value) { build_label_ = std::move(value); }
+  void set_diagnostics(std::string value) { diagnostics_ = std::move(value); }
   void set_return_to_campaign_available(bool available) noexcept;
+  void set_continue_save(std::filesystem::path value) {continue_save_=std::move(value);}
   void show_setup() noexcept;
   void show_entry() noexcept;
   void set_slots(stellar::native_startup::NativeStartupSaveSlots);
@@ -62,7 +67,7 @@ public:
               const TextMeasurer &, const PortraitProvider * = nullptr) const;
   void render(stellar::native_map::DrawList &, int width, int height,
               const TextMeasurer &, const PortraitProvider *,
-              const StartupArtworkProvider *) const;
+              const StartupArtworkProvider *, bool backdrop_only = false) const;
 
 private:
   void reset_pointer() noexcept;
@@ -76,6 +81,9 @@ private:
   std::string loading_tip_;
   int last_loading_tip_{-1};
   std::string failure_;
+  std::string build_label_;
+  std::string diagnostics_;
+  std::filesystem::path continue_save_;
   stellar::native_map::Point pointer_{};
   bool return_to_campaign_available_{};
 };

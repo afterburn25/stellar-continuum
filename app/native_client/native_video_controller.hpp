@@ -14,11 +14,13 @@ public:
   using Apply = std::function<void(const NativeVideoSettings&)>;
   using Now = std::function<Clock::time_point()>;
   using Persist = std::function<void(const NativeVideoSettings&)>;
-  NativeVideoController(std::filesystem::path, Apply, Now = Clock::now, Persist = {});
+  NativeVideoController(std::filesystem::path, Apply, Now = Clock::now, Persist = {},
+                        std::optional<NativeVideoSettings> launch_override = std::nullopt);
   ~NativeVideoController();
   NativeVideoController(const NativeVideoController&) = delete;
   NativeVideoController& operator=(const NativeVideoController&) = delete;
   void open();
+  void set_adapter(std::string value,std::function<void()> open_panel) {view_.set_adapter(std::move(value),std::move(open_panel));}
   void close();
   void service(bool focused=true,bool renderable=true);
   bool handle(const stellar::native_map::InputEvent&,int width,int height);

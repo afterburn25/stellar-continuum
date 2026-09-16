@@ -150,11 +150,12 @@ int main(int argc, char** argv) {
               refilled.queued_music_bytes <= refilled.music_queue_limit_bytes,
           "music loop did not refill after drain within its queue cap");
 
+    output.set_voice_gain(.25f);
     output.set_volumes(1.f, 0.5f, 0.25f);
     auto gains = output.diagnostics();
     check(std::abs(gains.applied_music_gain - 0.5f) < 0.0001f &&
               std::abs(gains.applied_voice_gain - 0.25f) < 0.0001f,
-          "saved music/effects gains were not applied to the music and voice streams");
+          "saved music/voice gains were not applied to the music and voice streams");
     check(rejects([&] { output.set_volumes(-0.1f, 0.5f, 0.5f); }), "negative gain was accepted");
     check(rejects([&] { output.set_volumes(std::numeric_limits<float>::infinity(), 0.5f, 0.5f); }),
           "non-finite gain was accepted");
@@ -176,12 +177,12 @@ int main(int argc, char** argv) {
     check(maximum_voice.use_count() >= 2, "active voice did not retain its immutable decoded clip");
     check(std::abs(speaking.applied_music_gain - 0.275f) < 0.0001f &&
               std::abs(speaking.applied_voice_gain - 0.25f) < 0.0001f,
-          "active voice did not duck music while following the effects gain");
+          "active voice did not duck music while following the independent voice gain");
     output.set_volumes(0.8f, 0.25f, 0.5f);
     gains = output.diagnostics();
     check(std::abs(gains.applied_music_gain - 0.11f) < 0.0001f &&
-              std::abs(gains.applied_voice_gain - 0.4f) < 0.0001f,
-          "volume changes did not preserve voice ducking and voice effects gain");
+              std::abs(gains.applied_voice_gain - 0.2f) < 0.0001f,
+          "volume changes did not preserve voice ducking and independent voice gain");
     std::vector<float> oversized_voice(maximum_voice_audio_bytes / sizeof(float) + audio_channels, 0.f);
     const auto too_large_voice = AudioClip::create(std::move(oversized_voice));
     check(rejects([&] { output.play_voice(too_large_voice); }), "oversized voice was accepted");

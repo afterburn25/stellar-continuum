@@ -14,7 +14,7 @@ enum class StartupArtworkKind {
   ApplicationStartup,
   MainMenu,
   NewGalaxyGeneration,
-  SaveRestoration
+  SaveRestoration, TitleLogo, GalaxyCard
 };
 
 using StartupArtworkProvider = std::function<std::shared_ptr<
@@ -39,7 +39,7 @@ public:
 
 private:
   std::filesystem::path asset_root_;
-  std::array<std::shared_ptr<const stellar::native_map::RgbaImage>, 4> cache_{};
+  std::array<std::shared_ptr<const stellar::native_map::RgbaImage>, 6> cache_{};
   std::size_t decoded_{};
 };
 

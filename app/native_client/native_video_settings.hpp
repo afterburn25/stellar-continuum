@@ -12,6 +12,7 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,7 @@ struct NativeVideoSettings {
   float refresh_hz{};
   VideoVsync vsync{VideoVsync::On};
   VideoFrameCap frame_cap{VideoFrameCap::Automatic};
+  int scene_resolution_percent{100}, scene_samples{1};
   [[nodiscard]] NativeVideoSettings sanitized() const noexcept;
   [[nodiscard]] bool operator==(const NativeVideoSettings &) const = default;
   [[nodiscard]] static NativeVideoSettings load(const std::filesystem::path &);
@@ -54,7 +56,7 @@ struct VideoSettingsLayout {
   std::vector<stellar::native_map::UiRect> choice_buttons;
   std::vector<stellar::native_map::UiRect> choice_previous;
   std::vector<stellar::native_map::UiRect> choice_next;
-  stellar::native_map::UiRect error;
+  stellar::native_map::UiRect error, quality_hint, nvidia;
   stellar::native_map::UiRect apply;
   stellar::native_map::UiRect cancel;
   // CONFIRM DISPLAY rollback overlay.
@@ -78,6 +80,7 @@ struct VideoSettingsResult {
 class NativeVideoSettingsView final {
 public:
   void open(NativeVideoSettings current) noexcept;
+  void set_adapter(std::string value, std::function<void()> open_panel) {adapter_label_=std::move(value);open_panel_=std::move(open_panel);}
   void close() noexcept;
   void set_display_choices(std::vector<VideoDisplayChoice>,
                            std::string actual_display_label);
@@ -109,6 +112,8 @@ private:
   std::vector<VideoDisplayChoice> windowed_choices_;
   std::string actual_display_label_{"Desktop default"};
   std::string error_;
+  std::string adapter_label_;
+  std::function<void()> open_panel_;
 };
 
 } // namespace stellar::native_video_settings

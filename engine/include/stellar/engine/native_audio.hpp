@@ -66,6 +66,7 @@ class AudioOutput final {
   void play_voice(std::shared_ptr<const AudioClip> clip);
   void stop_voice();
   void set_volumes(float master, float music, float effects);
+  void set_voice_gain(float voice);
   // Feed bounded music queues and retire completed effects. Call once per frame.
   void service();
   void stop_all();

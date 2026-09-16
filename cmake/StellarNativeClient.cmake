@@ -1,3 +1,4 @@
+include("${CMAKE_CURRENT_LIST_DIR}/NativeBrandingAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudio.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioSettings.cmake")

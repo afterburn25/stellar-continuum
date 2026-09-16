@@ -31,20 +31,22 @@ NativeNavigationArt::NativeNavigationArt(std::filesystem::path root) {
     return thumbnail(*image);
   };
   // The cache is built once at startup. image() only returns these immutable pointers.
-  map_ = load("assets/visual/space/campaign-galaxy-four-arm-v1.png");
-  home_ = load("assets/visual/sol/earth.jpg");
-  inspect_ = load("assets/visual/sol/earth-map.jpg");
-  zoom_in_ = load("assets/visual/space/deep-field-v2.png");
-  zoom_out_ = load("assets/visual/space/galactic-dust-detail-v1.png");
-  economy_ = load("assets/visual/catalog/portraits/research-economic_trade.png");
-  research_ = load("assets/visual/catalog/portraits/research-foundations.png");
-  shipyard_ = load("assets/visual/ships/interstellar-bulk-freighter.png");
-  construction_ = load("assets/visual/catalog/portraits/human_station_industry--l1.png");
-  explore_ = load("assets/visual/ships/pathfinder-scout.jpg");
-  colonies_ = load("assets/visual/ships/interstellar-colony-ship.jpg");
-  logistics_ = load("assets/visual/ships/resource-outpost-ship.png");
-  relations_ = load("assets/visual/catalog/portraits/research-social_admin.png");
-  menu_ = load("assets/visual/catalog/portraits/research-computing.png");
+  // These high-resolution transparent PNGs are exact rasters of the Godot
+  // semantic navigation SVGs, listed and hash-pinned by the export manifest.
+  map_ = load("assets/visual/native-navigation/nav_galaxy.png");
+  home_ = load("assets/visual/native-navigation/nav_home.png");
+  inspect_ = load("assets/visual/native-navigation/nav_inspection.png");
+  zoom_in_ = load("assets/visual/native-navigation/nav_zoom_in.png");
+  zoom_out_ = load("assets/visual/native-navigation/nav_zoom_out.png");
+  economy_ = load("assets/visual/native-navigation/nav_economy.png");
+  research_ = load("assets/visual/native-navigation/nav_research.png");
+  shipyard_ = load("assets/visual/native-navigation/nav_shipyard.png");
+  construction_ = load("assets/visual/native-navigation/nav_construction.png");
+  explore_ = load("assets/visual/native-navigation/nav_exploration.png");
+  colonies_ = load("assets/visual/native-navigation/nav_colonization.png");
+  logistics_ = load("assets/visual/native-navigation/nav_logistics.png");
+  relations_ = load("assets/visual/native-navigation/nav_relations.png");
+  menu_ = load("assets/visual/native-navigation/nav_settings.png");
 }
 std::shared_ptr<const RgbaImage> NativeNavigationArt::image(const stellar::native_map::UiAction action) const noexcept {
   switch (action) {

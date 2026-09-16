@@ -229,6 +229,7 @@ struct AudioOutput::Storage {
   float master{0.78f};
   float music{0.64f};
   float effects_gain{0.82f};
+  float voice_gain{0.82f};
   bool audio_initialized{};
   bool music_started{};
   bool voice_flushed{};
@@ -278,12 +279,19 @@ void AudioOutput::set_volumes(float master, float music, float effects) {
   storage_->master = master; storage_->music = music; storage_->effects_gain = effects;
   apply_gains();
 }
+void AudioOutput::set_voice_gain(float voice) {
+  require_owner();
+  if (!std::isfinite(voice) || voice < 0.f || voice > 1.f)
+    throw std::invalid_argument("Voice gain must be finite values in [0, 1].");
+  storage_->voice_gain = voice;
+  apply_gains();
+}
 
 void AudioOutput::apply_gains() {
   const auto music_duck = storage_->voice_clip ? voice_music_duck : 1.0f;
   require_sdl(SDL_SetAudioStreamGain(storage_->music_stream, storage_->master * storage_->music * music_duck),
               "SDL music gain setup failed");
-  require_sdl(SDL_SetAudioStreamGain(storage_->voice_stream, storage_->master * storage_->effects_gain),
+  require_sdl(SDL_SetAudioStreamGain(storage_->voice_stream, storage_->master * storage_->voice_gain),
               "SDL voice gain setup failed");
   for (const auto& voice : storage_->effects) {
     require_sdl(SDL_SetAudioStreamGain(voice.stream, storage_->master * storage_->effects_gain),

@@ -243,6 +243,7 @@ add_custom_target(stellar_runtime_data ALL
 add_dependencies(stellar-continuum stellar_runtime_data)
 if(WIN32)
   enable_language(RC)
+  include(cmake/NativeBrandingAssets.cmake)
   configure_file(app/windows_version.rc.in generated/windows_version.rc @ONLY)
   target_sources(stellar-continuum PRIVATE "${CMAKE_BINARY_DIR}/generated/windows_version.rc")
 endif()

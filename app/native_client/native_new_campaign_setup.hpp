@@ -27,6 +27,7 @@ struct NativeSpeciesSetupOption {
   std::vector<stellar::core::SpeciesSolvent> compatible_solvents;
   std::string biochemistry_label, preferred_atmosphere_label,
       biological_solvent_label;
+  double adult_mass_kg{},lifespan_years{},maturity_years{},metabolic_demand{};
 };
 
 struct NativeGalaxySizeOption {

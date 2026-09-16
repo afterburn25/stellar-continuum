@@ -43,8 +43,8 @@ void responsive_layout() {
              rect.y + rect.height <= viewport.y + viewport.height;
     };
     require(inside(layout.panel), "panel escaped");
-    require(layout.choice_labels.size() == 4 && layout.choice_buttons.size() == 4 &&
-                layout.choice_previous.size() == 4 && layout.choice_next.size() == 4,
+    require(layout.choice_labels.size() == 6 && layout.choice_buttons.size() == 6 &&
+                layout.choice_previous.size() == 6 && layout.choice_next.size() == 6,
             "choice rows incomplete");
     for (int index = 0; index < 4; ++index) {
       require(inside(layout.choice_buttons[index]), "choice escaped");

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.58",
-  "gameVersion": "0.1.9-alpha",
+  "engineVersion": "0.1.59",
+  "gameVersion": "0.1.10-alpha",
   "mode": "headless-foundation",
   "graphicalParity": false,
   "description": "C++23 campaign runtime and SDL3/Vulkan client with native race/size/seed setup, asynchronous generation/loading, independent Player17 save slots, research, fleets, shipyard, construction, orbital, colony, settlement, surface and diplomacy workspaces. Existing loading/menu, galaxy/regional, species and planet artwork is packaged. Detailed system stars, observer-safe map star markers and six approved ship artworks use bounded native image caches, with fleet route dashes, arrowheads and motion trails for active owned fleets. The relations workspace presents observer-filtered contacts, channels, agreements, proposals and history with revision-guarded commands and species transmission portraits. Detailed graphics, orbital structures and audio remain in migration. No Godot or .NET runtime is required. Diagnostic timings are not an FPS guarantee."

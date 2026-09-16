@@ -1,5 +1,6 @@
 #include "native_audio_settings.hpp"
 
+#include "native_menu_style.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 
 #include <nlohmann/json.hpp>
@@ -24,7 +25,7 @@ using namespace stellar::native_map;
 using Json = nlohmann::json;
 
 constexpr std::size_t maximum_settings_bytes = 4u * 1024u;
-constexpr Color veil{3, 10, 22, 210};
+constexpr Color veil{3, 10, 22, 48};
 constexpr Color panel_fill{10, 25, 45, 250};
 constexpr Color panel_stroke{104, 184, 212, 255};
 constexpr Color track_fill{25, 49, 72, 255};
@@ -204,8 +205,7 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
   const auto layout = AudioSettingsLayout::for_viewport(width, height);
   const UiRect viewport{0, 0, static_cast<float>(std::max(width, 1)), static_cast<float>(std::max(height, 1))};
   draw.overlay.emplace_back(FilledRectangle{viewport, veil});
-  draw.overlay.emplace_back(FilledRectangle{layout.panel, panel_fill});
-  draw.overlay.emplace_back(StrokedRectangle{layout.panel, panel_stroke});
+  native_menu_style::panel(draw,layout.panel,layout.scale);
   const UiRect title_clip{layout.panel.x + 12.f * layout.scale, layout.panel.y + 6.f * layout.scale,
                           layout.panel.width - 24.f * layout.scale, 34.f * layout.scale};
   label(draw, {layout.panel.x + layout.panel.width * .5f,

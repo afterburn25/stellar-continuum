@@ -33,7 +33,7 @@ void check_video_settings(NativeVideoController& controller,
   const auto initial = controller.active();
   const auto original_file = bytes_at(settings_path);
   const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  require(layout.choice_buttons.size() == 4,
+  require(layout.choice_buttons.size() == 6,
           "Video settings did not expose display, resolution, V-Sync and frame-cap rows.");
   const auto click = [&](UiRect bounds) {
     const Point point{bounds.x + bounds.width * .5f,
@@ -79,7 +79,8 @@ void check_video_settings(NativeVideoController& controller,
                                       .height = initial.height,
                                       .refresh_hz = initial.refresh_hz,
                                       .vsync = VideoVsync::Off,
-                                      .frame_cap = VideoFrameCap::Fps60};
+                                      .frame_cap = VideoFrameCap::Fps60,
+                                      .scene_resolution_percent=initial.scene_resolution_percent, .scene_samples=initial.scene_samples};
   require(!controller.previewing() && !controller.visible() &&
               NativeVideoSettings::load(settings_path) == previewed,
           "Keeping video settings did not atomically persist the preview.");

@@ -9,6 +9,9 @@ NATIVE_STARTUP_ART_SOURCES = {
     key: (f"assets/visual/loading/{key}.png", f"assets/visual/loading/{key}.png")
     for key in ('stellar-continuum-splash', 'stellar-loading-splash', 'stellar-galaxy-generation', 'stellar-save-loading')
 }
+for key, path in {"title-logo": "assets/visual/branding/stellar-continuum-title-v1.png",
+                  "galaxy-card": "assets/visual/space/campaign-galaxy-four-arm-v1.png"}.items():
+    NATIVE_STARTUP_ART_SOURCES[key] = (path, path)
 NATIVE_STARTUP_ART_SOURCES["credits"] = (
     "docs/engine/NATIVE_STARTUP_ART_SOURCES.md", "Licenses/Startup-art-sources.md")
 

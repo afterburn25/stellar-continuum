@@ -1,22 +1,19 @@
-# Native navigation photo sources
+# Native navigation icon sources
 
-Every native navigation action has an approved photo source recorded, with its
-SHA-256 digest, in `export/native-navigation-assets.json`. The five navigation
-actions that open economy, research, construction, relations, and settings use
-the approved catalog portraits; the rest use existing solar-system, deep-space,
-and ship artwork.
+The native navigation rail uses the existing semantic SVG icons from the Godot
+presentation layer. Each source stays unchanged in `assets/visual/ui/navigation/`
+or `assets/visual/icons/navigation/`. Native runtime PNGs are transparent 256 px
+rasters of those sources in `assets/visual/native-navigation/`; they add no new
+icon design or generated replacement art.
 
-`NativeNavigationArt` decodes each source and constructs one opaque 256px
-thumbnail during startup. It keeps fourteen immutable thumbnails (3.5 MiB
-total) and returns the cached object on every frame. Zoom button glyph overlays
-remain part of the main UI; their photo thumbnails are separate background art.
+`export/native-navigation-assets.json` maps every action to its source SVG and
+runtime PNG, records both SHA-256 hashes, and records the rasterization method.
+The Python exporter and CMake build validate the paths and hashes before packaging
+or staging; only the runtime PNGs are shipped for this feature. `NativeNavigationArt`
+loads those immutable RGBA images once at startup. The thumbnails remain 256 px
+each (3.5 MiB total), preserving transparent symbol padding.
 
-The build validates every declared source and runtime path against the reviewed
-hashes, then stages the source images. There is no raster regeneration step:
-the checked-in photos are the shipped assets.
-
-Validate the declaration from the repository root:
-
-```powershell
-python tools/stellar-export/test_native_navigation_assets.py
-```
+The mapping follows the Godot rail: galaxy, home, inspection, zoom in/out,
+economy, research, shipyard, construction, exploration, colonization, logistics,
+relations, and settings. Zoom glyphs are already part of the selected SVG and
+remain visible without photo overlays.

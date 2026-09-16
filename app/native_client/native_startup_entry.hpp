@@ -15,6 +15,8 @@
 namespace stellar::native_video_settings { class NativeVideoController; }
 namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_general { class NativeGeneralSettings; }
+namespace stellar::native_settings { class NativeSettingsHub; }
+namespace stellar::native_audio { class NativeVoiceSettings; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
   std::function<void()> service, menu_ready, confirm;
@@ -30,6 +32,9 @@ struct StartupEntryConfig {
   bool return_to_campaign_available{};
   stellar::native_video_settings::NativeVideoController* video_settings{};
   stellar::native_general::NativeGeneralSettings* general_settings{};
+  stellar::native_settings::NativeSettingsHub* settings_hub{};
+  stellar::native_audio::NativeVoiceSettings* voice_settings{};
+  std::function<void(stellar::native_map::DrawList&,int,int)> caption;
 };
 enum class StartupEntryAutomationAction { Create, ReturnToCampaign, Exit };
 struct StartupEntryAutomation {

@@ -1,4 +1,5 @@
 #include "native_general_settings.hpp"
+#include "native_menu_style.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -150,8 +151,8 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   if(!visible_)return;
   const auto l=GeneralSettingsLayout::for_viewport(width,height);const auto s=l.scale;
-  draw.overlay.emplace_back(FilledRectangle{{0,0,static_cast<float>(width),static_cast<float>(height)},{3,10,22,210}});
-  draw.overlay.emplace_back(FilledRectangle{l.panel,panel_fill});draw.overlay.emplace_back(StrokedRectangle{l.panel,{104,184,212,255}});
+  draw.overlay.emplace_back(FilledRectangle{{0,0,static_cast<float>(width),static_cast<float>(height)},{3,10,22,48}});
+  native_menu_style::panel(draw,l.panel,l.scale);
   label(draw,{l.panel.x+30*s,l.panel.y+20*s,l.panel.width-60*s,36*s},"GENERAL SETTINGS",l.heading_pixels);
   button(draw,l.audio,"AUDIO",l.font_pixels,false,browsing());button(draw,l.video,"VIDEO",l.font_pixels,false,browsing());
   label(draw,{l.folder.x,l.panel.y+119*s,l.folder.width,26*s},"SCREENSHOT FOLDER",l.font_pixels);

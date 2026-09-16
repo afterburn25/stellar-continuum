@@ -1,4 +1,5 @@
 #include "native_new_game_workspace.hpp"
+#include "native_menu_style.hpp"
 
 #include <algorithm>
 #include <array>
@@ -110,12 +111,12 @@ species_presentation(std::string_view id) noexcept {
 
 NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                                                        int height) noexcept {
-  const float scale = std::clamp(static_cast<float>(height) / 900.f, 1.f, 2.4f);
+  const float scale = std::clamp(static_cast<float>(height) / 1080.f, .8f, 2.5f);
   const float margin = 18.f * scale;
   const float available_width = std::max(1.f, static_cast<float>(width) - 2 * margin);
-  const float available_height = std::max(1.f, static_cast<float>(height) - 2 * margin);
+  const float available_height = std::max(1.f, std::min(820.f * scale, static_cast<float>(height) - 2 * margin));
   const float panel_width = std::min(1120.f * scale, available_width);
-  UiRect panel_rect{(width - panel_width) * .5f, margin, panel_width,
+  UiRect panel_rect{(width - panel_width) * .5f, (height-available_height)*.5f, panel_width,
                     available_height};
   const float pad = 14.f * scale;
   const float x = panel_rect.x + pad, right = panel_rect.x + panel_rect.width - pad;
@@ -150,6 +151,8 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                     36.f * scale};
   UiRect randomize_seed{seed_input.x + seed_input.width + 6.f * scale,
                         seed_input.y, 106.f * scale, 36.f * scale};
+  UiRect restore_defaults{seed_input.x, seed_input.y + 44.f * scale,
+                          156.f * scale, 32.f * scale};
   UiRect create{right - 190.f * scale, footer_y + 148.f * scale,
                 190.f * scale, 38.f * scale};
   UiRect sizes{randomize_seed.x + randomize_seed.width + gap, generation_y,
@@ -158,7 +161,7 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                86.f * scale};
   UiRect portrait{detail_content.x, detail_content.y, 116.f * scale,
                   116.f * scale};
-  const float size_width = (sizes.width - 4.f * scale) * .5f;
+  const float size_width = (sizes.width - 6.f * scale) * .5f;
   const float size_height = 30.f * scale;
   const float size_y = sizes.y + 18.f * scale;
   std::array<UiRect, 4> size_buttons{
@@ -169,10 +172,10 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
              size_height},
       UiRect{sizes.x + size_width + 4.f * scale,
              size_y + size_height + 4.f * scale, size_width, size_height}};
-  return {scale, static_cast<int>(24 * scale), static_cast<int>(15 * scale),
-          static_cast<int>(12 * scale), panel_rect, heading, cancel, story,
+  return {scale, static_cast<int>(24 * scale), std::max(14,static_cast<int>(17 * scale)),
+          std::max(12,static_cast<int>(14 * scale)), panel_rect, heading, cancel, story,
           sandbox, species, rows, details, detail_content, sizes, seed_label,
-          seed_input, randomize_seed, create, portrait, size_buttons};
+          seed_input, randomize_seed, restore_defaults, create, portrait, size_buttons,{restore_defaults.x+restore_defaults.width+8*scale,restore_defaults.y,138*scale,restore_defaults.height}};
 }
 
 void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
@@ -209,6 +212,19 @@ void NativeNewGameWorkspace::randomize_seed() {
   seed_text_ = std::to_string(static_cast<std::int64_t>(
       entropy & 0x7fff'ffff'ffff'ffffULL));
   seed_replace_pending_ = false;
+  message_.clear();
+}
+void NativeNewGameWorkspace::restore_defaults() {
+  if (!view_) return;
+  selected_species_id_ = view_->default_species_id;
+  selected_system_count_ = view_->default_system_count;
+  selected_pre_warp_civilization_count_ =
+      view_->default_pre_warp_civilization_count;
+  selected_ancient_civilization_count_ =
+      view_->default_ancient_civilization_count;
+  reconcile();
+  randomize_seed();
+  detail_scroll_ = 0;
   message_.clear();
 }
 void NativeNewGameWorkspace::reconcile() {
@@ -329,6 +345,9 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
                     ? std::string{"Can operate in vacuum without protection."}
                     : std::string{"Requires protection in vacuum."}})
       add(value, layout.body_font, 4.f * layout.scale);
+    add("PHYSIOLOGY",layout.small_font,6.f*layout.scale);
+    add("Adult mass  "+number(option->adult_mass_kg,0)+" kg · Maturity  "+number(option->maturity_years,0)+" years",layout.body_font,4.f*layout.scale);
+    add("Lifespan  "+number(option->lifespan_years,0)+" years · Metabolic demand  "+number(option->metabolic_demand,2)+"x Terran baseline",layout.body_font,4.f*layout.scale);
     result.details_content_height = content;
   }
   return result;
@@ -447,6 +466,14 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
     randomize_seed();
     return {NativeNewGameIntentKind::RandomizeSeed, true, {}, seed_text_};
   }
+  if (layout.restore_defaults.contains(event.position)) {
+    restore_defaults();
+    return {NativeNewGameIntentKind::RestoreDefaults, true, {}, seed_text_,
+            selected_system_count_, selected_pre_warp_civilization_count_,
+            selected_ancient_civilization_count_};
+  }
+  if(layout.copy_setup.contains(event.position))
+    return {NativeNewGameIntentKind::CopySetup,true,selected_species_id_,seed_text_,selected_system_count_,selected_pre_warp_civilization_count_,selected_ancient_civilization_count_};
   if (layout.create.contains(event.position))
     return {NativeNewGameIntentKind::Create, true, selected_species_id_,
             seed_text_, selected_system_count_, selected_pre_warp_civilization_count_,
@@ -511,8 +538,7 @@ void NativeNewGameWorkspace::render(
     fill(out, {0, 0, static_cast<float>(width), static_cast<float>(height)},
          background);
   }
-  fill(out, layout.panel, panel_tint);
-  stroke(out, layout.panel, border);
+  native_menu_style::panel(out,layout.panel,layout.scale);
   text(out, layout.heading, "CONFIGURE SANDBOX", bright, layout.heading_font,
        TextAlign::Left, FontFace::Heading);
   fill(out, layout.cancel,
@@ -643,6 +669,9 @@ void NativeNewGameWorkspace::render(
              ? "Can operate in vacuum without protection."
              : "Requires protection in vacuum.",
          muted);
+    line("PHYSIOLOGY",gold,layout.small_font,6.f);
+    line("Adult mass  "+number(species->adult_mass_kg,0)+" kg · Maturity  "+number(species->maturity_years,0)+" years");
+    line("Lifespan  "+number(species->lifespan_years,0)+" years · Metabolic demand  "+number(species->metabolic_demand,2)+"x Terran baseline");
     const float maximum_scroll =
         std::max(0.f, measured.details_content_height - facts_clip.height);
     if (maximum_scroll > 0.f) {
@@ -680,6 +709,11 @@ void NativeNewGameWorkspace::render(
   stroke(out, layout.randomize_seed, border);
   text(out, layout.randomize_seed, "RANDOMIZE", bright, layout.small_font,
        TextAlign::Center);
+  fill(out, layout.restore_defaults,
+       layout.restore_defaults.contains(pointer_) ? hover : raised_tint);
+  stroke(out, layout.restore_defaults, border);
+  text(out, layout.restore_defaults, "RESTORE DEFAULTS", bright,
+       layout.small_font, TextAlign::Center);
 
   if (!view_->size_presets.empty()) {
     const auto count =
@@ -695,16 +729,18 @@ void NativeNewGameWorkspace::render(
       auto compact = size.label;
       if (const auto separator = compact.find(" - ");
           separator != std::string::npos)
-        compact.replace(separator, 3, "\n");
-      text(out, button, std::move(compact), bright, layout.small_font,
+        compact.replace(separator, 3, " · ");
+      if(const auto units=compact.find(" systems");units!=std::string::npos)compact.erase(units);
+      const UiRect caption{button.x+2*s,button.y+(button.height-layout.small_font*1.35f)*.5f,button.width-4*s,button.height};
+      text(out, caption, std::move(compact), bright, layout.small_font,
            TextAlign::Center);
     }
     text(out, {layout.size_group.x, layout.size_group.y,
                layout.size_group.width, 18 * s},
-         "GALAXY SIZE", gold, layout.small_font);
+         "GALAXY SIZE · SYSTEMS", gold, layout.small_font);
   }
-  const UiRect notice{layout.seed_input.x, layout.seed_input.y + 42 * s,
-                      layout.create.x - layout.seed_input.x - 8 * s, 38 * s};
+  native_menu_style::button(out,layout.copy_setup,"COPY SETUP",layout.small_font,layout.copy_setup.contains(pointer_),true,s);
+  const UiRect notice{layout.seed_label.x,layout.create.y+layout.create.height+5*s,layout.create.x-layout.seed_label.x-10*s,18*s};
   text(out, notice,
        message_.empty()
            ? std::to_string(std::max(0, selected_pre_warp_civilization_count_ - 1)) +

@@ -1,24 +1,24 @@
-"""Validated, approved source photos used by native navigation."""
+"""Validated Godot semantic SVG icons and their native PNG raster assets."""
 from __future__ import annotations
 import hashlib
 import json
 
 NAMES = ("galaxy", "home", "inspection", "zoom_in", "zoom_out", "economy", "research", "shipyard", "construction", "exploration", "colonization", "logistics", "relations", "settings")
 SOURCES = {
-    "galaxy": ("assets/visual/space/campaign-galaxy-four-arm-v1.png",) * 2,
-    "home": ("assets/visual/sol/earth.jpg",) * 2,
-    "inspection": ("assets/visual/sol/earth-map.jpg",) * 2,
-    "zoom_in": ("assets/visual/space/deep-field-v2.png",) * 2,
-    "zoom_out": ("assets/visual/space/galactic-dust-detail-v1.png",) * 2,
-    "economy": ("assets/visual/catalog/portraits/research-economic_trade.png",) * 2,
-    "research": ("assets/visual/catalog/portraits/research-foundations.png",) * 2,
-    "shipyard": ("assets/visual/ships/interstellar-bulk-freighter.png",) * 2,
-    "construction": ("assets/visual/catalog/portraits/human_station_industry--l1.png",) * 2,
-    "exploration": ("assets/visual/ships/pathfinder-scout.jpg",) * 2,
-    "colonization": ("assets/visual/ships/interstellar-colony-ship.jpg",) * 2,
-    "logistics": ("assets/visual/ships/resource-outpost-ship.png",) * 2,
-    "relations": ("assets/visual/catalog/portraits/research-social_admin.png",) * 2,
-    "settings": ("assets/visual/catalog/portraits/research-computing.png",) * 2,
+    "galaxy": ("assets/visual/ui/navigation/nav_galaxy.svg", "assets/visual/native-navigation/nav_galaxy.png"),
+    "home": ("assets/visual/ui/navigation/nav_home.svg", "assets/visual/native-navigation/nav_home.png"),
+    "inspection": ("assets/visual/ui/navigation/nav_inspection.svg", "assets/visual/native-navigation/nav_inspection.png"),
+    "zoom_in": ("assets/visual/icons/navigation/nav_zoom_in.svg", "assets/visual/native-navigation/nav_zoom_in.png"),
+    "zoom_out": ("assets/visual/icons/navigation/nav_zoom_out.svg", "assets/visual/native-navigation/nav_zoom_out.png"),
+    "economy": ("assets/visual/ui/navigation/nav_economy.svg", "assets/visual/native-navigation/nav_economy.png"),
+    "research": ("assets/visual/ui/navigation/nav_research.svg", "assets/visual/native-navigation/nav_research.png"),
+    "shipyard": ("assets/visual/ui/navigation/nav_shipyard.svg", "assets/visual/native-navigation/nav_shipyard.png"),
+    "construction": ("assets/visual/ui/navigation/nav_construction.svg", "assets/visual/native-navigation/nav_construction.png"),
+    "exploration": ("assets/visual/ui/navigation/nav_exploration.svg", "assets/visual/native-navigation/nav_exploration.png"),
+    "colonization": ("assets/visual/ui/navigation/nav_colonization.svg", "assets/visual/native-navigation/nav_colonization.png"),
+    "logistics": ("assets/visual/ui/navigation/nav_logistics.svg", "assets/visual/native-navigation/nav_logistics.png"),
+    "relations": ("assets/visual/ui/navigation/nav_relations.svg", "assets/visual/native-navigation/nav_relations.png"),
+    "settings": ("assets/visual/ui/navigation/nav_settings.svg", "assets/visual/native-navigation/nav_settings.png"),
 }
 
 def native_navigation_asset_files(root):

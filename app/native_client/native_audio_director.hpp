@@ -8,8 +8,10 @@
 #include <deque>
 #include <future>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
+#include "native_voice_settings.hpp"
 
 namespace stellar::engine {
 class JobSystem;
@@ -37,6 +39,7 @@ struct NativeAudioStats final {
   std::uint64_t voice_event_count{};
   std::size_t queued_voice_bytes{};
 };
+struct VoiceCaption final { std::string speaker, text; std::chrono::steady_clock::time_point expires_at{}; };
 
 // UI-owner-thread coordinator for asynchronous clip decoding and SDL output.
 class NativeAudioDirector final {
@@ -57,6 +60,10 @@ class NativeAudioDirector final {
   void speak(VoiceCue cue);
   void stop_voice();
   void set_volumes(float master, float music, float effects);
+  void set_voice_preferences(const VoicePreferences&);
+  [[nodiscard]] VoicePreferences voice_preferences() const;
+  [[nodiscard]] std::optional<VoiceCaption> caption() const;
+  bool replay_last_voice();
   void stop();
   [[nodiscard]] std::string failure_message() const;
   [[nodiscard]] NativeAudioStats stats() const;
@@ -72,6 +79,8 @@ class NativeAudioDirector final {
   [[nodiscard]] static std::size_t voice_index(VoiceCue cue);
   void disable_voice(std::string message);
   void service_voice();
+  void show_caption(VoiceCue cue);
+  void admit_voice(VoiceCue cue, bool replay);
 
   std::thread::id owner_{std::this_thread::get_id()};
   std::filesystem::path asset_root_;
@@ -90,6 +99,9 @@ class NativeAudioDirector final {
   bool diagnostic_emitted_{};
   bool voice_diagnostic_emitted_{};
   std::string failure_message_;
+  VoicePreferences voice_preferences_{};
+  std::optional<VoiceCaption> caption_;
+  std::optional<VoiceCue> last_voice_cue_;
 };
 
 } // namespace stellar::native_audio

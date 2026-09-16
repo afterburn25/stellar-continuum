@@ -10,11 +10,13 @@ namespace stellar::native_startup_ui {
 namespace {
 using namespace stellar::native_map;
 
-constexpr std::array<const char *, 4> paths{
+constexpr std::array<const char *, 6> paths{
     "assets/visual/loading/stellar-loading-splash.png",
     "assets/visual/loading/stellar-continuum-splash.png",
     "assets/visual/loading/stellar-galaxy-generation.png",
-    "assets/visual/loading/stellar-save-loading.png"};
+    "assets/visual/loading/stellar-save-loading.png",
+    "assets/visual/branding/stellar-continuum-title-v1.png",
+    "assets/visual/space/campaign-galaxy-four-arm-v1.png"};
 
 std::string utf8(const std::filesystem::path &path) {
   const auto encoded = path.u8string();

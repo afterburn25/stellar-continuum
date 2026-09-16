@@ -1,4 +1,5 @@
 #include "native_audio_director.hpp"
+#include "native_voice_filter.hpp"
 
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/native_audio.hpp>
@@ -21,7 +22,11 @@ constexpr std::size_t maximum_total_decoded_bytes = 104u * 1024u * 1024u;
 constexpr std::size_t maximum_voice_clip_bytes = 8u * 1024u * 1024u;
 constexpr std::size_t maximum_total_voice_bytes = 16u * 1024u * 1024u;
 constexpr auto debounce_interval = std::chrono::milliseconds{60};
-constexpr auto voice_cooldown = std::chrono::seconds{8};
+constexpr std::array<std::string_view, 3> voice_text{
+    "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach.",
+    "Our research team has a new report. Review the findings before selecting our next objective.",
+    "System survey complete. The updated observations are ready for your review."};
+constexpr std::array<double, 3> voice_seconds{6.5, 6.025, 5.25};
 
 struct AssetPath { const char* relative; };
 constexpr std::array sfx_paths{
@@ -40,6 +45,8 @@ constexpr std::array voice_paths{
 struct NativeAudioDirector::Clips final {
   Clip hover, confirm, discovery, construction, ship, alert, music;
   Clip reconnaissance_required, research_report, survey_complete;
+  std::array<Clip,3> filtered;
+  std::array<int,3> filter_steps{-1,-1,-1};
 };
 
 struct NativeAudioDirector::LoadState final {
@@ -232,7 +239,7 @@ std::size_t NativeAudioDirector::voice_index(VoiceCue cue) {
 }
 
 void NativeAudioDirector::service_voice() {
-  if (!may_play_voice() || stats_.voice_active || voice_queue_.empty()) return;
+  if (!may_play_voice() || !voice_preferences_.enabled || stats_.voice_active || voice_queue_.empty()) return;
   const auto cue = voice_queue_.front();
   voice_queue_.pop_front();
   Clip clip;
@@ -242,7 +249,18 @@ void NativeAudioDirector::service_voice() {
     case VoiceCue::SurveyComplete: clip = clips_->survey_complete; break;
   }
   try {
+    const auto index = voice_index(cue);
+    const int step = static_cast<int>(std::lround(voice_preferences_.communication_filter*20.f));
+    if (step>0) {
+      if (clips_->filter_steps[index]!=step) {
+        clips_->filtered[index].reset();
+        clips_->filtered[index]=communication_clip(clip,step/20.f);
+        clips_->filter_steps[index]=step;
+      }
+      clip=clips_->filtered[index];
+    }
     output_->play_voice(std::move(clip));
+    show_caption(cue);
     const auto diagnostics = output_->diagnostics();
     stats_.voice_active = diagnostics.voice_active;
     stats_.voice_play_count = diagnostics.voice_play_count;
@@ -254,6 +272,7 @@ void NativeAudioDirector::service_voice() {
 
 void NativeAudioDirector::menu_ready() {
   require_owner();
+  menu_ready_ = true;
   if (stats_.stopped || !stats_.enabled) return;
   menu_ready_ = true;
   collect_loaded_assets();
@@ -303,24 +322,29 @@ void NativeAudioDirector::play_event(Cue cue) {
   catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what()); }
 }
 
-void NativeAudioDirector::speak(VoiceCue cue) {
-  require_owner();
-  if (!may_play_voice()) return;
-  const auto now = std::chrono::steady_clock::now();
-  const auto index = voice_index(cue);
-  if (now - last_voice_[index] < voice_cooldown) {
-    last_voice_[index] = now;
-    return;
-  }
-  last_voice_[index] = now;
-  ++stats_.voice_event_count;
-  if (voice_queue_.size() >= 3 ||
-      std::find(voice_queue_.begin(), voice_queue_.end(), cue) != voice_queue_.end()) return;
+void NativeAudioDirector::speak(VoiceCue cue) { require_owner(); admit_voice(cue,false); }
+void NativeAudioDirector::show_caption(VoiceCue cue) {
+  const auto index=voice_index(cue);
+  caption_=VoiceCaption{"CHIEF SCIENTIST",std::string(voice_text[index]),
+    std::chrono::steady_clock::now()+std::chrono::milliseconds{static_cast<int>((voice_seconds[index]+1.)*1000.)}};
+}
+void NativeAudioDirector::admit_voice(VoiceCue cue,bool replay) {
+  const auto index=voice_index(cue);
+  if (!menu_ready_ || stats_.stopped) return;
+  if (!replay && voice_preferences_.frequency==VoiceFrequency::Minimal && cue!=VoiceCue::ReconnaissanceRequired) return;
+  const auto now=std::chrono::steady_clock::now();
+  const auto cooldown=std::chrono::seconds{voice_preferences_.frequency==VoiceFrequency::Frequent?3:voice_preferences_.frequency==VoiceFrequency::Minimal?20:8};
+  if (!replay && now-last_voice_[index]<cooldown) {last_voice_[index]=now;return;}
+  last_voice_[index]=now;last_voice_cue_=cue;++stats_.voice_event_count;
+  if (!voice_preferences_.enabled || !may_play_voice()) {show_caption(cue);return;}
+  if (replay || !voice_preferences_.no_interruptions) stop_voice();
+  if (voice_queue_.size()>=3 || std::find(voice_queue_.begin(),voice_queue_.end(),cue)!=voice_queue_.end()) return;
   voice_queue_.push_back(cue);
 }
 
 void NativeAudioDirector::stop_voice() {
   require_owner();
+  caption_.reset();
   voice_queue_.clear();
   stats_.voice_active = false;
   stats_.queued_voice_bytes = 0;
@@ -338,11 +362,26 @@ void NativeAudioDirector::set_volumes(float master, float music, float effects) 
   try { output_->set_volumes(master, music, effects); }
   catch (const std::exception& error) { fail(std::string{"audio volume update failed: "} + error.what()); }
 }
+void NativeAudioDirector::set_voice_preferences(const VoicePreferences& value) {
+  require_owner();
+  const auto gain=[](float v){return std::isfinite(v)&&v>=0.f&&v<=1.f;};
+  if (!gain(value.volume)||!gain(value.communication_filter)||!gain(value.subtitle_background_opacity)||
+      value.subtitle_size<14||value.subtitle_size>32||static_cast<int>(value.frequency)<0||static_cast<int>(value.frequency)>2)
+    throw std::invalid_argument("Invalid voice preferences.");
+  if (!value.enabled && voice_preferences_.enabled) stop_voice();
+  voice_preferences_=value;
+  if(output_)try{output_->set_voice_gain(value.enabled?value.volume:0.f);}
+  catch(const std::exception& error){fail(std::string{"voice gain update failed: "}+error.what());}
+}
+VoicePreferences NativeAudioDirector::voice_preferences() const { require_owner(); return voice_preferences_; }
+std::optional<VoiceCaption> NativeAudioDirector::caption() const { require_owner(); if(!caption_ || !voice_preferences_.subtitles || std::chrono::steady_clock::now()>=caption_->expires_at) return {}; return caption_; }
+bool NativeAudioDirector::replay_last_voice() {require_owner();if(!last_voice_cue_||stats_.stopped)return false;admit_voice(*last_voice_cue_,true);return true;}
 
 void NativeAudioDirector::stop() {
   require_owner();
   if (stats_.stopped) return;
   stats_.stopped = true;
+  caption_.reset();
   if (output_) {
     try { output_->stop_all(); }
     catch (const std::exception& error) { fail(std::string{"audio shutdown failed: "} + error.what()); }

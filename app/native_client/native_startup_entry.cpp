@@ -1,5 +1,7 @@
 #include "native_startup_entry.hpp"
 #include "native_audio_settings.hpp"
+#include "native_settings_hub.hpp"
+#include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
@@ -49,6 +51,18 @@ StartupEntryResult run_native_startup_entry(Window &window,
     throw std::invalid_argument("Startup artwork minimum duration cannot be negative.");
   NativeStartupHost host(config.host);
   NativeStartupWorkspace workspace;
+  workspace.set_build_label("Stellar Continuum " + config.host.game_version);
+  const std::string system_info="Stellar Continuum "+config.host.game_version+"\n"+window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height());
+  workspace.set_diagnostics(window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height()));
+  const auto route_settings = [&](const InputEvent& e,int w,int h) {
+    if(config.voice_settings&&config.voice_settings->visible())return config.voice_settings->handle(e,w,h);
+    if(config.general_settings&&config.general_settings->visible())return config.general_settings->handle(e,w,h);
+    if(config.video_settings&&config.video_settings->visible())return config.video_settings->handle(e,w,h);
+    if(config.audio_settings&&config.audio_settings->visible())return config.audio_settings->handle(e,w,h);
+    return config.settings_hub&&config.settings_hub->handle(e,w,h);
+  };
+  const auto saved_slots=host.slots();
+  if(!saved_slots.slots.empty())workspace.set_continue_save(saved_slots.slots.front().path);
   const auto setup_view = host.setup();
   workspace.set_setup(setup_view);
   workspace.set_return_to_campaign_available(
@@ -141,8 +155,16 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (intent.kind != StartupIntentKind::None && config.audio.confirm)
       config.audio.confirm();
     switch (intent.kind) {
+    case StartupIntentKind::CopyDiagnostics:
+      try{window.set_clipboard_text(system_info);workspace.set_diagnostics(system_info+"\nCopied to clipboard.");}
+      catch(const std::exception&){workspace.set_diagnostics(system_info+"\nClipboard unavailable. Try again.");}
+      break;
+    case StartupIntentKind::CopySetup:
+      try{window.set_clipboard_text("Stellar Continuum sandbox\nSpecies: "+intent.species_id+"\nSeed: "+intent.seed_text+"\nSystems: "+std::to_string(intent.system_count)+"\nRival empires: "+std::to_string(std::max(0,intent.pre_warp_civilization_count-1))+"\nAncient empires: "+std::to_string(intent.ancient_civilization_count));workspace.set_setup_message("Setup copied to clipboard.",true);}
+      catch(const std::exception&){workspace.set_setup_message("Could not copy setup. Try again.",false);}break;
     case StartupIntentKind::OpenSettings:
-      if (config.audio_settings) config.audio_settings->open();
+      if(config.settings_hub)config.settings_hub->open();
+      else if (config.audio_settings) config.audio_settings->open();
       break;
     case StartupIntentKind::OpenLoad:
       workspace.set_slots(host.slots());
@@ -186,7 +208,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       if (!config.audio_settings) throw std::runtime_error("Audio settings validation requires the real overlay.");
       stellar::native_audio::check_audio_settings(*config.audio_settings,
           automation->audio_settings_path, width, height, "startup",
-          [&] { dispatch(workspace.handle({InputEventType::LeftPressed, center(entry_layout.settings)}, width, height, measure)); },
+          [&] { dispatch(workspace.handle({InputEventType::LeftPressed, center(entry_layout.settings)}, width, height, measure));
+            if(config.settings_hub)(void)route_settings({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[1])},width,height); },
           [&](const InputEvent& event) { (void)config.audio_settings->handle(event, width, height); },
           [&] {
             DrawList draw;
@@ -198,20 +221,20 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (!automation->video_settings_screenshot.empty()) {
       if (!config.audio_settings || !config.video_settings) throw std::runtime_error("Video settings validation requires the menu overlays.");
       const auto route=[&](const InputEvent& event){
-        if(config.video_settings->visible())(void)config.video_settings->handle(event,width,height);
-        else if(config.audio_settings->visible())(void)config.audio_settings->handle(event,width,height);
-        else dispatch(workspace.handle(event,width,height,measure));
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
       };
       stellar::native_video_settings::check_video_settings(*config.video_settings,
           automation->video_settings_path,width,height,"startup",
-          [&]{route({InputEventType::LeftPressed,center(entry_layout.settings)});
-              route({InputEventType::LeftPressed,center(stellar::native_audio::AudioSettingsLayout::for_viewport(width,height).video)});},route,
+          [&]{if(config.settings_hub)config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(config.settings_hub?stellar::native_settings::HubLayout::for_viewport(width,height).categories[2]:stellar::native_audio::AudioSettingsLayout::for_viewport(width,height).video)});},route,
           [&](bool confirming){DrawList draw;
             workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
             config.video_settings->render(draw,width,height);
             window.draw(draw,confirming?automation->video_confirm_screenshot:automation->video_settings_screenshot);
           });
     }
+    if(config.settings_hub)config.settings_hub->close();
     if (automation->action != StartupEntryAutomationAction::Create) {
       evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
       if (workspace.screen() == StartupScreen::Setup) {
@@ -350,21 +373,17 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     if (!input.renderable()) {
       for (const auto &event : input.events)
-        if (config.general_settings && config.general_settings->visible())
-          (void)config.general_settings->handle(event, input.drawable_width, input.drawable_height);
-        else if (config.video_settings && config.video_settings->visible())
-          (void)config.video_settings->handle(event, input.drawable_width, input.drawable_height);
-        else if (config.audio_settings && config.audio_settings->visible())
-          (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
-        else (void)workspace.handle(event, input.drawable_width,
+        if (!route_settings(event,input.drawable_width,input.drawable_height))
+          (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
       window.set_text_input(workspace.wants_text_input()&&
-          !(config.general_settings&&config.general_settings->visible()));
+          !(config.general_settings&&config.general_settings->visible())&&!(config.settings_hub&&config.settings_hub->visible()));
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
     }
     bool exit{};
     for (const auto &event : input.events) {
+      if(route_settings(event,input.drawable_width,input.drawable_height))continue;
       if (config.general_settings && config.general_settings->visible()) {
         (void)config.general_settings->handle(event, input.drawable_width, input.drawable_height);
         continue;
@@ -419,16 +438,24 @@ StartupEntryResult run_native_startup_entry(Window &window,
         workspace.set_operation(state);
     }
     window.set_text_input(workspace.wants_text_input()&&
-        !(config.general_settings&&config.general_settings->visible()));
+        !(config.general_settings&&config.general_settings->visible())&&!(config.settings_hub&&config.settings_hub->visible()));
     DrawList draw;
     workspace.render(draw, input.drawable_width, input.drawable_height, measure,
-                     &portrait_provider, &artwork_provider);
+                     &portrait_provider, &artwork_provider,
+                     (config.settings_hub&&config.settings_hub->visible())||
+                     (config.audio_settings&&config.audio_settings->visible())||
+                     (config.video_settings&&config.video_settings->visible())||
+                     (config.general_settings&&config.general_settings->visible())||
+                     (config.voice_settings&&config.voice_settings->visible()));
     if (config.audio_settings)
       config.audio_settings->render(draw, input.drawable_width, input.drawable_height);
     if (config.video_settings)
       config.video_settings->render(draw, input.drawable_width, input.drawable_height);
     if (config.general_settings)
       config.general_settings->render(draw, input.drawable_width, input.drawable_height);
+    if(config.caption)config.caption(draw,input.drawable_width,input.drawable_height);
+    if(config.voice_settings)config.voice_settings->render(draw,input.drawable_width,input.drawable_height);
+    if(config.settings_hub)config.settings_hub->render(draw,input.drawable_width,input.drawable_height);
     window.draw(draw);
   }
 }

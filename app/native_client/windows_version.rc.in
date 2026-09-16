@@ -1,4 +1,6 @@
 #include <windows.h>
+#include "@CMAKE_SOURCE_DIR@/engine/include/stellar/engine/windows_resource_ids.h"
+STELLAR_APPLICATION_ICON_ID ICON "@CMAKE_SOURCE_DIR@/assets/visual/branding/stellar-continuum-v1.ico"
 1 VERSIONINFO
  FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
  PRODUCTVERSION @STELLAR_GAME_RESOURCE_VERSION@,0

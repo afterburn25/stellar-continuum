@@ -59,11 +59,29 @@ int main(int argc,char**argv){
     require(SDL_GetWindowSize(native,&client_w,&client_h)&&client_w==960&&client_h==540,"Windowed client resolution was not preserved.");
     require(SDL_GetWindowPosition(native,&x,&y)&&SDL_GetWindowBordersSize(native,&top,&left,&bottom,&right),"Windowed coordinate or frame query failed.");
     require(x>=usable.x&&y>=usable.y&&x+client_w+left+right<=usable.x+usable.w&&y+client_h+top+bottom<=usable.y+usable.h,"Windowed frame did not fit within usable display bounds.");
+    {
+      DrawList quality;
+      quality.world.emplace_back(Line{{31.2f,30.1f},{180.5f,127.7f},{240,220,100,255}});
+      quality.overlay.emplace_back(FilledRectangle{{250,50,50,40},{40,210,100,255}});
+      window.set_scene_quality(100,1);window.draw(quality,temp.path/"quality-native.png");
+      window.set_scene_quality(100,4);window.draw(quality,temp.path/"quality-smooth.png");
+      const auto native_image=decode_rgba_image(temp.path/"quality-native.png"),smooth=decode_rgba_image(temp.path/"quality-smooth.png");
+      require(smooth->width()==window.drawable_width()&&smooth->height()==window.drawable_height(),"Quality changed screenshot dimensions.");
+      require(pixel(*native_image,270,70)==pixel(*smooth,270,70),"Scene smoothing changed native UI pixels.");
+      std::size_t different{};for(int py=28;py<132;++py)for(int px=28;px<185;++px)if(pixel(*native_image,px,py)!=pixel(*smooth,px,py))++different;
+      require(different>50,"Supersampling did not affect scene edges.");
+      float mx{},my{};require(SDL_RenderCoordinatesFromWindow(SDL_GetRenderer(native),100,100,&mx,&my)&&std::abs(mx-100)<2&&std::abs(my-100)<2,"Scene scale leaked into mouse mapping.");
+      window.set_scene_quality(50,1);window.draw(quality,temp.path/"quality-half.png");
+      const auto half=decode_rgba_image(temp.path/"quality-half.png");near_color(*half,270,70,{40,210,100,255},"Reduced scene resolution blurred interface.");
+      rejects([&]{window.set_scene_quality(0,1);});rejects([&]{window.set_scene_quality(100,3);});
+      window.set_scene_quality(100,1);
+      require(!window.graphics_adapter().empty(),"Adapter label was empty.");
+    }
     int pixel_w{},pixel_h{};require(SDL_GetWindowSizeInPixels(native,&pixel_w,&pixel_h),"Window pixel size query failed.");
     require(pixel_w==window.drawable_width()&&pixel_h==window.drawable_height(),"Renderer dimensions diverged from SDL drawable pixels.");
     const auto coordinate=Point{client_w*.5f,client_h*.5f};Point mapped{};require(SDL_RenderCoordinatesFromWindow(SDL_GetRenderer(native),coordinate.x,coordinate.y,&mapped.x,&mapped.y),"Window to drawable coordinate conversion failed.");
     require(std::abs(mapped.x-window.drawable_width()*.5f)<2.f&&std::abs(mapped.y-window.drawable_height()*.5f)<2.f,"Pointer coordinate mapping did not track the drawable scale.");
-    SDL_Event motion{};motion.type=SDL_EVENT_MOUSE_MOTION;motion.motion.windowID=SDL_GetWindowID(native);motion.motion.x=coordinate.x;motion.motion.y=coordinate.y;require(SDL_PushEvent(&motion)==1,"Could not inject test pointer motion.");const auto pointer_snapshot=window.poll();const auto mapped_event=std::find_if(pointer_snapshot.events.begin(),pointer_snapshot.events.end(),[](const auto& item){return item.type==InputEventType::PointerMove;});require(mapped_event!=pointer_snapshot.events.end()&&std::abs(mapped_event->position.x-window.drawable_width()*.5f)<2.f&&std::abs(mapped_event->position.y-window.drawable_height()*.5f)<2.f,"Injected pointer coordinates did not map to the renderer drawable.");
+    SDL_Event motion{};motion.type=SDL_EVENT_MOUSE_MOTION;motion.motion.windowID=SDL_GetWindowID(native);motion.motion.x=coordinate.x;motion.motion.y=coordinate.y;require(SDL_PushEvent(&motion)==1,"Could not inject test pointer motion.");const auto pointer_snapshot=window.poll();const auto mapped_event=std::find_if(pointer_snapshot.events.begin(),pointer_snapshot.events.end(),[&](const auto& item){return item.type==InputEventType::PointerMove&&std::abs(item.position.x-coordinate.x)<2.f&&std::abs(item.position.y-coordinate.y)<2.f;});require(mapped_event!=pointer_snapshot.events.end()&&std::abs(mapped_event->position.x-window.drawable_width()*.5f)<2.f&&std::abs(mapped_event->position.y-window.drawable_height()*.5f)<2.f,"Injected pointer coordinates did not map to the renderer drawable.");
     if(display_count>1){SDL_DisplayID second{};for(int i=0;i<display_count;++i)if(displays[i]!=original_display){second=displays[i];break;}require(second!=0,"Second active display was not distinct from the current display.");SDL_Rect second_bounds{};require(SDL_GetDisplayBounds(second,&second_bounds),"Second display bounds query failed.");const int target_x=second_bounds.x+std::max(0,(second_bounds.w-client_w)/2),target_y=second_bounds.y+std::max(0,(second_bounds.h-client_h)/2);require(SDL_SetWindowPosition(native,target_x,target_y)&&SDL_SyncWindow(native),"Could not move test window to the second display.");const auto second_current=SDL_GetDisplayForWindow(native);require(second_current==second,"Window did not move onto the second display.");window.set_display_mode(WindowDisplayMode::Borderless);require(SDL_GetDisplayForWindow(native)==second,"Borderless transition lost the selected display.");window.set_display_mode(WindowDisplayMode::Windowed,960,540);require(SDL_GetDisplayForWindow(native)==second,"Windowed restoration lost the selected display.");modes=window.display_modes();require(!modes.empty(),"Second display did not expose supported exclusive modes.");}
     SDL_free(displays);
 

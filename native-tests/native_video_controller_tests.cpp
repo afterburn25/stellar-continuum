@@ -238,6 +238,16 @@ void recovery_and_latched_failure() {
   require(latched.backend.calls.size() == attempts,
           "latched recovery failure retried the backend after faulting");
 }
+void launch_override_is_editable_and_not_persisted(){
+  Fixture f;NativeVideoSettings launch;launch.display=VideoDisplayMode::Windowed;launch.width=1280;launch.height=720;
+  NativeVideoController controller(f.path,[&](const auto& value){f.backend.apply(value);},[&]{return f.now;},[&](const auto& value){f.persisted.push_back(value);},launch);
+  require(controller.active()==launch&&f.backend.calls.back()==launch&&f.persisted.empty(),"Launch override was not applied independently of saved preferences");
+  controller.set_windowed_display_choices({{1280,720,0}});controller.open();
+  const auto layout=VideoSettingsLayout::for_viewport(width,height);
+  controller.handle(click(center(layout.choice_buttons[0])),width,height);controller.handle(click(center(layout.apply)),width,height);
+  require(controller.previewing()&&controller.active().display!=VideoDisplayMode::Windowed,"Windowed launch locked display controls");
+  controller.close();require(controller.active()==launch&&f.backend.calls.back()==launch&&f.persisted.empty(),"Cancelling launch-mode preview did not restore without saving");
+}
 } // namespace
 
 int main() try {
@@ -248,6 +258,7 @@ int main() try {
   inactive_window_reverts();
   confirmation_escape_cancel_and_close_restore();
   recovery_and_latched_failure();
+  launch_override_is_editable_and_not_persisted();
   std::cout << "native video controller tests passed\n";
   return 0;
 } catch (const std::exception &error) {
