@@ -152,6 +152,7 @@ struct Options {
   bool notification_smoke{};
   bool logistics_smoke{};
   bool economy_smoke{};
+  bool developer_smoke{};
   bool save_path_overridden{};
 };
 
@@ -197,6 +198,7 @@ struct Options {
     else if(arg==L"--notification-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.notification_smoke=true;result.windowed=true;}
     else if(arg==L"--logistics-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.logistics_smoke=true;result.windowed=true;}
     else if(arg==L"--economy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.economy_smoke=true;result.windowed=true;}
+    else if(arg==L"--developer-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.developer_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -230,11 +232,12 @@ struct Options {
     else if(arg=="--notification-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.notification_smoke=true;result.windowed=true;}
     else if(arg=="--logistics-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.logistics_smoke=true;result.windowed=true;}
     else if(arg=="--economy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.economy_smoke=true;result.windowed=true;}
+    else if(arg=="--developer-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.developer_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)+static_cast<int>(result.logistics_smoke)+static_cast<int>(result.economy_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)+static_cast<int>(result.logistics_smoke)+static_cast<int>(result.economy_smoke)+static_cast<int>(result.developer_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -242,6 +245,7 @@ struct Options {
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires --load with an active tactical encounter save.");
   if(result.notification_smoke&&!result.load)throw std::invalid_argument("--notification-smoke requires --load with a diplomacy-bearing player campaign fixture.");
   if(result.logistics_smoke&&!result.load)throw std::invalid_argument("--logistics-smoke requires --load with a player campaign fixture.");
+  if(result.developer_smoke&&!result.load)throw std::invalid_argument("--developer-smoke requires --load with a player campaign fixture.");
   if(result.economy_smoke&&!result.load)throw std::invalid_argument("--economy-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
@@ -1973,6 +1977,81 @@ class NativeCampaign final {
   void run_developer_command(std::string_view command_id){
     const auto outcome=session_->run_developer_command(command_id,utc_timestamp());
     developer_result_=outcome.message;developer_result_accepted_=outcome.accepted;
+  }
+  // --developer-smoke phase A (player session): open the campaign menu and
+  // click the DEVELOPMENT row; the outer loop then replaces the session.
+  void prepare_developer_smoke(int width,int height){
+    if(session_->developer_mode())
+      throw std::runtime_error("Developer smoke must start from a player campaign.");
+    InputSnapshot escape;escape.drawable_width=width;escape.drawable_height=height;
+    escape.events={{InputEventType::EscapePressed}};
+    if(!update(escape,width,height,0.,false))
+      throw std::runtime_error("Developer smoke Escape closed the campaign.");
+    if(!menu_)throw std::runtime_error("Developer smoke Escape did not open the menu.");
+    const auto layout=NativeUiLayout::for_viewport(width,height,false);
+    InputSnapshot click;click.drawable_width=width;click.drawable_height=height;
+    const Point at{layout.developer_button.x+layout.developer_button.width*.5f,
+                   layout.developer_button.y+layout.developer_button.height*.5f};
+    click.pointer=at;
+    click.events={{InputEventType::LeftPressed,at},
+                  {InputEventType::LeftReleased,at}};
+    if(!update(click,width,height,0.,false))
+      throw std::runtime_error("Developer smoke mode row closed the campaign.");
+    if(!mode_switch_ready())
+      throw std::runtime_error("The DEVELOPMENT menu row did not request the mode switch.");
+  }
+  // --developer-smoke phase B (Developer session): verify the Demo resume
+  // speed, open DEV TOOLS through the menu row, run grant_resources through
+  // the panel and confirm the Developer envelope landed on its own slot.
+  void prepare_developer_tools_smoke(int width,int height){
+    if(!session_->developer_mode())
+      throw std::runtime_error("Developer smoke switched to a non-Developer session.");
+    smoke_developer_mode_=true;
+    smoke_developer_demo_=
+        session_->frame().clock().speed()==StrategicSpeed::Demo;
+    InputSnapshot escape;escape.drawable_width=width;escape.drawable_height=height;
+    escape.events={{InputEventType::EscapePressed}};
+    if(!update(escape,width,height,0.,false))
+      throw std::runtime_error("Developer smoke Escape closed the campaign.");
+    if(!menu_)throw std::runtime_error("Developer smoke Escape did not open the menu.");
+    const auto click=[&](Point at){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=at;
+      input.events={{InputEventType::LeftPressed,at},
+                    {InputEventType::LeftReleased,at}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Developer smoke input closed the campaign.");
+    };
+    const auto menu_layout=NativeUiLayout::for_viewport(width,height,true);
+    click({menu_layout.dev_tools_button.x+menu_layout.dev_tools_button.width*.5f,
+           menu_layout.dev_tools_button.y+menu_layout.dev_tools_button.height*.5f});
+    if(!developer_tools_.visible()||menu_)
+      throw std::runtime_error("The DEV TOOLS menu row did not open the tools panel.");
+    smoke_developer_tools_=true;
+    const auto commands=developer_command_catalog();
+    std::size_t row=commands.size();
+    for(std::size_t i=0;i<commands.size();++i)
+      if(commands[i].id=="grant_resources"){row=i;break;}
+    if(row>=commands.size())
+      throw std::runtime_error("The Developer catalog lost grant_resources.");
+    const auto tools=native_developer::developer_tools_layout_for(width,height);
+    click({tools.command_rows[row].x+tools.command_rows[row].width*.5f,
+           tools.command_rows[row].y+tools.command_rows[row].height*.5f});
+    if(!developer_result_accepted_||!session_->developer_tools_used())
+      throw std::runtime_error("The DEV TOOLS grant_resources run was not accepted.");
+    smoke_developer_command_=true;
+    if(!developer_save_exists())
+      throw std::runtime_error("The Developer command wrote no envelope save.");
+    smoke_developer_save_=true;
+  }
+  [[nodiscard]] std::string developer_smoke_status()const{
+    std::ostringstream out;
+    out<<"{\"mode\":"<<(smoke_developer_mode_?1:0)
+       <<",\"demo_speed\":"<<(smoke_developer_demo_?1:0)
+       <<",\"tools_panel\":"<<(smoke_developer_tools_?1:0)
+       <<",\"command\":"<<(smoke_developer_command_?1:0)
+       <<",\"envelope_save\":"<<(smoke_developer_save_?1:0)<<"}";
+    return out.str();
   }
   // Mid-session setup cancellation hands the (already saved) session back so
   // the campaign can resume, matching the reference mode-select cancel.
@@ -3800,6 +3879,7 @@ class NativeCampaign final {
   std::int64_t smoke_diplomacy_proposal_id_{-1};
   bool smoke_diplomacy_portrait_{};
   bool smoke_notification_panel_{};
+  bool smoke_developer_mode_{},smoke_developer_demo_{},smoke_developer_tools_{},smoke_developer_command_{},smoke_developer_save_{};
   bool smoke_logistics_panel_{},smoke_economy_panel_{},
       smoke_economy_toggled_{};
   int smoke_logistics_ready_{},smoke_logistics_nodes_{},
@@ -3863,6 +3943,7 @@ int main(int argc,char **argv){
     StartupEntryEvidence startup_evidence,restart_evidence;
     std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot,restart_save_path;
     bool new_game_restart{};
+    bool developer_switched{};
     if(options.new_game_restart_smoke&&!std::filesystem::is_regular_file(options.save_path))
       throw std::invalid_argument("--new-game-restart-smoke requires a preexisting save-path anchor.");
     if(options.new_game_smoke){
@@ -3942,6 +4023,14 @@ int main(int argc,char **argv){
       else if(options.audio_smoke)
         campaign.prepare_audio_smoke(window.drawable_width(),
                                      window.drawable_height());
+      else if(options.developer_smoke){
+        if(developer_switched)
+          campaign.prepare_developer_tools_smoke(window.drawable_width(),
+                                                 window.drawable_height());
+        else
+          campaign.prepare_developer_smoke(window.drawable_width(),
+                                           window.drawable_height());
+      }
       else if(options.new_game_restart_smoke){/* the restart smoke drives N,
         the mid-session save, and the second campaign's manual save itself. */}
       else
@@ -3980,7 +4069,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke||options.logistics_smoke||options.economy_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke||options.logistics_smoke||options.economy_smoke||options.developer_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       std::optional<std::filesystem::path> screenshot;
@@ -4097,6 +4186,8 @@ int main(int argc,char **argv){
           std::cout<<" logistics="<<campaign.logistics_smoke_status();
         if(options.economy_smoke)
           std::cout<<" economy="<<campaign.economy_smoke_status();
+        if(options.developer_smoke)
+          std::cout<<" developer="<<campaign.developer_smoke_status();
         if(options.battle_smoke)
           std::cout<<" battle="<<campaign.battle_smoke_status();
         if(options.audio_smoke)
@@ -4147,6 +4238,7 @@ int main(int argc,char **argv){
                                                     :StrategicSpeed::Normal);
         (void)next->checkpoint_now(utc_timestamp());
         session=std::move(next);
+        if(to_developer)developer_switched=true;
       }catch(const std::exception &error){
         std::cerr<<"Stellar Continuum native client: mode switch failed: "
                  <<error.what()<<'\n';
