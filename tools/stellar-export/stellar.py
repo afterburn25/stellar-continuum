@@ -21,6 +21,7 @@ from native_navigation_runtime import validate_native_navigation_export
 from native_support_runtime import validate_native_support_export
 from native_battle_runtime import validate_native_battle_export
 from native_fleet_runtime import validate_native_fleet_export
+from native_military_runtime import validate_native_military_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
 from native_inspection_runtime import validate_native_inspection_export
@@ -94,6 +95,7 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_military_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_travel_runtime.py", "-v"], env=test_env)
@@ -484,6 +486,8 @@ def export(preset_name):
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_research_export(output, env))
             smoke.update(validate_native_fleet_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_military_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_shipyard_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))

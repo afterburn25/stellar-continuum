@@ -249,6 +249,104 @@ void observer_and_commands(CampaignFrame &frame) {
   }
   require(rejected_generation_rollback,
           "A stale window rebound the controller to an older generation.");
+
+  // An armed selected fleet alone receives a quoted strategic order; the
+  // quote cannot be replayed after Core has consumed it.
+  auto armed = std::ranges::find(world.fleets, scout->id, &FleetState::id);
+  require(armed != world.fleets.end(), "Selected fleet disappeared before military quote test.");
+  armed->role = FleetRole::Military;
+  armed->combat = create_initial_fleet_combat_state(std::nullopt, FleetRole::Military);
+  armed->current_system_id = world.systems.front().id;
+  armed->destination_system_id.reset();
+  armed->transit_phase = FleetTransitPhase::None;
+  require(controller.select(frame, generation + 1, armed->id).accepted,
+          "Armed fleet could not be selected.");
+  const auto armed_view = controller.build(frame, generation + 1);
+  const auto armed_row = std::ranges::find(armed_view.own_fleets, armed->id, &NativeOwnFleet::id);
+  require(armed_row != armed_view.own_fleets.end() && armed_row->military_order_quote,
+          "Selected armed fleet did not receive a military quote.");
+  auto order_quote = *armed_row->military_order_quote;
+  const auto fresh_military_quote = [&] {
+    const auto projected = controller.build(frame, generation + 1);
+    const auto row = std::ranges::find(projected.own_fleets, armed->id, &NativeOwnFleet::id);
+    require(row != projected.own_fleets.end() && row->military_order_quote, "Military quote refresh failed.");
+    return *row->military_order_quote;
+  };
+  armed->transit_progress += .001;
+  const auto advancing_progress = armed->transit_progress;
+  const auto advancing_route = armed->planned_route_system_ids;
+  require(fresh_military_quote() == order_quote &&
+              controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted &&
+              armed->transit_progress == advancing_progress && armed->planned_route_system_ids == advancing_route,
+          "Ordinary travel progress cancelled a valid click or Hold changed the route.");
+  order_quote = fresh_military_quote();
+  armed->combat->target_fleet_id = 999;
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "An intervening attack target change did not invalidate the military quote.");
+  armed->combat->target_fleet_id.reset();
+  const auto target_refreshed = controller.build(frame, generation + 1);
+  order_quote = *std::ranges::find(target_refreshed.own_fleets, armed->id,
+                                    &NativeOwnFleet::id)->military_order_quote;
+  armed->combat->order = MilitaryOrderType::Retreat;
+  armed->combat->retreat_started = true;
+  armed->combat->retreat_progress_days = .5;
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "An intervening retreat change did not invalidate the military quote.");
+  armed->combat = create_initial_fleet_combat_state(std::nullopt, FleetRole::Military);
+  const auto retreat_refreshed = controller.build(frame, generation + 1);
+  order_quote = *std::ranges::find(retreat_refreshed.own_fleets, armed->id,
+                                    &NativeOwnFleet::id)->military_order_quote;
+  const auto defended_system = *armed->current_system_id;
+  const auto defend = controller.issue_selected_military_order(frame, order_quote,
+                                                                MilitaryOrderType::Defend);
+  require(defend.accepted && armed->combat->order == MilitaryOrderType::Defend &&
+              armed->combat->defend_system_id == defended_system,
+          "Defend did not bind the live current system through Core.");
+  const auto command_view = controller.build(frame, generation + 1);
+  order_quote = *std::ranges::find(command_view.own_fleets, armed->id,
+                                    &NativeOwnFleet::id)->military_order_quote;
+  for (const auto altered : {0, 1}) {
+    auto tampered_order = order_quote;
+    if (altered == 0) ++tampered_order.campaign_generation;
+    else ++tampered_order.observer_id;
+    require(!controller.issue_selected_military_order(frame, tampered_order, MilitaryOrderType::Hold).accepted,
+            "Generation or observer tampering reached the military command.");
+  }
+  const auto other = std::ranges::find_if(world.fleets, [&](const auto &fleet) {
+    return fleet.id != armed->id && fleet.is_active && fleet.civilization_id == view.player_civilization_id;
+  });
+  require(other != world.fleets.end() && controller.select(frame, generation + 1, other->id).accepted &&
+              !controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "A changed selection retained military authorization.");
+  require(controller.select(frame, generation + 1, armed->id).accepted,
+          "Cannot restore armed selection after stale-command test.");
+  order_quote = fresh_military_quote();
+  armed->combat = create_initial_fleet_combat_state(std::nullopt, FleetRole::Scout);
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "An unarmed live fleet retained military authorization.");
+  armed->combat = create_initial_fleet_combat_state(std::nullopt, FleetRole::Military);
+  order_quote = fresh_military_quote();
+  armed->is_active = false;
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "A removed fleet retained military authorization.");
+  armed->is_active = true;
+  order_quote = fresh_military_quote();
+  const auto original_owner = armed->civilization_id;
+  armed->civilization_id = original_owner + 1;
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "A foreign fleet retained military authorization.");
+  armed->civilization_id = original_owner;
+  order_quote = fresh_military_quote();
+  world.active_combat_encounter = CampaignMassiveEncounter{.system_id = defended_system};
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "Strategic military order was accepted during tactical combat.");
+  world.active_combat_encounter.reset();
+  // The duplicate test is deliberately last: vector growth may invalidate
+  // `armed`, and a duplicate ID must never be dispatched through Core.
+  const auto duplicate = *armed;
+  world.fleets.push_back(duplicate);
+  require(!controller.issue_selected_military_order(frame, order_quote, MilitaryOrderType::Hold).accepted,
+          "Duplicate fleet identity retained military authorization.");
 }
 
 void civilian_recovery(CampaignFrame &frame) {
@@ -272,6 +370,22 @@ void civilian_recovery(CampaignFrame &frame) {
     return *selected->recovery;
   };
   auto first = quote();
+  {
+    const auto projected = controller.build(frame, generation);
+    const auto selected = std::ranges::find(projected.own_fleets, id, &NativeOwnFleet::id);
+    require(selected != projected.own_fleets.end() && selected->locate,
+            "Selected owned civilian fleet has no Locate quote.");
+    const auto before_position = colony.position;
+    const auto located = controller.locate_selected(frame, *selected->locate);
+    require(located.accepted && located.fleet_id == id &&
+                located.position.x == before_position.x && located.position.y == before_position.y &&
+                colony.position.x == before_position.x && colony.position.y == before_position.y,
+            "Locate did not resolve the authoritative owned position read-only.");
+    auto stale_locate = *selected->locate;
+    ++stale_locate.mission_order_revision;
+    require(!controller.locate_selected(frame, stale_locate).accepted,
+            "Tampered Locate quote was accepted.");
+  }
   require(controller.issue_civilian_recovery(frame, first, NativeCivilianRecoveryAction::Hold).accepted &&
           colony.hold_requested && colony.destination_system_id == original.destination_system_id,
           "Hold failed or replaced existing mission.");

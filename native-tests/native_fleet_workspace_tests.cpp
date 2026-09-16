@@ -16,9 +16,11 @@ void require(bool value, const char *message) {
 }
 
 [[nodiscard]] bool contained(UiRect outer, UiRect inner) noexcept {
-  return inner.x >= outer.x && inner.y >= outer.y &&
-         inner.x + inner.width <= outer.x + outer.width &&
-         inner.y + inner.height <= outer.y + outer.height;
+  // Layout uses fractional pixels at 1440p/4K; tolerate float roundoff only.
+  constexpr float epsilon = .01f;
+  return inner.x + epsilon >= outer.x && inner.y + epsilon >= outer.y &&
+         inner.x + inner.width <= outer.x + outer.width + epsilon &&
+         inner.y + inner.height <= outer.y + outer.height + epsilon;
 }
 
 [[nodiscard]] Point center(UiRect bounds) noexcept {
@@ -84,7 +86,16 @@ int main() try {
                 contained(layout.panel, layout.details) &&
                 contained(layout.panel, layout.route) &&
                 contained(layout.panel, layout.feedback) &&
-                contained(layout.panel, layout.confirm),
+                contained(layout.panel, layout.confirm) &&
+                contained(layout.details, layout.order_hold) &&
+                contained(layout.details, layout.order_defend) &&
+                contained(layout.details, layout.order_retreat) &&
+                contained(layout.details, layout.civilian_locate) &&
+                contained(layout.confirm, layout.locate) &&
+                contained(layout.confirm, layout.military_locate) &&
+                contained(layout.confirm, layout.engage) &&
+                layout.order_hold.x + layout.order_hold.width < layout.order_defend.x &&
+                layout.order_defend.x + layout.order_defend.width < layout.order_retreat.x,
             "Fleet workspace escaped its viewport.");
   }
 
@@ -188,7 +199,7 @@ int main() try {
   warship.combat_status = stellar::core::OwnCombatFleetStatus{};
   warship.combat_status->is_armed = true;
   const auto engage_click = [&] {
-    return engagement.handle({InputEventType::LeftPressed, center(layout.confirm)},
+    return engagement.handle({InputEventType::LeftPressed, center(layout.engage)},
                              1280, 720, markers, std::nullopt).kind;
   };
   engagement.set_view(armed);
@@ -221,6 +232,64 @@ int main() try {
   require(engage_click() == FleetWorkspaceCommandKind::Confirm,
           "Engagement replaced an explicit travel confirmation.");
 
+  {
+    NativeFleetWorkspace strategic;
+    auto tactical = armed;
+    auto &fleet = tactical.own_fleets.front();
+    fleet.military_order_quote = NativeMilitaryOrderQuote{
+        .campaign_generation=4,.token=9,.observer_id=0,.fleet_id=10,
+        .mission_order_revision=fleet.mission_order_revision,
+        .role=stellar::core::FleetRole::Military,.current_system_id=0,
+        .armed=true,.combat_effective=true};
+    fleet.locate = NativeFleetLocateQuote{.campaign_generation=4,.observer_id=0,
+                                          .fleet_id=10,.mission_order_revision=fleet.mission_order_revision};
+    const auto order_quote=*fleet.military_order_quote;
+    const auto locate_quote=*fleet.locate;
+    strategic.set_view(tactical);
+    DrawList tactical_draw;
+    strategic.render(tactical_draw,1280,720,{});
+    require(has_text(tactical_draw,"HOLD")&&has_text(tactical_draw,"DEFEND")&&
+                has_text(tactical_draw,"RETREAT")&&has_text(tactical_draw,"LOCATE")&&
+                has_text(tactical_draw,"Current tactical order Hold"),
+            "Eligible armed fleet did not show strategic choices and Locate.");
+    strategic.set_notice("Persistent command result.",true);
+    (void)strategic.handle({InputEventType::PointerMove,center(layout.order_hold)},1280,720,{},std::nullopt);
+    DrawList help_draw;
+    strategic.render(help_draw,1280,720,{});
+    require(has_text(help_draw,"Hold changes combat stance; it does not stop travel")&&
+                !has_text(help_draw,"Persistent command result."),
+            "Hovered tactical help did not override persistent feedback.");
+    auto command=strategic.handle({InputEventType::LeftPressed,center(layout.order_defend)},1280,720,{},std::nullopt);
+    require(command.captured&&command.kind==FleetWorkspaceCommandKind::None,
+            "Strategic order was issued before its release.");
+    command=strategic.handle({InputEventType::LeftReleased,center(layout.order_defend)},1280,720,{},std::nullopt);
+    require(command.kind==FleetWorkspaceCommandKind::MilitaryOrder&&
+                command.military_order==stellar::core::MilitaryOrderType::Defend&&
+                command.military_order_quote==order_quote,
+            "Strategic order did not retain the displayed quote.");
+    (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_retreat)},1280,720,{},std::nullopt);
+    auto changed=tactical;
+    ++changed.own_fleets.front().military_order_quote->token;
+    strategic.set_view(changed);
+    command=strategic.handle({InputEventType::LeftReleased,center(layout.order_retreat)},1280,720,{},std::nullopt);
+    require(command.kind==FleetWorkspaceCommandKind::None,
+            "Changed military quote retained a pressed action.");
+    (void)strategic.handle({InputEventType::LeftPressed,center(layout.military_locate)},1280,720,{},std::nullopt);
+    command=strategic.handle({InputEventType::LeftReleased,center(layout.military_locate)},1280,720,{},std::nullopt);
+    require(command.kind==FleetWorkspaceCommandKind::Locate&&command.locate_quote==locate_quote,
+            "Locate did not retain its displayed quote.");
+    (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
+    (void)strategic.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
+    command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);
+    require(command.kind==FleetWorkspaceCommandKind::None,
+            "Pointer cancellation retained an armed strategic action.");
+    (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
+    strategic.cancel_recovery();
+    command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);
+    require(command.kind==FleetWorkspaceCommandKind::None,
+            "Public navigation cancellation retained an armed strategic action.");
+  }
+
   auto revised = player_view(true);
   {
     NativeFleetWorkspace recovery;
@@ -229,7 +298,11 @@ int main() try {
         .campaign_generation=4, .observer_id=0, .fleet_id=10,
         .role=stellar::core::FleetRole::Colony, .destination_body=4,
         .settlement_body=4, .settlement_days=3.5};
+    view.own_fleets.front().locate = NativeFleetLocateQuote{
+        .campaign_generation=4,.observer_id=0,.fleet_id=10,
+        .mission_order_revision=view.own_fleets.front().mission_order_revision};
     const auto quote = *view.own_fleets.front().recovery;
+    const auto locate_quote = *view.own_fleets.front().locate;
     recovery.set_view(view);
     const auto click = [&](UiRect bounds) {
       return recovery.handle({InputEventType::LeftPressed,center(bounds)},1280,720,{},std::nullopt);
@@ -238,6 +311,14 @@ int main() try {
     require(hold.kind == FleetWorkspaceCommandKind::Recovery && hold.recovery_quote == quote &&
             hold.recovery_action == NativeCivilianRecoveryAction::Hold && !hold.confirm_abandon,
             "Hold click lost the displayed mission identity.");
+    DrawList recovery_draw;
+    recovery.render(recovery_draw,1280,720,{});
+    require(has_text(recovery_draw,"LOCATE")&&has_text(recovery_draw,"RETURN TO BASE"),
+            "Civilian recovery did not retain both recovery controls and Locate.");
+    (void)recovery.handle({InputEventType::LeftPressed,center(layout.civilian_locate)},1280,720,{},std::nullopt);
+    const auto locate=recovery.handle({InputEventType::LeftReleased,center(layout.civilian_locate)},1280,720,{},std::nullopt);
+    require(locate.kind==FleetWorkspaceCommandKind::Locate&&locate.locate_quote==locate_quote,
+            "Civilian Locate did not bind its displayed quote.");
     const auto initial = click(layout.recovery_right);
     require(initial.recovery_action == NativeCivilianRecoveryAction::ReturnToBase && !initial.confirm_abandon,
             "First return click authorized abandonment.");

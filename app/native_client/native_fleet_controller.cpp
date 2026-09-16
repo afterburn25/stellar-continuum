@@ -30,6 +30,9 @@ struct PlayerContext {
   auto &runtime = frame.runtime();
   auto &simulation = runtime.world();
   auto &world = simulation.campaign();
+  if (std::ranges::count(world.civilizations, world.player_civilization_id,
+                         &Civilization::id) != 1)
+    throw std::runtime_error("The campaign has no unique player civilization.");
   const auto player = std::ranges::find(world.civilizations,
                                          world.player_civilization_id,
                                          &Civilization::id);
@@ -39,6 +42,8 @@ struct PlayerContext {
 }
 
 [[nodiscard]] FleetState *find_owned(PlayerContext &player, int fleet_id) {
+  if (std::ranges::count(player.world.fleets, fleet_id, &FleetState::id) != 1)
+    return nullptr;
   const auto found = std::ranges::find(player.world.fleets, fleet_id,
                                         &FleetState::id);
   return found != player.world.fleets.end() && found->is_active &&
@@ -56,6 +61,24 @@ struct PlayerContext {
   case FleetRole::Logistics: return InterstellarMissionKind::Logistics;
   }
   return InterstellarMissionKind::MilitaryDeployment;
+}
+
+[[nodiscard]] bool tactical_for(const FreshCampaignState &world, const int fleet_id) {
+  return world.active_combat_encounter && !world.active_combat_encounter->reconciled &&
+      std::ranges::any_of(world.active_combat_encounter->vessels,
+                          [fleet_id](const auto &binding) { return binding.fleet_id == fleet_id; });
+}
+
+[[nodiscard]] NativeMilitaryOrderQuote military_quote(
+    const FleetState &fleet, const OwnCombatFleetStatus &status,
+    const std::uint64_t generation, const int observer, const bool tactical) {
+  return {generation, 0, observer, fleet.id, fleet.mission_order_revision, fleet.role,
+          fleet.current_system_id, fleet.destination_system_id, status.defend_system_id,
+          fleet.transit_phase, fleet.planned_route_system_ids,
+          status.current_order, fleet.combat ? fleet.combat->target_fleet_id : std::nullopt,
+          fleet.combat && fleet.combat->retreat_started,
+          status.is_armed, status.is_combat_effective,
+          status.is_disengaged, tactical};
 }
 
 [[nodiscard]] NativeCivilianRecoveryQuote recovery_quote(
@@ -90,7 +113,7 @@ void NativeFleetController::bind_generation(
     throw std::invalid_argument(
         "A stale campaign generation cannot replace the current fleet view.");
   if (generation_ && *generation_ != campaign_generation)
-    selected_fleet_id_.reset();
+    selected_fleet_id_.reset(), military_order_quote_.reset();
   generation_ = campaign_generation;
 }
 
@@ -110,7 +133,8 @@ NativeFleetMapView NativeFleetController::build(
   result.campaign_generation = campaign_generation;
   result.player_civilization_id = player.player_id;
   for (const auto &fleet : player.world.fleets) {
-    if (!fleet.is_active || fleet.civilization_id != player.player_id) continue;
+    if (!fleet.is_active || fleet.civilization_id != player.player_id ||
+        std::ranges::count(player.world.fleets, fleet.id, &FleetState::id) != 1) continue;
     NativeOwnFleet item{
         .id = fleet.id,
         .name = fleet.name,
@@ -156,7 +180,7 @@ NativeFleetMapView NativeFleetController::build(
   if (selected_fleet_id_ && find_owned(player, *selected_fleet_id_))
     result.selected_fleet_id = selected_fleet_id_;
   else
-    selected_fleet_id_.reset();
+    selected_fleet_id_.reset(), military_order_quote_.reset();
   if (result.selected_fleet_id) {
     auto selected = std::ranges::find(result.own_fleets, *result.selected_fleet_id,
                                      &NativeOwnFleet::id);
@@ -171,6 +195,26 @@ NativeFleetMapView NativeFleetController::build(
         // Route planning belongs to the explicit order, not a 10 Hz outliner
         // refresh. Core reports reachability and paid-work confirmation there.
         selected->recovery_message = "Return to the nearest reachable owned refuelling settlement. Paid colony work requires confirmation.";
+    }
+    if (selected != result.own_fleets.end()) {
+      const auto status = status_by_id.find(selected->id);
+      const auto *live = find_owned(player, selected->id);
+      const bool tactical_active = player.world.active_combat_encounter &&
+                                   !player.world.active_combat_encounter->reconciled;
+      if (live && status != status_by_id.end() && status->second.is_armed &&
+          !tactical_active) {
+        auto quote = military_quote(*live, status->second, campaign_generation,
+                                    player.player_id, false);
+        if (military_order_quote_) quote.token = military_order_quote_->token;
+        if (!military_order_quote_ || *military_order_quote_ != quote) {
+          if (next_military_quote_token_ == 0) throw std::overflow_error("Military quote token exhausted.");
+          quote.token = next_military_quote_token_++;
+          military_order_quote_ = quote;
+        }
+        selected->military_order_quote = military_order_quote_;
+      } else military_order_quote_.reset();
+      selected->locate = NativeFleetLocateQuote{campaign_generation, player.player_id,
+                                                 selected->id, selected->mission_order_revision};
     }
   }
   return result;
@@ -187,6 +231,7 @@ NativeFleetSelectionOutcome NativeFleetController::select(
   if (!fleet)
     return {false, "That owned fleet is no longer available."};
   selected_fleet_id_ = fleet->id;
+  military_order_quote_.reset();
   return {true, fleet->name + " selected."};
 }
 
@@ -215,12 +260,14 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
                         : current;
   const auto *fleet = find_owned(player, *next);
   selected_fleet_id_ = *next;
+  military_order_quote_.reset();
   return {true, fleet->name + " selected."};
 }
 
 void NativeFleetController::clear_selection() {
   require_owner();
   selected_fleet_id_.reset();
+  military_order_quote_.reset();
 }
 
 NativeFleetRoutePreview NativeFleetController::preview_selected_route(
@@ -373,6 +420,60 @@ NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
   const auto *current = find_owned(player, id);
   return {accepted, std::move(message), current ? current->mission_order_revision : 0,
           confirmation};
+}
+
+NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
+    CampaignFrame &frame, const NativeMilitaryOrderQuote &quote,
+    const MilitaryOrderType type) {
+  require_owner();
+  if (type != MilitaryOrderType::Hold && type != MilitaryOrderType::Defend &&
+      type != MilitaryOrderType::Retreat)
+    return {false, "Unknown military order."};
+  if (!generation_ || *generation_ != quote.campaign_generation ||
+      !military_order_quote_ || *military_order_quote_ != quote ||
+      selected_fleet_id_ != quote.fleet_id)
+    return {false, "The military order changed; refresh fleet details first."};
+  auto player = context(frame);
+  if (player.player_id != quote.observer_id ||
+      (player.world.active_combat_encounter && !player.world.active_combat_encounter->reconciled))
+    return {false, "Strategic military orders are unavailable during tactical combat."};
+  auto *fleet = find_owned(player, quote.fleet_id);
+  if (!fleet)
+    return {false, "Select an active owned armed military fleet."};
+  const auto statuses = player.runtime.core().get_own_combat_fleet_status(
+      &player.simulation, player.player_id);
+  const auto status = std::ranges::find(statuses.fleets, fleet->id,
+                                        &OwnCombatFleetStatus::fleet_id);
+  if (status == statuses.fleets.end() || !status->is_armed)
+    return {false, "Select an active owned armed military fleet.", fleet->mission_order_revision};
+  auto current = military_quote(*fleet, *status, *generation_, player.player_id,
+                                tactical_for(player.world, fleet->id));
+  current.token = quote.token;
+  if (current != quote)
+    return {false, "Fleet orders changed; refresh fleet details first.", fleet->mission_order_revision};
+  const auto outcome = player.runtime.core().issue_military_order(
+      &player.simulation, player.player_id, fleet->id,
+      MilitaryOrder{type, {}, type == MilitaryOrderType::Defend ? fleet->current_system_id : std::nullopt});
+  military_order_quote_.reset();
+  const auto *after = find_owned(player, quote.fleet_id);
+  return {outcome.accepted, outcome.message,
+          after ? after->mission_order_revision : quote.mission_order_revision};
+}
+
+NativeFleetLocateOutcome NativeFleetController::locate_selected(
+    CampaignFrame &frame, const NativeFleetLocateQuote &quote) {
+  require_owner();
+  if (!generation_ || *generation_ != quote.campaign_generation ||
+      selected_fleet_id_ != quote.fleet_id)
+    return {false, "The fleet selection changed; refresh fleet details first."};
+  auto player = context(frame);
+  if (player.player_id != quote.observer_id)
+    return {false, "The fleet observer changed; refresh fleet details first."};
+  const auto *fleet = find_owned(player, quote.fleet_id);
+  if (!fleet || fleet->mission_order_revision != quote.mission_order_revision)
+    return {false, "That owned fleet is no longer at its displayed position."};
+  return {true, fleet->name + " located.", fleet->id, fleet->current_system_id,
+          fleet->position};
 }
 
 } // namespace stellar::native_fleet

@@ -84,3 +84,11 @@ Gate109 adds a maintained fleet export validator and nine negative/positive Pyth
 The combined engine0.1.46 run passed 118 CTest and 57 Python checks, plus all six actual map/research/fleet launches. Ordered and loaded 1280x720 captures were inspected. The current point-map and fleet markers remain functional migration visuals, not detailed ship artwork or the finished game.
 
 Engine0.1.57 adds approved ship artwork and authorized route effects. `native_ship_art_assets` resolves design_id-then-role artwork from six reviewed images through a single-decode 6-entry/4MiB cache downsampled to 224px thumbnails; fleet rows and details render them alongside `NativeOwnFleet.design_id`. `native_fleet_route_effects` appends faint under-strokes, dashes, chevron arrowheads and bounded trail strokes for active owned fleets matching the Godot map, including legs through unsurveyed systems because own route geometry is player-authorized while foreign contacts remain unplaced. `native_ship_art_runtime` authors a shipyard-capable save, demands six decoded sources, exact cache bytes, fleet/shipyard art rows and route evidence, then verifies paused reload equality.
+
+
+## Strategic orders and Locate (2026-09-16)
+
+The native panel now exposes controller-token-bound Hold/Defend/Retreat and
+read-only Locate, including civilian Locate alongside recovery. See
+[NATIVE_MILITARY_ORDERS.md](NATIVE_MILITARY_ORDERS.md) for the authoritative command,
+continuous-progress, input cancellation and maintained export proof contracts.

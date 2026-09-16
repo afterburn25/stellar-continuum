@@ -252,7 +252,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
-  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{};
+  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -280,6 +280,7 @@ struct Options {
     else if(arg==L"--video-settings-check") result.video_settings_check=true;
     else if(arg==L"--logistics-check") result.logistics_check=true;
     else if(arg==L"--economy-check") result.economy_check=true;
+    else if(arg==L"--military-check") result.military_check=true;
     else if(arg==L"--inspection-check") result.inspection_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg==L"--load") result.load=true;
@@ -322,6 +323,7 @@ struct Options {
     else if(arg=="--video-settings-check") result.video_settings_check=true;
     else if(arg=="--logistics-check") result.logistics_check=true;
     else if(arg=="--economy-check") result.economy_check=true;
+    else if(arg=="--military-check") result.military_check=true;
     else if(arg=="--inspection-check") result.inspection_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg=="--load") result.load=true;
@@ -355,6 +357,7 @@ struct Options {
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
   if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
+  if(result.military_check&&(!result.menu_smoke||!result.load))throw std::invalid_argument("--military-check requires an isolated --load --smoke invocation.");
   if(result.economy_check&&!result.menu_smoke)throw std::invalid_argument("--economy-check requires an isolated --smoke invocation.");
   if(result.logistics_check&&!result.menu_smoke)throw std::invalid_argument("--logistics-check requires an isolated --smoke invocation.");
   if(result.inspection_check&&!result.menu_smoke)throw std::invalid_argument("--inspection-check requires an isolated --smoke invocation.");
@@ -580,6 +583,83 @@ class NativeCampaign final {
   void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  [[nodiscard]] std::string military_smoke(int width,int height,
+      const std::function<void(const DrawList&,std::string_view)>& draw) {
+    if(!menu_||settings_visible()||session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("Military proof requires the paused campaign menu.");
+    const PlayerCampaignCaptureOptions capture_options{session_->frame().clock().simulation_days(),
+      STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"};
+    auto expected=capture_player_campaign_v17(session_->frame().runtime(),capture_options);
+    const auto route=[&](std::vector<InputEvent> events){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=events.empty()?Point{}:events.back().position;input.events=std::move(events);
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Military input exited the game.");
+    };
+    const auto click=[&](Point point){route({{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}});};
+    const auto ui=NativeUiLayout::for_viewport(width,height);
+    route({{InputEventType::EscapePressed}});
+    const bool restore_running=session_->frame().clock().speed()!=StrategicSpeed::Paused;
+    if(restore_running)click(center(ui.pause));
+    const auto layout=FleetWorkspaceLayout::for_viewport(width,height);
+    const auto& fleets=fleet_workspace_.view()->own_fleets;
+    const auto military=std::ranges::find_if(fleets,[](const auto& fleet){
+      return fleet.role==FleetRole::Military&&fleet.current_system_id&&
+             fleet.combat_status&&fleet.combat_status->is_armed;});
+    if(military==fleets.end())throw std::runtime_error("Military proof needs an owned armed fixture.");
+    const int fleet_id=military->id;
+    const auto index=static_cast<std::size_t>(military-fleets.begin());
+    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
+    if(fleet_controller_.selection()!=fleet_id)throw std::runtime_error("Military mouse selection failed.");
+    const auto live=[&]()->const FleetState&{
+      const auto& all=session_->frame().runtime().world().campaign().fleets;
+      const auto found=std::ranges::find(all,fleet_id,&FleetState::id);
+      if(found==all.end()||!found->combat)throw std::runtime_error("Military proof lost its ship.");
+      return *found;
+    };
+    if(!expected.galaxy.fleets)throw std::runtime_error("Military proof has no fleet payload.");
+    auto saved=std::ranges::find(*expected.galaxy.fleets,fleet_id,&FleetSaveDto::id);
+    if(saved==expected.galaxy.fleets->end()||!saved->combat)
+      throw std::runtime_error("Military proof has no combat payload.");
+    saved->combat->order=MilitaryOrderType::Defend;
+    saved->combat->defend_system_id=live().current_system_id;
+    draw(scene(width,height),"ready");
+    const auto order=[&](UiRect button,MilitaryOrderType type){
+      click(center(button));
+      if(!last_fleet_command_accepted_||live().combat->order!=type||
+         live().combat->target_fleet_id||
+         live().combat->defend_system_id!=(type==MilitaryOrderType::Defend?live().current_system_id:std::nullopt))
+        throw std::runtime_error("Military mouse order did not reach canonical Core.");
+    };
+    order(layout.order_hold,MilitaryOrderType::Hold);
+    order(layout.order_defend,MilitaryOrderType::Defend);
+    order(layout.order_retreat,MilitaryOrderType::Retreat);
+    draw(scene(width,height),"retreat");
+    order(layout.order_hold,MilitaryOrderType::Hold);
+    order(layout.order_defend,MilitaryOrderType::Defend);
+    const auto before_locate=encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options));
+    const auto zoom=camera_.pixels_per_world;
+    click(center(layout.military_locate));
+    if(!last_fleet_command_accepted_||fleet_controller_.selection()!=fleet_id||
+       camera_.center.x!=live().position.x||camera_.center.y!=live().position.y||
+       camera_.pixels_per_world!=zoom||
+       encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options))!=before_locate)
+      throw std::runtime_error("Military Locate changed gameplay, selection, or zoom.");
+    draw(scene(width,height),"located");
+    if(restore_running)click(center(ui.pause));
+    route({{InputEventType::EscapePressed}});
+    if(!menu_||session_->frame().clock().simulation_days()!=capture_options.simulation_days||
+       encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options))!=
+       encode_player_campaign_v17_json(expected))
+      throw std::runtime_error("Military input changed campaign state beyond the authorized Defend order.");
+    click(center(ui.save_button));
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+    while(!smoke_save_succeeded()&&std::chrono::steady_clock::now()<deadline){
+      route({});std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if(!smoke_save_succeeded())throw std::runtime_error("Military order was not saved.");
+    return "{\"selection\":true,\"hold\":true,\"defend\":true,\"retreat\":true,"
+      "\"locate\":true,\"zoom_preserved\":true,\"only_order_changed\":true,\"order_saved\":true}";
+  }
   [[nodiscard]] std::string economy_smoke(int width,int height,
       const std::function<void(const DrawList&,std::string_view)>& draw) {
     using namespace stellar::native_economy;
@@ -1610,6 +1690,17 @@ class NativeCampaign final {
        state().planned_route_system_ids!=before.planned_route_system_ids)
       throw std::runtime_error("Recovery smoke changed the original mission.");
     smoke_civilian_recovery_=true;
+    const PlayerCampaignCaptureOptions capture_options{session_->frame().clock().simulation_days(),
+      STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"};
+    const auto payload=encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options));
+    const auto zoom=camera_.pixels_per_world;
+    click(center(layout.civilian_locate));
+    if(!last_fleet_command_accepted_||fleet_controller_.selection()!=recovery_id||
+       camera_.center.x!=state().position.x||camera_.center.y!=state().position.y||
+       camera_.pixels_per_world!=zoom||
+       encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options))!=payload)
+      throw std::runtime_error("Civilian Locate changed gameplay, selection, or zoom.");
+    smoke_fleet_located_=true;
     click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
   }
   void prepare_shipyard_smoke(int width,int height){
@@ -2217,7 +2308,8 @@ class NativeCampaign final {
     out<<found->id<<":"<<*smoke_fleet_destination_<<":"
        <<found->mission_order_revision<<":"<<std::fixed
        <<std::setprecision(6)<<found->transit_progress
-       <<" civilian_recovery="<<(smoke_civilian_recovery_?1:0);
+       <<" civilian_recovery="<<(smoke_civilian_recovery_?1:0)
+       <<" fleet_located="<<(smoke_fleet_located_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -3813,6 +3905,30 @@ class NativeCampaign final {
       refresh_system_travel(true);
       return;
     }
+    if(command.kind==FleetWorkspaceCommandKind::MilitaryOrder){
+      if(!command.military_order_quote)return;
+      const auto outcome=fleet_controller_.issue_selected_military_order(
+          session_->frame(),*command.military_order_quote,command.military_order);
+      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      last_fleet_command_accepted_=outcome.accepted;
+      if(outcome.accepted){
+        pending_fleet_preview_.reset();fleet_workspace_.clear_preview();
+        publish_notification("Fleet",message);if(audio_confirm_)audio_confirm_();
+      }
+      fleet_workspace_.set_notice(message,outcome.accepted);
+      refresh_fleets(true);refresh_system_travel(true);return;
+    }
+    if(command.kind==FleetWorkspaceCommandKind::Locate){
+      if(!command.locate_quote)return;
+      const auto outcome=fleet_controller_.locate_selected(session_->frame(),*command.locate_quote);
+      last_fleet_command_accepted_=outcome.accepted;
+      if(outcome.accepted){
+        camera_.center={outcome.position.x,outcome.position.y};
+        if(audio_confirm_)audio_confirm_();
+      }
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      refresh_fleets(true);return;
+    }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
       fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
@@ -4038,6 +4154,7 @@ class NativeCampaign final {
   std::size_t smoke_ship_art_bytes_{};
   std::optional<int> smoke_fleet_id_;
   bool smoke_civilian_recovery_{};
+  bool smoke_fleet_located_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{},smoke_system_focused_{};
   double smoke_system_day_{};
@@ -4440,6 +4557,11 @@ int main(int argc,char **argv){
           std::cout<<"body_inspection="<<campaign.body_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-body-details"));
+              })<<'\n';
+        if(options.military_check)
+          std::cout<<"military_inspection="<<campaign.military_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="ready"?L"-military-ready":stage=="retreat"?L"-military-retreat":L"-military-located"));
               })<<'\n';
         if(options.economy_check)
           std::cout<<"economy_inspection="<<campaign.economy_smoke(

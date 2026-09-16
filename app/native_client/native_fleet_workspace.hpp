@@ -31,6 +31,13 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect confirm;
   stellar::native_map::UiRect recovery_left;
   stellar::native_map::UiRect recovery_right;
+  stellar::native_map::UiRect order_hold;
+  stellar::native_map::UiRect order_defend;
+  stellar::native_map::UiRect order_retreat;
+  stellar::native_map::UiRect locate;
+  stellar::native_map::UiRect military_locate;
+  stellar::native_map::UiRect civilian_locate;
+  stellar::native_map::UiRect engage;
 
   [[nodiscard]] static FleetWorkspaceLayout for_viewport(int width,
                                                           int height) noexcept;
@@ -43,6 +50,8 @@ enum class FleetWorkspaceCommandKind {
   Preview,
   Confirm,
   Engage,
+  MilitaryOrder,
+  Locate,
   Recovery
 };
 
@@ -55,6 +64,9 @@ struct FleetWorkspaceCommand {
   std::optional<stellar::native_fleet::NativeCivilianRecoveryQuote> recovery_quote;
   stellar::native_fleet::NativeCivilianRecoveryAction recovery_action{};
   bool confirm_abandon{};
+  std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> military_order_quote;
+  stellar::core::MilitaryOrderType military_order{stellar::core::MilitaryOrderType::Hold};
+  std::optional<stellar::native_fleet::NativeFleetLocateQuote> locate_quote;
 };
 
 class NativeFleetWorkspace final {
@@ -90,8 +102,12 @@ public:
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
 
 private:
+  enum class PressTarget { None, Hold, Defend, Retreat, Locate };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
   selected_fleet() const noexcept;
+  void clear_pressed_action() noexcept;
+  [[nodiscard]] PressTarget pressed_target_at(
+      stellar::native_map::Point, const FleetWorkspaceLayout &) const noexcept;
 
   std::optional<stellar::native_fleet::NativeFleetMapView> view_;
   std::optional<stellar::native_fleet::NativeFleetRoutePreview> preview_;
@@ -102,6 +118,10 @@ private:
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
   float list_scroll_{};
+  PressTarget pressed_action_{PressTarget::None};
+  stellar::native_map::UiRect pressed_bounds_{};
+  std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;
+  std::optional<stellar::native_fleet::NativeFleetLocateQuote> pressed_locate_quote_;
   mutable int last_ship_art_rows_{};
 };
 

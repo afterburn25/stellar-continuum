@@ -5,7 +5,43 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
-### Sovereign Treasury and industry priorities
+### Strategic fleet orders and Locate
+
+Native fleet controls selectively adapt Devin `e8672801`: owned armed fleets
+receive Hold, Defend and Retreat controls with current order and pre-action hover
+explanations. Civilian and military Locate centers the owned fleet without changing
+zoom or issuing an order. Civilian recovery and travel confirmation remain intact.
+Distinct action hit regions, press/release matching, focus/menu cancellation and
+720p detail/art bounds prevent input leaks and clipped information.
+
+Core remains authoritative. Controller-held single-use tokens bind campaign,
+observer, selection, mission, route/phase and combat decision state. Stale, replayed,
+foreign, inactive/duplicate, unarmed and tactical-conflicting orders are rejected.
+Ordinary travel progress does not cancel a valid click; Hold does not stop travel,
+and Retreat does not route home. No Core, C# or Player17 schema changes. Contract:
+`docs/engine/NATIVE_MILITARY_ORDERS.md`.
+
+Validation: MSVC native build; 15 affected CTests (fleet UI retested after correcting
+civilian Locate hit resolution); Python export discovery 468 tests, 451 passed /
+17 optional STELLAR_NATIVE_EXE tests skipped. Two relocated Vulkan military runs at
+720p/1080p exercise actual app input for all orders and Locate. Whole canonical
+Player17 comparison permits only the selected owned ship's final Defend order and
+defended-system field to change. Normal saving and a second process reload preserve
+the whole payload except timestamp. Eight captures, including order/Locate frames,
+were produced; 720p/1080p inspected. Existing relocated fleet travel, tactical battle
+and system-travel/reload suites also pass; civilian Locate proves no gameplay/zoom
+change. Evidence: work/native-military-{build,ctest,python}.log,
+work/native-military-final-ctest.log and native-military-{runtime,fleet,battle,travel}.json.
+
+Next: review Devin `a0f3b102` BMP dimension validation against existing drawable/pixel
+checks, then outstanding authored planet/star rendering against approved Sol/Earth
+art and bounded resource contracts. Generated discs bc681eb6, fe364430/aabde2b1,
+Land/Collect d9d23f57 and colony sites e49f4df0 remain unimported. Latest inventoried
+Devin head e8672801. Shared base ac45d958 and PR332 remain unmerged. The local tested
+package is UNSEALED and not a release download; full 3D visuals and sustained
+performance remain unfinished.
+
+### Previous checkpoint: Sovereign Treasury and industry priorities
 
 The native C++ economy workspace selectively adapts Devin `810d2a6d`. Six compact
 metrics show sovereign reserves, income, recurring expense, net income, stored

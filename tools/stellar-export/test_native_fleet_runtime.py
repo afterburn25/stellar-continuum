@@ -12,7 +12,7 @@ from native_fleet_runtime import validate_native_fleet_export
 class NativeFleetExportTests(unittest.TestCase):
     def exercise(self, *, wrong_owner=False, unchanged=False, zero_advance=False,
                  mutate_load=False, skipped_save=False, already_routed=False,
-                 frozen_time=False, switched_player=False, recovery="1"):
+                 frozen_time=False, switched_player=False, recovery="1", locate="1"):
         with tempfile.TemporaryDirectory(prefix="stellar-fleet-export-test-") as temporary:
             root = Path(temporary)
             package = root / "package"
@@ -67,7 +67,8 @@ class NativeFleetExportTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     args, 0,
                     "gpu_driver=vulkan systems=20 save=" + marker +
-                    " fleet=4:13:3:0.250000 civilian_recovery=" + recovery, "")
+                    " fleet=4:13:3:0.250000 civilian_recovery=" + recovery +
+                    " fleet_located=" + locate, "")
 
             with mock.patch("native_fleet_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_fleet_export(package, {}, fixture)
@@ -85,6 +86,11 @@ class NativeFleetExportTests(unittest.TestCase):
         for value in ("", "0", "10", "true"):
             with self.subTest(value=value), self.assertRaisesRegex(RuntimeError,"civilian hold/resume"):
                 self.exercise(recovery=value)
+
+    def test_missing_or_failed_locate_is_rejected(self):
+        for value in ("", "0", "10", "true"):
+            with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, "Locate"):
+                self.exercise(locate=value)
 
     def test_wrong_owner_cannot_count_as_player_order(self):
         with self.assertRaisesRegex(RuntimeError, "unique player-owned fleet"):

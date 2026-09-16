@@ -34,6 +34,36 @@ struct NativeCivilianRecoveryQuote {
 
 enum class NativeCivilianRecoveryAction { Hold, Resume, ReturnToBase };
 
+struct NativeMilitaryOrderQuote {
+  std::uint64_t campaign_generation{};
+  std::uint64_t token{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  stellar::core::FleetRole role{};
+  std::optional<int> current_system_id, destination_system_id, defend_system_id;
+  stellar::core::FleetTransitPhase transit_phase{};
+  // Continuous progress is not authorization: a moving ship must remain clickable.
+  std::vector<int> planned_route_system_ids;
+  stellar::core::MilitaryOrderType current_order{stellar::core::MilitaryOrderType::Hold};
+  std::optional<int> target_fleet_id;
+  bool retreat_started{};
+  bool armed{}, combat_effective{}, disengaged{}, tactical_encounter_active{};
+  bool operator==(const NativeMilitaryOrderQuote &) const = default;
+};
+
+struct NativeFleetLocateQuote {
+  std::uint64_t campaign_generation{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  bool operator==(const NativeFleetLocateQuote &) const = default;
+};
+
+struct NativeFleetLocateOutcome {
+  bool accepted{};
+  std::string message;
+  int fleet_id{};
+  std::optional<int> current_system_id;
+  stellar::core::Vec2 position{};
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -53,6 +83,8 @@ struct NativeOwnFleet {
   std::optional<stellar::core::OwnCombatFleetStatus> combat_status;
   double combat_power{};
   std::optional<NativeCivilianRecoveryQuote> recovery;
+  std::optional<NativeMilitaryOrderQuote> military_order_quote;
+  std::optional<NativeFleetLocateQuote> locate;
   std::string recovery_message;
 };
 
@@ -126,6 +158,11 @@ public:
   [[nodiscard]] NativeFleetOrderOutcome issue_civilian_recovery(
       stellar::core::CampaignFrame &, const NativeCivilianRecoveryQuote &,
       NativeCivilianRecoveryAction, bool confirm_abandon = false);
+  [[nodiscard]] NativeFleetOrderOutcome issue_selected_military_order(
+      stellar::core::CampaignFrame &, const NativeMilitaryOrderQuote &,
+      stellar::core::MilitaryOrderType);
+  [[nodiscard]] NativeFleetLocateOutcome locate_selected(
+      stellar::core::CampaignFrame &, const NativeFleetLocateQuote &);
   [[nodiscard]] std::optional<int> selection() const;
 
 private:
@@ -135,6 +172,8 @@ private:
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::optional<int> selected_fleet_id_;
+  std::optional<NativeMilitaryOrderQuote> military_order_quote_;
+  std::uint64_t next_military_quote_token_{1};
 };
 
 } // namespace stellar::native_fleet
