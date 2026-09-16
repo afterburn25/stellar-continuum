@@ -1,9 +1,11 @@
 #pragma once
 
+#include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 
@@ -16,6 +18,8 @@ struct NativeStellarDiscAppearance {
   stellar::native_map::Color spectral_color{213, 217, 214, 255};
   bool black_hole{};
   std::uint32_t deterministic_seed{};
+  // Approved photographic sprite class; absent or BlackHole stays procedural.
+  std::optional<stellar::core::StellarClass> stellar_class;
 };
 
 struct NativeCelestialAppearanceStats {
@@ -31,6 +35,8 @@ public:
 
   NativeCelestialAppearanceRenderer();
   ~NativeCelestialAppearanceRenderer();
+  // Directory containing assets/visual/stars; empty keeps procedural discs.
+  void set_asset_root(std::filesystem::path);
   NativeCelestialAppearanceRenderer(NativeCelestialAppearanceRenderer &&) noexcept;
   NativeCelestialAppearanceRenderer &
   operator=(NativeCelestialAppearanceRenderer &&) noexcept;

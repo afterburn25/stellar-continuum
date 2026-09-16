@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <limits>
+#include <map>
 #include <ranges>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -178,13 +181,38 @@ std::shared_ptr<const RgbaImage> make_ring(
   }
   return RgbaImage::create(size, size, std::move(rgba));
 }
+std::optional<std::string> star_sprite_key(core::StellarClass kind) {
+  switch (kind) {
+    case core::StellarClass::MRedDwarf: return "star-m-dwarf";
+    case core::StellarClass::KOrangeDwarf: return "star-k-dwarf";
+    case core::StellarClass::GYellowDwarf: return "star-g-dwarf";
+    case core::StellarClass::FYellowWhiteDwarf: return "star-f-dwarf";
+    case core::StellarClass::AWhiteStar: return "star-a-white";
+    case core::StellarClass::HotBlueStar: return "star-hot-blue";
+    case core::StellarClass::Giant: return "star-giant";
+    case core::StellarClass::WhiteDwarf: return "star-white-dwarf";
+    case core::StellarClass::NeutronStar: return "star-neutron";
+    case core::StellarClass::Protostar: return "star-protostar";
+    case core::StellarClass::Pulsar: return "star-pulsar";
+    case core::StellarClass::BlackHole: default: return std::nullopt;
+  }
+}
 } // namespace
-
 struct NativeCelestialAppearanceRenderer::Storage {
-  struct Key { Color color{}; std::uint32_t seed{}; bool black_hole{}, ring{}, front{}; stellar::native_system::NativeSystemRingClass ring_kind{}; bool operator==(const Key&other)const noexcept{return color.r==other.color.r&&color.g==other.color.g&&color.b==other.color.b&&color.a==other.color.a&&seed==other.seed&&black_hole==other.black_hole&&ring==other.ring&&front==other.front&&ring_kind==other.ring_kind;} };
+  struct Key { Color color{}; std::uint32_t seed{}; bool black_hole{}, ring{}, front{}; stellar::native_system::NativeSystemRingClass ring_kind{}; std::string file_key; bool operator==(const Key&other)const noexcept{return color.r==other.color.r&&color.g==other.color.g&&color.b==other.color.b&&color.a==other.color.a&&seed==other.seed&&black_hole==other.black_hole&&ring==other.ring&&front==other.front&&ring_kind==other.ring_kind&&file_key==other.file_key;} };
   struct Entry { Key key; std::shared_ptr<const RgbaImage> image; std::uint64_t use{}; };
   std::vector<Entry> entries;std::size_t bytes{},generated{};std::uint64_t use{};
+  std::filesystem::path asset_root;
+  std::map<std::string,std::shared_ptr<const RgbaImage>> sprites;
+  std::shared_ptr<const RgbaImage> sprite(const std::string&file_key) {
+    if(const auto found=sprites.find(file_key);found!=sprites.end())return found->second;
+    const auto path=(asset_root/"stars"/(file_key+".png")).u8string();
+    std::shared_ptr<const RgbaImage> image;
+    try{image=decode_rgba_image(std::string(reinterpret_cast<const char*>(path.data()),path.size()));}catch(const std::exception&error){throw std::runtime_error("Stellar appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(path.data()),path.size())+": "+error.what());}
+    return sprites.emplace(file_key,std::move(image)).first->second;
+  }
   std::shared_ptr<const RgbaImage> obtain(Key key) {
+    if(!key.file_key.empty())return sprite(key.file_key);
     const auto found=std::ranges::find(entries,key,&Entry::key);
     if(found!=entries.end()){found->use=++use;return found->image;}
     auto image=key.ring?make_ring(key.front,key.ring_kind):make_star(key.color,key.black_hole,key.seed);
@@ -199,9 +227,12 @@ NativeCelestialAppearanceRenderer::NativeCelestialAppearanceRenderer():storage_(
 NativeCelestialAppearanceRenderer::~NativeCelestialAppearanceRenderer()=default;
 NativeCelestialAppearanceRenderer::NativeCelestialAppearanceRenderer(NativeCelestialAppearanceRenderer&&)noexcept=default;
 NativeCelestialAppearanceRenderer&NativeCelestialAppearanceRenderer::operator=(NativeCelestialAppearanceRenderer&&)noexcept=default;
+void NativeCelestialAppearanceRenderer::set_asset_root(std::filesystem::path root){storage_->asset_root=std::move(root);}
 void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point center,float radius,const NativeStellarDiscAppearance&a,double seconds,std::optional<UiRect>clip){
   if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0||!std::isfinite(seconds))throw std::invalid_argument("Stellar appearance geometry must be finite and positive.");
-  const auto image=storage_->obtain({a.spectral_color,a.deterministic_seed,a.black_hole,false,false});const float extent=radius*2.20f;
+  Storage::Key key{a.spectral_color,a.deterministic_seed,a.black_hole,false,false,{}};
+  if(!a.black_hole&&a.stellar_class&&!storage_->asset_root.empty())if(const auto sprite=star_sprite_key(*a.stellar_class))key.file_key=*sprite;
+  const auto image=storage_->obtain(std::move(key));const float extent=radius*2.20f;
   out.world.emplace_back(Image{image,{center.x-extent,center.y-extent,extent*2,extent*2},std::nullopt,{255,255,255,255},clip});
   if(a.black_hole)return;
   const float seed=static_cast<float>(a.deterministic_seed&65535u);

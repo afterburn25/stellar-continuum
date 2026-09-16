@@ -374,6 +374,7 @@ class NativeCampaign final {
         asset_root_(std::filesystem::absolute(asset_root)),
         audio_mixer_(session_->save_path().parent_path()/"audio-settings.json"),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.image(appearance);},std::move(text_measurer)) {
+    system_workspace_.set_celestial_asset_root(asset_root_/"assets/visual");
     if(audio_mixer_.load_assets(asset_root_))audio_device_.open(audio_mixer_);
     audio_mixer_.complete_startup_loading();
     initialize_voice();

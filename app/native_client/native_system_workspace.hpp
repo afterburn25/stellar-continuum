@@ -104,6 +104,8 @@ public:
   [[nodiscard]] const std::string &notice()const noexcept{return notice_;}
   [[nodiscard]] std::size_t visible_body_count()const noexcept;
   [[nodiscard]] std::vector<stellar::native_system_travel::NativeLocalLaneGeometry> lane_geometry()const;
+  // Directory containing assets/visual/stars; empty keeps procedural stars.
+  void set_celestial_asset_root(std::filesystem::path root){celestial_appearance_.set_asset_root(std::move(root));}
   [[nodiscard]] SystemWorkspaceCommand handle(const stellar::native_map::InputEvent&,int width,int height);
   void render(stellar::native_map::DrawList&,int width,int height);
   void reset_fit(int width,int height);
