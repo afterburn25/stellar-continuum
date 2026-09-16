@@ -28,6 +28,21 @@ _RENDER_FIELDS = {"sites", "meshes", "triangles", "road_segments"}
 _MAX_RENDER_TRIANGLES = 8192
 _MAX_RENDER_ROAD_SEGMENTS = 192
 
+_POPULATED_SURFACE_SITES = (
+    # family, x, z, yaw, enabled, priority, condition, industry cost
+    ("power_generator", 210., 0., 0., True, 0, 1., 300.),
+    ("science_lab", 170., 123., 90., True, 0, 1., 400.),
+    ("habitat_complex", 65., 200., 180., True, 0, 1., 350.),
+    ("fabricator", -65., 200., 270., True, 1, 1., 450.),
+    ("science_lab", -170., 123., 0., False, 0, 1., 400.),
+    ("habitat_complex", -210., 0., 90., True, 0, .5, 350.),
+    ("fabricator", -170., -123., 180., True, 0, 1., 450.),
+    ("power_generator", -65., -200., 270., True, 0, 1., 300.),
+    # This last ordinary-priority demand creates power-allocation pressure.
+    # Powered/staffed are derived view flags and are not claimed by this proof.
+    ("science_lab", 65., -200., 0., True, 0, 1., 400.),
+)
+
 
 def _finite(value, label):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -237,6 +252,102 @@ def _normalized(payload):
     return result
 
 
+def _first_difference(left, right, path="$"):
+    if type(left) is not type(right):
+        return f"{path} changed type"
+    if isinstance(left, dict):
+        if set(left) != set(right):
+            return f"{path} changed fields"
+        for key in left:
+            difference = _first_difference(left[key], right[key], f"{path}.{key}")
+            if difference:
+                return difference
+        return ""
+    if isinstance(left, list):
+        if len(left) != len(right):
+            return f"{path} changed length from {len(left)} to {len(right)}"
+        for index, (left_item, right_item) in enumerate(zip(left, right)):
+            difference = _first_difference(left_item, right_item, f"{path}[{index}]")
+            if difference:
+                return difference
+        return ""
+    return "" if left == right else f"{path} changed value from {left!r} to {right!r}"
+
+
+def _surface_site(site_id, type_id, x, z, rotation, *, progress,
+                  complete, enabled=True, priority=0, condition=1.):
+    return {"Id": site_id, "TypeId": type_id, "X": x, "Z": z,
+            "RotationDegrees": rotation, "IndustryProgress": progress,
+            "IsComplete": complete, "IsEnabled": enabled,
+            "PendingUpgradeTypeId": None, "UpgradeDaysRemaining": 0.,
+            "OperatingPriority": priority, "Condition": condition,
+            "StoredPowerDays": 0.}
+
+
+def _populated_surface_fixture(payload, colony_id):
+    fixture = copy.deepcopy(payload)
+    colony = next((item for item in fixture["Galaxy"]["Colonies"]
+                   if item.get("Id") == colony_id), None)
+    if colony is None:
+        raise RuntimeError("Populated surface fixture lost its owned colony")
+    # This is validation-only authored surface state, derived after the
+    # standard fresh campaign. Population remains authoritative; staffing is
+    # derived by Core and has no per-building persisted field in Player17.
+    used_ids = [site.get("Id") for item in fixture["Galaxy"]["Colonies"]
+                for site in item.get("SurfaceBuildings", [])
+                if type(site.get("Id")) is int]
+    next_id = max(used_ids, default=-1) + 1
+    sites = [_surface_site(next_id + index, type_id, x, z, rotation,
+                           progress=cost, complete=True, enabled=enabled,
+                           priority=priority, condition=condition)
+             for index, (type_id, x, z, rotation, enabled, priority,
+                         condition, cost) in enumerate(_POPULATED_SURFACE_SITES)]
+    # Reload smoke requires one persisted unfinished site. Its highest ID makes
+    # selection deterministic without changing any completed representative.
+    sites.append(_surface_site(next_id + len(sites), "power_generator",
+                               170., -123., 0.,
+                               progress=75., complete=False))
+    colony["SurfaceBuildings"] = sites
+    return fixture
+
+
+def _verify_populated_surface(before, after, state, art):
+    before_colony = _base_colony(before)
+    after_colony = _base_colony(after)
+    difference = _first_difference(_normalized(before), _normalized(after))
+    if before_colony.get("Id") != state["colony_id"] or difference:
+        raise RuntimeError("Paused populated surface reload changed its Player17 fixture" +
+                           (f" at {difference}" if difference else ""))
+    sites = after_colony.get("SurfaceBuildings", [])
+    if len(sites) != len(_POPULATED_SURFACE_SITES) + 1:
+        raise RuntimeError("Populated surface fixture lost a representative site")
+    completed = [site for site in sites if site.get("IsComplete") is True]
+    if len(completed) != len(_POPULATED_SURFACE_SITES):
+        raise RuntimeError("Populated surface fixture changed completed-site identity")
+    for site, definition in zip(completed, _POPULATED_SURFACE_SITES):
+        (type_id, x, z, rotation, enabled, priority, condition, cost) = definition
+        if (site.get("TypeId") != type_id or site.get("IsComplete") is not True or
+                site.get("IsEnabled") is not enabled or
+                site.get("OperatingPriority") != priority or
+                not _close(site.get("X"), x) or not _close(site.get("Z"), z) or
+                not _close(site.get("RotationDegrees"), rotation) or
+                not _close(site.get("IndustryProgress"), cost) or
+                not _close(site.get("Condition"), condition)):
+            raise RuntimeError("Populated surface fixture changed a representative state")
+    anchor = max((site for site in sites if site.get("IsComplete") is False),
+                 key=lambda site: site.get("Id", -1), default=None)
+    if (anchor is None or anchor.get("TypeId") != "power_generator" or
+            not _close(anchor.get("IndustryProgress"), 75.)):
+        raise RuntimeError("Populated surface fixture lost its unfinished reload anchor")
+    expected_ready = len(sites) + 1  # All sites plus the surface hub.
+    if (art["requested"] != expected_ready or art["ready"] != expected_ready or
+            art["replaced"] != expected_ready):
+        raise RuntimeError("Populated surface did not draw every ready building raster")
+    if (state["site_id"] != anchor["Id"] or state["type_id"] != "power_generator" or
+            state["site_count_saved"] != len(sites) or state["progress"] <= 0):
+        raise RuntimeError("Populated surface reload selected the wrong persisted anchor")
+
+
 def _verify_ordered(before, after, state):
     before_colony = _base_colony(before)
     galaxy, player_id, economy, knowledge, colonies = _player_parts(after)
@@ -288,6 +399,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
     captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
+    populated_captures, populated_diagnostics = [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-surface-") as temporary:
         work = Path(temporary)
         save = work / "fresh.player17.json"
@@ -342,11 +454,53 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             shutil.copy2(capture, evidence)
             captures.append(str(evidence)); diagnostics.append(result.stdout.strip())
             art_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-without-buildings.bmp"; shutil.copy2(sidecar, art_evidence); art_captures.append(str(art_evidence))
+
+        populated_fixture = _populated_surface_fixture(
+            ordered_payload, ordered_state["colony_id"])
+        for width, height in ((1280, 720), (1920, 1080)):
+            save.write_text(json.dumps(populated_fixture), encoding="utf-8")
+            # A test-authored primary must either load exactly or fail. A prior
+            # smoke backup must not turn an invalid fixture into false evidence.
+            save.with_name(save.name + ".bak").unlink(missing_ok=True)
+            capture = work / f"surface-populated-{width}x{height}.bmp"
+            result, uploads = _launch(
+                common + ["--width", str(width), "--height", str(height),
+                          "--surface-reload-smoke", str(capture), "--load",
+                          "--profile-frames", "120"],
+                work, clean, f"test-only populated {width}x{height}")
+            if uploads < 1:
+                raise RuntimeError("Populated surface did not prove image uploads")
+            state = _diagnostic(result.stdout, "paused_reload")
+            art = _surface_art(result.stdout)
+            _bmp(capture, width, height)
+            sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
+            _validate_surface_art_pixels(capture, sidecar, width, height,
+                                         art["terrain"])
+            after = json.loads(save.read_text(encoding="utf-8-sig"))
+            _verify_populated_surface(populated_fixture, after, state, art)
+            stem = f"{folder.name}-surface-populated-{width}x{height}"
+            evidence = folder.parent / f"{stem}.bmp"
+            sidecar_evidence = folder.parent / f"{stem}-without-buildings.bmp"
+            shutil.copy2(capture, evidence)
+            shutil.copy2(sidecar, sidecar_evidence)
+            (folder.parent / f"{stem}.log").write_text(
+                result.stdout + "\n" + result.stderr, encoding="utf-8")
+            populated_captures.append(str(evidence))
+            populated_diagnostics.append({"surface": state, "art": art})
     return {"nativeSurfaceFreshOwnedEarth": True,
             "nativeSurfacePlayerInput": True,
             "nativeSurfacePausedReload": True,
             "surfaceCaptures": captures,
             "surfaceDiagnostics": diagnostics, "surfaceArtDiagnostics": art_diagnostics,
             "surfaceArtCaptures": art_captures,
+            "surfacePopulatedFixture": "test-only authored Player17 derived from the standard fresh campaign",
+            "surfacePopulatedFamilies": ["power_generator", "science_lab",
+                                         "habitat_complex", "fabricator"],
+            "surfacePopulatedPersistedStates": ["complete", "enabled", "disabled",
+                                                "priority", "condition-repair"],
+            "surfacePopulatedDerivedStateLimit":
+                "Powered and staffed are Core-derived view state and are not directly diagnosed by this runtime proof.",
+            "surfacePopulatedCaptures": populated_captures,
+            "surfacePopulatedDiagnostics": populated_diagnostics,
             "surfaceFixture": "unaltered standard fresh 500-system Player17 campaign",
             "surfaceDemolition": "completed-site demolition remains controller-test evidence"}

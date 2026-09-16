@@ -1247,6 +1247,34 @@ class NativeCampaign final {
       if(session_->frame().clock().speed()==StrategicSpeed::Paused)
         click(center(main_layout.pause));
     }else smoke_fleet_destination_=selected_destination;
+    // Exercise an independent civilian through actual UI input while preserving
+    // the routed ship and the paused-reload payload exactly.
+    const auto &recovery_fleets=fleet_workspace_.view()->own_fleets;
+    const auto civilian=std::ranges::find_if(recovery_fleets,[&](const auto &f){
+      return is_civilian_role(f.role)&&f.id!=selected_fleet_id;});
+    if(civilian==recovery_fleets.end())throw std::runtime_error("Fleet smoke lacks a second civilian ship.");
+    const int recovery_id=civilian->id;
+    const auto recovery_index=static_cast<std::size_t>(civilian-recovery_fleets.begin());
+    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(recovery_index)*45.f+20.f)*layout.scale});
+    const auto state=[&]()->const FleetState &{
+      const auto &live=session_->frame().runtime().world().campaign().fleets;
+      const auto found=std::ranges::find(live,recovery_id,&FleetState::id);
+      if(found==live.end())throw std::runtime_error("Recovery smoke ship vanished.");
+      return *found;
+    };
+    if(fleet_controller_.selection()!=recovery_id)throw std::runtime_error("Recovery smoke selection failed.");
+    const auto before=state();
+    click(center(layout.recovery_left));
+    if(!last_fleet_command_accepted_||state().hold_requested==before.hold_requested)
+      throw std::runtime_error("Recovery smoke hold/resume failed.");
+    click(center(layout.recovery_left));
+    if(!last_fleet_command_accepted_||state().hold_requested!=before.hold_requested||
+       state().mission_order_revision!=before.mission_order_revision||
+       state().destination_system_id!=before.destination_system_id||
+       state().planned_route_system_ids!=before.planned_route_system_ids)
+      throw std::runtime_error("Recovery smoke changed the original mission.");
+    smoke_civilian_recovery_=true;
+    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
   }
   void prepare_shipyard_smoke(int width,int height){
     const auto click=[&](Point point){
@@ -1852,7 +1880,8 @@ class NativeCampaign final {
     std::ostringstream out;
     out<<found->id<<":"<<*smoke_fleet_destination_<<":"
        <<found->mission_order_revision<<":"<<std::fixed
-       <<std::setprecision(6)<<found->transit_progress;
+       <<std::setprecision(6)<<found->transit_progress
+       <<" civilian_recovery="<<(smoke_civilian_recovery_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -1988,6 +2017,7 @@ class NativeCampaign final {
     refresh_battle(width,height,elapsed);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
+      fleet_workspace_.cancel_recovery();
       notification_view_.close();
       system_workspace_.close();
       colony_workspace_.close();
@@ -2007,6 +2037,7 @@ class NativeCampaign final {
       }
     };
     for(const auto &event:input.events){
+      if(event.type==InputEventType::PointerCancelled)fleet_workspace_.cancel_recovery();
       if(audio_settings_&&audio_settings_->visible()){
         notification_view_.close();
         (void)audio_settings_->handle(event,width,height);
@@ -3156,6 +3187,9 @@ class NativeCampaign final {
     if(!force&&fleet_refresh_elapsed_<.1)return;
     auto view=fleet_controller_.build(session_->frame(),
                                       session_->cache().generation);
+    const auto names=observed_system_names();
+    for(auto &fleet:view.own_fleets)
+      fleet.recovery_message=observer_safe_fleet_message(fleet.recovery_message,names);
     if(pending_fleet_preview_){
       const auto selected=view.selected_fleet_id
                               ?std::ranges::find(view.own_fleets,
@@ -3175,6 +3209,20 @@ class NativeCampaign final {
 
   void handle_fleet_command(const FleetWorkspaceCommand &command){
     if(command.kind==FleetWorkspaceCommandKind::None)return;
+    if(command.kind==FleetWorkspaceCommandKind::Recovery){
+      if(!command.recovery_quote)return;
+      auto outcome=fleet_controller_.issue_civilian_recovery(
+          session_->frame(),*command.recovery_quote,command.recovery_action,
+          command.confirm_abandon);
+      outcome.message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      pending_fleet_preview_.reset();
+      fleet_workspace_.clear_preview();
+      fleet_workspace_.set_recovery_result(*command.recovery_quote,outcome);
+      last_fleet_command_accepted_=outcome.accepted;
+      refresh_fleets(true);
+      refresh_system_travel(true);
+      return;
+    }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
       fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
@@ -3223,7 +3271,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
@@ -3341,6 +3389,7 @@ class NativeCampaign final {
   std::size_t smoke_ship_art_cached_{};
   std::size_t smoke_ship_art_bytes_{};
   std::optional<int> smoke_fleet_id_;
+  bool smoke_civilian_recovery_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};

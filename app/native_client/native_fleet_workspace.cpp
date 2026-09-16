@@ -137,7 +137,10 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           details,
           route,
           feedback,
-          confirm};
+          confirm,
+          {confirm.x, confirm.y, (confirm.width - 8.f * scale) * .5f, confirm.height},
+          {confirm.x + (confirm.width + 8.f * scale) * .5f, confirm.y,
+           (confirm.width - 8.f * scale) * .5f, confirm.height}};
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
@@ -155,6 +158,12 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
                                                 *view_->selected_fleet_id,
                                                 &NativeOwnFleet::id)
                             : view_->own_fleets.end();
+  if (pending_return_ && (selected == view_->own_fleets.end() ||
+      selected->recovery != pending_return_)) {
+    cancel_recovery();
+    notice_ = "Mission changed. Review Return to Base again before confirming.";
+    notice_accepted_ = false;
+  }
   if (preview_ &&
       (selected == view_->own_fleets.end() ||
        preview_->fleet_id != selected->id ||
@@ -166,6 +175,7 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 }
 
 void NativeFleetWorkspace::discard_campaign() {
+  cancel_recovery();
   view_.reset();
   preview_.reset();
   target_display_name_.clear();
@@ -175,6 +185,7 @@ void NativeFleetWorkspace::discard_campaign() {
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
                                        std::string target_display_name) {
+  cancel_recovery();
   preview_ = std::move(preview);
   target_display_name_ = std::move(target_display_name);
   notice_.clear();
@@ -190,13 +201,30 @@ void NativeFleetWorkspace::set_notice(std::string message, bool accepted) {
   notice_accepted_ = accepted;
 }
 
+void NativeFleetWorkspace::cancel_recovery() noexcept {
+  pending_return_.reset();
+  return_warning_.clear();
+}
+
+void NativeFleetWorkspace::set_recovery_result(
+    const NativeCivilianRecoveryQuote &quote, const NativeFleetOrderOutcome &outcome) {
+  cancel_recovery();
+  const auto *fleet = selected_fleet();
+  if (!outcome.accepted && outcome.requires_confirmation && fleet &&
+      fleet->recovery == quote) {
+    pending_return_ = quote;
+    return_warning_ = outcome.message;
+  }
+  set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
+}
+
 FleetWorkspaceCommand NativeFleetWorkspace::handle(
     const InputEvent &event, int width, int height,
     std::span<const FleetScreenMarker> markers,
     std::optional<int> target_system_id) {
   pointer_ = event.position;
   const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
-  if (event.type == InputEventType::PointerCancelled) return {};
+  if (event.type == InputEventType::PointerCancelled) { cancel_recovery(); return {}; }
   if (event.type == InputEventType::Wheel && layout.list.contains(event.position)) {
     const auto count = view_ ? view_->own_fleets.size() : 0;
     const auto content = static_cast<float>(count) * 45.f * layout.scale;
@@ -215,6 +243,25 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   }
   if (event.type != InputEventType::LeftPressed) return {};
   if (layout.panel.contains(event.position)) {
+    if (const auto *fleet = selected_fleet(); !preview_ && fleet && fleet->recovery) {
+      const bool left = layout.recovery_left.contains(event.position);
+      const bool right = layout.recovery_right.contains(event.position);
+      if (pending_return_ && right) {
+        cancel_recovery();
+        set_notice("Return cancelled. The existing mission is unchanged.", true);
+        return {FleetWorkspaceCommandKind::None, true};
+      }
+      if (left || (right && !fleet->recovery->return_requested)) {
+        FleetWorkspaceCommand command{FleetWorkspaceCommandKind::Recovery, true, fleet->id};
+        command.recovery_quote = pending_return_.value_or(*fleet->recovery);
+        command.confirm_abandon = pending_return_.has_value();
+        command.recovery_action = pending_return_ || right
+            ? NativeCivilianRecoveryAction::ReturnToBase
+            : fleet->recovery->hold_requested ? NativeCivilianRecoveryAction::Resume
+                                               : NativeCivilianRecoveryAction::Hold;
+        return command;
+      }
+    }
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
@@ -340,6 +387,12 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     text(out, layout.details,
          "Select an owned fleet on the map or in the outliner.", muted,
          layout.body_font_pixels);
+  } else if (pending_return_) {
+    // Use the entire details region: never truncate the paid-mission warning.
+    const UiRect warning_bounds{layout.details.x, layout.details.y,
+        layout.details.width, layout.feedback.y - layout.details.y - 8.f * layout.scale};
+    text(out, warning_bounds, "ABANDON COLONY MISSION?\n\n" + return_warning_,
+         warning, layout.body_font_pixels);
   } else {
     const std::string details =
         fleet->name + "\n" + role_name(fleet->role) + "  |  " +
@@ -385,16 +438,33 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
          layout.small_font_pixels);
   }
 
-  const auto feedback = !notice_.empty()
+  const auto* selected=selected_fleet();
+  const auto feedback = pending_return_ ? "Cancel keeps the existing mission and its progress."
+                        : !notice_.empty()
                             ? notice_
                             : preview_ && !preview_->command_available
                                   ? preview_->message
-                                  : std::string{};
+                                  : selected ? selected->recovery_message : std::string{};
   if (!feedback.empty())
     text(out, layout.feedback, visible_message(feedback),
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
-  const auto* selected=selected_fleet();
+  if (!preview_ && selected && selected->recovery) {
+    const bool queued = selected->recovery->return_requested;
+    for (const bool left : {true, false}) {
+      const auto bounds = left ? layout.recovery_left : layout.recovery_right;
+      const bool enabled = left || pending_return_ || !queued;
+      fill(out, bounds, enabled && bounds.contains(pointer_) ? hover_color : row_color);
+      stroke(out, bounds, pending_return_ && left ? warning : border_color);
+      const auto label = pending_return_ ? (left ? "CONFIRM RETURN" : "CANCEL")
+          : left ? (selected->recovery->hold_requested ? "RESUME" : "HOLD")
+                 : queued ? "RETURN QUEUED" : "RETURN TO BASE";
+      text(out, {bounds.x, bounds.y + 10.f * layout.scale, bounds.width,
+                 bounds.height - 10.f * layout.scale}, label,
+           enabled ? bright : muted, layout.small_font_pixels, FontFace::Interface,
+           TextAlign::Center);
+    }
+  }
   const bool engage=!preview_&&selected&&selected->role==stellar::core::FleetRole::Military&&
       selected->current_system_id&&!selected->destination_system_id&&
       selected->combat_status&&selected->combat_status->is_armed;

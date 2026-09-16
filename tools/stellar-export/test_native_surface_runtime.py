@@ -89,6 +89,8 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                 else:
                     payload = json.loads(save.read_text())
                     reload = "--surface-reload-smoke" in args
+                    sites = payload["Galaxy"]["Colonies"][0].get("SurfaceBuildings", [])
+                    populated = len(sites) > 1
                     mode = "paused_reload" if reload else "ordered"
                     state = {"mode": mode, "system_id": 0, "body_id": 0, "colony_id": 4,
                              "type_id": "power_generator", "site_id": 0,
@@ -129,8 +131,40 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                         if fault == "site_progress": payload["Galaxy"]["Colonies"][0]["SurfaceBuildings"][0]["IndustryProgress"] += 1
                         if fault == "saved_treasury": payload["Galaxy"]["Economies"][0]["Credits"] += 1
                     else:
+                        anchor = max((site for site in sites if not site.get("IsComplete")),
+                                     key=lambda site: site["Id"])
+                        state.update({"type_id": anchor["TypeId"], "site_id": anchor["Id"],
+                                      "x": anchor["X"], "z": anchor["Z"],
+                                      "rotation": anchor["RotationDegrees"],
+                                      "treasury_before": payload["Galaxy"]["Economies"][0]["Credits"],
+                                      "treasury_saved": payload["Galaxy"]["Economies"][0]["Credits"],
+                                      "site_count_before": len(sites), "site_count_saved": len(sites),
+                                      "progress": anchor["IndustryProgress"],
+                                      "before_days": payload["SimulationDays"],
+                                      "saved_days": payload["SimulationDays"]})
+                        state["render"] = {"sites": len(sites), "meshes": len(sites) + 2,
+                                           "triangles": len(sites) * 24,
+                                           "road_segments": len(sites)}
+                        requested = len(sites) + 1
+                        art.update({"requested": requested, "ready": requested,
+                                    "replaced": requested, "entries": requested,
+                                    "cache_bytes": requested * 512,
+                                    "admitted": requested, "completed": requested})
                         payload["SavedAtUtc"] = "reload"
                         if fault == "payload": payload["Galaxy"]["ReloadMutation"] = True
+                        if populated and fault == "populated_payload":
+                            payload["Galaxy"]["ReloadMutation"] = True
+                        if populated and fault == "populated_family":
+                            sites[0]["TypeId"] = "trade_hub"
+                        if populated and fault == "populated_state":
+                            sites[5]["Condition"] = .8
+                        if populated and fault == "populated_missing_ready":
+                            for key in ("requested", "ready", "replaced", "entries"):
+                                art[key] -= 1
+                        if populated and fault == "populated_replaced":
+                            art["replaced"] -= 1
+                        if populated and fault == "populated_anchor":
+                            state["site_id"] = 106
                     if fault in state:
                         state[fault] = False if isinstance(state[fault], bool) else -1
                     if fault == "extra": state["hidden_name"] = "Earth"
@@ -178,7 +212,7 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
 
             with mock.patch("native_surface_runtime.subprocess.run", side_effect=run):
                 result = validate_native_surface_export(package, {})
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 5)
             self.assertNotIn("--load", calls[0]); self.assertTrue(all("--load" in c for c in calls[1:]))
             self.assertNotIn("--profile-frames", calls[0])
             self.assertTrue(all(c[-2:] == ["--profile-frames", "120"] for c in calls[1:]))
@@ -186,6 +220,15 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
             self.assertTrue(result["nativeSurfacePlayerInput"])
             self.assertTrue(result["nativeSurfacePausedReload"])
             self.assertEqual(len(result["surfaceCaptures"]), 3)
+            self.assertEqual(len(result["surfacePopulatedCaptures"]), 2)
+            self.assertEqual(result["surfacePopulatedFamilies"],
+                             ["power_generator", "science_lab",
+                              "habitat_complex", "fabricator"])
+            self.assertEqual(result["surfacePopulatedPersistedStates"],
+                             ["complete", "enabled", "disabled", "priority",
+                              "condition-repair"])
+            self.assertIn("Core-derived", result["surfacePopulatedDerivedStateLimit"])
+            self.assertIn("test-only", result["surfacePopulatedFixture"])
 
     def test_order_reload(self): self.exercise()
     def test_palette_required(self):
@@ -290,6 +333,18 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
             fallback.write_bytes(logical_bmp(20, 20, bits=32, top_down=True,
                                              offset=70, changed=changed))
             _validate_surface_art_pixels(capture, fallback, 20, 20, [0, 0, 20, 20])
+    def test_populated_reload_mutation_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_payload")
+    def test_populated_family_mutation_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_family")
+    def test_populated_operating_state_mutation_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_state")
+    def test_populated_missing_ready_raster_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_missing_ready")
+    def test_populated_missing_replacement_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_replaced")
+    def test_populated_wrong_reload_anchor_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("populated_anchor")
     def test_fresh_format_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("fresh_format")
     def test_fresh_system_count_rejected(self):

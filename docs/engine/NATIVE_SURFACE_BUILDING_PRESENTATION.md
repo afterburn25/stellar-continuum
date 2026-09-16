@@ -70,3 +70,16 @@ wheel and drag input; capture readback is excluded from frame timing.
 Build/runtime results and remaining limitations are recorded in the current
 migration handoff. No sealed release or sustained 60 FPS claim follows from
 this presentation integration alone.
+
+The validator also checks a clearly labeled test-only populated Player17
+gallery derived from the unchanged fresh campaign after normal placement and
+reload checks. Nine completed sites span generators, science labs, habitat
+complexes and fabricators with enabled/disabled, priority and repair-condition
+inputs. One unfinished generator anchors the existing reload input path.
+All ten sites and the hub must be ready and drawn at 720p/1080p, with exact
+paused payload preservation and clipped RGB comparison. The test removes only
+its temporary backup so fallback recovery cannot supply false evidence.
+
+This is not a dense gameplay-built city. Powered/staffed flags are Core-derived
+and not directly diagnosed. At fit-to-all scale the building silhouettes remain
+small, especially at 720p; visual finish still requires work.

@@ -32,3 +32,32 @@ from the live campaign back to race/galaxy setup, using a distinct save slot.
 Devin's successful-restart smoke is a useful starting point. It does not by
 itself prove cancellation, explicit exit, audio preservation or save-failure
 recovery. These are the next integration gates before adapting this change.
+
+## Follow-up review at Devin 263b4396 (2026-09-15)
+
+The restart branch still ignores `restart_result.exit_requested`; the earlier
+New Game lifecycle gates therefore remain open. The subsequent seven-commit
+batch was inventoried. Civilian recovery `263b4396` is selectively adapted
+with mission-bound commands and cancellation. Its boolean-only pending
+confirmation was insufficient: it reset on selection/generation changes but
+could survive a new mission on the same ship. The adaptation also avoids
+running return-route planning in the frequent outliner refresh.
+
+System inspection `d2a41caa` is not imported. After a full system survey and
+civilization contact it reads a foreign colony's current population,
+infrastructure and stability directly from `FreshCampaignState`; those
+conditions alone do not establish live foreign-colony observation authority.
+It also picks the first colony in a system rather than representing all known
+bodies. Integrate through an observer DTO and prove stale/contact-only secrecy.
+
+Logistics `ea9164e9` is not imported. Its broad exception-to-initializing
+fallback needs an explicit error/recovery state so malformed data cannot look
+like indefinite loading. Review clipping, refresh cadence and reuse of the
+existing colony/logistics projections before adding another panel.
+
+The new voice/settings/roster pipeline is inventoried, not fully audited or
+imported. It introduces a SAPI synthesis/cache path and overlaps this branch's
+existing bounded audio lifecycle, settings and dry recorded UK-female scientist
+cues. Reconcile those contracts before integration; do not overwrite the
+approved audio work or claim a specific production voice from an installed
+system synthesizer.

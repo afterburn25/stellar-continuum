@@ -2,9 +2,9 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`b9e55e79`; support, notifications and tactical workspace selectively adapted;
-mid-session New Game, surface sprites, candidate shortcuts, duplicate audio
-settings and timing changes reviewed but not imported).
+`263b4396` inventoried; support, notifications, tactical and civilian recovery
+selectively adapted. New Game/inspection have open findings; new voice and
+logistics additions remain unimported pending full integration review).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -14,6 +14,54 @@ validators, and `docs/engine/*_VALIDATION.md` contracts. "PARITY VERIFIED" means
 subsystem has a maintained parity/validation gate that runs in the sealed export.
 
 ## Current integration checkpoint (2026-09-15)
+
+### Civilian recovery and populated surface validation
+
+The fleet panel now exposes Hold/Resume and Return to Base for owned civilian
+mission ships, selectively adapting Devin `263b4396`. Commands bind observer,
+campaign, ship and displayed mission state. Paid colony return shows the full
+Core warning with separate confirmation and cancellation. Changed missions,
+selection, focus and menu transitions invalidate approval. Frequent outliner
+refreshes do not run route planning. Core recovery/movement rules are unchanged.
+
+Final MSVC host build and five affected CTests pass: fleet controller,
+workspace, presentation, system workspace and Core civilian recovery parity.
+Python validators pass 10 fleet and 61 surface tests. The final relocated
+Vulkan executable passes two fleet captures, two system-travel captures and
+five surface captures. Fleet hold/resume uses native mouse events; ordered
+travel and exact paused reload remain verified. Paid abandonment and queued
+return in warp are controller-test evidence, not a live paid-colony screenshot.
+
+The surface validator adds a clearly labeled test-only Player17 gallery: nine
+completed power/research/housing/industry sites and one unfinished generator.
+At 720p/1080p all ten sites plus the hub are ready and drawn (11 rasters,
+2,883,584 bytes; zero pending/deferred/failed/reserved work). Entire paused
+payloads remain equal except SavedAtUtc. Enabled, disabled, priority and
+repair-condition inputs are checked. Powered/staffed flags are Core-derived
+and not directly diagnosed. This sparse gallery is not a gameplay-built city;
+small silhouettes at fit-to-all scale remain a visual gap, especially at 720p.
+
+The fixture preserves a valid timestamp and removes only its temporary backup
+before authored-primary launches. Earlier invalid test timestamps had caused
+recovery of the old backup; strict equality exposed that test setup error.
+No production save schema, surface footprints, economy or C# files changed.
+
+Evidence: `work/native-civilian-recovery-build.log`,
+`work/native-civilian-recovery-ctest.log`,
+`work/native-civilian-recovery-runtime.json`,
+`work/native-civilian-recovery-system-travel.json`, and
+`work/native-surface-populated-final.json`. Contracts:
+`engine/NATIVE_CIVILIAN_RECOVERY.md` and
+`engine/NATIVE_SURFACE_BUILDING_PRESENTATION.md`.
+
+Devin was inventoried through `263b4396`. New Game still ignores restart exit.
+Inspection needs observed foreign-colony data; logistics needs explicit error
+states. New voice/SAPI work is not fully audited or imported; retain existing
+recorded UK-female scientist cues. Details: `engine/NATIVE_NEW_CAMPAIGN_REVIEW.md`.
+
+Next: repair mid-session New Game, then improve surface overview legibility
+and live operating-state proof. Package remains UNSEALED; PR #332 unmerged;
+sustained 60 FPS is not established.
 
 ### Live native surface building presentation
 
@@ -56,9 +104,8 @@ Prior preparation c4c99fa5 passed GitHub Actions 35034467899. This local
 package is still UNSEALED; full 3D surface navigation, populated cities,
 manual roads and distinct alien architecture remain open.
 
-Next: representative completed-building/runtime coverage and visible
-construction/operating-state polish, then address the pending native
-mid-session New Game lifecycle review without duplicating Devin's work.
+This preceding checkpoint is extended by the populated proof above; live
+operating-state diagnosis and the New Game lifecycle remain open.
 
 ### Tactical corvette artwork and interaction
 
