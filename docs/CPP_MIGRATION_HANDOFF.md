@@ -5,23 +5,50 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
-### Bounded surface building preparation
+### Live native surface building presentation
 
-Devin's building geometry is extracted behind explicit rotation/construction/
-operational-state contracts and the existing Engine image job queue. A new
-surface cache coalesces requests, rejects stale work, caps admissions/memory,
-and latches failures until explicit retry. Canonical catalog footprints and
-Core's hub exclusion radius replace copied visual guesses. The final MSVC
-build and three focused CTests pass, including a 68-variant 256/512 raster
-matrix with maximum 1,932,632 pixel tests under the eight-million limit.
+The colony workspace now consumes prepared building images through an
+observer-owned presentation adapter. Worker jobs prepare geometry/raster data;
+owner updates coalesce visible hub/site/quote requests and drawing only reads
+ready images. Exact quoted rotation, construction state, power/staffing,
+condition, homeworld/outpost identity and campaign scope remain bound. Missing
+or failed imagery keeps usable fallback meshes; explicit reopen retries errors.
+Core construction, costs, canonical footprints, obstruction routing and
+Player17 remain unchanged.
 
-This preparation code is not yet connected to the live surface workspace.
-Existing roads, placement, building meshes and Core/Player17 are unchanged.
-Next: connect grounded image placement and depth ordering, then actual mixed
-720p/1080p captures, preview/state/reload and cold/churn timing. Contracts and
-reproduction are in `engine/NATIVE_SURFACE_BUILDING_PREPARATION.md`; final logs
-are `work/native-surface-building-stage-build.log` and
-`work/native-surface-building-stage-test.log`. The package remains unsealed.
+Actual captures exposed inward cylinder/ellipsoid winding and a duplicate
+flat apron that made buildings appear to sit in raised bowls. Both were fixed
+with regressions. Cosmetic road ends now continue beneath foundations while
+the cached route and obstruction geometry remain unchanged. Ready and fallback
+structures share depth order, with selection/status drawn last.
+
+Final MSVC build and eight affected CTests pass; 55 Python evidence tests pass.
+The final relocated Vulkan package passes fresh 500-system generation, paid
+surface placement/cancel/refund at 720p and exact paused Player17 reload at
+1080p. Both captures were inspected. Each shows the completed hub and one
+unfinished generator using two ready images (512 KiB), zero pending/deferred/
+failed work, and matched fallback-only captures proving real in-terrain RGB
+changes without outside clipping changes. This sparse fixture does not prove
+a complete populated city or every finished building family in live play.
+The 68-variant geometry/raster matrix and workspace tests cover further states.
+
+Two 120-frame profiles include balanced wheel/drag input. At 720p/1080p,
+steady owner-update maxima were 0.328/0.309 ms, scene maxima 0.319/0.407 ms,
+and mean frame intervals 16.715/16.735 ms. Frame p95 was 18.680/17.534 ms;
+cold render/present spikes reached about 66.6 ms. Sustained 60 FPS is therefore
+not established. GPU capture time is excluded from these samples.
+
+Evidence: `work/native-surface-host-build.log`,
+`work/native-surface-host-ctest.log`, `work/native-surface-live-runtime.json`,
+and `work/native-audio-validation/package-surface-{1280x720,1920x1080}.log`
+and BMP pairs. Contracts: `engine/NATIVE_SURFACE_BUILDING_PRESENTATION.md`.
+Prior preparation c4c99fa5 passed GitHub Actions 35034467899. This local
+package is still UNSEALED; full 3D surface navigation, populated cities,
+manual roads and distinct alien architecture remain open.
+
+Next: representative completed-building/runtime coverage and visible
+construction/operating-state polish, then address the pending native
+mid-session New Game lifecycle review without duplicating Devin's work.
 
 ### Tactical corvette artwork and interaction
 

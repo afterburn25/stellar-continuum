@@ -1,6 +1,8 @@
 if(BUILD_TESTING)
   add_executable(stellar_surface_visual_tests
     native-tests/native_surface_visual_tests.cpp
+    app/native_client/native_surface_building_geometry.cpp
+    app/native_client/native_surface_building_layer.cpp
     app/native_client/native_surface_workspace.cpp
     app/native_client/native_surface_scene.cpp)
   target_include_directories(stellar_surface_visual_tests PRIVATE

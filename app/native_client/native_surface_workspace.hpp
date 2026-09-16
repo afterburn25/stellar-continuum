@@ -49,6 +49,8 @@ public:
   // only the ready result, keeping the UI headless and dependency-free.
   void set_terrain_image(
       std::shared_ptr<const stellar::native_map::RgbaImage>) noexcept;
+  void set_building_images(SurfaceBuildingReadyProvider,
+                          std::optional<ReadySurfaceBuildingImage> preview = std::nullopt);
   void open(stellar::native_colony::NativeColonyView, int width, int height);
   void set_view(stellar::native_colony::NativeColonyView);
   void close() noexcept;
@@ -59,6 +61,7 @@ public:
   void set_removal_quote(stellar::native_colony::NativeSurfaceRemovalQuote);
   void complete_command(std::string notice);
   void set_notice(std::string value) { notice_ = std::move(value); }
+  void set_artwork_notice(std::string value) { artwork_notice_ = std::move(value); }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] bool modal_open() const noexcept {
@@ -116,10 +119,13 @@ private:
                stellar::native_colony::NativeSurfaceRemovalQuote>
       confirmation_;
   std::string notice_;
+  std::string artwork_notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
   std::shared_ptr<const stellar::native_map::RgbaImage> terrain_image_;
+  SurfaceBuildingReadyProvider building_images_;
+  std::optional<ReadySurfaceBuildingImage> preview_image_;
   mutable std::size_t scene_sites_{}, scene_meshes_{}, scene_triangles_{},
-      scene_road_segments_{};
+      scene_road_segments_{}, scene_replaced_structures_{};
   mutable NativeSurfaceScene scene_;
 };
 

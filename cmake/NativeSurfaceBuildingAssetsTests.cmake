@@ -2,6 +2,7 @@ add_executable(stellar_native_surface_building_assets_tests
   app/native_client/native_surface_building_geometry.cpp
   app/native_client/native_surface_building_raster.cpp
   app/native_client/native_surface_building_assets.cpp
+  app/native_client/native_surface_building_presentation.cpp
   native-tests/native_surface_building_assets_tests.cpp)
 target_include_directories(stellar_native_surface_building_assets_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_surface_building_assets_tests PRIVATE stellar_native_image stellar_core)

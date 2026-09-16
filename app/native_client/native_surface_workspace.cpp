@@ -211,6 +211,7 @@ void NativeSurfaceWorkspace::fit(const int width, const int height) noexcept {
 
 void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
                                   const int height) {
+  set_building_images({});
   visible_ = true;
   view_ = std::move(view);
   selected_type_id_.reset();
@@ -233,7 +234,19 @@ void NativeSurfaceWorkspace::set_terrain_image(
   terrain_image_ = std::move(value);
 }
 
+void NativeSurfaceWorkspace::set_building_images(
+    SurfaceBuildingReadyProvider provider,
+    std::optional<ReadySurfaceBuildingImage> preview) {
+  building_images_ = std::move(provider);
+  preview_image_ = std::move(preview);
+  artwork_notice_.clear();
+}
+
 void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
+  if (!view_ || view_->campaign_generation != view.campaign_generation ||
+      view_->system_id != view.system_id || view_->body_id != view.body_id ||
+      view_->colony_id != view.colony_id)
+    set_building_images({});
   const auto changed = !view_ ||
                        view_->campaign_generation != view.campaign_generation ||
                        view_->revision != view.revision;
@@ -264,6 +277,8 @@ void NativeSurfaceWorkspace::reconcile() {
 }
 
 void NativeSurfaceWorkspace::close() noexcept {
+  set_building_images({});
+  scene_replaced_structures_ = 0;
   visible_ = false;
   pressed_ = false;
   dragging_ = false;
@@ -276,6 +291,8 @@ void NativeSurfaceWorkspace::close() noexcept {
 }
 
 void NativeSurfaceWorkspace::discard_campaign() noexcept {
+  set_building_images({});
+  scene_replaced_structures_ = 0;
   visible_ = false;
   view_.reset();
   selected_type_id_.reset();
@@ -293,7 +310,8 @@ void NativeSurfaceWorkspace::discard_campaign() noexcept {
 
 NativeSurfaceSceneDiagnostics
 NativeSurfaceWorkspace::scene_diagnostics() const {
-  return {scene_sites_, scene_meshes_, scene_triangles_, scene_road_segments_};
+  return {scene_sites_, scene_meshes_, scene_triangles_, scene_road_segments_,
+          scene_replaced_structures_};
 }
 
 void NativeSurfaceWorkspace::set_placement_quote(
@@ -703,16 +721,35 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   }
   const auto diagnostics =
       scene_.append(out, viewport_, layout.terrain, view.construction_sites,
-                    selected_building_id_, view.surface_hub_level);
+                    selected_building_id_, view.surface_hub_level,
+                    building_images_ ? &building_images_ : nullptr);
   scene_sites_ = diagnostics.sites;
   scene_meshes_ = diagnostics.meshes;
   scene_triangles_ = diagnostics.triangles;
   scene_road_segments_ = diagnostics.road_segments;
+  scene_replaced_structures_ = diagnostics.replaced_structures;
   if (selected_type_id_ && placement_quote_) {
     const auto option =
         std::ranges::find(view.available_buildings, *selected_type_id_,
                           &NativeSurfaceBuildOption::type_id);
     if (option != view.available_buildings.end()) {
+      // The ghost uses the exact quoted yaw and remains a detached preview;
+      // footprints and acceptance continue to come from the Core quote.
+      using namespace stellar::native_surface_building;
+      const auto expected = normalize_surface_building_state(
+          SurfaceBuildingState{.type_id = option->type_id,
+            .rotation_degrees = placement_quote_->normalized_rotation_degrees,
+            .complete = true, .progress_fraction = 1., .powered = true,
+            .enabled = true, .staffed = true});
+      if (preview_image_ && expected &&
+          preview_image_->expected_state == *expected.key)
+        if (auto placed = place_surface_building_image(
+                preview_image_->prepared, *expected.key, preview_image_->spec,
+                placement_quote_->x, placement_quote_->z, viewport_, layout.terrain)) {
+          placed->image.tint = placement_quote_->accepted
+              ? Color{170, 255, 195, 170} : Color{255, 135, 125, 160};
+          out.overlay.emplace_back(std::move(placed->image));
+        }
       const auto center = viewport_.world_to_screen(
           placement_quote_->x, placement_quote_->z, layout.terrain);
       const auto radius =
@@ -731,6 +768,10 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
     }
   }
 
+  if (!artwork_notice_.empty())
+    text(out, {layout.terrain.x + 10.f, layout.terrain.y + layout.terrain.height - 32.f,
+               layout.terrain.width - 20.f, 28.f}, artwork_notice_, warning,
+         layout.small_font);
   fill(out, layout.inspector, inset);
   stroke(out, layout.inspector, border);
   const auto ix = layout.inspector.x + 10.f * layout.scale;

@@ -40,6 +40,33 @@ std::uint64_t image_hash(const stellar::native_map::RgbaImage &image) {
   return result;
 }
 
+surface::Vec3 subtract(surface::Vec3 left, surface::Vec3 right) {
+  return {left.x - right.x, left.y - right.y, left.z - right.z};
+}
+
+surface::Vec3 cross(surface::Vec3 left, surface::Vec3 right) {
+  return {left.y * right.z - left.z * right.y,
+          left.z * right.x - left.x * right.z,
+          left.x * right.y - left.y * right.x};
+}
+
+float dot(surface::Vec3 left, surface::Vec3 right) {
+  return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
+surface::Vec3 centroid(const surface::Triangle &triangle) {
+  return {(triangle.a.x + triangle.b.x + triangle.c.x) / 3.f,
+          (triangle.a.y + triangle.b.y + triangle.c.y) / 3.f,
+          (triangle.a.z + triangle.b.z + triangle.c.z) / 3.f};
+}
+
+void verify_outward(const surface::Triangle &triangle, surface::Vec3 center,
+                    const char *message) {
+  const auto normal = cross(subtract(triangle.b, triangle.a),
+                            subtract(triangle.c, triangle.a));
+  verify(dot(normal, subtract(centroid(triangle), center)) > 1e-5f, message);
+}
+
 void normalized_visual_keys_are_stable() {
   auto first = building();
   first.complete = false;
@@ -110,6 +137,36 @@ void rotation_anchor_and_bounds_are_preserved() {
          "projected sprite bounds are empty");
   verify(projection.projection->canonical_footprint_radius == 17,
          "canonical picking footprint was not retained separately");
+}
+
+void primitive_faces_point_outward() {
+  const auto prepared = surface::prepare_geometry(building("fabricator"));
+  verify(static_cast<bool>(prepared), "primitive winding geometry failed");
+  const auto &triangles = prepared.geometry->triangles;
+
+  // Every four triangles form one segment of the eight-sided foundation
+  // cylinder: two wall faces followed by the bottom and top caps.
+  verify(triangles.size() >= 32, "foundation cylinder geometry is incomplete");
+  for (std::size_t index = 0; index < 32; ++index)
+    verify_outward(triangles[index], {0, .7f, 0},
+                   "cylinder face points into the solid");
+
+  // The fabricator's first structure primitive immediately follows the
+  // foundation and is a box centered at this point.
+  verify(triangles.size() >= 44, "fabricator box geometry is incomplete");
+  for (std::size_t index = 32; index < 44; ++index)
+    verify_outward(triangles[index], {0, 4.5f, 0},
+                   "box face points into the solid");
+
+  // A complete operational structure ends with the 16-by-10 spherical status
+  // marker: 16 bottom, 256 body and 16 top triangles.
+  constexpr std::size_t marker_triangles = 288;
+  verify(triangles.size() >= marker_triangles,
+         "ellipsoid status marker geometry is incomplete");
+  for (std::size_t index = triangles.size() - marker_triangles;
+       index < triangles.size(); ++index)
+    verify_outward(triangles[index], {0, 13, 0},
+                   "ellipsoid face points into the solid");
 }
 
 void construction_and_operational_states_are_visible() {
@@ -334,6 +391,7 @@ int main() {
   try {
     normalized_visual_keys_are_stable();
     rotation_anchor_and_bounds_are_preserved();
+    primitive_faces_point_outward();
     construction_and_operational_states_are_visible();
     hub_levels_and_capital_state_are_distinct();
     raster_is_bounded_and_reports_metadata();

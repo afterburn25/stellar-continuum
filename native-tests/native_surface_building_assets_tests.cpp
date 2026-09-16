@@ -1,4 +1,5 @@
 #include "native_surface_building_assets.hpp"
+#include "native_surface_building_presentation.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -13,6 +14,15 @@ namespace s = stellar::native_surface_building;
 using stellar::native_map::ImagePreparationQueue;
 using stellar::native_map::RgbaImage;
 using namespace std::chrono_literals;
+namespace stellar::native_colony_ui {
+native_map::Point SurfaceViewport::world_to_screen(
+    double x, double z, native_map::UiRect terrain) const noexcept {
+  return {static_cast<float>(terrain.x + terrain.width * .5 +
+                             (x - center_x) * pixels_per_unit),
+          static_cast<float>(terrain.y + terrain.height * .5 +
+                             (z - center_z) * pixels_per_unit)};
+}
+} // namespace stellar::native_colony_ui
 namespace {
 void check(bool value, const char *message) { if (!value) throw std::runtime_error(message); }
 const s::SurfaceBuildingAssetScope scope{1, 2, 3, 4};
@@ -209,12 +219,149 @@ void real_worker_prepares_geometry_and_image() {
         result[0].prepared->state.rotation_degrees == 90 && result[0].prepared->input_triangles > 10,
         "Real geometry/raster path failed through the Engine worker.");
 }
+
+stellar::native_colony::NativeColonyView presentation_view() {
+  using namespace stellar::native_colony;
+  NativeColonyView view;
+  view.campaign_generation = 11;
+  view.revision = 12;
+  view.player_civilization_id = 1;
+  view.system_id = 2;
+  view.body_id = 3;
+  view.colony_id = 4;
+  view.solid_surface = true;
+  view.surface_hub_level = 3;
+  view.available_buildings.push_back({.type_id = "fabricator"});
+  view.construction_sites.push_back({.building_id = 9,
+                                     .type_id = "fabricator",
+                                     .x = 80,
+                                     .z = 60,
+                                     .rotation_degrees = 90,
+                                     .progress_fraction = 1,
+                                     .complete = true,
+                                     .powered = true,
+                                     .staffed = true,
+                                     .enabled = true,
+                                     .condition = 1});
+  return view;
+}
+
+void settle_presentation(
+    stellar::native_colony_ui::NativeSurfaceBuildingPresentation &presentation,
+    const stellar::native_colony::NativeColonyView &view,
+    stellar::native_colony_ui::SurfaceViewport viewport,
+    const std::optional<stellar::native_colony::NativeSurfacePlacementQuote>
+        &quote = std::nullopt) {
+  const auto deadline = std::chrono::steady_clock::now() + 10s;
+  for (;;) {
+    presentation.update(view, viewport, {0, 0, 900, 700}, quote);
+    const auto stats = presentation.stats();
+    if (!stats.pending && !stats.deferred)
+      return;
+    check(std::chrono::steady_clock::now() < deadline,
+          "Surface presentation did not settle.");
+    std::this_thread::sleep_for(1ms);
+  }
+}
+
+void presentation_binds_authoritative_ready_state() {
+  using namespace stellar::native_colony_ui;
+  using namespace stellar::native_colony;
+  auto queue = std::make_shared<ImagePreparationQueue>();
+  NativeSurfaceBuildingPresentation presentation(queue, fake);
+  auto view = presentation_view();
+  settle_presentation(presentation, view, {0, 0, 1});
+  const auto provider = presentation.provider();
+  const auto site = provider(9);
+  const auto hub = provider(std::nullopt);
+  check(site && site->expected_state.rotation_degrees == 90 &&
+            site->prepared->state == site->expected_state,
+        "Presentation did not bind the exact ready site state.");
+  check(hub && hub->expected_state.hub_level == 3 &&
+            !hub->expected_state.capital,
+        "Non-homeworld hub received capital ornament state.");
+  check(presentation.stats().ready == 2 && presentation.ready(),
+        "Presentation readiness disagreed with ready bindings.");
+
+  view.homeworld = true;
+  settle_presentation(presentation, view, {0, 0, 1});
+  check(presentation.provider()(std::nullopt)->expected_state.capital,
+        "Authoritative homeworld did not select capital hub state.");
+
+  NativeSurfacePlacementQuote quote;
+  quote.campaign_generation = view.campaign_generation;
+  quote.colony_revision = view.revision;
+  quote.player_civilization_id = view.player_civilization_id;
+  quote.system_id = view.system_id;
+  quote.body_id = view.body_id;
+  quote.colony_id = view.colony_id;
+  quote.type_id = "fabricator";
+  quote.x = 15;
+  quote.z = -20;
+  quote.normalized_rotation_degrees = 270;
+  settle_presentation(presentation, view, {0, 0, 1}, quote);
+  check(presentation.preview() &&
+            presentation.preview()->expected_state.rotation_degrees == 270 &&
+            presentation.provider()(9).has_value(),
+        "Detached quote did not preserve identity/yaw beside site bindings.");
+  ++quote.colony_revision;
+  settle_presentation(presentation, view, {0, 0, 1}, quote);
+  check(!presentation.preview(),
+        "Stale detached quote survived authoritative revision validation.");
+
+  auto changed = view;
+  ++changed.campaign_generation;
+  changed.construction_sites.front().building_id = 10;
+  settle_presentation(presentation, changed, {0, 0, 1});
+  const auto changed_provider = presentation.provider();
+  check(!changed_provider(9) && changed_provider(10),
+        "Campaign scope change retained an old site binding.");
+  presentation.clear();
+  check(!presentation.provider()(10) && !presentation.preview() &&
+            presentation.stats().requested == 0,
+        "Presentation clear retained scope resources.");
+}
+
+void presentation_tiers_and_failures_are_bounded() {
+  using namespace stellar::native_colony_ui;
+  auto view = presentation_view();
+  view.surface_hub_level = 0;
+  auto queue = std::make_shared<ImagePreparationQueue>();
+  NativeSurfaceBuildingPresentation presentation(queue, fake);
+  settle_presentation(presentation, view, {0, 0, 1});
+  const auto first = presentation.stats().cache;
+  settle_presentation(presentation, view, {10, -10, 4});
+  const auto panned = presentation.stats().cache;
+  check(panned.admitted == first.admitted,
+        "Pan or same-tier zoom churned a prepared raster key.");
+  settle_presentation(presentation, view, {10, -10, 4.01});
+  const auto high = presentation.stats().cache;
+  check(high.admitted == first.admitted + 1 && high.entries <= 48 &&
+            high.cached_bytes <= s::NativeSurfaceBuildingAssets::maximum_cached_bytes,
+        "Resolution-tier transition was not singular and bounded.");
+
+  std::atomic<int> calls{};
+  NativeSurfaceBuildingPresentation failing(
+      std::make_shared<ImagePreparationQueue>(),
+      [&](const auto &, const auto &) -> s::SurfaceBuildingRasterResult {
+        ++calls;
+        throw std::runtime_error("latched presentation failure");
+      });
+  settle_presentation(failing, view, {0, 0, 1});
+  for (int index = 0; index < 10; ++index)
+    failing.update(view, {0, 0, 1}, {0, 0, 900, 700}, std::nullopt);
+  check(calls == 1 && failing.stats().failed == 1 &&
+            failing.stats().cache.pending == 0,
+        "Presentation retried a latched preparation failure.");
+}
 } // namespace
 int main() {
   try {
     coalescing_normalized_keys_and_owner(); stale_work_and_shared_capacity();
     failures_latch_and_invalid_requests_do_not_start(); output_metadata_is_checked();
     admission_memory_and_lru_are_bounded(); real_worker_prepares_geometry_and_image();
+    presentation_binds_authoritative_ready_state();
+    presentation_tiers_and_failures_are_bounded();
     std::cout << "Native surface building preparation/cache checks passed.\n";
     return 0;
   } catch (const std::exception &error) {

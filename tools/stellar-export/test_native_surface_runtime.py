@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_surface_runtime import validate_native_surface_export
+from native_surface_runtime import _validate_surface_art_pixels, validate_native_surface_export
 
 
 def base_payload():
@@ -36,6 +36,30 @@ def bmp(width, height):
     return (b"BM" + struct.pack("<IHHI", size, 0, 0, 54) +
             struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
                         length, 2835, 2835, 0, 0) + pixels)
+
+
+def logical_bmp(width, height, *, bits, top_down, offset, changed=frozenset()):
+    channels = bits // 8
+    stride = ((width * bits + 31) // 32) * 4
+    rows = []
+    for stored_y in range(height):
+        y = stored_y if top_down else height - stored_y - 1
+        row = bytearray(stride)
+        for x in range(width):
+            color = [17 + x, 31 + y, 47 + (x + y) % 100]
+            if (x, y) in changed:
+                color[0] ^= 7
+            at = x * channels
+            row[at:at + 3] = bytes(color)
+            if channels == 4:
+                row[at + 3] = 255
+        rows.append(row)
+    pixels = b"".join(rows)
+    size = offset + len(pixels)
+    header = (b"BM" + struct.pack("<IHHI", size, 0, 0, offset) +
+              struct.pack("<IiiHHIIiiII", 40, width, -height if top_down else height,
+                          1, bits, 0, len(pixels), 2835, 2835, 0, 0))
+    return header + bytes(offset - len(header)) + pixels
 
 
 class NativeSurfaceRuntimeTests(unittest.TestCase):
@@ -82,6 +106,12 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                              "persisted_site": True, "paused": True}
                     state["render"] = {"sites": 1, "meshes": 3, "triangles": 24,
                                         "road_segments": 1}
+                    art = {"requested": 2, "ready": 2, "pending": 0, "deferred": 0, "failed": 0,
+                           "replaced": 2, "entries": 2, "cache_bytes": 1024, "reserved_bytes": 0,
+                           "admitted": 2, "completed": 2, "canceled": 0, "terrain": [100, 100, 300, 300]}
+                    if fault == "art_bad_terrain": art["terrain"] = [100, 100, "bad", 300]
+                    if fault == "art_ready_mismatch": art["ready"] = 1
+                    if fault == "art_zero_entries": art["entries"] = 0
                     if not reload:
                         payload["SavedAtUtc"] = "ordered"
                         payload["SimulationDays"] = .5
@@ -120,13 +150,27 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                     save.write_text(json.dumps(payload), encoding="utf-8")
                     flag = "--surface-reload-smoke" if reload else "--surface-smoke"
                     capture = Path(args[args.index(flag) + 1])
-                    stdout = ("gpu_driver=vulkan systems=500 image_uploads=9 save=ok " +
+                    stdout = ("gpu_driver=vulkan systems=500 image_uploads=9 save=ok\n" +
+                              "surface_art=" + json.dumps(art, separators=(",", ":")) + "\n" +
                               "surface=" + json.dumps(state, separators=(",", ":")))
                 if fault != "capture":
                     image = bmp(width - 1 if fault == "geometry" else width, height)
                     if fault == "truncated":
                         image = bytearray(image[:-64]); struct.pack_into("<I", image, 2, len(image)); image = bytes(image)
                     capture.write_bytes(image)
+                    sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
+                    if fault != "art_missing_sidecar":
+                        side = bytearray(image); stride = ((width * 24 + 31) // 32) * 4
+                        changed = ((0, 0, 10, 10) if fault == "art_outside" else
+                                   (100, 100, 11, 9) if fault == "art_too_few" else
+                                   (100, 100, 0, 0) if fault in ("art_unchanged", "art_header_only") else
+                                   (100, 100, 100, 100))
+                        left, top, changed_width, changed_height = changed
+                        for py in range(top, top + changed_height):
+                            for px in range(left, left + changed_width):
+                                at = 54 + (height - py - 1) * stride + px * 3; side[at] ^= 7
+                        if fault == "art_header_only": side[6] ^= 1
+                        sidecar.write_bytes(side)
                 if fault == "renderer": stdout = stdout.replace("gpu_driver=vulkan", "gpu_driver=software")
                 if fault == "uploads" and "--smoke" not in args: stdout = stdout.replace("image_uploads=9", "image_uploads=0")
                 calls.append(args)
@@ -136,6 +180,8 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                 result = validate_native_surface_export(package, {})
             self.assertEqual(len(calls), 3)
             self.assertNotIn("--load", calls[0]); self.assertTrue(all("--load" in c for c in calls[1:]))
+            self.assertNotIn("--profile-frames", calls[0])
+            self.assertTrue(all(c[-2:] == ["--profile-frames", "120"] for c in calls[1:]))
             self.assertTrue(result["nativeSurfaceFreshOwnedEarth"])
             self.assertTrue(result["nativeSurfacePlayerInput"])
             self.assertTrue(result["nativeSurfacePausedReload"])
@@ -218,6 +264,32 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("geometry")
     def test_truncated_capture_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("truncated")
+    def test_unchanged_surface_art_sidecar_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_unchanged")
+    def test_header_only_surface_art_sidecar_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_header_only")
+    def test_fewer_than_100_surface_art_pixels_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_too_few")
+    def test_surface_art_pixels_outside_terrain_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_outside")
+    def test_malformed_surface_art_terrain_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_bad_terrain")
+    def test_surface_art_ready_mismatch_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_ready_mismatch")
+    def test_surface_art_zero_entries_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_zero_entries")
+    def test_missing_surface_art_sidecar_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("art_missing_sidecar")
+    def test_surface_art_comparison_decodes_each_bmp_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            capture = root / "capture.bmp"
+            fallback = root / "fallback.bmp"
+            changed = {(x, y) for y in range(10) for x in range(10)}
+            capture.write_bytes(logical_bmp(20, 20, bits=24, top_down=False, offset=54))
+            fallback.write_bytes(logical_bmp(20, 20, bits=32, top_down=True,
+                                             offset=70, changed=changed))
+            _validate_surface_art_pixels(capture, fallback, 20, 20, [0, 0, 20, 20])
     def test_fresh_format_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("fresh_format")
     def test_fresh_system_count_rejected(self):

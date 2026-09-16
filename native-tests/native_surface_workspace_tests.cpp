@@ -26,6 +26,36 @@ Point center(UiRect value) {
   return {value.x + value.width * .5f, value.y + value.height * .5f};
 }
 
+ReadySurfaceBuildingImage ready_image(
+    const stellar::native_surface_building::SurfaceBuildingStateKey &key,
+    int size = 64) {
+  using namespace stellar::native_surface_building;
+  SurfaceBuildingRasterSpec spec;
+  spec.width = spec.height = size;
+  spec.camera.half_extent = 30;
+  std::vector<std::uint8_t> pixels(
+      static_cast<std::size_t>(size) * size * 4, 255);
+  auto prepared = std::make_shared<PreparedSurfaceBuildingRaster>();
+  prepared->state = key;
+  prepared->image = RgbaImage::create(size, size, std::move(pixels));
+  prepared->projection = {{size * .5f, size * .5f},
+                          {1, 1, static_cast<float>(size - 2),
+                           static_cast<float>(size - 2)},
+                          17};
+  prepared->input_triangles = prepared->rasterized_triangles = 1;
+  prepared->pixel_tests = 1;
+  return {key, spec, std::move(prepared)};
+}
+
+std::size_t image_uses(const DrawList &draw,
+                       const std::shared_ptr<const RgbaImage> &resource) {
+  return static_cast<std::size_t>(std::ranges::count_if(
+      draw.overlay, [&](const auto &command) {
+        const auto *image = std::get_if<Image>(&command);
+        return image && image->resource == resource;
+      }));
+}
+
 NativeColonyView colony() {
   NativeColonyView value;
   value.campaign_generation = 5;
@@ -421,6 +451,89 @@ void surface_scene_rotation_and_families() {
           "advanced functional family fell back to the generic silhouette");
 }
 
+void workspace_ready_images_and_preview_identity() {
+  using namespace stellar::native_surface_building;
+  auto view = colony();
+  auto &existing = view.construction_sites.front();
+  SurfaceBuildingState existing_state{
+      .type_id = existing.type_id,
+      .rotation_degrees = existing.rotation_degrees,
+      .complete = existing.complete,
+      .progress_fraction = existing.progress_fraction,
+      .powered = existing.powered,
+      .enabled = existing.enabled,
+      .staffed = existing.staffed,
+      .condition = existing.condition};
+  const auto existing_key =
+      *normalize_surface_building_state(existing_state).key;
+  auto existing_ready = ready_image(existing_key);
+  const auto existing_resource = existing_ready.prepared->image;
+  SurfaceBuildingReadyProvider provider =
+      [existing_ready](std::optional<int> id)
+      -> std::optional<ReadySurfaceBuildingImage> {
+    return id == 9 ? std::optional{existing_ready} : std::nullopt;
+  };
+
+  NativeSurfaceWorkspace workspace;
+  workspace.open(view, 1280, 720);
+  workspace.set_building_images(provider);
+  DrawList ready_draw;
+  workspace.render(ready_draw, 1280, 720);
+  require(image_uses(ready_draw, existing_resource) == 1 &&
+              workspace.scene_diagnostics().replaced_structures == 1,
+          "workspace did not render its ready scene image");
+
+  auto stale = existing_ready;
+  stale.expected_state.rotation_degrees = 0;
+  workspace.set_building_images(
+      [stale](std::optional<int> id)
+          -> std::optional<ReadySurfaceBuildingImage> {
+        return id == 9 ? std::optional{stale} : std::nullopt;
+      });
+  DrawList stale_draw;
+  workspace.render(stale_draw, 1280, 720);
+  require(image_uses(stale_draw, existing_resource) == 0 &&
+              workspace.scene_diagnostics().replaced_structures == 0,
+          "workspace accepted stale scene-image state");
+
+  workspace.open(view, 1280, 720);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
+  (void)workspace.handle(
+      {InputEventType::LeftPressed,
+       {layout.palette_rows.x + 10, layout.palette_rows.y + 10}},
+      1280, 720);
+  NativeSurfacePlacementQuote quote;
+  quote.type_id = "fabricator";
+  quote.x = 20;
+  quote.z = -15;
+  quote.normalized_rotation_degrees = 90;
+  quote.accepted = true;
+  workspace.set_placement_quote(quote, false);
+  SurfaceBuildingState preview_state{
+      .type_id = "fabricator",
+      .rotation_degrees = 90,
+      .complete = true,
+      .progress_fraction = 1,
+      .powered = true,
+      .enabled = true,
+      .staffed = true,
+      .condition = 1};
+  auto preview = ready_image(*normalize_surface_building_state(preview_state).key);
+  const auto preview_resource = preview.prepared->image;
+  workspace.set_building_images({}, preview);
+  DrawList preview_draw;
+  workspace.render(preview_draw, 1280, 720);
+  require(image_uses(preview_draw, preview_resource) == 1,
+          "matching selected type and quoted yaw did not render preview image");
+
+  preview.expected_state.rotation_degrees = 0;
+  workspace.set_building_images({}, preview);
+  DrawList wrong_yaw;
+  workspace.render(wrong_yaw, 1280, 720);
+  require(image_uses(wrong_yaw, preview_resource) == 0,
+          "preview image ignored the exact quoted yaw identity");
+}
+
 void surface_scene_route_cache_and_bounds() {
   auto site = colony().construction_sites.front();
   site.complete = site.enabled = site.powered = site.staffed = true;
@@ -584,6 +697,7 @@ int main() try {
   pending_ghost_cancellation();
   surface_scene_geometry();
   surface_scene_rotation_and_families();
+  workspace_ready_images_and_preview_identity();
   surface_scene_route_cache_and_bounds();
   std::cout << "native surface workspace tests passed\n";
   return 0;

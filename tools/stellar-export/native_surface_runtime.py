@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_client_runtime import _validate_capture
 
 _FIELDS = {
     "mode", "system_id", "body_id", "colony_id", "type_id", "site_id",
@@ -131,6 +132,65 @@ def _bmp(path: Path, width: int, height: int):
     if not pixels or min(pixels) == max(pixels):
         raise RuntimeError("Native surface capture contains no rendered variation")
 
+def _surface_art(stdout: str) -> dict:
+    rows = re.findall(r"(?m)^surface_art=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1: raise RuntimeError("Native surface art diagnostic is missing or duplicated")
+    try: state = json.loads(rows[0])
+    except ValueError as error: raise RuntimeError("Native surface art diagnostic is malformed") from error
+    fields = {"requested","ready","pending","deferred","failed","replaced","entries","cache_bytes","reserved_bytes","admitted","completed","canceled","terrain"}
+    if not isinstance(state, dict) or set(state) != fields or not isinstance(state["terrain"], list) or len(state["terrain"]) != 4: raise RuntimeError("Native surface art diagnostic has an invalid schema")
+    if any(type(state[k]) is not int or state[k] < 0 for k in fields - {"terrain"}): raise RuntimeError("Native surface art counters are invalid")
+    if (state["requested"] > 130 or state["entries"] < 1 or state["entries"] > 48 or state["cache_bytes"] + state["reserved_bytes"] > 24*1024*1024 or state["pending"] or state["deferred"] or state["failed"] or state["replaced"] < 2 or state["ready"] != state["requested"] or state["ready"] < 2 or state["replaced"] > state["ready"] or state["reserved_bytes"] != 0): raise RuntimeError("Native surface art diagnostic violates its bounded contract")
+    if any(type(v) not in (int, float) or not math.isfinite(v) for v in state["terrain"]): raise RuntimeError("Native surface art terrain is invalid")
+    return state
+
+
+def _bmp_rgb_rows(path: Path, width: int, height: int):
+    data = path.read_bytes() if path.is_file() else b""
+    if len(data) < 54 or data[:2] != b"BM":
+        raise RuntimeError("Native surface art sidecar is not a BMP frame")
+    declared = struct.unpack_from("<I", data, 2)[0]
+    offset = struct.unpack_from("<I", data, 10)[0]
+    header = struct.unpack_from("<I", data, 14)[0]
+    actual_width, signed_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
+    compression = struct.unpack_from("<I", data, 30)[0]
+    channels = bits // 8
+    stride = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
+    required = stride * abs(signed_height)
+    if (declared != len(data) or offset < 54 or header < 40 or
+            actual_width != width or abs(signed_height) != height or planes != 1 or
+            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
+            offset + required > len(data)):
+        raise RuntimeError("Native surface art sidecar has invalid renderer geometry")
+
+    pixels = memoryview(data)
+    rows = []
+    for y in range(height):
+        stored_y = height - y - 1 if signed_height > 0 else y
+        start = offset + stored_y * stride
+        rows.append((pixels, start, channels))
+    return rows
+
+
+def _validate_surface_art_pixels(capture: Path, fallback: Path, width: int, height: int, terrain):
+    _validate_capture(capture, width, height)
+    _validate_capture(fallback, width, height)
+    base_rows = _bmp_rgb_rows(capture, width, height)
+    alt_rows = _bmp_rgb_rows(fallback, width, height)
+    x, y, w, h = terrain
+    if w <= 0 or h <= 0 or x < -2 or y < -2 or x + w > width + 2 or y + h > height + 2: raise RuntimeError("Native surface art terrain is outside the capture")
+    inside = outside = 0
+    for py in range(height):
+        base, base_start, base_channels = base_rows[py]
+        alt, alt_start, alt_channels = alt_rows[py]
+        for px in range(width):
+            base_at = base_start + px * base_channels
+            alt_at = alt_start + px * alt_channels
+            if base[base_at:base_at + 3] != alt[alt_at:alt_at + 3]:
+                if x - 2 <= px <= x + w + 2 and y - 2 <= py <= y + h + 2: inside += 1
+                else: outside += 1
+    if inside < 100 or outside: raise RuntimeError("Native surface art sidecar did not isolate building pixels")
+
 
 def _player_parts(payload):
     galaxy = payload.get("Galaxy", {})
@@ -227,7 +287,7 @@ def _launch(args, cwd, env, label):
 def validate_native_surface_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics = [], []
+    captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-surface-") as temporary:
         work = Path(temporary)
         save = work / "fresh.player17.json"
@@ -252,12 +312,18 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 (1920, 1080, "--surface-reload-smoke", "paused_reload")):
             capture = work / f"surface-{mode}-{width}x{height}.bmp"
             result, uploads = _launch(common + ["--width", str(width), "--height", str(height),
-                                                flag, str(capture), "--load"],
+                                                flag, str(capture), "--load",
+                                                "--profile-frames", "120"],
                                       work, clean, mode)
             if uploads < 1:
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
+            art_diagnostics.append(_surface_art(result.stdout))
             _bmp(capture, width, height)
+            sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
+            _validate_capture(sidecar, width, height)
+            _validate_surface_art_pixels(capture, sidecar, width, height, art_diagnostics[-1]["terrain"])
+            (folder.parent / f"{folder.name}-surface-{width}x{height}.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
                 raise RuntimeError("Native surface wrote a noncurrent Player17 save")
@@ -275,10 +341,12 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             evidence = folder.parent / f"{folder.name}-surface-{width}x{height}.bmp"
             shutil.copy2(capture, evidence)
             captures.append(str(evidence)); diagnostics.append(result.stdout.strip())
+            art_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-without-buildings.bmp"; shutil.copy2(sidecar, art_evidence); art_captures.append(str(art_evidence))
     return {"nativeSurfaceFreshOwnedEarth": True,
             "nativeSurfacePlayerInput": True,
             "nativeSurfacePausedReload": True,
             "surfaceCaptures": captures,
-            "surfaceDiagnostics": diagnostics,
+            "surfaceDiagnostics": diagnostics, "surfaceArtDiagnostics": art_diagnostics,
+            "surfaceArtCaptures": art_captures,
             "surfaceFixture": "unaltered standard fresh 500-system Player17 campaign",
             "surfaceDemolition": "completed-site demolition remains controller-test evidence"}

@@ -93,8 +93,8 @@ public:
       const auto b1 = point(bottom, -height * .5f, next);
       const auto t0 = point(top, height * .5f, index);
       const auto t1 = point(top, height * .5f, next);
-      triangle(b0, b1, t1, material);
-      triangle(b0, t1, t0, material);
+      triangle(b0, t1, b1, material);
+      triangle(b0, t0, t1, material);
       triangle(bottom_center, b0, b1, material);
       triangle(top_center, t1, t0, material);
     }
@@ -118,16 +118,16 @@ public:
     const auto bottom = add(rotate({0, -radii.y, 0}, rotation), at);
     const auto top = add(rotate({0, radii.y, 0}, rotation), at);
     for (int index = 0; index < segments; ++index)
-      triangle(bottom, point(1, index + 1), point(1, index), material);
+      triangle(bottom, point(1, index), point(1, index + 1), material);
     for (int ring = 1; ring < rings - 1; ++ring)
       for (int index = 0; index < segments; ++index) {
-        triangle(point(ring, index), point(ring, index + 1),
-                 point(ring + 1, index + 1), material);
         triangle(point(ring, index), point(ring + 1, index + 1),
-                 point(ring + 1, index), material);
+                 point(ring, index + 1), material);
+        triangle(point(ring, index), point(ring + 1, index),
+                 point(ring + 1, index + 1), material);
       }
     for (int index = 0; index < segments; ++index)
-      triangle(point(rings - 1, index), point(rings - 1, index + 1), top,
+      triangle(point(rings - 1, index + 1), point(rings - 1, index), top,
                material);
   }
 

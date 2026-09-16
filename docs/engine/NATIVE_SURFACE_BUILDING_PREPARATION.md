@@ -1,11 +1,11 @@
 # Native surface building preparation
 
-This checkpoint extracts Devin `58aaf475` building geometry and adds bounded
-background preparation through the existing Engine `ImagePreparationQueue`.
-It is maintained native C++ preparation code with tests. It is not yet connected
-to the live colony workspace; the existing terrain, building meshes, placement,
-selection and roads remain active. No new surface screenshot or performance
-claim is attributed to this preparation-only checkpoint.
+The preparation checkpoint c4c99fa5 extracted Devin `58aaf475` building
+geometry and added bounded background preparation through the existing Engine
+`ImagePreparationQueue`. Live integration is now documented in
+`NATIVE_SURFACE_BUILDING_PRESENTATION.md`; this document retains the original
+preparation contracts and validation basis. A subsequent visual review corrected
+inward cylinder/ellipsoid faces without changing their geometry or footprints.
 
 ## State and authority
 
@@ -98,14 +98,9 @@ Logs: `work/native-surface-building-stage-build.log` and
 `work/native-surface-building-stage-test.log`. The extraction worker's earlier
 isolated build is additional evidence, not a replacement for the final tests.
 
-## Next integration gate
+## Live integration
 
-Connect requested state to the observer-owned colony view, prepare only visible
-keys, and place images using projected ground anchors and camera scale. Keep
-canonical footprint selection, preview rotation, placement costs and road
-obstruction checks. Draw prepared structures in depth order above ground/roads
-and below selection/status; pending meshes must remain coherent with that order.
-The host must not infer capital from a display name or apply human architecture
-as purported alien art. Validate actual mixed-building 720p/1080p captures,
-rotation/preview, completed/unfinished states, paused save equality and cold/churn
-owner-frame timing before claiming live surface integration.
+The observer-owned workspace adapter, grounded image drawing, fallback ordering,
+preview identity, cosmetic road endpoints and actual 720p/1080p evidence are
+covered in `NATIVE_SURFACE_BUILDING_PRESENTATION.md` and the current migration
+handoff. This remains a fixed oblique image layer, not a navigable 3D surface.

@@ -76,6 +76,7 @@ std::string signature(const NativeColonyView &view) {
   append(out, view.population_species_id);
   append(out, view.resource_outpost);
   append(out, view.solid_surface);
+  append(out, view.homeworld);
   append(out, view.currency.name);
   append(out, view.currency.code);
   append(out, view.currency.symbol);
@@ -249,6 +250,17 @@ NativeColonyViewResult NativeColonyController::build(
   view.body_display_name = shown_body->name;
   view.population_species_id = colony->population_species_id;
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
+  if (system.system_id == current.player.home_system_id) {
+    // Use the same Core body resolution as campaign seeding, never display names.
+    // A later hostile environment must not prevent the colony UI from opening.
+    try {
+      view.homeworld = resolve_species_homeworld(current.player.id,
+          current.player.species_id, current.player.home_system_id,
+          current.world.bodies).planetary_body_id == selected_body_id;
+    } catch (const std::invalid_argument &) {
+      view.homeworld = false;
+    }
+  }
   view.solid_surface = shown_body->details && shown_body->details->has_solid_surface;
   view.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);

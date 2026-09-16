@@ -5,6 +5,7 @@
 #include <map>
 #include <numbers>
 #include <stdexcept>
+#include <iterator>
 #include <stellar/core/surface_construction.hpp>
 #include <stellar/core/surface_economy.hpp>
 #include <string_view>
@@ -13,6 +14,7 @@ namespace stellar::native_colony_ui {
 namespace {
 using namespace stellar::native_map;
 using stellar::native_colony::NativeSurfaceSite;
+using namespace stellar::native_surface_building;
 constexpr std::size_t max_triangles = 8192, max_road_segments = 192;
 constexpr std::size_t max_sites = 128, max_type_id_bytes = 256;
 constexpr float road_half_width = 2.7f, clearance = 4.5f;
@@ -39,6 +41,11 @@ struct Batch {
 };
 using Layers = std::array<std::map<Color, Batch, ColorOrder>,
                           static_cast<std::size_t>(Layer::Count)>;
+struct DepthItem {
+  float depth{};
+  int stable_id{};
+  std::vector<UiOverlayCommand> commands;
+};
 constexpr Color road{31, 39, 44, 235}, apron{76, 84, 87, 235},
     road_edge{88, 98, 101, 235}, road_marking{145, 135, 99, 225},
     shadow{18, 25, 29, 145}, metal{105, 118, 123, 250},
@@ -181,6 +188,57 @@ Color status(const NativeSurfaceSite &s) {
   if (!s.staffed)
     return {85, 159, 179, 255};
   return light;
+}
+
+std::optional<SurfaceBuildingStateKey> state_for(const NativeSurfaceSite &s) {
+  SurfaceBuildingState state;
+  state.type_id = s.type_id;
+  state.rotation_degrees = s.rotation_degrees;
+  state.complete = s.complete;
+  state.progress_fraction = s.progress_fraction;
+  state.powered = s.powered;
+  state.enabled = s.enabled;
+  state.staffed = s.staffed;
+  state.condition = s.condition;
+  auto normalized = normalize_surface_building_state(state);
+  return normalized ? normalized.key : std::nullopt;
+}
+
+void move_layer(Layers &from, Layer layer, Layers &to) {
+  auto &source = from[static_cast<std::size_t>(layer)];
+  auto &target = to[static_cast<std::size_t>(layer)];
+  for (auto &[color, batch] : source) {
+    auto &destination = target[color];
+    const auto base = static_cast<int>(destination.vertices.size());
+    destination.vertices.insert(destination.vertices.end(),
+                                std::make_move_iterator(batch.vertices.begin()),
+                                std::make_move_iterator(batch.vertices.end()));
+    for (const auto index : batch.indices)
+      destination.indices.push_back(base + index);
+  }
+  source.clear();
+}
+
+std::vector<UiOverlayCommand> take_structure(Layers &layers, UiRect terrain) {
+  std::vector<UiOverlayCommand> result;
+  for (auto layer : {Layer::Structure, Layer::Roof, Layer::Detail})
+    for (auto &[color, batch] : layers[static_cast<std::size_t>(layer)])
+      if (!batch.indices.empty())
+        result.emplace_back(TriangleMesh{std::move(batch.vertices),
+                                         std::move(batch.indices), color,
+                                         terrain});
+  return result;
+}
+
+void emit_layer(DrawList &out, Layers &layers, Layer layer,
+                NativeSurfaceSceneDiagnostics &diagnostics, UiRect terrain) {
+  for (auto &[color, batch] : layers[static_cast<std::size_t>(layer)])
+    if (!batch.indices.empty()) {
+      out.overlay.emplace_back(TriangleMesh{std::move(batch.vertices),
+                                            std::move(batch.indices), color,
+                                            terrain});
+      ++diagnostics.meshes;
+    }
 }
 
 void building(Layers &l, const NativeSurfaceSite &s, Point c, float scale,
@@ -356,7 +414,8 @@ NativeSurfaceSceneDiagnostics
 NativeSurfaceScene::append(DrawList &out, const SurfaceViewport &v,
                            UiRect terrain,
                            const std::vector<NativeSurfaceSite> &sites,
-                           std::optional<int> selected, int hub_level) const {
+                           std::optional<int> selected, int hub_level,
+                           const SurfaceBuildingReadyProvider *provider) const {
   NativeSurfaceSceneDiagnostics result{};
   if (sites.size() > max_sites)
     throw std::invalid_argument("Surface scene site limit exceeded.");
@@ -375,6 +434,7 @@ NativeSurfaceScene::append(DrawList &out, const SurfaceViewport &v,
         s.type_id.size() > max_type_id_bytes)
       throw std::invalid_argument("Invalid persisted surface site geometry.");
   Layers layers;
+  std::vector<DepthItem> depth_items;
   refresh_roads(sites);
   float scale = static_cast<float>(v.pixels_per_unit);
   const bool dense = sites.size() > 24;
@@ -385,6 +445,16 @@ NativeSurfaceScene::append(DrawList &out, const SurfaceViewport &v,
                                  terrain),
            b = v.world_to_screen(r.points[i].first, r.points[i].second,
                                  terrain);
+      // Continue the cosmetic endpoints beneath each foundation. The routed
+      // path and its obstruction checks still end at canonical footprint edges;
+      // an oblique foundation covers less screen area than that top-down circle.
+      if (provider && i == 1)
+        a = v.world_to_screen(0, 0, terrain);
+      if (provider && i + 1 == r.points.size()) {
+        const auto site = std::ranges::find(sites, r.building_id,
+                                           &NativeSurfaceSite::building_id);
+        if (site != sites.end()) b = v.world_to_screen(site->x, site->z, terrain);
+      }
       float hw = road_half_width * scale;
       if (!finite(a) || !finite(b) ||
           !intersects({std::min(a.x, b.x) - hw, std::min(a.y, b.y) - hw,
@@ -401,27 +471,125 @@ NativeSurfaceScene::append(DrawList &out, const SurfaceViewport &v,
     }
   auto hub = v.world_to_screen(0, 0, terrain);
   float hr = stellar::core::surface_hub_radius * scale;
-  if (finite(hub) &&
-      intersects({hub.x - hr, hub.y - hr, 2 * hr, 2 * hr}, terrain)) {
-    polygon(layers, Layer::Ground, apron, hub, hr, 16, 0, result.triangles);
-    polygon(layers, Layer::Structure, metal, hub, hr * .72f, 12, 0,
-            result.triangles);
-    const int hub_sides = hub_level >= 3 ? 16 : hub_level >= 2 ? 12 : 8;
-    polygon(layers, Layer::Roof, glass, hub, hr * .42f, hub_sides, .25f,
-            result.triangles);
-    if (hub_level >= 3)
-      polygon(layers, Layer::Roof, light, hub, hr * .18f, 8, 0,
+  const auto hub_visible = finite(hub) &&
+                           intersects({hub.x - hr, hub.y - hr, 2 * hr, 2 * hr},
+                                      terrain);
+  if (!provider) {
+    if (hub_visible) {
+      polygon(layers, Layer::Ground, apron, hub, hr, 16, 0, result.triangles);
+      polygon(layers, Layer::Structure, metal, hub, hr * .72f, 12, 0,
               result.triangles);
-    ring(layers, Layer::Detail, light, hub, hr * .76f, hr * .82f, 16, 0,
-         result.triangles);
+      const int hub_sides = hub_level >= 3 ? 16 : hub_level >= 2 ? 12 : 8;
+      polygon(layers, Layer::Roof, glass, hub, hr * .42f, hub_sides, .25f,
+              result.triangles);
+      if (hub_level >= 3)
+        polygon(layers, Layer::Roof, light, hub, hr * .18f, 8, 0,
+                result.triangles);
+      ring(layers, Layer::Detail, light, hub, hr * .76f, hr * .82f, 16, 0,
+           result.triangles);
+    }
+  } else {
+    std::optional<PlacedSurfaceBuildingImage> ready_hub;
+    try {
+      if (const auto ready = (*provider)(std::nullopt);
+          ready && ready->expected_state.hub_level == hub_level)
+        ready_hub = place_surface_building_image(
+            ready->prepared, ready->expected_state, ready->spec, 0, 0, v,
+            terrain);
+    } catch (...) {
+      ready_hub.reset();
+    }
+    if (hub_visible || ready_hub) {
+      Layers temporary;
+      std::size_t temporary_triangles{};
+      // Prepared sprites include their projected foundation. An additional
+      // top-down circular apron creates a false raised wall below the image.
+      if (hub_visible && !ready_hub) {
+        polygon(temporary, Layer::Ground, apron, hub, hr, 16, 0,
+                temporary_triangles);
+        polygon(temporary, Layer::Structure, metal, hub, hr * .72f, 12, 0,
+                temporary_triangles);
+        const int hub_sides = hub_level >= 3 ? 16 : hub_level >= 2 ? 12 : 8;
+        polygon(temporary, Layer::Roof, glass, hub, hr * .42f, hub_sides,
+                .25f, temporary_triangles);
+        if (hub_level >= 3)
+          polygon(temporary, Layer::Roof, light, hub, hr * .18f, 8, 0,
+                  temporary_triangles);
+        ring(temporary, Layer::Detail, light, hub, hr * .76f, hr * .82f, 16,
+             0, temporary_triangles);
+      }
+      const auto ground_triangles =
+          temporary[static_cast<std::size_t>(Layer::Ground)].empty()
+              ? std::size_t{}
+              : temporary[static_cast<std::size_t>(Layer::Ground)]
+                    .begin()
+                    ->second.indices.size() /
+                    3;
+      result.triangles += ground_triangles;
+      move_layer(temporary, Layer::Ground, layers);
+      if (ready_hub) {
+        DepthItem item{ready_hub->depth, -1, {}};
+        item.commands.emplace_back(std::move(ready_hub->image));
+        depth_items.push_back(std::move(item));
+        ++result.replaced_structures;
+      } else if (hub_visible) {
+        auto commands = take_structure(temporary, terrain);
+        for (const auto &command : commands)
+          if (const auto *mesh = std::get_if<TriangleMesh>(&command))
+            result.triangles += mesh->indices.size() / 3;
+        depth_items.push_back({hub.y, -1, std::move(commands)});
+      }
+    }
   }
-  for (auto &s : sites) {
+  for (const auto &s : sites) {
     auto c = v.world_to_screen(s.x, s.z, terrain);
     float rr = site_radius(s) * scale;
-    if (!finite(c) || !std::isfinite(rr) ||
-        !intersects({c.x - rr, c.y - rr, 2 * rr, 2 * rr}, terrain))
+    const auto footprint_visible =
+        finite(c) && std::isfinite(rr) &&
+        intersects({c.x - rr, c.y - rr, 2 * rr, 2 * rr}, terrain);
+    std::optional<PlacedSurfaceBuildingImage> ready_image;
+    if (provider)
+      try {
+        const auto expected = state_for(s);
+        if (expected)
+          if (const auto ready = (*provider)(s.building_id);
+              ready && ready->expected_state == *expected)
+            ready_image = place_surface_building_image(
+                ready->prepared, *expected, ready->spec, s.x, s.z, v,
+                terrain);
+      } catch (...) {
+        ready_image.reset();
+      }
+    if (!footprint_visible && !ready_image)
       continue;
-    building(layers, s, c, scale, dense, result.triangles);
+    if (!provider) {
+      building(layers, s, c, scale, dense, result.triangles);
+    } else {
+      Layers temporary;
+      std::size_t temporary_triangles{};
+      if (footprint_visible && !ready_image)
+        building(temporary, s, c, scale, dense, temporary_triangles);
+      for (const auto layer : {Layer::Ground})
+        for (const auto &[color, batch] :
+             temporary[static_cast<std::size_t>(layer)]) {
+          (void)color;
+          result.triangles += batch.indices.size() / 3;
+        }
+      move_layer(temporary, Layer::Ground, layers);
+      if (ready_image) {
+        DepthItem item{ready_image->depth, s.building_id, {}};
+        item.commands.emplace_back(std::move(ready_image->image));
+        depth_items.push_back(std::move(item));
+        ++result.replaced_structures;
+      } else {
+        auto commands = take_structure(temporary, terrain);
+        for (const auto &command : commands)
+          if (const auto *mesh = std::get_if<TriangleMesh>(&command))
+            result.triangles += mesh->indices.size() / 3;
+        depth_items.push_back(
+            {finite(c) ? c.y : 0.f, s.building_id, std::move(commands)});
+      }
+    }
     ++result.sites;
     float a = angle(s);
     if (selected && *selected == s.building_id)
@@ -446,14 +614,34 @@ NativeSurfaceScene::append(DrawList &out, const SurfaceViewport &v,
                 std::max(.7f, rr * .035f), result.triangles);
     }
   }
-  for (auto &layer : layers)
-    for (auto &[color, batch] : layer)
-      if (!batch.indices.empty()) {
-        out.overlay.emplace_back(TriangleMesh{std::move(batch.vertices),
-                                              std::move(batch.indices), color,
-                                              terrain});
-        ++result.meshes;
+  if (!provider) {
+    for (auto &layer : layers)
+      for (auto &[color, batch] : layer)
+        if (!batch.indices.empty()) {
+          out.overlay.emplace_back(TriangleMesh{std::move(batch.vertices),
+                                                std::move(batch.indices), color,
+                                                terrain});
+          ++result.meshes;
+        }
+  } else {
+    for (const auto layer : {Layer::RoadEdge, Layer::Roads,
+                             Layer::RoadMarking, Layer::Ground})
+      emit_layer(out, layers, layer, result, terrain);
+    std::stable_sort(depth_items.begin(), depth_items.end(),
+                     [](const auto &left, const auto &right) {
+                       return left.depth != right.depth
+                                  ? left.depth < right.depth
+                                  : left.stable_id < right.stable_id;
+                     });
+    for (auto &item : depth_items)
+      for (auto &command : item.commands) {
+        if (std::holds_alternative<TriangleMesh>(command))
+          ++result.meshes;
+        out.overlay.push_back(std::move(command));
       }
+    emit_layer(out, layers, Layer::Selection, result, terrain);
+    emit_layer(out, layers, Layer::Status, result, terrain);
+  }
   return result;
 }
 } // namespace stellar::native_colony_ui

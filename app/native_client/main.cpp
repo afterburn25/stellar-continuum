@@ -19,6 +19,7 @@
 #include "native_settlement_workspace.hpp"
 #include "native_surface_construction_controller.hpp"
 #include "native_surface_workspace.hpp"
+#include "native_surface_building_presentation.hpp"
 #include "native_construction_controller.hpp"
 #include "native_construction_workspace.hpp"
 #include "native_diplomacy_controller.hpp"
@@ -341,7 +342,7 @@ struct Options {
   if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
   if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
-  if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
+  if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
   if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
@@ -1964,6 +1965,7 @@ class NativeCampaign final {
       diplomacy_portraits_.clear();
       colony_workspace_.discard_campaign();
       surface_workspace_.discard_campaign();
+      surface_buildings_.clear();surface_buildings_active_=false;
       battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();battle_art_plan_.clear();
       settlement_workspace_.discard_campaign();
       colony_entry_view_.reset();
@@ -2272,10 +2274,51 @@ class NativeCampaign final {
           session_->cache().generation);
       territory_refresh_elapsed_=0.;
     }
+    update_surface_buildings(width,height);
     return true;
   }
 
-  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0:system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();}
+  void update_surface_buildings(int width,int height){
+    if(!surface_workspace_.visible()||!surface_workspace_.view()){
+      if(surface_buildings_active_){
+        surface_workspace_.set_building_images({});
+        surface_buildings_.clear();surface_buildings_active_=false;
+      }
+      return;
+    }
+    surface_buildings_active_=true;
+    surface_buildings_.update(*surface_workspace_.view(),surface_workspace_.viewport(),
+        SurfaceWorkspaceLayout::for_viewport(width,height).terrain,
+        surface_workspace_.placement_quote());
+    surface_workspace_.set_building_images(surface_buildings_.provider(),surface_buildings_.preview());
+    if(surface_buildings_.stats().failed)
+      surface_workspace_.set_artwork_notice("Detailed buildings unavailable. Reopen the surface to retry.");
+  }
+
+  void surface_building_smoke(int width,int height,const std::function<void(const DrawList&)>&draw){
+    if(!surface_workspace_.visible()||!surface_buildings_.ready())
+      throw std::runtime_error("Surface building capture requires ready owned-colony artwork.");
+    surface_workspace_.set_building_images({});
+    draw(scene(width,height));
+    surface_workspace_.set_building_images(surface_buildings_.provider(),surface_buildings_.preview());
+    (void)scene(width,height);
+  }
+
+  [[nodiscard]] std::string surface_building_status(int width,int height)const{
+    const auto stats=surface_buildings_.stats();
+    std::ostringstream out;
+    out<<"{\"requested\":"<<stats.requested<<",\"ready\":"<<stats.ready
+       <<",\"pending\":"<<stats.pending<<",\"deferred\":"<<stats.deferred
+       <<",\"failed\":"<<stats.failed<<",\"replaced\":"<<surface_workspace_.scene_diagnostics().replaced_structures
+       <<",\"entries\":"<<stats.cache.entries<<",\"cache_bytes\":"<<stats.cache.cached_bytes
+       <<",\"reserved_bytes\":"<<stats.cache.reserved_bytes<<",\"admitted\":"<<stats.cache.admitted
+       <<",\"completed\":"<<stats.cache.completed<<",\"canceled\":"<<stats.cache.canceled;
+    const auto terrain=SurfaceWorkspaceLayout::for_viewport(width,height).terrain;
+    out<<",\"terrain\":["<<terrain.x<<','<<terrain.y<<','<<terrain.width<<','<<terrain.height<<"]}";
+    return out.str();
+  }
+
+  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0&&surface_buildings_.ready():system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();}
 
   [[nodiscard]] DrawList scene(int width,int height){
     if(battle_workspace_.visible()&&!menu_){
@@ -3245,6 +3288,8 @@ class NativeCampaign final {
   NativeGalaxyBackdrop galaxy_backdrop_;
   double fitted_pixels_per_world_{.01};
   std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>()};
+  NativeSurfaceBuildingPresentation surface_buildings_{image_preparation_};
+  bool surface_buildings_active_{};
   NativePlanetDiscAssets planet_discs_;
   NativeShipArtAssets ship_art_;
   native_battle_art::NativeBattleSprites battle_sprites_;
@@ -3472,6 +3517,21 @@ int main(int argc,char **argv){
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
       prior=now;
       auto input=window.poll();
+      if(options.profile_frames&&(options.surface_smoke||options.surface_reload_smoke)){
+        const auto terrain=SurfaceWorkspaceLayout::for_viewport(input.drawable_width,input.drawable_height).terrain;
+        const auto point=center(terrain);
+        if(frames==150||frames==180){
+          input.pointer=point;
+          input.events={{InputEventType::Wheel,point,{},frames==150?1.f:-1.f}};
+        }else if(frames==160||frames==190){
+          const Point delta{frames==160?40.f:-40.f,0.f};
+          const Point moved{point.x+delta.x,point.y};
+          input.pointer=moved;
+          input.events={{InputEventType::LeftPressed,point},
+              {InputEventType::PointerMove,moved,delta},
+              {InputEventType::LeftReleased,moved}};
+        }
+      }
       audio.service();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
@@ -3597,6 +3657,10 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.surface_smoke||options.surface_reload_smoke)
+          campaign.surface_building_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
+            window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-buildings"));
+          });
         if(options.battle_smoke)
           campaign.battle_art_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-ships"));
@@ -3695,6 +3759,8 @@ int main(int argc,char **argv){
           std::cout<<" settlement="<<campaign.settlement_smoke_status();
         if(options.surface_smoke||options.surface_reload_smoke)
           std::cout<<" surface="<<campaign.surface_smoke_status();
+        if(options.surface_smoke||options.surface_reload_smoke)
+          std::cout<<"\nsurface_art="<<campaign.surface_building_status(input.drawable_width,input.drawable_height);
         if(options.galaxy_art_smoke)
           std::cout<<" galaxy_art="<<campaign.galaxy_art_smoke_status();
         if(options.ship_art_smoke)

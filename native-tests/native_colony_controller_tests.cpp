@@ -93,6 +93,16 @@ void inspector_tests(const fs::path &research_root, const fs::path &catalog) {
               frozen.body_id == *owned->planetary_body_id,
           "colony projection lost its ownership binding");
   require_finite(frozen);
+  require(frozen.homeworld, "seeded home colony lost its Core homeworld identity");
+  const auto dependent = std::ranges::find_if(world.colonies, [&](const auto &candidate) {
+    return candidate.civilization_id == player && candidate.system_id == owned->system_id &&
+           candidate.id != owned->id && candidate.planetary_body_id;
+  });
+  if (dependent != world.colonies.end()) {
+    const auto other = controller.build(frame, 7, *system.snapshot, *dependent->planetary_body_id);
+    require(other.view && !other.view->homeworld,
+            "another colony in the home system received capital identity");
+  }
   require(std::ranges::is_sorted(frozen.construction_sites, {},
                                  &NativeSurfaceSite::building_id),
           "surface construction sites are not deterministic");

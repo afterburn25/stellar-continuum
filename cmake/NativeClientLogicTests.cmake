@@ -317,13 +317,15 @@ add_test(NAME native_settlement_workspace COMMAND stellar_settle_ui_tests)
 
 add_executable(stellar_surface_view_tests
   native-tests/native_surface_workspace_tests.cpp
+  app/native_client/native_surface_building_geometry.cpp
+  app/native_client/native_surface_building_layer.cpp
   app/native_client/native_surface_scene.cpp
   app/native_client/native_surface_workspace.cpp
   app/native_client/native_colony_workspace.cpp)
 target_include_directories(stellar_surface_view_tests PRIVATE
   app/native_client
   engine/include)
-target_link_libraries(stellar_surface_view_tests PRIVATE stellar_core)
+target_link_libraries(stellar_surface_view_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_surface_workspace COMMAND stellar_surface_view_tests)
 if(MSVC)
   target_compile_options(stellar_surface_view_tests PRIVATE
