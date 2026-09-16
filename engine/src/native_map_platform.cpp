@@ -12,6 +12,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <numbers>
 #include <stdexcept>
 #include <string_view>
@@ -57,10 +58,45 @@ void report_capture(const std::filesystem::path &path,int width,int height){
   }
   std::cout<<"native_capture={\"path\":\""<<escaped<<"\",\"width\":"<<width<<",\"height\":"<<height<<"}\n";
 }
-[[nodiscard]] std::filesystem::path player_screenshot_directory(){
+[[nodiscard]] std::filesystem::path player_screenshot_directory(const std::filesystem::path& configured){
   wchar_t override_path[32768]{};
   const auto length=GetEnvironmentVariableW(L"STELLAR_SCREENSHOT_DIR",override_path,static_cast<DWORD>(std::size(override_path)));
   if(length>0&&length<std::size(override_path))return override_path;
+  if(!configured.empty())return configured;
+  return Window::default_screenshot_directory();
+}
+struct FolderDialogState {
+  std::mutex mutex;
+  bool pending{};
+  std::optional<FolderDialogResult> result;
+};
+struct FolderDialogRequest {
+  std::shared_ptr<FolderDialogState> state;
+  std::uint64_t id{};
+  std::string initial_directory;
+};
+void SDLCALL folder_dialog_complete(void* userdata,const char* const* files,int) noexcept {
+  std::unique_ptr<FolderDialogRequest> request(static_cast<FolderDialogRequest*>(userdata));
+  // SDL may invoke this from another thread. Copy SDL-owned strings before
+  // returning; the shared state remains valid even after Window destruction.
+  try {
+    FolderDialogResult result{request->id,{},{}};
+    if(!files)result.error=std::string("Folder browser failed: ")+SDL_GetError();
+    else if(files[0])result.directory=std::filesystem::path(std::u8string(
+        reinterpret_cast<const char8_t*>(files[0])));
+    std::lock_guard lock(request->state->mutex);
+    request->state->result=std::move(result);
+    request->state->pending=false;
+  } catch(...) {
+    // Never unwind through SDL's C callback. A missing result is treated as
+    // cancellation if an exceptional allocation/conversion failed.
+    std::lock_guard lock(request->state->mutex);
+    request->state->result=FolderDialogResult{request->id,{},{}};
+    request->state->pending=false;
+  }
+}
+}
+std::filesystem::path Window::default_screenshot_directory(){
   PWSTR pictures{};
   if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Pictures,0,nullptr,&pictures))&&pictures){
     const std::filesystem::path result=std::filesystem::path(pictures)/L"Stellar Continuum"/L"Screenshots";
@@ -68,10 +104,11 @@ void report_capture(const std::filesystem::path &path,int width,int height){
   }
   throw std::runtime_error("Pictures folder is unavailable.");
 }
-[[nodiscard]] std::filesystem::path player_screenshot_path(std::uint64_t serial){
+namespace {
+[[nodiscard]] std::filesystem::path player_screenshot_path(std::uint64_t serial,const std::filesystem::path& configured){
   SYSTEMTIME time{};GetLocalTime(&time);wchar_t name[96]{};
   swprintf_s(name,L"Stellar-Continuum-%04u%02u%02u-%02u%02u%02u-%03u-%llu.png",time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond,time.wMilliseconds,static_cast<unsigned long long>(serial));
-  auto directory=player_screenshot_directory();std::error_code error;std::filesystem::create_directories(directory,error);
+  auto directory=player_screenshot_directory(configured);std::error_code error;std::filesystem::create_directories(directory,error);
   if(error)throw std::runtime_error("Screenshot folder could not be created.");
   auto path=directory/name;
   for(std::uint32_t suffix=1;std::filesystem::exists(path,error);++suffix){
@@ -133,6 +170,7 @@ using SoftCircleIndices=std::array<int,soft_circle_segments*3>;
 }
 
 struct Window::Storage {
+  std::shared_ptr<FolderDialogState> folder_dialog{std::make_shared<FolderDialogState>()};
   static constexpr std::size_t text_cache_capacity=640,text_cache_byte_capacity=32u*1024u*1024u;
   struct CachedImage {std::shared_ptr<const RgbaImage> owner;SDL_Texture *texture{};std::size_t resident_bytes{};std::uint64_t last_use{};};
   SDL_Window *window{};SDL_GPUDevice *device{};SDL_Renderer *renderer{};HDC text_dc{};
@@ -140,7 +178,7 @@ struct Window::Storage {
   std::vector<SDL_Vertex> triangle_vertices;
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
-  int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
+  int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::filesystem::path screenshot_directory;std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   ~Storage(){
     for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
@@ -255,7 +293,7 @@ InputSnapshot Window::poll(){
     case SDL_EVENT_QUIT:input.quit_requested=true;break;
     case SDL_EVENT_KEY_DOWN:if(!event.key.repeat){
       if(event.key.key==SDLK_F12||event.key.key==SDLK_PRINTSCREEN){
-        if(!storage_->player_screenshot)try{storage_->player_screenshot=player_screenshot_path(++storage_->screenshot_serial);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;}catch(const std::exception& error){storage_->screenshot_status=std::string("Screenshot failed: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;}
+        if(!storage_->player_screenshot)try{storage_->player_screenshot=player_screenshot_path(++storage_->screenshot_serial,storage_->screenshot_directory);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;}catch(const std::exception& error){storage_->screenshot_status=std::string("Screenshot failed: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;}
       }else if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key)});
     }break;
     case SDL_EVENT_TEXT_INPUT:if(storage_->text_input_requested&&event.text.text)input.events.push_back({InputEventType::TextEntered,storage_->pointer,{},0.f,event.text.text});break;
@@ -275,6 +313,27 @@ void Window::set_text_input(bool enabled){storage_->text_input_requested=enabled
 bool Window::request_screenshot(std::filesystem::path path){
   if(storage_->player_screenshot||path.empty())return false;
   storage_->player_screenshot=std::move(path);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;return true;
+}
+void Window::set_screenshot_directory(std::filesystem::path path){
+  if((!path.empty()&&!path.is_absolute())||path.native().find(L'\0')!=std::wstring::npos)throw std::invalid_argument("Screenshot directory must be absolute and contain no NUL.");
+  storage_->screenshot_directory=std::move(path);
+}
+bool Window::request_folder_dialog(std::uint64_t request_id,std::filesystem::path initial_directory){
+  auto request=std::make_unique<FolderDialogRequest>(FolderDialogRequest{
+      storage_->folder_dialog,request_id,utf8_path(initial_directory)});
+  {
+    std::lock_guard lock(storage_->folder_dialog->mutex);
+    if(storage_->folder_dialog->pending||storage_->folder_dialog->result)return false;
+    storage_->folder_dialog->pending=true;
+  }
+  auto* payload=request.release();
+  SDL_ShowOpenFolderDialog(folder_dialog_complete,payload,storage_->window,
+      payload->initial_directory.empty()?nullptr:payload->initial_directory.c_str(),false);
+  return true;
+}
+std::optional<FolderDialogResult> Window::take_folder_dialog_result(){
+  std::lock_guard lock(storage_->folder_dialog->mutex);
+  return std::exchange(storage_->folder_dialog->result,std::nullopt);
 }
 std::optional<std::string> Window::take_screenshot_status(){return std::exchange(storage_->screenshot_status,std::nullopt);}
 std::vector<DisplayMode> Window::display_modes()const{

@@ -1,5 +1,6 @@
 #include "native_startup_entry.hpp"
 #include "native_audio_settings.hpp"
+#include "native_general_settings.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
@@ -349,18 +350,25 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     if (!input.renderable()) {
       for (const auto &event : input.events)
-        if (config.video_settings && config.video_settings->visible())
+        if (config.general_settings && config.general_settings->visible())
+          (void)config.general_settings->handle(event, input.drawable_width, input.drawable_height);
+        else if (config.video_settings && config.video_settings->visible())
           (void)config.video_settings->handle(event, input.drawable_width, input.drawable_height);
         else if (config.audio_settings && config.audio_settings->visible())
           (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
         else (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
-      window.set_text_input(workspace.wants_text_input());
+      window.set_text_input(workspace.wants_text_input()&&
+          !(config.general_settings&&config.general_settings->visible()));
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
     }
     bool exit{};
     for (const auto &event : input.events) {
+      if (config.general_settings && config.general_settings->visible()) {
+        (void)config.general_settings->handle(event, input.drawable_width, input.drawable_height);
+        continue;
+      }
       if (config.video_settings && config.video_settings->visible()) {
         (void)config.video_settings->handle(event, input.drawable_width, input.drawable_height);
         continue;
@@ -410,7 +418,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       else
         workspace.set_operation(state);
     }
-    window.set_text_input(workspace.wants_text_input());
+    window.set_text_input(workspace.wants_text_input()&&
+        !(config.general_settings&&config.general_settings->visible()));
     DrawList draw;
     workspace.render(draw, input.drawable_width, input.drawable_height, measure,
                      &portrait_provider, &artwork_provider);
@@ -418,6 +427,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       config.audio_settings->render(draw, input.drawable_width, input.drawable_height);
     if (config.video_settings)
       config.video_settings->render(draw, input.drawable_width, input.drawable_height);
+    if (config.general_settings)
+      config.general_settings->render(draw, input.drawable_width, input.drawable_height);
     window.draw(draw);
   }
 }

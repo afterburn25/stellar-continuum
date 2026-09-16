@@ -77,6 +77,11 @@ struct DrawList {
 struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
 struct DisplayMode { int width{},height{}; float refresh_hz{}; };
 enum class WindowDisplayMode { Windowed, Borderless, ExclusiveFullscreen };
+struct FolderDialogResult {
+  std::uint64_t request_id{};
+  std::optional<std::filesystem::path> directory;
+  std::string error;
+};
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, KeyPressed, TextEntered,
@@ -125,6 +130,15 @@ class Window final {
   // Queues at most one player capture. F12/PrintScreen call this internally;
   // tests may use it with an isolated directory.
   [[nodiscard]] bool request_screenshot(std::filesystem::path path);
+  // Empty restores the standard Pictures destination. Environment override is
+  // intentionally resolved above this application preference.
+  void set_screenshot_directory(std::filesystem::path path);
+  [[nodiscard]] static std::filesystem::path default_screenshot_directory();
+  // SDL's asynchronous native picker. Invoke/consume on the window thread;
+  // the callback owns independent state and never touches the Window or UI.
+  [[nodiscard]] bool request_folder_dialog(std::uint64_t request_id,
+                                         std::filesystem::path initial_directory);
+  [[nodiscard]] std::optional<FolderDialogResult> take_folder_dialog_result();
   [[nodiscard]] std::optional<std::string> take_screenshot_status();
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,

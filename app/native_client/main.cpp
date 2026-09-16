@@ -4,6 +4,7 @@
 #include "native_surface_art_assets.hpp"
 #include "native_surface_status.hpp"
 #include "native_audio_settings.hpp"
+#include "native_general_settings.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
@@ -578,7 +579,8 @@ class NativeCampaign final {
                  std::function<void()> audio_confirm={},
                  stellar::native_audio::NativeAudioSettings* audio_settings=nullptr,
                  stellar::native_audio::NativeAudioDirector* presentation_audio=nullptr,
-                 stellar::native_video_settings::NativeVideoController* video_settings=nullptr)
+                 stellar::native_video_settings::NativeVideoController* video_settings=nullptr,
+                 stellar::native_general::NativeGeneralSettings* general_settings=nullptr)
       : session_(std::move(session)),
         navigation_art_(std::filesystem::absolute(asset_root)),
         research_art_(std::filesystem::absolute(asset_root)),
@@ -614,6 +616,7 @@ class NativeCampaign final {
     audio_confirm_=std::move(audio_confirm);
     audio_settings_=audio_settings;
     video_settings_=video_settings;
+    general_settings_=general_settings;
     presentation_audio_=presentation_audio;
   }
 
@@ -1143,6 +1146,8 @@ class NativeCampaign final {
     if(!smoke_system_focused_)throw std::runtime_error("System smoke Focus Planet failed to center Earth or changed zoom.");
   }
   std::string body_inspection_smoke(int width,int height,const std::function<void(const DrawList&)>& capture){
+    if(!system_workspace_.visible()||!system_workspace_.viewport())
+      throw std::runtime_error("Body inspection smoke requires an open system view; it was closed during validation.");
     const auto layout=SystemWorkspaceLayout::for_viewport(width,height);
     const auto before=*system_workspace_.viewport();
     const auto wheel=[&](float amount){
@@ -5376,6 +5381,12 @@ class NativeCampaign final {
     for(const auto &event:input.events){
       if(session_->new_campaign_pending()) break;
       if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
+      if(general_settings_&&general_settings_->visible()){
+        notification_view_.close();
+        (void)general_settings_->handle(event,width,height);
+        gesture_.capture_for_ui();
+        continue;
+      }
       if(video_settings_&&video_settings_->visible()){
         notification_view_.close();
         (void)video_settings_->handle(event,width,height);
@@ -6289,6 +6300,7 @@ class NativeCampaign final {
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(audio_settings_)audio_settings_->render(out,width,height);
+    if(general_settings_)general_settings_->render(out,width,height);
     if(video_settings_)video_settings_->render(out,width,height);
     return out;
   }
@@ -7239,7 +7251,8 @@ class NativeCampaign final {
   double notification_refresh_elapsed_{};
   stellar::native_audio::NativeAudioDirector* presentation_audio_{};
   std::chrono::steady_clock::time_point last_event_sound_{};
-  bool settings_visible() const { return (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
+  bool settings_visible() const { return (general_settings_&&general_settings_->visible()) || (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
+  stellar::native_general::NativeGeneralSettings* general_settings_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
   bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
@@ -7260,10 +7273,19 @@ int main(int argc,char **argv){
     const auto startup_begin=std::chrono::steady_clock::now();
     const auto settings_path=(options.smoke_screenshot?options.save_path:default_native_campaign_save_path()).parent_path()/"audio-settings.json";
     const auto video_settings_path=settings_path.parent_path()/"video-settings.json";
+    const auto general_settings_path=settings_path.parent_path()/"general-settings.json";
     const auto initial_video=stellar::native_video_settings::NativeVideoSettings::load(video_settings_path);
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    stellar::native_general::NativeGeneralSettings general_settings(general_settings_path);
+    window.set_screenshot_directory(general_settings.saved().screenshot_directory);
+    general_settings.set_text_measurer([&](const Text& text){return window.measure_text(text);});
+    general_settings.set_apply([&](const auto& value){window.set_screenshot_directory(value.screenshot_directory);});
+    try{general_settings.set_default_directory(Window::default_screenshot_directory());}
+    catch(const std::exception& error){std::cerr<<"Default screenshot folder unavailable: "<<error.what()<<'\n';}
+    general_settings.set_browse([&](auto id,const auto& path){return window.request_folder_dialog(id,path);});
+    const auto service_general=[&]{if(auto result=window.take_folder_dialog_result())general_settings.accept_browse_result(std::move(*result));};
     // Declared after Window: audio closes its streams/device before SDL teardown.
     stellar::native_audio::NativeAudioDirector audio(asset_root,!options.smoke_screenshot||options.audio_check);
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
@@ -7283,7 +7305,7 @@ int main(int argc,char **argv){
         else window.set_frame_cap(value.frame_cap==VideoFrameCap::Fps60?60.:value.frame_cap==VideoFrameCap::Fps120?120.:
           value.frame_cap==VideoFrameCap::Fps144?144.:0.);
       });
-    audio_settings.set_video_navigation([&]{
+    const auto open_video=[&]{
       std::vector<stellar::native_video_settings::VideoDisplayChoice> modes;
       try{for(const auto& mode:window.display_modes())modes.push_back({mode.width,mode.height,mode.refresh_hz});}
       catch(const std::exception& error){std::cerr<<"Display choices unavailable: "<<error.what()<<'\n';}
@@ -7297,15 +7319,18 @@ int main(int argc,char **argv){
           std::to_string(desktop.height)+" @ "+std::to_string(static_cast<int>(std::lround(desktop.refresh_hz)))+" Hz");
       video_settings.set_windowed_display_choices(std::move(windowed_modes));
       video_settings.open();
-    });
+    };
+    audio_settings.set_video_navigation(open_video);
+    audio_settings.set_general_navigation([&]{general_settings.open();});
+    general_settings.set_navigation([&]{audio.confirm();audio_settings.open();},[&]{audio.confirm();open_video();});
     bool audio_menu_ready{};std::size_t audio_boot_services{};
     const StartupAudioHooks audio_hooks{
-      [&]{audio.service();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
+      [&]{audio.service();service_general();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
       [&]{audio_menu_ready=true;audio.menu_ready();},
       [&]{audio.confirm();},[&]{return audio.assets_ready();}};
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence;
@@ -7341,7 +7366,7 @@ int main(int argc,char **argv){
     const auto restart_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
     while(session){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings);
+                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings);
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     if(options.smoke_screenshot){
       if(options.research_smoke)
@@ -7479,6 +7504,7 @@ int main(int argc,char **argv){
         }
       }
       audio.service();
+      service_general();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
         const auto state=audio.stats();

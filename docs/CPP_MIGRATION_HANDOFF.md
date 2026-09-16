@@ -5,6 +5,44 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### General settings screenshot folder
+
+Settings -> General is now reachable from the main-menu and paused-campaign Audio
+panel. Browse opens the asynchronous Windows folder picker; Save persists the
+chosen folder across restarts. Use Default is a draft change and Cancel preserves
+the current destination. The actual known Pictures path is shown by default.
+Long UTF-8 paths use measured, cached wrapping with clipped scrolling, and the
+panel has separate Audio/Video navigation. F12 PNG captures use the saved path;
+the isolated-test environment override remains highest priority.
+
+Application-only `general-settings.json` has bounded schema-1 persistence and
+atomic writes. Invalid paths/schema, duplicate keys, embedded NUL and write
+failures are handled without changing a valid saved destination. The SDL picker
+callback never touches Window/UI state; one pending request and request IDs
+prevent repeat dialogs and stale results. Rendering/audio remain serviced while
+the picker is open. Core, campaign save schema, artwork and display-mode behavior
+are unchanged.
+
+Validation: 187/187 serial native CTests passed. Actual window-message tests
+selected a Unicode folder in the native Windows browser, saved it, captured F12
+PNGs there, cancelled a second browse/default draft, restarted into the saved
+destination, and verified the environment override. The 720p campaign and 1080p
+main-menu General panels were captured and reviewed. Relocated startup and
+paused reload audio/video checks pass with unchanged campaign recovery. Evidence:
+`work/general-settings-{ctest,runtime}.log`, `work/general-folder-runtime/result.json`,
+`startup-result.json`, and their images/logs. Final focused settings checks after
+the path-wrapping polish pass in `work/general-settings-final-tests.log`, including
+Unicode-safe wrapping, cache reuse, clipping and scrolling. The handoff is a development source
+milestone; the Alpha 0.1.8 download below has not been replaced or version-bumped.
+
+The interaction test also found an existing unsafe test-only assumption:
+`body_inspection_smoke` dereferenced its system viewport after an external test
+had closed that view. The Windows fault offset resolved to that function. It now
+checks the precondition and reports a terminal validation error. The normal game
+settings flow and corrected system-inspection smoke both complete successfully.
+`work/general-folder-runtime/guard-result.json` confirms the invalid test exits 1
+with a useful terminal message instead of an access violation.
+
 ### Native display modes and player screenshots
 
 Settings -> Video now offers Windowed, Borderless Fullscreen (default and
