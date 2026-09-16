@@ -77,10 +77,9 @@ which were corrected, plus an audio asset-read timeout and a platform test exit
 run. Their initial intermittent cause is unconfirmed; no suppression or audio
 disable was added. Preserve that history if either failure recurs.
 
-Game version is `0.1.8-alpha`; engine version remains `0.1.58`. The local runtime
+Game version is `0.1.8-alpha`; engine version remains `0.1.58`. The initial local runtime
 under `work/ui-restoration-runtime/package` is an **unsealed validation package**.
-This milestone has not produced a new release ZIP. Run the established complete
-export/sealing pipeline before handing out a download.
+It is not the delivered ZIP. The later complete export below supplies the download.
 
 ### Alpha 0.1.8 export version boundary
 
@@ -96,4 +95,26 @@ all unrelated-state checks and exact paused-reload comparisons. Missing/malforme
 version configuration and incorrect versions still fail. The real 720p diplomacy
 acceptance and 1080p paused reload passed this corrected check. No game rules or
 save schema changed. The original failed export retains `EXPORT_FAILED.txt`; it
-is not reused as a distributable package. A new clean export is required.
+is not reused as a distributable package.
+
+### Successful native Alpha delivery
+
+The fresh official export of clean commit
+`16b230b7f968acd320755f588df17c5843ae224f` passed all 186 native tests,
+466 exporter Python tests and the complete relocated runtime sequence, including
+diplomacy progress and exact paused reload. The official manifest validator
+passed. All 182 manifest file hashes plus the manifest match the delivered ZIP;
+it has no failure marker. Full graphical parity remains false.
+
+- Official export prefix:
+  `Builds/Windows/StellarContinuum-windows-native-preview-16b230b7-20260916T183840391372Z`
+- Delivery: `D:/StellarContinuum/Downloads/StellarContinuum-Cpp-0.1.8-alpha-16b230b7.zip`
+- Size: 82,904,435 bytes.
+- SHA-256: `9c8c88e6c27cfbd7ced90667a609a786e89c05d071e3f5d97a2bd57fdf86ee30`.
+- Launch after extraction: `stellar-continuum-native.exe`.
+- Build log: `work/alpha-018-export-final.log`; validation JSON is beside the
+  official export directory. The copy's hash equals the official archive.
+
+C: reported zero free bytes, so delivery is on D:. No user files or saves were
+deleted. Standard game saves/settings still use Windows LocalAppData, and the
+player needs free space there for normal saving.

@@ -7,12 +7,28 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ### Native presentation restoration / Alpha 0.1.8
 
+**Delivered export:** the complete official `windows-native-preview` export of
+clean commit `16b230b7f968acd320755f588df17c5843ae224f` passed on 2026-09-16.
+The manifest records game `0.1.8-alpha`, engine `0.1.58` and `sourceDirty=false`.
+All 186 CTests, 466 exporter Python checks and every relocated native interaction
+and recovery check passed, including diplomacy. All 182 declared file hashes and
+the archive manifest match. Delivery:
+`D:/StellarContinuum/Downloads/StellarContinuum-Cpp-0.1.8-alpha-16b230b7.zip`
+(82,904,435 bytes; SHA-256
+`9c8c88e6c27cfbd7ced90667a609a786e89c05d071e3f5d97a2bd57fdf86ee30`).
+Extract and launch `stellar-continuum-native.exe`. C: reported zero free space;
+no user data was removed. Default saves/settings still use LocalAppData on C:.
+Exact export, validation JSON and captures share prefix
+`Builds/Windows/StellarContinuum-windows-native-preview-16b230b7-20260916T183840391372Z`.
+This validated native Alpha does not claim complete graphical parity or a
+separate clean-machine certification.
+
 Release preparation found a strict-validator version-boundary issue: the retained
 fixture is 0.1.7, while current saves correctly identify 0.1.8. Diplomacy now checks
 against the exact packaged version and still rejects all unrelated state changes
 and paused-reload drift. Both actual diplomacy launches pass. The failed original
-export is preserved and not distributed; repeat the full clean export before
-handing out the new ZIP. See the presentation-restoration document for evidence.
+export is preserved and not distributed; the fresh successful export above is
+the delivered build. See the presentation-restoration document for evidence.
 
 The current priority is repairing the player-facing regressions reported after
 the C++ conversion. The full-art main menu now leads to separate Story Campaign
