@@ -3,7 +3,7 @@
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
 `e8672801` inventoried; support, notifications, tactical, civilian recovery
-safe video settings, observer-safe system/planet inspection, home-system supply, surface management and
+safe video settings, observer-safe system/planet inspection, home-system supply, surface management, sovereign economy and
 save-gated New Game selectively adapted. New voice and newest empire/mission
 boards remain unimported pending review).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
@@ -16,7 +16,48 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
-### Owned surface building management
+### Sovereign Treasury and industry priorities
+
+The native C++ economy workspace selectively adapts Devin `810d2a6d`. Six compact
+metrics show sovereign reserves, income, recurring expense, net income, stored
+materials and material production. Two income sources and all seven expense
+categories (including research operations and separately reserved research funds)
+remain reachable at 720p. Priority controls explain canonical allocation weights
+before selection, are free/reversible, and use Core's existing command and save
+field. The rail has a distinct economy icon. No Core, C# or Player17 schema changes.
+
+Projection validates unique actual player/home/economy/construction records;
+missing data and failures are explicit with Retry and Support diagnostics. Invalid
+numeric values fail cleanly. Failed queries latch until Retry; paused frames cache,
+active refresh requires changed simulation time and a one-second interval. Commands
+revalidate campaign, revision, observer and current priority and consume their
+revision. A same-choice command cannot leave the controller permanently locked.
+Material rates are not formatted as currency. Controls and explanatory feedback
+stay pinned; measured content scrolls without moving the map. Contract:
+`docs/engine/NATIVE_ECONOMY.md`.
+
+Validation: MSVC native build, 14 affected CTests, and Python export discovery
+463 tests (446 passed / 17 optional STELLAR_NATIVE_EXE tests skipped). Two relocated
+Vulkan economy runs at 720p/1080p exercise normal navigation, scrolling, all expense
+rows, refresh, competing workspace isolation, priority changes and normal saving.
+The complete before/after canonical Player17 permits only the actual player's
+industry priority to change; reload preserves the whole saved payload except its
+timestamp. Eight captures produced, including summary/end/priority screens;
+720p/1080p screenshots reviewed. Existing relocated Supply, navigation and colony
+regression suites also pass. Evidence: work/native-economy-{build,ctest,python}.log,
+work/native-economy-{runtime,supply,navigation,colony}.json and
+work/native-audio-validation/package-economy-*.bmp.
+
+Next: review Devin `e8672801` armed-fleet strategic orders/Locate against existing
+observer, command-authority, travel and tactical encounter contracts. `a0f3b102`
+adds BMP dimension validation; review without weakening drawable/pixel gates.
+Latest inventoried Devin head remains e8672801. Generated discs bc681eb6,
+fe364430/aabde2b1, Land/Collect d9d23f57 and colony sites e49f4df0 remain unimported.
+Keep approved Sol/Earth art, recorded UK scientist cues and existing save contracts.
+Shared base ac45d958 and PR332 remain unmerged; this validation package is UNSEALED,
+not a release download. Full 3D visuals and sustained performance remain unfinished.
+
+### Previous checkpoint: owned surface building management
 
 The native surface inspector now supports building upgrades, repair,
 shutdown/restart, operating priority and colony-hub upgrades. Each action opens

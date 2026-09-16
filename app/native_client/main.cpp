@@ -37,6 +37,7 @@
 #include "native_system_view.hpp"
 #include "native_inspection.hpp"
 #include "native_logistics_workspace.hpp"
+#include "native_economy_workspace.hpp"
 #include "native_system_travel.hpp"
 #include "native_system_workspace.hpp"
 #include "native_planet_disc_assets.hpp"
@@ -251,7 +252,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
-  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{};
+  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -278,6 +279,7 @@ struct Options {
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
     else if(arg==L"--video-settings-check") result.video_settings_check=true;
     else if(arg==L"--logistics-check") result.logistics_check=true;
+    else if(arg==L"--economy-check") result.economy_check=true;
     else if(arg==L"--inspection-check") result.inspection_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg==L"--load") result.load=true;
@@ -319,6 +321,7 @@ struct Options {
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
     else if(arg=="--video-settings-check") result.video_settings_check=true;
     else if(arg=="--logistics-check") result.logistics_check=true;
+    else if(arg=="--economy-check") result.economy_check=true;
     else if(arg=="--inspection-check") result.inspection_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg=="--load") result.load=true;
@@ -352,6 +355,7 @@ struct Options {
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
   if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
+  if(result.economy_check&&!result.menu_smoke)throw std::invalid_argument("--economy-check requires an isolated --smoke invocation.");
   if(result.logistics_check&&!result.menu_smoke)throw std::invalid_argument("--logistics-check requires an isolated --smoke invocation.");
   if(result.inspection_check&&!result.menu_smoke)throw std::invalid_argument("--inspection-check requires an isolated --smoke invocation.");
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires an isolated active-encounter save and --load.");
@@ -544,6 +548,7 @@ class NativeCampaign final {
     research_workspace_.set_text_measurer(text_measurer_);
     inspection_card_.set_text_measurer(text_measurer_);
     supply_workspace_.set_text_measurer(text_measurer_);
+    economy_workspace_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
@@ -575,6 +580,98 @@ class NativeCampaign final {
   void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  [[nodiscard]] std::string economy_smoke(int width,int height,
+      const std::function<void(const DrawList&,std::string_view)>& draw) {
+    using namespace stellar::native_economy;
+    if(!menu_||settings_visible()||session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("Economy proof requires the paused campaign menu.");
+    const PlayerCampaignCaptureOptions capture_options{session_->frame().clock().simulation_days(),
+      STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"};
+    auto expected=capture_player_campaign_v17(session_->frame().runtime(),capture_options);
+    if(!expected.galaxy.economies)throw std::runtime_error("Economy proof has no saved economies.");
+    const auto actor=expected.galaxy.player_civilization_id;
+    auto own=std::ranges::find(*expected.galaxy.economies,actor,&EconomySaveDto::civilization_id);
+    if(own==expected.galaxy.economies->end())throw std::runtime_error("Economy proof has no player economy.");
+    own->industry_priority=IndustryPriority::ShipbuildingFirst;
+    const auto camera_before=camera_;const auto selected_before=selected_id_;
+    const auto route=[&](std::vector<InputEvent> events,double elapsed=0.){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=events.empty()?Point{}:events.back().position;input.events=std::move(events);
+      if(!update(input,width,height,elapsed,false))throw std::runtime_error("Economy input exited the game.");
+    };
+    const auto click=[&](Point point){route({{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}});};
+    const auto ui=NativeUiLayout::for_viewport(width,height);
+    route({{InputEventType::EscapePressed}});
+    const bool restore_running=session_->frame().clock().speed()!=StrategicSpeed::Paused;
+    if(restore_running)click(center(ui.pause));
+    const auto before=economy_controller_.attempted_refresh_count();
+    click(center(ui.economy));
+    const auto& view=economy_controller_.view();
+    if(!economy_workspace_.visible()||view.state!=EconomyState::Ready||
+       economy_controller_.attempted_refresh_count()!=before+1)
+      throw std::runtime_error("Economy navigation did not perform exactly one ready projection.");
+    const auto& runtime=session_->frame().runtime();
+    const auto reference=build_economy_view(runtime.world().campaign(),&runtime.research(),std::nullopt);
+    if(view.cards!=reference.cards||view.income_rows!=reference.income_rows||view.cost_rows!=reference.cost_rows||
+       view.income_rows.size()!=2||view.cost_rows.size()!=7)
+      throw std::runtime_error("Economy displayed totals differ from Core.");
+    route({{InputEventType::PointerMove,{static_cast<float>(width)*.5f,82.f}}});
+    draw(scene(width,height),"ready");
+    route({},2.);
+    if(economy_controller_.attempted_refresh_count()!=before+1)
+      throw std::runtime_error("Paused economy unnecessarily rebuilt its projection.");
+    const auto layout=EconomyLayout::for_viewport(width,height);const auto inside=center(layout.body);
+    route({{InputEventType::Wheel,inside,{},-1000.f}});
+    const auto end=economy_workspace_.scroll_offset();
+    route({{InputEventType::Wheel,inside,{},-1000.f}});
+    if(economy_workspace_.scroll_offset()!=end)throw std::runtime_error("Economy scroll was unbounded.");
+    auto end_scene=scene(width,height);bool research_visible=false;
+    for(const auto& item:end_scene.overlay)if(const auto* label=std::get_if<Text>(&item))
+      if(label->value=="RESEARCH PROGRAMS")research_visible=true;
+    if(!research_visible)throw std::runtime_error("Research operating costs were unreachable.");
+    draw(end_scene,"end");
+    const Point outside{static_cast<float>(width)-2.f,static_cast<float>(height)-2.f};
+    route({{InputEventType::LeftPressed,inside},{InputEventType::PointerMove,outside,{70.f,80.f}},
+           {InputEventType::LeftReleased,outside},{InputEventType::PointerCancelled}});
+    if(camera_.center.x!=camera_before.center.x||camera_.center.y!=camera_before.center.y||
+       camera_.pixels_per_world!=camera_before.pixels_per_world||selected_id_!=selected_before)
+      throw std::runtime_error("Economy input moved the underlying chart.");
+    click(center(layout.refresh));
+    if(economy_controller_.attempted_refresh_count()!=before+2)
+      throw std::runtime_error("Economy refresh did not project exactly once.");
+    for(const auto index:{1,0,2}){
+      click(center(layout.priority_buttons[static_cast<std::size_t>(index)]));
+      if(static_cast<int>(economy_controller_.view().industry_priority)!=index)
+        throw std::runtime_error("Economy priority input did not reach Core.");
+    }
+    draw(scene(width,height),"priority");
+    click(center(ui.supply));
+    if(economy_workspace_.visible()||!supply_workspace_.visible())
+      throw std::runtime_error("Economy and Supply were not exclusive.");
+    click(center(ui.research));
+    if(economy_workspace_.visible()||supply_workspace_.visible()||!research_workspace_.visible())
+      throw std::runtime_error("Economy and Research were not exclusive.");
+    click(center(ui.economy));
+    if(!economy_workspace_.visible()||research_workspace_.visible()||supply_workspace_.visible())
+      throw std::runtime_error("Economy did not regain navigation ownership.");
+    click(center(layout.close));
+    if(economy_workspace_.visible())throw std::runtime_error("Economy close failed.");
+    if(restore_running)click(center(ui.pause));
+    route({{InputEventType::EscapePressed}});
+    if(!menu_||session_->frame().clock().simulation_days()!=capture_options.simulation_days||
+       encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options))!=
+       encode_player_campaign_v17_json(expected))
+      throw std::runtime_error("Economy changed campaign state beyond the authorized industry priority.");
+    click(center(ui.save_button));
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+    while(!smoke_save_succeeded()&&std::chrono::steady_clock::now()<deadline){
+      route({});std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if(!smoke_save_succeeded())throw std::runtime_error("Economy priority was not saved.");
+    return "{\"navigation\":true,\"canonical_totals\":true,\"single_projection\":true,"
+      "\"paused_cached\":true,\"scroll_bounded\":true,\"research_visible\":true,\"map_stationary\":true,"
+      "\"refresh\":true,\"workspace_isolation\":true,\"priority_saved\":true,\"only_priority_changed\":true}";
+  }
   [[nodiscard]] std::string supply_smoke(int width,int height,
       const std::function<void(const DrawList&,bool)>& draw) {
     using namespace stellar::native_logistics;
@@ -623,7 +720,7 @@ class NativeCampaign final {
     if(supply_controller_.attempted_refresh_count()!=before+2)
       throw std::runtime_error("Supply refresh did not project exactly once.");
     click(center(ui.research));
-    if(supply_workspace_.visible()||!research_workspace_.visible())
+    if(economy_workspace_.visible()||supply_workspace_.visible()||!research_workspace_.visible())
       throw std::runtime_error("Supply/Research navigation was not exclusive.");
     click(center(ui.supply));
     if(!supply_workspace_.visible()||research_workspace_.visible())
@@ -2222,6 +2319,7 @@ class NativeCampaign final {
       selected_id_.reset();
       inspection_card_.clear();
       supply_workspace_.close();supply_controller_.clear();supply_day_.reset();supply_generation_.reset();
+      economy_workspace_.clear();economy_controller_.clear();economy_day_.reset();economy_generation_.reset();last_industry_allocation_.reset();
       pre_menu_speed_=StrategicSpeed::Normal;
       fit_camera(width,height);
       galaxy_backdrop_.discard_campaign();
@@ -2267,15 +2365,20 @@ class NativeCampaign final {
     }
     refresh_battle(width,height,elapsed);
     refresh_inspection();
+    refresh_economy(false,false);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
       if(action!=UiAction::Supply)supply_workspace_.close();
+      if(action!=UiAction::Economy)economy_workspace_.close();
       fleet_workspace_.cancel_recovery();
       notification_view_.close();
       system_workspace_.close();
       colony_workspace_.close();
       surface_workspace_.close();
-      if(action==UiAction::Supply){
+      if(action==UiAction::Economy){
+        if(economy_workspace_.visible())economy_workspace_.close();
+        else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();economy_workspace_.open();refresh_economy(true,false);}
+      }else if(action==UiAction::Supply){
         if(supply_workspace_.visible())supply_workspace_.close();
         else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();supply_workspace_.open();refresh_supply(true,false);}
       }else if(action==UiAction::Research){
@@ -2328,7 +2431,7 @@ class NativeCampaign final {
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
           system_workspace_.close();colony_workspace_.close();surface_workspace_.close();
           research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
-          supply_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);
+          economy_workspace_.close();supply_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);
           if(!diplomacy_workspace_.select_contact_civilization(command.civilization_id))
             diplomacy_workspace_.set_notice("This contact is no longer identified. Review the contact list.",false);
           refresh_diplomacy(true);
@@ -2377,12 +2480,27 @@ class NativeCampaign final {
         const auto navigation=action==UiAction::Research||
                               action==UiAction::Shipyard||
                               action==UiAction::Construction||
-                              action==UiAction::Diplomacy||action==UiAction::Supply;
+                              action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy;
         if(navigation){
           if(audio_confirm_)audio_confirm_();
           route_navigation(action);
           gesture_.begin(true);
           continue;
+        }
+      }
+      if(economy_workspace_.visible()&&!menu_){
+        const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
+        if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          using stellar::native_economy::EconomyCommandKind;
+          const auto command=economy_workspace_.handle(event,economy_controller_.view(),width,height);
+          if(command.kind==EconomyCommandKind::Refresh){refresh_economy(true,true);if(audio_confirm_)audio_confirm_();}
+          else if(command.kind==EconomyCommandKind::SetIndustryPriority){
+            const auto outcome=economy_controller_.change_priority(session_->frame(),session_->cache().generation,command.view_revision,command.priority);
+            if(outcome.accepted){last_industry_allocation_.reset();publish_notification("Economy",outcome.message);if(audio_confirm_)audio_confirm_();}
+            economy_workspace_.set_notice(outcome.message);
+            refresh_economy(true,false);
+          }
+          if(command.captured){gesture_.cancel();continue;}
         }
       }
       if(supply_workspace_.visible()&&!menu_){
@@ -2449,6 +2567,7 @@ class NativeCampaign final {
         gesture_.cancel();
         (void)inspection_card_.handle(event,inspection_bounds(width,height));
         (void)supply_workspace_.handle(event,supply_controller_.view(),width,height);
+        (void)economy_workspace_.handle(event,economy_controller_.view(),width,height);
         (void)research_workspace_.handle(event,width,height);
         (void)shipyard_workspace_.handle(event,width,height);
         (void)construction_workspace_.handle(event,width,height);
@@ -2502,7 +2621,7 @@ class NativeCampaign final {
         if(result.closed)selected_id_.reset();
         if(result.captured){gesture_.cancel();continue;}
       }
-      if(!menu_&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
+      if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
         if(event.type==InputEventType::LeftPressed&&event.click_count>=2){
           if(const auto target=system_hit(event.position,width,height);target&&enter_system(*target,width,height)){
             gesture_.capture_for_ui();continue;
@@ -2513,7 +2632,7 @@ class NativeCampaign final {
           if(target&&enter_system(*target,width,height)){gesture_.capture_for_ui();continue;}
         }
       }
-      if(!menu_&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
+      if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
         const auto markers=fleet_markers(width,height);
         const auto target=event.type==InputEventType::RightPressed
                               ?system_hit(event.position,width,height)
@@ -2538,18 +2657,22 @@ class NativeCampaign final {
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
-        if(supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
+        if(economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
-      if(event.type==InputEventType::Wheel){if(!menu_&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
-      if(event.type==InputEventType::LeftReleased){if(!menu_&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||supply_workspace_.visible()||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::Wheel){if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
+      if(event.type==InputEventType::LeftReleased){if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||economy_workspace_.visible()||supply_workspace_.visible()||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
     if(const auto request=surface_workspace_.take_preview_request())execute_surface(*request);
     if(research_workspace_.take_refresh_request())refresh_research(true);
     if(advance_simulation){
       const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp);
       publish_feedback(frame_result);
+      const auto player=session_->frame().runtime().world().campaign().player_civilization_id;
+      for(const auto& step:frame_result.strategic_results)
+        for(const auto& allocation:step.core.industry_allocations)
+          if(allocation.civilization_id==player)last_industry_allocation_=allocation;
       research_refresh_elapsed_+=elapsed;
       refresh_research(false);
       fleet_refresh_elapsed_+=elapsed;
@@ -2569,6 +2692,8 @@ class NativeCampaign final {
     }
     supply_refresh_elapsed_+=std::max(0.,elapsed);
     refresh_supply(false,false);
+    economy_refresh_elapsed_+=std::max(0.,elapsed);
+    refresh_economy(false,false);
     notification_refresh_elapsed_+=std::max(0.,elapsed);
     if(notification_refresh_elapsed_>=1.)refresh_notifications();
     refresh_knowledge();
@@ -2973,7 +3098,7 @@ class NativeCampaign final {
       }
     }
     }
-    if(!menu_&&!supply_workspace_.visible()&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
+    if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
       fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
@@ -2985,7 +3110,8 @@ class NativeCampaign final {
     surface_workspace_.render(out,width,height);
     settlement_workspace_.render(out,width,height);
     if(!menu_)supply_workspace_.render(out,supply_controller_.view(),width,height);
-    if(!menu_&&!supply_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
+    if(!menu_)economy_workspace_.render(out,economy_controller_.view(),width,height);
+    if(!menu_&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
        !construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&
        !colony_workspace_.visible()&&!surface_workspace_.visible()&&!settlement_workspace_.visible())
       feedback_.render(out,width,height);
@@ -3010,6 +3136,12 @@ class NativeCampaign final {
     const auto draw_navigation=[&](UiRect bounds,UiAction action,bool active,std::string_view tip){
       panel(out,bounds,bounds.contains(pointer_),active);
       if(const auto image=navigation_art_.image(action))out.overlay.emplace_back(Image{image,{bounds.x+7.f*layout.scale,bounds.y+7.f*layout.scale,bounds.width-14.f*layout.scale,bounds.height-14.f*layout.scale}});
+      if(action==UiAction::Economy){
+        const float u=bounds.width/44.f;const Color gold{242,198,97,255};
+        for(int i=0;i<3;++i){const float x=bounds.x+(10.f+9.f*i)*u;const float h=(10.f+7.f*i)*u;
+          out.overlay.emplace_back(FilledRectangle{{x,bounds.y+34.f*u-h,6.f*u,h},gold});}
+        out.overlay.emplace_back(Line{{bounds.x+8.f*u,bounds.y+35.f*u},{bounds.x+36.f*u,bounds.y+35.f*u},{128,229,201,255}});
+      }
       if(action==UiAction::Supply){
         const float u=bounds.width/44.f;
         const Color network{109,220,195,255}, cargo{241,193,100,255};
@@ -3035,6 +3167,7 @@ class NativeCampaign final {
       draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
       draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),"Relations");
       draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),"Supply network");
+      draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),"Economy and industry");
     }
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
@@ -3118,7 +3251,7 @@ class NativeCampaign final {
     if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();return;}
     bool observed_changed=false;
     if(!battle_workspace_.visible()){
-      supply_workspace_.close();notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
+      economy_workspace_.close();supply_workspace_.close();notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
       construction_workspace_.close();diplomacy_workspace_.close();system_workspace_.close();
       colony_workspace_.close();surface_workspace_.close();
       battle_workspace_.open(frame.tactical_snapshot(),world.player_civilization_id,width,height);
@@ -3247,7 +3380,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();surface_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
+    economy_workspace_.close();supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();surface_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     if(travel.snapshot)system_workspace_.refresh_travel(std::move(*travel.snapshot),fleet_controller_.selection());else system_workspace_.set_notice(travel.denial);
     system_refresh_elapsed_=0.;return true;
@@ -3731,7 +3864,7 @@ class NativeCampaign final {
   void toggle_menu(){fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   [[nodiscard]] bool inspection_visible()const noexcept {
-    return inspection_card_.visible()&&!supply_workspace_.visible()&&!menu_&&!system_workspace_.visible()&&
+    return inspection_card_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_&&!system_workspace_.visible()&&
         !surface_workspace_.visible()&&!colony_workspace_.visible()&&
         !settlement_workspace_.visible()&&!research_workspace_.visible()&&
         !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
@@ -3743,6 +3876,18 @@ class NativeCampaign final {
     const float x=80.f*scale,top=90.f*scale,bottom=static_cast<float>(height)-88.f*scale;
     const float panel_height=std::max(100.f,std::min(500.f*scale,bottom-top));
     return {x,bottom-panel_height,std::max(120.f,std::min(360.f*scale,static_cast<float>(width)-x-18.f*scale)),panel_height};
+  }
+  void refresh_economy(bool force,bool retry) {
+    if(!economy_workspace_.visible()||menu_||battle_workspace_.visible())return;
+    auto& frame=session_->frame();const auto& world=frame.runtime().world().campaign();
+    const auto generation=session_->cache().generation;const auto day=frame.clock().simulation_days();
+    const bool changed=economy_generation_!=generation||economy_observer_!=world.player_civilization_id;
+    if(changed)last_industry_allocation_.reset();
+    if(!force&&!changed&&(economy_refresh_elapsed_<1.||economy_day_==day))return;
+    economy_refresh_elapsed_=0.;economy_day_=day;economy_generation_=generation;economy_observer_=world.player_civilization_id;
+    const bool attempted=economy_controller_.refresh(frame,generation,last_industry_allocation_,retry);
+    if(attempted&&!economy_controller_.view().diagnostic.empty())
+      support_.record("economy",utc_timestamp()+" "+economy_controller_.view().diagnostic);
   }
   void refresh_supply(bool force,bool retry) {
     if(!supply_workspace_.visible()||menu_||battle_workspace_.visible())return;
@@ -3777,6 +3922,13 @@ class NativeCampaign final {
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
   stellar::native_inspection::SystemInspectionCard inspection_card_;
+  stellar::native_economy::NativeEconomyController economy_controller_;
+  stellar::native_economy::NativeEconomyWorkspace economy_workspace_;
+  std::optional<CivilizationIndustryAllocation> last_industry_allocation_;
+  double economy_refresh_elapsed_{};
+  std::optional<double> economy_day_;
+  std::optional<std::uint64_t> economy_generation_;
+  int economy_observer_{};
   stellar::native_logistics::HomeLogisticsController supply_controller_;
   stellar::native_logistics::SupplyWorkspace supply_workspace_;
   double supply_refresh_elapsed_{};
@@ -4288,6 +4440,11 @@ int main(int argc,char **argv){
           std::cout<<"body_inspection="<<campaign.body_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
                 window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-body-details"));
+              })<<'\n';
+        if(options.economy_check)
+          std::cout<<"economy_inspection="<<campaign.economy_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="ready"?L"-economy-ready":stage=="end"?L"-economy-end":L"-economy-priority"));
               })<<'\n';
         if(options.logistics_check)
           std::cout<<"supply_inspection="<<campaign.supply_smoke(

@@ -32,7 +32,8 @@ enum class UiAction {
   Support,
   Notifications,
   Exit,
-  Supply
+  Supply,
+  Economy
 };
 
 struct NativeUiLayout {
@@ -59,6 +60,7 @@ struct NativeUiLayout {
   UiRect support_button;
   UiRect new_game_button;
   UiRect supply;
+  UiRect economy;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
@@ -117,7 +119,8 @@ struct NativeUiLayout {
          first_y + (button_height + gap) * 4.f, button_width, button_height},
         {center_x - button_width * .5f,
          first_y + (button_height + gap) * 5.f, button_width, button_height},
-        {inset, rail_y + (rail_size + rail_gap) * 4.f, rail_size, rail_size}};
+        {inset, rail_y + (rail_size + rail_gap) * 4.f, rail_size, rail_size},
+        {inset, rail_y + (rail_size + rail_gap) * 5.f, rail_size, rail_size}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -139,6 +142,7 @@ struct NativeUiLayout {
     if (construction.contains(point)) return UiAction::Construction;
     if (diplomacy.contains(point)) return UiAction::Diplomacy;
     if (supply.contains(point)) return UiAction::Supply;
+    if (economy.contains(point)) return UiAction::Economy;
     return UiAction::None;
   }
 };

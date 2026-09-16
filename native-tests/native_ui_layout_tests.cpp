@@ -56,6 +56,9 @@ void verify(int width, int height, float expected_scale) {
               contains_rect(viewport, layout.research) &&
               contains_rect(viewport, layout.shipyard) &&
               contains_rect(viewport, layout.construction) &&
+              contains_rect(viewport, layout.diplomacy) &&
+              contains_rect(viewport, layout.supply) &&
+              contains_rect(viewport, layout.economy) &&
               contains_rect(viewport, layout.day_text) &&
               contains_rect(viewport, layout.status_text) &&
               contains_rect(viewport, layout.menu_panel) &&
@@ -67,14 +70,18 @@ void verify(int width, int height, float expected_scale) {
               !overlaps(layout.notifications, layout.status_text) &&
               !overlaps(layout.research, layout.shipyard) &&
               !overlaps(layout.shipyard, layout.construction) &&
-              !overlaps(layout.construction, layout.diplomacy),
+              !overlaps(layout.construction, layout.diplomacy) &&
+              !overlaps(layout.diplomacy, layout.supply) &&
+              !overlaps(layout.supply, layout.economy),
           "Top controls overlap each other.");
   const auto rail_right = layout.research.x + layout.research.width;
   require(std::abs(layout.research.x - 18.f * layout.scale) < .01f &&
               rail_right <= native_navigation_content_left * layout.scale &&
               layout.shipyard.x == layout.research.x &&
               layout.construction.x == layout.research.x &&
-              layout.diplomacy.x == layout.research.x,
+              layout.diplomacy.x == layout.research.x &&
+              layout.supply.x == layout.research.x &&
+              layout.economy.x == layout.research.x,
           "Navigation rail did not preserve the shared content gutter.");
   require(!overlaps(layout.pause, layout.day_text) &&
               !overlaps(layout.speed, layout.day_text) &&
@@ -134,8 +141,15 @@ void verify(int width, int height, float expected_scale) {
     require(layout.hit(point, false) == UiAction::Diplomacy,
             "A point inside Relations missed its action.");
   }
+  for (const auto point : interior_points(layout.supply))
+    require(layout.hit(point, false) == UiAction::Supply,
+            "A point inside Supply missed its action.");
+  for (const auto point : interior_points(layout.economy))
+    require(layout.hit(point, false) == UiAction::Economy,
+            "A point inside Economy missed its action.");
   for (const auto bounds : {layout.research, layout.shipyard,
-                            layout.construction, layout.diplomacy})
+                            layout.construction, layout.diplomacy,
+                            layout.supply, layout.economy})
     for (const auto point : interior_points(bounds))
       require(layout.hit(point, true) == UiAction::None,
               "Pause menu accepted a hidden navigation-rail action.");
