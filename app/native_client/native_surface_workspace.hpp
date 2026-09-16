@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_relief.hpp"
 #include "native_surface_scene.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
@@ -96,6 +97,9 @@ public:
   [[nodiscard]] std::size_t scene_cached_images() const noexcept {
     return scene_.cached_images();
   }
+  [[nodiscard]] std::size_t relief_cached_images() const noexcept {
+    return relief_.cached_images();
+  }
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -133,6 +137,7 @@ private:
   std::string notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
   mutable stellar::native_surface::NativeSurfaceSceneRenderer scene_;
+  mutable stellar::native_surface::NativeSurfaceRelief relief_;
 };
 
 } // namespace stellar::native_colony_ui

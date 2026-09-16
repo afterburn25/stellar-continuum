@@ -170,6 +170,7 @@ target_sources(stellar-continuum-native PRIVATE
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_surface_construction_controller.cpp
   app/native_client/native_surface_workspace.cpp
+  app/native_client/native_surface_relief.cpp
   app/native_client/native_surface_scene.cpp)
 
 target_sources(stellar-continuum-native PRIVATE

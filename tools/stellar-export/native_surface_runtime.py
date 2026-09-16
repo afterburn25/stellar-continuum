@@ -20,7 +20,7 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused", "scene_sprites", "managed",
+    "persisted_site", "paused", "scene_sprites", "relief_images", "managed",
 }
 
 
@@ -62,6 +62,8 @@ def _diagnostic(stdout: str, expected_mode: str):
         raise RuntimeError("Native surface did not prove a persisted paused site")
     if type(state.get("scene_sprites")) is not int or state["scene_sprites"] < 2:
         raise RuntimeError("Native surface did not rasterize hub and site sprites")
+    if type(state.get("relief_images")) is not int or state["relief_images"] < 1:
+        raise RuntimeError("Native surface did not render its terrain-relief hillshade")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
                    "removal_confirmed", "refund_exact", "managed")
