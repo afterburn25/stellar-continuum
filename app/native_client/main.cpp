@@ -35,6 +35,7 @@
 #include "native_shipyard_controller.hpp"
 #include "native_shipyard_workspace.hpp"
 #include "native_system_view.hpp"
+#include "native_inspection.hpp"
 #include "native_system_travel.hpp"
 #include "native_system_workspace.hpp"
 #include "native_planet_disc_assets.hpp"
@@ -249,7 +250,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
-  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{};
+  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
 };
@@ -275,6 +276,7 @@ struct Options {
     else if(arg==L"--voice-check") result.voice_check=true;
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
     else if(arg==L"--video-settings-check") result.video_settings_check=true;
+    else if(arg==L"--inspection-check") result.inspection_check=true;
     else if(arg==L"--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg==L"--load") result.load=true;
     else if(arg==L"--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
@@ -314,6 +316,7 @@ struct Options {
     else if(arg=="--voice-check") result.voice_check=true;
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
     else if(arg=="--video-settings-check") result.video_settings_check=true;
+    else if(arg=="--inspection-check") result.inspection_check=true;
     else if(arg=="--save-path"&&i+1<argc){result.save_path=argv[++i];result.save_path_overridden=true;}
     else if(arg=="--load") result.load=true;
     else if(arg=="--width"&&i+1<argc) result.window_width=std::stoi(argv[++i]);
@@ -346,6 +349,7 @@ struct Options {
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
   if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
+  if(result.inspection_check&&!result.menu_smoke)throw std::invalid_argument("--inspection-check requires an isolated --smoke invocation.");
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires an isolated active-encounter save and --load.");
   if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.restart_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
   if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
@@ -534,6 +538,7 @@ class NativeCampaign final {
         text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
     research_workspace_.set_text_measurer(text_measurer_);
+    inspection_card_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
@@ -564,6 +569,98 @@ class NativeCampaign final {
   void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
+  [[nodiscard]] std::string system_inspection_smoke(int width,int height,
+      const std::function<void(const DrawList&,std::string_view)>& draw) {
+    using stellar::native_inspection::SystemInspectionCard;
+    if(!menu_||settings_visible()||session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("System inspection proof requires the paused campaign menu.");
+    const auto initial=restart_snapshot();
+    const auto original_camera=camera_;
+    const auto original_selected=selected_id_;
+    const auto& world=session_->frame().runtime().world().campaign();
+    const auto observer=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
+    if(observer==world.civilizations.end()||!observer->is_player)
+      throw std::runtime_error("System inspection fixture has no validated player.");
+    const auto home=std::ranges::find(world.systems,observer->home_system_id,&StellarSystem::id);
+    const auto unknown=std::ranges::find_if(world.systems,[&](const auto& system){
+      return world.knowledge.system_survey_level(observer->id,system.id)==SystemSurveyLevel::unknown;
+    });
+    if(home==world.systems.end()||unknown==world.systems.end()||
+       world.knowledge.system_survey_level(observer->id,home->id)!=SystemSurveyLevel::fully_surveyed)
+      throw std::runtime_error("System inspection fixture needs a surveyed home and unknown star.");
+    const auto route=[&](std::vector<InputEvent> events){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=events.empty()?Point{}:events.back().position;input.events=std::move(events);
+      if(!update(input,width,height,0.,false))throw std::runtime_error("System inspection input exited the game.");
+    };
+    const auto click=[&](Point point){route({{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}});};
+    const auto same_camera=[](const Camera& a,const Camera& b){return a.center.x==b.center.x&&a.center.y==b.center.y&&a.pixels_per_world==b.pixels_per_world;};
+    const auto card_text=[&](const DrawList& draw,std::string_view value){
+      const auto panel=inspection_bounds(width,height);
+      return std::ranges::any_of(draw.overlay,[&](const auto& command){
+        const auto* label=std::get_if<Text>(&command);
+        return label&&label->value==value&&label->clip&&panel.contains(label->at);
+      });
+    };
+    route({{InputEventType::EscapePressed}});
+    if(menu_)throw std::runtime_error("Inspection could not leave the pause menu.");
+    const bool restore_running=session_->frame().clock().speed()!=StrategicSpeed::Paused;
+    if(restore_running)click(center(NativeUiLayout::for_viewport(width,height).pause));
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("Inspection could not pause the simulation through its control.");
+    const auto select_star=[&](const StellarSystem& system){
+      // Place an actual chart marker in a free part of the viewport, then use
+      // the same press/release hit testing as the player (no synthetic selection).
+      camera_.pixels_per_world=10.;
+      camera_.center={system.position.x-static_cast<double>(width)*.12/10.,system.position.y};
+      click(camera_.project({system.position.x,system.position.y},width,height));
+      if(selected_id_!=std::optional{system.id}||!inspection_visible())
+        throw std::runtime_error("Actual star click did not open its inspection card.");
+    };
+    select_star(*home);
+    auto known_scene=scene(width,height);
+    if(!card_text(known_scene,home->name)||!card_text(known_scene,"Fully surveyed"))
+      throw std::runtime_error("Surveyed star facts are missing from the visible card.");
+    draw(known_scene,"known");
+    const auto bounds=inspection_bounds(width,height);
+    const auto inside=center(SystemInspectionCard::body_bounds(bounds));
+    const Point outside{static_cast<float>(width)*.65f,static_cast<float>(height)*.7f};
+    const auto before_camera=camera_;
+    route({{InputEventType::Wheel,inside,{},-1000.f}});
+    const auto end_scroll=inspection_card_.scroll_offset();
+    route({{InputEventType::Wheel,inside,{},-1000.f}});
+    if(end_scroll!=inspection_card_.scroll_offset()||!same_camera(camera_,before_camera))
+      throw std::runtime_error("Inspection wheel escaped its scroll bounds or zoomed the map.");
+    draw(scene(width,height),"end");
+    route({{InputEventType::LeftPressed,inside},{InputEventType::PointerMove,outside,{100.f,80.f}},
+           {InputEventType::LeftReleased,outside}});
+    if(!same_camera(camera_,before_camera)||selected_id_!=std::optional{home->id})
+      throw std::runtime_error("Inspection drag panned or selected through the card.");
+    route({{InputEventType::PointerCancelled}});
+    route({{InputEventType::Wheel,inside,{},1000.f}});
+    if(inspection_card_.scroll_offset()!=0.f)throw std::runtime_error("Inspection could not scroll back to its first row.");
+    click(center(NativeUiLayout::for_viewport(width,height).research));
+    if(!research_workspace_.visible()||inspection_visible())
+      throw std::runtime_error("Research navigation failed to hide the map inspector.");
+    route({{InputEventType::EscapePressed}});
+    if(!inspection_visible())throw std::runtime_error("Map inspection was lost when closing Research.");
+    click(center(SystemInspectionCard::close_bounds(bounds)));
+    if(selected_id_||inspection_card_.visible())throw std::runtime_error("Inspection close retained its selected target.");
+    select_star(*unknown);
+    const auto unknown_scene=scene(width,height);
+    if(!card_text(unknown_scene,"UNKNOWN")||card_text(unknown_scene,unknown->name))
+      throw std::runtime_error("Unknown inspection failed its rendered name redaction.");
+    draw(unknown_scene,"unknown");
+    click(center(SystemInspectionCard::close_bounds(bounds)));
+    camera_=original_camera;selected_id_=original_selected;refresh_inspection();
+    if(restore_running)click(center(NativeUiLayout::for_viewport(width,height).pause));
+    route({{InputEventType::EscapePressed}});
+    if(restart_snapshot()!=initial)throw std::runtime_error("Read-only inspection changed campaign, clock, selection or camera.");
+    return "{\"known_clicked\":true,\"unknown_clicked\":true,\"unknown_redacted\":true,"
+      "\"wheel_bounded\":true,\"map_stationary\":true,\"drag_captured\":true,"
+      "\"workspace_isolation\":true,\"close_clears_selection\":true,\"campaign_unchanged\":true}";
+  }
+
   void repeat_unknown_lane_voice_input(int width,int height){
     if(!smoke_system_travel_unknown_denied_||!system_workspace_.travel_snapshot())
       throw std::runtime_error("Scientist check requires an observer-denied connected lane.");
@@ -2005,6 +2102,7 @@ class NativeCampaign final {
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
       selected_id_.reset();
+      inspection_card_.clear();
       pre_menu_speed_=StrategicSpeed::Normal;
       fit_camera(width,height);
       galaxy_backdrop_.discard_campaign();
@@ -2049,6 +2147,7 @@ class NativeCampaign final {
       return true;
     }
     refresh_battle(width,height,elapsed);
+    refresh_inspection();
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
       fleet_workspace_.cancel_recovery();
@@ -2217,6 +2316,7 @@ class NativeCampaign final {
       }
       if(event.type==InputEventType::PointerCancelled){
         gesture_.cancel();
+        (void)inspection_card_.handle(event,inspection_bounds(width,height));
         (void)research_workspace_.handle(event,width,height);
         (void)shipyard_workspace_.handle(event,width,height);
         (void)construction_workspace_.handle(event,width,height);
@@ -2264,6 +2364,11 @@ class NativeCampaign final {
         }
         if(command.captured||event.type==InputEventType::TextEntered||
            event.type==InputEventType::BackspacePressed)continue;
+      }
+      if(inspection_visible()){
+        const auto result=inspection_card_.handle(event,inspection_bounds(width,height));
+        if(result.closed)selected_id_.reset();
+        if(result.captured){gesture_.cancel();continue;}
       }
       if(!menu_&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
         if(event.type==InputEventType::LeftPressed&&event.click_count>=2){
@@ -2333,6 +2438,9 @@ class NativeCampaign final {
     notification_refresh_elapsed_+=std::max(0.,elapsed);
     if(notification_refresh_elapsed_>=1.)refresh_notifications();
     refresh_knowledge();
+    refresh_inspection();
+    if(!inspection_visible())
+      (void)inspection_card_.handle({InputEventType::PointerCancelled},inspection_bounds(width,height));
     territory_overlay_.poll();
     territory_refresh_elapsed_+=std::max(0.,elapsed);
     if(!system_workspace_.visible() &&
@@ -2732,18 +2840,7 @@ class NativeCampaign final {
                      session_->frame().clock().simulation_days())),
         {154, 181, 211, 235}, layout.metric_font_pixels,
         layout.day_text.width, layout.day_text});
-    if(selected_id_&&!menu_&&!system_workspace_.visible()&&
-       !surface_workspace_.visible()&&!colony_workspace_.visible()&&
-       !settlement_workspace_.visible()&&!research_workspace_.visible()&&
-       !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
-       !diplomacy_workspace_.visible()){
-      const auto found=cache.systems_by_id.find(*selected_id_);
-      if(found!=cache.systems_by_id.end()){
-        const bool known=known_.contains(*selected_id_);const float x=18,y=screen_height-82;
-        out.text.push_back({{x,y},known?found->second->name:"Unknown system",{238,244,255,255}});
-        out.text.push_back({{x,y+18},known?spectral_name(found->second->primary):"No survey data",{154,181,211,235}});
-      }
-    }
+    if(inspection_visible())inspection_card_.render(out,inspection_bounds(width,height));
     const auto &notice = session_->notice();
     const bool preparing_galaxy=!system_workspace_.visible()&&
         (!galaxy_backdrop_.artwork_ready()||!territory_overlay_.valid()||territory_overlay_.pending());
@@ -3417,10 +3514,29 @@ class NativeCampaign final {
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void toggle_menu(){fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
+  [[nodiscard]] bool inspection_visible()const noexcept {
+    return inspection_card_.visible()&&!menu_&&!system_workspace_.visible()&&
+        !surface_workspace_.visible()&&!colony_workspace_.visible()&&
+        !settlement_workspace_.visible()&&!research_workspace_.visible()&&
+        !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
+        !diplomacy_workspace_.visible()&&!battle_workspace_.visible()&&
+        !notification_view_.visible()&&!settings_visible();
+  }
+  [[nodiscard]] static UiRect inspection_bounds(int width,int height) {
+    const auto scale=NativeUiLayout::for_viewport(width,height).scale;
+    const float x=80.f*scale,top=90.f*scale,bottom=static_cast<float>(height)-88.f*scale;
+    const float panel_height=std::max(100.f,std::min(500.f*scale,bottom-top));
+    return {x,bottom-panel_height,std::max(120.f,std::min(360.f*scale,static_cast<float>(width)-x-18.f*scale)),panel_height};
+  }
+  void refresh_inspection() {
+    if(!selected_id_){inspection_card_.clear();return;}
+    inspection_card_.set_inspection(stellar::native_inspection::build_system_inspection(
+        session_->frame().runtime().world().campaign(),*selected_id_));
+  }
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
-  void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;}
+  void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;refresh_inspection();}
   std::unique_ptr<NativeCampaignSession> session_;
   Camera camera_;
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
@@ -3431,6 +3547,7 @@ class NativeCampaign final {
   double territory_refresh_elapsed_{.5};
   std::unordered_set<int> known_;
   std::optional<int> selected_id_;
+  stellar::native_inspection::SystemInspectionCard inspection_card_;
   NativeResearchController research_controller_;
   NativeResearchWorkspace research_workspace_;
   NativeFleetController fleet_controller_;
@@ -3932,6 +4049,11 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.inspection_check)
+          std::cout<<"system_inspection="<<campaign.system_inspection_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,std::string_view stage){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,stage=="known"?L"-inspection-known":stage=="end"?L"-inspection-end":L"-inspection-unknown"));
+              })<<'\n';
         if(options.surface_reload_smoke)
           std::cout<<"surface_inspection="<<campaign.surface_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool capture_detail){

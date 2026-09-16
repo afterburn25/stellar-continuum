@@ -6,6 +6,12 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- A single chart-star click opens a survey-gated system inspector. Header/progress
+  stay pinned while measured findings/own-colony rows scroll; pointer gestures
+  cannot pan the map or issue fleet orders through the panel. The maintained
+  720p/1080p replay preserves campaign, camera, selection and paused saves, with
+  known/unknown/scrolled-end captures. See `NATIVE_SYSTEM_INSPECTION.md`.
+
 - Research has renderer-measured detail sections, independently bounded scroll,
   a pinned action/result, and stable reading position during routine simulation
   updates. Its maintained replay requires 720p fresh and 1080p reload captures

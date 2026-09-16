@@ -1,4 +1,13 @@
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
+add_executable(stellar_native_inspection_tests
+  native-tests/native_inspection_tests.cpp app/native_client/native_inspection.cpp)
+target_include_directories(stellar_native_inspection_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_inspection_tests PRIVATE stellar_core)
+add_test(NAME native_inspection COMMAND stellar_native_inspection_tests)
+if(MSVC)
+  target_compile_options(stellar_native_inspection_tests PRIVATE /W4 /WX)
+endif()
+
 add_executable(stellar_battle_workspace_tests
   native-tests/native_battle_workspace_tests.cpp
   app/native_client/native_battle_workspace.cpp)

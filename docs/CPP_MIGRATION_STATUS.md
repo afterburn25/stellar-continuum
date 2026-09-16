@@ -2,8 +2,8 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`1c8e9744` inventoried; support, notifications, tactical, civilian recovery
-safe video settings and save-gated New Game selectively adapted. Observer inspection, new voice,
+`d9d23f57` inventoried; support, notifications, tactical, civilian recovery
+safe video settings, observer-safe system inspection and save-gated New Game selectively adapted. New voice,
 logistics and newest empire/mission boards remain unimported pending review).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
@@ -15,7 +15,46 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-### Safe native video settings
+### Observer-safe galaxy system inspection
+
+Single-clicking a star now opens a native system card with survey progress,
+metric/light-year distance from home, authorized stellar findings and every
+owned settlement in that system. The navy/cyan card uses renderer-measured
+wrapped text, pinned header/progress/close controls, separate settlement fields,
+and a bounded scroll indicator. Wheel/drag input is captured before map/fleet
+handling; Research and other workspaces hide the card. Paused updates rebuild
+its observer-filtered value snapshot; campaign replacement clears it.
+
+This selectively adapts Devin d2a41caa. Contact plus survey no longer leaks live
+foreign colony existence, count, names or statistics. Unknown names/class/traits
+remain hidden; detected/partial names follow the reference. Home chart distance
+is intentionally public. Own colonies sort by name/ID and validate body membership.
+No economy/logistics recomputation, swallowed exceptions, Core changes, Player17
+changes or C# changes. Contract: docs/engine/NATIVE_SYSTEM_INSPECTION.md.
+
+Validation: final MSVC native build and all 9 affected CTests pass. Export-tool
+unit discovery reports 452 tests, 435 passed and 17 skipped because the optional
+STELLAR_NATIVE_EXE integration fixture was not configured. Two relocated actual
+Vulkan runs cover fresh 720p and 1080p reload, actual chart hit testing, known /
+unknown / scrolled-end screenshots, mouse capture, Research roundtrip, close,
+unchanged campaign/camera/selection and exact paused Player17 equality except
+SavedAtUtc. Existing relocated navigation and fleet suites also pass. Final card
+screenshots inspected; no body text escapes the header/panel or bottom boundary.
+Evidence: work/native-inspection-{build,ctest,python}.log and
+work/native-inspection-{runtime,navigation,fleet}.json; captures under
+work/native-audio-validation/package-inspection-*.bmp. The package is UNSEALED.
+
+Next: adapt ea9164e9 supply network with explicit unavailable/failed/retry states,
+validated player/home identity, a single Core projection per refresh, and bounded
+input/layout. Never turn exceptions into permanent “initializing” or invent supply
+values. Latest fetched Devin head d9d23f57 includes bc681eb6 generated planet art,
+fe364430 generated star art and d9d23f57 mission Land/Collect commands; these are
+inventoried only. Review observer visibility, command revalidation, alpha edges,
+bounded image preparation, asset provenance and preservation of approved Sol
+textures before import. Earlier 641955f0 physical inspector and 1c8e9744 surface
+management remain unimported. Shared base ac45d958 and PR332 remain unmerged.
+
+### Previous checkpoint: safe native video settings
 
 VIDEO is available through the existing main/pause Settings panel. Borderless
 and exclusive fullscreen, detected resolution/refresh pairs, verified V-Sync

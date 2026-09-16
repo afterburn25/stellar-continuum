@@ -23,6 +23,7 @@ from native_battle_runtime import validate_native_battle_export
 from native_fleet_runtime import validate_native_fleet_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
+from native_inspection_runtime import validate_native_inspection_export
 from native_system_travel_runtime import validate_native_system_travel_export
 from native_colony_runtime import validate_native_colony_export
 from native_settlement_runtime import validate_native_settlement_export
@@ -487,6 +488,7 @@ def export(preset_name):
             smoke.update(validate_native_construction_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_export(output, env))
+            smoke.update(validate_native_inspection_export(output, env))
             smoke.update(validate_native_colony_export(output, env))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_surface_export(output, env))
