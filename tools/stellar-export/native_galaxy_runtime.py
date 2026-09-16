@@ -82,9 +82,10 @@ def _bmp(path: Path, stdout: str, width: int, height: int):
     # The capture is at drawable-pixel size; on high-DPI displays that is a
     # multiple of the requested window size. The smoke reports the actual
     # drawable so the BMP geometry is checked against the real render surface.
-    declared = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
-    if declared:
-        width, height = int(declared.group(1)), int(declared.group(2))
+    sizes = {(width, height)}
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        sizes.add((int(drawable.group(1)), int(drawable.group(2))))
     declared_size, pixel_offset = struct.unpack_from("<II", data, 2)[0], struct.unpack_from("<I", data, 10)[0]
     header_size = struct.unpack_from("<I", data, 14)[0]
     actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
@@ -92,7 +93,7 @@ def _bmp(path: Path, stdout: str, width: int, height: int):
     row_bytes = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
     required = row_bytes * abs(actual_height)
     if (declared_size != len(data) or pixel_offset < 54 or header_size < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
+            (actual_width, abs(actual_height)) not in sizes or planes != 1 or
             bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
             pixel_offset + required > len(data)):
         raise RuntimeError("Native galaxy capture has invalid renderer geometry")

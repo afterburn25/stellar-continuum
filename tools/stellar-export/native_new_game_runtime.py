@@ -62,9 +62,10 @@ def _bmp(path: Path, stdout: str, width: int, height: int):
     # The capture is at drawable-pixel size; on high-DPI displays that is a
     # multiple of the requested window size. The smoke reports the actual
     # drawable so the BMP geometry is checked against the real render surface.
+    sizes = {(width, height)}
     drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
     if drawable:
-        width, height = int(drawable.group(1)), int(drawable.group(2))
+        sizes.add((int(drawable.group(1)), int(drawable.group(2))))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -73,7 +74,7 @@ def _bmp(path: Path, stdout: str, width: int, height: int):
     row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
     required = row * abs(actual_height)
     if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
+            (actual_width, abs(actual_height)) not in sizes or planes != 1 or
             bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
             offset + required > len(data)):
         raise RuntimeError("Native New Game capture has invalid renderer geometry")
