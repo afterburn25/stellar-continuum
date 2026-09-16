@@ -430,7 +430,12 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   bridge, roster-based character resolution, settings window). Remaining: the
   reference's optional manifest-gated offline-neural backend (SAPI is the
   reference's own default fallback when the pack is absent).
-- Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
+- Frame pacing: smoke means are vsync-bound to the host's ~53 Hz virtual
+  display. Unbounded measurement (`video-settings.json` `{"vsync":"Off",
+  "frame_cap":"Unlimited"}` beside the save) shows 10.6 ms mean / 15.8 ms p95
+  draw (≈ 94 FPS) on the 500-system map at 2560×1440 drawable — 60 FPS render
+  throughput proven on this host; only native-refresh presentation needs a
+  physical 60 Hz display.
 - `cleanMachineTest` still needs a separate machine/VM.
 - `graphicalParity=false` stays until visual parity evidence exists.
 

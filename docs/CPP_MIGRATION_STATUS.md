@@ -56,11 +56,16 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
    dialogue voice → captions) over the Windows SAPI 5 backend, with the voice
    & subtitles settings view live under the pause menu's VOICE button; the
    reference's offline-neural backend remains.
-3. Frame pacing is present-bound on the measurement host: smoke now reports
+3. Frame pacing is present-bound on the measurement host: smoke reports
    `cpu_mean/p95` (update+scene build ≈ 2.3 ms mean / 0.14 ms p95) separately
    from `draw_mean/p95` (≈ 18.9 ms — the vsync interval of the ~53 Hz Meta
-   Virtual Monitor the host displays through). CPU headroom for 60 FPS is
-   established; a native-refresh measurement needs a physical 60 Hz display.
+   Virtual Monitor the host displays through). Unbounded throughput is now
+   measured directly: with `video-settings.json` `{"vsync":"Off",
+   "frame_cap":"Unlimited"}` beside the save, the smoke reports
+   `presentation=unbounded` with the full 500-system map at the 2× drawable
+   (2560×1440) at **10.6 ms mean / 15.8 ms p95 draw (≈ 94 FPS)** — the render
+   pipeline clears 60 FPS on this host; only a native-refresh presentation
+   measurement still needs a physical 60 Hz display.
 4. `graphicalParity=false` retained honestly; `cleanMachineTest` needs a separate machine/VM.
 
 ## Current state (engine 0.1.58, working branch `cpp/devin-swe2-native-conversion`)
