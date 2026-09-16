@@ -183,6 +183,7 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 
 void NativeFleetWorkspace::discard_campaign() {
   view_.reset();
+  overview_.reset();
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
@@ -258,6 +259,20 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
           return {FleetWorkspaceCommandKind::Select, true,
                   view_->own_fleets[index].id};
       }
+    }
+    // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
+    if (overview_ && !selected_fleet_id()) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      const auto overview_layout =
+          native_overview::overview_layout_for(*overview_, content);
+      for (std::size_t index = 0;
+           index < overview_layout.colony_rows.size(); ++index)
+        if (overview_layout.colony_rows[index].contains(event.position))
+          return {FleetWorkspaceCommandKind::OpenColony, true, 0, 0, {},
+                  overview_->colonies[index].colony_id};
     }
     return {FleetWorkspaceCommandKind::None, true};
   }
@@ -361,9 +376,22 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
 
   const auto *fleet = selected_fleet();
   if (!fleet) {
-    text(out, layout.details,
-         "Select an owned fleet on the map or in the outliner.", muted,
-         layout.body_font_pixels);
+    // Reference EmpireOverviewPanel empire mode: the selected-system home
+    // reference plus the own-colony quick list fill the detail area.
+    if (overview_) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      native_overview::render_empire_overview(
+          out, *overview_,
+          native_overview::overview_layout_for(*overview_, content),
+          pointer_);
+    } else {
+      text(out, layout.details,
+           "Select an owned fleet on the map or in the outliner.", muted,
+           layout.body_font_pixels);
+    }
   } else {
     std::string details =
         fleet->name + "\n" + role_name(fleet->role) + "  |  " +

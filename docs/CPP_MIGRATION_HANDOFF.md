@@ -206,6 +206,32 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `native_logistics` CTest covers the initializing state, home-network build,
   kind labels, panel containment/close, and rendering.
 
+## Empire overview slice (candidate for review)
+
+- `app/native_client/native_overview.{hpp,cpp}` — ports the
+  `EmpireOverviewPanel` empire mode: `build_empire_overview` returns the
+  knowledge-gated selected-system name (`Unknown` until surveyed), the
+  homeworld distance in the reference `MetricFormat.InterstellarDistance`
+  form (metric primary + parsec suffix), the own-colony quick list (planet
+  name, system, population in the reference M/B wording) and the combined
+  fleet power. Foreign colonies and fleets are never read.
+- The reference panel shares its top-right slot with the ship inspector;
+  natively the fleet workspace panel owns that slot, so the overview renders
+  inside its detail area while no fleet is selected (ship detail stays the
+  workspace's own inspector). Colony rows emit
+  `FleetWorkspaceCommandKind::OpenColony` → `open_overview_colony`, the
+  `UiOpenOwnedColony(colonyId, land:false)` port: enter the owning system's
+  orbital view focused on the colony world via the new public
+  `NativeSystemWorkspace::select_body` (reference `FocusBody`).
+- `refresh_fleets` rebuilds the overview on its existing 0.1 s cadence;
+  `discard_campaign` clears it.
+- The fleet smoke clears the selection, asserts the colony rows, clicks the
+  first colony, verifies the system workspace opened at the owning system,
+  then returns to the map and emits `overview=1`. `native_fleet_runtime` and
+  the system-travel validator require the new token.
+- `native_overview` CTest covers own-only filtering, knowledge-gated names,
+  placeholders, layout bounds and rendering.
+
 ## Civilian fleet controls slice (candidate for review)
 
 - Ports the reference `UiToggleSelectedCivilianFleetHold` /

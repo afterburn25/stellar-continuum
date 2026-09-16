@@ -6,6 +6,7 @@
 #include "native_orbital_structure.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -70,6 +71,24 @@ public:
     settlement_status_ = std::move(value);
   }
   void set_notice(std::string);
+  // Programmatic body selection (reference _systemSpatialCanvas.FocusBody):
+  // used by the empire overview's colony rows to open the owning system view
+  // already focused on the colony world. Returns false when the body is not
+  // in the current snapshot.
+  [[nodiscard]] bool select_body(int body_id) noexcept {
+    if (!snapshot_ ||
+        std::ranges::find(snapshot_->bodies, body_id,
+                          &stellar::native_system::NativeSystemBody::id) ==
+            snapshot_->bodies.end())
+      return false;
+    selected_body_id_ = body_id;
+    selected_project_id_.reset();
+    colony_body_id_.reset();
+    inspector_focus_ = InspectorFocus::body;
+    dragging_ = false;
+    notice_.clear();
+    return true;
+  }
   void close() noexcept;
   void discard_campaign() noexcept;
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}

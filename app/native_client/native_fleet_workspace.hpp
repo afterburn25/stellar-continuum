@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_fleet_controller.hpp"
+#include "native_overview.hpp"
 #include "native_ship_art_assets.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
@@ -45,7 +46,8 @@ enum class FleetWorkspaceCommandKind {
   Confirm,
   Engage,
   HoldResume,
-  ReturnToBase
+  ReturnToBase,
+  OpenColony
 };
 
 struct FleetWorkspaceCommand {
@@ -54,6 +56,7 @@ struct FleetWorkspaceCommand {
   int fleet_id{};
   int target_system_id{};
   std::vector<int> hit_fleet_ids;
+  int colony_id{};
 };
 
 class NativeFleetWorkspace final {
@@ -64,6 +67,18 @@ public:
                    std::string target_display_name);
   void clear_preview();
   void set_notice(std::string message, bool accepted);
+  // Reference EmpireOverviewPanel (empire mode): while no fleet is selected,
+  // the detail area shows the selected-system home reference, the own-colony
+  // quick list and the combined fleet power instead of the selection hint.
+  void set_overview(
+      std::optional<stellar::native_overview::NativeEmpireOverview>
+          overview) {
+    overview_ = std::move(overview);
+  }
+  [[nodiscard]] const stellar::native_overview::NativeEmpireOverview *
+  overview() const noexcept {
+    return overview_ ? &*overview_ : nullptr;
+  }
   // Reference UiSelectedCivilianReturnNeedsConfirmation: the RETURN TO BASE
   // button switches to a confirmation prompt while a paid-commitment return
   // is pending operator confirmation.
@@ -96,6 +111,7 @@ private:
   selected_fleet() const noexcept;
 
   std::optional<stellar::native_fleet::NativeFleetMapView> view_;
+  std::optional<stellar::native_overview::NativeEmpireOverview> overview_;
   std::optional<stellar::native_fleet::NativeFleetRoutePreview> preview_;
   std::string target_display_name_;
   std::string notice_;

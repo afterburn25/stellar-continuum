@@ -8,6 +8,7 @@
 #include "native_galaxy_star_markers.hpp"
 #include "native_inspection.hpp"
 #include "native_logistics.hpp"
+#include "native_overview.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
 #include "native_colony_workspace.hpp"
@@ -96,6 +97,7 @@ namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_inspection = stellar::native_inspection;
 namespace native_logistics = stellar::native_logistics;
 namespace native_notifications = stellar::native_notifications;
+namespace native_overview = stellar::native_overview;
 namespace native_support = stellar::native_support;
 namespace native_voice = stellar::native_voice;
 namespace native_voice_settings = stellar::native_voice_settings;
@@ -944,6 +946,31 @@ class NativeCampaign final {
         throw std::runtime_error("Fleet smoke resume order did not land.");
       smoke_civilian_recovery_=true;
     }
+    // EmpireOverviewPanel parity: with no fleet selected the detail area
+    // lists own colonies; a colony row opens its system's orbital view.
+    {
+      fleet_controller_.clear_selection();
+      refresh_fleets(true);
+      const auto *overview=fleet_workspace_.overview();
+      const UiRect overview_content{layout.details.x,layout.details.y,
+          layout.details.width,
+          layout.route.y+layout.route.height-layout.details.y};
+      if(!overview||overview->colonies.empty())throw std::runtime_error(
+          "Fleet smoke saw no empire overview colonies.");
+      const auto overview_layout=native_overview::overview_layout_for(
+          *overview,overview_content);
+      if(overview_layout.colony_rows.empty())throw std::runtime_error(
+          "Fleet smoke saw no empire overview colony rows.");
+      const auto colony_system=overview->colonies.front().system_id;
+      click({overview_layout.colony_rows[0].x+8.f*overview_layout.scale,
+             overview_layout.colony_rows[0].y+8.f*overview_layout.scale});
+      if(!system_workspace_.visible()||
+         system_workspace_.system_id()!=std::optional<int>{colony_system})
+        throw std::runtime_error(
+            "Fleet smoke overview colony row did not open its system view.");
+      system_workspace_.close();
+      smoke_overview_=true;
+    }
     // Inspection-card parity: clicking a star selects it and renders the
     // observer-gated intelligence card (reference SystemInspectionPanel).
     {
@@ -1654,7 +1681,8 @@ class NativeCampaign final {
        <<std::setprecision(6)<<found->transit_progress
        <<":hover="<<(smoke_fleet_hover_preview_?1:0)
        <<":inspect="<<(smoke_inspection_?1:0)
-       <<":civilian="<<(smoke_civilian_recovery_?1:0);
+       <<":civilian="<<(smoke_civilian_recovery_?1:0)
+       <<":overview="<<(smoke_overview_?1:0);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -1875,6 +1903,7 @@ class NativeCampaign final {
                width,height))
           continue;
       }
+
       if(event.type==InputEventType::EscapePressed){
         if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
@@ -1979,7 +2008,9 @@ class NativeCampaign final {
                               :std::nullopt;
         const auto fleet_command=fleet_workspace_.handle(
             event,width,height,markers,target);
-        handle_fleet_command(fleet_command);
+        if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)
+          open_overview_colony(fleet_command.colony_id,width,height);
+        else handle_fleet_command(fleet_command);
         if(fleet_command.captured){
           if(event.type==InputEventType::LeftPressed)gesture_.begin(true);
           continue;
@@ -2791,6 +2822,23 @@ class NativeCampaign final {
     return result;
   }
 
+  // Reference UiOpenOwnedColony(colonyId, land:false): enter the owning
+  // system's orbital view already focused on the colony world.
+  void open_overview_colony(int colony_id,int width,int height){
+    const auto &campaign=session_->frame().runtime().world().campaign();
+    const auto colony=std::ranges::find(campaign.colonies,colony_id,
+                                        &Colony::id);
+    if(colony==campaign.colonies.end()||!colony->planetary_body_id)return;
+    notification_view_.close();
+    if(!enter_system(colony->system_id,width,height)||
+       !system_workspace_.select_body(*colony->planetary_body_id)){
+      session_->publish_status(
+          "The colony world is not available in the current orbital survey.");
+      return;
+    }
+    refresh_colony_entry(true);
+  }
+
   void refresh_fleets(bool force){
     if(!force&&fleet_refresh_elapsed_<.1)return;
     auto view=fleet_controller_.build(session_->frame(),
@@ -2809,6 +2857,8 @@ class NativeCampaign final {
     }
     fleet_marker_offsets_=deterministic_fleet_marker_offsets(view.own_fleets);
     fleet_workspace_.set_view(std::move(view));
+    fleet_workspace_.set_overview(native_overview::build_empire_overview(
+        session_->frame().runtime().world().campaign(),selected_id_));
     fleet_refresh_elapsed_=0.;
   }
 
@@ -3108,7 +3158,7 @@ class NativeCampaign final {
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_fleet_hover_preview_{},smoke_inspection_{},
-      smoke_civilian_recovery_{};
+      smoke_civilian_recovery_{},smoke_overview_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};
