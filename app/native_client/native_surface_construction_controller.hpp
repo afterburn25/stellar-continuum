@@ -56,6 +56,25 @@ public:
   [[nodiscard]] NativeSurfaceCommandOutcome confirm_removal(
       stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
       const NativeSurfaceRemovalQuote &);
+  // Immediate building-management orders (reference UiUpgradeSurfaceBuilding,
+  // UiRepairSurfaceBuilding, UiSetSurfaceBuildingEnabled,
+  // UiSetSurfaceBuildingPriority, UiUpgradeSurfaceHub): no detached quote —
+  // the live colony binding is re-checked and the canonical order runs.
+  [[nodiscard]] NativeSurfaceCommandOutcome upgrade_building(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &, int building_id);
+  [[nodiscard]] NativeSurfaceCommandOutcome repair_building(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &, int building_id);
+  [[nodiscard]] NativeSurfaceCommandOutcome set_building_enabled(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &, int building_id, bool enabled);
+  [[nodiscard]] NativeSurfaceCommandOutcome set_building_priority(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &, int building_id, bool prioritized);
+  [[nodiscard]] NativeSurfaceCommandOutcome upgrade_hub(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &);
   // Cancels only this controller's detached confirmation token.
   [[nodiscard]] bool cancel_quote(std::uint64_t campaign_generation,
                                   std::uint64_t quote_revision);

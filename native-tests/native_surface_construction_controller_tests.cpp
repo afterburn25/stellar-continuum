@@ -244,6 +244,71 @@ void changed_world_tests(const fs::path &research_root,
           "foreign colony view produced an accepted surface quote");
 }
 
+void management_order_tests(const fs::path &research_root,
+                            const fs::path &catalog) {
+  auto frame = make_frame(research_root, catalog);
+  NativeSystemViewController systems;
+  NativeColonyController colonies;
+  auto selected = select_home(frame, 12, systems, colonies);
+  NativeSurfaceConstructionController controller;
+  const auto type = selected.colony.available_buildings.front().type_id;
+  const auto quote =
+      accepted_quote(controller, frame, 12, selected.colony, type);
+  require(controller.confirm_placement(frame, 12, quote).accepted,
+          "management fixture placement failed");
+  const auto site_id = quote.prepared_building_id;
+  auto &site = *std::ranges::find(
+      colony(frame, selected.colony.colony_id).surface_buildings, site_id,
+      &SurfaceBuilding::id);
+  require(!controller
+               .set_building_priority(frame, 12, selected.colony, site_id, true)
+               .accepted,
+          "incomplete site accepted a priority order");
+  site.is_complete = true;
+  site.condition = .5;
+  require(controller
+              .set_building_priority(frame, 12, selected.colony, site_id, true)
+              .accepted &&
+              site.operating_priority > 0,
+          "priority order did not set canonical operating priority");
+  require(controller
+              .set_building_enabled(frame, 12, selected.colony, site_id, false)
+              .accepted &&
+              !site.is_enabled,
+          "shutdown order did not disable the building");
+  require(controller
+              .set_building_enabled(frame, 12, selected.colony, site_id, true)
+              .accepted &&
+              site.is_enabled,
+          "restart order did not re-enable the building");
+  const auto repair_cost = surface_repair_industry_cost(site);
+  require(repair_cost > 0., "damaged fixture reported no repair cost");
+  economy(frame).industry += repair_cost + 10.;
+  const auto industry_before = economy(frame).industry;
+  require(controller
+              .repair_building(frame, 12, selected.colony, site_id)
+              .accepted &&
+              site.condition == 1. &&
+              std::abs(economy(frame).industry -
+                       (industry_before - repair_cost)) < 1e-9,
+          "repair order did not restore condition for its quoted materials");
+  const auto pending =
+      accepted_quote(controller, frame, 12, selected.colony, type, -320.f);
+  require(controller
+              .set_building_priority(frame, 12, selected.colony, site_id, false)
+              .accepted &&
+              site.operating_priority == 0,
+          "priority clear order failed");
+  require(!controller.confirm_placement(frame, 12, pending).accepted,
+          "a management order left a superseded quote confirmable");
+  auto foreign = selected.colony;
+  ++foreign.player_civilization_id;
+  require(!controller
+               .set_building_priority(frame, 12, foreign, site_id, true)
+               .accepted,
+          "foreign colony view accepted a management order");
+}
+
 void paused_reload_test(const fs::path &research_root,
                         const fs::path &catalog) {
   auto frame = make_frame(research_root, catalog);
@@ -287,8 +352,9 @@ int main(int argc, char **argv) try {
   const auto catalog = fs::absolute(argv[2]);
   quote_and_progress_tests(research_root, catalog);
   changed_world_tests(research_root, catalog);
+  management_order_tests(research_root, catalog);
   paused_reload_test(research_root, catalog);
-  std::cout << "native surface controller: 3/3 bounded cases passed\n";
+  std::cout << "native surface controller: 4/4 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native surface controller failed: " << error.what() << '\n';

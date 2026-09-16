@@ -16,7 +16,8 @@ struct SurfaceWorkspaceLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect surface, back, title, palette, palette_rows,
-      terrain, inspector, rotate, remove, confirmation, confirm, cancel;
+      terrain, inspector, rotate, remove, confirmation, confirm, cancel,
+      upgrade, repair, toggle_operation, priority, hub_upgrade;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
 };
@@ -43,7 +44,12 @@ enum class SurfaceWorkspaceCommandKind {
   ConfirmPlacement,
   PreviewRemoval,
   ConfirmRemoval,
-  CancelQuote
+  CancelQuote,
+  UpgradeBuilding,
+  RepairBuilding,
+  SetBuildingEnabled,
+  SetBuildingPriority,
+  UpgradeHub
 };
 
 struct SurfaceWorkspaceCommand {
@@ -53,6 +59,7 @@ struct SurfaceWorkspaceCommand {
   int building_id{};
   float x{}, z{}, rotation_degrees{};
   std::uint64_t quote_revision{};
+  bool flag{};
 };
 
 class NativeSurfaceWorkspace final {
@@ -67,6 +74,7 @@ public:
   void set_removal_quote(stellar::native_colony::NativeSurfaceRemovalQuote);
   void complete_command(std::string notice);
   void set_notice(std::string value) { notice_ = std::move(value); }
+  [[nodiscard]] const std::string &notice() const noexcept { return notice_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView>&

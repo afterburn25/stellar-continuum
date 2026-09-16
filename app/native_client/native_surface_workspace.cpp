@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <ranges>
 #include <sstream>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -163,7 +164,24 @@ SurfaceWorkspaceLayout SurfaceWorkspaceLayout::for_viewport(
            154.f * scale, 32.f * scale},
           {confirmation.x + 20.f * scale,
            confirmation.y + confirmation.height - 48.f * scale,
-           118.f * scale, 32.f * scale}};
+           118.f * scale, 32.f * scale},
+          {inspector.x + 10.f * scale,
+           inspector.y + inspector.height - 141.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 16.f * scale +
+               (inspector.width - 26.f * scale) * .5f,
+           inspector.y + inspector.height - 141.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 10.f * scale,
+           inspector.y + inspector.height - 101.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 16.f * scale +
+               (inspector.width - 26.f * scale) * .5f,
+           inspector.y + inspector.height - 101.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 10.f * scale,
+           inspector.y + inspector.height - 45.f * scale,
+           inspector.width - 20.f * scale, 34.f * scale}};
 }
 
 Point SurfaceViewport::world_to_screen(const double x, const double z,
@@ -468,6 +486,33 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(
       pending_preview_.reset();
       return {SurfaceWorkspaceCommandKind::None, true};
     }
+    if (selected_building_id_) {
+      const auto site = std::ranges::find(view_->construction_sites,
+                                          *selected_building_id_,
+                                          &NativeSurfaceSite::building_id);
+      if (site != view_->construction_sites.end()) {
+        if (layout.upgrade.contains(event.position) && site->can_upgrade &&
+            site->can_afford_upgrade && site->upgrade_lock_reason.empty())
+          return {SurfaceWorkspaceCommandKind::UpgradeBuilding, true, false,
+                  {}, *selected_building_id_};
+        if (layout.repair.contains(event.position) &&
+            site->can_afford_repair && site->condition < .999999)
+          return {SurfaceWorkspaceCommandKind::RepairBuilding, true, false,
+                  {}, *selected_building_id_};
+        if (layout.toggle_operation.contains(event.position))
+          return {SurfaceWorkspaceCommandKind::SetBuildingEnabled, true,
+                  false, {}, *selected_building_id_, {}, {}, {}, {},
+                  !site->enabled};
+        if (layout.priority.contains(event.position))
+          return {SurfaceWorkspaceCommandKind::SetBuildingPriority, true,
+                  false, {}, *selected_building_id_, {}, {}, {}, {},
+                  !site->prioritized};
+      }
+    }
+    if (layout.hub_upgrade.contains(event.position) && !selected_building_id_ &&
+        !selected_type_id_ && view_->hub_upgrade_available &&
+        view_->can_afford_hub_upgrade)
+      return {SurfaceWorkspaceCommandKind::UpgradeHub, true};
     if (layout.remove.contains(event.position) && selected_building_id_)
       return {SurfaceWorkspaceCommandKind::PreviewRemoval, true, false, {},
               *selected_building_id_};
@@ -759,8 +804,13 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                                         &NativeSurfaceSite::building_id);
     if (site != view.construction_sites.end()) {
       add(site->name, text_color, layout.body_font, 26.f);
-      add(site->complete ? "Operational module" : site->construction_stage,
-          site->complete ? good : warning, layout.small_font, 23.f);
+      if (site->upgrade_days_remaining > 0.)
+        add("Upgrading  " + number(site->upgrade_days_remaining, 1) +
+                " game days remaining at full funding",
+            warning, layout.small_font, 23.f);
+      else
+        add(site->complete ? "Operational module" : site->construction_stage,
+            site->complete ? good : warning, layout.small_font, 23.f);
       add("Position  " + number(site->x, 1) + ", " + number(site->z, 1),
           muted, layout.small_font, 22.f);
       add("Rotation  " + number(site->rotation_degrees, 0) + " deg", muted,
@@ -771,8 +821,50 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
         add("Materials remaining  " +
                 number(site->remaining_construction_materials, 1),
             muted, layout.small_font, 22.f);
-      add("Completion depends on available construction materials.", muted,
-          layout.small_font, 46.f);
+      else {
+        add("Condition  " + number(site->condition * 100., 0) + "%" +
+                "  ·  Efficiency  " + number(site->efficiency * 100., 0) + "%",
+            site->condition <= .500001 ? warning : text_color,
+            layout.small_font, 22.f);
+        add(std::string(site->powered ? "Powered" : "Unpowered") + "  ·  " +
+                (site->staffed ? "Staffed" : "Understaffed") + "  ·  " +
+                (site->enabled ? "Operating" : "Shut down") +
+                (site->prioritized ? "  ·  Priority" : "") +
+                (site->essential_service ? "  ·  Essential" : ""),
+            muted, layout.small_font, 22.f);
+      }
+      if (!site->upgrade_lock_reason.empty())
+        add(site->upgrade_lock_reason, warning, layout.small_font, 44.f);
+      else if (site->can_upgrade && !site->can_afford_upgrade)
+        add(site->upgrade_name + " requires " +
+                view.currency.format(site->upgrade_credit_budget_units) +
+                " and " + number(site->upgrade_industry_cost, 0) +
+                " available materials.",
+            muted, layout.small_font, 44.f);
+      const auto action = [&](const stellar::native_map::UiRect &rect,
+                              std::string_view label, const bool enabled) {
+        fill(out, rect,
+             !enabled ? inset
+                      : rect.contains(pointer_) ? hover : row);
+        stroke(out, rect, enabled ? border : inset);
+        text(out, rect, std::string(label),
+             enabled ? text_color : muted, layout.small_font,
+             TextAlign::Center);
+      };
+      if (site->can_upgrade)
+        action(layout.upgrade,
+               "UPGRADE" +
+                   std::string(site->upgrade_name.empty()
+                                   ? ""
+                                   : "  " + site->upgrade_name),
+               site->can_afford_upgrade && site->upgrade_lock_reason.empty());
+      action(layout.repair,
+             "REPAIR  " + number(site->repair_industry_cost, 0) + " MAT",
+             site->can_afford_repair && site->condition < .999999);
+      action(layout.toggle_operation,
+             site->enabled ? "SHUT DOWN" : "RESTART", true);
+      action(layout.priority,
+             site->prioritized ? "NORMAL PRIORITY" : "PRIORITIZE", true);
       fill(out, layout.remove,
            layout.remove.contains(pointer_) ? hover : row);
       stroke(out, layout.remove, warning);
@@ -785,10 +877,40 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
         layout.body_font, 48.f);
     add("Drag to pan. Wheel zooms at the pointer.", muted,
         layout.small_font, 40.f);
+    if (!view.hub_name.empty()) {
+      add(view.hub_name + "  ·  level " +
+              std::to_string(view.surface_hub_level),
+          text_color, layout.small_font, 24.f);
+      if (view.hub_upgrade_days_remaining > 0.)
+        add("Upgrading  " + number(view.hub_upgrade_days_remaining, 1) +
+                " game days remaining",
+            warning, layout.small_font, 22.f);
+      else if (!view.hub_upgrade_lock_reason.empty())
+        add(view.hub_upgrade_lock_reason, warning, layout.small_font, 44.f);
+      else if (view.hub_upgrade_available && !view.can_afford_hub_upgrade)
+        add("Upgrade requires " +
+                view.currency.format(view.hub_upgrade_credit_budget_units) +
+                " and " + number(view.hub_upgrade_industry_cost, 0) +
+                " available materials.",
+            muted, layout.small_font, 44.f);
+      if (view.hub_upgrade_available &&
+          view.hub_upgrade_days_remaining <= 0.) {
+        fill(out, layout.hub_upgrade,
+             !view.can_afford_hub_upgrade
+                 ? inset
+                 : layout.hub_upgrade.contains(pointer_) ? hover : row);
+        stroke(out, layout.hub_upgrade,
+               view.can_afford_hub_upgrade ? good : inset);
+        text(out, layout.hub_upgrade,
+             "UPGRADE " + view.hub_name,
+             view.can_afford_hub_upgrade ? text_color : muted,
+             layout.small_font, TextAlign::Center);
+      }
+    }
   }
   if (!notice_.empty())
     text(out, {ix, layout.inspector.y + layout.inspector.height -
-                       138.f * layout.scale,
+                       196.f * layout.scale,
                iw, 44.f * layout.scale},
          notice_, warning, layout.small_font);
 

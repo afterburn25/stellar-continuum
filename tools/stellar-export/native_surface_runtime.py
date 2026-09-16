@@ -20,7 +20,7 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused", "scene_sprites",
+    "persisted_site", "paused", "scene_sprites", "managed",
 }
 
 
@@ -64,7 +64,7 @@ def _diagnostic(stdout: str, expected_mode: str):
         raise RuntimeError("Native surface did not rasterize hub and site sprites")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
-                   "removal_confirmed", "refund_exact")
+                   "removal_confirmed", "refund_exact", "managed")
     if expected_mode == "ordered":
         for key in interaction:
             if state.get(key) is not True:

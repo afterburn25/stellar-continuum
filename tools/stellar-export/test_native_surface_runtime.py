@@ -79,6 +79,7 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                              "placement_cancelled": not reload, "cancel_no_change": not reload,
                              "placement_confirmed": not reload, "removal_previewed": not reload,
                              "removal_confirmed": not reload, "refund_exact": not reload,
+                             "managed": not reload,
                              "persisted_site": True, "paused": True,
                              "scene_sprites": 4}
                     if not reload:
