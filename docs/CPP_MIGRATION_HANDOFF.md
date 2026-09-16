@@ -5,6 +5,18 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Alpha 0.1.9 release preparation
+
+Native game version is now `0.1.9-alpha` (engine remains `0.1.58`). This release
+includes the display modes, player PNG screenshots and persistent General
+settings screenshot-folder browser described below. The packaged README now
+explains the display choices, F12 and folder selection. Native version metadata
+comes from `export/runtime-config.json`; the preserved C# reference is unchanged.
+Delivery requires a clean-source `windows-native-preview` export, its complete
+build/test/runtime gates, manifest/hash verification and a separate versioned ZIP
+in `D:/StellarContinuum/Downloads`. Until those finish, 0.1.8 remains the last
+delivered download.
+
 ### General settings screenshot folder
 
 Settings -> General is now reachable from the main-menu and paused-campaign Audio
@@ -33,7 +45,7 @@ paused reload audio/video checks pass with unchanged campaign recovery. Evidence
 `startup-result.json`, and their images/logs. Final focused settings checks after
 the path-wrapping polish pass in `work/general-settings-final-tests.log`, including
 Unicode-safe wrapping, cache reuse, clipping and scrolling. The handoff is a development source
-milestone; the Alpha 0.1.8 download below has not been replaced or version-bumped.
+milestone; release preparation and delivery are recorded separately above.
 
 The interaction test also found an existing unsafe test-only assumption:
 `body_inspection_smoke` dereferenced its system viewport after an external test

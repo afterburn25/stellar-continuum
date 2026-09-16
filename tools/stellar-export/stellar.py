@@ -457,7 +457,7 @@ def export(preset_name):
             dependencies = sorted(set(dependencies + native_client["windowsImports"]))
             readme = output / "README.txt"
             readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
-                "Launch stellar-continuum-native.exe for the fullscreen galaxy preview.\n"
+                "Launch stellar-continuum-native.exe. Borderless Fullscreen is the recommended default.\n"
                 "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
                 "Use the left icon rail for Research, Shipyard, Construction and Relations; hover an icon for its name.\n"
                 "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
@@ -472,7 +472,11 @@ def export(preset_name):
                 "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
                 "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots.\n"
-                "Settings in the main and pause menus control audio; three scientist voice cues are integrated. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
+                "Settings in the main and pause menus provide Audio, Video and General options.\n"
+                "Video offers Windowed, Borderless Fullscreen and Exclusive Fullscreen, with resolution and refresh options where supported.\n"
+                "Press F12 to save a PNG screenshot. The default folder is Pictures/Stellar Continuum/Screenshots.\n"
+                "Choose General > Browse, select a screenshot folder, then Save to remember it across restarts.\n"
+                "Three scientist voice cues are integrated. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
