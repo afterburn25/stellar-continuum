@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
@@ -104,6 +105,36 @@ void persistence_round_trip() {
   saved.save(path);
   const auto loaded = NativeVideoSettings::load(path);
   require(loaded == saved, "video settings did not round-trip");
+  {
+    std::ifstream input(path, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(input)), {});
+    require(bytes.find("Exclusive") != std::string::npos,
+            "exclusive display key changed during persistence");
+  }
+  NativeVideoSettings windowed{};
+  windowed.display = VideoDisplayMode::Windowed;
+  windowed.width = 1280;
+  windowed.height = 720;
+  windowed.refresh_hz = 0.f;
+  windowed.save(path);
+  require(NativeVideoSettings::load(path) == windowed,
+          "Windowed resolution with zero refresh did not round-trip");
+  {
+    std::ifstream input(path, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(input)), {});
+    require(bytes.find("Windowed") != std::string::npos,
+            "windowed display key was not persisted");
+  }
+  NativeVideoSettings borderless{};
+  borderless.save(path);
+  require(NativeVideoSettings::load(path) == borderless,
+          "Borderless display state did not round-trip");
+  {
+    std::ifstream input(path, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(input)), {});
+    require(bytes.find("Borderless") != std::string::npos,
+            "legacy Borderless display key changed during persistence");
+  }
 
   // Malformed files fall back to defaults instead of throwing.
   { std::ofstream output(path, std::ios::trunc); output << "{not json"; }
@@ -161,12 +192,16 @@ void choice_cycles() {
   view.set_display_choices({{1920, 1080, 60.f}, {2560, 1440, 144.f}}, "1920 x 1080 @ 60 Hz");
   require(view.visible(), "view not visible after open");
 
-  // Display: Borderless → Exclusive → Borderless.
+  // Display: Borderless → Exclusive → Windowed → Borderless.
   auto result = view.handle(press(InputEventType::LeftPressed,
                                   center(layout.choice_buttons[0])), width, height);
   require(result.command == VideoSettingsCommand::None && result.captured &&
               result.values.display == VideoDisplayMode::Exclusive,
           "display did not cycle to exclusive");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_buttons[0])), width, height);
+  require(result.values.display == VideoDisplayMode::Windowed,
+          "display did not cycle to windowed");
   result = view.handle(press(InputEventType::LeftPressed,
                              center(layout.choice_buttons[0])), width, height);
   require(result.values.display == VideoDisplayMode::Borderless,
@@ -224,6 +259,67 @@ void choice_cycles() {
                              center(layout.choice_previous[3])), width, height);
   require(result.values.frame_cap == VideoFrameCap::Unlimited,
           "frame-cap previous control did not wrap backward");
+}
+
+void same_resolution_refresh_choices_and_windowed_sizes() {
+  constexpr int width = 1280, height = 720;
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  NativeVideoSettingsView view;
+  view.open(NativeVideoSettings{});
+  view.set_display_choices({{1280, 720, 60.f}, {1280, 720, 144.f},
+                            {1920, 1080, 60.f}},
+                           "test display");
+  // A window-size list is intentionally independent from exclusive refresh
+  // tuples and may be deduped to one choice for each logical size.
+  view.set_windowed_choices({{1280, 720, 0.f}, {1280, 720, 0.f},
+                             {1920, 1080, 0.f}});
+  auto result = view.handle(press(InputEventType::LeftPressed,
+                                  center(layout.choice_next[0])), width, height);
+  require(result.values.display == VideoDisplayMode::Exclusive,
+          "display did not enter Exclusive mode");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 1280 && result.values.height == 720 &&
+              result.values.refresh_hz == 60.f,
+          "exclusive choices did not begin at the first refresh tuple");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 1280 && result.values.height == 720 &&
+              result.values.refresh_hz == 144.f,
+          "same-size exclusive refresh choice was lost or stuck");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 1920 && result.values.height == 1080 &&
+              result.values.refresh_hz == 60.f,
+          "exclusive size did not advance after same-size refresh choices");
+
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[0])), width, height);
+  require(result.values.display == VideoDisplayMode::Windowed &&
+              result.values.width == 1920 && result.values.height == 1080 &&
+              result.values.refresh_hz == 0.f,
+          "Windowed mode did not retain its size and clear refresh rate");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 0 && result.values.height == 0 &&
+              result.values.refresh_hz == 0.f,
+          "Windowed size cycle did not expose its default-size choice");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 1280 && result.values.height == 720 &&
+              result.values.refresh_hz == 0.f,
+          "Windowed size choices did not advance independently of exclusive modes");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[1])), width, height);
+  require(result.values.width == 1920 && result.values.height == 1080 &&
+              result.values.refresh_hz == 0.f,
+          "Windowed choices did not retain both deduped logical sizes");
+  result = view.handle(press(InputEventType::LeftPressed,
+                             center(layout.choice_next[0])), width, height);
+  require(result.values.display == VideoDisplayMode::Borderless &&
+              result.values.width == 0 && result.values.height == 0 &&
+              result.values.refresh_hz == 0.f,
+          "legacy Borderless display state changed after Windowed cycling");
 }
 
 void apply_confirm_revert_flow() {
@@ -291,6 +387,7 @@ int main() {
     responsive_layout();
     persistence_round_trip();
     choice_cycles();
+    same_resolution_refresh_choices_and_windowed_sizes();
     apply_confirm_revert_flow();
   } catch (const std::exception &error) {
     std::cerr << "native video settings tests failed: " << error.what() << '\n';

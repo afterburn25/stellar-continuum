@@ -24,6 +24,7 @@ public:
   bool handle(const stellar::native_map::InputEvent&,int width,int height);
   void render(stellar::native_map::DrawList&,int width,int height) const;
   void set_display_choices(std::vector<VideoDisplayChoice> choices,std::string label);
+  void set_windowed_display_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible()const noexcept{return view_.visible();}
   [[nodiscard]] bool previewing()const noexcept{return previous_.has_value();}
   [[nodiscard]] bool backend_state_known() const noexcept{return !faulted_;}

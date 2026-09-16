@@ -82,4 +82,5 @@ void NativeVideoController::render(stellar::native_map::DrawList& draw,int width
 void NativeVideoController::set_display_choices(std::vector<VideoDisplayChoice> choices,std::string label){
   view_.set_display_choices(std::move(choices),std::move(label));
 }
+void NativeVideoController::set_windowed_display_choices(std::vector<VideoDisplayChoice> choices){view_.set_windowed_choices(std::move(choices));}
 }

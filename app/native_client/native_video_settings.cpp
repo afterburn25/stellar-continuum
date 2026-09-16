@@ -38,8 +38,8 @@ constexpr Color gold{230, 190, 105, 255};
 constexpr std::size_t maximum_settings_bytes = 64u * 1024u;
 constexpr std::array<std::string_view, 4> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
                                                         "FRAME CAP"};
-constexpr std::array<std::string_view, 2> display_names = {"Borderless",
-                                                         "Exclusive fullscreen"};
+constexpr std::array<std::string_view, 3> display_names = {"Borderless fullscreen",
+                                                         "Exclusive fullscreen", "Windowed"};
 constexpr std::array<std::string_view, 3> vsync_names = {"Off", "On",
                                                        "Adaptive"};
 constexpr std::array<std::string_view, 5> frame_cap_names = {
@@ -78,7 +78,8 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color, int pixe
 }
 
 [[nodiscard]] std::string_view display_key(const VideoDisplayMode value) {
-  return value == VideoDisplayMode::Exclusive ? "Exclusive" : "Borderless";
+  return value == VideoDisplayMode::Exclusive ? "Exclusive" :
+         value == VideoDisplayMode::Windowed ? "Windowed" : "Borderless";
 }
 [[nodiscard]] std::string_view vsync_key(const VideoVsync value) {
   return value == VideoVsync::Off       ? "Off"
@@ -98,6 +99,7 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color, int pixe
 parse_display(std::string_view value) noexcept {
   if (value == "Exclusive") return VideoDisplayMode::Exclusive;
   if (value == "Borderless") return VideoDisplayMode::Borderless;
+  if (value == "Windowed") return VideoDisplayMode::Windowed;
   return std::nullopt;
 }
 [[nodiscard]] std::optional<VideoVsync> parse_vsync(std::string_view value) noexcept {
@@ -137,7 +139,12 @@ parse_frame_cap(std::string_view value) noexcept {
 }
 [[nodiscard]] std::string resolution_name(const NativeVideoSettings &value,
                                           std::string_view desktop) {
-  if (value.display != VideoDisplayMode::Exclusive) return "Desktop (" + std::string(desktop) + ")";
+  if (value.display == VideoDisplayMode::Borderless)
+    return "Desktop (" + std::string(desktop) + ")";
+  if (value.display == VideoDisplayMode::Windowed) {
+    if (value.width <= 0 || value.height <= 0) return "Default window size";
+    return std::to_string(value.width) + " x " + std::to_string(value.height);
+  }
   if (value.width <= 0 || value.height <= 0 || !std::isfinite(value.refresh_hz) || value.refresh_hz <= 0.f)
     return "Desktop default";
   return std::to_string(value.width) + " x " + std::to_string(value.height) + " @ " +
@@ -148,7 +155,8 @@ parse_frame_cap(std::string_view value) noexcept {
 NativeVideoSettings NativeVideoSettings::sanitized() const noexcept {
   auto copy = *this;
   if (copy.display != VideoDisplayMode::Borderless &&
-      copy.display != VideoDisplayMode::Exclusive)
+      copy.display != VideoDisplayMode::Exclusive &&
+      copy.display != VideoDisplayMode::Windowed)
     copy.display = VideoDisplayMode::Borderless;
   if (copy.vsync != VideoVsync::Off && copy.vsync != VideoVsync::On &&
       copy.vsync != VideoVsync::Adaptive)
@@ -158,8 +166,11 @@ NativeVideoSettings NativeVideoSettings::sanitized() const noexcept {
     copy.frame_cap = VideoFrameCap::Automatic;
   if (copy.width < 0 || copy.width > 16384 || copy.height < 0 || copy.height > 16384 ||
       !std::isfinite(copy.refresh_hz) || copy.refresh_hz < 0.f || copy.refresh_hz > 1000.f ||
-      (copy.width == 0) != (copy.height == 0) || ((copy.width == 0) != (copy.refresh_hz == 0.f)))
+      (copy.width == 0) != (copy.height == 0) ||
+      (copy.display != VideoDisplayMode::Windowed &&
+       ((copy.width == 0) != (copy.refresh_hz == 0.f))))
     copy.width = copy.height = 0, copy.refresh_hz = 0.f;
+  if(copy.display == VideoDisplayMode::Windowed)copy.refresh_hz=0.f;
   return copy;
 }
 
@@ -305,17 +316,36 @@ void NativeVideoSettingsView::set_display_choices(
   });
   choices.erase(std::unique(choices.begin(), choices.end()), choices.end());
   display_choices_ = std::move(choices);
+  windowed_choices_=display_choices_;
+  windowed_choices_.erase(std::unique(windowed_choices_.begin(),windowed_choices_.end(),
+    [](const auto& left,const auto& right){return left.width==right.width&&left.height==right.height;}),windowed_choices_.end());
   actual_display_label_ = actual_display_label.empty() ? "Desktop default" : std::move(actual_display_label);
   reconcile_resolution();
+}
+void NativeVideoSettingsView::set_windowed_choices(std::vector<VideoDisplayChoice> choices){
+  choices.erase(std::remove_if(choices.begin(),choices.end(),[](const auto& choice){return choice.width<=0||choice.width>16384||choice.height<=0||choice.height>16384;}),choices.end());
+  std::sort(choices.begin(),choices.end(),[](const auto& left,const auto& right){return std::tie(left.width,left.height,left.refresh_hz)<std::tie(right.width,right.height,right.refresh_hz);});
+  choices.erase(std::unique(choices.begin(),choices.end(),[](const auto& left,const auto& right){return left.width==right.width&&left.height==right.height;}),choices.end());
+  windowed_choices_=std::move(choices);reconcile_resolution();
 }
 void NativeVideoSettingsView::set_error(std::string message) {
   error_ = std::move(message);
 }
 
 void NativeVideoSettingsView::reconcile_resolution() noexcept {
-  if (values_.display != VideoDisplayMode::Exclusive) {
+  if (values_.display == VideoDisplayMode::Borderless) {
     values_.width = values_.height = 0;
     values_.refresh_hz = 0.f;
+    return;
+  }
+  if(values_.display == VideoDisplayMode::Windowed){
+    values_.refresh_hz=0.f;
+    if(values_.width==0&&values_.height==0){
+      if(!windowed_choices_.empty()){values_.width=windowed_choices_.front().width;values_.height=windowed_choices_.front().height;}
+      return;
+    }
+    const auto found=std::ranges::find_if(windowed_choices_,[&](const auto& choice){return choice.width==values_.width&&choice.height==values_.height;});
+    if(found==windowed_choices_.end())values_.width=values_.height=0;
     return;
   }
   const VideoDisplayChoice selected{values_.width, values_.height, values_.refresh_hz};
@@ -331,29 +361,33 @@ void NativeVideoSettingsView::cycle_choice(const int index,
         (static_cast<int>(value) + direction + count) % count);
   };
   if (index == 0) {
-    cycle(values_.display, 2);
+    cycle(values_.display, 3);
     reconcile_resolution();
-  } else if (index == 1 && values_.display == VideoDisplayMode::Exclusive &&
-             !display_choices_.empty()) {
+  } else if (index == 1 && (values_.display == VideoDisplayMode::Exclusive ||
+                            values_.display == VideoDisplayMode::Windowed) &&
+             !(values_.display==VideoDisplayMode::Windowed?windowed_choices_:display_choices_).empty()) {
+    const auto& choices=values_.display==VideoDisplayMode::Windowed?windowed_choices_:display_choices_;
     const VideoDisplayChoice selected{values_.width, values_.height, values_.refresh_hz};
-    const auto found = std::ranges::find(display_choices_, selected);
-    if (found == display_choices_.end()) {
-      const auto &next = direction < 0 ? display_choices_.back()
-                                       : display_choices_.front();
+    const auto found = values_.display==VideoDisplayMode::Windowed?
+      std::ranges::find_if(choices,[&](const auto& choice){return choice.width==selected.width&&choice.height==selected.height;}):
+      std::ranges::find(choices, selected);
+    if (found == choices.end()) {
+      const auto &next = direction < 0 ? choices.back()
+                                       : choices.front();
       values_.width = next.width;
       values_.height = next.height;
-      values_.refresh_hz = next.refresh_hz;
-    } else if (direction < 0 && found == display_choices_.begin()) {
+      values_.refresh_hz = values_.display==VideoDisplayMode::Windowed?0.f:next.refresh_hz;
+    } else if (direction < 0 && found == choices.begin()) {
       values_.width = values_.height = 0;
       values_.refresh_hz = 0.f;
-    } else if (direction > 0 && std::next(found) == display_choices_.end()) {
+    } else if (direction > 0 && std::next(found) == choices.end()) {
       values_.width = values_.height = 0;
       values_.refresh_hz = 0.f;
     } else {
       const auto next = direction < 0 ? std::prev(found) : std::next(found);
       values_.width = next->width;
       values_.height = next->height;
-      values_.refresh_hz = next->refresh_hz;
+      values_.refresh_hz = values_.display==VideoDisplayMode::Windowed?0.f:next->refresh_hz;
     }
   } else if (index == 2) cycle(values_.vsync, 3);
   else if (index == 3) cycle(values_.frame_cap, 5);
@@ -423,7 +457,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
   text(out, layout.title, "VIDEO", text_primary,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   text(out, layout.hint,
-       "Use the left side for previous; the remaining area selects next.",
+       "Borderless fullscreen is recommended. Use left for previous; the remaining area selects next.",
        text_muted, layout.small_font_pixels);
   const auto draw_button = [&](UiRect bounds, std::string caption, bool enabled = true, float inset = 0.f) {
     fill(out, bounds, enabled && bounds.contains(pointer_) ? hover : button);
@@ -442,7 +476,8 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
          std::string(choice_names[static_cast<std::size_t>(index)]), gold,
          layout.small_font_pixels);
     const auto enabled = index != 1 ||
-                         (values_.display == VideoDisplayMode::Exclusive && !display_choices_.empty());
+                         ((values_.display == VideoDisplayMode::Exclusive && !display_choices_.empty()) ||
+                          (values_.display == VideoDisplayMode::Windowed && !windowed_choices_.empty()));
     const auto bounds=layout.choice_buttons[index];
     draw_button(bounds, choice_values[static_cast<std::size_t>(index)],enabled,enabled?22.f*layout.scale:0.f);
     if(enabled){

@@ -17,7 +17,7 @@
 
 namespace stellar::native_video_settings {
 
-enum class VideoDisplayMode { Borderless, Exclusive };
+enum class VideoDisplayMode { Borderless, Exclusive, Windowed };
 enum class VideoVsync { Off, On, Adaptive };
 enum class VideoFrameCap { Automatic, Fps60, Fps120, Fps144, Unlimited };
 
@@ -81,6 +81,7 @@ public:
   void close() noexcept;
   void set_display_choices(std::vector<VideoDisplayChoice>,
                            std::string actual_display_label);
+  void set_windowed_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] const NativeVideoSettings &values() const noexcept {
     return values_;
@@ -105,6 +106,7 @@ private:
   stellar::native_map::Point pointer_{};
   NativeVideoSettings values_{};
   std::vector<VideoDisplayChoice> display_choices_;
+  std::vector<VideoDisplayChoice> windowed_choices_;
   std::string actual_display_label_{"Desktop default"};
   std::string error_;
 };

@@ -23,6 +23,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#include <ShlObj.h>
 #else
 #error The native UI preview requires the Windows GDI text rasterizer.
 #endif
@@ -32,6 +33,21 @@ namespace {
 [[nodiscard]] std::runtime_error sdl_error(const char *operation){return std::runtime_error(std::string(operation)+": "+SDL_GetError());}
 void require(bool success,const char *operation){if(!success)throw sdl_error(operation);}
 [[nodiscard]] std::string utf8_path(const std::filesystem::path &path){const auto value=path.u8string();return {reinterpret_cast<const char*>(value.data()),value.size()};}
+struct WindowDecoration { int top{},left{},bottom{},right{}; };
+[[nodiscard]] WindowDecoration window_decoration(SDL_Window *window,SDL_DisplayID display){
+  WindowDecoration result;
+  require(SDL_GetWindowBordersSize(window,&result.top,&result.left,&result.bottom,&result.right),"Window border query failed");
+  // SDL reports zero borders while fullscreen. Use the process DPI-aware Win32
+  // non-client metrics to filter prospective windowed choices conservatively.
+  if(result.top==0&&result.left==0&&result.bottom==0&&result.right==0){
+    const auto dpi=static_cast<UINT>(std::clamp(std::lround(SDL_GetDisplayContentScale(display)*96.f),96l,768l));
+    const auto frame=GetSystemMetricsForDpi(SM_CXSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi);
+    result.left=result.right=std::max(0,frame);
+    result.top=std::max(0,GetSystemMetricsForDpi(SM_CYCAPTION,dpi)+frame);
+    result.bottom=std::max(0,frame);
+  }
+  return result;
+}
 void report_capture(const std::filesystem::path &path,int width,int height){
   std::string escaped;
   for(const unsigned char value:utf8_path(std::filesystem::absolute(path).lexically_normal())){
@@ -40,6 +56,29 @@ void report_capture(const std::filesystem::path &path,int width,int height){
     else escaped+=static_cast<char>(value);
   }
   std::cout<<"native_capture={\"path\":\""<<escaped<<"\",\"width\":"<<width<<",\"height\":"<<height<<"}\n";
+}
+[[nodiscard]] std::filesystem::path player_screenshot_directory(){
+  wchar_t override_path[32768]{};
+  const auto length=GetEnvironmentVariableW(L"STELLAR_SCREENSHOT_DIR",override_path,static_cast<DWORD>(std::size(override_path)));
+  if(length>0&&length<std::size(override_path))return override_path;
+  PWSTR pictures{};
+  if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Pictures,0,nullptr,&pictures))&&pictures){
+    const std::filesystem::path result=std::filesystem::path(pictures)/L"Stellar Continuum"/L"Screenshots";
+    CoTaskMemFree(pictures);return result;
+  }
+  throw std::runtime_error("Pictures folder is unavailable.");
+}
+[[nodiscard]] std::filesystem::path player_screenshot_path(std::uint64_t serial){
+  SYSTEMTIME time{};GetLocalTime(&time);wchar_t name[96]{};
+  swprintf_s(name,L"Stellar-Continuum-%04u%02u%02u-%02u%02u%02u-%03u-%llu.png",time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond,time.wMilliseconds,static_cast<unsigned long long>(serial));
+  auto directory=player_screenshot_directory();std::error_code error;std::filesystem::create_directories(directory,error);
+  if(error)throw std::runtime_error("Screenshot folder could not be created.");
+  auto path=directory/name;
+  for(std::uint32_t suffix=1;std::filesystem::exists(path,error);++suffix){
+    if(error||suffix>9999)throw std::runtime_error("A unique screenshot filename could not be allocated.");
+    path=directory/(std::filesystem::path(name).stem().wstring()+L"-"+std::to_wstring(suffix)+L".png");
+  }
+  return path;
 }
 [[nodiscard]] std::wstring utf16(std::string_view value){
   if(value.empty())return {};
@@ -101,7 +140,7 @@ struct Window::Storage {
   std::vector<SDL_Vertex> triangle_vertices;
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
-  int width{},height{};bool initialized{},left_down{},focused{true},minimized{},vsync{},text_input_requested{},text_input_active{};Point pointer{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
+  int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   ~Storage(){
     for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
@@ -214,7 +253,11 @@ InputSnapshot Window::poll(){
   InputSnapshot input;require(SDL_GetWindowSizeInPixels(storage_->window,&storage_->width,&storage_->height),"SDL drawable pixel query failed");const auto convert=[&](float x,float y){Point result;require(SDL_RenderCoordinatesFromWindow(storage_->renderer,x,y,&result.x,&result.y),"SDL input coordinate conversion failed");return result;};SDL_Event event;
   while(SDL_PollEvent(&event)){switch(event.type){
     case SDL_EVENT_QUIT:input.quit_requested=true;break;
-    case SDL_EVENT_KEY_DOWN:if(!event.key.repeat){if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key)});}break;
+    case SDL_EVENT_KEY_DOWN:if(!event.key.repeat){
+      if(event.key.key==SDLK_F12||event.key.key==SDLK_PRINTSCREEN){
+        if(!storage_->player_screenshot)try{storage_->player_screenshot=player_screenshot_path(++storage_->screenshot_serial);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;}catch(const std::exception& error){storage_->screenshot_status=std::string("Screenshot failed: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;}
+      }else if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key)});
+    }break;
     case SDL_EVENT_TEXT_INPUT:if(storage_->text_input_requested&&event.text.text)input.events.push_back({InputEventType::TextEntered,storage_->pointer,{},0.f,event.text.text});break;
     case SDL_EVENT_MOUSE_MOTION:{const auto prior=storage_->pointer;storage_->pointer=convert(event.motion.x,event.motion.y);input.events.push_back({InputEventType::PointerMove,storage_->pointer,{storage_->pointer.x-prior.x,storage_->pointer.y-prior.y}});break;}
     case SDL_EVENT_MOUSE_BUTTON_DOWN:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=true;input.events.push_back({InputEventType::LeftPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
@@ -223,10 +266,17 @@ InputSnapshot Window::poll(){
     case SDL_EVENT_WINDOW_FOCUS_LOST:storage_->focused=false;storage_->left_down=false;if(storage_->text_input_active){require(SDL_StopTextInput(storage_->window),"SDL text input stop on focus loss failed");storage_->text_input_active=false;}input.events.push_back({InputEventType::PointerCancelled,storage_->pointer,{}});break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:storage_->focused=true;if(storage_->text_input_requested&&!storage_->text_input_active){require(SDL_StartTextInput(storage_->window),"SDL text input restart failed");storage_->text_input_active=true;}break;
     case SDL_EVENT_WINDOW_MINIMIZED:storage_->minimized=true;storage_->left_down=false;input.events.push_back({InputEventType::PointerCancelled,storage_->pointer,{}});break;
-    case SDL_EVENT_WINDOW_RESTORED:storage_->minimized=false;break;default:break;}}
+    case SDL_EVENT_WINDOW_RESTORED:storage_->minimized=false;break;
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:if(storage_->auto_frame_cap){const auto refresh=display_refresh_hz();storage_->frame_cap_interval_ns=static_cast<Uint64>(1000000000./refresh);storage_->last_present_ns=0;}break;
+    default:break;}}
   input.drawable_width=storage_->width;input.drawable_height=storage_->height;input.pointer=storage_->pointer;input.focused=storage_->focused;input.minimized=storage_->minimized;return input;
 }
 void Window::set_text_input(bool enabled){storage_->text_input_requested=enabled;if(!storage_->focused)return;if(enabled==storage_->text_input_active)return;require(enabled?SDL_StartTextInput(storage_->window):SDL_StopTextInput(storage_->window),enabled?"SDL text input start failed":"SDL text input stop failed");storage_->text_input_active=enabled;}
+bool Window::request_screenshot(std::filesystem::path path){
+  if(storage_->player_screenshot||path.empty())return false;
+  storage_->player_screenshot=std::move(path);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;return true;
+}
+std::optional<std::string> Window::take_screenshot_status(){return std::exchange(storage_->screenshot_status,std::nullopt);}
 std::vector<DisplayMode> Window::display_modes()const{
   int count{};const auto display=SDL_GetDisplayForWindow(storage_->window);
   auto **modes=SDL_GetFullscreenDisplayModes(display,&count);
@@ -242,19 +292,74 @@ std::vector<DisplayMode> Window::display_modes()const{
   std::ranges::sort(result,[](const auto&a,const auto&b){return std::tie(a.width,a.height,a.refresh_hz)>std::tie(b.width,b.height,b.refresh_hz);});
   return result;
 }
+std::vector<DisplayMode> Window::windowed_display_modes()const{
+  const auto display=SDL_GetDisplayForWindow(storage_->window);if(!display)throw sdl_error("Current display query failed");
+  SDL_Rect usable{};require(SDL_GetDisplayUsableBounds(display,&usable),"Usable display bounds query failed");
+  const auto decoration=window_decoration(storage_->window,display);
+  auto modes=display_modes();
+  modes.erase(std::remove_if(modes.begin(),modes.end(),[&](const auto& mode){return mode.width>usable.w-decoration.left-decoration.right||mode.height>usable.h-decoration.top-decoration.bottom;}),modes.end());
+  return modes;
+}
+DisplayMode Window::desktop_display_mode()const{
+  const auto display=SDL_GetDisplayForWindow(storage_->window);if(!display)throw sdl_error("Current display query failed");
+  const auto *mode=SDL_GetDesktopDisplayMode(display);if(!mode||mode->w<=0||mode->h<=0||!std::isfinite(mode->refresh_rate)||mode->refresh_rate<1.f)throw sdl_error("Desktop display mode query failed");
+  return {mode->w,mode->h,mode->refresh_rate};
+}
 float Window::display_refresh_hz()const{
   const auto *mode=SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(storage_->window));
   return mode&&std::isfinite(mode->refresh_rate)&&mode->refresh_rate>1.f?mode->refresh_rate:60.f;
 }
-void Window::set_fullscreen_mode(bool exclusive,int width,int height,float refresh_hz){
+void Window::set_display_mode(WindowDisplayMode requested,int width,int height,float refresh_hz){
   if(width<0||height<0||!std::isfinite(refresh_hz)||refresh_hz<0.f)
-    throw std::invalid_argument("Invalid fullscreen resolution or refresh rate.");
+    throw std::invalid_argument("Invalid display resolution or refresh rate.");
   int count{};const auto display=SDL_GetDisplayForWindow(storage_->window);
+  if (!display) throw sdl_error("Current display query failed");
+  if (requested == WindowDisplayMode::Windowed) {
+    require(SDL_SetWindowFullscreen(storage_->window,false),"Windowed mode was rejected");
+    require(SDL_SyncWindow(storage_->window),"Windowed mode change did not complete");
+    const auto windowed_display=SDL_GetDisplayForWindow(storage_->window);
+    if(!windowed_display)throw sdl_error("Windowed display query failed");
+    SDL_Rect usable{};
+    require(SDL_GetDisplayUsableBounds(windowed_display,&usable),"Usable display bounds query failed");
+    const auto decoration=window_decoration(storage_->window,windowed_display);
+    const int limit_width=std::max(320,usable.w-decoration.left-decoration.right);
+    const int limit_height=std::max(240,usable.h-decoration.top-decoration.bottom);
+    const bool explicit_size=width!=0||height!=0;
+    if(width==0&&height==0&&storage_->has_windowed_bounds){
+      width=storage_->windowed_width;height=storage_->windowed_height;
+    }
+    if(width==0&&height==0){width=std::min(1280,limit_width);height=std::min(720,limit_height);}
+    if(explicit_size&&(width<320||height<240||width>limit_width||height>limit_height))
+      throw std::invalid_argument("The selected window size does not fit the current display's usable area.");
+    width=std::clamp(width,320,limit_width);height=std::clamp(height,240,limit_height);
+    require(SDL_SetWindowSize(storage_->window,width,height),"Windowed size was rejected");
+    const int outer_width=width+decoration.left+decoration.right,outer_height=height+decoration.top+decoration.bottom;
+    int x=usable.x+(usable.w-outer_width)/2,y=usable.y+(usable.h-outer_height)/2;
+    if(storage_->has_windowed_bounds){
+      x=std::clamp(storage_->windowed_x,usable.x,usable.x+std::max(0,usable.w-outer_width));
+      y=std::clamp(storage_->windowed_y,usable.y,usable.y+std::max(0,usable.h-outer_height));
+    }
+    require(SDL_SetWindowPosition(storage_->window,x,y),"Windowed position was rejected");
+    require(SDL_SyncWindow(storage_->window),"Windowed size change did not complete");
+    if(SDL_GetWindowFlags(storage_->window)&SDL_WINDOW_FULLSCREEN)
+      throw std::runtime_error("The window manager did not leave fullscreen.");
+    require(SDL_GetCurrentRenderOutputSize(storage_->renderer,&storage_->width,&storage_->height),"Changed display dimensions could not be read");
+    require(SDL_GetWindowPosition(storage_->window,&storage_->windowed_x,&storage_->windowed_y),"Windowed position query failed");
+    require(SDL_GetWindowSize(storage_->window,&storage_->windowed_width,&storage_->windowed_height),"Windowed size query failed");
+    storage_->has_windowed_bounds=true;
+    storage_->last_present_ns=0;
+    return;
+  }
+  if(!(SDL_GetWindowFlags(storage_->window)&SDL_WINDOW_FULLSCREEN)){
+    (void)SDL_GetWindowPosition(storage_->window,&storage_->windowed_x,&storage_->windowed_y);
+    (void)SDL_GetWindowSize(storage_->window,&storage_->windowed_width,&storage_->windowed_height);
+    storage_->has_windowed_bounds=true;
+  }
   auto **modes=SDL_GetFullscreenDisplayModes(display,&count);
   if(!modes)throw sdl_error("Display mode enumeration failed");
   const std::unique_ptr<SDL_DisplayMode*,decltype(&SDL_free)> owner(modes,SDL_free);
   const SDL_DisplayMode *selected=nullptr;
-  if(exclusive){
+  if(requested==WindowDisplayMode::ExclusiveFullscreen){
     const auto *desktop=SDL_GetDesktopDisplayMode(display);
     if(!desktop)throw sdl_error("Desktop display query failed");
     if(width==0&&height==0){width=desktop->w;height=desktop->h;refresh_hz=desktop->refresh_rate;}
@@ -270,6 +375,7 @@ void Window::set_fullscreen_mode(bool exclusive,int width,int height,float refre
   if(!(SDL_GetWindowFlags(storage_->window)&SDL_WINDOW_FULLSCREEN))
     throw std::runtime_error("The window manager did not enter fullscreen.");
   const auto *actual=SDL_GetWindowFullscreenMode(storage_->window);
+  const bool exclusive=requested==WindowDisplayMode::ExclusiveFullscreen;
   if(exclusive?(!actual||actual->w!=width||actual->h!=height||std::abs(actual->refresh_rate-selected->refresh_rate)>.02f):actual!=nullptr)
     throw std::runtime_error("The window manager did not apply the selected display mode.");
   if(exclusive){
@@ -280,6 +386,10 @@ void Window::set_fullscreen_mode(bool exclusive,int width,int height,float refre
   require(SDL_GetCurrentRenderOutputSize(storage_->renderer,&storage_->width,&storage_->height),"Changed display dimensions could not be read");
   storage_->last_present_ns=0;
 }
+void Window::set_fullscreen_mode(bool exclusive,int width,int height,float refresh_hz){
+  set_display_mode(exclusive?WindowDisplayMode::ExclusiveFullscreen:WindowDisplayMode::Borderless,
+                   width,height,refresh_hz);
+}
 void Window::set_vsync(int mode){
   if(mode!=0&&mode!=1&&mode!=-1)throw std::invalid_argument("Unsupported VSync mode.");
   require(SDL_SetRenderVSync(storage_->renderer,mode),"Requested VSync mode is unavailable");
@@ -289,8 +399,12 @@ void Window::set_vsync(int mode){
 }
 void Window::set_frame_cap(double hz){
   if(!std::isfinite(hz)||hz<0.||hz>1000.)throw std::invalid_argument("Invalid frame cap.");
-  storage_->frame_cap_interval_ns=hz>=1.?static_cast<Uint64>(1000000000./hz):0;
+  storage_->auto_frame_cap=false;storage_->frame_cap_interval_ns=hz>=1.?static_cast<Uint64>(1000000000./hz):0;
   storage_->last_present_ns=0;
+}
+void Window::set_auto_frame_cap(){
+  const auto hz=display_refresh_hz();storage_->auto_frame_cap=true;
+  storage_->frame_cap_interval_ns=static_cast<Uint64>(1000000000./hz);storage_->last_present_ns=0;
 }
 TextExtent Window::measure_text(const Text &label){if(label.value.empty())return {};const auto &cached=storage_->text(label);return {cached.width,cached.height};}
 void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot,FrameTiming *timing){
@@ -303,7 +417,37 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
   for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
   if(timing)timing->submission_ms=elapsed_ms(*submission_started);
-  if(screenshot){const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");if(timing)timing->readback_ms=elapsed_ms(*readback_started);report_capture(*screenshot,surface->w,surface->h);}
+  const bool player_capture=!screenshot&&storage_->player_screenshot.has_value();
+  const auto capture=screenshot?screenshot:storage_->player_screenshot;
+  if(capture){
+    int captured_width{},captured_height{};
+    const auto save_capture=[&](const std::filesystem::path& output,bool png){
+      const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
+      SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");
+      const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);
+      const auto path=utf8_path(output);
+      require(png?SDL_SavePNG(surface,path.c_str()):SDL_SaveBMP(surface,path.c_str()),png?"SDL PNG screenshot write failed":"SDL screenshot write failed");
+      captured_width=surface->w;captured_height=surface->h;
+      if(timing)timing->readback_ms=elapsed_ms(*readback_started);
+    };
+    storage_->player_screenshot.reset();
+    const bool png=capture->extension()==L".png"||capture->extension()==L".PNG";
+    if(player_capture){std::filesystem::path temporary;try{
+      temporary=*capture;temporary+=L"."+std::to_wstring(GetCurrentProcessId())+L"."+std::to_wstring(storage_->screenshot_serial)+L".partial";
+      std::error_code ignored;std::filesystem::remove(temporary,ignored);
+      save_capture(temporary,png);
+      if(!MoveFileExW(temporary.c_str(),capture->c_str(),MOVEFILE_WRITE_THROUGH)){
+        std::filesystem::remove(temporary,ignored);
+        throw std::runtime_error("Screenshot filename already exists or could not be published.");
+      }
+      report_capture(*capture,captured_width,captured_height);
+      storage_->screenshot_status="Screenshot saved: "+utf8_path(capture->filename());storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;
+    }catch(const std::exception& error){std::error_code ignored;if(!temporary.empty())std::filesystem::remove(temporary,ignored);storage_->screenshot_status=std::string("Screenshot failed: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;}}
+    else {save_capture(*capture,png);report_capture(*capture,captured_width,captured_height);}
+  }
+  if(storage_->screenshot_status&&SDL_GetTicksNS()<storage_->screenshot_status_until_ns)
+    storage_->draw_text(Text{{20.f,std::max(20.f,static_cast<float>(storage_->height-44))},*storage_->screenshot_status,{220,240,255,255},16,static_cast<float>(std::max(100,storage_->width-40)),std::nullopt,TextAlign::Left,FontFace::Interface});
+  else if(storage_->screenshot_status)storage_->screenshot_status.reset();
   const auto pace=std::max(storage_->frame_cap_interval_ns,storage_->vsync?Uint64{0}:storage_->fallback_interval_ns);
   if(pace){const auto throttle_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<pace)SDL_DelayPrecise(pace-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();if(timing)timing->throttle_ms=elapsed_ms(*throttle_started);}
   const auto present_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;require(SDL_RenderPresent(storage_->renderer),"SDL present failed");if(timing)timing->present_ms=elapsed_ms(*present_started);

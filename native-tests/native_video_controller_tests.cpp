@@ -71,6 +71,18 @@ void choose_exclusive_and_apply(NativeVideoController &controller) {
           "apply did not capture input");
 }
 
+void choose_windowed_and_apply(NativeVideoController &controller) {
+  controller.set_display_choices({{1280,720,60.f},{1920,1080,60.f}},"test display");
+  controller.set_windowed_display_choices({{1280,720,0.f},{1920,1080,0.f}});
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  require(controller.handle(click(center(layout.choice_next[0])), width, height),
+          "display row did not capture first mode cycle");
+  require(controller.handle(click(center(layout.choice_next[0])), width, height),
+          "display row did not capture Windowed mode cycle");
+  require(controller.handle(click(center(layout.apply)), width, height),
+          "Windowed Apply did not capture input");
+}
+
 void partial_apply_is_restored() {
   Fixture fixture;
   auto controller = fixture.make();
@@ -110,6 +122,33 @@ void keep_persists_or_rolls_back() {
               failed.backend.calls.size() == 3 &&
               failed.backend.calls.back() == NativeVideoSettings{},
           "failed Keep did not roll the display back before reporting failure");
+}
+
+void windowed_keep_and_revert_preserve_saved_preferences() {
+  Fixture kept;
+  auto controller = kept.make();
+  controller.open();
+  choose_windowed_and_apply(controller);
+  require(controller.previewing() && controller.active().display == VideoDisplayMode::Windowed &&
+              controller.active().width == 1280 && controller.active().height == 720 &&
+              controller.active().refresh_hz == 0.f,
+          "Windowed preview did not retain its logical client resolution");
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  controller.handle(click(center(layout.keep)), width, height);
+  require(kept.persisted.size() == 1 &&
+              kept.persisted.front().display == VideoDisplayMode::Windowed &&
+              kept.persisted.front().width == 1280 && kept.persisted.front().height == 720,
+          "Keep did not persist the selected Windowed settings");
+
+  Fixture reverted;
+  auto rollback = reverted.make();
+  rollback.open();
+  choose_windowed_and_apply(rollback);
+  rollback.handle(click(center(layout.revert)), width, height);
+  require(!rollback.previewing() && rollback.active() == NativeVideoSettings{} &&
+              reverted.persisted.empty() && reverted.backend.calls.size() == 3 &&
+              reverted.backend.calls.back() == NativeVideoSettings{},
+          "Revert changed saved preferences or failed to restore the prior mode");
 }
 
 void timeout_and_late_keep_are_safe() {
@@ -204,6 +243,7 @@ void recovery_and_latched_failure() {
 int main() try {
   partial_apply_is_restored();
   keep_persists_or_rolls_back();
+  windowed_keep_and_revert_preserve_saved_preferences();
   timeout_and_late_keep_are_safe();
   inactive_window_reverts();
   confirmation_escape_cancel_and_close_restore();

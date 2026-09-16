@@ -6278,7 +6278,7 @@ class NativeCampaign final {
           static_cast<float>(width)-72.f*layout.scale,
           std::max(0.f,static_cast<float>(height)-footer_y-12.f*layout.scale)};
       if(footer.height>=32.f*layout.scale){
-        std::string detail="Export diagnostics (F8) includes your last completed save and recent session reports.";
+        std::string detail="F12 saves a PNG screenshot. Export diagnostics (F8) includes your last completed save and recent session reports.";
         if(support_.state()==stellar::native_support::SupportExportState::Succeeded)
           detail="Diagnostics saved: "+utf8_path(support_.result());
         else if(support_.state()==stellar::native_support::SupportExportState::Failed)
@@ -7258,33 +7258,44 @@ int main(int argc,char **argv){
     const auto options=parse_options(argc,argv);
     const auto asset_root=std::filesystem::absolute(options.asset_root);
     const auto startup_begin=std::chrono::steady_clock::now();
+    const auto settings_path=(options.smoke_screenshot?options.save_path:default_native_campaign_save_path()).parent_path()/"audio-settings.json";
+    const auto video_settings_path=settings_path.parent_path()/"video-settings.json";
+    const auto initial_video=stellar::native_video_settings::NativeVideoSettings::load(video_settings_path);
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
-                  options.window_height,!options.windowed,
+                  options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
     // Declared after Window: audio closes its streams/device before SDL teardown.
     stellar::native_audio::NativeAudioDirector audio(asset_root,!options.smoke_screenshot||options.audio_check);
-    const auto settings_path=(options.smoke_screenshot?options.save_path:default_native_campaign_save_path()).parent_path()/"audio-settings.json";
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
       [&audio](const stellar::native_audio::AudioPreferences& value){audio.set_volumes(value.muted?0.f:value.master,value.music,value.effects);},
       [&audio]{audio.confirm();});
-    const auto video_settings_path=settings_path.parent_path()/"video-settings.json";
     stellar::native_video_settings::NativeVideoController video_settings(video_settings_path,
       [&](const stellar::native_video_settings::NativeVideoSettings& value){
         using namespace stellar::native_video_settings;
-        // Explicit windowed smoke captures do not change the user's desktop mode.
-        if(!options.windowed)window.set_fullscreen_mode(value.display==VideoDisplayMode::Exclusive,value.width,value.height,value.refresh_hz);
+        // Explicit windowed smoke captures retain their requested viewport, but
+        // normal settings changes apply all three supported display modes.
+        if(!options.windowed)window.set_display_mode(
+          value.display==VideoDisplayMode::Windowed?WindowDisplayMode::Windowed:
+          value.display==VideoDisplayMode::Exclusive?WindowDisplayMode::ExclusiveFullscreen:
+          WindowDisplayMode::Borderless,value.width,value.height,value.refresh_hz);
         window.set_vsync(value.vsync==VideoVsync::Off?0:value.vsync==VideoVsync::On?1:-1);
-        const double cap=value.frame_cap==VideoFrameCap::Automatic?window.display_refresh_hz():
-          value.frame_cap==VideoFrameCap::Fps60?60.:value.frame_cap==VideoFrameCap::Fps120?120.:
-          value.frame_cap==VideoFrameCap::Fps144?144.:0.;
-        window.set_frame_cap(cap);
+        if(value.frame_cap==VideoFrameCap::Automatic)window.set_auto_frame_cap();
+        else window.set_frame_cap(value.frame_cap==VideoFrameCap::Fps60?60.:value.frame_cap==VideoFrameCap::Fps120?120.:
+          value.frame_cap==VideoFrameCap::Fps144?144.:0.);
       });
     audio_settings.set_video_navigation([&]{
       std::vector<stellar::native_video_settings::VideoDisplayChoice> modes;
       try{for(const auto& mode:window.display_modes())modes.push_back({mode.width,mode.height,mode.refresh_hz});}
       catch(const std::exception& error){std::cerr<<"Display choices unavailable: "<<error.what()<<'\n';}
-      video_settings.set_display_choices(std::move(modes),std::to_string(window.drawable_width())+" x "+
-          std::to_string(window.drawable_height())+" @ "+std::to_string(static_cast<int>(std::lround(window.display_refresh_hz())))+" Hz");
+      std::vector<stellar::native_video_settings::VideoDisplayChoice> windowed_modes;
+      try{for(const auto& mode:window.windowed_display_modes())windowed_modes.push_back({mode.width,mode.height,mode.refresh_hz});}
+      catch(const std::exception& error){std::cerr<<"Windowed display choices unavailable: "<<error.what()<<'\n';}
+      auto desktop=stellar::native_map::DisplayMode{window.drawable_width(),window.drawable_height(),window.display_refresh_hz()};
+      try{desktop=window.desktop_display_mode();}
+      catch(const std::exception& error){std::cerr<<"Desktop display mode unavailable: "<<error.what()<<'\n';}
+      video_settings.set_display_choices(std::move(modes),std::to_string(desktop.width)+" x "+
+          std::to_string(desktop.height)+" @ "+std::to_string(static_cast<int>(std::lround(desktop.refresh_hz)))+" Hz");
+      video_settings.set_windowed_display_choices(std::move(windowed_modes));
       video_settings.open();
     });
     bool audio_menu_ready{};std::size_t audio_boot_services{};

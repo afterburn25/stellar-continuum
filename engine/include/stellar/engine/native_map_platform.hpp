@@ -76,6 +76,7 @@ struct DrawList {
 // may include driver or GPU waits; these are not GPU execution measurements.
 struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
 struct DisplayMode { int width{},height{}; float refresh_hz{}; };
+enum class WindowDisplayMode { Windowed, Borderless, ExclusiveFullscreen };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, KeyPressed, TextEntered,
@@ -111,12 +112,20 @@ class Window final {
   [[nodiscard]] InputSnapshot poll();
   void set_text_input(bool enabled);
   [[nodiscard]] std::vector<DisplayMode> display_modes() const;
+  [[nodiscard]] std::vector<DisplayMode> windowed_display_modes() const;
+  [[nodiscard]] DisplayMode desktop_display_mode() const;
   [[nodiscard]] float display_refresh_hz() const;
   // Owner-thread operations. Driver rejection is reported to the host's
   // transactional preview controller; no requested setting is reported saved.
+  void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);
   void set_fullscreen_mode(bool exclusive,int width=0,int height=0,float refresh_hz=0);
   void set_vsync(int mode);
   void set_frame_cap(double hz);
+  void set_auto_frame_cap();
+  // Queues at most one player capture. F12/PrintScreen call this internally;
+  // tests may use it with an isolated directory.
+  [[nodiscard]] bool request_screenshot(std::filesystem::path path);
+  [[nodiscard]] std::optional<std::string> take_screenshot_status();
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
             const std::optional<std::filesystem::path> &screenshot = std::nullopt,

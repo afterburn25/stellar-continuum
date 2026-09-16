@@ -11,7 +11,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
-  PRIVATE SDL3::SDL3 Gdi32 User32)
+  PRIVATE SDL3::SDL3 Gdi32 User32 Shell32)
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
   app/native_client/native_research_workspace.cpp app/native_client/native_fleet_controller.cpp

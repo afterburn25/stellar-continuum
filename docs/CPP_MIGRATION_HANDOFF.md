@@ -5,6 +5,41 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Native display modes and player screenshots
+
+Settings -> Video now offers Windowed, Borderless Fullscreen (default and
+recommended), and Exclusive Fullscreen. Windowed preferences survive restart,
+the initial window respects the saved mode, and size choices are separate from
+exclusive resolution/refresh tuples. Decorated windows fit the current monitor's
+usable area; unsupported explicit sizes are rejected rather than silently
+resized. Keep/Revert, timeout and failure recovery preserve saved preferences.
+Automatic pacing follows monitor changes; pointer conversion remains SDL's
+drawable-coordinate mapping. Core, C#, Player17 and approved artwork are unchanged.
+
+F12 captures the actual rendered game to a timestamped PNG under the Windows
+Pictures known folder, `Stellar Continuum/Screenshots`. PrintScreen also works
+when Windows delivers it to SDL. The renderer accepts only one pending request,
+reads back only on demand, publishes without replacing existing files, and reports
+success/failure after capture so notices do not appear in the image. Write failures
+are nonfatal. Existing strict BMP validation captures remain supported. Tests use
+`STELLAR_SCREENSHOT_DIR` to avoid writing to the player's Pictures folder.
+
+Validation: all 186 serial native CTests passed; focused display/controller tests
+cover mode transitions, persistence/rollback, two-display movement and retention,
+drawable/input coordinates, PNG pixels and dimensions, Unicode names, collisions,
+write failures, hotkey repeats and frame pacing. The configured display scale was
+1.0, so this is not physical mixed-DPI certification. Relocated 720p startup and
+1080p paused-reload checks pass for video/audio settings and unchanged campaign
+recovery. A bounded actual game run received F12 through its Windows message queue
+and wrote a visually reviewed 1280x720 PNG of the Sol system.
+
+Evidence: `work/window-capture-ctest.log`, `work/window-capture-runtime.log`,
+`work/window-capture-runtime/startup-video-result.json`, its BMP sidecars, and
+`work/window-capture-runtime/live-f12/result.json`. Feature contract:
+`engine/NATIVE_VIDEO_SETTINGS.md`. This is a development milestone; the previously
+delivered Alpha 0.1.8 ZIP below remains the last sealed download. No release version
+was bumped for this source change.
+
 ### Native presentation restoration / Alpha 0.1.8
 
 **Delivered export:** the complete official `windows-native-preview` export of
