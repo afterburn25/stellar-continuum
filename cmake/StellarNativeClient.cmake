@@ -134,6 +134,16 @@ if(BUILD_TESTING)
   if(MSVC)
     target_compile_options(stellar_native_missions_tests PRIVATE /WX)
   endif()
+  add_executable(stellar_native_economy_tests
+    native-tests/native_economy_tests.cpp
+    app/native_client/native_economy.cpp)
+  target_include_directories(stellar_native_economy_tests PRIVATE
+    app/native_client engine/include)
+  target_link_libraries(stellar_native_economy_tests PRIVATE stellar_core)
+  add_test(NAME native_economy COMMAND stellar_native_economy_tests)
+  if(MSVC)
+    target_compile_options(stellar_native_economy_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_campaign_session_tests
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
     app/native_client/native_notifications.cpp)
@@ -216,6 +226,7 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio_device.cpp
   app/native_client/native_audio_settings.cpp
   app/native_client/native_inspection.cpp
+  app/native_client/native_economy.cpp
   app/native_client/native_logistics.cpp
   app/native_client/native_missions.cpp
   app/native_client/native_notifications.cpp

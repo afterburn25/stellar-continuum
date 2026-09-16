@@ -32,6 +32,7 @@ from native_battle_runtime import validate_native_battle_export
 from native_audio_runtime import validate_native_audio_export
 from native_notification_runtime import validate_native_notification_export
 from native_logistics_runtime import validate_native_logistics_export
+from native_economy_runtime import validate_native_economy_export
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
@@ -493,6 +494,8 @@ def export(preset_name):
             smoke.update(validate_native_notification_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_logistics_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_economy_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]

@@ -18,6 +18,7 @@ enum class UiAction {
   Notifications,
   Logistics,
   Missions,
+  Economy,
   Continue,
   Save,
   Load,
@@ -43,6 +44,7 @@ struct NativeUiLayout {
   UiRect notifications;
   UiRect logistics;
   UiRect missions;
+  UiRect economy;
   UiRect day_text;
   UiRect status_text;
   UiRect menu_panel;
@@ -93,6 +95,7 @@ struct NativeUiLayout {
         {inset + 732.f * scale, inset, 56.f * scale, 32.f * scale},
         {inset + 798.f * scale, inset, 84.f * scale, 32.f * scale},
         {inset + 892.f * scale, inset, 104.f * scale, 32.f * scale},
+        {inset + 1006.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset, 56.f * scale, 230.f * scale, 22.f * scale},
         {inset, 80.f * scale, status_width, 44.f * scale},
         panel,
@@ -140,6 +143,7 @@ struct NativeUiLayout {
     if (notifications.contains(point)) return UiAction::Notifications;
     if (logistics.contains(point)) return UiAction::Logistics;
     if (missions.contains(point)) return UiAction::Missions;
+    if (economy.contains(point)) return UiAction::Economy;
     return UiAction::None;
   }
 };

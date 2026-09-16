@@ -95,10 +95,16 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
+def _bmp(path: Path, stdout: str, width: int, height: int):
     data = path.read_bytes() if path.is_file() else b""
     if len(data) < 54 or data[:2] != b"BM":
         raise RuntimeError("Native surface did not capture a BMP frame")
+    # The capture is at drawable-pixel size; on high-DPI displays that is a
+    # multiple of the requested window size. The smoke reports the actual
+    # drawable so the BMP geometry is checked against the real render surface.
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        width, height = int(drawable.group(1)), int(drawable.group(2))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -221,7 +227,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
         result, _ = _launch(common + ["--width", "1280", "--height", "720",
                                       "--smoke", str(base_capture)], work, clean,
                             "fresh-base launch")
-        _bmp(base_capture, 1280, 720)
+        _bmp(base_capture, result.stdout, 1280, 720)
         if not save.is_file():
             raise RuntimeError("Native surface fresh-base launch wrote no Player17 save")
         base = json.loads(save.read_text(encoding="utf-8-sig"))
@@ -241,7 +247,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             if uploads < 1:
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
-            _bmp(capture, width, height)
+            _bmp(capture, result.stdout, width, height)
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
                 raise RuntimeError("Native surface wrote a noncurrent Player17 save")

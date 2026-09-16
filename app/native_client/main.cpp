@@ -7,6 +7,7 @@
 #include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_inspection.hpp"
+#include "native_economy.hpp"
 #include "native_logistics.hpp"
 #include "native_missions.hpp"
 #include "native_overview.hpp"
@@ -97,6 +98,7 @@ namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_inspection = stellar::native_inspection;
+namespace native_economy = stellar::native_economy;
 namespace native_logistics = stellar::native_logistics;
 namespace native_missions = stellar::native_missions;
 namespace native_notifications = stellar::native_notifications;
@@ -144,6 +146,7 @@ struct Options {
   bool audio_smoke{};
   bool notification_smoke{};
   bool logistics_smoke{};
+  bool economy_smoke{};
   bool save_path_overridden{};
 };
 
@@ -188,6 +191,7 @@ struct Options {
     else if(arg==L"--audio-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.audio_smoke=true;result.windowed=true;}
     else if(arg==L"--notification-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.notification_smoke=true;result.windowed=true;}
     else if(arg==L"--logistics-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.logistics_smoke=true;result.windowed=true;}
+    else if(arg==L"--economy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.economy_smoke=true;result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -220,11 +224,12 @@ struct Options {
     else if(arg=="--audio-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.audio_smoke=true;result.windowed=true;}
     else if(arg=="--notification-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.notification_smoke=true;result.windowed=true;}
     else if(arg=="--logistics-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.logistics_smoke=true;result.windowed=true;}
+    else if(arg=="--economy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.economy_smoke=true;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)+static_cast<int>(result.logistics_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.new_game_restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.audio_smoke)+static_cast<int>(result.notification_smoke)+static_cast<int>(result.logistics_smoke)+static_cast<int>(result.economy_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -232,6 +237,7 @@ struct Options {
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires --load with an active tactical encounter save.");
   if(result.notification_smoke&&!result.load)throw std::invalid_argument("--notification-smoke requires --load with a diplomacy-bearing player campaign fixture.");
   if(result.logistics_smoke&&!result.load)throw std::invalid_argument("--logistics-smoke requires --load with a player campaign fixture.");
+  if(result.economy_smoke&&!result.load)throw std::invalid_argument("--economy-smoke requires --load with a player campaign fixture.");
   if(result.system_travel_smoke&&!result.load)throw std::invalid_argument("--system-travel-smoke requires --load with a routed player fleet fixture.");
   if(result.system_travel_reload_smoke&&!result.load)throw std::invalid_argument("--system-travel-reload-smoke requires --load with the paused system travel save.");
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
@@ -1425,6 +1431,71 @@ class NativeCampaign final {
        <<"}";
     return out.str();
   }
+  void prepare_economy_smoke(int width,int height){
+    // The top-rail ECONOMY button toggles the panel (reference CampaignSidebar
+    // "economy" section), then the third priority toggle issues the
+    // Shipbuilding-first order through the real dispatch path.
+    const auto main_layout=NativeUiLayout::for_viewport(width,height);
+    const auto click=[&](Point point){
+      InputSnapshot input;
+      input.drawable_width=width;
+      input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},
+                    {InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error(
+            "Economy smoke input closed the campaign.");
+    };
+    click(center(main_layout.economy));
+    if(!economy_view_.visible())
+      throw std::runtime_error(
+          "Economy smoke could not open the treasury panel.");
+    smoke_economy_panel_=true;
+    const auto &campaign=session_->frame().runtime().world().campaign();
+    const auto view=native_economy::build_economy_view(
+        campaign,&session_->frame().runtime().research(),
+        last_industry_allocation_);
+    const auto layout=
+        native_economy::economy_layout_for(view,width,height);
+    click(center(layout.priority_buttons[2]));
+    const auto &after=session_->frame().runtime().world().campaign();
+    const auto economy=std::ranges::find(
+        after.economies,after.player_civilization_id,
+        &CivilizationEconomy::civilization_id);
+    smoke_economy_toggled_=
+        economy!=after.economies.end()&&
+        economy->industry_priority==IndustryPriority::ShipbuildingFirst;
+    if(!smoke_economy_toggled_)
+      throw std::runtime_error(
+          "Economy smoke priority toggle did not update the stored priority.");
+  }
+  void capture_economy_panel(){
+    const auto &campaign=session_->frame().runtime().world().campaign();
+    const auto view=native_economy::build_economy_view(
+        campaign,&session_->frame().runtime().research(),
+        last_industry_allocation_);
+    smoke_economy_ready_=view.ready?1:0;
+    smoke_economy_cards_=static_cast<int>(view.cards.size());
+    smoke_economy_flow_rows_=static_cast<int>(view.income_rows.size()+
+                                              view.cost_rows.size());
+    smoke_economy_priority_=
+        static_cast<int>(view.industry_priority);
+    if(smoke_economy_ready_==0||smoke_economy_flow_rows_!=9)
+      throw std::runtime_error(
+          "Economy smoke found no resolvable treasury view.");
+  }
+  [[nodiscard]] std::string economy_smoke_status()const{
+    std::ostringstream out;
+    out<<"{\"panel\":"<<(smoke_economy_panel_?1:0)
+       <<",\"ready\":"<<smoke_economy_ready_
+       <<",\"cards\":"<<smoke_economy_cards_
+       <<",\"rows\":"<<smoke_economy_flow_rows_
+       <<",\"priority\":"<<smoke_economy_priority_
+       <<",\"toggled\":"<<(smoke_economy_toggled_?1:0)
+       <<"}";
+    return out.str();
+  }
   void prepare_battle_smoke(int width,int height){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -1990,6 +2061,30 @@ class NativeCampaign final {
                width,height))
           continue;
       }
+      if(economy_view_.visible()&&!menu_){
+        auto &runtime=session_->frame().runtime();
+        const auto &campaign=runtime.world().campaign();
+        const auto view=native_economy::build_economy_view(
+            campaign,&runtime.research(),last_industry_allocation_);
+        const auto command=
+            economy_view_.handle(event,view,width,height);
+        if(command.kind==native_economy::EconomyCommandKind::Close)
+          economy_view_.close();
+        else if(command.kind==native_economy::EconomyCommandKind::
+                    SetIndustryPriority){
+          // Reference UiSetIndustryPriority (Main.Economy.cs).
+          const auto outcome=set_industry_priority(
+              runtime.world().campaign().economies,
+              campaign.player_civilization_id,campaign.player_civilization_id,
+              command.priority);
+          if(outcome.accepted){
+            last_industry_allocation_.reset();
+            session_->publish_notification("Economy",outcome.message);
+          }
+          session_->publish_status(outcome.message);
+        }
+        if(command.captured)continue;
+      }
       if(missions_view_.visible()&&!menu_){
         const auto &campaign=session_->frame().runtime().world().campaign();
         const auto site_fleets=settlement_controller_.build(
@@ -2217,6 +2312,10 @@ class NativeCampaign final {
           missions_view_.toggle();
           captured=true;
         }
+        else if(action==UiAction::Economy){
+          economy_view_.toggle();
+          captured=true;
+        }
         if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         if(action!=UiAction::None)audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
         gesture_.begin(captured);continue;
@@ -2229,6 +2328,15 @@ class NativeCampaign final {
     if(research_workspace_.take_refresh_request())refresh_research(true);
     if(advance_simulation){
       const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp);
+      {
+        const auto player=session_->frame()
+                              .runtime().world().campaign()
+                              .player_civilization_id;
+        for(const auto &step:frame_result.strategic_results)
+          for(const auto &allocation:step.core.industry_allocations)
+            if(allocation.civilization_id==player)
+              last_industry_allocation_=allocation;
+      }
       research_refresh_elapsed_+=elapsed;
       refresh_research(false);
       fleet_refresh_elapsed_+=elapsed;
@@ -2374,6 +2482,14 @@ class NativeCampaign final {
            missions_view_.visible() ? Color{154, 225, 188, 255} : border);
     label(out, layout.missions, "MISSIONS", {225, 238, 250, 255},
           layout.control_font_pixels, layout.scale);
+    fill(out, layout.economy,
+         economy_view_.visible()
+             ? selected
+             : layout.economy.contains(pointer_) ? hover : button);
+    stroke(out, layout.economy,
+           economy_view_.visible() ? Color{154, 225, 188, 255} : border);
+    label(out, layout.economy, "ECONOMY", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -2451,6 +2567,14 @@ class NativeCampaign final {
       logistics_view_.render(
           out,native_logistics::build_home_logistics(
                   campaign,campaign.player_civilization_id),
+          width,height);
+    }
+    if(!menu_&&economy_view_.visible()){
+      auto &runtime=session_->frame().runtime();
+      economy_view_.render(
+          out,native_economy::build_economy_view(
+                  runtime.world().campaign(),&runtime.research(),
+                  last_industry_allocation_),
           width,height);
     }
     if(!menu_&&missions_view_.visible()){
@@ -3079,7 +3203,7 @@ class NativeCampaign final {
         colony_workspace_.visible()||research_workspace_.visible()||
         shipyard_workspace_.visible()||construction_workspace_.visible()||
         diplomacy_workspace_.visible()||notification_view_.visible()||
-        logistics_view_.visible()||
+        logistics_view_.visible()||economy_view_.visible()||
         gesture_.captured_by_ui()||gesture_.allows_world_drag()||
         !fleet_workspace_.selected_fleet_id();
     const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
@@ -3328,6 +3452,11 @@ class NativeCampaign final {
   native_audio_settings::NativeAudioSettingsView audio_settings_;
   native_notifications::NativeNotificationView notification_view_;
   native_logistics::NativeLogisticsView logistics_view_;
+  native_economy::NativeEconomyPanel economy_view_;
+  // Reference Main._lastPlayerIndustryAllocation: presentation-side cache of
+  // the player's most recent industry allocation, cleared when a new
+  // priority is chosen.
+  std::optional<CivilizationIndustryAllocation> last_industry_allocation_;
   native_missions::NativeMissionView missions_view_;
   std::int64_t last_played_notification_{};
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
@@ -3411,9 +3540,12 @@ class NativeCampaign final {
   std::int64_t smoke_diplomacy_proposal_id_{-1};
   bool smoke_diplomacy_portrait_{};
   bool smoke_notification_panel_{};
-  bool smoke_logistics_panel_{};
+  bool smoke_logistics_panel_{},smoke_economy_panel_{},
+      smoke_economy_toggled_{};
   int smoke_logistics_ready_{},smoke_logistics_nodes_{},
       smoke_logistics_corridors_{};
+  int smoke_economy_ready_{},smoke_economy_cards_{},
+      smoke_economy_flow_rows_{},smoke_economy_priority_{};
   double smoke_logistics_supply_{},smoke_logistics_demand_{},
       smoke_logistics_delivered_{},smoke_logistics_shortfall_{};
   int smoke_notification_items_{},smoke_notification_unread_{},
@@ -3535,6 +3667,9 @@ int main(int argc,char **argv){
       else if(options.logistics_smoke)
         campaign.prepare_logistics_smoke(window.drawable_width(),
                                          window.drawable_height());
+      else if(options.economy_smoke)
+        campaign.prepare_economy_smoke(window.drawable_width(),
+                                       window.drawable_height());
       else if(options.battle_smoke)
         campaign.prepare_battle_smoke(window.drawable_width(),
                                       window.drawable_height());
@@ -3577,7 +3712,7 @@ int main(int argc,char **argv){
       window.set_text_input(campaign.wants_text_input());
       if(options.smoke_screenshot){
         ++frames;
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke||options.logistics_smoke)&&frames==60)
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.surface_smoke||options.surface_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.battle_smoke||options.notification_smoke||options.logistics_smoke||options.economy_smoke)&&frames==60)
           campaign.request_smoke_save();
       }
       std::optional<std::filesystem::path> screenshot;
@@ -3627,6 +3762,8 @@ int main(int argc,char **argv){
       }
       if(options.logistics_smoke&&frames==120)
         campaign.capture_logistics_panel();
+      if(options.economy_smoke&&frames==120)
+        campaign.capture_economy_panel();
       if(options.battle_smoke&&frames==120)campaign.capture_battle_workspace();
       const bool capture=options.smoke_screenshot&&(options.galaxy_art_smoke?frames>=123:options.ship_art_smoke?frames>=122:options.diplomacy_smoke?frames>=122:options.notification_smoke?frames>=122:frames>=120);
       if(capture){
@@ -3647,6 +3784,8 @@ int main(int argc,char **argv){
         std::cout<<std::fixed<<std::setprecision(3)
                  <<"native-map smoke ok: gpu_driver="<<window.gpu_driver()
                  <<" presentation="<<window.presentation_mode()
+                 <<" drawable="<<window.drawable_width()<<"x"
+                 <<window.drawable_height()
                  <<" systems="<<campaign.system_count()<<" frames="<<frames
                  <<" startup_ms="<<startup_ms
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
@@ -3688,6 +3827,8 @@ int main(int argc,char **argv){
           std::cout<<" notifications="<<campaign.notification_smoke_status();
         if(options.logistics_smoke)
           std::cout<<" logistics="<<campaign.logistics_smoke_status();
+        if(options.economy_smoke)
+          std::cout<<" economy="<<campaign.economy_smoke_status();
         if(options.battle_smoke)
           std::cout<<" battle="<<campaign.battle_smoke_status();
         if(options.audio_smoke)

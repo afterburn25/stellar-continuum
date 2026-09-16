@@ -55,10 +55,16 @@ def _source_payload(fixture: Path) -> dict:
     return payload
 
 
-def _bmp(path: Path, width: int, height: int):
+def _bmp(path: Path, stdout: str, width: int, height: int):
     data = path.read_bytes() if path.is_file() else b""
     if len(data) < 54 or data[:2] != b"BM":
         raise RuntimeError("Native New Game did not capture a BMP frame")
+    # The capture is at drawable-pixel size; on high-DPI displays that is a
+    # multiple of the requested window size. The smoke reports the actual
+    # drawable so the BMP geometry is checked against the real render surface.
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        width, height = int(drawable.group(1)), int(drawable.group(2))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -220,7 +226,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if not generated.is_file():
             raise RuntimeError("New Game did not create its reported independent save")
         for path in (setup_capture, loading_capture, final_capture):
-            _bmp(path, 1280, 720)
+            _bmp(path, fresh.stdout, 1280, 720)
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
         _verify_campaign(generated_payload, state)
 
@@ -230,7 +236,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             "--load", "--width", "1920", "--height", "1080", "--windowed",
             "--smoke", str(reload_capture),
         ], cwd, clean, "paused reload")
-        _bmp(reload_capture, 1920, 1080)
+        _bmp(reload_capture, loaded.stdout, 1920, 1080)
         if anchor.read_bytes() != anchor_bytes or not generated.is_file():
             raise RuntimeError("Reload changed the original anchor or removed generated save")
         reloaded_payload = json.loads(generated.read_text(encoding="utf-8"))
@@ -270,7 +276,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
                 int(restart_slot) < 1):
             raise RuntimeError("Mid-session New Game path is not its isolated native sibling")
         for path in (restart_setup, restart_loading, restart_capture):
-            _bmp(path, 1280, 720)
+            _bmp(path, restarted.stdout, 1280, 720)
         if not regenerated.is_file():
             raise RuntimeError("Mid-session New Game did not create its independent save")
         _verify_campaign(json.loads(regenerated.read_text(encoding="utf-8")),
