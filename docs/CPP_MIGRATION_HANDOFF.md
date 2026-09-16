@@ -5,6 +5,26 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Settlement preparation review
+
+Read-only preparation now follows the earned full survey for non-owned Ilyra
+body 1001. It shows canonical suitability/site/habitat facts, colony and
+outpost costs, distinct ship and expedition costs, minimum build workdays and
+population reservation. Existing Shipyard navigation is reused with matched
+press/release; owned-colony priority and strict identity binding prevent stale
+views. No grants, spending, builds or new modal were introduced. Core, C#,
+Player17 and approved art are unchanged.
+
+Seed 115501/player 0 at day 6587.15625 passed two serial resolutions with full
+Player17 equality except `SavedAtUtc`, retaining eight images and two saves.
+MSVC, eight focused CTests, Python 564 checks (547 pass, 17 optional skips),
+final navigation, system, shipyard and four-process earned-survey regressions
+passed, including malformed CLI coverage. Evidence is in
+`work/native-settlement-preparation-{build-final,ctest,python,runtime}.log`
+and `-runtime.json`. The reviewed site is too harsh and has no rare deposit.
+Next: earn a viable site through exploration/science, then build, dispatch and
+establish a populated settlement with save/reload; never fabricate eligibility.
+
 ### First earned science survey
 
 The paid science vessel now has local survey progress, Hold and completion
@@ -29,12 +49,10 @@ logs and JSON. Contract: `engine/NATIVE_FIRST_SURVEY_UI.md` (from docs root).
 PR332 stays unmerged; the local package is UNSEALED, not a release download.
 Shared base/Devin remain ac45d958/b023e384.
 
-Next: turn confirmed survey findings into the first earned settlement decision
-and ship/facility preparation, exposing actual costs and blockers. Continue from
-work/native-audio-validation/package-first-survey-paused-full.player17.json;
-never grant prerequisites or silently rebalance Core. Native system artwork,
-readable map scale and broader visual finish remain open; these captures prove
-the gameplay path, not final graphics or sustained 60 FPS.
+The settlement-preparation checkpoint above supersedes this survey checkpoint's
+next-step note. Native system artwork, readable map scale and broader visual
+finish remain open; these captures prove the gameplay path, not final graphics
+or sustained 60 FPS.
 
 ### Previous checkpoint: First-ships graphical progression
 

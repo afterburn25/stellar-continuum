@@ -16,6 +16,28 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
+### Settlement preparation review
+
+The earned full-survey save now drives a read-only preparation review for
+non-owned Ilyra body 1001. Canonical species suitability, site facts, habitat
+needs, colony/outpost costs, distinct ship/expedition costs, minimum build
+workdays and population reservation are visible. View Shipyard reuses existing
+navigation with matched input; owned-colony priority and strict observer,
+generation, system, body and full-survey binding clear stale views. No new
+modal, grant, spending or build action was added; Core, C#, Player17 and
+approved art remain unchanged. See `engine/NATIVE_SETTLEMENT_PREPARATION_UI.md`.
+
+The native smoke continues seed 115501/player 0 at day 6587.15625. Both
+1280x720 and 1920x1080 runs preserve full Player17 equality except
+`SavedAtUtc`, with eight inspected images and two saves. MSVC and eight focused
+CTests pass; Python reports 564 checks (547 pass, 17 optional skips). Final
+navigation, system, shipyard and four-process earned-survey regressions also
+pass, including malformed CLI coverage. Evidence
+is under `work/native-settlement-preparation-*`. The site is too harsh and has
+no rare deposit, so the next step is earned exploration/science for a viable
+site, followed by an actual populated settlement build, dispatch, establishment
+and save/reload. Do not fabricate a planet or grant eligibility.
+
 ### First earned science survey
 
 The paid science vessel now has local survey progress, Hold and completion
@@ -40,12 +62,10 @@ logs and JSON. Contract: `engine/NATIVE_FIRST_SURVEY_UI.md` (from docs root).
 PR332 stays unmerged; the local package is UNSEALED, not a release download.
 Shared base/Devin remain ac45d958/b023e384.
 
-Next: turn confirmed survey findings into the first earned settlement decision
-and ship/facility preparation, exposing actual costs and blockers. Continue from
-work/native-audio-validation/package-first-survey-paused-full.player17.json;
-never grant prerequisites or silently rebalance Core. Native system artwork,
-readable map scale and broader visual finish remain open; these captures prove
-the gameplay path, not final graphics or sustained 60 FPS.
+The settlement-preparation checkpoint above supersedes this survey checkpoint's
+next-step note. Native system artwork, readable map scale and broader visual
+finish remain open; these captures prove the gameplay path, not final graphics
+or sustained 60 FPS.
 
 ### Previous checkpoint: First-ships graphical progression
 

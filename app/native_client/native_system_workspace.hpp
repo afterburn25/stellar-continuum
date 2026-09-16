@@ -4,6 +4,7 @@
 #include "native_body_inspection_panel.hpp"
 #include "native_system_travel.hpp"
 #include "native_celestial_appearance.hpp"
+#include "native_settlement_preparation.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <functional>
@@ -32,6 +33,7 @@ enum class SystemWorkspaceCommandKind {
   open_destination,
   reconnaissance_required,
   open_colony,
+  open_shipyard,
   settlement_target
 };
 struct SystemWorkspaceCommand {
@@ -67,6 +69,8 @@ public:
                       std::optional<int> selected_fleet_id);
   void clear_travel() noexcept;
   void set_colony_body(std::optional<int>) noexcept;
+  void set_settlement_preparation(std::optional<stellar::native_settlement_preparation::View>);
+  [[nodiscard]] const auto &settlement_preparation() const noexcept { return preparation_; }
   void set_settlement_status(std::optional<NativeSystemSettlementStatus> value) {
     settlement_status_ = std::move(value);
   }
@@ -108,6 +112,8 @@ private:
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;
   std::optional<int> selected_body_id_;
   std::optional<int> colony_body_id_;
+  std::optional<stellar::native_settlement_preparation::View> preparation_;
+  bool preparation_pressed_{};
   std::optional<NativeSystemSettlementStatus> settlement_status_;
   std::optional<stellar::native_system_travel::NativeSystemTravelSnapshot> travel_;
   std::vector<stellar::native_system_travel::NativeLaneLabelMetrics> lane_metrics_;

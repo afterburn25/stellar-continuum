@@ -250,6 +250,7 @@ struct Options {
   bool colony_reload_smoke{};
   bool settlement_smoke{};
   bool settlement_reload_smoke{};
+  bool settlement_preparation_smoke{};
   bool surface_smoke{};
   bool surface_reload_smoke{};
   bool new_game_smoke{},restart_smoke{};
@@ -321,6 +322,7 @@ struct Options {
     else if(arg==L"--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg==L"--fresh-progression-smoke"||arg==L"--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fresh_progression_smoke=arg==L"--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg==L"--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg==L"--first-exploration-smoke"||arg==L"--first-exploration-paused-smoke"||arg==L"--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_exploration_mode=arg==L"--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg==L"--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if(arg==L"--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #else
     const std::string arg=argv[i];
@@ -367,6 +369,7 @@ struct Options {
     else if(arg=="--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg=="--fresh-progression-smoke"||arg=="--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.fresh_progression_smoke=arg=="--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg=="--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg=="--first-exploration-smoke"||arg=="--first-exploration-paused-smoke"||arg=="--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=argv[++i];result.first_exploration_mode=arg=="--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg=="--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if(arg=="--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
@@ -385,12 +388,13 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
   if(result.first_exploration_mode&&!result.load)throw std::invalid_argument("First exploration smoke requires --load with the earned first-ships save.");
   if(result.first_exploration_mode&&result.seed!=115501)throw std::invalid_argument("First exploration smoke requires --seed 115501.");
+  if(result.settlement_preparation_smoke&&(!result.load||result.seed!=115501))throw std::invalid_argument("Settlement preparation smoke requires --load with the earned full survey save and --seed 115501.");
   if(result.first_survey_mode&&!result.load)throw std::invalid_argument("First survey smoke requires --load with the completed scout save.");
   if(result.first_survey_mode&&result.seed!=115501)throw std::invalid_argument("First survey smoke requires --seed 115501.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
@@ -3317,6 +3321,92 @@ class NativeCampaign final {
         << ",\"save_roundtrip\":" << first_exploration_roundtrip_ << '}';
     return out.str();
   }
+  void prepare_settlement_preparation_smoke(int width,int height,
+      const std::function<void()> &pump,
+      const std::function<void(std::string_view)> &capture){
+    auto &frame=session_->frame();const auto &world=frame.runtime().world().campaign();
+    if(frame.clock().speed()!=StrategicSpeed::Paused)
+      throw std::runtime_error("Settlement preparation requires a paused earned campaign.");
+    const auto initial=stellar::native_settlement_preparation::build_settlement_preparation(
+        frame,session_->cache().generation,1,1001);
+    if(!initial||initial->site_can_found_current_colony||!initial->solid_surface||initial->rare_resource)
+      throw std::runtime_error("Settlement preparation requires the actual surveyed, unsuitable Ilyra.");
+    const PlayerCampaignCaptureOptions fixed_capture{frame.clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:19Z"};
+    const auto payload=[&]{return nlohmann::json::parse(encode_player_campaign_v17_json(
+        PreparedPlayerCampaignSave::capture(frame.runtime(),fixed_capture).payload()));};
+    const auto before=payload();
+    const auto route=[&](std::vector<InputEvent> events){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=events.empty()?Point{}:events.back().position;input.events=std::move(events);
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Settlement preparation UI closed unexpectedly.");};
+    const auto click=[&](Point at){route({{InputEventType::LeftPressed,at},{InputEventType::LeftReleased,at}});};
+    const auto stable=[&]{if(payload()!=before)throw std::runtime_error("Settlement preparation changed the Player17 campaign.");};
+    const auto wait_art=[&]{const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+      do{pump();if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Settlement artwork did not become ready.");}while(!artwork_ready());};
+    if(!enter_system(1,width,height))throw std::runtime_error("Surveyed system did not open.");
+    const auto spatial=project_system(*system_workspace_.snapshot());
+    const auto marker=std::ranges::find(spatial.bodies,1001,&SystemSpatialBodyMarker::body_id);
+    if(marker==spatial.bodies.end())throw std::runtime_error("Ilyra absent from the observed system.");
+    const auto point=system_workspace_.viewport()->world_to_screen(marker->offset_x,marker->offset_y);
+    const auto layout=SystemWorkspaceLayout::for_viewport(width,height);
+    if(!layout.world_field.contains({point.x,point.y})||system_workspace_.viewport()->hit_body(spatial,point.x,point.y)!=1001)
+      throw std::runtime_error("Ilyra is not independently clickable.");
+    click({point.x,point.y});
+    if(system_workspace_.selected_body_id()!=1001||!system_workspace_.settlement_preparation())
+      throw std::runtime_error("Planet click did not publish settlement preparation.");
+    wait_art();stable();capture("assessment");
+    bool colony_cost{},outpost_cost{},guidance{},shipyard_button{};
+    const auto observe=[&]{const auto draw=scene(width,height);for(const auto &item:draw.overlay)
+      if(const auto *label=std::get_if<Text>(&item)){
+        colony_cost=colony_cost||label->value==initial->colony_ship.formatted_ship_cost;
+        outpost_cost=outpost_cost||label->value==initial->resource_outpost.formatted_ship_cost;
+        guidance=guidance||label->value=="Explore other worlds";
+        shipyard_button=shipyard_button||label->value=="VIEW SHIPYARD";
+      }};
+    observe();
+    int cost_capture_at=-1;bool cost_capture{};
+    for(int n=0;n<100;++n){
+      route({{InputEventType::Wheel,center(layout.inspector),{},-1.f}});observe();
+      if(outpost_cost&&cost_capture_at<0)cost_capture_at=n+4;
+      if(n==cost_capture_at){capture("costs");cost_capture=true;}
+    }
+    if(!colony_cost||!outpost_cost||!guidance||!shipyard_button)
+      throw std::runtime_error("Scrolling did not expose both vessel costs and truthful settlement guidance.");
+    if(!cost_capture)throw std::runtime_error("Settlement cost capture was not reached.");
+    stable();
+    click(center(layout.colony_action));
+    if(!shipyard_workspace_.visible()||system_workspace_.visible()||!shipyard_workspace_.view())
+      throw std::runtime_error("Settlement footer did not open the ordinary shipyard.");
+    const auto shipyard=ShipyardWorkspaceLayout::for_viewport(width,height);
+    for(const auto *option:{&initial->colony_ship,&initial->resource_outpost}){
+      for(int n=0;n<100&&!shipyard_workspace_.design_bounds(option->design_id,width,height);++n)
+        route({{InputEventType::Wheel,center(shipyard.designs),{},-1.f}});
+      const auto bounds=shipyard_workspace_.design_bounds(option->design_id,width,height);
+      if(!bounds)throw std::runtime_error("Earned settlement vessel design missing from shipyard.");
+      click(center(*bounds));
+      const auto &designs=shipyard_workspace_.view()->available_designs;
+      const auto design=std::ranges::find(designs,option->design_id,&NativeShipDesign::id);
+      if(shipyard_workspace_.selected_design_id()!=option->design_id||design==designs.end()||
+         design->formatted_credit_cost!=option->formatted_ship_cost||design->population_cost_millions!=option->population_reservation_millions)
+        throw std::runtime_error("Shipyard disagrees with preparation cost or population reservation.");
+      stable();
+    }
+    wait_art();capture("shipyard");
+    click(center(shipyard.close));
+    if(shipyard_workspace_.visible())throw std::runtime_error("Shipyard Back did not dismiss review.");
+    stable();
+    preparation_evidence_=nlohmann::json{{"system_id",1},{"body_id",1001},{"player_id",world.player_civilization_id},
+      {"read_only",true},{"unsuitable_site",true},{"colony_cost_visible",colony_cost},{"outpost_cost_visible",outpost_cost},
+      {"shipyard_opened",true},{"review_closed",true},{"days",frame.clock().simulation_days()}}.dump();
+    // Return to the planet for the final capture, through the same UI hit path.
+    if(!enter_system(1,width,height))throw std::runtime_error("Surveyed system disappeared after review.");
+    const auto restored_point=system_workspace_.viewport()->world_to_screen(marker->offset_x,marker->offset_y);
+    click({restored_point.x,restored_point.y});wait_art();stable();
+    InputSnapshot ready;ready.drawable_width=width;ready.drawable_height=height;
+    if(!update(ready,width,height,0.,true))throw std::runtime_error("Settlement review save boundary failed.");
+    session_->request_save();
+  }
+  [[nodiscard]] const std::string &settlement_preparation_smoke_status()const{return preparation_evidence_;}
+
   void prepare_first_survey_smoke(
       int width, int height, Options::FirstSurveyMode mode,
       const std::function<void()> &pump,
@@ -4422,6 +4512,11 @@ class NativeCampaign final {
           else if(command.kind==SystemWorkspaceCommandKind::reconnaissance_required){scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);}
            else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
            else if(command.kind==SystemWorkspaceCommandKind::settlement_target){preview_settlement(command.target_id,width,height);}
+           else if(command.kind==SystemWorkspaceCommandKind::open_shipyard){
+             refresh_colony_entry(true);
+             if(system_workspace_.settlement_preparation()&&system_workspace_.selected_body_id()==command.target_id)
+               route_navigation(UiAction::Shipyard);
+           }
           refresh_colony_entry(false);
           continue;
         }
@@ -5330,12 +5425,16 @@ class NativeCampaign final {
 
   void refresh_colony_entry(bool force){
     if(!system_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.selected_body_id()){
-      colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);return;
+      colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);system_workspace_.set_settlement_preparation(std::nullopt);return;
     }
+    if(!force&&system_workspace_.settlement_preparation())return;
     if(!force&&colony_entry_view_&&colony_entry_view_->campaign_generation==session_->cache().generation&&colony_entry_view_->system_id==*system_workspace_.system_id()&&colony_entry_view_->body_id==*system_workspace_.selected_body_id())return;
     auto built=colony_controller_.build(session_->frame(),session_->cache().generation,*system_workspace_.snapshot(),*system_workspace_.selected_body_id());
     if(built.view){colony_entry_view_=std::move(*built.view);system_workspace_.set_colony_body(colony_entry_view_->body_id);}
     else{colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);}
+    system_workspace_.set_settlement_preparation(colony_entry_view_?std::nullopt:
+        stellar::native_settlement_preparation::build_settlement_preparation(session_->frame(),session_->cache().generation,
+            *system_workspace_.system_id(),*system_workspace_.selected_body_id()));
   }
 
   void open_colony_from_system(int body_id){
@@ -6047,6 +6146,7 @@ class NativeCampaign final {
   FleetTransitPhase first_survey_phase_before_{FleetTransitPhase::None},first_survey_phase_after_{FleetTransitPhase::None};
   double first_survey_before_days_{},first_survey_after_days_{},first_survey_survey_progress_before_{},first_survey_survey_progress_after_{},first_survey_transit_progress_before_{},first_survey_transit_progress_after_{};
   std::vector<int> first_survey_seen_phases_;
+  std::string preparation_evidence_;
   bool first_survey_selected_{},first_survey_selection_read_only_{},first_survey_preview_read_only_{},first_survey_lane_connected_{},first_survey_inspection_read_only_{},first_survey_facts_visible_{},first_survey_roundtrip_{};
   std::optional<std::string> smoke_research_node_;
   int smoke_navigation_switches_{};
@@ -6254,6 +6354,10 @@ int main(int argc,char **argv){
             *options.first_exploration_mode,
             [&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("First exploration window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
             [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="departure"?L"-departure":L"-arrival"));});
+      else if(options.settlement_preparation_smoke)
+        campaign.prepare_settlement_preparation_smoke(window.drawable_width(),window.drawable_height(),
+            [&]{audio.service();auto progress=window.poll();if(!campaign.update(progress,progress.drawable_width,progress.drawable_height,0.,false))throw std::runtime_error("Settlement review window closed.");if(progress.renderable())window.draw(campaign.scene(progress.drawable_width,progress.drawable_height));},
+            [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="assessment"?L"-assessment":tag=="costs"?L"-costs":L"-shipyard"));});
       else if(options.first_survey_mode)
         campaign.prepare_first_survey_smoke(
             window.drawable_width(),window.drawable_height(),
@@ -6619,6 +6723,8 @@ int main(int argc,char **argv){
           std::cout<<"fresh_progression="<<campaign.fresh_progression_smoke_status()<<'\n';
         if(options.first_exploration_mode)
           std::cout<<"first_exploration="<<campaign.first_exploration_smoke_status()<<'\n';
+        if(options.settlement_preparation_smoke)
+          std::cout<<"settlement_preparation="<<campaign.settlement_preparation_smoke_status()<<'\n';
         if(options.first_survey_mode)
           std::cout<<"first_survey="<<campaign.first_survey_smoke_status()<<'\n';
         std::ranges::sort(frame_ms);

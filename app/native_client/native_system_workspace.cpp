@@ -20,6 +20,18 @@ void overlay_fill(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(FilledRect
 void overlay_stroke(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(StrokedRectangle{b,c});}
 void overlay_text(DrawList&o,float x,float y,std::string value,Color c,int size=15,float wrap=0,std::optional<UiRect> clip=std::nullopt){o.overlay.emplace_back(Text{{x,y},std::move(value),c,size,wrap,clip});}
 std::string number(double value,int precision=2){std::ostringstream out;out<<std::fixed<<std::setprecision(precision)<<value;return out.str();}
+std::string environmental_hazard(EnvironmentalLimitingFactor value){
+  switch(value){
+  case EnvironmentalLimitingFactor::Gravity:return "Gravity";
+  case EnvironmentalLimitingFactor::Temperature:return "Temperature";
+  case EnvironmentalLimitingFactor::Pressure:return "Pressure";
+  case EnvironmentalLimitingFactor::Atmosphere:return "Atmosphere";
+  case EnvironmentalLimitingFactor::Solvent:return "Biological solvent";
+  case EnvironmentalLimitingFactor::Immersion:return "Immersion";
+  case EnvironmentalLimitingFactor::Radiation:return "Radiation";
+  case EnvironmentalLimitingFactor::None:return "None";
+  }return "Unconfirmed";
+}
 Color visual_color(NativeSystemBodyVisualClass value){switch(value){case NativeSystemBodyVisualClass::rocky:return {178,143,115,255};case NativeSystemBodyVisualClass::oceanic:return {70,152,213,255};case NativeSystemBodyVisualClass::frozen:return {171,217,235,255};case NativeSystemBodyVisualClass::hot_rocky:return {222,116,66,255};case NativeSystemBodyVisualClass::gas_giant:return {211,167,114,255};case NativeSystemBodyVisualClass::ice_giant:return {111,190,215,255};case NativeSystemBodyVisualClass::moon:return {180,184,190,255};case NativeSystemBodyVisualClass::unknown_moon:return {112,137,160,255};default:return {94,132,166,255};}}
 Color star_color(std::optional<StellarClass> value){if(!value)return {135,150,174,235};switch(*value){case StellarClass::MRedDwarf:return {255,119,76,230};case StellarClass::KOrangeDwarf:return {255,167,92,235};case StellarClass::GYellowDwarf:return {255,230,150,245};case StellarClass::FYellowWhiteDwarf:return {255,247,215,245};case StellarClass::AWhiteStar:return {225,236,255,245};case StellarClass::HotBlueStar:return {126,174,255,245};case StellarClass::Giant:return {255,142,88,245};case StellarClass::WhiteDwarf:return {221,236,255,235};case StellarClass::NeutronStar:return {133,218,255,250};case StellarClass::BlackHole:return {126,92,178,230};case StellarClass::Protostar:return {255,112,160,230};case StellarClass::Pulsar:return {91,229,255,250};}return {135,150,174,235};}
 std::uint32_t mix(std::uint32_t value){value^=value>>16;value*=0x7feb352du;value^=value>>15;value*=0x846ca68bu;return value^(value>>16);}
@@ -64,7 +76,7 @@ SystemWorkspaceLayout SystemWorkspaceLayout::for_viewport(int width,int height) 
 
 NativeSystemWorkspace::NativeSystemWorkspace(SystemImageProvider provider,SystemTextMeasurer measurer):image_provider_(std::move(provider)),text_measurer_(std::move(measurer)){body_inspection_.set_text_measurer(text_measurer_);}
 void NativeSystemWorkspace::use_background_preparation(std::shared_ptr<ImagePreparationQueue> queue){celestial_appearance_.use_background_preparation(std::move(queue));}
-void NativeSystemWorkspace::open(NativeSystemSnapshot snapshot,int width,int height){celestial_appearance_.cancel_preparation();artwork_ready_=false;clear_travel();snapshot_=std::move(snapshot);spatial_=project_system(*snapshot_);body_inspection_.clear();selected_body_id_.reset();colony_body_id_.reset();inspector_focus_=InspectorFocus::automatic;dragging_=false;pending_initial_travel_fit_=true;width_=width;height_=height;viewport_=workspace_fit(*spatial_,width,height,text_measurer_,std::nullopt,{});}
+void NativeSystemWorkspace::open(NativeSystemSnapshot snapshot,int width,int height){celestial_appearance_.cancel_preparation();artwork_ready_=false;clear_travel();snapshot_=std::move(snapshot);spatial_=project_system(*snapshot_);body_inspection_.clear();preparation_.reset();preparation_pressed_=false;selected_body_id_.reset();colony_body_id_.reset();inspector_focus_=InspectorFocus::automatic;dragging_=false;pending_initial_travel_fit_=true;width_=width;height_=height;viewport_=workspace_fit(*spatial_,width,height,text_measurer_,std::nullopt,{});}
 void NativeSystemWorkspace::refresh(NativeSystemSnapshot snapshot){
   if(!snapshot_||snapshot.campaign_generation!=snapshot_->campaign_generation||snapshot.system_id!=snapshot_->system_id)
     throw std::invalid_argument("A system workspace can refresh only its current campaign and system.");
@@ -78,8 +90,14 @@ void NativeSystemWorkspace::refresh(NativeSystemSnapshot snapshot){
 void NativeSystemWorkspace::refresh_travel(NativeSystemTravelSnapshot travel,std::optional<int> selected_fleet_id){if(!snapshot_||travel.campaign_generation!=snapshot_->campaign_generation||travel.system_id!=snapshot_->system_id||travel.observer_civilization_id!=snapshot_->observer_civilization_id)throw std::invalid_argument("Local travel presentation belongs to a different system view.");if(!text_measurer_&&!travel.lanes.empty())throw std::logic_error("Local lane layout requires renderer text measurement.");std::vector<NativeLaneLabelMetrics> measured;measured.reserve(travel.lanes.size());for(const auto&lane:travel.lanes){const auto value=lane_label(lane);const auto extent=text_measurer_(Text{{},value,{210,226,218,245},12});if(extent.width<0||extent.height<0)throw std::runtime_error("Renderer returned invalid lane label bounds.");measured.push_back({lane.destination_system_id,static_cast<float>(extent.width),static_cast<float>(extent.height)});}travel_=std::move(travel);lane_metrics_=std::move(measured);if(pending_initial_travel_fit_&&viewport_&&spatial_)viewport_=workspace_fit(*spatial_,width_,height_,text_measurer_,travel_,lane_metrics_);pending_initial_travel_fit_=false;selected_fleet_id_=selected_fleet_id;if(selected_fleet_id_&&std::ranges::none_of(travel_->fleets,[&](const auto&fleet){return fleet.fleet_id==*selected_fleet_id_;})){selected_fleet_id_.reset();if(inspector_focus_==InspectorFocus::fleet)inspector_focus_=InspectorFocus::automatic;}hovered_fleet_id_.reset();hovered_lane_id_.reset();}
 void NativeSystemWorkspace::clear_travel()noexcept{travel_.reset();lane_metrics_.clear();selected_fleet_id_.reset();settlement_status_.reset();hovered_fleet_id_.reset();hovered_lane_id_.reset();notice_.clear();}
 void NativeSystemWorkspace::set_colony_body(std::optional<int> body_id)noexcept{colony_body_id_=body_id;}
+void NativeSystemWorkspace::set_settlement_preparation(std::optional<stellar::native_settlement_preparation::View> value){
+  if(value&&(!snapshot_||!selected_body()||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed||
+      value->campaign_generation!=snapshot_->campaign_generation||value->player_civilization_id!=snapshot_->observer_civilization_id||
+      value->system_id!=snapshot_->system_id||value->body_id!=selected_body_id_))value.reset();
+  preparation_=std::move(value);sync_body_inspection();
+}
 void NativeSystemWorkspace::set_notice(std::string value){notice_=std::move(value);}
-void NativeSystemWorkspace::close()noexcept{celestial_appearance_.cancel_preparation();artwork_ready_=true;body_inspection_.clear();snapshot_.reset();spatial_.reset();viewport_.reset();selected_body_id_.reset();colony_body_id_.reset();clear_travel();dragging_=false;pending_initial_travel_fit_=false;width_=height_=0;}
+void NativeSystemWorkspace::close()noexcept{preparation_.reset();preparation_pressed_=false;celestial_appearance_.cancel_preparation();artwork_ready_=true;body_inspection_.clear();snapshot_.reset();spatial_.reset();viewport_.reset();selected_body_id_.reset();colony_body_id_.reset();clear_travel();dragging_=false;pending_initial_travel_fit_=false;width_=height_=0;}
 void NativeSystemWorkspace::discard_campaign()noexcept{close();celestial_appearance_.clear();}
 std::optional<int> NativeSystemWorkspace::system_id()const noexcept{return snapshot_?std::optional<int>{snapshot_->system_id}:std::nullopt;}
 std::optional<std::uint64_t> NativeSystemWorkspace::campaign_generation()const noexcept{return snapshot_?std::optional<std::uint64_t>{snapshot_->campaign_generation}:std::nullopt;}
@@ -92,9 +110,18 @@ void NativeSystemWorkspace::resize(int width,int height){if(!snapshot_||!spatial
 void NativeSystemWorkspace::reset_fit(int width,int height){if(!spatial_)return;width_=width;height_=height;viewport_=workspace_fit(*spatial_,width,height,text_measurer_,travel_,lane_metrics_);pending_initial_travel_fit_=false;}
 std::vector<NativeLocalLaneGeometry> NativeSystemWorkspace::lane_geometry()const{if(!travel_||!spatial_||!viewport_)return {};return layout_local_lanes(*spatial_,*viewport_,travel_->lanes,lane_metrics_);}
 std::vector<int> NativeSystemWorkspace::fleet_hits(Point point)const{if(!travel_||!spatial_||!viewport_)return {};return hit_local_fleets(travel_->fleets,*spatial_,*viewport_,point);}
-SystemWorkspaceCommand NativeSystemWorkspace::handle(const InputEvent&e,int width,int height){if(!visible())return {};pointer_=e.position;resize(width,height);const auto layout=SystemWorkspaceLayout::for_viewport(width,height);if(e.type==InputEventType::EscapePressed)return {SystemWorkspaceCommandKind::close,true};if(e.type==InputEventType::PointerCancelled){dragging_=false;hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed&&layout.back.contains(e.position))return {SystemWorkspaceCommandKind::close,true};if(e.type==InputEventType::LeftPressed&&layout.reset.contains(e.position)){dragging_=false;reset_fit(width,height);return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed&&colony_body_id_&&selected_body_id_==colony_body_id_&&layout.colony_action.contains(e.position))return {SystemWorkspaceCommandKind::open_colony,true,*colony_body_id_};if(e.type==InputEventType::LeftPressed&&selected_body()&&layout.focus_action.contains(e.position)){focus_selected_body(width,height);return {SystemWorkspaceCommandKind::none,true};}
+SystemWorkspaceCommand NativeSystemWorkspace::handle(const InputEvent&e,int width,int height){if(!visible())return {};pointer_=e.position;
+const bool resized=width!=width_||height!=height_;resize(width,height);
+if(resized||e.type==InputEventType::PointerCancelled)preparation_pressed_=false;
+const auto layout=SystemWorkspaceLayout::for_viewport(width,height);if(e.type==InputEventType::LeftReleased&&preparation_pressed_){
+preparation_pressed_=false;dragging_=false;
+if(preparation_&&!colony_body_id_&&layout.colony_action.contains(e.position))return {SystemWorkspaceCommandKind::open_shipyard,true,preparation_->body_id};
+return {SystemWorkspaceCommandKind::none,true};}
+if(e.type==InputEventType::LeftPressed){preparation_pressed_=false;
+if(preparation_&&!colony_body_id_&&layout.colony_action.contains(e.position)){preparation_pressed_=true;dragging_=false;return {SystemWorkspaceCommandKind::none,true};}}
+if(e.type==InputEventType::EscapePressed)return {SystemWorkspaceCommandKind::close,true};if(e.type==InputEventType::PointerCancelled){dragging_=false;hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed&&layout.back.contains(e.position))return {SystemWorkspaceCommandKind::close,true};if(e.type==InputEventType::LeftPressed&&layout.reset.contains(e.position)){dragging_=false;reset_fit(width,height);return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed&&colony_body_id_&&selected_body_id_==colony_body_id_&&layout.colony_action.contains(e.position))return {SystemWorkspaceCommandKind::open_colony,true,*colony_body_id_};if(e.type==InputEventType::LeftPressed&&selected_body()&&layout.focus_action.contains(e.position)){focus_selected_body(width,height);return {SystemWorkspaceCommandKind::none,true};}
 if(e.type==InputEventType::Wheel&&layout.inspector.contains(e.position)&&body_inspection_.visible()){body_inspection_.scroll(e.wheel_y,layout.inspector,layout.focus_action.y);dragging_=false;return {SystemWorkspaceCommandKind::none,true};}
-if(layout.inspector.contains(e.position)||layout.controls_row.contains(e.position)||!layout.world_field.contains(e.position)){if(e.type==InputEventType::LeftPressed||e.type==InputEventType::LeftReleased||e.type==InputEventType::RightPressed||e.type==InputEventType::RightReleased||e.type==InputEventType::PointerMove)dragging_=false;hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::RightPressed){if(!fleet_hits(e.position).empty())return {SystemWorkspaceCommandKind::none,true};if(const auto hit=viewport_->hit_body(*spatial_,e.position.x,e.position.y);hit)return {SystemWorkspaceCommandKind::settlement_target,true,*hit};return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::Wheel){pending_initial_travel_fit_=false;viewport_=viewport_->zoomed_at(std::pow(1.16f,e.wheel_y),e.position.x,e.position.y,.01f,5.f);viewport_->center_x=std::clamp(viewport_->center_x,-32000.f,32000.f);viewport_->center_y=std::clamp(viewport_->center_y,-32000.f,32000.f);return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed){const auto hits=fleet_hits(e.position);if(!hits.empty()){selected_body_id_.reset();body_inspection_.clear();colony_body_id_.reset();inspector_focus_=InspectorFocus::fleet;dragging_=false;notice_.clear();return {SystemWorkspaceCommandKind::select_fleet,true,hits.front(),hits};}if(travel_)for(const auto&geometry:lane_geometry())if(hit_local_lane(geometry,e.position)){const auto marker=std::ranges::find(travel_->lanes,geometry.destination_system_id,&NativeLocalLaneMarker::destination_system_id);dragging_=false;if(marker!=travel_->lanes.end()&&marker->known_label){notice_.clear();return {SystemWorkspaceCommandKind::open_destination,true,geometry.destination_system_id};}notice_="Telemetry unavailable. Dispatch a scout to establish a local survey.";return {SystemWorkspaceCommandKind::reconnaissance_required,true};}if(const auto hit=viewport_->hit_body(*spatial_,e.position.x,e.position.y);hit){(void)select_body(*hit);}else dragging_=true;return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::PointerMove&&dragging_){pending_initial_travel_fit_=false;*viewport_=viewport_->translated(e.delta.x,e.delta.y);viewport_->center_x=std::clamp(viewport_->center_x,-32000.f,32000.f);viewport_->center_y=std::clamp(viewport_->center_y,-32000.f,32000.f);hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::PointerMove){const auto hits=fleet_hits(e.position);hovered_fleet_id_=hits.empty()?std::nullopt:std::optional<int>{hits.front()};hovered_lane_id_.reset();if(!hovered_fleet_id_)for(const auto&geometry:lane_geometry())if(hit_local_lane(geometry,e.position)){hovered_lane_id_=geometry.destination_system_id;break;}return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftReleased){dragging_=false;return {SystemWorkspaceCommandKind::none,true};}return {SystemWorkspaceCommandKind::none,true};}
+if(layout.inspector.contains(e.position)||layout.controls_row.contains(e.position)||!layout.world_field.contains(e.position)){if(e.type==InputEventType::LeftPressed||e.type==InputEventType::LeftReleased||e.type==InputEventType::RightPressed||e.type==InputEventType::RightReleased||e.type==InputEventType::PointerMove)dragging_=false;hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::RightPressed){if(!fleet_hits(e.position).empty())return {SystemWorkspaceCommandKind::none,true};if(const auto hit=viewport_->hit_body(*spatial_,e.position.x,e.position.y);hit)return {SystemWorkspaceCommandKind::settlement_target,true,*hit};return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::Wheel){pending_initial_travel_fit_=false;viewport_=viewport_->zoomed_at(std::pow(1.16f,e.wheel_y),e.position.x,e.position.y,.01f,5.f);viewport_->center_x=std::clamp(viewport_->center_x,-32000.f,32000.f);viewport_->center_y=std::clamp(viewport_->center_y,-32000.f,32000.f);return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftPressed){const auto hits=fleet_hits(e.position);if(!hits.empty()){selected_body_id_.reset();body_inspection_.clear();preparation_.reset();preparation_pressed_=false;colony_body_id_.reset();inspector_focus_=InspectorFocus::fleet;dragging_=false;notice_.clear();return {SystemWorkspaceCommandKind::select_fleet,true,hits.front(),hits};}if(travel_)for(const auto&geometry:lane_geometry())if(hit_local_lane(geometry,e.position)){const auto marker=std::ranges::find(travel_->lanes,geometry.destination_system_id,&NativeLocalLaneMarker::destination_system_id);dragging_=false;if(marker!=travel_->lanes.end()&&marker->known_label){notice_.clear();return {SystemWorkspaceCommandKind::open_destination,true,geometry.destination_system_id};}notice_="Telemetry unavailable. Dispatch a scout to establish a local survey.";return {SystemWorkspaceCommandKind::reconnaissance_required,true};}if(const auto hit=viewport_->hit_body(*spatial_,e.position.x,e.position.y);hit){(void)select_body(*hit);}else dragging_=true;return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::PointerMove&&dragging_){pending_initial_travel_fit_=false;*viewport_=viewport_->translated(e.delta.x,e.delta.y);viewport_->center_x=std::clamp(viewport_->center_x,-32000.f,32000.f);viewport_->center_y=std::clamp(viewport_->center_y,-32000.f,32000.f);hovered_fleet_id_.reset();hovered_lane_id_.reset();return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::PointerMove){const auto hits=fleet_hits(e.position);hovered_fleet_id_=hits.empty()?std::nullopt:std::optional<int>{hits.front()};hovered_lane_id_.reset();if(!hovered_fleet_id_)for(const auto&geometry:lane_geometry())if(hit_local_lane(geometry,e.position)){hovered_lane_id_=geometry.destination_system_id;break;}return {SystemWorkspaceCommandKind::none,true};}if(e.type==InputEventType::LeftReleased){dragging_=false;return {SystemWorkspaceCommandKind::none,true};}return {SystemWorkspaceCommandKind::none,true};}
 
 void NativeSystemWorkspace::render(DrawList &out,int width,int height){artwork_ready_=true;celestial_appearance_.begin_frame();if(!snapshot_||!spatial_||!viewport_)return;resize(width,height);for(std::uint32_t i=0;i<96;++i){const auto a=mix(static_cast<std::uint32_t>(snapshot_->system_id)*131u+i);const auto b=mix(a+17u);const Point p{static_cast<float>(a%static_cast<std::uint32_t>(std::max(1,width))),static_cast<float>(b%static_cast<std::uint32_t>(std::max(1,height)))};out.world.emplace_back(Circle{p,(a&3u)?0.65f:1.1f,{102,133,169,static_cast<std::uint8_t>(70u+a%80u)}});}
   const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto panel=layout.inspector;const auto field=layout.world_field;std::map<int,const SystemSpatialBodyMarker*> markers;for(const auto&m:spatial_->bodies)markers.emplace(m.body_id,&m);
@@ -120,15 +147,64 @@ void NativeSystemWorkspace::render(DrawList &out,int width,int height){artwork_r
   overlay_stroke(out,layout.focus_action,{102,205,224,255});
   overlay_text(out,layout.focus_action.x+10.f,layout.focus_action.y+9.f,"FOCUS PLANET",text,14,layout.focus_action.width-20.f,layout.focus_action);
 }
-if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"OPEN COLONY",text,14,layout.colony_action.width-20,layout.colony_action);}else if(!notice_.empty()){const UiRect notice_bounds=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
+if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"OPEN COLONY",text,14,layout.colony_action.width-20,layout.colony_action);}else if(preparation_&&selected_body()){
+overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
+overlay_stroke(out,layout.colony_action,{102,232,164,255});
+overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"VIEW SHIPYARD",text,14,layout.colony_action.width-20,layout.colony_action);
+}else if(!notice_.empty()){const UiRect notice_bounds=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
 void NativeSystemWorkspace::sync_body_inspection(){
-  if(!snapshot_||!selected_body_id_){body_inspection_.clear();return;}
-  body_inspection_.set_inspection(build_body_inspection(*snapshot_,*selected_body_id_));
+  if(!snapshot_||!selected_body_id_){preparation_.reset();preparation_pressed_=false;body_inspection_.clear();return;}
+  auto inspection=build_body_inspection(*snapshot_,*selected_body_id_);
+  if(preparation_&&(preparation_->campaign_generation!=snapshot_->campaign_generation||
+      preparation_->player_civilization_id!=snapshot_->observer_civilization_id||
+      preparation_->system_id!=snapshot_->system_id||preparation_->body_id!=selected_body_id_||
+      snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)){
+    preparation_.reset();preparation_pressed_=false;
+  }
+  if(inspection&&preparation_){
+    const auto& v=*preparation_;const auto& a=v.suitability;const auto& e=a.environment;
+    std::string habitat;
+    const auto support=[&](bool needed,const char* name){if(needed){if(!habitat.empty())habitat+="; ";habitat+=name;}};
+    support(e.requires_gravity_mitigation,"Gravity support");support(e.requires_thermal_control,"Thermal control");
+    support(e.requires_pressure_control,"Pressure control");support(e.requires_sealed_habitat,"Sealed habitat");
+    support(e.requires_artificial_biosphere,"Artificial biosphere");support(e.requires_radiation_shielding,"Radiation shielding");
+    std::string site;
+    if(!v.solid_surface)site="No solid settlement surface";
+    else if(v.native_pre_warp_life)site="Protected native civilization";
+    else if(a.viability==SpeciesColonizationViability::Unsuitable)site="Too harsh for a colony";
+    else if(a.viability==SpeciesColonizationViability::HabitatSupportedFallback)site="Habitat support required";
+    else site="Naturally viable environment";
+    BodySection readiness{"SETTLEMENT ASSESSMENT",{
+      {"Population",v.species_name},
+      {"Environment",site},
+      {"Natural fit",number(e.natural_habitability*100.,0)+"%"},
+      {"Primary hazard",environmental_hazard(e.limiting_factor)},
+      {"Life support",habitat.empty()?"No environmental mitigation":habitat},
+      {"Rare deposit",v.rare_resource?"Confirmed":"None confirmed"},
+      {"Next step",a.can_found_current_colony?"Prepare a colony vessel":
+          v.solid_surface&&!v.native_pre_warp_life&&v.rare_resource?"Review a sealed resource outpost":"Explore other worlds"}
+    }};
+    inspection->sections.insert(inspection->sections.begin(),std::move(readiness));
+    const auto add_option=[&](const stellar::native_settlement_preparation::Option& o){
+      inspection->sections.push_back({o.design_name,{
+        {"Ship cost",o.formatted_ship_cost},{"Industry",number(o.industry_cost,0)+" over construction"},
+        {"Population",number(o.population_reservation_millions,0)+" million reserved"},
+        {"Build time",number(o.minimum_build_days,1)+" days minimum at full production"},
+        {"Shipyard",o.shipbuilding_blocker.value_or("Ready to order")},
+        {"Expedition",o.formatted_expedition_cost+" separately authorized"},
+        {"Establishment",number(o.establishment_days,0)+" work days after arrival"}}});
+    };
+    add_option(v.colony_ship);add_option(v.resource_outpost);
+    inspection->sections.push_back({"BEFORE COMMITTING",{{"Treasury",v.formatted_treasury},
+      {"Timing","Supply and funding can delay completion"},
+      {"Mission","Select a populated vessel and right-click a surveyed world. Route, occupancy, reservations and funds are checked before confirmation."}}});
+  }
+  body_inspection_.set_inspection(std::move(inspection));
 }
 bool NativeSystemWorkspace::select_body(int body_id){
   if(!snapshot_||!spatial_||std::ranges::find(snapshot_->bodies,body_id,&NativeSystemBody::id)==snapshot_->bodies.end()||
      std::ranges::find(spatial_->bodies,body_id,&SystemSpatialBodyMarker::body_id)==spatial_->bodies.end())return false;
-  selected_body_id_=body_id;colony_body_id_.reset();inspector_focus_=InspectorFocus::body;dragging_=false;notice_.clear();sync_body_inspection();return true;
+  if(selected_body_id_!=body_id)preparation_.reset();preparation_pressed_=false;selected_body_id_=body_id;colony_body_id_.reset();inspector_focus_=InspectorFocus::body;dragging_=false;notice_.clear();sync_body_inspection();return true;
 }
 void NativeSystemWorkspace::focus_selected_body(int width,int height){
   if(!selected_body_id_||!spatial_||!viewport_)return;

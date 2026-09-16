@@ -105,6 +105,7 @@ target_sources(stellar-continuum-native PRIVATE
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_settlement_mission_controller.cpp
+  app/native_client/native_settlement_preparation.cpp
   app/native_client/native_settlement_workspace.cpp)
 
 target_sources(stellar-continuum-native PRIVATE

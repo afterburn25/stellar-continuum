@@ -42,6 +42,48 @@ int main(int argc,char**argv)try{
   NativeSystemViewController controller;auto built=controller.build(campaign,1,sol_system_id);
   require(built.snapshot.has_value(),"fresh Sol view unavailable");
   const auto reference=*built.snapshot;auto display=reference;
+  // Read-only preparation is bound to the exact admitted body and observer.
+  NativeSystemWorkspace preparation_ui;
+  preparation_ui.open(reference,1280,720);
+  require(preparation_ui.select_body(earth_body_id),"preparation fixture lacks Earth");
+  stellar::native_settlement_preparation::View preparation;
+  preparation.campaign_generation=reference.campaign_generation;
+  preparation.player_civilization_id=reference.observer_civilization_id;
+  preparation.system_id=reference.system_id;preparation.body_id=earth_body_id;
+  preparation.species_id="terran_baseline";preparation.species_name="Humans";
+  preparation_ui.set_settlement_preparation(preparation);
+  require(preparation_ui.settlement_preparation().has_value(),"admitted preparation was rejected");
+  for(const auto [w,h]:std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}){
+    const auto panel=SystemWorkspaceLayout::for_viewport(w,h);
+    DrawList scene;preparation_ui.render(scene,w,h);
+    const auto action=center(panel.colony_action);
+    require(preparation_ui.handle({InputEventType::LeftReleased,action},w,h).kind==SystemWorkspaceCommandKind::none,"release alone opened shipyard");
+    require(preparation_ui.handle({InputEventType::LeftPressed,action},w,h).kind==SystemWorkspaceCommandKind::none,"press alone opened shipyard");
+    auto outcome=preparation_ui.handle({InputEventType::LeftReleased,action},w,h);
+    require(outcome.kind==SystemWorkspaceCommandKind::open_shipyard&&outcome.target_id==earth_body_id,"preparation footer did not navigate on matching release");
+    (void)preparation_ui.handle({InputEventType::LeftPressed,action},w,h);
+    (void)preparation_ui.handle({InputEventType::PointerCancelled},w,h);
+    require(preparation_ui.handle({InputEventType::LeftReleased,action},w,h).kind==SystemWorkspaceCommandKind::none,"cancelled input opened shipyard");
+    preparation_ui.set_colony_body(earth_body_id);
+    require(preparation_ui.handle({InputEventType::LeftPressed,action},w,h).kind==SystemWorkspaceCommandKind::open_colony,"preparation stole owned colony navigation");
+    preparation_ui.set_colony_body(std::nullopt);
+  }
+  auto wrong_preparation=preparation;++wrong_preparation.player_civilization_id;
+  preparation_ui.set_settlement_preparation(wrong_preparation);
+  require(!preparation_ui.settlement_preparation(),"foreign preparation accepted");
+  wrong_preparation=preparation;++wrong_preparation.campaign_generation;
+  preparation_ui.set_settlement_preparation(wrong_preparation);
+  require(!preparation_ui.settlement_preparation(),"stale campaign preparation accepted");
+  wrong_preparation=preparation;++wrong_preparation.body_id;
+  preparation_ui.set_settlement_preparation(wrong_preparation);
+  require(!preparation_ui.settlement_preparation(),"different body preparation accepted");
+  preparation_ui.set_settlement_preparation(preparation);
+  auto partial_preparation=reference;partial_preparation.survey_level=SystemSurveyLevel::partially_surveyed;
+  preparation_ui.refresh(partial_preparation);
+  require(!preparation_ui.settlement_preparation(),"survey downgrade kept settlement intelligence");
+  preparation_ui.set_settlement_preparation(preparation);
+  require(!preparation_ui.settlement_preparation(),"partial survey admitted settlement intelligence");
+  preparation_ui.close();
   // Pending body artwork keeps mouse navigation alive but is never capture-ready.
   bool deferred_ready{};
   const auto prepared_body=RgbaImage::create(1,1,{120,150,180,255});
