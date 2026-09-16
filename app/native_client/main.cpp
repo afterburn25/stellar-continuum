@@ -596,6 +596,16 @@ class NativeCampaign final {
     if(system_workspace_.selected_body_id()!=earth_body_id)throw std::runtime_error("System smoke could not select Earth.");
     smoke_system_hit_=true;const auto before=*system_workspace_.viewport();InputSnapshot zoom;zoom.drawable_width=width;zoom.drawable_height=height;zoom.pointer={420,320};zoom.events={{InputEventType::Wheel,zoom.pointer,{},1}};(void)update(zoom,width,height,0.,false);const auto zoomed=*system_workspace_.viewport();smoke_system_zoomed_=zoomed.scale>before.scale;InputSnapshot move;move.drawable_width=width;move.drawable_height=height;move.pointer={392,318};move.events={{InputEventType::LeftPressed,{360,300}},{InputEventType::PointerMove,{392,318},{32,18}},{InputEventType::LeftReleased,{392,318}}};(void)update(move,width,height,0.,false);const auto after=*system_workspace_.viewport();smoke_system_panned_=after.center_x!=zoomed.center_x||after.center_y!=zoomed.center_y;
     if(!smoke_system_zoomed_||!smoke_system_panned_)throw std::runtime_error("System smoke did not preserve zoom and pan input.");
+    const auto focus_target=std::ranges::find_if(spatial.bodies,[&](const SystemSpatialBodyMarker&marker){return marker.body_id!=earth_body_id;});
+    if(focus_target==spatial.bodies.end())throw std::runtime_error("System smoke lacks a second body for the focus check.");
+    const auto target_screen=system_workspace_.viewport()->world_to_screen(focus_target->offset_x,focus_target->offset_y);
+    click({target_screen.x,target_screen.y});
+    if(system_workspace_.selected_body_id()!=focus_target->body_id)throw std::runtime_error("System smoke could not select its focus target.");
+    click({system_layout.colony_action.x+system_layout.colony_action.width*.5f,system_layout.colony_action.y+system_layout.colony_action.height*.5f});
+    const auto focused=system_workspace_.viewport()->world_to_screen(focus_target->offset_x,focus_target->offset_y);
+    smoke_system_focused_=std::abs(focused.x-(system_layout.world_field.x+system_layout.world_field.width*.5f))<4.f&&std::abs(focused.y-(system_layout.world_field.y+system_layout.world_field.height*.5f))<4.f;
+    if(!smoke_system_focused_)throw std::runtime_error("System smoke FOCUS PLANET did not center its body.");
+    if(!system_workspace_.select_body(earth_body_id))throw std::runtime_error("System smoke could not restore its Earth selection.");
   }
   void prepare_colony_smoke(int width,int height,bool reload){
     smoke_colony_reload_=reload;
@@ -1782,6 +1792,7 @@ class NativeCampaign final {
       <<":pause_retained="<<smoke_system_pause_retained_
       <<":speed_retained="<<smoke_system_speed_retained_
       <<":gesture_cleared="<<smoke_system_gesture_cleared_
+      <<":focused="<<smoke_system_focused_
       <<":paused="<<(session_->frame().clock().speed()==StrategicSpeed::Paused)
       <<":day_unchanged="<<(session_->frame().clock().simulation_days()==smoke_system_day_);
     return out.str();
@@ -3350,7 +3361,7 @@ class NativeCampaign final {
   int smoke_missions_{},smoke_mission_count_{},smoke_mission_sites_{},
       smoke_mission_site_selection_{};
   std::optional<int> smoke_fleet_destination_;
-  bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
+  bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{},smoke_system_focused_{};
   double smoke_system_day_{};
   std::optional<int> smoke_system_travel_fleet_id_,smoke_system_travel_system_id_,smoke_system_travel_destination_id_;
   int smoke_system_travel_mission_revision_{};std::size_t smoke_system_travel_lane_count_{};
