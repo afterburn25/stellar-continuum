@@ -152,6 +152,14 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   seeded fresh campaign and backup retention — and
   `native_developer_runtime.py` validates all seven diagnostic keys plus
   the primary/backup envelopes.
+- Unified design system (`native_ui_theme`, `6ad1650b`): merged
+  `polish/professional-ui-ux-overhaul` — every workspace, panel and menu now
+  draws through a shared palette (`native_ui::color`) and primitive helpers
+  (`panel`/`section_header`/`button`/`progress`/`status_chip`/`tooltip`)
+  with consistent surfaces, keylines, drop shadows and clipped captions.
+  `docs/VISUAL_STYLE_GUIDE.md` documents the contract; the merge also
+  hardened `native_ui::button` to clip captions to button bounds and
+  updated fleet/startup/construction assertions for the new presentation.
 - Support bundle (`native_support`): ports `SupportLogger` — a per-session
   `game-<id>.log`/`system-<id>.txt` under `<save>/logs`, and a SUPPORT BUNDLE
   menu button plus F8 that export `support/support-<id>-<ts>.zip` as a
@@ -241,6 +249,15 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
   smokes show `cpu_mean_ms` 1.2–5.0 / `cpu_p95` <0.5 across all scenes against
   a ~18.9 ms present interval — frame pacing is present-bound on the
   measurement host's ~53 Hz Meta Virtual Monitor, not CPU-bound.
+- Sealed export `StellarContinuum-windows-native-preview-6ad1650b-20260916T200146986316Z`
+  (163 files, 78 MB ZIP): first seal of the merged design-system + Developer-mode
+  line. 172/172 CTest and every runtime validator green, including
+  `nativeDeveloperMode`/`nativeDeveloperTools` — `--developer-smoke` reported
+  all seven flags (`mode`, `demo_speed`, `tools_panel`, `command`,
+  `envelope_save`, `fresh_campaign`, `backup_kept`) on both the tools and
+  loaded-session phases with BMP captures, and the developer validator
+  verified the primary/backup Developer envelopes beside an untouched
+  Player17 save. `sourceDirty` records untracked local scratch files only.
 - Prior sealed export `StellarContinuum-windows-native-preview-410753da-20260915T042104279069Z`
   (113 files) remains the baseline for the pre-diplomacy slice.
 - Orbital construction presentation (`eb1ab876`): home-system infrastructure markers
