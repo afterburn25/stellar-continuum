@@ -263,6 +263,8 @@ struct Options {
   std::optional<FirstExplorationMode> first_exploration_mode;
   enum class FirstSurveyMode { Depart, Paused, Resume };
   std::optional<FirstSurveyMode> first_survey_mode;
+  enum class SettlementCompletionMode { Resume, Paused };
+  std::optional<SettlementCompletionMode> settlement_completion_mode;
   bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
@@ -322,6 +324,7 @@ struct Options {
     else if(arg==L"--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg==L"--fresh-progression-smoke"||arg==L"--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fresh_progression_smoke=arg==L"--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg==L"--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg==L"--first-exploration-smoke"||arg==L"--first-exploration-paused-smoke"||arg==L"--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_exploration_mode=arg==L"--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg==L"--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if((arg==L"--settlement-completion-smoke"||arg==L"--settlement-founded-smoke")&&i+1<argc){if(result.settlement_completion_mode)throw std::invalid_argument("Choose one settlement completion mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_completion_mode=arg==L"--settlement-completion-smoke"?Options::SettlementCompletionMode::Resume:Options::SettlementCompletionMode::Paused;result.windowed=true;}
     else if(arg==L"--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #else
@@ -369,6 +372,7 @@ struct Options {
     else if(arg=="--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_reload_smoke=true;result.windowed=true;}
     else if((arg=="--fresh-progression-smoke"||arg=="--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.fresh_progression_smoke=arg=="--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg=="--fresh-progression-reload-smoke";result.windowed=true;}
     else if((arg=="--first-exploration-smoke"||arg=="--first-exploration-paused-smoke"||arg=="--first-exploration-resume-smoke")&&i+1<argc){if(result.first_exploration_mode)throw std::invalid_argument("Choose one first exploration mode.");result.smoke_screenshot=argv[++i];result.first_exploration_mode=arg=="--first-exploration-smoke"?Options::FirstExplorationMode::Depart:arg=="--first-exploration-paused-smoke"?Options::FirstExplorationMode::Paused:Options::FirstExplorationMode::Resume;result.windowed=true;}
+    else if((arg=="--settlement-completion-smoke"||arg=="--settlement-founded-smoke")&&i+1<argc){if(result.settlement_completion_mode)throw std::invalid_argument("Choose one settlement completion mode.");result.smoke_screenshot=argv[++i];result.settlement_completion_mode=arg=="--settlement-completion-smoke"?Options::SettlementCompletionMode::Resume:Options::SettlementCompletionMode::Paused;result.windowed=true;}
     else if(arg=="--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
 #endif
@@ -388,13 +392,14 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
   if(result.first_exploration_mode&&!result.load)throw std::invalid_argument("First exploration smoke requires --load with the earned first-ships save.");
   if(result.first_exploration_mode&&result.seed!=115501)throw std::invalid_argument("First exploration smoke requires --seed 115501.");
   if(result.settlement_preparation_smoke&&(!result.load||result.seed!=115501))throw std::invalid_argument("Settlement preparation smoke requires --load with the earned full survey save and --seed 115501.");
+  if(result.settlement_completion_mode&&!result.load)throw std::invalid_argument("Settlement completion smoke requires --load with an authorized or founded expedition save.");
   if(result.first_survey_mode&&!result.load)throw std::invalid_argument("First survey smoke requires --load with the completed scout save.");
   if(result.first_survey_mode&&result.seed!=115501)throw std::invalid_argument("First survey smoke requires --seed 115501.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
@@ -1415,6 +1420,7 @@ class NativeCampaign final {
       const auto&world=session_->frame().runtime().world().campaign();
       bool found{};
       for(const auto&body:world.bodies){
+        if(world.knowledge.system_survey_level(world.player_civilization_id,body.system_id)!=SystemSurveyLevel::fully_surveyed)continue;
         const auto system=session_->cache().systems_by_id.find(body.system_id);
         if(system==session_->cache().systems_by_id.end())continue;
         const auto point=camera_.project({system->second->position.x,system->second->position.y},width,height);
@@ -3321,6 +3327,189 @@ class NativeCampaign final {
         << ",\"save_roundtrip\":" << first_exploration_roundtrip_ << '}';
     return out.str();
   }
+  void prepare_settlement_completion_smoke(int width, int height,
+      Options::SettlementCompletionMode mode, const std::function<void()> &pump,
+      const std::function<void()> &capture_progress) {
+    auto &frame = session_->frame();
+    const auto &world = frame.runtime().world().campaign();
+    const int player_id = world.player_civilization_id;
+    const bool paused = mode == Options::SettlementCompletionMode::Paused;
+    if (frame.clock().speed() != StrategicSpeed::Paused)
+      throw std::runtime_error("Settlement completion requires a paused source.");
+    const auto snapshot = [&] {
+      return nlohmann::json::parse(encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(frame.runtime(),
+              {frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+               "2044-05-06T07:08:21Z"}).payload()));
+    };
+    const auto original = snapshot();
+    const double before_days = frame.clock().simulation_days();
+    const auto colonies_before = world.colonies.size();
+    std::vector<NativeSettlementMissionView> active;
+    for (auto &view : settlement_controller_.build(frame, session_->cache().generation))
+      if (has_active_settlement_target(view)) active.push_back(std::move(view));
+    int fleet_id = -1, system_id = -1, body_id = -1, colony_id = -1, revision = -1;
+    SettlementKind kind = SettlementKind::Colony;
+    if (!paused) {
+      if (active.size() != 1)
+        throw std::runtime_error("Settlement completion requires one authorized active expedition.");
+      const auto &mission = active.front();
+      fleet_id = mission.fleet_id;
+      revision = mission.mission_order_revision;
+      body_id = mission.settlement_body_id.value_or(mission.destination_body_id.value_or(-1));
+      const auto vessel = std::ranges::find(world.fleets, fleet_id, &FleetState::id);
+      if (vessel == world.fleets.end()) throw std::runtime_error("Settlement vessel missing.");
+      system_id = mission.destination_system_id.value_or(vessel->current_system_id.value_or(-1));
+      kind = mission.kind == NativeSettlementMissionKind::Colony
+          ? SettlementKind::Colony : SettlementKind::ResourceOutpost;
+      if (mission.settlement_days_completed >= mission.establishment_days - 5.)
+        throw std::runtime_error("Settlement completion needs at least five workdays remaining.");
+    } else {
+      const auto player = std::ranges::find(world.civilizations, player_id, &Civilization::id);
+      if (player == world.civilizations.end() || !active.empty())
+        throw std::runtime_error("Founded reload requires no active expedition.");
+      for (const auto &colony : world.colonies) {
+        if (colony.civilization_id != player_id || colony.system_id == player->home_system_id)
+          continue;
+        if (colony_id >= 0) throw std::runtime_error("Founded reload target is ambiguous.");
+        colony_id = colony.id; system_id = colony.system_id;
+        body_id = colony.planetary_body_id.value_or(-1); kind = colony.kind;
+      }
+      for (const auto &fleet : world.fleets) {
+        if (fleet.civilization_id != player_id || fleet.role != FleetRole::Colony || fleet.is_active)
+          continue;
+        if (fleet_id >= 0) throw std::runtime_error("Founded reload vessel is ambiguous.");
+        fleet_id = fleet.id; revision = fleet.mission_order_revision;
+      }
+    }
+    if (fleet_id < 0 || system_id < 0 || body_id < 0 ||
+        world.knowledge.system_survey_level(player_id, system_id) != SystemSurveyLevel::fully_surveyed)
+      throw std::runtime_error("Settlement completion lacks a surveyed, exact target.");
+    const auto find_colony = [&]() -> const Colony * {
+      const auto found = std::ranges::find_if(world.colonies, [&](const Colony &colony) {
+        return colony.civilization_id == player_id && colony.system_id == system_id &&
+               colony.planetary_body_id == body_id;
+      });
+      return found == world.colonies.end() ? nullptr : &*found;
+    };
+    if (!paused && find_colony()) throw std::runtime_error("Expedition target was already settled.");
+    const auto route = [&](std::vector<InputEvent> events) {
+      InputSnapshot input; input.drawable_width = width; input.drawable_height = height;
+      input.pointer = events.empty() ? Point{} : events.back().position;
+      input.events = std::move(events);
+      if (!update(input, width, height, 0., false))
+        throw std::runtime_error("Settlement completion input closed the game.");
+    };
+    const auto click = [&](Point at) {
+      route({{InputEventType::LeftPressed, at}, {InputEventType::LeftReleased, at}});
+    };
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    const auto wait_art = [&] {
+      do {
+        if (std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error("Settlement completion artwork timed out.");
+        pump();
+      } while (!artwork_ready());
+    };
+    if (!paused) {
+      refresh_fleets(true);
+      const auto &fleets = fleet_workspace_.view()->own_fleets;
+      const auto fleet = std::ranges::find(fleets, fleet_id, &NativeOwnFleet::id);
+      if (fleet == fleets.end()) throw std::runtime_error("Expedition missing from outliner.");
+      const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+      const auto index = static_cast<float>(fleet - fleets.begin());
+      click({layout.list.x + 12.f * layout.scale,
+             layout.list.y + (index * 45.f + 20.f) * layout.scale});
+      if (fleet_controller_.selection() != fleet_id)
+        throw std::runtime_error("Expedition outliner selection failed.");
+    }
+    if (!enter_system(system_id, width, height))
+      throw std::runtime_error("Settlement target system could not open.");
+    const auto select_body = [&] {
+      const auto spatial = project_system(*system_workspace_.snapshot());
+      const auto marker = std::ranges::find(spatial.bodies, body_id, &SystemSpatialBodyMarker::body_id);
+      if (marker == spatial.bodies.end()) throw std::runtime_error("Settlement body is not visible.");
+      const auto at = system_workspace_.viewport()->world_to_screen(marker->offset_x, marker->offset_y);
+      click({at.x, at.y});
+      if (system_workspace_.selected_body_id() != body_id)
+        throw std::runtime_error("Settlement body click missed its target.");
+    };
+    select_body();
+    constexpr double step_days = 1. / 64.;
+    std::uint64_t steps{};
+    bool progress_captured{};
+    using stellar::native_campaign_feedback::FeedbackKind;
+    const auto feedback_before = feedback_.counts().count(FeedbackKind::ColonyFounded);
+    if (!paused) {
+      click(center(NativeUiLayout::for_viewport(width, height).pause));
+      while (!find_colony()) {
+        if (++steps > 1024 * 64 || std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error("Settlement did not finish within 1024 days / 300 seconds.");
+        if (frame.clock().speed() != StrategicSpeed::Normal || frame.clock().backlog_days() != 0.)
+          throw std::runtime_error("Settlement completion left Normal speed.");
+        const auto before = frame.clock().simulation_days();
+        const auto result = frame.advance(step_days);
+        if (result.route != CampaignFrameRoute::Strategic || result.completed_substeps != std::vector<double>{step_days} ||
+            frame.clock().simulation_days() - before != step_days || frame.clock().backlog_days() != 0.)
+          throw std::runtime_error("Settlement completion left exact 1/64-day stepping.");
+        publish_feedback(result);
+        const auto vessel = std::ranges::find(world.fleets, fleet_id, &FleetState::id);
+        // Core clears the consumed vessel's route once, incrementing revision.
+        if (vessel == world.fleets.end() ||
+            vessel->mission_order_revision != revision + (find_colony() ? 1 : 0))
+          throw std::runtime_error("Settlement completion lost or reordered the expedition.");
+        if (!progress_captured && !find_colony() && vessel->settlement_days_completed >= 5.) {
+          click(center(NativeUiLayout::for_viewport(width, height).pause));
+          refresh_system(true); refresh_fleets(true); refresh_settlement_status();
+          wait_art(); capture_progress(); progress_captured = true;
+          click(center(NativeUiLayout::for_viewport(width, height).pause));
+        }
+        if (steps % 64 == 0) { refresh_system(true); refresh_fleets(true); pump(); }
+      }
+      click(center(NativeUiLayout::for_viewport(width, height).pause));
+      if (!progress_captured || world.colonies.size() != colonies_before + 1 ||
+          feedback_.counts().count(FeedbackKind::ColonyFounded) != feedback_before + 1)
+        throw std::runtime_error("Settlement lacks timed work, one founded colony or normal completion feedback.");
+    }
+    const auto *colony = find_colony();
+    const auto consumed = std::ranges::find(world.fleets, fleet_id, &FleetState::id);
+    if (!colony || colony->kind != kind || colony->population_millions <= 0. ||
+        consumed == world.fleets.end() || consumed->is_active || consumed->embarked_population_millions != 0. ||
+        consumed->mission_order_revision != revision + (paused ? 0 : 1))
+      throw std::runtime_error("Founding did not preserve population or consume the authorized vessel.");
+    colony_id = colony->id;
+    const auto before_inspection = snapshot();
+    refresh_system(true); select_body(); refresh_colony_entry(true);
+    click(center(SystemWorkspaceLayout::for_viewport(width, height).colony_action));
+    if (!colony_workspace_.visible() || !colony_workspace_.view() ||
+        colony_workspace_.view()->colony_id != colony_id)
+      throw std::runtime_error("Founded colony could not open through its normal planet action.");
+    wait_art();
+    if (snapshot() != before_inspection || (paused && snapshot() != original))
+      throw std::runtime_error("Colony inspection or paused reload changed Player17.");
+    const PlayerCampaignCaptureOptions options{frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+                                               "2044-05-06T07:08:21Z"};
+    auto restored = restore_player_campaign_v17_json(
+        load_adaptive_research_strategic_runtime(asset_root_ / "Data/research/v1"),
+        encode_player_campaign_v17_json(PreparedPlayerCampaignSave::capture(frame.runtime(), options).payload()));
+    auto resumed = std::move(restored).activate();
+    if (nlohmann::json::parse(encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(resumed, options).payload())) != snapshot())
+      throw std::runtime_error("Founded colony changed during full Player17 restoration.");
+    settlement_completion_proof_ = nlohmann::json{
+        {"mode", paused ? "paused" : "resume"}, {"player_id", player_id}, {"fleet_id", fleet_id},
+        {"system_id", system_id}, {"body_id", body_id}, {"colony_id", colony_id},
+        {"kind", kind == SettlementKind::Colony ? "colony" : "outpost"}, {"revision", consumed->mission_order_revision},
+        {"before_days", before_days}, {"after_days", frame.clock().simulation_days()},
+        {"steps", steps}, {"step_days", step_days}, {"colonies_before", colonies_before},
+        {"colonies_after", world.colonies.size()}, {"consumed", true}, {"opened_colony", true},
+        {"read_only", true}, {"feedback", !paused}, {"roundtrip", true}}.dump();
+    InputSnapshot ready; ready.drawable_width = width; ready.drawable_height = height;
+    if (!update(ready, width, height, 0., true)) throw std::runtime_error("Founded save boundary failed.");
+    session_->request_save();
+  }
+  [[nodiscard]] const std::string &settlement_completion_smoke_status() const { return settlement_completion_proof_; }
+
   void prepare_settlement_preparation_smoke(int width,int height,
       const std::function<void()> &pump,
       const std::function<void(std::string_view)> &capture){
@@ -4351,7 +4540,7 @@ class NativeCampaign final {
     };
     for(const auto &event:input.events){
       if(session_->new_campaign_pending()) break;
-      if(event.type==InputEventType::PointerCancelled){(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
+      if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
       if(video_settings_&&video_settings_->visible()){
         notification_view_.close();
         (void)video_settings_->handle(event,width,height);
@@ -5935,7 +6124,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   [[nodiscard]] bool inspection_visible()const noexcept {
     return inspection_card_.visible()&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_&&!system_workspace_.visible()&&
@@ -6184,6 +6373,7 @@ class NativeCampaign final {
   bool smoke_system_travel_reload_{},smoke_system_travel_selected_{},smoke_system_travel_canonical_moved_{},smoke_system_travel_rendered_moved_{},smoke_system_travel_paused_stable_{},smoke_system_travel_pause_retained_{},smoke_system_travel_known_opened_{},smoke_system_travel_unknown_denied_{},smoke_system_travel_knowledge_unchanged_{},smoke_system_travel_lanes_connected_{};
   bool smoke_colony_reload_{},smoke_colony_selected_{},smoke_colony_opened_{},smoke_colony_back_{},smoke_colony_pause_retained_{},smoke_colony_speed_retained_{};
   double smoke_colony_day_{};
+  std::string settlement_completion_proof_;
   bool smoke_settlement_mode_{},smoke_settlement_reload_{},smoke_settlement_selected_{},smoke_settlement_previewed_{},smoke_settlement_accepted_{};
   bool smoke_settlement_cancelled_{},smoke_settlement_cancel_no_charge_{},smoke_settlement_requires_authorization_{},smoke_settlement_no_instant_colony_{};
   std::optional<int> smoke_settlement_fleet_id_,smoke_settlement_system_id_,smoke_settlement_body_id_;
@@ -6354,6 +6544,10 @@ int main(int argc,char **argv){
             *options.first_exploration_mode,
             [&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("First exploration window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
             [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="departure"?L"-departure":L"-arrival"));});
+      else if(options.settlement_completion_mode)
+        campaign.prepare_settlement_completion_smoke(window.drawable_width(),window.drawable_height(),*options.settlement_completion_mode,
+            [&]{audio.service();auto progress=window.poll();if(!campaign.update(progress,progress.drawable_width,progress.drawable_height,0.,false))throw std::runtime_error("Settlement completion window closed.");if(progress.renderable())window.draw(campaign.scene(progress.drawable_width,progress.drawable_height));},
+            [&]{window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,L"-establishment"));});
       else if(options.settlement_preparation_smoke)
         campaign.prepare_settlement_preparation_smoke(window.drawable_width(),window.drawable_height(),
             [&]{audio.service();auto progress=window.poll();if(!campaign.update(progress,progress.drawable_width,progress.drawable_height,0.,false))throw std::runtime_error("Settlement review window closed.");if(progress.renderable())window.draw(campaign.scene(progress.drawable_width,progress.drawable_height));},
@@ -6723,6 +6917,8 @@ int main(int argc,char **argv){
           std::cout<<"fresh_progression="<<campaign.fresh_progression_smoke_status()<<'\n';
         if(options.first_exploration_mode)
           std::cout<<"first_exploration="<<campaign.first_exploration_smoke_status()<<'\n';
+        if(options.settlement_completion_mode)
+          std::cout<<"settlement_completion="<<campaign.settlement_completion_smoke_status()<<'\n';
         if(options.settlement_preparation_smoke)
           std::cout<<"settlement_preparation="<<campaign.settlement_preparation_smoke_status()<<'\n';
         if(options.first_survey_mode)

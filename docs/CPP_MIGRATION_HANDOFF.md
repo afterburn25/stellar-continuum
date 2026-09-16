@@ -5,6 +5,32 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Earned settlement establishment
+
+The maintained no-grant seed-115501 continuation starts from the completed
+science survey at day 6587.15625, visits systems 2, 3 and 8, fully surveys Ross
+154, and selects viable Xanthe body 8004. Paid canonical shipbuilding produces
+colony vessel 2 with 250M passengers at day 6725.765625; Core establishes
+colony 9 at day 6762.421875 and consumes the vessel. The graphical 720p order
+reviews a real quote for 120 simulation budget units ($1.2B UED), cancels
+without charge, then confirms normally. Latest graphical run: day 6726.7884387
+to 6762.4134387 in 2280 Normal 1/64-day steps; paused 1080p reload preserves
+the state except `SavedAtUtc`. Timer 5/30, colony entry and normal feedback were
+inspected. A prior 2282-step proof also passed; the difference is normal clock
+fractional variation.
+
+The rebuilt MSVC run and all 10 focused CTests pass. Python final validation
+reports 577 checks (560 pass, 17 optional skips). The maintained earned wrapper,
+navigation, system, preparation and authored ordering checks pass, as do four
+CLI cases. The next milestone is the first paid Xanthe surface
+module through canonical build timers and save/reload, with no grants or Core,
+C#, Player17 or approved-art changes. The package remains unsealed.
+
+Contract and evidence: `engine/NATIVE_EARNED_SETTLEMENT.md` and
+`work/native-earned-settlement-export.json`. Continue from
+`work/native-audio-validation/package-settlement-founded-1920x1080.player17.json`
+(player 0, system 8, body 8004, colony 9, 250M settlers, no surface modules).
+
 ### Settlement preparation review
 
 Read-only preparation now follows the earned full survey for non-owned Ilyra
@@ -22,8 +48,8 @@ final navigation, system, shipyard and four-process earned-survey regressions
 passed, including malformed CLI coverage. Evidence is in
 `work/native-settlement-preparation-{build-final,ctest,python,runtime}.log`
 and `-runtime.json`. The reviewed site is too harsh and has no rare deposit.
-Next: earn a viable site through exploration/science, then build, dispatch and
-establish a populated settlement with save/reload; never fabricate eligibility.
+Historical prior blocked step: earning a viable site and establishing it is now
+resolved by the earned settlement checkpoint above; never fabricate eligibility.
 
 ### First earned science survey
 

@@ -39,17 +39,39 @@ SettlementWorkspaceLayout SettlementWorkspaceLayout::for_viewport(int width,int 
   return {scale,static_cast<int>(std::lround(23.f*scale)),static_cast<int>(std::lround(16.f*scale)),static_cast<int>(std::lround(13.f*scale)),{0,0,w,h},panel_rect,{panel_rect.x+panel_rect.width-button_w-18.f*scale,bottom,button_w,button_h},{panel_rect.x+18.f*scale,bottom,button_w,button_h}};
 }
 
-void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){preview_=std::move(value);}
-void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};}
+void NativeSettlementWorkspace::reset_gesture() noexcept { pointer_owned_=false; pressed_=PressTarget::None; press_width_=press_height_=0; }
+void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();preview_=std::move(value);}
+void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};reset_gesture();}
 
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};
   pointer_=event.position;
   if(event.type==InputEventType::EscapePressed){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
   const auto layout=SettlementWorkspaceLayout::for_viewport(width,height);
+  if(event.type==InputEventType::PointerCancelled){reset_gesture();return {SettlementWorkspaceCommandKind::None,true};}
+  if(pointer_owned_&&(width!=press_width_||height!=press_height_)){reset_gesture();}
   if(event.type==InputEventType::LeftPressed){
-    if(layout.cancel.contains(event.position)){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
-    if(layout.confirm.contains(event.position)&&preview_->accepted)return {SettlementWorkspaceCommandKind::Confirm,true};
+    if(!layout.panel.contains(event.position))return {SettlementWorkspaceCommandKind::None,true};
+    pointer_owned_=true;press_width_=width;press_height_=height;
+    pressed_=layout.cancel.contains(event.position)?PressTarget::Cancel:
+             (layout.confirm.contains(event.position)&&preview_->accepted?PressTarget::Confirm:PressTarget::None);
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
+  if(event.type==InputEventType::PointerMove){
+    if(pointer_owned_ && pressed_==PressTarget::Confirm && !layout.confirm.contains(event.position)) pressed_=PressTarget::None;
+    if(pointer_owned_ && pressed_==PressTarget::Cancel && !layout.cancel.contains(event.position)) pressed_=PressTarget::None;
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
+  if(event.type==InputEventType::LeftReleased){
+    const bool captured=true;
+    const auto target=pressed_;
+    const bool activate=pointer_owned_&&target!=PressTarget::None&&
+      ((target==PressTarget::Cancel&&layout.cancel.contains(event.position))||
+       (target==PressTarget::Confirm&&preview_->accepted&&layout.confirm.contains(event.position)));
+    reset_gesture();
+    if(!activate)return {SettlementWorkspaceCommandKind::None,captured};
+    if(target==PressTarget::Cancel){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
+    return {SettlementWorkspaceCommandKind::Confirm,true};
   }
   return {SettlementWorkspaceCommandKind::None,true};
 }

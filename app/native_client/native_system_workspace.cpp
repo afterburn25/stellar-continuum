@@ -96,6 +96,18 @@ void NativeSystemWorkspace::set_settlement_preparation(std::optional<stellar::na
       value->system_id!=snapshot_->system_id||value->body_id!=selected_body_id_))value.reset();
   preparation_=std::move(value);sync_body_inspection();
 }
+void NativeSystemWorkspace::set_settlement_status(std::optional<NativeSystemSettlementStatus> value){
+  if(value==settlement_status_)return;
+  const auto applies=[&](const std::optional<NativeSystemSettlementStatus>&status){
+    return status&&snapshot_&&selected_body_id_&&
+      snapshot_->survey_level==SystemSurveyLevel::fully_surveyed&&
+      status->destination_body_id==selected_body_id_&&
+      (!status->destination_system_id||*status->destination_system_id==snapshot_->system_id);
+  };
+  const bool relevant=applies(settlement_status_)||applies(value);
+  settlement_status_=std::move(value);
+  if(relevant)sync_body_inspection();
+}
 void NativeSystemWorkspace::set_notice(std::string value){notice_=std::move(value);}
 void NativeSystemWorkspace::close()noexcept{preparation_.reset();preparation_pressed_=false;celestial_appearance_.cancel_preparation();artwork_ready_=true;body_inspection_.clear();snapshot_.reset();spatial_.reset();viewport_.reset();selected_body_id_.reset();colony_body_id_.reset();clear_travel();dragging_=false;pending_initial_travel_fit_=false;width_=height_=0;}
 void NativeSystemWorkspace::discard_campaign()noexcept{close();celestial_appearance_.clear();}
@@ -198,6 +210,17 @@ void NativeSystemWorkspace::sync_body_inspection(){
     inspection->sections.push_back({"BEFORE COMMITTING",{{"Treasury",v.formatted_treasury},
       {"Timing","Supply and funding can delay completion"},
       {"Mission","Select a populated vessel and right-click a surveyed world. Route, occupancy, reservations and funds are checked before confirmation."}}});
+  }
+  if(inspection&&settlement_status_&&snapshot_->survey_level==SystemSurveyLevel::fully_surveyed&&
+     settlement_status_->destination_body_id==selected_body_id_&&
+     (!settlement_status_->destination_system_id||*settlement_status_->destination_system_id==snapshot_->system_id)){
+    const auto& status=*settlement_status_;
+    inspection->sections.insert(inspection->sections.begin(),{"SETTLEMENT IN PROGRESS",{
+      {"Status",status.status},
+      {"Establishment",number(status.settlement_days_completed,1)+" / "+number(status.establishment_days,1)+" days"},
+      {"Next step","Keep the expedition supplied while establishment completes."}
+    }});
+    if(preparation_&&!inspection->sections.empty())for(auto&section:inspection->sections)if(section.heading=="SETTLEMENT ASSESSMENT")for(auto&fact:section.facts)if(fact.label=="Next step")fact.value="Settlement expedition is establishing this body.";
   }
   body_inspection_.set_inspection(std::move(inspection));
 }

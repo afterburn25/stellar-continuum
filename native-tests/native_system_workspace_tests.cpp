@@ -32,6 +32,7 @@ bool same_camera(const SystemSpatialViewport&a,const SystemSpatialViewport&b){re
 bool overlaps(UiRect left,UiRect right){return left.x<right.x+right.width&&left.x+left.width>right.x&&left.y<right.y+right.height&&left.y+left.height>right.y;}
 std::vector<UiRect> visible_body_label_bounds(const DrawList&draw,const NativeSystemSnapshot&snapshot){std::vector<UiRect> result;for(const auto&item:draw.world){const auto*label=std::get_if<Text>(&item);if(!label||std::ranges::none_of(snapshot.bodies,[&](const auto&body){return body.name==label->value;}))continue;result.push_back({label->at.x,label->at.y,static_cast<float>(label->value.size()*7u),14.f});}return result;}
 bool has_body_label(const DrawList&draw,const std::string&value){return std::ranges::any_of(draw.world,[&](const WorldCommand&item){const auto*label=std::get_if<Text>(&item);return label&&label->value==value;});}
+bool has_overlay_text(const DrawList&draw,const std::string&value){return std::ranges::any_of(draw.overlay,[&](const UiOverlayCommand&item){const auto*label=std::get_if<Text>(&item);return label&&label->value.find(value)!=std::string::npos;});}
 bool has_central_star(const DrawList&draw,const SystemSpatialViewport&camera,Color color){return std::ranges::any_of(draw.world,[&](const WorldCommand&item){const auto*circle=std::get_if<Circle>(&item);return circle&&std::abs(circle->center.x-camera.center_x)<.001f&&std::abs(circle->center.y-camera.center_y)<.001f&&circle->color.r==color.r&&circle->color.g==color.g&&circle->color.b==color.b&&circle->color.a==color.a;});}
 bool has_central_stellar_image(const DrawList&draw,const SystemSpatialViewport&camera){return std::ranges::any_of(draw.world,[&](const WorldCommand&item){const auto*image=std::get_if<Image>(&item);return image&&image->resource&&image->resource->width()==NativeCelestialAppearanceRenderer::stellar_texture_size&&std::abs(image->destination.x+image->destination.width*.5f-camera.center_x)<.001f&&std::abs(image->destination.y+image->destination.height*.5f-camera.center_y)<.001f;});}
 }
@@ -51,8 +52,33 @@ int main(int argc,char**argv)try{
   preparation.player_civilization_id=reference.observer_civilization_id;
   preparation.system_id=reference.system_id;preparation.body_id=earth_body_id;
   preparation.species_id="terran_baseline";preparation.species_name="Humans";
+  preparation.suitability.can_found_current_colony=true;
   preparation_ui.set_settlement_preparation(preparation);
   require(preparation_ui.settlement_preparation().has_value(),"admitted preparation was rejected");
+  DrawList status_draw;preparation_ui.render(status_draw,1280,720);
+  require(!has_overlay_text(status_draw,"SETTLEMENT IN PROGRESS"),"missing settlement status appeared in the body inspector");
+  preparation_ui.set_settlement_status(NativeSystemSettlementStatus{91,"Establishing colony",std::optional<int>{reference.system_id},std::optional<int>{earth_body_id+1},4.,30.});
+  status_draw={};preparation_ui.render(status_draw,1280,720);
+  require(!has_overlay_text(status_draw,"SETTLEMENT IN PROGRESS"),"other-body settlement status leaked into selected body inspector");
+  preparation_ui.set_settlement_status(NativeSystemSettlementStatus{91,"Establishing colony",std::nullopt,std::optional<int>{earth_body_id},7.5,30.});
+  status_draw={};preparation_ui.render(status_draw,1280,720);
+  require(has_overlay_text(status_draw,"SETTLEMENT IN PROGRESS")&&has_overlay_text(status_draw,"7.5 / 30.0 days")&&!has_overlay_text(status_draw,"Prepare a colony vessel"),"matched owned settlement status did not show timed progress or suppress stale readiness guidance");
+  const auto status_panel=SystemWorkspaceLayout::for_viewport(1280,720).inspector;
+  bool current_guidance{};
+  for(int step=0;step<128&&!current_guidance;++step){
+    status_draw={};preparation_ui.render(status_draw,1280,720);
+    current_guidance=has_overlay_text(status_draw,"Settlement expedition is establishing this body.");
+    require(!has_overlay_text(status_draw,"Prepare a colony vessel"),"active expedition retained stale vessel preparation guidance");
+    if(!current_guidance)(void)preparation_ui.handle({InputEventType::Wheel,center(status_panel),{},-1},1280,720);
+  }
+  require(current_guidance,"settlement status did not replace the readiness next step after scrolling to that section");
+  (void)preparation_ui.handle({InputEventType::Wheel,center(status_panel),{},1000},1280,720);
+  preparation_ui.set_settlement_status(NativeSystemSettlementStatus{91,"Establishing colony",std::nullopt,std::optional<int>{earth_body_id},9.,30.});
+  status_draw={};preparation_ui.render(status_draw,1280,720);
+  require(has_overlay_text(status_draw,"9.0 / 30.0 days"),"settlement progress refresh did not update the exact selected body");
+  preparation_ui.set_settlement_status(std::nullopt);
+  status_draw={};preparation_ui.render(status_draw,1280,720);
+  require(!has_overlay_text(status_draw,"SETTLEMENT IN PROGRESS")&&has_overlay_text(status_draw,"Prepare a colony vessel"),"clearing settlement status did not restore readiness guidance");
   for(const auto [w,h]:std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}){
     const auto panel=SystemWorkspaceLayout::for_viewport(w,h);
     DrawList scene;preparation_ui.render(scene,w,h);

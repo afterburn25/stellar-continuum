@@ -27,6 +27,7 @@ class NativeSettlementWorkspace final {
 public:
   void set_preview(stellar::native_colony::NativeSettlementTargetPreview);
   void clear() noexcept;
+  void cancel_pending_input() noexcept { reset_gesture(); }
   void discard_campaign() noexcept { clear(); }
   [[nodiscard]] bool visible() const noexcept { return preview_.has_value(); }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeSettlementTargetPreview>& preview() const noexcept { return preview_; }
@@ -34,8 +35,13 @@ public:
       const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
 private:
+  enum class PressTarget { None, Confirm, Cancel };
+  void reset_gesture() noexcept;
   std::optional<stellar::native_colony::NativeSettlementTargetPreview> preview_;
   stellar::native_map::Point pointer_{};
+  bool pointer_owned_{};
+  PressTarget pressed_{PressTarget::None};
+  int press_width_{}, press_height_{};
 };
 
 } // namespace stellar::native_colony_ui

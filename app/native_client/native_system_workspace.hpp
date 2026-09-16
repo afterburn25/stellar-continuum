@@ -47,6 +47,7 @@ struct NativeSystemSettlementStatus {
   std::string status;
   std::optional<int> destination_system_id, destination_body_id;
   double settlement_days_completed{}, establishment_days{};
+  bool operator==(const NativeSystemSettlementStatus &) const = default;
 };
 struct SystemWorkspaceLayout {
   stellar::native_map::UiRect controls_row;
@@ -71,9 +72,7 @@ public:
   void set_colony_body(std::optional<int>) noexcept;
   void set_settlement_preparation(std::optional<stellar::native_settlement_preparation::View>);
   [[nodiscard]] const auto &settlement_preparation() const noexcept { return preparation_; }
-  void set_settlement_status(std::optional<NativeSystemSettlementStatus> value) {
-    settlement_status_ = std::move(value);
-  }
+  void set_settlement_status(std::optional<NativeSystemSettlementStatus> value);
   void set_notice(std::string);
   void close() noexcept;
   void discard_campaign() noexcept;

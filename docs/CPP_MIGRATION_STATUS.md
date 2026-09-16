@@ -16,6 +16,26 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
+### Earned settlement establishment
+
+The no-grant seed-115501 continuation from the full survey at day 6587.15625
+visited systems 2, 3 and 8, fully surveyed Ross 154 and selected viable Xanthe
+body 8004. Paid canonical shipbuilding produced colony vessel 2 with 250M
+passengers at day 6725.765625; Core founded colony 9 at day 6762.421875 and
+consumed the vessel. The 720p UI reviewed and cancelled a real quote for 120
+simulation budget units ($1.2B UED) without charge before confirming. Latest
+graphical run: day 6726.7884387 to 6762.4134387 in 2280 Normal 1/64-day steps;
+paused 1080p reload matches except `SavedAtUtc`. Timer 5/30, colony entry and
+normal feedback were inspected. A prior 2282-step proof also passed; the
+difference is normal clock fractional variation.
+
+The rebuilt MSVC run and all 10 focused CTests pass. Python final validation
+reports 577 checks (560 pass, 17 optional skips). The maintained earned wrapper,
+navigation, system, preparation and authored ordering checks pass, as do four
+CLI cases. Next: establish the first paid Xanthe surface module
+through canonical build timers and save/reload, without grants or Core, C#,
+Player17 or approved-art changes. The package is unsealed.
+
 ### Settlement preparation review
 
 The earned full-survey save now drives a read-only preparation review for

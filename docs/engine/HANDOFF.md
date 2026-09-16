@@ -1,5 +1,25 @@
 # Stellar Engine migration handoff
 
+### Earned settlement establishment (2026-09-16)
+
+The maintained seed-115501 continuation starts at the completed science survey
+(day 6587.15625), visits systems 2, 3 and 8, fully surveys Ross 154 and selects
+viable Xanthe body 8004. Paid canonical shipbuilding produces colony vessel 2
+with 250M passengers at day 6725.765625; colony 9 is founded at day 6762.421875
+and the vessel is consumed. The 720p graphical order reviews/cancels a real
+quote for 120 simulation budget units ($1.2B UED) without charge, then confirms.
+Latest graphical run: day 6726.7884387 to 6762.4134387 in 2280 Normal 1/64-day
+steps; paused 1080p reload matches except `SavedAtUtc`. The 5/30 timer, colony
+entry and normal feedback were inspected. A prior 2282-step proof also passed;
+the difference is normal clock fractional variation.
+
+The rebuilt MSVC run and all 10 focused CTests pass. Python final validation
+reports 577 checks (560 pass, 17 optional skips). The maintained earned wrapper,
+navigation, system, preparation and authored ordering checks pass, as do four
+CLI cases.
+Next is the first paid Xanthe surface module through canonical build timers and
+save/reload, with no grants or Core/C#/Player17/approved-art changes.
+
 ### Settlement preparation review (2026-09-16)
 
 The earned full-survey Player17 save now supports a read-only preparation view
@@ -18,9 +38,9 @@ skips), final navigation, system, shipyard and four-process earned-survey
 regressions passed, including malformed CLI coverage. See
 `NATIVE_SETTLEMENT_PREPARATION_UI.md` and
 `work/native-settlement-preparation-runtime.json`. The inspected site is too
-harsh and has no rare deposit. Next: use earned exploration/science to find a
-viable site, then build, dispatch, establish and save/reload an actual populated
-settlement without fabricated eligibility.
+harsh and has no rare deposit. Historical prior blocked step: earning a viable
+site and establishing it is now resolved by the earned settlement checkpoint
+above; never fabricate eligibility.
 
 ### First earned science survey
 
