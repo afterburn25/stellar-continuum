@@ -1,5 +1,36 @@
 # Stellar Engine migration status
 
+First earned scout exploration checkpoint (2026-09-16):
+
+The fresh seed-115501 scout now receives its first direct Sol-to-Proxima order
+through native outliner selection, Locate, map zoom/drag, right-click preview and
+Confirm. Core starts departure on the next step; acceptance alone is not motion.
+The replay observes departure, partial warp, local arrival and automatic two-work-
+day reconnaissance. The only order raises mission revision 0 to 1; resuming
+never reissues it. Day 6568.5 reaches partial warp at 6569.34375 (54 exact 1/64-day
+steps), then reconnaissance completes at 6572.359375 (193 further steps), with
+survey knowledge advancing from detected/0 to partial/0.35.
+
+Owned scout feedback now shows local work, Hold status, completion and the next
+science-survey decision. Review found that a consumed fleet-button release left
+the map gesture captured: releasing the UI gesture now restores immediate wheel
+zoom after Locate. The replay asserts real zoom and exact scout selection.
+Validation: final MSVC build; 8 affected CTests; Python 532 checks (515 pass,
+17 optional executable skips). The relocated four-process Vulkan journey passes
+at 720p/1080p, preserving the complete Player17 payload across both paused reloads
+except SavedAtUtc. Six exact-dimension captures and four distinct saves are
+retained; departure, arrival and completed scout feedback were inspected. Existing
+navigation, fleet, local-system travel and fresh first-ships graphical regressions
+pass. Missing load, wrong seed and conflicting modes exit nonzero in the terminal.
+Evidence: work/native-first-exploration-{build-final,ctest-final,python,runtime,
+regressions,cli}.log and work/native-first-exploration-{runtime,regressions}.json.
+The shared base and Devin head remain ac45d958 / b023e384.
+
+No Core, C#, Player17 schema or approved-art changes. Contract:
+`NATIVE_FIRST_EXPLORATION_UI.md`. PR332 remains unmerged, and the local
+package remains UNSEALED. Next: extend this earned campaign through the science
+vessel's full survey, including actionable discoveries and save/recovery.
+
 First-ships graphical checkpoint (2026-09-16): the no-grant seed-115501 native
 replay passes the MSVC build, 13 affected CTests and Python 516 (499 pass / 17
 optional executable skips). Normal input reaches day 6568.5 after 26,274

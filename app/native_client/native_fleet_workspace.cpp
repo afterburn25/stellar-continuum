@@ -579,6 +579,32 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     } else if (fleet->destination_system_id) {
       route = "TRAVEL STATUS\nTravel order active\nTransit progress " +
               number(fleet->transit_progress * 100., 1) + "%";
+    } else if (fleet->reconnaissance) {
+      const auto &reconnaissance = *fleet->reconnaissance;
+      if (reconnaissance.completed) {
+        route = reconnaissance.fully_surveyed
+                    ? "RECONNAISSANCE\nRapid reconnaissance complete\nSystem fully surveyed"
+                    : "RECONNAISSANCE\nRapid reconnaissance complete\nSend a science vessel for a full survey.";
+      } else {
+        route = "RECONNAISSANCE\n" +
+                std::string(reconnaissance.held ? "Held; work paused\nWork "
+                                                : "Local work\nWork ") +
+                number(reconnaissance.days_completed, 1) + " / " +
+                number(reconnaissance.required_days, 1) + " work-days";
+        const auto progress = reconnaissance.required_days > 0.
+                                  ? std::clamp(reconnaissance.days_completed /
+                                                   reconnaissance.required_days,
+                                               0., 1.)
+                                  : 0.;
+        const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
+                             7.f * layout.scale,
+                         layout.route.width, 4.f * layout.scale};
+        fill(out, bar, row_color);
+        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(progress),
+                   bar.height},
+             reconnaissance.held ? muted : own_color);
+        stroke(out, bar, border_color);
+      }
     } else {
       route = "ROUTE PREVIEW\nRight-click a system to preview travel.";
     }

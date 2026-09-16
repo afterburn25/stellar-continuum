@@ -64,6 +64,18 @@ struct NativeFleetLocateOutcome {
   stellar::core::Vec2 position{};
 };
 
+// Read-only evidence of the automatic local reconnaissance performed by a
+// stationed scout. This deliberately carries no system identity: the fleet's
+// own current system is the only authorized context for the presentation.
+struct NativeScoutReconnaissanceStatus {
+  double days_completed{};
+  double required_days{};
+  bool held{};
+  bool completed{};
+  bool fully_surveyed{};
+  bool operator==(const NativeScoutReconnaissanceStatus &) const = default;
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -85,6 +97,7 @@ struct NativeOwnFleet {
   std::optional<NativeCivilianRecoveryQuote> recovery;
   std::optional<NativeMilitaryOrderQuote> military_order_quote;
   std::optional<NativeFleetLocateQuote> locate;
+  std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
   std::string recovery_message;
 };
 

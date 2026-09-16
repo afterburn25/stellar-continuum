@@ -191,6 +191,45 @@ int main() try {
               confirm.kind == FleetWorkspaceCommandKind::Confirm,
           "Explicit travel confirmation was not routed.");
 
+  NativeFleetWorkspace reconnaissance;
+  auto recon_view = player_view(true);
+  recon_view.own_fleets.front().reconnaissance = NativeScoutReconnaissanceStatus{
+      1., 2., false, false, false};
+  reconnaissance.set_view(recon_view);
+  DrawList recon_draw;
+  reconnaissance.render(recon_draw, 1280, 720, markers);
+  require(has_text(recon_draw, "RECONNAISSANCE") &&
+              has_text(recon_draw, "Work 1.0 / 2.0 work-days") &&
+              !has_text(recon_draw, "Right-click a system"),
+          "Local scout work did not replace idle travel guidance.");
+  const auto progress_bar = std::ranges::find_if(recon_draw.overlay, [&](const auto &command) {
+    const auto *fill = std::get_if<FilledRectangle>(&command);
+    return fill && fill->bounds.height == 4.f && contained(layout.route, fill->bounds);
+  });
+  require(progress_bar != recon_draw.overlay.end(),
+          "Reconnaissance progress bar escaped the fixed 720p route area.");
+  recon_view.own_fleets.front().reconnaissance->held = true;
+  reconnaissance.set_view(recon_view);
+  DrawList held_recon_draw;
+  reconnaissance.render(held_recon_draw, 1280, 720, markers);
+  require(has_text(held_recon_draw, "Held; work paused"),
+          "Held scout work did not explain its paused state.");
+  recon_view.own_fleets.front().reconnaissance = NativeScoutReconnaissanceStatus{
+      2., 2., false, true, false};
+  reconnaissance.set_view(recon_view);
+  DrawList completed_recon_draw;
+  reconnaissance.render(completed_recon_draw, 1280, 720, markers);
+  require(has_text(completed_recon_draw, "Rapid reconnaissance complete") &&
+              has_text(completed_recon_draw, "Send a science vessel for a full survey"),
+          "Completed reconnaissance omitted its science-survey next step.");
+  recon_view.own_fleets.front().reconnaissance->fully_surveyed = true;
+  reconnaissance.set_view(recon_view);
+  DrawList fully_surveyed_draw;
+  reconnaissance.render(fully_surveyed_draw, 1280, 720, markers);
+  require(has_text(fully_surveyed_draw, "System fully surveyed") &&
+              !has_text(fully_surveyed_draw, "Send a science vessel"),
+          "Fully surveyed system encouraged redundant science work.");
+
   NativeFleetWorkspace engagement;
   auto armed = player_view(true);
   auto &warship = armed.own_fleets.front();

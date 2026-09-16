@@ -99,6 +99,32 @@ struct PlayerContext {
   return distance_light_years / speed;
 }
 
+[[nodiscard]] std::optional<NativeScoutReconnaissanceStatus>
+scout_reconnaissance(const PlayerContext &player, const FleetState &fleet) {
+  if (fleet.role != FleetRole::Scout || !fleet.current_system_id ||
+      fleet.transit_phase != FleetTransitPhase::None ||
+      fleet.destination_system_id)
+    return std::nullopt;
+
+  const auto system_id = *fleet.current_system_id;
+  const auto level = player.world.knowledge.system_survey_level(
+      player.player_id, system_id);
+  const bool recorded_here = fleet.reconnaissance_system_id == system_id;
+  if (level < SystemSurveyLevel::partially_surveyed) {
+    return NativeScoutReconnaissanceStatus{
+        recorded_here ? fleet.reconnaissance_days_completed : 0.,
+        ExplorationSimulation::scout_reconnaissance_days, fleet.hold_requested,
+        false, false};
+  }
+  // Knowledge alone does not establish that this scout completed it. Retain a
+  // completion only when the fleet's canonical recorder identifies this system.
+  if (!recorded_here) return std::nullopt;
+  return NativeScoutReconnaissanceStatus{
+      fleet.reconnaissance_days_completed,
+      ExplorationSimulation::scout_reconnaissance_days, fleet.hold_requested,
+      true, level >= SystemSurveyLevel::fully_surveyed};
+}
+
 } // namespace
 
 void NativeFleetController::require_owner() const {
@@ -156,6 +182,7 @@ NativeFleetMapView NativeFleetController::build(
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
+    item.reconnaissance = scout_reconnaissance(player, fleet);
     result.own_fleets.push_back(std::move(item));
   }
   std::ranges::sort(result.own_fleets, {}, &NativeOwnFleet::id);

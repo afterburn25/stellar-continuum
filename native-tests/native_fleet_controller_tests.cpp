@@ -66,6 +66,85 @@ void write(const fs::path &path, std::string_view value) {
                        CampaignFramePolicy::Player);
 }
 
+void reconnaissance_projection(CampaignFrame &frame) {
+  NativeFleetController controller;
+  constexpr std::uint64_t generation = 73;
+  auto initial = controller.build(frame, generation);
+  auto &world = frame.runtime().world().campaign();
+  const auto scout_row = std::ranges::find_if(initial.own_fleets, [](const auto &fleet) {
+    return fleet.role == FleetRole::Scout;
+  });
+  require(scout_row != initial.own_fleets.end(), "Authored fixture lacks a scout for reconnaissance projection.");
+  auto scout = std::ranges::find(world.fleets, scout_row->id, &FleetState::id);
+  require(scout != world.fleets.end(), "Reconnaissance scout disappeared.");
+  const auto system = std::ranges::find_if(world.systems, [&](const auto &candidate) {
+    return world.knowledge.system_survey_level(world.player_civilization_id, candidate.id) <
+           SystemSurveyLevel::partially_surveyed;
+  });
+  require(system != world.systems.end(), "Fixture lacks a reconnaissance-grade system.");
+  const auto original = *scout;
+  scout->current_system_id = system->id;
+  scout->destination_system_id.reset();
+  scout->transit_phase = FleetTransitPhase::None;
+  scout->hold_requested = false;
+  scout->reconnaissance_system_id = system->id;
+  scout->reconnaissance_days_completed = 1.;
+  const auto work = controller.build(frame, generation);
+  const auto work_row = std::ranges::find(work.own_fleets, scout->id, &NativeOwnFleet::id);
+  require(work_row != work.own_fleets.end() && work_row->reconnaissance &&
+              !work_row->reconnaissance->completed &&
+              work_row->reconnaissance->days_completed == 1. &&
+              work_row->reconnaissance->required_days == ExplorationSimulation::scout_reconnaissance_days,
+          "Stationed scout did not project canonical local reconnaissance work.");
+  require(scout->reconnaissance_system_id == system->id &&
+              scout->reconnaissance_days_completed == 1.,
+          "Read-only reconnaissance projection mutated authoritative fleet work.");
+  scout->hold_requested = true;
+  const auto held = controller.build(frame, generation);
+  const auto held_row = std::ranges::find(held.own_fleets, scout->id, &NativeOwnFleet::id);
+  require(held_row != held.own_fleets.end() && held_row->reconnaissance &&
+              held_row->reconnaissance->held,
+          "Held reconnaissance did not retain the fleet's canonical hold state.");
+  scout->transit_phase = FleetTransitPhase::LocalDeparture;
+  const auto departing = controller.build(frame, generation);
+  require(!std::ranges::find(departing.own_fleets, scout->id,
+                             &NativeOwnFleet::id)->reconnaissance,
+          "Moving scout exposed local reconnaissance work.");
+  scout->transit_phase = FleetTransitPhase::None;
+  scout->destination_system_id = system->id;
+  const auto travelling = controller.build(frame, generation);
+  require(!std::ranges::find(travelling.own_fleets, scout->id,
+                             &NativeOwnFleet::id)->reconnaissance,
+          "Travelling scout exposed local reconnaissance work.");
+  scout->destination_system_id.reset();
+  scout->civilization_id = world.player_civilization_id + 1;
+  const auto foreign = controller.build(frame, generation);
+  require(std::ranges::find(foreign.own_fleets, scout->id, &NativeOwnFleet::id) ==
+              foreign.own_fleets.end(),
+          "Foreign scout reconnaissance was exposed to the player.");
+  scout->civilization_id = world.player_civilization_id;
+  world.knowledge.record_reconnaissance(world.player_civilization_id, system->id);
+  scout->reconnaissance_system_id.reset();
+  const auto known_elsewhere = controller.build(frame, generation);
+  require(!std::ranges::find(known_elsewhere.own_fleets, scout->id,
+                             &NativeOwnFleet::id)->reconnaissance,
+          "Known system without this scout's recorder exposed reconnaissance completion.");
+  scout->reconnaissance_system_id = system->id;
+  scout->reconnaissance_days_completed = ExplorationSimulation::scout_reconnaissance_days;
+  const auto complete = controller.build(frame, generation);
+  const auto complete_row = std::ranges::find(complete.own_fleets, scout->id, &NativeOwnFleet::id);
+  require(complete_row != complete.own_fleets.end() && complete_row->reconnaissance &&
+              complete_row->reconnaissance->completed && !complete_row->reconnaissance->fully_surveyed,
+          "Matching scout recorder did not project completed reconnaissance.");
+  world.knowledge.mark_system_fully_surveyed(world.player_civilization_id, system->id);
+  const auto surveyed = controller.build(frame, generation);
+  const auto surveyed_row = std::ranges::find(surveyed.own_fleets, scout->id, &NativeOwnFleet::id);
+  require(surveyed_row != surveyed.own_fleets.end() && surveyed_row->reconnaissance &&
+              surveyed_row->reconnaissance->fully_surveyed,
+          "Completed reconnaissance did not preserve full-survey knowledge.");
+  *scout = original;
+}
+
 void observer_and_commands(CampaignFrame &frame) {
   NativeFleetController controller;
   constexpr std::uint64_t generation = 11;
@@ -476,6 +555,9 @@ int main(int argc, char **argv) try {
         "Usage: native_fleet_controller_tests <research-root> <catalog> <Player17-fixture> <scratch>");
   auto frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                             fs::absolute(argv[4]));
+  auto reconnaissance_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
+                                           fs::absolute(argv[4]));
+  reconnaissance_projection(reconnaissance_frame);
   observer_and_commands(frame);
   auto recovery_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                                     fs::absolute(argv[4]));
