@@ -95,6 +95,15 @@ class Window final {
   Window &operator=(const Window &) = delete;
   [[nodiscard]] InputSnapshot poll();
   void set_text_input(bool enabled);
+  // Runtime display settings (the reference VideoSettingsService port): vsync
+  // follows SDL_SetRenderVSync semantics (0 off, 1 on, -1 adaptive) and
+  // reports whether the driver accepted it; fullscreen(false) keeps the
+  // borderless desktop mode while fullscreen(true) switches to exclusive at
+  // the desktop display mode; frame_cap_hz throttles presents at or below
+  // the cap (<= 0 disables it).
+  bool set_vsync(int mode);
+  bool set_fullscreen(bool exclusive);
+  void set_frame_cap(double hz) noexcept;
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
             const std::optional<std::filesystem::path> &screenshot = std::nullopt);

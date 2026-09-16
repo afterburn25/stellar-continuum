@@ -151,6 +151,28 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   exports (the export previously shipped no voice catalogue, which disabled
   the pipeline and the settings persistence check in `--audio-smoke`).
 
+## Video settings
+
+- `app/native_client/native_video_settings.{hpp,cpp}` —
+  `NativeVideoSettingsView` ports the reference VIDEO panel
+  (MainMenuLayer.cs + VideoSettingsService): DISPLAY cycles borderless ↔
+  exclusive fullscreen (SDL `SDL_SetWindowFullscreenMode` at the desktop
+  mode), V-SYNC cycles Off/On/Adaptive (runtime `SDL_SetRenderVSync`), and
+  FRAME CAP cycles Automatic/60/120/144/Unlimited (present throttle in
+  `Window::draw`). Apply arms the reference's 15-second CONFIRM DISPLAY
+  rollback — Keep persists `video-settings.json` beside the save, Revert or
+  expiry restores the previous settings (the deadline ticks in
+  `NativeCampaign::update`). The reference's RESOLUTION row stays absent: it
+  is disabled upstream and its MSAA/3D-resolution rows only affect the
+  reference's 3D pipeline. `Window` gained `set_vsync`, `set_fullscreen` and
+  `set_frame_cap`; the vsync-unavailable refresh pacing fallback is retained
+  and composes with the cap. `--audio-smoke` exercises the view end to end
+  (`video_settings=1`) and the export validator requires it plus the
+  persisted file. `native-tests/native_video_settings_tests.cpp` covers
+  layout, persistence round-trip, choice cycles and the
+  apply/confirm/revert flow. `NativeCampaign` now holds `Window*` for
+  runtime display control.
+
 ## Hover route preview
 
 - With an owned fleet selected, `PointerMove` over a star drives

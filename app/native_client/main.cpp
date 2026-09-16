@@ -38,6 +38,7 @@
 #include "native_voice.hpp"
 #include "native_voice_bridge.hpp"
 #include "native_voice_playback.hpp"
+#include "native_video_settings.hpp"
 #include "native_voice_settings.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
@@ -101,6 +102,7 @@ namespace native_missions = stellar::native_missions;
 namespace native_notifications = stellar::native_notifications;
 namespace native_overview = stellar::native_overview;
 namespace native_support = stellar::native_support;
+namespace native_video_settings = stellar::native_video_settings;
 namespace native_voice = stellar::native_voice;
 namespace native_voice_settings = stellar::native_voice_settings;
 using namespace stellar::native_system;
@@ -361,9 +363,10 @@ struct ResearchStamp {
 
 class NativeCampaign final {
  public:
-  NativeCampaign(std::unique_ptr<NativeCampaignSession> session,int width,int height,
+  NativeCampaign(std::unique_ptr<NativeCampaignSession> session,Window &window,int width,int height,
                  const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer)
       : session_(std::move(session)),
+        window_(&window),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
@@ -374,6 +377,11 @@ class NativeCampaign final {
     if(audio_mixer_.load_assets(asset_root_))audio_device_.open(audio_mixer_);
     audio_mixer_.complete_startup_loading();
     initialize_voice();
+    // VideoSettingsService.LoadAndApply port: persisted display settings apply
+    // before the first presented frame.
+    video_settings_path_=session_->save_path().parent_path()/"video-settings.json";
+    video_settings_=native_video_settings::NativeVideoSettings::load(video_settings_path_);
+    apply_video_settings(video_settings_);
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
@@ -1541,6 +1549,26 @@ class NativeCampaign final {
     // Restore defaults so downstream voice evidence still synthesizes.
     apply_voice_settings(native_voice::NativeVoiceSettings{});
     smoke_voice_settings_=1;
+    // VIDEO parity: open the video settings view, cycle V-SYNC to Adaptive,
+    // Apply to arm the CONFIRM DISPLAY rollback, Keep to persist, then
+    // restore defaults so downstream pacing stays vsync-bound.
+    click(center(layout.video_button));
+    if(!video_settings_view_.visible())
+      throw std::runtime_error("Audio smoke could not open the video settings view.");
+    const auto video_layout=native_video_settings::VideoSettingsLayout::for_viewport(width,height);
+    click(center(video_layout.choice_buttons[1]));
+    click(center(video_layout.apply));
+    if(!video_settings_view_.confirming())
+      throw std::runtime_error("Audio smoke Apply did not arm the display rollback.");
+    click(center(video_layout.keep));
+    if(video_settings_view_.visible()||video_rollback_)
+      throw std::runtime_error("Audio smoke Keep did not commit the video settings.");
+    if(native_video_settings::NativeVideoSettings::load(video_settings_path_).vsync!=
+       native_video_settings::VideoVsync::Adaptive)
+      throw std::runtime_error("Audio smoke did not persist the video settings.");
+    apply_video_settings(native_video_settings::NativeVideoSettings{});
+    video_settings_.save(video_settings_path_);
+    smoke_video_settings_=1;
     // SUPPORT BUNDLE / F8 parity: the menu button exports while the menu is
     // open; F8 exports with the menu closed. Both land in the support dir.
     click(center(layout.support_button));
@@ -1590,6 +1618,7 @@ class NativeCampaign final {
        <<",\"settings\":"<<smoke_audio_settings_
        <<",\"support\":"<<smoke_audio_support_
        <<",\"voice_settings\":"<<smoke_voice_settings_
+       <<",\"video_settings\":"<<smoke_video_settings_
        <<",\"voice_pipeline\":"<<(voice_playback_?1:0)
        <<",\"voice_backend\":"
        <<json_string(voice_playback_?voice_playback_->backend_status():"none")
@@ -1794,6 +1823,9 @@ class NativeCampaign final {
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     pointer_=input.pointer;
+    // VideoSettingsService preview rollback: an unconfirmed display preview
+    // restores the previous settings once the 15s window lapses.
+    if(video_rollback_&&video_rollback_remaining()<=0.)revert_video_preview();
     const auto hovered_action=NativeUiLayout::for_viewport(width,height).hit(pointer_,menu_);
     if(hovered_action!=hovered_action_){if(hovered_action!=UiAction::None)audio_mixer_.play_hover();hovered_action_=hovered_action;}
     const auto timestamp=utc_timestamp();
@@ -1910,6 +1942,15 @@ class NativeCampaign final {
         else if(voice_result.command==VoiceCommand::Replay){if(voice_playback_)voice_playback_->replay_last();}
         else if(voice_result.command==VoiceCommand::Stop){if(voice_playback_)voice_playback_->stop();}
         else if(voice_result.command==VoiceCommand::Close){apply_voice_settings(voice_result.values);voice_settings_view_.close();}
+        continue;
+      }
+      if(menu_&&video_settings_view_.visible()){
+        const auto video_result=video_settings_view_.handle(event,width,height);
+        using VideoCommand=native_video_settings::VideoSettingsCommand;
+        if(video_result.command==VideoCommand::Apply)begin_video_preview(video_result.values);
+        else if(video_result.command==VideoCommand::Keep)keep_video_settings();
+        else if(video_result.command==VideoCommand::Revert)revert_video_preview();
+        else if(video_result.command==VideoCommand::Cancel){if(video_rollback_)revert_video_preview();video_settings_view_.close();}
         continue;
       }
       if(notification_view_.visible()&&!menu_){
@@ -2087,6 +2128,7 @@ class NativeCampaign final {
         else if(action==UiAction::NewGame)request_new_game();
         else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
         else if(action==UiAction::Voice){audio_settings_.close();voice_settings_view_.open(voice_settings_);}
+        else if(action==UiAction::Video){audio_settings_.close();voice_settings_view_.close();video_settings_view_.open(video_settings_);}
         else if(action==UiAction::Support)export_support_bundle();
         else if(action==UiAction::Exit)session_->request_exit();
         else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
@@ -2310,6 +2352,9 @@ class NativeCampaign final {
         audio_settings_.render(out, width, height);
       } else if (voice_settings_view_.visible()) {
         voice_settings_view_.render(out, width, height);
+      } else if (video_settings_view_.visible()) {
+        video_settings_view_.render(out, width, height,
+                                    video_rollback_remaining());
       } else {
       fill(out, layout.menu_panel, panel);
       stroke(out, layout.menu_panel, {116, 174, 225, 255});
@@ -2327,6 +2372,7 @@ class NativeCampaign final {
       draw_button(layout.new_game_button, "NEW GAME");
       draw_button(layout.audio_button, "AUDIO");
       draw_button(layout.voice_button, "VOICE");
+      draw_button(layout.video_button, "VIDEO");
       draw_button(layout.support_button, "SUPPORT BUNDLE");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
       }
@@ -3097,13 +3143,14 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();notification_view_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();video_settings_view_.close();notification_view_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;}
   std::unique_ptr<NativeCampaignSession> session_;
+  Window *window_{};
   Camera camera_;
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   NativeTerritoryOverlay territory_overlay_;
@@ -3139,6 +3186,62 @@ class NativeCampaign final {
     if(voice_playback_)voice_playback_->apply_settings(voice_settings_);
     audio_mixer_.set_dialogue_volume(voice_settings_.volume);
     if(!voice_settings_path_.empty())voice_settings_.save(voice_settings_path_);
+  }
+  // VideoSettingsService port: applies a display payload to the window. The
+  // reference's Apply → 15s CONFIRM DISPLAY → Keep/Revert rollback flow is
+  // driven by begin_video_preview/keep_video_settings/revert_video_preview.
+  native_video_settings::NativeVideoSettings video_settings_;
+  std::filesystem::path video_settings_path_;
+  native_video_settings::NativeVideoSettingsView video_settings_view_;
+  struct VideoRollback {
+    native_video_settings::NativeVideoSettings previous;
+    std::chrono::steady_clock::time_point deadline;
+  };
+  std::optional<VideoRollback> video_rollback_;
+  void apply_video_settings(native_video_settings::NativeVideoSettings values){
+    video_settings_=values.sanitized();
+    using native_video_settings::VideoDisplayMode;
+    using native_video_settings::VideoFrameCap;
+    using native_video_settings::VideoVsync;
+    const int sdl_vsync=video_settings_.vsync==VideoVsync::Off?0
+        :video_settings_.vsync==VideoVsync::Adaptive?SDL_RENDERER_VSYNC_ADAPTIVE:1;
+    bool ok=true;
+    if(window_){
+      ok=window_->set_vsync(sdl_vsync)&&ok;
+      ok=window_->set_fullscreen(video_settings_.display==VideoDisplayMode::Exclusive)&&ok;
+      double cap=0.;
+      switch(video_settings_.frame_cap){
+        case VideoFrameCap::Fps60:cap=60.;break;
+        case VideoFrameCap::Fps120:cap=120.;break;
+        case VideoFrameCap::Fps144:cap=144.;break;
+        default:break;
+      }
+      window_->set_frame_cap(cap);
+    }
+    if(!ok)video_settings_view_.set_error(
+        "The display driver rejected part of these settings; the preview "
+        "continues with what applied.");
+  }
+  void begin_video_preview(native_video_settings::NativeVideoSettings values){
+    if(!video_rollback_)
+      video_rollback_=VideoRollback{video_settings_,std::chrono::steady_clock::now()+std::chrono::seconds(15)};
+    apply_video_settings(std::move(values));
+    video_settings_view_.set_confirming(true);
+  }
+  void keep_video_settings(){
+    video_rollback_.reset();
+    video_settings_view_.set_confirming(false);
+    if(!video_settings_path_.empty())video_settings_.save(video_settings_path_);
+    video_settings_view_.close();
+  }
+  void revert_video_preview(){
+    if(video_rollback_)apply_video_settings(video_rollback_->previous);
+    video_rollback_.reset();
+    video_settings_view_.set_confirming(false);
+  }
+  [[nodiscard]] double video_rollback_remaining()const{
+    if(!video_rollback_)return 0.;
+    return std::chrono::duration<double>(video_rollback_->deadline-std::chrono::steady_clock::now()).count();
   }
   native_voice::NativeVoiceProfileRegistry voice_profiles_;
   std::optional<UiRect> inspection_card_bounds_;
@@ -3200,6 +3303,7 @@ class NativeCampaign final {
   bool smoke_shortcut_{};
   int smoke_audio_support_{};
   int smoke_voice_settings_{};
+  int smoke_video_settings_{};
   std::optional<native_support::NativeSupportLog> support_log_;
   std::optional<std::string> smoke_research_node_;
   bool last_fleet_command_accepted_{};
@@ -3307,7 +3411,7 @@ int main(int argc,char **argv){
       if(!result.session)throw std::runtime_error("Startup ended without a campaign session.");
       session=std::move(result.session);
     }
-    NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
+    NativeCampaign campaign(std::move(session),window,window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);});
     campaign.enable_support_log({STELLAR_GAME_VERSION,SDL_GetPlatform(),
                                  window.gpu_driver(),

@@ -63,7 +63,8 @@ def _diagnostic(stdout: str):
         raise RuntimeError("Native audio diagnostic is malformed") from error
     for key in ("required", "music", "device", "music_frames", "voices",
                 "voiced_chunks", "clipped_samples", "settings", "support",
-                "voice_settings", "voice_pipeline", "voice_lines"):
+                "voice_settings", "voice_pipeline", "voice_lines",
+                "video_settings"):
         value = state.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
             raise RuntimeError(f"Native audio reported invalid {key}")
@@ -88,6 +89,8 @@ def _diagnostic(stdout: str):
         raise RuntimeError("Native support bundle did not export from the menu or F8")
     if state["voice_settings"] != 1:
         raise RuntimeError("Native voice settings view did not apply and persist")
+    if state["video_settings"] != 1:
+        raise RuntimeError("Native video settings view did not apply and persist")
     if state["voice_pipeline"] != 1 or state["voice_lines"] < 1:
         raise RuntimeError("Native voice pipeline produced no spoken line")
     backend = state.get("voice_backend")
@@ -171,6 +174,15 @@ def validate_native_audio_export(folder: Path, env: dict[str, str]):
         voice_values = json.loads(voice_settings.read_text(encoding="utf-8"))
         if voice_values.get("enableVoices") is not True:
             raise RuntimeError("Native voice settings persisted the wrong state")
+        # The video settings exercise ends on restored defaults persisted
+        # beside the save path (reference VideoSettingsService parity).
+        video_settings = save.parent / "video-settings.json"
+        if not video_settings.is_file():
+            raise RuntimeError("Native video settings did not persist to disk")
+        video_values = json.loads(video_settings.read_text(encoding="utf-8"))
+        if video_values.get("vsync") != "On" or \
+                video_values.get("display") != "Borderless":
+            raise RuntimeError("Native video settings persisted the wrong state")
     return {"nativeAudioStreams": True,
             "nativeAudioDevice": bool(state["device"]),
             "nativeAudioCapture": str(evidence),

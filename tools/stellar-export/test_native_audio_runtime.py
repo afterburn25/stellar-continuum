@@ -17,6 +17,7 @@ def diagnostic():
         "settings": 1, "support": 1,
         "voice_settings": 1, "voice_pipeline": 1, "voice_lines": 1,
         "voice_backend": "Backend: windows-sapi · 2 voices",
+        "video_settings": 1,
     }
 
 
@@ -49,6 +50,7 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                 if fault == "voice_flag": state["voice_settings"] = 0
                 if fault == "voice_lines": state["voice_lines"] = 0
                 if fault == "voice_backend": state["voice_backend"] = "none"
+                if fault == "video_flag": state["video_settings"] = 0
                 varied = bytes(range(256)) if fault != "blank" else bytes(200)
                 if fault != "capture":
                     capture.write_bytes(b"BM" + b"\0" * 52 + varied * 40)
@@ -80,6 +82,13 @@ class NativeAudioRuntimeTests(unittest.TestCase):
                         voice["enableVoices"] = False
                     (save.parent / "voice-settings.json").write_text(
                         json.dumps(voice), encoding="utf-8")
+                if fault != "video_settings_missing":
+                    video = {"display": "Borderless", "vsync": "On",
+                             "frameCap": "Automatic"}
+                    if fault == "video_state":
+                        video["vsync"] = "Off"
+                    (save.parent / "video-settings.json").write_text(
+                        json.dumps(video), encoding="utf-8")
                 stdout = "gpu_driver=vulkan systems=500 save=ok " + \
                     f"audio={json.dumps(state, separators=(',', ':'))}"
                 if fault == "diagnostic":
@@ -144,6 +153,12 @@ class NativeAudioRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("voice_settings_missing")
     def test_wrong_voice_state_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("voice_state")
+    def test_unexercised_video_settings_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("video_flag")
+    def test_missing_video_settings_file_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("video_settings_missing")
+    def test_wrong_video_state_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("video_state")
 
 
 class NativeAudioAssetTests(unittest.TestCase):
