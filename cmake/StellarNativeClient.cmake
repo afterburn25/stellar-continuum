@@ -19,6 +19,7 @@ add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_construction_controller.cpp app/native_client/native_construction_workspace.cpp
   app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
   app/native_client/native_logistics.cpp app/native_client/native_logistics_workspace.cpp
+  app/native_client/native_body_inspection.cpp app/native_client/native_body_inspection_panel.cpp
   app/native_client/native_inspection.cpp
   app/native_client/native_planet_disc_assets.cpp app/native_client/native_system_travel.cpp)
 add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_runtime_data)

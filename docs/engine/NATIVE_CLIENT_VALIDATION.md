@@ -6,6 +6,11 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 
 ## Current interaction
 
+- Selecting a system-view planet shows grouped metric physical/environment facts
+  and known moons/signals. Measured rows scroll at 720p; Focus Planet centers the
+  selection without changing zoom. Exact values remain survey-gated; Open Colony
+  keeps its existing ownership checks. See `NATIVE_BODY_INSPECTION.md`.
+
 - A single chart-star click opens a survey-gated system inspector. Header/progress
   stay pinned while measured findings/own-colony rows scroll; pointer gestures
   cannot pan the map or issue fleet orders through the panel. The maintained

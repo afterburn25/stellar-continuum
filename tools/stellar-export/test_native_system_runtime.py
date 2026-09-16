@@ -49,6 +49,8 @@ class NativeSystemExportTests(unittest.TestCase):
                     save.write_text(json.dumps(payload))
                 if fault != "capture":
                     capture.write_bytes(b"BM" + bytes(54))
+                if fault != "detail_capture":
+                    capture.with_name(capture.stem + "-body-details.bmp").write_bytes(b"BM" + bytes(54))
                 body = 4 if fault == "body" else 3
                 images = 0 if fault == "images" else 9
                 scale = "nan" if fault == "scale" else "0.025"
@@ -56,7 +58,16 @@ class NativeSystemExportTests(unittest.TestCase):
                 stdout = (f"gpu_driver=vulkan systems=500 image_uploads={images} save=ok "
                           f"system=id=0:body={body}:visible=9:scale={scale}"
                           f":entry=1:hit=1:pan={pan}:zoom=1:reset=1:back=1"
-                          f":pause_retained=1:speed_retained=1:gesture_cleared=1:paused=1:day_unchanged=1")
+                          f":pause_retained=1:speed_retained=1:gesture_cleared=1:focused=1:paused=1:day_unchanged=1")
+                proof = dict(physical=True, environment=True, bounded=True, camera_unchanged=True,
+                             focused=True, scroll_end=150 if len(calls) == 1 else 0, scroll_reset=0)
+                if fault in proof:
+                    proof[fault] = False
+                if fault == "no_scroll": proof["scroll_end"] = 0
+                if fault == "nan_scroll": proof["scroll_end"] = float("nan")
+                if fault == "not_reset": proof["scroll_reset"] = 1
+                if fault != "no_body_proof":
+                    stdout += "\nbody_inspection=" + json.dumps(proof) + "\n"
                 if profile_frames:
                     self.assertEqual(args[args.index("--profile-frames") + 1], str(profile_frames))
                     stdout += " steady_profile=" + json.dumps(steady_profile(profile_frames))
@@ -114,6 +125,11 @@ class NativeSystemExportTests(unittest.TestCase):
 
     def test_missing_save_is_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("save")
+
+    def test_missing_or_invalid_body_inspection_is_rejected(self):
+        for fault in ("physical", "environment", "bounded", "camera_unchanged", "focused",
+                      "no_scroll", "nan_scroll", "not_reset", "no_body_proof", "detail_capture"):
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError): self.exercise(fault)
 
     def test_missing_capture_is_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("capture")

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_system_view.hpp"
+#include "native_body_inspection_panel.hpp"
 #include "native_system_travel.hpp"
 #include "native_celestial_appearance.hpp"
 #include <stellar/engine/native_map_platform.hpp>
@@ -52,6 +53,7 @@ struct SystemWorkspaceLayout {
   stellar::native_map::UiRect inspector;
   stellar::native_map::UiRect colony_action;
   stellar::native_map::UiRect world_field;
+  stellar::native_map::UiRect focus_action;
   [[nodiscard]] static SystemWorkspaceLayout for_viewport(int width,int height) noexcept;
 };
 class NativeSystemWorkspace final {
@@ -87,14 +89,19 @@ public:
   [[nodiscard]] SystemWorkspaceCommand handle(const stellar::native_map::InputEvent&,int width,int height);
   void render(stellar::native_map::DrawList&,int width,int height);
   void reset_fit(int width,int height);
+  [[nodiscard]] bool select_body(int body_id);
+  [[nodiscard]] float inspection_scroll() const noexcept { return body_inspection_.scroll_offset(); }
 private:
   enum class InspectorFocus { automatic, body, fleet };
   void resize(int width,int height);
+  void sync_body_inspection();
+  void focus_selected_body(int width,int height);
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
   SystemImageProvider image_provider_;
   SystemTextMeasurer text_measurer_;
+  BodyInspectionPanel body_inspection_;
   NativeCelestialAppearanceRenderer celestial_appearance_;
   std::optional<stellar::native_system::NativeSystemSnapshot> snapshot_;
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;

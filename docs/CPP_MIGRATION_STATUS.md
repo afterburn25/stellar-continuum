@@ -2,8 +2,8 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`d9d23f57` inventoried; support, notifications, tactical, civilian recovery
-safe video settings, observer-safe system inspection, home-system supply and
+`810d2a6d` inventoried; support, notifications, tactical, civilian recovery
+safe video settings, observer-safe system/planet inspection, home-system supply and
 save-gated New Game selectively adapted. New voice and newest empire/mission
 boards remain unimported pending review).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
@@ -16,7 +16,47 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-### Native home-system supply workspace
+### Surveyed planet inspection and Focus Planet
+
+The native orbital inspector now groups metric physical facts, environment,
+and known moons/signals into measured label/value rows. Header, survey status,
+Focus Planet and the separately authorized Open Colony action stay pinned.
+Bounded scrolling keeps all details reachable at 720p without moving the map;
+1080p fits Earth's complete current facts. Focus centers the selected body at
+unchanged zoom, including bodies without a colony. No ship order is issued.
+
+This selectively adapts Devin 641955f0. Exact radius/eccentricity/inclination
+remain unconfirmed during reconnaissance despite approximate geometry in the
+safe drawing snapshot. Full survey plus details gates all exact physical and
+environment values; nonfinite/invalid/overflow readings are unconfirmed. Parent
+and moon membership use only the safe snapshot. Refresh redacts values, removed
+selection clears, observer change closes, and campaign discard clears. Measured
+UTF-8 layout caches until facts/viewport/measurer change, with a bounded header
+for long names. No raw foreign colony telemetry, Core, Player17 or C# changes.
+
+Validation: final MSVC native build and all 11 affected CTests pass. Python
+export discovery: 456 tests, 439 passed / 17 optional STELLAR_NATIVE_EXE cases
+skipped. Final relocated Vulkan 720p fresh / 1080p reload exercise actual mouse
+routing, physical/environment rows, Focus, scroll end/reset and camera isolation.
+Complete paused Player17 equality holds except SavedAtUtc. Screenshots inspected.
+Existing relocated navigation, colony and local system-travel suites also pass.
+Contract: docs/engine/NATIVE_BODY_INSPECTION.md. Evidence:
+work/native-body-{build,ctest,python}.log and
+work/native-body-{runtime,navigation,colony,travel}.json;
+package-system-*.bmp under work/native-audio-validation. Package remains UNSEALED.
+
+Next: review/adapt Devin 1c8e9744 surface management with current observer,
+campaign generation, colony membership and changed-state command validation.
+Preserve truthful Core workforce/power status and existing placement/cancellation.
+Latest fetched Devin head 810d2a6d additionally introduces an Economy panel;
+inventoried only, alongside bc681eb6 planet discs, fe364430 star discs and
+d9d23f57 mission Land/Collect. Preserve approved Sol textures, dry recorded UK
+scientist cues, bounded image lifecycle and observer authority. Shared base
+ac45d958 and PR332 remain unmerged. Broader 3D visuals and sustained performance
+remain unfinished. Previous 84df6d44 CI35054810208 was still in progress when
+checked; do not treat it as passed or poll-loop waiting on it.
+
+### Previous checkpoint: native home-system supply workspace
 
 The Supply rail icon now opens an organized, read-only home-system network:
 available surplus, import demand, delivered supply, shortfall, and every owned
@@ -46,14 +86,8 @@ work/native-supply-{runtime,navigation,fleet}.json; captures under
 work/native-audio-validation/package-supply-*.bmp. Validation package is UNSEALED.
 It reports the existing Core shortage; no synthetic surplus conceals it.
 
-Next: review/adapt Devin 641955f0 physical/environment inspection to make surveyed
-planet conditions readable in the system view; keep unknown physical values and
-foreign live colony telemetry sealed and respect metric units. Review 1c8e9744
-surface management after that, including current generation/ownership revalidation
-for every command. Latest fetched Devin head remains d9d23f57; bc681eb6 generated
-planet discs, fe364430 star discs, and d9d23f57 mission Land/Collect are inventoried
-only. Preserve approved Sol textures, observer authority and bounded artwork
-lifecycle. Shared base ac45d958 and PR332 remain unmerged.
+The subsequent planet-inspection milestone above supersedes this checkpoint's
+641955f0 follow-up. Surface management remains the next command review.
 
 ### Previous checkpoint: observer-safe galaxy system inspection
 

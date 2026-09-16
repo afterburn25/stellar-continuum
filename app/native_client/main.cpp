@@ -907,6 +907,55 @@ class NativeCampaign final {
     if(system_workspace_.selected_body_id()!=earth_body_id)throw std::runtime_error("System smoke could not select Earth.");
     smoke_system_hit_=true;const auto before=*system_workspace_.viewport();InputSnapshot zoom;zoom.drawable_width=width;zoom.drawable_height=height;zoom.pointer={420,320};zoom.events={{InputEventType::Wheel,zoom.pointer,{},1}};(void)update(zoom,width,height,0.,false);const auto zoomed=*system_workspace_.viewport();smoke_system_zoomed_=zoomed.scale>before.scale;InputSnapshot move;move.drawable_width=width;move.drawable_height=height;move.pointer={392,318};move.events={{InputEventType::LeftPressed,{360,300}},{InputEventType::PointerMove,{392,318},{32,18}},{InputEventType::LeftReleased,{392,318}}};(void)update(move,width,height,0.,false);const auto after=*system_workspace_.viewport();smoke_system_panned_=after.center_x!=zoomed.center_x||after.center_y!=zoomed.center_y;
     if(!smoke_system_zoomed_||!smoke_system_panned_)throw std::runtime_error("System smoke did not preserve zoom and pan input.");
+    const auto focus_scale=system_workspace_.viewport()->scale;
+    click({system_layout.focus_action.x+system_layout.focus_action.width*.5f,
+           system_layout.focus_action.y+system_layout.focus_action.height*.5f});
+    const auto focused=system_workspace_.viewport()->world_to_screen(earth->offset_x,earth->offset_y);
+    smoke_system_focused_=system_workspace_.viewport()->scale==focus_scale&&
+      std::abs(focused.x-(system_layout.world_field.x+system_layout.world_field.width*.5f))<.1f&&
+      std::abs(focused.y-(system_layout.world_field.y+system_layout.world_field.height*.5f))<.1f;
+    if(!smoke_system_focused_)throw std::runtime_error("System smoke Focus Planet failed to center Earth or changed zoom.");
+  }
+  std::string body_inspection_smoke(int width,int height,const std::function<void(const DrawList&)>& capture){
+    const auto layout=SystemWorkspaceLayout::for_viewport(width,height);
+    const auto before=*system_workspace_.viewport();
+    const auto wheel=[&](float amount){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer={layout.inspector.x+30.f,layout.inspector.y+220.f};
+      input.events={{InputEventType::Wheel,input.pointer,{},amount}};
+      (void)update(input,width,height,0.,false);
+    };
+    const auto contains=[&](const DrawList& draw,std::string_view value){
+      return std::ranges::any_of(draw.overlay,[&](const auto& item){
+        const auto* text=std::get_if<Text>(&item);
+        return text&&text->value==value&&text->clip&&
+          text->clip->x>=layout.inspector.x&&text->clip->y>=layout.inspector.y&&
+          text->clip->x+text->clip->width<=layout.inspector.x+layout.inspector.width&&
+          text->clip->y+text->clip->height<=layout.focus_action.y;
+      });
+    };
+    wheel(10000.f);
+    const auto initial=scene(width,height);
+    const bool physical=contains(initial,"Physical")&&contains(initial,"6,371 km")&&
+      contains(initial,"9.81 m/s²")&&contains(initial,"SURVEY COMPLETE");
+    wheel(-10000.f);
+    const auto end=scene(width,height);
+    const bool environment=contains(end,"Environment")&&contains(end,"Oxygen / nitrogen")&&
+      contains(end,"Satellites & signals")&&contains(end,"Known moons");
+    const float end_scroll=system_workspace_.inspection_scroll();
+    wheel(-10000.f);
+    const bool bounded=system_workspace_.inspection_scroll()==end_scroll;
+    capture(end);
+    wheel(10000.f);
+    const auto after=*system_workspace_.viewport();
+    const bool camera_unchanged=before.center_x==after.center_x&&before.center_y==after.center_y&&before.scale==after.scale;
+    if(!physical||!environment||!bounded||!camera_unchanged||system_workspace_.inspection_scroll()!=0.f)
+      throw std::runtime_error("Planet inspector failed physical/environment rendering, bounded scrolling or camera isolation.");
+    std::ostringstream out;out<<std::boolalpha<<"{\"physical\":"<<physical
+      <<",\"environment\":"<<environment<<",\"bounded\":"<<bounded
+      <<",\"camera_unchanged\":"<<camera_unchanged<<",\"focused\":"<<smoke_system_focused_
+      <<",\"scroll_end\":"<<end_scroll<<",\"scroll_reset\":"<<system_workspace_.inspection_scroll()<<'}';
+    return out.str();
   }
   void prepare_colony_smoke(int width,int height,bool reload){
     smoke_colony_reload_=reload;
@@ -2110,7 +2159,7 @@ class NativeCampaign final {
       <<":reset="<<smoke_system_reset_<<":back="<<smoke_system_back_
       <<":pause_retained="<<smoke_system_pause_retained_
       <<":speed_retained="<<smoke_system_speed_retained_
-      <<":gesture_cleared="<<smoke_system_gesture_cleared_
+      <<":gesture_cleared="<<smoke_system_gesture_cleared_<<":focused="<<smoke_system_focused_
       <<":paused="<<(session_->frame().clock().speed()==StrategicSpeed::Paused)
       <<":day_unchanged="<<(session_->frame().clock().simulation_days()==smoke_system_day_);
     return out.str();
@@ -3765,7 +3814,7 @@ class NativeCampaign final {
   std::optional<int> smoke_fleet_id_;
   bool smoke_civilian_recovery_{};
   std::optional<int> smoke_fleet_destination_;
-  bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
+  bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{},smoke_system_focused_{};
   double smoke_system_day_{};
   std::optional<int> smoke_system_travel_fleet_id_,smoke_system_travel_system_id_,smoke_system_travel_destination_id_;
   int smoke_system_travel_mission_revision_{};std::size_t smoke_system_travel_lane_count_{};
@@ -4162,6 +4211,11 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.system_smoke)
+          std::cout<<"body_inspection="<<campaign.body_inspection_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-body-details"));
+              })<<'\n';
         if(options.logistics_check)
           std::cout<<"supply_inspection="<<campaign.supply_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool end){

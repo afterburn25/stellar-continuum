@@ -16,7 +16,7 @@ from native_frame_profile import validate_cold_profile, validate_profile_frames,
 def _system_diagnostic(stdout):
     state = re.search(r"\bsystem=id=(\d+):body=(\d+):visible=(\d+):scale=([^:\s]+)"
                       r":entry=1:hit=1:pan=1:zoom=1:reset=1:back=1"
-                      r":pause_retained=1:speed_retained=1:gesture_cleared=1"
+                      r":pause_retained=1:speed_retained=1:gesture_cleared=1:focused=1"
                       r":paused=1:day_unchanged=1(?:\s|$)", stdout)
     uploads = re.search(r"\bimage_uploads=(\d+)(?:\s|$)", stdout)
     if not state or not uploads:
@@ -36,7 +36,7 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
     validate_profile_frames(profile_frames)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics, profiles, cold_profiles = [], [], [], []
+    captures, diagnostics, profiles, cold_profiles, details, inspections = [], [], [], [], [], []
     baseline = None
     with tempfile.TemporaryDirectory(prefix="stellar-native-system-") as temporary:
         work = Path(temporary)
@@ -57,6 +57,27 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
             if any(token not in result.stdout for token in ("gpu_driver=vulkan ", "systems=500 ", "save=ok ")):
                 raise RuntimeError("Native orbital view did not confirm Vulkan, fresh campaign and save")
             _system_diagnostic(result.stdout)
+            match = re.search(r"^body_inspection=(.+)$", result.stdout, re.MULTILINE)
+            try:
+                inspection = json.loads(match.group(1)) if match else None
+            except (ValueError, TypeError) as error:
+                raise RuntimeError("Native body inspection proof is malformed") from error
+            if (not isinstance(inspection, dict) or
+                    any(inspection.get(key) is not True for key in
+                        ("physical", "environment", "bounded", "camera_unchanged", "focused")) or
+                    isinstance(inspection.get("scroll_end"), bool) or
+                    not isinstance(inspection.get("scroll_end"), (int, float)) or
+                    not math.isfinite(inspection["scroll_end"]) or inspection["scroll_end"] < 0 or
+                    (width == 1280 and inspection["scroll_end"] <= 0) or
+                    type(inspection.get("scroll_reset")) not in (int, float) or inspection["scroll_reset"] != 0):
+                raise RuntimeError("Native body inspection did not prove fields, focus and bounded scrolling")
+            inspections.append(inspection)
+            detail = capture.with_name(capture.stem + "-body-details.bmp")
+            if not detail.is_file() or detail.stat().st_size < 54 or detail.read_bytes()[:2] != b"BM":
+                raise RuntimeError("Native body inspection did not capture its final details")
+            detail_evidence = folder.parent / f"{folder.name}-system-{width}x{height}-body-details.bmp"
+            shutil.copy2(detail, detail_evidence)
+            details.append(str(detail_evidence))
             if profile_frames:
                 profiles.append(validate_steady_profile(result.stdout, profile_frames))
                 cold_profiles.append(validate_cold_profile(result.stdout))
@@ -81,7 +102,8 @@ def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_
             diagnostics.append(result.stdout.strip())
     result = {"nativeSystemPlayerInput": True, "nativeSystemBodyImages": True,
             "nativeSystemPausedReload": True, "systemCaptures": captures,
-            "systemDiagnostics": diagnostics}
+            "systemDiagnostics": diagnostics, "bodyInspection": inspections,
+            "bodyInspectionCaptures": details}
     if profile_frames:
         result["systemProfiles"] = profiles
         result["systemColdProfiles"] = cold_profiles

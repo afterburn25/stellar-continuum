@@ -1,0 +1,26 @@
+#pragma once
+#include "native_body_inspection.hpp"
+#include <stellar/engine/native_map_platform.hpp>
+#include <functional>
+
+namespace stellar::native_system_ui {
+class BodyInspectionPanel {
+public:
+  void set_inspection(std::optional<BodyInspection>);
+  void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>);
+  void clear();
+  bool visible() const noexcept { return value_.has_value(); }
+  float scroll_offset() const noexcept { return scroll_; }
+  void scroll(float wheel,stellar::native_map::UiRect panel,float footer_top);
+  void render(stellar::native_map::DrawList&,stellar::native_map::UiRect panel,float footer_top) const;
+private:
+  struct Item {float x{},y{},width{},height{};std::string text;bool heading{};};
+  void layout(stellar::native_map::UiRect,float) const;
+  std::optional<BodyInspection> value_;
+  std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
+  mutable std::vector<Item> items_;
+  mutable stellar::native_map::UiRect panel_{},body_{};
+  mutable float footer_top_{},name_height_{},content_height_{},scroll_{};
+  mutable bool valid_{};
+};
+}

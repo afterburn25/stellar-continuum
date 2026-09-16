@@ -87,6 +87,24 @@ int main(int argc,char**argv)try{
   int clipped_inspector_text{};
   for(const auto&item:draw.overlay)if(const auto*label=std::get_if<Text>(&item);label&&label->clip&&layout720.inspector.contains(label->at)){++clipped_inspector_text;require(label->at.y<layout720.inspector.y+layout720.inspector.height,"720p inspector content escaped its panel");}
   require(clipped_inspector_text>=12,"full three-signature inspector was not rendered compactly and clipped");
+  // Focusing a body is a camera operation only: it remains available without a
+  // colony, preserves zoom, and centers the selected marker in the world field.
+  const auto focus_scale=workspace.viewport()->scale;
+  command=workspace.handle({InputEventType::LeftPressed,center(layout720.focus_action)},1280,720);
+  const auto focused_earth=workspace.viewport()->world_to_screen(earth->offset_x,earth->offset_y);
+  DrawList focus_without_colony;workspace.render(focus_without_colony,1280,720);
+  const auto has_open_colony=std::ranges::any_of(focus_without_colony.overlay,[](const UiOverlayCommand&item){const auto*label=std::get_if<Text>(&item);return label&&label->value=="OPEN COLONY";});
+  require(command.kind==SystemWorkspaceCommandKind::none&&command.captured&&
+              !workspace.selected_fleet_id()&&!has_open_colony&&std::abs(workspace.viewport()->scale-focus_scale)<.00001f&&
+              std::abs(focused_earth.x-(layout720.world_field.x+layout720.world_field.width*.5f))<.001f&&
+              std::abs(focused_earth.y-(layout720.world_field.y+layout720.world_field.height*.5f))<.001f,
+          "Focus planet did not center the selected marker without issuing a fleet command");
+  const auto inspector_camera=*workspace.viewport();
+  const auto scroll_before=workspace.inspection_scroll();
+  command=workspace.handle({InputEventType::Wheel,center(layout720.inspector),{},-100},1280,720);
+  require(command.kind==SystemWorkspaceCommandKind::none&&command.captured&&
+              workspace.inspection_scroll()>scroll_before&&same_camera(inspector_camera,*workspace.viewport()),
+          "inspector scrolling moved the camera or failed to reach detailed facts");
   const auto protected_camera=*workspace.viewport();const auto protected_selection=workspace.selected_body_id();const auto panel_point=center(layout720.inspector);
   (void)workspace.handle({InputEventType::LeftPressed,panel_point},1280,720);
   (void)workspace.handle({InputEventType::PointerMove,{panel_point.x+24,panel_point.y+16},{24,16}},1280,720);
@@ -108,6 +126,18 @@ int main(int argc,char**argv)try{
   require(std::abs(workspace.viewport()->center_x-(system_layout.world_field.x+system_layout.world_field.width*.5f))<.001f&&std::abs(workspace.viewport()->center_y-(system_layout.world_field.y+system_layout.world_field.height*.5f))<.001f&&workspace.viewport()->scale>0,"reset fit did not restore the system field camera");
   command=workspace.handle({InputEventType::LeftPressed,center(system_layout.back)},1920,1080);
   require(command.kind==SystemWorkspaceCommandKind::close&&command.captured,"Back did not route to the system workspace");
+  auto downgraded=reference;downgraded.survey_level=SystemSurveyLevel::partially_surveyed;
+  const auto downgraded_earth=std::ranges::find(downgraded.bodies,earth_body_id,&NativeSystemBody::id);
+  require(downgraded_earth!=downgraded.bodies.end()&&downgraded_earth->details,"Sol downgrade fixture lacks detailed Earth values");
+  downgraded_earth->radius_earth=42.;downgraded_earth->orbital_eccentricity=.91;
+  downgraded_earth->details->mass_earth=999.;downgraded_earth->details->temperature_kelvin=9999.;
+  workspace.refresh(downgraded);draw={};workspace.render(draw,1920,1080);
+  const auto overlay_has=[&](std::string_view value){return std::ranges::any_of(draw.overlay,[&](const UiOverlayCommand&item){const auto*label=std::get_if<Text>(&item);return label&&label->value==value;});};
+  require(overlay_has("Unconfirmed")&&!overlay_has("267,582 km")&&!overlay_has("9999 K"),
+          "refresh downgrade retained exact body inspection values");
+  auto changed_observer=downgraded;++changed_observer.observer_civilization_id;workspace.refresh(std::move(changed_observer));
+  require(!workspace.visible()&&!workspace.viewport()&&!workspace.selected_body_id(),
+          "observer change did not close the system workspace");
   workspace.discard_campaign();require(!workspace.visible()&&!workspace.selected_body_id()&&!workspace.campaign_generation(),"campaign replacement retained system state or image eligibility");
 
   auto recon=reference;recon.campaign_generation=2;recon.survey_level=SystemSurveyLevel::partially_surveyed;recon.archetype.reset();recon.primary_stellar_class.reset();
