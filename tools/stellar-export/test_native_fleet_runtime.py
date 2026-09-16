@@ -12,7 +12,8 @@ from native_fleet_runtime import validate_native_fleet_export
 class NativeFleetExportTests(unittest.TestCase):
     def exercise(self, *, wrong_owner=False, unchanged=False, zero_advance=False,
                  mutate_load=False, skipped_save=False, already_routed=False,
-                 frozen_time=False, switched_player=False, no_hover=False):
+                 frozen_time=False, switched_player=False, no_hover=False,
+                 no_military=False):
         with tempfile.TemporaryDirectory(prefix="stellar-fleet-export-test-") as temporary:
             root = Path(temporary)
             package = root / "package"
@@ -25,10 +26,14 @@ class NativeFleetExportTests(unittest.TestCase):
                                                 "Credits": 100}],
                                  "Fleets": [{"Id": 4, "CivilizationId": 7,
                                              "IsActive": True,
+                                             "CurrentSystemId": 0,
                                              "DestinationSystemId": 9 if already_routed else None,
                                              "PlannedRouteSystemIds": [1, 9] if already_routed else [],
                                              "MissionOrderRevision": 2,
-                                             "TransitProgress": 0.0}]}}
+                                             "TransitProgress": 0.0,
+                                             "Combat": {"ProfileId": "civilian_light_v1",
+                                                        "Order": 0,
+                                                        "DefendSystemId": None}}]}}
             fixture = root / "player17-fixture.json"
             fixture.write_text(json.dumps({"Rows": [{"Name": "valid-current17",
                                                        "InputJson": json.dumps(source)}]}))
@@ -45,6 +50,7 @@ class NativeFleetExportTests(unittest.TestCase):
                 payload = json.loads(save.read_text())
                 replay = len(calls) == 1
                 fleet = payload["Galaxy"]["Fleets"][0]
+                armed = payload["Galaxy"]["Fleets"][1]
                 if not replay:
                     payload["SimulationDays"] = 42.0 if frozen_time else 42.25
                     if switched_player:
@@ -55,6 +61,10 @@ class NativeFleetExportTests(unittest.TestCase):
                         fleet["PlannedRouteSystemIds"] = [1, 5, 13]
                         fleet["MissionOrderRevision"] = 3
                         fleet["TransitProgress"] = 0 if zero_advance else .25
+                    if not no_military:
+                        armed["Combat"]["Order"] = 1
+                        armed["Combat"]["DefendSystemId"] = \
+                            armed["CurrentSystemId"]
                     payload["SavedAtUtc"] = "ordered"
                 else:
                     payload["SavedAtUtc"] = "loaded"
@@ -66,10 +76,12 @@ class NativeFleetExportTests(unittest.TestCase):
                 marker = "preserved" if skipped_save and replay else "ok"
                 hover = (":hover=1:inspect=1:civilian=1:locate=1:overview=1:missions=1:2:sites=1:1"
                          if not no_hover else "")
+                military = "" if no_hover else (
+                    ":military=0:-1" if no_military else ":military=1:5")
                 return subprocess.CompletedProcess(
                     args, 0,
                     "gpu_driver=vulkan systems=20 save=" + marker +
-                    " fleet=4:13:3:0.250000" + hover, "")
+                    " fleet=4:13:3:0.250000" + hover + military, "")
 
             with mock.patch("native_fleet_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_fleet_export(package, {}, fixture)
@@ -98,6 +110,10 @@ class NativeFleetExportTests(unittest.TestCase):
     def test_missing_hover_preview_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "hover preview"):
             self.exercise(no_hover=True)
+
+    def test_missing_military_orders_are_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "military orders"):
+            self.exercise(no_military=True)
 
     def test_loaded_treasury_mutation_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "changed during paused load"):

@@ -23,6 +23,34 @@ def _source_row(fixture: Path) -> dict:
     return json.loads(matches[0]["InputJson"])
 
 
+def _author_armed_fleet(source: dict) -> tuple[dict, int]:
+    """Append a player-owned patrol corvette so the smoke can exercise the
+    strategic HOLD / DEFEND / RETREAT order buttons (reference
+    UiIssueMilitaryOrder). The fixture's two owned fleets are both civilian
+    profiles, so the armed formation is authored like the battle picket."""
+    authored = copy.deepcopy(source)
+    galaxy = authored.get("Galaxy", {})
+    player = galaxy.get("PlayerCivilizationId")
+    fleets = galaxy.get("Fleets", [])
+    donors = [fleet for fleet in fleets
+              if fleet.get("CivilizationId") == player and
+              fleet.get("IsActive") and
+              isinstance(fleet.get("CurrentSystemId"), int) and
+              isinstance(fleet.get("Combat"), dict)]
+    if not donors:
+        raise RuntimeError("Fleet fixture has no player fleet to arm")
+    donor = donors[0]
+    fleet_ids = {fleet.get("Id") for fleet in fleets}
+    armed = copy.deepcopy(donor)
+    armed["Id"] = max(fleet_ids) + 1
+    armed["Name"] = "Vigilance One"
+    armed["Combat"] = {**donor["Combat"],
+                       "ProfileId": "patrol_corvette_mk1",
+                       "Shields": 35, "Armor": 45, "Hull": 95}
+    fleets.append(armed)
+    return authored, armed["Id"]
+
+
 def _fleet(payload: dict, fleet_id: int) -> tuple[dict, int]:
     galaxy = payload.get("Galaxy", {})
     player_id = galaxy.get("PlayerCivilizationId")
@@ -35,30 +63,33 @@ def _fleet(payload: dict, fleet_id: int) -> tuple[dict, int]:
     return matches[0], player_id
 
 
-def _diagnostic(stdout: str) -> tuple[int, int, int, float]:
+def _diagnostic(stdout: str) -> tuple[int, int, int, float, int, int]:
     match = re.search(
         r" fleet=(\d+):(\d+):(\d+):([0-9.]+):hover=1:inspect=1:civilian=1"
-        r":locate=1:overview=1:missions=1:(\d+):sites=(\d+):(\d+)",
+        r":locate=1:overview=1:missions=1:(\d+):sites=(\d+):(\d+)"
+        r":military=(\d+):(-?\d+)",
         stdout)
     if not match:
         raise RuntimeError(
             "Native fleet did not report its selected route state "
             "(hover preview, inspection card, civilian recovery orders, "
-            "empire overview and the missions board are required)")
+            "military orders, empire overview and the missions board "
+            "are required)")
     if int(match.group(5)) < 1:
         raise RuntimeError(
             "Native fleet reported an empty mission board; the fixture "
             "carries owned scout/science/colony fleets")
     fleet_id, destination, revision = map(int, match.groups()[:3])
     progress = float(match.group(4))
+    military, armed_id = int(match.group(8)), int(match.group(9))
     if not math.isfinite(progress):
         raise RuntimeError("Native fleet reported non-finite transit progress")
-    return fleet_id, destination, revision, progress
+    return fleet_id, destination, revision, progress, military, armed_id
 
 
 def validate_native_fleet_export(folder: Path, env: dict[str, str],
                                  player17_fixture: Path):
-    source = _source_row(player17_fixture)
+    source, armed_fleet_id = _author_armed_fleet(_source_row(player17_fixture))
     systems = source.get("Galaxy", {}).get("Systems", [])
     source_player_id = source.get("Galaxy", {}).get("PlayerCivilizationId")
     source_days = source.get("SimulationDays")
@@ -115,6 +146,19 @@ def validate_native_fleet_export(folder: Path, env: dict[str, str],
             if (fleet.get("DestinationSystemId") != state[1] or
                     fleet.get("MissionOrderRevision") != state[2]):
                 raise RuntimeError("Fleet diagnostic does not match the saved owned fleet")
+            if state[4] != 1 or state[5] != armed_fleet_id:
+                raise RuntimeError(
+                    "Native fleet did not exercise the armed fleet's "
+                    "strategic military orders")
+            armed = [entry for entry in saved_galaxy.get("Fleets", [])
+                     if entry.get("Id") == armed_fleet_id]
+            armed_combat = armed[0].get("Combat", {}) if len(armed) == 1 else {}
+            if (armed_combat.get("Order") != 1 or
+                    armed_combat.get("DefendSystemId") !=
+                    armed[0].get("CurrentSystemId")):
+                raise RuntimeError(
+                    "Fleet military orders did not land a durable DEFEND "
+                    "order in the authoritative save")
 
             if not replay:
                 saved_days = payload.get("SimulationDays")

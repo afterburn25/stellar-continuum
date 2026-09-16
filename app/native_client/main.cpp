@@ -992,6 +992,50 @@ class NativeCampaign final {
         throw std::runtime_error("Fleet smoke LOCATE did not center its fleet.");
       smoke_fleet_located_=true;
     }
+    // Reference UiIssueMilitaryOrder: an armed fleet exposes strategic
+    // HOLD / DEFEND / RETREAT orders; the authored patrol-corvette profile
+    // proves the full order chain against the authoritative save. Runs
+    // without an armed fixture simply report military=0.
+    {
+      const auto &view_fleets=fleet_workspace_.view()->own_fleets;
+      const auto armed=std::ranges::find_if(view_fleets,[](const auto &f){
+        return f.combat_status&&f.combat_status->is_armed;});
+      if(armed!=view_fleets.end()){
+        const int armed_fleet_id=armed->id;
+        const auto armed_index=
+            static_cast<std::size_t>(armed-view_fleets.begin());
+        click({layout.list.x+12.f*layout.scale,
+               layout.list.y+(static_cast<float>(armed_index)*45.f+20.f)*
+                                 layout.scale});
+        if(fleet_controller_.selection()!=std::optional<int>{armed_fleet_id})
+          throw std::runtime_error("Fleet smoke armed selection failed.");
+        const auto order_of=[&]{
+          const auto &world_fleets=
+              session_->frame().runtime().world().campaign().fleets;
+          const auto it=std::ranges::find(world_fleets,armed_fleet_id,
+                                          &FleetState::id);
+          if(it==world_fleets.end()||!it->combat)throw std::runtime_error(
+              "Fleet smoke lost the armed fleet's combat state.");
+          return it->combat->order;
+        };
+        click(center(layout.order_hold));
+        if(order_of()!=MilitaryOrderType::Hold)throw std::runtime_error(
+            "Fleet smoke HOLD order did not land.");
+        click(center(layout.order_defend));
+        if(order_of()!=MilitaryOrderType::Defend)throw std::runtime_error(
+            "Fleet smoke DEFEND order did not land.");
+        click(center(layout.order_retreat));
+        if(order_of()!=MilitaryOrderType::Retreat)throw std::runtime_error(
+            "Fleet smoke RETREAT order did not land.");
+        // Re-issue DEFEND so the durable save evidence carries a stable
+        // order (RETREAT resolves into a disengagement during simulation).
+        click(center(layout.order_defend));
+        if(order_of()!=MilitaryOrderType::Defend)throw std::runtime_error(
+            "Fleet smoke DEFEND re-issue did not land.");
+        smoke_military_fleet_id_=armed_fleet_id;
+        smoke_military_orders_=true;
+      }
+    }
     // EmpireOverviewPanel parity: with no fleet selected the detail area
     // lists own colonies; a colony row opens its system's orbital view.
     {
@@ -1843,7 +1887,9 @@ class NativeCampaign final {
        <<":locate="<<(smoke_fleet_located_?1:0)
        <<":overview="<<(smoke_overview_?1:0)
        <<":missions="<<smoke_missions_<<":"<<smoke_mission_count_
-       <<":sites="<<smoke_mission_sites_<<":"<<smoke_mission_site_selection_;
+       <<":sites="<<smoke_mission_sites_<<":"<<smoke_mission_site_selection_
+       <<":military="<<(smoke_military_orders_?1:0)<<":"
+       <<(smoke_military_fleet_id_?*smoke_military_fleet_id_:-1);
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -3600,8 +3646,9 @@ class NativeCampaign final {
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_fleet_hover_preview_{},smoke_inspection_{},
-       smoke_fleet_located_{},
+       smoke_fleet_located_{},smoke_military_orders_{},
       smoke_civilian_recovery_{},smoke_overview_{};
+  std::optional<int> smoke_military_fleet_id_;
   int smoke_missions_{},smoke_mission_count_{},smoke_mission_sites_{},
       smoke_mission_site_selection_{};
   std::optional<int> smoke_fleet_destination_;

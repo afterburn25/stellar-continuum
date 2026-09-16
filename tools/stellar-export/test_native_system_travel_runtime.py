@@ -39,7 +39,8 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                     fleet.update(DestinationSystemId=2, MissionOrderRevision=1, TransitPhase=1,
                                  PlannedRouteSystemIds=[1, 2], LocalTransitPositionX=.1)
                     marker = (" fleet=7:2:1:0.1:hover=1:inspect=1:civilian=1"
-                              ":locate=1:overview=1:missions=1:2:sites=1:1")
+                              ":locate=1:overview=1:missions=1:2:sites=1:1"
+                              ":military=0:-1")
                     if fault == "preparation": fleet["TransitPhase"] = 2
                 elif "--system-travel-smoke" in args or "--system-travel-reload-smoke" in args:
                     observer=payload["Galaxy"]["Knowledge"][0]

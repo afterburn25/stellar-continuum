@@ -97,7 +97,7 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
         # Existing actual-input proof issues the route through Core, not a fake
         # presentation-only motion. Its source fixture is explicitly test-authored.
         prepared_stdout, prepared = launch("--fleet-smoke", "prepared")
-        fleet_id, destination_id, revision, _ = _diagnostic(prepared_stdout)
+        fleet_id, destination_id, revision, _, _, _ = _diagnostic(prepared_stdout)
         routed, player_id = _fleet(prepared, fleet_id)
         route = routed.get("PlannedRouteSystemIds")
         if (not route or routed.get("CurrentSystemId") is None or
