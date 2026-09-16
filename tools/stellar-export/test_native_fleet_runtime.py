@@ -64,7 +64,7 @@ class NativeFleetExportTests(unittest.TestCase):
                 capture.write_bytes(b"BM" + bytes(54))
                 calls.append(args)
                 marker = "preserved" if skipped_save and replay else "ok"
-                hover = (":hover=1:inspect=1:civilian=1:overview=1"
+                hover = (":hover=1:inspect=1:civilian=1:overview=1:missions=1:2"
                          if not no_hover else "")
                 return subprocess.CompletedProcess(
                     args, 0,

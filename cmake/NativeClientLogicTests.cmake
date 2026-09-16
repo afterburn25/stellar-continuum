@@ -82,7 +82,7 @@ add_test(NAME native_fleet_controller COMMAND stellar_native_fleet_controller_te
 set_tests_properties(native_fleet_controller PROPERTIES TIMEOUT 90)
 add_executable(stellar_native_fleet_workspace_tests
   native-tests/native_fleet_workspace_tests.cpp app/native_client/native_fleet_workspace.cpp
-  app/native_client/native_ship_art_assets.cpp)
+  app/native_client/native_overview.cpp app/native_client/native_ship_art_assets.cpp)
 target_include_directories(stellar_native_fleet_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_fleet_workspace COMMAND stellar_native_fleet_workspace_tests)

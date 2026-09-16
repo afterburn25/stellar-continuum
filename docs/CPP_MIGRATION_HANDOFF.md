@@ -206,6 +206,39 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 - `native_logistics` CTest covers the initializing state, home-network build,
   kind labels, panel containment/close, and rendering.
 
+## Missions board slice (candidate for review)
+
+- `app/native_client/native_missions.{hpp,cpp}` — ports the
+  `ExplorationMissionPanel` missions tab: `build_mission_board` is the
+  `ExplorationReadModel.ActiveMissions` + `Main.Exploration` snapshot port —
+  owned, active scout/science/colony fleets ordered by id, `Take(8)`, each
+  card carrying fleet name, role, phase label, destination
+  (`DestinationSystemId ?? CurrentSystemId`, "Deep space" when neither
+  resolves), ETA (`{days:0.0} days remaining` / `Ready for orders` /
+  `ETA unavailable`) and the full `ExplorationMissionStatus.Build` summary
+  text. The evaluator port covers every reference branch: inactive fleets,
+  unfunded operating capacity, holds (at-station and post-arrival), transit
+  with chart-distance + local-transit + funding division, science
+  known/unknown detailed-survey estimates, scout reconnaissance, colony
+  no-colonists / manual-authorization / in-progress establishment / missing
+  species / survey gate / single-colony cap / no-viable-body / explicit-body
+  and best-available settlement resolution with the naturally-viable vs
+  habitat-fallback wording. All data comes from `FreshCampaignState` +
+  `Knowledge` — no foreign state is read.
+- `NativeMissionView` is a toggleable right-side panel (reference
+  `ContainPointerInput`) with the `MISSIONS & SETTLEMENT` header and
+  display-only mission cards — the reference cards have no click action.
+  `NativeUiLayout` gained `UiAction::Missions` + the top-rail MISSIONS
+  button. The reference's Colony Sites tab is already covered by the native
+  settlement workspace (candidates, authorization, order issuance), so the
+  native board intentionally ships the missions tab only.
+- The fleet smoke clicks the MISSIONS rail button, verifies the panel and
+  emits `missions=<open>:<count>`; `native_fleet_runtime` and the
+  system-travel validator require `missions=1` with a non-empty board.
+- `native_missions` CTest covers owned-only filtering, traveling/held/
+  scouting/science-survey/colony-gate summaries, unfunded suspension, the
+  eight-card cap, layout bounds, close/containment and rendering.
+
 ## Empire overview slice (candidate for review)
 
 - `app/native_client/native_overview.{hpp,cpp}` — ports the

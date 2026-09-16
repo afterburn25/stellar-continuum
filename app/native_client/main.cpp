@@ -8,6 +8,7 @@
 #include "native_galaxy_star_markers.hpp"
 #include "native_inspection.hpp"
 #include "native_logistics.hpp"
+#include "native_missions.hpp"
 #include "native_overview.hpp"
 #include "native_campaign_session.hpp"
 #include "native_colony_controller.hpp"
@@ -96,6 +97,7 @@ namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_inspection = stellar::native_inspection;
 namespace native_logistics = stellar::native_logistics;
+namespace native_missions = stellar::native_missions;
 namespace native_notifications = stellar::native_notifications;
 namespace native_overview = stellar::native_overview;
 namespace native_support = stellar::native_support;
@@ -1005,6 +1007,18 @@ class NativeCampaign final {
       }
 
     }
+    // Missions-panel parity: the MISSIONS rail button opens the observer-safe
+    // mission board (reference ExplorationMissionPanel missions tab).
+    {
+      const auto rail=NativeUiLayout::for_viewport(width,height);
+      const auto button=center(rail.missions);
+      click(button);
+      (void)scene(width,height);
+      const auto board=native_missions::build_mission_board(
+          session_->frame().runtime().world().campaign());
+      smoke_missions_=missions_view_.visible()?1:0;
+      smoke_mission_count_=static_cast<int>(board.missions.size());
+    }
   }
   void prepare_shipyard_smoke(int width,int height){
     const auto click=[&](Point point){
@@ -1682,7 +1696,8 @@ class NativeCampaign final {
        <<":hover="<<(smoke_fleet_hover_preview_?1:0)
        <<":inspect="<<(smoke_inspection_?1:0)
        <<":civilian="<<(smoke_civilian_recovery_?1:0)
-       <<":overview="<<(smoke_overview_?1:0);
+       <<":overview="<<(smoke_overview_?1:0)
+       <<":missions="<<smoke_missions_<<":"<<smoke_mission_count_;
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -1903,6 +1918,15 @@ class NativeCampaign final {
                width,height))
           continue;
       }
+      if(missions_view_.visible()&&!menu_){
+        const auto &campaign=session_->frame().runtime().world().campaign();
+        const auto command=missions_view_.handle(
+            event,native_missions::build_mission_board(campaign),width,
+            height);
+        if(command.kind==native_missions::MissionViewCommandKind::Close)
+          missions_view_.close();
+        if(command.captured)continue;
+      }
 
       if(event.type==InputEventType::EscapePressed){
         if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
@@ -2056,6 +2080,10 @@ class NativeCampaign final {
           logistics_view_.toggle();
           captured=true;
         }
+        else if(action==UiAction::Missions){
+          missions_view_.toggle();
+          captured=true;
+        }
         if(research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         if(action!=UiAction::None)audio_mixer_.play(native_audio::NativeSfx::ui_confirm);
         gesture_.begin(captured);continue;
@@ -2205,6 +2233,14 @@ class NativeCampaign final {
            logistics_view_.visible() ? Color{154, 225, 188, 255} : border);
     label(out, layout.logistics, "SUPPLY", {225, 238, 250, 255},
           layout.control_font_pixels, layout.scale);
+    fill(out, layout.missions,
+         missions_view_.visible()
+             ? selected
+             : layout.missions.contains(pointer_) ? hover : button);
+    stroke(out, layout.missions,
+           missions_view_.visible() ? Color{154, 225, 188, 255} : border);
+    label(out, layout.missions, "MISSIONS", {225, 238, 250, 255},
+          layout.control_font_pixels, layout.scale);
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 2.f * layout.scale},
         "Day " + std::to_string(static_cast<int>(
@@ -2279,6 +2315,11 @@ class NativeCampaign final {
           out,native_logistics::build_home_logistics(
                   campaign,campaign.player_civilization_id),
           width,height);
+    }
+    if(!menu_&&missions_view_.visible()){
+      const auto &campaign=session_->frame().runtime().world().campaign();
+      missions_view_.render(
+          out,native_missions::build_mission_board(campaign),width,height);
     }
     // Voice captions (reference VoiceCaptionDock): hidden while the menu or
     // diplomacy surface is open.
@@ -3067,6 +3108,7 @@ class NativeCampaign final {
   native_audio_settings::NativeAudioSettingsView audio_settings_;
   native_notifications::NativeNotificationView notification_view_;
   native_logistics::NativeLogisticsView logistics_view_;
+  native_missions::NativeMissionView missions_view_;
   std::int64_t last_played_notification_{};
   std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> diplomacy_portraits_;
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
@@ -3159,6 +3201,7 @@ class NativeCampaign final {
   std::optional<int> smoke_fleet_id_;
   bool smoke_fleet_hover_preview_{},smoke_inspection_{},
       smoke_civilian_recovery_{},smoke_overview_{};
+  int smoke_missions_{},smoke_mission_count_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};

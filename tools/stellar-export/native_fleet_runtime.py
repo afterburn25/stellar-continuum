@@ -38,13 +38,17 @@ def _fleet(payload: dict, fleet_id: int) -> tuple[dict, int]:
 def _diagnostic(stdout: str) -> tuple[int, int, int, float]:
     match = re.search(
         r" fleet=(\d+):(\d+):(\d+):([0-9.]+):hover=1:inspect=1:civilian=1"
-        r":overview=1",
+        r":overview=1:missions=1:(\d+)",
         stdout)
     if not match:
         raise RuntimeError(
             "Native fleet did not report its selected route state "
-            "(hover preview, inspection card, civilian recovery orders and "
-            "empire overview are required)")
+            "(hover preview, inspection card, civilian recovery orders, "
+            "empire overview and the missions board are required)")
+    if int(match.group(5)) < 1:
+        raise RuntimeError(
+            "Native fleet reported an empty mission board; the fixture "
+            "carries owned scout/science/colony fleets")
     fleet_id, destination, revision = map(int, match.groups()[:3])
     progress = float(match.group(4))
     if not math.isfinite(progress):
