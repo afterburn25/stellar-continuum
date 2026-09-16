@@ -443,6 +443,7 @@ add_executable(stellar_ship_art_tests
   app/native_client/native_ship_art_assets.cpp
   app/native_client/native_fleet_route_effects.cpp
   app/native_client/native_fleet_workspace.cpp
+  app/native_client/native_overview.cpp
   app/native_client/native_shipyard_workspace.cpp)
 target_include_directories(stellar_ship_art_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_ship_art_tests PRIVATE stellar_native_image stellar_core)

@@ -226,12 +226,24 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
   habitat-fallback wording. All data comes from `FreshCampaignState` +
   `Knowledge` — no foreign state is read.
 - `NativeMissionView` is a toggleable right-side panel (reference
-  `ContainPointerInput`) with the `MISSIONS & SETTLEMENT` header and
-  display-only mission cards — the reference cards have no click action.
-  `NativeUiLayout` gained `UiAction::Missions` + the top-rail MISSIONS
-  button. The reference's Colony Sites tab is already covered by the native
-  settlement workspace (candidates, authorization, order issuance), so the
-  native board intentionally ships the missions tab only.
+  `ContainPointerInput`) with the `MISSIONS & SETTLEMENT` header, the
+  reference Missions / Colony Sites tabs and display-only mission cards —
+  the reference cards have no click action. `NativeUiLayout` gained
+  `UiAction::Missions` + the top-rail MISSIONS button.
+- The Colony Sites tab ports `GetUiColonyOpportunityState` +
+  `BuildFleetOnlyDetails` / `BuildSelectedSiteDetails` /
+  `GetUiResourceOutpostOpportunityState` over the existing
+  `NativeSettlementMissionController::build` views: populated owned colony /
+  outpost fleets ordered by id, bounded 8-candidate site lists, ship/site
+  navigation, the reference detail text (viability, natural fit, unprotected
+  capacity, limiting factor, reach, authorization vs treasury, compacted
+  planner reason), the funding gate (`treasury + epsilon >= authorization`)
+  and the "Select ship on map" action (`UiFocusOwnedFleet` — selects the
+  fleet, closes the panel and centers the map camera). Owned-colony rows
+  list name / planet / system / population with a View action routed through
+  `open_overview_colony` (reference `UiOpenOwnedColony(colonyId, land:false)`).
+  The reference's Land/freight quick actions stay inside the colony and
+  logistics workspaces.
 - The fleet smoke clicks the MISSIONS rail button, verifies the panel and
   emits `missions=<open>:<count>`; `native_fleet_runtime` and the
   system-travel validator require `missions=1` with a non-empty board.

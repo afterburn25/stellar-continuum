@@ -10,6 +10,7 @@
 using namespace stellar::native_missions;
 using namespace stellar::core;
 namespace native_map = stellar::native_map;
+namespace native_colony = stellar::native_colony;
 
 namespace {
 
@@ -219,7 +220,7 @@ int main() {
     fleet.destination_system_id = 2;
     campaign.fleets = {fleet};
     const auto board = build_mission_board(campaign);
-    const auto layout = mission_layout_for(board, 1600, 900);
+    const auto layout = mission_layout_for(board, {}, 0, 1600, 900, false);
     check(layout.cards.size() == 1, "one mission must produce one card rect");
 
     NativeMissionView view;
@@ -228,7 +229,7 @@ int main() {
     close_event.type = native_map::InputEventType::LeftReleased;
     close_event.position = {layout.close_button.x + 4.f,
                             layout.close_button.y + 4.f};
-    const auto close_command = view.handle(close_event, board, 1600, 900);
+    const auto close_command = view.handle(close_event, board, {}, {}, 1600, 900);
     check(close_command.kind == MissionViewCommandKind::Close &&
               close_command.captured,
           "the close button must issue a captured Close command");
@@ -236,14 +237,14 @@ int main() {
     native_map::InputEvent map_press;
     map_press.type = native_map::InputEventType::LeftPressed;
     map_press.position = {40.f, 400.f};
-    const auto map_command = view.handle(map_press, board, 1600, 900);
+    const auto map_command = view.handle(map_press, board, {}, {}, 1600, 900);
     check(!map_command.captured,
           "a press outside the panel must reach the map");
 
     native_map::InputEvent panel_press;
     panel_press.type = native_map::InputEventType::LeftPressed;
     panel_press.position = {layout.panel.x + 30.f, layout.panel.y + 60.f};
-    const auto panel_command = view.handle(panel_press, board, 1600, 900);
+    const auto panel_command = view.handle(panel_press, board, {}, {}, 1600, 900);
     check(panel_command.captured &&
               panel_command.kind == MissionViewCommandKind::None,
           "a press inside the panel must be captured without a command");
@@ -257,14 +258,175 @@ int main() {
     native_map::InputEvent press;
     press.type = native_map::InputEventType::LeftPressed;
     press.position = {1400.f, 200.f};
-    check(!view.handle(press, board, 1600, 900).captured,
+    check(!view.handle(press, board, {}, {}, 1600, 900).captured,
           "a hidden view must ignore input");
     native_map::DrawList out;
-    view.render(out, board, 1600, 900);
+    view.render(out, board, {}, {}, 1600, 900);
     check(out.overlay.empty(), "a hidden view must not render");
     view.open();
-    view.render(out, board, 1600, 900);
+    view.render(out, board, {}, {}, 1600, 900);
     check(!out.overlay.empty(), "a visible view must render the panel");
+  }
+  {
+    // Colony-sites tab: no populated colony ships → unavailable state.
+    const auto selection = colony_site_selection({}, 0, 0);
+    check(!selection.available && !selection.fleet_id,
+          "an empty fleet list must leave the site browser unavailable");
+    check(selection.details.find("No populated colony ships") !=
+              std::string::npos,
+          "the empty sites state must carry the reference guidance");
+  }
+  {
+    // Colony-sites tab with a fleet view: clamps indices, carries site ids.
+    native_colony::NativeSettlementMissionView view;
+    view.fleet_id = 21;
+    view.fleet_name = "CSV Horizon";
+    view.personnel_species_name = "Terran Baseline";
+    view.personnel_millions = 2.5;
+    view.can_receive_orders = true;
+    view.treasury_budget_units = 500.0;
+    view.authorization_budget_units = 120.0;
+    view.formatted_authorization = "120 SC";
+    view.formatted_treasury = "500 SC";
+    native_colony::NativeSettlementCandidate site;
+    site.system_id = 2;
+    site.body_id = 7;
+    site.system_name = "Proxima";
+    site.body_name = "Proxima b";
+    site.can_order = true;
+    site.reason = "Within operational reach.";
+    site.viability = SpeciesColonizationViability::NaturallyViable;
+    site.reach.is_supported = true;
+    site.reach.is_authoritative = true;
+    view.candidates = {site};
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{
+        view};
+    const auto selection = colony_site_selection(fleets, 4, 9);
+    check(selection.fleet_index == 0 && selection.site_index == 0,
+          "site indices must clamp into the bounded lists");
+    check(selection.fleet_id == 21 && selection.site_system_id == 2 &&
+              selection.site_body_id == 7,
+          "the selection must carry the fleet and site identities");
+    check(selection.can_settle,
+          "an orderable, funded site must permit settlement");
+    check(selection.details.find("Colony ship 1/1: CSV Horizon") !=
+                  std::string::npos &&
+              selection.details.find("Proxima / Proxima b") !=
+                  std::string::npos &&
+              selection.details.find("natural") != std::string::npos,
+          "the site details must match the reference builder");
+  }
+  {
+    // Unfunded site: can_settle drops and the status asks for funding.
+    native_colony::NativeSettlementMissionView view;
+    view.fleet_id = 21;
+    view.fleet_name = "CSV Horizon";
+    view.can_receive_orders = true;
+    view.treasury_budget_units = 40.0;
+    view.authorization_budget_units = 120.0;
+    view.formatted_authorization = "120 SC";
+    view.formatted_treasury = "40 SC";
+    native_colony::NativeSettlementCandidate site;
+    site.system_id = 2;
+    site.body_id = 7;
+    site.can_order = true;
+    site.reason = "Within operational reach.";
+    view.candidates = {site};
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{
+        view};
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    check(!selection.can_settle,
+          "an unfunded site must not permit settlement");
+    check(selection.status.find("Settlement requires 120 SC") !=
+              std::string::npos,
+          "the status must report the funding shortfall");
+  }
+  {
+    // Owned colony rows: own-only filtering, names resolved.
+    auto campaign = campaign_fixture();
+    Colony own;
+    own.id = 30;
+    own.civilization_id = 1;
+    own.system_id = 1;
+    own.name = "Landing";
+    own.population_millions = 12.5;
+    Colony foreign;
+    foreign.id = 31;
+    foreign.civilization_id = 2;
+    foreign.system_id = 2;
+    campaign.colonies = {foreign, own};
+    const auto rows = build_owned_colony_rows(campaign);
+    check(rows.size() == 1 && rows.front().colony_id == 30 &&
+              rows.front().system_name == "Sol" &&
+              rows.front().planet_name == "Orbital habitat",
+          "owned colony rows must filter foreign colonies");
+  }
+  {
+    // Sites tab interaction: tab switch, select-ship focus, colony View.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    native_colony::NativeSettlementMissionView view;
+    view.fleet_id = 21;
+    view.fleet_name = "CSV Horizon";
+    view.can_receive_orders = true;
+    view.treasury_budget_units = 500.0;
+    view.authorization_budget_units = 120.0;
+    native_colony::NativeSettlementCandidate site;
+    site.system_id = 2;
+    site.body_id = 7;
+    site.can_order = true;
+    view.candidates = {site};
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{
+        view};
+    Colony own;
+    own.id = 30;
+    own.civilization_id = 1;
+    own.system_id = 1;
+    own.name = "Landing";
+    campaign.colonies = {own};
+    const auto colonies = build_owned_colony_rows(campaign);
+
+    NativeMissionView panel;
+    panel.open();
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    const auto layout =
+        mission_layout_for(board, selection, colonies.size(), 1600, 900,
+                           true);
+
+    // Open the sites tab.
+    native_map::InputEvent tab;
+    tab.type = native_map::InputEventType::LeftReleased;
+    tab.position = {layout.sites_tab.x + 4.f, layout.sites_tab.y + 4.f};
+    const auto tab_command =
+        panel.handle(tab, board, fleets, colonies, 1600, 900);
+    check(tab_command.captured &&
+              tab_command.kind == MissionViewCommandKind::None,
+          "the sites tab must be captured without a command");
+
+    // Select ship on map → FocusFleet.
+    native_map::InputEvent pick;
+    pick.type = native_map::InputEventType::LeftReleased;
+    pick.position = {layout.select_ship.x + 4.f, layout.select_ship.y + 4.f};
+    const auto pick_command =
+        panel.handle(pick, board, fleets, colonies, 1600, 900);
+    check(pick_command.kind == MissionViewCommandKind::FocusFleet &&
+              pick_command.fleet_id == 21,
+          "select-ship must issue FocusFleet for the chosen fleet");
+
+    // Owned colony View → OpenColony.
+    native_map::InputEvent open;
+    open.type = native_map::InputEventType::LeftReleased;
+    open.position = {layout.colony_view_buttons.front().x + 4.f,
+                     layout.colony_view_buttons.front().y + 4.f};
+    const auto open_command =
+        panel.handle(open, board, fleets, colonies, 1600, 900);
+    check(open_command.kind == MissionViewCommandKind::OpenColony &&
+              open_command.colony_id == 30,
+          "a colony View button must issue OpenColony");
+
+    native_map::DrawList out;
+    panel.render(out, board, fleets, colonies, 1600, 900);
+    check(!out.overlay.empty(), "the sites tab must render");
   }
   if (failures > 0) {
     std::cerr << failures << " mission panel checks failed\n";

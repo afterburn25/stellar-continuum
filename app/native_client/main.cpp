@@ -1018,6 +1018,20 @@ class NativeCampaign final {
           session_->frame().runtime().world().campaign());
       smoke_missions_=missions_view_.visible()?1:0;
       smoke_mission_count_=static_cast<int>(board.missions.size());
+      // Colony Sites tab: switch tabs and record the bounded site-browser
+      // state (reference GetUiColonyOpportunityState).
+      const auto &campaign=session_->frame().runtime().world().campaign();
+      const auto site_fleets=settlement_controller_.build(
+          session_->frame(),session_->cache().generation);
+      const auto colonies=native_missions::build_owned_colony_rows(campaign);
+      const auto sites_layout=native_missions::mission_layout_for(
+          board,native_missions::colony_site_selection(site_fleets,0,0),
+          colonies.size(),width,height,true);
+      click(center(sites_layout.sites_tab));
+      const auto selection=native_missions::colony_site_selection(
+          site_fleets,0,0);
+      smoke_mission_sites_=static_cast<int>(site_fleets.size());
+      smoke_mission_site_selection_=selection.available?1:0;
     }
   }
   void prepare_shipyard_smoke(int width,int height){
@@ -1697,7 +1711,8 @@ class NativeCampaign final {
        <<":inspect="<<(smoke_inspection_?1:0)
        <<":civilian="<<(smoke_civilian_recovery_?1:0)
        <<":overview="<<(smoke_overview_?1:0)
-       <<":missions="<<smoke_missions_<<":"<<smoke_mission_count_;
+       <<":missions="<<smoke_missions_<<":"<<smoke_mission_count_
+       <<":sites="<<smoke_mission_sites_<<":"<<smoke_mission_site_selection_;
     return out.str();
   }
   [[nodiscard]] std::string shipyard_smoke_status()const{
@@ -1920,11 +1935,35 @@ class NativeCampaign final {
       }
       if(missions_view_.visible()&&!menu_){
         const auto &campaign=session_->frame().runtime().world().campaign();
+        const auto site_fleets=settlement_controller_.build(
+            session_->frame(),session_->cache().generation);
+        const auto colony_rows=
+            native_missions::build_owned_colony_rows(campaign);
         const auto command=missions_view_.handle(
-            event,native_missions::build_mission_board(campaign),width,
-            height);
+            event,native_missions::build_mission_board(campaign),site_fleets,
+            colony_rows,width,height);
         if(command.kind==native_missions::MissionViewCommandKind::Close)
           missions_view_.close();
+        else if(command.kind==native_missions::MissionViewCommandKind::
+                    FocusFleet){
+          const auto selected=fleet_controller_.select(
+              session_->frame(),session_->cache().generation,
+              command.fleet_id);
+          if(selected.accepted){
+            missions_view_.close();
+            const auto &world=campaign;
+            if(const auto fleet=std::ranges::find(world.fleets,command.fleet_id,
+                                                  &FleetState::id);
+               fleet!=world.fleets.end())
+              camera_.center={fleet->position.x,fleet->position.y};
+            session_->publish_status(selected.message);
+          }
+        }
+        else if(command.kind==native_missions::MissionViewCommandKind::
+                    OpenColony){
+          missions_view_.close();
+          open_overview_colony(command.colony_id,width,height);
+        }
         if(command.captured)continue;
       }
 
@@ -2318,8 +2357,11 @@ class NativeCampaign final {
     }
     if(!menu_&&missions_view_.visible()){
       const auto &campaign=session_->frame().runtime().world().campaign();
+      const auto site_fleets=settlement_controller_.build(
+          session_->frame(),session_->cache().generation);
       missions_view_.render(
-          out,native_missions::build_mission_board(campaign),width,height);
+          out,native_missions::build_mission_board(campaign),site_fleets,
+          native_missions::build_owned_colony_rows(campaign),width,height);
     }
     // Voice captions (reference VoiceCaptionDock): hidden while the menu or
     // diplomacy surface is open.
@@ -3201,7 +3243,8 @@ class NativeCampaign final {
   std::optional<int> smoke_fleet_id_;
   bool smoke_fleet_hover_preview_{},smoke_inspection_{},
       smoke_civilian_recovery_{},smoke_overview_{};
-  int smoke_missions_{},smoke_mission_count_{};
+  int smoke_missions_{},smoke_mission_count_{},smoke_mission_sites_{},
+      smoke_mission_site_selection_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{};
   double smoke_system_day_{};
