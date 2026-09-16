@@ -3,8 +3,9 @@
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
 `d9d23f57` inventoried; support, notifications, tactical, civilian recovery
-safe video settings, observer-safe system inspection and save-gated New Game selectively adapted. New voice,
-logistics and newest empire/mission boards remain unimported pending review).
+safe video settings, observer-safe system inspection, home-system supply and
+save-gated New Game selectively adapted. New voice and newest empire/mission
+boards remain unimported pending review).
 Codex working branch: `cpp/codex-native-architecture-integration`, based on `ac45d958`.
 Reference: Godot 4.7.2 / C# / .NET 8 under `src/`, retained as behavioral and visual truth.
 
@@ -15,7 +16,46 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-15)
 
-### Observer-safe galaxy system inspection
+### Native home-system supply workspace
+
+The Supply rail icon now opens an organized, read-only home-system network:
+available surplus, import demand, delivered supply, shortfall, and every owned
+location with facility kind/status/daily values. Tiny positive values show <0.01.
+This selectively adapts Devin ea9164e9 without swallowed-initializing errors,
+duplicate Core projection or an eight-row cutoff. Actual player/home identity and
+required records are validated. Failure clears stale values, provides Retry,
+logs the exception diagnostic, and latches until explicit retry or new identity.
+One Core home_system_logistics call per admitted refresh; no rules/schema/C# edits.
+
+The measured, clipped table caches detached index-based geometry. Unchanged
+frames do not measure rows again; names, viewport and measurer changes invalidate
+it. Pinned controls and bounded wheel/drag capture prevent map/fleet input leaks.
+Automatic queries require changed simulation time and at least one second while
+visible; paused frames use cached results. Navigation/battle/replacement close
+or clear the panel appropriately. Contract: docs/engine/NATIVE_SUPPLY_NETWORK.md.
+
+Validation: final MSVC build and all 14 targeted CTests pass, including two Core
+logistics parity suites. Export Python discovery: 455 tests, 438 passed / 17
+optional STELLAR_NATIVE_EXE cases skipped; final strict supply-proof tests pass.
+Relocated Vulkan 720p fresh / 1080p reload verify actual navigation, canonical
+totals, projection counts, paused caching, bounded scroll/drag, Refresh, Research
+switching, Close and complete unchanged Player17 state except SavedAtUtc.
+Final screenshots inspected. Existing relocated navigation and fleet suites pass.
+Evidence: work/native-supply-{build,ctest,python}.log and
+work/native-supply-{runtime,navigation,fleet}.json; captures under
+work/native-audio-validation/package-supply-*.bmp. Validation package is UNSEALED.
+It reports the existing Core shortage; no synthetic surplus conceals it.
+
+Next: review/adapt Devin 641955f0 physical/environment inspection to make surveyed
+planet conditions readable in the system view; keep unknown physical values and
+foreign live colony telemetry sealed and respect metric units. Review 1c8e9744
+surface management after that, including current generation/ownership revalidation
+for every command. Latest fetched Devin head remains d9d23f57; bc681eb6 generated
+planet discs, fe364430 star discs, and d9d23f57 mission Land/Collect are inventoried
+only. Preserve approved Sol textures, observer authority and bounded artwork
+lifecycle. Shared base ac45d958 and PR332 remain unmerged.
+
+### Previous checkpoint: observer-safe galaxy system inspection
 
 Single-clicking a star now opens a native system card with survey progress,
 metric/light-year distance from home, authorized stellar findings and every
@@ -44,15 +84,7 @@ Evidence: work/native-inspection-{build,ctest,python}.log and
 work/native-inspection-{runtime,navigation,fleet}.json; captures under
 work/native-audio-validation/package-inspection-*.bmp. The package is UNSEALED.
 
-Next: adapt ea9164e9 supply network with explicit unavailable/failed/retry states,
-validated player/home identity, a single Core projection per refresh, and bounded
-input/layout. Never turn exceptions into permanent “initializing” or invent supply
-values. Latest fetched Devin head d9d23f57 includes bc681eb6 generated planet art,
-fe364430 generated star art and d9d23f57 mission Land/Collect commands; these are
-inventoried only. Review observer visibility, command revalidation, alpha edges,
-bounded image preparation, asset provenance and preservation of approved Sol
-textures before import. Earlier 641955f0 physical inspector and 1c8e9744 surface
-management remain unimported. Shared base ac45d958 and PR332 remain unmerged.
+The subsequent supply milestone above supersedes the supply follow-up from this checkpoint.
 
 ### Previous checkpoint: safe native video settings
 

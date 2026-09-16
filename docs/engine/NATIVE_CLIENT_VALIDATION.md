@@ -460,3 +460,15 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 ## Remaining migration
 
 Production HUD styling, full construction/unlock progression, detailed 3D planet/surface views, authoritative physical orbital sites, tactical presentation, broader character casting and dynamic speech remain. The native RELATIONS workspace covers the sections present in its C# reference; grievances and a demand/trade composer would be new product work rather than an unported reference gap. Native new-game selection/generation, orbital browsing, owned-colony telemetry, ship-delivered settlement, operational surface placement/cancellation, fixed audio/voice cues and diplomacy are integrated. These are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+
+## Native home-system supply validation
+
+The Supply rail entry opens read-only home-system totals and every authorized
+location. Maintained headless tests cover disclosure, missing state, failure and
+explicit retry, text geometry and pointer capture. The graphical exporter also
+runs fresh 720p and loaded 1080p native input replays with isolated Player17 saves,
+restricted PATH and an unrelated Unicode working directory. It verifies one
+projection per explicit refresh, paused caching, canonical totals, workspace
+isolation and complete save equality. See NATIVE_SUPPLY_NETWORK.md for scope,
+failure contracts and evidence details. A supply deficit is displayed as reported
+by Core; this UI does not manufacture a healthy network or alter economy rules.

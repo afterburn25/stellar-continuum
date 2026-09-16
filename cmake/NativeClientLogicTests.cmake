@@ -1,3 +1,16 @@
+add_executable(stellar_native_logistics_tests native-tests/native_logistics_tests.cpp app/native_client/native_logistics.cpp)
+target_include_directories(stellar_native_logistics_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_logistics_tests PRIVATE stellar_core)
+add_test(NAME native_logistics COMMAND stellar_native_logistics_tests)
+add_executable(stellar_native_logistics_workspace_tests native-tests/native_logistics_workspace_tests.cpp app/native_client/native_logistics_workspace.cpp)
+target_include_directories(stellar_native_logistics_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_logistics_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_logistics_workspace COMMAND stellar_native_logistics_workspace_tests)
+if(MSVC)
+  target_compile_options(stellar_native_logistics_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_logistics_workspace_tests PRIVATE /W4 /WX)
+endif()
+
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
 add_executable(stellar_native_inspection_tests
   native-tests/native_inspection_tests.cpp app/native_client/native_inspection.cpp)
