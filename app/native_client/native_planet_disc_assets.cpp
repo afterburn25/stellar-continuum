@@ -1,5 +1,7 @@
 #include "native_planet_disc_assets.hpp"
 
+#include <stellar/engine/native_image_preparation.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -75,20 +77,41 @@ struct SourceDisc {float center_x{},center_y{},radius_x{},radius_y{};};
 struct NativePlanetDiscAssets::Storage {
   struct Key {std::uint64_t generation{};int body_id{};bool fully_surveyed{};NativeSystemBodyVisualClass visual_class{};std::optional<std::string> texture_key;std::uint32_t seed{};int lighting_step{};bool operator==(const Key&)const=default;};
   struct Entry {Key key;std::shared_ptr<const RgbaImage> image;std::uint64_t last_use{};};
+  struct Pending {Key key;stellar::native_map::ImagePreparationQueue::Ticket ticket;};
   explicit Storage(std::filesystem::path root){if(root.empty())throw std::invalid_argument("A Sol appearance asset directory is required.");asset_root=std::filesystem::absolute(std::move(root));}
-  std::filesystem::path asset_root;std::thread::id owner{std::this_thread::get_id()};std::optional<std::uint64_t> generation;std::vector<Entry> cache;std::size_t bytes{};std::uint64_t use{},decodes{},generated{};
+  std::filesystem::path asset_root;std::thread::id owner{std::this_thread::get_id()};std::optional<std::uint64_t> generation;std::vector<Entry> cache;std::vector<Pending> pending;std::shared_ptr<stellar::native_map::ImagePreparationQueue> preparation;std::size_t bytes{};std::uint64_t use{},decodes{},generated{};
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("Planet disc assets must be used on their owner thread.");}
-  void bind(std::uint64_t value){if(generation&&value<*generation)throw std::invalid_argument("A stale campaign generation cannot replace planet disc assets.");if(!generation||*generation!=value){cache.clear();bytes=0;generation=value;}}
+  void clear_pending()noexcept{pending.clear();}
+  void bind(std::uint64_t value){if(generation&&value<*generation)throw std::invalid_argument("A stale campaign generation cannot replace planet disc assets.");if(!generation||*generation!=value){clear_pending();cache.clear();bytes=0;generation=value;}}
   void evict(std::size_t incoming){if(incoming>maximum_planet_disc_bytes)throw std::length_error("A generated planet disc exceeds the cache byte limit.");while(cache.size()>=maximum_planet_disc_entries||bytes+incoming>maximum_planet_disc_bytes){const auto oldest=std::ranges::min_element(cache,{},&Entry::last_use);if(oldest==cache.end())break;bytes-=oldest->image->byte_size();cache.erase(oldest);}}
+  void cache_image(Key key,std::shared_ptr<const RgbaImage> result){evict(result->byte_size());cache.push_back({std::move(key),std::move(result),++use});bytes+=cache.back().image->byte_size();++generated;}
+  void collect_ready(){for(std::size_t index{};index<pending.size();){if(!pending[index].ticket.ready()){++index;continue;}auto key=std::move(pending[index].key);auto ticket=std::move(pending[index].ticket);pending.erase(pending.begin()+static_cast<std::ptrdiff_t>(index));auto result=ticket.take();if(key.texture_key)++decodes;cache_image(std::move(key),std::move(result));}}
 };
 
 NativePlanetDiscAssets::NativePlanetDiscAssets(std::filesystem::path root):storage_(std::make_unique<Storage>(std::move(root))){}
 NativePlanetDiscAssets::~NativePlanetDiscAssets()=default;
-std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::image(const SystemBodyAppearance &appearance){
-  storage_->require_owner();storage_->bind(appearance.campaign_generation);if(appearance.body_id<0)throw std::invalid_argument("Planet disc body identity must be nonnegative.");if(!std::isfinite(appearance.lighting_longitude))throw std::invalid_argument("Planet disc lighting must be finite.");if(!appearance.fully_surveyed&&!unknown_class(appearance.visual_class))throw std::invalid_argument("Reconnaissance bodies cannot request a known visual class.");if(appearance.texture_key&&(!appearance.fully_surveyed||unknown_class(appearance.visual_class)))throw std::invalid_argument("Observer-hidden bodies cannot request a Sol appearance asset.");if(unknown_class(appearance.visual_class))return {};
-  if(appearance.texture_key&&!canonical_key(*appearance.texture_key))throw std::invalid_argument("The observer-safe Sol appearance key is not approved.");const auto lighting_step=static_cast<int>(std::lround(std::remainder(appearance.lighting_longitude,2.f*std::numbers::pi_v<float>)*4096.f));Storage::Key key{appearance.campaign_generation,appearance.body_id,appearance.fully_surveyed,appearance.visual_class,appearance.texture_key,appearance.deterministic_seed,lighting_step};if(const auto found=std::ranges::find(storage_->cache,key,&Storage::Entry::key);found!=storage_->cache.end()){found->last_use=++storage_->use;return found->image;}
-  std::shared_ptr<const RgbaImage> source;if(appearance.texture_key){const auto path=storage_->asset_root/(*appearance.texture_key+".jpg");try{source=stellar::native_map::decode_rgba_image(path);}catch(const std::exception &error){const auto value=path.u8string();throw std::runtime_error("Planet appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(value.data()),value.size())+": "+error.what());}++storage_->decodes;}const auto result=generate_disc(appearance,source.get(),appearance.texture_key?source_disc(*appearance.texture_key):std::nullopt,lighting_step);source.reset();storage_->evict(result->byte_size());storage_->cache.push_back({std::move(key),result,++storage_->use});storage_->bytes+=result->byte_size();++storage_->generated;return result;
+namespace {
+void validate(const SystemBodyAppearance &appearance){
+  if(appearance.body_id<0)throw std::invalid_argument("Planet disc body identity must be nonnegative.");if(!std::isfinite(appearance.lighting_longitude))throw std::invalid_argument("Planet disc lighting must be finite.");if(!appearance.fully_surveyed&&!unknown_class(appearance.visual_class))throw std::invalid_argument("Reconnaissance bodies cannot request a known visual class.");if(appearance.texture_key&&(!appearance.fully_surveyed||unknown_class(appearance.visual_class)))throw std::invalid_argument("Observer-hidden bodies cannot request a Sol appearance asset.");if(appearance.texture_key&&!canonical_key(*appearance.texture_key))throw std::invalid_argument("The observer-safe Sol appearance key is not approved.");
 }
-void NativePlanetDiscAssets::discard_campaign()noexcept{storage_->cache.clear();storage_->bytes=0;storage_->generation.reset();}
+int lighting_step_for(const SystemBodyAppearance &appearance){return static_cast<int>(std::lround(std::remainder(appearance.lighting_longitude,2.f*std::numbers::pi_v<float>)*4096.f));}
+std::shared_ptr<const RgbaImage> prepare_disc(SystemBodyAppearance appearance,std::filesystem::path root,int lighting_step){
+  std::shared_ptr<const RgbaImage> source;if(appearance.texture_key){const auto path=root/(*appearance.texture_key+".jpg");try{source=stellar::native_map::decode_rgba_image(path);}catch(const std::exception &error){const auto value=path.u8string();throw std::runtime_error("Planet appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(value.data()),value.size())+": "+error.what());}}
+  return generate_disc(appearance,source.get(),appearance.texture_key?source_disc(*appearance.texture_key):std::nullopt,lighting_step);
+}
+}
+std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::image(const SystemBodyAppearance &appearance){
+  storage_->require_owner();storage_->bind(appearance.campaign_generation);validate(appearance);if(unknown_class(appearance.visual_class))return {};const auto lighting_step=lighting_step_for(appearance);Storage::Key key{appearance.campaign_generation,appearance.body_id,appearance.fully_surveyed,appearance.visual_class,appearance.texture_key,appearance.deterministic_seed,lighting_step};if(const auto found=std::ranges::find(storage_->cache,key,&Storage::Entry::key);found!=storage_->cache.end()){found->last_use=++storage_->use;return found->image;}
+  if(const auto pending=std::ranges::find(storage_->pending,key,&Storage::Pending::key);pending!=storage_->pending.end())storage_->pending.erase(pending);
+  const auto result=prepare_disc(appearance,storage_->asset_root,lighting_step);if(appearance.texture_key)++storage_->decodes;storage_->cache_image(std::move(key),result);return result;
+}
+void NativePlanetDiscAssets::use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue> queue){storage_->require_owner();storage_->clear_pending();storage_->preparation=std::move(queue);}
+std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::request_image(const SystemBodyAppearance &appearance){
+  storage_->require_owner();storage_->bind(appearance.campaign_generation);validate(appearance);if(unknown_class(appearance.visual_class))return {};storage_->collect_ready();const auto lighting_step=lighting_step_for(appearance);Storage::Key key{appearance.campaign_generation,appearance.body_id,appearance.fully_surveyed,appearance.visual_class,appearance.texture_key,appearance.deterministic_seed,lighting_step};if(const auto found=std::ranges::find(storage_->cache,key,&Storage::Entry::key);found!=storage_->cache.end()){found->last_use=++storage_->use;return found->image;}
+  if(!storage_->preparation)return image(appearance);if(std::ranges::find(storage_->pending,key,&Storage::Pending::key)!=storage_->pending.end())return {};
+  auto copied=appearance;auto root=storage_->asset_root;const auto reservation=256u*256u*4u;auto ticket=storage_->preparation->submit(reservation,[copied=std::move(copied),root=std::move(root),lighting_step]{return prepare_disc(copied,root,lighting_step);});if(!ticket)return {};storage_->pending.push_back({std::move(key),std::move(*ticket)});return {};
+}
+void NativePlanetDiscAssets::discard_campaign()noexcept{storage_->clear_pending();storage_->cache.clear();storage_->bytes=0;storage_->generation.reset();}
 std::size_t NativePlanetDiscAssets::cache_entries()const noexcept{return storage_->cache.size();}std::size_t NativePlanetDiscAssets::cache_bytes()const noexcept{return storage_->bytes;}std::uint64_t NativePlanetDiscAssets::source_decode_count()const noexcept{return storage_->decodes;}std::uint64_t NativePlanetDiscAssets::generated_disc_count()const noexcept{return storage_->generated;}
+std::size_t NativePlanetDiscAssets::pending_count()const noexcept{return storage_->pending.size();}
 } // namespace stellar::native_system_ui

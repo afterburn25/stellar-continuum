@@ -1,13 +1,20 @@
 #include "native_galaxy_backdrop.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <mutex>
 #include <ranges>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <variant>
+#include <vector>
 
 using namespace stellar::native_galaxy_ui;
 using namespace stellar::native_map;
@@ -15,6 +22,71 @@ using namespace stellar::native_map;
 namespace {
 void require(bool value, const char *message) {
   if (!value) throw std::runtime_error(message);
+}
+
+struct WorkerGate {
+  struct State { std::mutex mutex; std::condition_variable changed; bool started{}, released{}; };
+  std::shared_ptr<State> state{std::make_shared<State>()};
+  ~WorkerGate() { release(); }
+  static std::shared_ptr<const RgbaImage> block(const std::shared_ptr<State> &value) {
+    std::unique_lock lock(value->mutex);
+    value->started=true; value->changed.notify_all();
+    value->changed.wait(lock,[&]{return value->released;});
+    return RgbaImage::create(1,1,{0,0,0,0});
+  }
+  void wait_started() {
+    std::unique_lock lock(state->mutex);
+    require(state->changed.wait_for(lock,std::chrono::seconds(15),[&]{return state->started;}),
+            "Galaxy worker did not reach the preparation barrier.");
+  }
+  void release() {
+    { std::lock_guard lock(state->mutex); state->released=true; }
+    state->changed.notify_all();
+  }
+};
+
+class OversizeArtworkFixture final {
+ public:
+  OversizeArtworkFixture() {
+    try {
+      parent_=std::filesystem::canonical(std::filesystem::temp_directory_path());
+      const auto stamp=std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      root_=parent_/("stellar-galaxy-oversize-"+std::to_string(stamp));
+      if(!std::filesystem::create_directory(root_))throw std::runtime_error("Galaxy fixture directory already exists.");
+      owns_root_=true;
+      std::filesystem::create_directories(root_/"assets/visual/space");
+      const auto source=root_/"assets/visual/space/deep-field-v2.png";
+      std::ofstream output(source,std::ios::binary|std::ios::trunc);
+      if(!output)throw std::runtime_error("Could not create oversized galaxy fixture.");
+      const auto put16=[&](std::uint16_t value){output.put(static_cast<char>(value&255u));output.put(static_cast<char>(value>>8u));};
+      const auto put32=[&](std::uint32_t value){put16(static_cast<std::uint16_t>(value));put16(static_cast<std::uint16_t>(value>>16u));};
+      constexpr std::uint32_t width=2049,height=1024,bytes=width*height*4u;
+      put16(0x4d42u);put32(54u+bytes);put16(0);put16(0);put32(54);put32(40);put32(width);put32(height);put16(1);put16(32);put32(0);put32(bytes);put32(0);put32(0);put32(0);put32(0);
+      std::vector<std::uint8_t> row(static_cast<std::size_t>(width)*4u);
+      for(std::uint32_t y{};y<height;++y)output.write(reinterpret_cast<const char*>(row.data()),static_cast<std::streamsize>(row.size()));
+      if(!output)throw std::runtime_error("Could not write oversized galaxy fixture.");
+    } catch (...) {cleanup();throw;}
+  }
+  ~OversizeArtworkFixture() {cleanup();}
+  [[nodiscard]]const std::filesystem::path &root()const noexcept{return root_;}
+ private:
+  void cleanup() noexcept {
+    if(!owns_root_)return;
+    std::error_code error;
+    const auto root=std::filesystem::weakly_canonical(root_,error);
+    if(error||root.parent_path()!=parent_||root.filename().string().rfind("stellar-galaxy-oversize-",0)!=0)return;
+    std::filesystem::remove_all(root,error);
+  }
+  std::filesystem::path parent_,root_;
+  bool owns_root_{};
+};
+
+template<class Predicate> void await(Predicate ready) {
+  const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+  while(!ready()) {
+    require(std::chrono::steady_clock::now()<deadline,"Galaxy background preparation timed out.");
+    std::this_thread::yield();
+  }
 }
 
 GalaxyBackdropCatalog catalog(std::uint64_t generation = 7) {
@@ -185,6 +257,101 @@ void secrecy_generation_and_order(const std::filesystem::path &root) {
               std::get<Text>(ordered.world[4]).value == "Known",
           "Canonical foreground was not ordered above the backdrop.");
 }
+
+void background_layers_and_pixels(const std::filesystem::path &root) {
+  NativeGalaxyBackdropAssets reference(root);
+  auto queue=std::make_shared<ImagePreparationQueue>();
+  WorkerGate gate;
+  auto barrier=*queue->submit(4,[state=gate.state]{return WorkerGate::block(state);});
+  gate.wait_started();
+  NativeGalaxyBackdropAssets assets(root);
+  assets.use_background_preparation(queue);
+  NativeGalaxyBackdrop backdrop(assets);
+  backdrop.bind(catalog());
+  const auto fitted=backdrop.fit_camera(1280,720);
+  const GalaxyBackdropView overview{7,1280,720,fitted,fitted.pixels_per_world,true};
+  const GalaxyBackdropView regional{7,1920,1080,{{40.,-18.},.7},.1,true};
+  DrawList scene;
+  backdrop.append(scene,{7,1280,720,fitted,fitted.pixels_per_world,false});
+  require(scene.world.empty()&&assets.pending_count()==0&&backdrop.artwork_ready(),
+          "Non-galaxy view requested or waited for galaxy images.");
+  backdrop.append(scene,overview);
+  require(!backdrop.artwork_ready()&&assets.pending_count()==2&&images(scene)==1&&
+              backdrop.last_render_stats().undisclosed_core_fog_images==1,
+          "Pending overview lost core fog or claimed finished scenery.");
+  scene={};backdrop.append(scene,overview);
+  require(assets.pending_count()==2,"Repeated frame admitted duplicate galaxy decodes.");
+  scene={};backdrop.append(scene,regional);
+  require(!backdrop.artwork_ready()&&assets.pending_count()==3&&images(scene)==1&&
+              backdrop.last_render_stats().regional_points==356&&
+              backdrop.last_render_stats().undisclosed_core_fog_images==1,
+          "Pending regional view lost its observer fog or decorative stars.");
+  gate.release();await([&]{return barrier.ready();});barrier.cancel();
+  await([&]{scene={};backdrop.append(scene,regional);return backdrop.artwork_ready();});
+  require(assets.decoded_count()==3&&assets.pending_count()==0&&images(scene)==2,
+          "Changing view stranded completed galaxy requests or skipped scenery.");
+  scene={};backdrop.append(scene,overview);
+  require(backdrop.artwork_ready()&&images(scene)==3,"Ready overview did not restore all image layers.");
+  const auto equal=[](const auto &a,const auto &b){return a->width()==b->width()&&a->height()==b->height()&&a->pixels()==b->pixels();};
+  require(equal(assets.deep_field(),reference.deep_field())&&
+              equal(assets.galaxy_layer(),reference.galaxy_layer())&&
+              equal(assets.regional_nebula(),reference.regional_nebula())&&
+              equal(assets.undisclosed_core_fog(),reference.undisclosed_core_fog()),
+          "Background galaxy preparation changed final source RGBA.");
+  backdrop.discard_campaign();backdrop.bind(catalog(8));
+  require(assets.pending_count()==0&&assets.decoded_count()==3&&
+              assets.request_deep_field()==assets.deep_field(),
+          "Campaign discard unnecessarily lost reusable generic scenery.");
+}
+
+void background_capacity_cancel_and_failure(const std::filesystem::path &root) {
+  auto queue=std::make_shared<ImagePreparationQueue>(2,NativeGalaxyBackdropAssets::maximum_prepared_image_bytes+4u);
+  WorkerGate gate;
+  auto barrier=*queue->submit(4,[state=gate.state]{return WorkerGate::block(state);});
+  gate.wait_started();
+  NativeGalaxyBackdropAssets assets(root);assets.use_background_preparation(queue);
+  NativeGalaxyBackdrop backdrop(assets);backdrop.bind(catalog());
+  require(!assets.request_deep_field()&&assets.pending_count()==1,"Cold deep field was not queued.");
+  require(!assets.request_regional_nebula()&&assets.pending_count()==1,"Galaxy requests exceeded reserved output capacity.");
+  backdrop.discard_campaign();
+  require(assets.pending_count()==0&&assets.decoded_count()==0&&backdrop.artwork_ready(),
+          "Discard retained a queued galaxy decode or pending capture.");
+  gate.release();await([&]{return barrier.ready();});barrier.cancel();
+  std::shared_ptr<const RgbaImage> result;
+  await([&]{result=assets.request_regional_nebula();return static_cast<bool>(result);});
+  require(assets.decoded_count()==1&&assets.pending_count()==0,
+          "Canceled galaxy requests repopulated the cache or prevented a capacity retry.");
+  bool owner_rejected{};
+  std::jthread other([&]{try{(void)assets.request_deep_field();}catch(const std::logic_error&){owner_rejected=true;}});
+  other.join();require(owner_rejected,"Galaxy request accepted a non-owner thread.");
+  NativeGalaxyBackdropAssets missing(root/"nonexistent-galaxy-fixture");
+  missing.use_background_preparation(queue);
+  require(!missing.request_deep_field(),"Missing source request blocked instead of deferring.");
+  bool failed{};
+  try{await([&]{return static_cast<bool>(missing.request_deep_field());});}
+  catch(const std::runtime_error &error){const std::string message=error.what();failed=message.find("deep-field-v2.png")!=std::string::npos&&message.find("nonexistent-galaxy-fixture")!=std::string::npos;}
+  require(failed&&missing.pending_count()==0&&missing.decoded_count()==0,
+          "Background galaxy failure lacked its path or retained a pending request.");
+}
+
+void oversized_artwork_is_never_cached() {
+  OversizeArtworkFixture fixture;
+  NativeGalaxyBackdropAssets synchronous(fixture.root());
+  bool first_rejected{},second_rejected{};
+  try{(void)synchronous.deep_field();}catch(const std::runtime_error&){first_rejected=true;}
+  try{(void)synchronous.deep_field();}catch(const std::runtime_error&){second_rejected=true;}
+  require(first_rejected&&second_rejected&&synchronous.decoded_count()==0,
+          "Oversized synchronous artwork was cached after rejection.");
+  auto queue=std::make_shared<ImagePreparationQueue>();
+  NativeGalaxyBackdropAssets asynchronous(fixture.root());
+  asynchronous.use_background_preparation(queue);
+  require(!asynchronous.request_deep_field(),"Oversized artwork request did not defer.");
+  bool failed{};
+  try{await([&]{return static_cast<bool>(asynchronous.request_deep_field());});}
+  catch(const std::runtime_error &error){const std::string message=error.what();failed=message.find("deep-field-v2.png")!=std::string::npos&&message.find("prepared image byte limit")!=std::string::npos;}
+  require(failed&&asynchronous.pending_count()==0&&asynchronous.decoded_count()==0,
+          "Oversized background artwork failure was cached or retained pending state.");
+}
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -195,7 +362,10 @@ int main(int argc, char **argv) {
     cached_assets_and_alpha(root);
     overview_regional_and_view_gate(root);
     secrecy_generation_and_order(root);
-    std::cout << "native galaxy backdrop: 4/4 cases passed\n";
+    background_layers_and_pixels(root);
+    background_capacity_cancel_and_failure(root);
+    oversized_artwork_is_never_cached();
+    std::cout << "native galaxy backdrop: 7/7 cases passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << "native galaxy backdrop failure: " << error.what() << '\n';

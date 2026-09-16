@@ -12,6 +12,10 @@ import struct
 import subprocess
 import tempfile
 
+from native_audio_runtime import parse_native_audio_check
+from native_audio_settings_runtime import (parse_native_audio_settings_check,
+                                           verify_native_audio_settings_file)
+
 _FIELDS = {
     "mode", "entry_opened", "setup_opened", "species_selected",
     "size_selected", "seed_entered", "create_requested",
@@ -87,6 +91,34 @@ def _diagnostic(stdout: str) -> dict:
     return state
 
 
+def _video_diagnostic(stdout: str, location: str) -> dict:
+    rows = re.findall(r"^video_settings_check=(.*)$", stdout, flags=re.MULTILINE)
+    if len(rows) != 1:
+        raise RuntimeError("Expected exactly one video settings diagnostic")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        report = json.loads(rows[0], object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Video settings diagnostic was not valid unique-key JSON") from error
+    flags = ("opened", "four_rows", "previewed", "normal_capture",
+             "confirm_capture", "escape_reverted", "kept", "restored")
+    expected_keys = {"location", *flags}
+    if (not isinstance(report, dict) or set(report) != expected_keys or
+            report.get("location") != location):
+        raise RuntimeError("Video settings diagnostic did not report the expected fields and location")
+    if any(report[name] is not True for name in flags):
+        raise RuntimeError("Video settings diagnostic did not complete the visible preview/keep/revert flow")
+    return report
+
+
 def _resolved_reported(value, work: Path, label: str) -> Path:
     if not isinstance(value, str) or not value:
         raise RuntimeError(f"Native New Game reported no {label}")
@@ -144,7 +176,10 @@ def _launch(args, cwd: Path, env: dict[str, str], label: str):
 
 
 def validate_native_new_game_export(folder: Path, env: dict[str, str],
-                                    fixture_path: Path):
+                                    fixture_path: Path, *, audio_check=False,
+                                    audio_settings_check=False, video_settings_check=False):
+    if audio_settings_check and not audio_check:
+        raise RuntimeError("Native audio settings check requires the audio check")
     anchor_payload = _source_payload(fixture_path)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
@@ -159,12 +194,23 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         final_capture = work / "new-game-1280x720.bmp"
         setup_capture = work / "new-game-1280x720-setup.bmp"
         loading_capture = work / "new-game-1280x720-loading.bmp"
+        fresh_settings_capture = work / "new-game-1280x720-audio-settings.bmp"
+        settings_path = anchor.parent / "audio-settings.json"
         exe = str(folder / "stellar-continuum-native.exe")
-        fresh = _launch([
+        fresh_args = [
             exe, "--asset-root", str(folder), "--save-path", str(anchor),
             "--seed", _SEED, "--width", "1280", "--height", "720",
             "--windowed", "--new-game-smoke", str(final_capture),
-        ], cwd, clean, "fresh input")
+        ]
+        if audio_check:
+            fresh_args.append("--audio-check")
+        if audio_settings_check:
+            fresh_args.append("--audio-settings-check")
+        if video_settings_check: fresh_args.append("--video-settings-check")
+        fresh = _launch(fresh_args, cwd, clean, "fresh input")
+        fresh_audio = parse_native_audio_check(fresh.stdout, fresh=True) if audio_check else None
+        fresh_audio_settings = (parse_native_audio_settings_check(fresh.stdout, fresh=True)
+                                if audio_settings_check else None)
         state = _diagnostic(fresh.stdout)
         requested = _resolved_reported(state["requested_save_path"], work, "requested path")
         generated = _resolved_reported(state["generated_save_path"], work, "generated path")
@@ -190,16 +236,35 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             raise RuntimeError("New Game did not create its reported independent save")
         for path in (setup_capture, loading_capture, final_capture):
             _bmp(path, 1280, 720)
+        settings_bytes = None
+        if audio_settings_check:
+            _bmp(fresh_settings_capture, 1280, 720)
+            settings_bytes = verify_native_audio_settings_file(settings_path)
+        video_bytes = (anchor.parent / "video-settings.json").read_bytes() if video_settings_check else None
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
         _verify_campaign(generated_payload, state)
 
         reload_capture = work / "new-game-reload-1920x1080.bmp"
-        loaded = _launch([
+        reload_settings_capture = work / "new-game-reload-1920x1080-audio-settings.bmp"
+        reload_args = [
             exe, "--asset-root", str(folder), "--save-path", str(generated),
             "--load", "--width", "1920", "--height", "1080", "--windowed",
             "--smoke", str(reload_capture),
-        ], cwd, clean, "paused reload")
+        ]
+        if audio_check:
+            reload_args.append("--audio-check")
+        if audio_settings_check:
+            reload_args.append("--audio-settings-check")
+        if video_settings_check: reload_args.append("--video-settings-check")
+        loaded = _launch(reload_args, cwd, clean, "paused reload")
+        reload_audio = parse_native_audio_check(loaded.stdout, fresh=False) if audio_check else None
+        reload_audio_settings = (parse_native_audio_settings_check(loaded.stdout, fresh=False)
+                                 if audio_settings_check else None)
         _bmp(reload_capture, 1920, 1080)
+        if audio_settings_check:
+            _bmp(reload_settings_capture, 1920, 1080)
+            if verify_native_audio_settings_file(settings_path) != settings_bytes:
+                raise RuntimeError("Native audio settings changed during paused reload")
         if anchor.read_bytes() != anchor_bytes or not generated.is_file():
             raise RuntimeError("Reload changed the original anchor or removed generated save")
         reloaded_payload = json.loads(generated.read_text(encoding="utf-8"))
@@ -210,15 +275,41 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if before != after:
             raise RuntimeError("Generated campaign changed during paused reload/recapture")
 
-        for path in (setup_capture, loading_capture, final_capture, reload_capture):
+        video_checks = {}
+        if video_settings_check:
+            if (anchor.parent / "video-settings.json").read_bytes() != video_bytes:
+                raise RuntimeError("Video preferences changed across cold campaign reload")
+            for location, process in (("startup", fresh), ("pause", loaded)):
+                video_checks[location] = _video_diagnostic(process.stdout, location)
+        capture_paths = [setup_capture, loading_capture, final_capture, reload_capture]
+        if video_settings_check:
+            for base, dimensions in ((final_capture, (1280, 720)), (reload_capture, (1920, 1080))):
+                for suffix in ("-video-settings", "-video-confirm"):
+                    path = base.with_stem(base.stem + suffix)
+                    _bmp(path, *dimensions)
+                    capture_paths.append(path)
+        if audio_settings_check:
+            capture_paths.extend((fresh_settings_capture, reload_settings_capture))
+        for path in capture_paths:
             evidence = folder.parent / (folder.name + "-" + path.name)
             shutil.copy2(path, evidence)
             captures.append(str(evidence))
         diagnostics.extend((fresh.stdout.strip(), loaded.stdout.strip()))
-        return {
+        result = {
             "nativeNewGamePlayerInput": True,
             "nativeNewGameIndependentSave": True,
             "nativeNewGamePausedReload": True,
             "newGameCaptures": captures,
             "newGameDiagnostics": diagnostics,
         }
+        if audio_check:
+            result["nativeNewGameAudioCheck"] = True
+            result["newGameAudioChecks"] = {"fresh": fresh_audio, "reload": reload_audio}
+        if audio_settings_check:
+            result["nativeAudioSettingsCheck"] = True
+            result["audioSettingsChecks"] = {"fresh": fresh_audio_settings,
+                                               "reload": reload_audio_settings}
+        if video_settings_check:
+            result["nativeVideoSettingsCheck"] = True
+            result["videoSettingsChecks"] = video_checks
+        return result

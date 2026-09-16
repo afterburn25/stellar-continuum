@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -60,6 +61,18 @@ void write(const fs::path &path, const std::string &value) {
   return false;
 }
 
+void wait_for_save(NativeCampaignSession &session) {
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  while (session.notice().kind == SessionNoticeKind::Saving &&
+         std::chrono::steady_clock::now() < deadline) {
+    // Service must consume completion without relying on simulation updates.
+    (void)session.service("2044-05-06T07:08:09Z", false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  require(session.notice().kind != SessionNoticeKind::Saving,
+          "Background manual save did not finish.");
+}
+
 void save_load_and_transactional_failure(const fs::path &research_root,
                                          const std::string &source,
                                          const fs::path &directory) {
@@ -80,6 +93,7 @@ void save_load_and_transactional_failure(const fs::path &research_root,
   (void)session->advance(0., "2044-05-06T07:08:08Z");
   session->request_save();
   (void)session->service("2044-05-06T07:08:09Z", false);
+  wait_for_save(*session);
   require(session->notice().kind == SessionNoticeKind::Saved &&
               fs::is_regular_file(save_path),
           "Manual session save did not succeed.");
@@ -113,6 +127,7 @@ void save_load_and_transactional_failure(const fs::path &research_root,
   (void)session->advance(0., "2044-05-06T07:08:10Z");
   session->request_save();
   (void)session->service("2044-05-06T07:08:11Z", true);
+  wait_for_save(*session);
   require(session->notice().kind == SessionNoticeKind::Saved,
           "Second manual save did not succeed.");
   const auto stable_generation = session->cache().generation;
@@ -144,6 +159,109 @@ void save_load_and_transactional_failure(const fs::path &research_root,
           "Decode failure changed the live campaign.");
 }
 
+void new_campaign_save_fence(const fs::path &research_root,
+                             const std::string &source, const fs::path &directory) {
+  const auto path = directory / "new-game-fence.json";
+  write(path, source);
+  std::atomic_int entered{}, allowed{};
+  NativeCampaignSessionDependencies dependencies;
+  dependencies.save_writer = [&](const fs::path &destination,
+      const PreparedPlayerCampaignSave &prepared, bool preserve) {
+    const auto call = ++entered;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (allowed.load() < call) {
+      if (std::chrono::steady_clock::now() > deadline)
+        throw std::runtime_error("Test save fence was not released");
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    write_prepared_player_campaign(destination, prepared, preserve);
+  };
+  auto session = NativeCampaignSession::load_startup(research_root, path, "0.1.7-alpha", {}, dependencies);
+  struct Release final { std::atomic_int &value; ~Release(){value.store(100);} } release{allowed};
+  const auto service_until = [&](auto predicate) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!predicate() && std::chrono::steady_clock::now() < deadline) {
+      (void)session->service("2044-05-06T07:08:12Z", true);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(predicate(), "New Game save fence did not reach its expected state");
+  };
+  (void)session->advance(0., "2044-05-06T07:08:11Z");
+  session->request_save();
+  service_until([&]{return entered.load()==1;});
+  session->frame().runtime().world().campaign().seed += 33;
+  const auto expected_seed=session->frame().runtime().world().campaign().seed;
+  const auto day=session->frame().clock().simulation_days();
+  const auto generation=session->cache().generation;
+  const auto* world=&session->frame().runtime().world().campaign();
+  require(session->request_new_campaign(), "New Game rejected a completed frame");
+  require(!session->request_new_campaign(), "New Game admitted a duplicate transition");
+  session->frame().clock().set_speed(StrategicSpeed::Normal);
+  (void)session->advance(120., "2044-05-06T07:08:12Z");
+  session->request_load();session->request_save();
+  require(!session->load_pending() && session->frame().clock().simulation_days()==day &&
+      session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "Pending New Game allowed simulation, load or an older save to authorize it");
+  allowed=1;
+  service_until([&]{return entered.load()==2;});
+  require(session->new_campaign_transition()==NewCampaignTransition::Saving &&
+      Json::parse(read(path)).at("Galaxy").at("Seed")==expected_seed-33,
+      "An older save was mistaken for this transition's save");
+  session->cancel_new_campaign();
+  require(!session->new_campaign_pending(), "Cancel left the transition locked");
+  require(session->request_new_campaign(), "A cancelled transition could not be retried");
+  allowed=2;
+  service_until([&]{return entered.load()==3;});
+  require(session->new_campaign_transition()==NewCampaignTransition::Saving,
+      "A cancelled writer authorized a later New Game request");
+  allowed=3;
+  service_until([&]{return session->new_campaign_transition()==NewCampaignTransition::Ready;});
+  require(Json::parse(read(path)).at("Galaxy").at("Seed")==expected_seed && entered.load()==3,
+      "Ready New Game did not durably capture the requested campaign");
+  (void)session->advance(120., "2044-05-06T07:08:13Z");
+  session->cancel_new_campaign();
+  require(&session->frame().runtime().world().campaign()==world &&
+      session->cache().generation==generation && session->frame().clock().simulation_days()==day,
+      "Cancelling ready setup replaced or advanced the original campaign");
+  // A previous Saved notice must still require a fresh write.
+  require(session->request_new_campaign(), "Ready cancellation could not be retried");
+  require(session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "An existing Saved notice bypassed the transition capture");
+  session->cancel_new_campaign();
+}
+
+void new_campaign_filesystem_failure(const fs::path &research_root,
+                                     const std::string &source, const fs::path &directory) {
+  const auto path=directory/"new-game-disk-failure.json";
+  write(path, source);
+  auto session=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  (void)session->advance(0.,"2044-05-06T07:08:11Z");
+  const auto* world=&session->frame().runtime().world().campaign();
+  const auto preserved=directory/"new-game-preserved.json";
+  fs::rename(path,preserved);
+  require(fs::create_directory(path),"Could not create a real blocked save destination");
+  require(session->request_new_campaign(),"Could not request filesystem-failure case");
+  (void)session->service("2044-05-06T07:08:12Z",true);
+  wait_for_save(*session);
+  require(session->new_campaign_transition()==NewCampaignTransition::Failed &&
+      session->notice().kind==SessionNoticeKind::Failure && !session->notice().message.empty() &&
+      &session->frame().runtime().world().campaign()==world && read(preserved)==source && !session->exit_ready(),
+      "Filesystem failure discarded the live campaign, previous save or diagnostic");
+  for(int i=0;i<5;++i)(void)session->service("2044-05-06T07:08:13Z",true);
+  require(session->new_campaign_transition()==NewCampaignTransition::Failed,
+      "Failed New Game automatically retried");
+  require(fs::remove(path),"Cannot remove the empty test obstruction");
+  fs::rename(preserved,path);
+  require(session->request_new_campaign(),"Explicit recovery retry was rejected");
+  (void)session->service("2044-05-06T07:08:14Z",true);wait_for_save(*session);
+  require(session->new_campaign_transition()==NewCampaignTransition::Ready,
+      "Correcting the save destination did not recover New Game");
+  session->request_exit();
+  (void)session->service("2044-05-06T07:08:15Z",true);
+  require(session->exit_ready() && !session->new_campaign_pending(),
+      "Explicit exit after a prepared New Game failed to exit durably");
+}
+
 void failed_exit_stays_open(const fs::path &research_root,
                             const std::string &source,
                             const fs::path &directory) {
@@ -171,7 +289,7 @@ void failed_exit_stays_open(const fs::path &research_root,
 
 void pending_save_precedes_load(const fs::path &research_root,
                                 const std::string &source,
-                                const fs::path &directory) {
+                                const fs::path &directory, bool manual) {
   struct Barriers final {
     std::mutex mutex;
     std::condition_variable changed;
@@ -209,13 +327,17 @@ void pending_save_precedes_load(const fs::path &research_root,
         return load_existing_player_campaign_v17(path, factory, progress);
       };
 
-  const auto save_path = directory / "pending-before-load.json";
+  const auto save_path = directory / (manual ? "manual-before-load.json" : "pending-before-load.json");
   write(save_path, source);
   auto session = NativeCampaignSession::load_startup(
       research_root, save_path, "0.1.7-alpha", {}, dependencies);
   const auto original_day = session->frame().clock().simulation_days();
-  session->frame().clock().restore(original_day + 100.);
+  if (!manual) session->frame().clock().restore(original_day + 100.);
   (void)session->advance(0., "2044-05-06T07:08:13Z");
+  if (manual) {
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:13Z", false);
+  }
 
   bool writer_was_entered{};
   bool loader_started_before_release{};
@@ -262,7 +384,7 @@ void pending_save_precedes_load(const fs::path &research_root,
 
 void failed_pending_save_prevents_load(const fs::path &research_root,
                                        const std::string &source,
-                                       const fs::path &directory) {
+                                       const fs::path &directory, bool manual) {
   std::atomic_int loader_calls{};
   NativeCampaignSessionDependencies dependencies;
   dependencies.save_writer = [](const fs::path &,
@@ -276,15 +398,19 @@ void failed_pending_save_prevents_load(const fs::path &research_root,
         ++loader_calls;
         return load_existing_player_campaign_v17(path, factory, progress);
       };
-  const auto save_path = directory / "failed-drain.json";
+  const auto save_path = directory / (manual ? "failed-manual-drain.json" : "failed-drain.json");
   write(save_path, source);
   auto session = NativeCampaignSession::load_startup(
       research_root, save_path, "0.1.7-alpha", {}, dependencies);
   const auto generation = session->cache().generation;
   const auto seed = session->frame().runtime().world().campaign().seed;
-  session->frame().clock().restore(
+  if (!manual) session->frame().clock().restore(
       session->frame().clock().simulation_days() + 100.);
   (void)session->advance(0., "2044-05-06T07:08:15Z");
+  if (manual) {
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:15Z", false);
+  }
   session->request_load();
   require(loader_calls.load() == 1 && !session->load_pending() &&
               session->notice().kind == SessionNoticeKind::Failure &&
@@ -294,6 +420,102 @@ void failed_pending_save_prevents_load(const fs::path &research_root,
   require(session->cache().generation == generation &&
               session->frame().runtime().world().campaign().seed == seed,
           "Failed pre-load drain changed the live campaign.");
+}
+
+void background_manual_save(const fs::path &research_root,
+                            const std::string &source,
+                            const fs::path &directory, bool fail_first) {
+  struct Gate {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool entered{};
+    bool released{};
+    bool timed_out{};
+  } gate;
+  const auto owner = std::this_thread::get_id();
+  std::atomic_int calls{};
+  std::atomic_bool writer_on_owner{};
+  std::string first_capture;
+  NativeCampaignSessionDependencies dependencies;
+  dependencies.save_writer = [&](const fs::path &path,
+                                 const PreparedPlayerCampaignSave &prepared,
+                                 bool preserve) {
+    writer_on_owner = writer_on_owner.load() || std::this_thread::get_id() == owner;
+    if (++calls == 1) {
+      std::unique_lock lock(gate.mutex);
+      gate.entered = true;
+      gate.changed.notify_all();
+      gate.timed_out = !gate.changed.wait_for(lock, std::chrono::seconds(10), [&] {
+        return gate.released;
+      });
+      lock.unlock();
+      if (fail_first) throw std::runtime_error("injected manual write failure");
+      first_capture = encode_player_campaign_v17_json(prepared.payload());
+    }
+    write_prepared_player_campaign(path, prepared, preserve);
+  };
+  const auto path = directory / (fail_first ? "async-failure.json" : "async-manual.json");
+  write(path, source);
+  auto session = NativeCampaignSession::load_startup(
+      research_root, path, "0.1.7-alpha", {}, dependencies);
+  // Release before session destruction even if a subsequent assertion throws.
+  struct Release {
+    Gate &gate;
+    ~Release() {
+      { std::scoped_lock lock(gate.mutex); gate.released = true; }
+      gate.changed.notify_all();
+    }
+  } release{gate};
+  (void)session->advance(0., "2044-05-06T07:08:09Z");
+  const auto generation = session->cache().generation;
+  const auto expected_first = encode_player_campaign_v17_json(capture_player_campaign_v17(
+      session->frame().runtime(),
+      {session->frame().clock().simulation_days(), "0.1.7-alpha", "2044-05-06T07:08:09Z"}));
+  session->request_save();
+  (void)session->service("2044-05-06T07:08:09Z", false);
+  bool entered{};
+  {
+    std::unique_lock lock(gate.mutex);
+    entered = gate.changed.wait_for(lock, std::chrono::seconds(5), [&] { return gate.entered; });
+  }
+  const bool pending_notice = session->notice().kind == SessionNoticeKind::Saving;
+  // Change the live world while the worker owns its immutable first capture.
+  session->frame().runtime().world().campaign().seed += 17;
+  session->request_save();
+  session->request_save();
+  for (int i = 0; i < 3; ++i) {
+    (void)session->service("2044-05-06T07:08:09Z", false);
+    (void)session->advance(0., "2044-05-06T07:08:09Z");
+  }
+  const bool one_writer = calls.load() == 1;
+  {
+    std::scoped_lock lock(gate.mutex);
+    gate.released = true;
+  }
+  gate.changed.notify_all();
+  wait_for_save(*session);
+  require(entered && !gate.timed_out && pending_notice && one_writer && !writer_on_owner,
+          "Manual saving blocked the owner, reported success early, or admitted competing writes.");
+  require(session->cache().generation == generation && !session->exit_ready(),
+          "Manual saving replaced the live campaign or closed it.");
+  if (fail_first) {
+    require(calls.load() == 1 && session->notice().kind == SessionNoticeKind::Failure &&
+                session->notice().message.find("injected manual write failure") != std::string::npos &&
+                read(path) == source,
+            "Queued save hid a failed write, retried automatically, or damaged the primary.");
+    session->request_save();
+    (void)session->service("2044-05-06T07:08:09Z", false);
+    wait_for_save(*session);
+  } else {
+    require(first_capture == expected_first && read(fs::path(path).concat(".bak")) == first_capture,
+            "Worker borrowed live state or queued write bypassed ordered backup rotation.");
+  }
+  const auto expected_latest = encode_player_campaign_v17_json(capture_player_campaign_v17(
+      session->frame().runtime(),
+      {session->frame().clock().simulation_days(), "0.1.7-alpha", "2044-05-06T07:08:09Z"}));
+  require(calls.load() == 2 && session->notice().kind == SessionNoticeKind::Saved &&
+              session->notice().message == "Saved campaign" && read(path) == expected_latest,
+          "Coalesced/retried manual save did not persist the exact latest capture.");
 }
 
 void failed_frame_clears_save_readiness(const fs::path &research_root,
@@ -323,7 +545,7 @@ void failed_frame_clears_save_readiness(const fs::path &research_root,
   require(failed, "Injected invalid strategic frame unexpectedly completed.");
   require(writer_calls.load() == 0 && !session->exit_ready() &&
               session->notice().kind == SessionNoticeKind::Failure &&
-              session->notice().message.find("until a strategic frame completes") !=
+              session->notice().message.find("until a campaign frame completes") !=
                   std::string::npos,
           "Failed frame retained stale manual save readiness.");
 }
@@ -364,6 +586,120 @@ void wrong_thread_rejected_before_mutation(const fs::path &research_root,
               !session->load_pending(),
           "Wrong-thread session calls mutated state before rejection.");
 }
+
+void tactical_save_reload_and_continuation(const fs::path &research_root,
+                                         const std::string &source,
+                                         const fs::path &directory) {
+  auto fixture=Json::parse(source);
+  // Arrange an encounter through the production begin command, not a second
+  // hand-authored battle representation. The fixture supplies two military
+  // fleets and existing civilians at one system, with an identified war.
+  for(auto& fleet:fixture["Galaxy"]["Fleets"]){
+    const auto id=fleet["Id"].get<int>();
+    if(id!=0&&id!=6&&id!=7)continue;
+    fleet["CurrentSystemId"]=0;fleet["X"]=0;fleet["Y"]=0;
+    if(id==7)continue;
+    fleet["Role"]=static_cast<int>(FleetRole::Military);
+    fleet["DesignId"]="patrol_corvette";
+    fleet["Combat"]["ProfileId"]="patrol_corvette_mk1";
+    fleet["Combat"]["Shields"]=35;fleet["Combat"]["Armor"]=45;
+    fleet["Combat"]["Hull"]=95;
+  }
+  const auto tick=static_cast<std::int64_t>(fixture["SimulationDays"].get<double>()*1000.);
+  fixture["Diplomacy"]["Contacts"].push_back({
+      {"ObserverCivilizationId",0},{"ContactId","native-tactical-contact"},
+      {"TargetCivilizationId",3},{"FirstObservedTick",tick-8},{"LastObservedTick",tick},
+      {"LastObservedSystemId",0},{"Awareness",2},{"Condition",1},
+      {"CommunicationAvailable",false},{"Confidence",.9}});
+  fixture["Diplomacy"]["Relationships"].push_back({
+      {"CivilizationAId",0},{"CivilizationBId",3},{"PoliticalState",3},
+      {"Trust",0.},{"Hostility",.9},{"Fear",.2},{"Respect",0.},
+      {"Cooperation",0.},{"Grievances",Json::array()}});
+  const auto path=directory/"tactical.json";write(path,fixture.dump());
+  auto session=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  auto& frame=session->frame();
+  require(frame.tactical_snapshot().formations.empty()&&
+      !frame.issue_tactical_order({1,MassiveCombatOrderType::Hold}).accepted,
+      "Tactical adapter fabricated a battle without an encounter.");
+  const auto begun=frame.begin_tactical(0);
+  require(begun.accepted,"Production tactical begin rejected the arranged opposing fleets.");
+  auto& encounter=*frame.runtime().world().campaign().active_combat_encounter;
+  const auto own=std::ranges::find_if(encounter.battle.formations,[](const auto& f){return f.civilization_id==0;});
+  const auto foreign=std::ranges::find_if(encounter.battle.formations,[](const auto& f){return f.civilization_id!=0;});
+  require(own!=encounter.battle.formations.end()&&foreign!=encounter.battle.formations.end(),
+      "Canonical begin did not create both participants.");
+  require(!frame.issue_tactical_order({foreign->id,MassiveCombatOrderType::Hold}).accepted,
+      "Native tactical adapter accepted a foreign formation order.");
+  require(frame.issue_tactical_order({own->id,MassiveCombatOrderType::Hold}).accepted,
+      "Native tactical adapter rejected its owned formation order.");
+  frame.set_tactical_speed(0.);frame.set_tactical_resume_speed(2.);
+  const auto starting_tick=encounter.battle.tick;
+  const auto step=session->advance(.5,"2044-05-06T07:08:20Z");
+  require(step.route==CampaignFrameRoute::Tactical&&encounter.battle.tick==starting_tick&&
+      frame.tactical_clock().speed_multiplier()==0.,"Changing resume speed advanced a paused battle.");
+  const auto capture=[](NativeCampaignSession& value){
+    return encode_player_campaign_v17_json(capture_player_campaign_v17(value.frame().runtime(),
+      {value.frame().clock().simulation_days(),"0.1.7-alpha","2044-05-06T07:08:20Z"}));
+  };
+  const auto paused=capture(*session);
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",false);wait_for_save(*session);
+  require(session->notice().kind==SessionNoticeKind::Saved&&read(path)==paused,
+      "Paused tactical save did not retain the complete canonical state.");
+  auto loaded=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  require(capture(*loaded)==paused&&loaded->frame().tactical_clock().speed_multiplier()==0.,
+      "Tactical startup reload changed its save or resumed the encounter.");
+  const auto* original_frame=&session->frame();
+  const auto* original_encounter=&*session->frame().runtime().world().campaign().active_combat_encounter;
+  const auto* original_cache=&session->cache();
+  const auto original_generation=session->cache().generation;
+  require(session->request_new_campaign()&&
+      session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "An older tactical Saved notice authorized New Game without a fresh capture.");
+  (void)session->advance(120.,"2044-05-06T07:08:20Z");
+  require(capture(*session)==paused&&
+      session->frame().runtime().world().campaign().active_combat_encounter->battle.tick==starting_tick,
+      "Pending New Game advanced or changed the paused tactical encounter.");
+  const auto transition_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+  while(session->new_campaign_transition()!=NewCampaignTransition::Ready&&
+        std::chrono::steady_clock::now()<transition_deadline){
+    (void)session->service("2044-05-06T07:08:20Z",true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  require(session->new_campaign_transition()==NewCampaignTransition::Ready&&
+      capture(*session)==paused&&read(path)==paused,
+      "New Game did not durably preserve the exact paused tactical state.");
+  session->cancel_new_campaign();
+  require(&session->frame()==original_frame&&
+      &*session->frame().runtime().world().campaign().active_combat_encounter==original_encounter&&
+      &session->cache()==original_cache&&session->cache().generation==original_generation&&
+      capture(*session)==paused,
+      "Cancelling tactical New Game replaced or changed its live frame, encounter or cache.");
+  frame.set_tactical_speed(2.);loaded->frame().set_tactical_speed(2.);
+  for(const auto delta:{.13,.017,.25}){
+    (void)session->advance(delta,"2044-05-06T07:08:20Z");
+    (void)loaded->advance(delta,"2044-05-06T07:08:20Z");
+    require(capture(*session)==capture(*loaded),"Tactical reload diverged during matched continuation.");
+  }
+  const auto running=capture(*session);
+  require(running!=paused,"Matched tactical continuation did not advance.");
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",false);wait_for_save(*session);
+  require(session->notice().kind==SessionNoticeKind::Saved&&read(path)==running,
+      "Running tactical capture lost its orders, pending time or combat events.");
+  // Failed activation keeps this live encounter and its clock untouched.
+  write(path,"broken tactical save");write(fs::path(path.string()+".bak"),"broken backup");
+  session->request_load();require(!wait_for_load(*session,false),"Broken tactical save replaced live state.");
+  require(session->notice().kind==SessionNoticeKind::Failure&&capture(*session)==running,
+      "Failed tactical load damaged the running campaign.");
+  // Reconciliation remains canonical and idempotent after surrender.
+  for(auto& f:encounter.battle.formations)if(f.civilization_id!=0)f.surrendered=true;
+  frame.set_tactical_speed(0.);
+  const auto ended=session->advance(0.,"2044-05-06T07:08:20Z");
+  require(ended.tactical_completed&&encounter.reconciled&&frame.tactical_snapshot().formations.empty(),
+      "Completed encounter did not reconcile and relinquish tactical presentation.");
+  const auto completed=capture(*session);
+  session->request_save();(void)session->service("2044-05-06T07:08:20Z",true);wait_for_save(*session);
+  require(read(path)==completed,"Completion-frame tactical save was not durable.");
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -385,11 +721,18 @@ int main(int argc, char **argv) try {
           std::chrono::steady_clock::now().time_since_epoch().count()));
   require(fs::create_directory(directory), "Cannot claim session test directory.");
   save_load_and_transactional_failure(research_root, source, directory);
+  new_campaign_save_fence(research_root, source, directory);
+  new_campaign_filesystem_failure(research_root, source, directory);
   failed_exit_stays_open(research_root, source, directory);
-  pending_save_precedes_load(research_root, source, directory);
-  failed_pending_save_prevents_load(research_root, source, directory);
+  pending_save_precedes_load(research_root, source, directory, false);
+  pending_save_precedes_load(research_root, source, directory, true);
+  failed_pending_save_prevents_load(research_root, source, directory, false);
+  failed_pending_save_prevents_load(research_root, source, directory, true);
+  background_manual_save(research_root, source, directory, false);
+  background_manual_save(research_root, source, directory, true);
   failed_frame_clears_save_readiness(research_root, source, directory);
   wrong_thread_rejected_before_mutation(research_root, source, directory);
+  tactical_save_reload_and_continuation(research_root, source, directory);
   std::cout << "Native session save/load, ordered pending IO, transactional activation, owner-thread enforcement, cache generations and failed Exit passed\n";
   return 0;
 } catch (const std::exception &error) {

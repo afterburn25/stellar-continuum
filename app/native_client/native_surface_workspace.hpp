@@ -1,10 +1,14 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_scene.hpp"
+#include "native_surface_viewport.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <optional>
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <utility>
 #include <variant>
@@ -15,24 +19,10 @@ struct SurfaceWorkspaceLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect surface, back, title, palette, palette_rows,
-      terrain, inspector, rotate, remove, confirmation, confirm, cancel;
+      terrain, inspector, overview, focus, rotate, remove, confirmation,
+      confirm, cancel;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
-};
-
-struct SurfaceViewport {
-  double center_x{}, center_z{}, pixels_per_unit{.5};
-  [[nodiscard]] stellar::native_map::Point world_to_screen(
-      double x, double z, stellar::native_map::UiRect terrain) const noexcept;
-  [[nodiscard]] std::pair<double, double> screen_to_world(
-      stellar::native_map::Point, stellar::native_map::UiRect terrain) const
-      noexcept;
-  [[nodiscard]] SurfaceViewport translated(float dx, float dy) const noexcept;
-  [[nodiscard]] SurfaceViewport zoomed_at(float factor,
-                                          stellar::native_map::Point anchor,
-                                          stellar::native_map::UiRect terrain,
-                                          double minimum,
-                                          double maximum) const noexcept;
 };
 
 enum class SurfaceWorkspaceCommandKind {
@@ -56,6 +46,12 @@ struct SurfaceWorkspaceCommand {
 
 class NativeSurfaceWorkspace final {
 public:
+  // The app prepares this immutable image outside the workspace and supplies
+  // only the ready result, keeping the UI headless and dependency-free.
+  void set_terrain_image(
+      std::shared_ptr<const stellar::native_map::RgbaImage>) noexcept;
+  void set_building_images(SurfaceBuildingReadyProvider,
+                          std::optional<ReadySurfaceBuildingImage> preview = std::nullopt);
   void open(stellar::native_colony::NativeColonyView, int width, int height);
   void set_view(stellar::native_colony::NativeColonyView);
   void close() noexcept;
@@ -66,8 +62,12 @@ public:
   void set_removal_quote(stellar::native_colony::NativeSurfaceRemovalQuote);
   void complete_command(std::string notice);
   void set_notice(std::string value) { notice_ = std::move(value); }
+  void set_artwork_notice(std::string value) { artwork_notice_ = std::move(value); }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] bool modal_open() const noexcept {
+    return !std::holds_alternative<std::monostate>(confirmation_);
+  }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView>&
   view() const noexcept { return view_; }
   [[nodiscard]] const std::optional<std::string>& selected_type_id() const
@@ -84,6 +84,7 @@ public:
   [[nodiscard]] const SurfaceViewport& viewport() const noexcept {
     return viewport_;
   }
+  [[nodiscard]] NativeSurfaceSceneDiagnostics scene_diagnostics() const;
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -93,6 +94,7 @@ public:
 
 private:
   void fit(int width, int height) noexcept;
+  void focus_selected(int width, int height) noexcept;
   void reconcile();
   [[nodiscard]] std::optional<std::size_t> palette_hit(
       stellar::native_map::Point, const SurfaceWorkspaceLayout&) const noexcept;
@@ -119,7 +121,14 @@ private:
                stellar::native_colony::NativeSurfaceRemovalQuote>
       confirmation_;
   std::string notice_;
+  std::string artwork_notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
+  std::shared_ptr<const stellar::native_map::RgbaImage> terrain_image_;
+  SurfaceBuildingReadyProvider building_images_;
+  std::optional<ReadySurfaceBuildingImage> preview_image_;
+  mutable std::size_t scene_sites_{}, scene_meshes_{}, scene_triangles_{},
+      scene_road_segments_{}, scene_replaced_structures_{};
+  mutable NativeSurfaceScene scene_;
 };
 
 } // namespace stellar::native_colony_ui

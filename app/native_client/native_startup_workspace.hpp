@@ -16,7 +16,8 @@ namespace stellar::native_startup_ui {
 enum class StartupScreen { Entry, Setup, LoadSlots, Busy, Failure };
 enum class StartupOperationOrigin { NewCampaign, SavedCampaign };
 enum class StartupIntentKind {
-  None, OpenSetup, OpenLoad, Back, Exit, Create, LoadSelected, CancelOperation
+  None, OpenSetup, OpenLoad, OpenSettings, Back, Exit, ReturnToCampaign,
+  Create, LoadSelected, CancelOperation
 };
 struct StartupIntent {
   StartupIntentKind kind{StartupIntentKind::None};
@@ -29,7 +30,8 @@ struct StartupLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, title, subtitle, new_campaign,
-      load_campaign, exit, list, back, primary, status;
+      load_campaign, exit, list, back, primary, status, settings,
+      return_to_campaign;
   [[nodiscard]] static StartupLayout for_viewport(int width,
                                                    int height) noexcept;
 };
@@ -42,6 +44,8 @@ public:
       stellar::native_setup_ui::NativeNewGameWorkspace::PortraitProvider;
 
   void set_setup(stellar::native_setup::NativeNewCampaignSetupView);
+  void set_return_to_campaign_available(bool available) noexcept;
+  void show_setup() noexcept;
   void show_entry() noexcept;
   void set_slots(stellar::native_startup::NativeStartupSaveSlots);
   void set_setup_message(std::string message, bool accepted);
@@ -73,5 +77,6 @@ private:
   int last_loading_tip_{-1};
   std::string failure_;
   stellar::native_map::Point pointer_{};
+  bool return_to_campaign_available_{};
 };
 } // namespace stellar::native_startup_ui

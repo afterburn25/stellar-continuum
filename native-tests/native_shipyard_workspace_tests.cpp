@@ -1,4 +1,5 @@
 #include "native_shipyard_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -109,7 +110,10 @@ void layout_is_contained_and_action_stays_visible() {
     const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.designs, layout.design_details,
                               layout.orders, layout.readiness,
                               layout.feedback, layout.action})
@@ -152,11 +156,13 @@ void start_and_cancel_use_real_mouse_hit_bounds() {
   refreshed.orders = {order()};
   workspace.set_view(std::move(refreshed));
   REQUIRE(workspace.arm_cancel_confirmation(command.id));
+  REQUIRE(workspace.confirmation_open());
   auto changed_quote = view();
   changed_quote.shipyard_revision = 6;
   changed_quote.orders = {order()};
   changed_quote.orders.front().formatted_refund = "$8.00 SOL";
   workspace.set_view(std::move(changed_quote));
+  REQUIRE(!workspace.confirmation_open());
   command = workspace.handle(
       {InputEventType::LeftPressed, center(layout.action)}, 1280, 720);
   REQUIRE(command.kind == ShipyardWorkspaceCommandKind::PrepareCancel);

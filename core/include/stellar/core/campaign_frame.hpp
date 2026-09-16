@@ -47,6 +47,12 @@ class CampaignFrame final {
   void pause_tactical_for_menu();
   void resume_tactical_after_menu();
   [[nodiscard]] CombatOrderResult begin_tactical(int fleet_id);
+  // Mirrors Main.UiIssueMassiveCombatOrder / UiMassiveCombatSnapshot for the
+  // player observer. The snapshot is empty when no unreconciled encounter is
+  // active; orders are rejected with the reference message in that case.
+  [[nodiscard]] MassiveCombatOrderResult
+  issue_tactical_order(MassiveCombatOrder order);
+  [[nodiscard]] MassiveCombatSnapshot tactical_snapshot();
   [[nodiscard]] CampaignFrameResult advance(double real_delta_seconds);
 
  private:

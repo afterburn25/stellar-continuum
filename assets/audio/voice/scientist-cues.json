@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "profile": "human_female_chief_scientist",
+  "locale": "en-GB",
+  "voice": "bf_emma",
+  "speed": 1.0,
+  "synthetic": true,
+  "model": "Kokoro-82M-v1.0",
+  "modelSha256": "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5",
+  "voicesSha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+  "workerSha256": "c5cdee55ed1ad4400be968932799f37d9ed4c490a0e0341b3c35947eb8032101",
+  "processing": "Dry mono PCM; no reverb, echo or communications filter",
+  "clips": [
+    {
+      "cue": "scientist-reconnaissance",
+      "file": "scientist-reconnaissance.wav",
+      "text": "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach.",
+      "sha256": "56369c6d0d23bb57c5c54ce44f2063693b8d8e50d1597bd55f3e78eb2c7c1541",
+      "durationSeconds": 6.5,
+      "sampleRate": 24000,
+      "samples": 156000,
+      "peak": 0.7097698450088501,
+      "rms": 0.0913393422961235,
+      "chunks": 1
+    },
+    {
+      "cue": "scientist-research-report",
+      "file": "scientist-research-report.wav",
+      "text": "Our research team has a new report. Review the findings before selecting our next objective.",
+      "sha256": "704f5681d7453720946352e22759e1bec0e2cbdcfb212325b2da3750141a0e46",
+      "durationSeconds": 6.025,
+      "sampleRate": 24000,
+      "samples": 144600,
+      "peak": 0.6349163055419922,
+      "rms": 0.0898217260837555,
+      "chunks": 1
+    },
+    {
+      "cue": "scientist-survey-complete",
+      "file": "scientist-survey-complete.wav",
+      "text": "System survey complete. The updated observations are ready for your review.",
+      "sha256": "331b99bebf9895c5d7c0164738de015ffaeed15f264e0d51ff7bcdb29393b3a4",
+      "durationSeconds": 5.25,
+      "sampleRate": 24000,
+      "samples": 126000,
+      "peak": 0.7891941070556641,
+      "rms": 0.0902315080165863,
+      "chunks": 1
+    }
+  ]
+}

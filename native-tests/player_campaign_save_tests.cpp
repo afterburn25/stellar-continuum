@@ -20,6 +20,19 @@ namespace {
 void check(bool condition, const char *message) {
   if (!condition) throw std::runtime_error(message);
 }
+class PromiseRelease final {
+public:
+  explicit PromiseRelease(std::promise<void> &promise) : promise_(promise) {}
+  ~PromiseRelease() { release(); }
+  void release() noexcept {
+    if (released_) return;
+    released_ = true;
+    try { promise_.set_value(); } catch (...) {}
+  }
+private:
+  std::promise<void> &promise_;
+  bool released_{};
+};
 std::string read(const fs::path &path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) throw std::runtime_error("Could not open test file: " + path.string());
@@ -175,6 +188,60 @@ void blocking_manual_drain(const Fixture &fixture,const fs::path &directory) {
   const auto saved=manual.get();
   check(started && blocked && one_writer && saved.succeeded && calls==2,"Manual save did not block/drain before its own write");
 }
+
+void async_manual_admission(const Fixture &fixture,const fs::path &directory) {
+  auto runtime=fixture.runtime();
+  const auto expected=encode_player_campaign_v17_json(
+      PreparedPlayerCampaignSave::capture(runtime,options).payload());
+  std::promise<void> entered,release;
+  auto entered_future=entered.get_future();auto gate=release.get_future().share();
+  PromiseRelease release_guard(release);
+  std::atomic<int> calls{};std::string captured;
+  PlayerCampaignSaveController saves({},[&](const fs::path &,const PreparedPlayerCampaignSave &prepared,bool){
+    ++calls;entered.set_value();gate.wait();captured=encode_player_campaign_v17_json(prepared.payload());
+  });
+  saves.configure(directory/"async-manual.json",9,0,false);
+  const auto admitted=saves.begin_manual(runtime,options);
+  const auto entered_in_time=entered_future.wait_for(std::chrono::seconds(5))==std::future_status::ready;
+  runtime.world().campaign().seed+=1;
+  bool replacement_rejected{},second_rejected{};
+  try{saves.configure(directory/"replacement.json",10,42.25,false);}catch(const std::logic_error&){replacement_rejected=true;}
+  try{(void)saves.begin_manual(runtime,options);}catch(const std::logic_error&){second_rejected=true;}
+  const bool no_completion=!saves.complete(50,saves.path(),9).has_value();
+  release_guard.release();
+  const auto complete=saves.complete(51,saves.path(),9,true);
+  check(!admitted && entered_in_time && saves.pending()==false && no_completion,
+        "Async manual admission did not return while its writer was blocked");
+  check(replacement_rejected&&second_rejected&&calls==1&&complete&&complete->succeeded,
+        "Async manual admission allowed a replacement or parallel writer");
+  check(captured==expected,"Async manual writer borrowed mutable live state");
+}
+
+void async_manual_failure_and_owner(const Fixture &fixture,const fs::path &directory) {
+  auto runtime=fixture.runtime();std::atomic<int> calls{};
+  PlayerCampaignSaveController saves({},[&](const fs::path &,const PreparedPlayerCampaignSave &,bool preserve){
+    check(preserve,"Async failure lost the recovery backup flag before completion");
+    if(++calls==1)throw std::runtime_error("async durable write failure");
+  });
+  saves.configure(directory/"async-retry.json",11,0,true);
+  const auto admitted=saves.begin_manual(runtime,options);
+  const auto failed=saves.complete(50,saves.path(),11,true);
+  check(!admitted&&failed&&!failed->succeeded&&failed->preserved_backup&&
+        failed->error_message=="async durable write failure"&&saves.next_due_day()==51&&
+        saves.preserves_recovered_backup(),"Async manual failure lost its retry or recovery state");
+  const auto retry=saves.begin_manual(runtime,options);
+  const auto repaired=saves.complete(51,saves.path(),11,true);
+  check(retry==std::nullopt&&repaired&&repaired->succeeded&&saves.next_due_day()==81&&
+        !saves.preserves_recovered_backup(),"Async manual failure/retry scheduling or recovery state is wrong");
+  runtime.world().campaign().developer_provenance=CampaignDeveloperProvenance{true};
+  const auto capture_failed=saves.begin_manual(runtime,options);
+  check(capture_failed&&!capture_failed->succeeded&&capture_failed->error_message.size()>0&&!saves.pending(),
+        "Async manual capture failure was not returned synchronously");
+  auto wrong_thread=std::async(std::launch::async,[&]{try{
+    (void)saves.begin_manual(runtime,options);return false;
+  }catch(const std::logic_error&){return true;}catch(...){return false;}});
+  check(wrong_thread.get(),"Wrong-thread async admission reached campaign capture");
+}
 } // namespace
 int main(int argc,char **argv) try {
   if(argc!=4) throw std::invalid_argument("Usage: player_campaign_save_tests <Player17 JSON fixture> <research root> <exclusive output parent>");
@@ -191,6 +258,8 @@ int main(int argc,char **argv) try {
   failure_retry_and_identity(fixture,directory);
   frame_admission_and_drain(fixture,directory);
   blocking_manual_drain(fixture,directory);
-  std::cout<<"Player17 prepared/async save: detached state, real atomic IO, backup repair, one writer, frame admission, completion-day scheduling, stale identity, manual drain, provenance and thread ownership passed\n";
+  async_manual_admission(fixture,directory);
+  async_manual_failure_and_owner(fixture,directory);
+  std::cout<<"Player17 prepared/async save: detached state, real atomic IO, backup repair, one writer, frame admission, completion-day scheduling, stale identity, manual drain, async manual admission, provenance and thread ownership passed\n";
   return 0;
 }catch(const std::exception &error){std::cerr<<"ExceptionType: "<<typeid(error).name()<<"\nMessage: "<<error.what()<<"\nCurrentDirectory: "<<fs::current_path().string()<<'\n';return 1;}

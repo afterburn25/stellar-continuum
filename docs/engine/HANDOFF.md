@@ -1,5 +1,16 @@
 # Stellar Engine migration handoff
 
+Current Codex candidate (2026-09-15): PR #332 integrates native diplomacy,
+observer-safe territory, approved artwork, audio/settings/scientist cues,
+top-down colony construction, recent events, bounded diagnostic exports and
+corrected native tactical controls/persistence. See `../CPP_MIGRATION_HANDOFF.md`
+for current tests and checkpoint history. Tactical `357872e8` is selectively
+adapted with the corrections in `NATIVE_TACTICAL_WORKSPACE.md`; the native-only
+zero-fleet tactical identity repair is an explicit C# parity exception. Surface
+sprites `58aaf475` remain unimported; see `NATIVE_SURFACE_SPRITE_REVIEW.md`.
+PR #332 remains unmerged and unsealed. Detailed ships fighting inside the system,
+full 3D colonies, production HUD styling and sustained 60 FPS remain unfinished.
+
 Engine 0.1.55 restores the four approved menu/loading artworks in the native C++23 client: application boot, main menu and race setup, new-galaxy generation, and saved-campaign restoration. The application-loading screen lasts at least seven seconds; its displayed progress is bounded by both loaded assets and the minimum presentation time. New/save operations retain real operation progress without an artificial delay. The right artwork survives immediate worker completion because the request origin is recorded explicitly. Responsive translucent controls, complete species portraits and one gameplay tip per operation remain legible at 720p and 1080p.
 
 System stars now use cached 1024px class-coloured photospheres, seeded sunspots and intermittent prominence animation. Saturn renders a textured globe between continuous back/front ring layers. Review caught and removed a diagonal ring-opacity seam. Generated celestial resources are bounded to 18 entries / 32 MiB; camera movement does not regenerate textures. These are improved 2D visuals, not full reference shader or 3D parity.

@@ -7,10 +7,21 @@ import unittest
 from unittest import mock
 
 from native_system_runtime import validate_native_system_export
+from test_native_frame_profile import cold_profile
+
+
+def steady_profile(samples):
+    metrics = {"mean_ms": 2.0, "p50_ms": 1.0, "p95_ms": 3.0,
+               "p99_ms": 4.0, "max_ms": 5.0}
+    value = {"samples": samples}
+    for phase in ("interval", "update", "scene", "submission", "throttle", "present"):
+        value[phase] = dict(metrics)
+    value["readback"] = {key: 0.0 for key in metrics}
+    return value
 
 
 class NativeSystemExportTests(unittest.TestCase):
-    def exercise(self, fault=None):
+    def exercise(self, fault=None, profile_frames=0):
         with tempfile.TemporaryDirectory(prefix="stellar-orbital-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -46,19 +57,42 @@ class NativeSystemExportTests(unittest.TestCase):
                           f"system=id=0:body={body}:visible=9:scale={scale}"
                           f":entry=1:hit=1:pan={pan}:zoom=1:reset=1:back=1"
                           f":pause_retained=1:speed_retained=1:gesture_cleared=1:paused=1:day_unchanged=1")
+                if profile_frames:
+                    self.assertEqual(args[args.index("--profile-frames") + 1], str(profile_frames))
+                    stdout += " steady_profile=" + json.dumps(steady_profile(profile_frames))
+                    if fault != "cold_profile":
+                        stdout += " cold_profile=" + json.dumps(cold_profile())
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_system_runtime.subprocess.run", side_effect=launch):
-                result = validate_native_system_export(package, {})
+                result = validate_native_system_export(package, {}, profile_frames=profile_frames)
             self.assertEqual(len(calls), 2)
             self.assertNotIn("--load", calls[0])
             self.assertIn("--load", calls[1])
             self.assertTrue(result["nativeSystemPlayerInput"])
             self.assertTrue(result["nativeSystemBodyImages"])
             self.assertTrue(result["nativeSystemPausedReload"])
+            if profile_frames:
+                self.assertEqual(len(result["systemProfiles"]), 2)
+                self.assertEqual(result["systemColdProfiles"], [cold_profile(), cold_profile()])
+            else:
+                self.assertNotIn("systemProfiles", result)
+                self.assertNotIn("systemColdProfiles", result)
 
     def test_actual_input_images_and_paused_reload_are_required(self):
         self.exercise()
+
+    def test_requested_steady_profile_is_forwarded_and_validated(self):
+        self.exercise(profile_frames=120)
+
+    def test_requested_profile_requires_cold_diagnostics(self):
+        with self.assertRaises(RuntimeError): self.exercise("cold_profile", profile_frames=120)
+
+    def test_invalid_profile_request_is_rejected_before_launch(self):
+        with mock.patch("native_system_runtime.subprocess.run") as launch:
+            with self.assertRaises(RuntimeError):
+                validate_native_system_export(Path("package"), {}, profile_frames=True)
+            launch.assert_not_called()
 
     def test_wrong_body_is_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("body")

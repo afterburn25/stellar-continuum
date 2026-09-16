@@ -66,6 +66,10 @@ public:
   // The host must consume/report any pending completion before this call.
   [[nodiscard]] PlayerCampaignSaveResult save_manual(
       IntegratedAdaptiveCampaignRuntime &, const PlayerCampaignCaptureOptions &);
+  // Admits one detached manual save to the existing writer. Nullopt means the
+  // capture and job submission succeeded and completion remains pending.
+  [[nodiscard]] std::optional<PlayerCampaignSaveResult> begin_manual(
+      IntegratedAdaptiveCampaignRuntime &, const PlayerCampaignCaptureOptions &);
   [[nodiscard]] bool pending() const noexcept;
   [[nodiscard]] bool preserves_recovered_backup() const noexcept;
   [[nodiscard]] double next_due_day() const noexcept;
@@ -81,6 +85,7 @@ private:
     bool preserved_backup{};
   };
   void require_owner() const;
+  void submit(PreparedPlayerCampaignSave, double captured_day, bool preserve);
   PlayerCampaignSaveResult failure(std::exception_ptr, double captured_day,
                                   const std::filesystem::path &, bool) const;
   std::thread::id owner_{std::this_thread::get_id()};

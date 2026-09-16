@@ -3,6 +3,7 @@
 #include "map_camera.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_image_preparation.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <thread>
 #include <vector>
 
 namespace stellar::native_galaxy_ui {
@@ -57,6 +59,8 @@ struct GalaxyBackdropRenderStats {
 
 class NativeGalaxyBackdropAssets final {
  public:
+  // Each retained or prepared source image is bounded to this decoded size.
+  static constexpr std::size_t maximum_prepared_image_bytes=8u*1024u*1024u;
   explicit NativeGalaxyBackdropAssets(std::filesystem::path asset_root);
   [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
   deep_field();
@@ -64,12 +68,40 @@ class NativeGalaxyBackdropAssets final {
   galaxy_layer();
   [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
   regional_nebula();
+  void use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
+  // A null request result means the image is pending or the bounded queue is
+  // full; callers may safely retry on a later owner-thread frame.
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
+  request_deep_field();
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
+  request_galaxy_layer();
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
+  request_regional_nebula();
+  // Cancels pending source work without clearing reusable generic artwork.
+  void cancel_preparation() noexcept;
+  [[nodiscard]] std::size_t pending_count()const noexcept;
   [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
   undisclosed_core_fog();
   [[nodiscard]] std::size_t decoded_count() const noexcept;
 
  private:
+  enum class ArtworkKind {deep_field,galaxy_layer,regional_nebula};
+  struct ArtworkSource {std::filesystem::path path;const char *label;};
+  struct Pending {ArtworkKind kind;stellar::native_map::ImagePreparationQueue::Ticket ticket;};
+  void require_owner()const;
+  void collect_ready();
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
+  request(ArtworkKind);
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
+  synchronous(ArtworkKind);
+  [[nodiscard]] ArtworkSource source(ArtworkKind)const;
+  [[nodiscard]] static std::shared_ptr<const stellar::native_map::RgbaImage>
+  decode_source(const ArtworkSource&);
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>& slot(ArtworkKind);
   std::filesystem::path asset_root_;
+  std::thread::id owner_{std::this_thread::get_id()};
+  std::shared_ptr<stellar::native_map::ImagePreparationQueue> preparation_;
+  std::vector<Pending> pending_;
   std::shared_ptr<const stellar::native_map::RgbaImage> deep_field_;
   std::shared_ptr<const stellar::native_map::RgbaImage> galaxy_layer_;
   std::shared_ptr<const stellar::native_map::RgbaImage> regional_nebula_;
@@ -93,6 +125,7 @@ class NativeGalaxyBackdrop final {
   [[nodiscard]] stellar::native_map::Camera fit_camera(int viewport_width,
                                                        int viewport_height) const;
   [[nodiscard]] std::size_t regional_point_count() const noexcept;
+  [[nodiscard]] bool artwork_ready() const noexcept;
 
  private:
   struct RegionalPoint {
@@ -105,6 +138,7 @@ class NativeGalaxyBackdrop final {
   std::optional<GalaxyBackdropFrame> artwork_frame_;
   std::vector<RegionalPoint> regional_points_;
   GalaxyBackdropRenderStats last_stats_{};
+  bool artwork_ready_{true};
 };
 
 // The Engine draws legacy batches before ordered world commands. Call this once

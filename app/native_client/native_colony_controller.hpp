@@ -41,7 +41,7 @@ struct NativeColonyView {
   std::uint64_t campaign_generation{}, revision{};
   int player_civilization_id{}, system_id{}, body_id{}, colony_id{};
   std::string colony_name, body_display_name, population_species_id;
-  bool resource_outpost{}, solid_surface{};
+  bool resource_outpost{}, solid_surface{}, homeworld{};
   stellar::core::SovereignCurrencyDefinition currency;
   double treasury_budget_units{}, stored_industry{};
   std::string formatted_treasury;

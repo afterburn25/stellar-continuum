@@ -142,26 +142,34 @@ void NativeGalaxyStarMarkerRenderer::append(DrawList &out, Point center,
                                               float core_radius,
                                               const NativeGalaxyStarAppearance &appearance,
                                               bool selected,
-                                              std::optional<UiRect> clip) {
+                                              std::optional<UiRect> clip,
+                                              float alpha) {
   if (!std::isfinite(center.x) || !std::isfinite(center.y) ||
-      !std::isfinite(core_radius) || core_radius <= 0.f) {
+      !std::isfinite(core_radius) || core_radius <= 0.f ||
+      !std::isfinite(alpha) || alpha < 0.f) {
     throw std::invalid_argument("Galaxy star marker geometry must be finite and positive.");
   }
+  alpha = std::min(alpha, 1.f);
+  const auto scaled = [&](std::uint8_t value) {
+    return static_cast<std::uint8_t>(
+        std::clamp(std::lround(value * alpha), 0l, 255l));
+  };
   const auto place = [&](GalaxyStarVisualClass visual, Point offset, float scale) {
     const float extent = core_radius * 3.5f * scale;
     out.world.emplace_back(Image{storage_->obtain(visual),
                                  {center.x + offset.x - extent,
                                   center.y + offset.y - extent,
                                   extent * 2.f, extent * 2.f},
-                                 std::nullopt, {255, 255, 255, 255}, clip});
+                                 std::nullopt, {255, 255, 255, scaled(255)},
+                                 clip});
   };
   if (selected) {
     out.world.emplace_back(Circle{center, core_radius * 1.9f,
-                                  {111, 225, 255, 52}});
+                                  {111, 225, 255, scaled(52)}});
   }
   out.world.emplace_back(
       Circle{center, std::clamp(core_radius * 1.85f, 3.5f, 6.f),
-             {1, 4, 9, 155}});
+             {1, 4, 9, scaled(155)}});
   place(appearance.primary, {}, 1.f);
   if (appearance.secondary) {
     place(*appearance.secondary,

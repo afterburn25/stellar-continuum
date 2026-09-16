@@ -14,6 +14,26 @@
 
 namespace stellar::native_fleet {
 
+[[nodiscard]] constexpr bool is_civilian_role(stellar::core::FleetRole role) noexcept {
+  using stellar::core::FleetRole;
+  return role == FleetRole::Scout || role == FleetRole::Science ||
+         role == FleetRole::Colony;
+}
+
+// Presentation commands bind the displayed mission, never whichever fleet
+// happens to be selected when an old confirmation reaches the owner thread.
+struct NativeCivilianRecoveryQuote {
+  std::uint64_t campaign_generation{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  stellar::core::FleetRole role{};
+  bool hold_requested{}, return_requested{};
+  std::optional<int> destination_system, destination_body, settlement_body;
+  double settlement_days{};
+  bool operator==(const NativeCivilianRecoveryQuote &) const = default;
+};
+
+enum class NativeCivilianRecoveryAction { Hold, Resume, ReturnToBase };
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -32,6 +52,8 @@ struct NativeOwnFleet {
   int mission_order_revision{};
   std::optional<stellar::core::OwnCombatFleetStatus> combat_status;
   double combat_power{};
+  std::optional<NativeCivilianRecoveryQuote> recovery;
+  std::string recovery_message;
 };
 
 // A historic intelligence record owns no current position. The strategic
@@ -74,6 +96,7 @@ struct NativeFleetOrderOutcome {
   bool accepted{};
   std::string message;
   int mission_order_revision{};
+  bool requires_confirmation{};
 };
 
 class NativeFleetController final {
@@ -100,6 +123,9 @@ public:
   [[nodiscard]] NativeFleetOrderOutcome
   issue_selected_route(stellar::core::CampaignFrame &,
                        const NativeFleetRoutePreview &preview);
+  [[nodiscard]] NativeFleetOrderOutcome issue_civilian_recovery(
+      stellar::core::CampaignFrame &, const NativeCivilianRecoveryQuote &,
+      NativeCivilianRecoveryAction, bool confirm_abandon = false);
   [[nodiscard]] std::optional<int> selection() const;
 
 private:

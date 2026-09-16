@@ -17,6 +17,9 @@ import tempfile
 from research_runtime_files import copy_research_runtime_files
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_research_runtime import validate_native_research_export
+from native_navigation_runtime import validate_native_navigation_export
+from native_support_runtime import validate_native_support_export
+from native_battle_runtime import validate_native_battle_export
 from native_fleet_runtime import validate_native_fleet_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
@@ -27,6 +30,7 @@ from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
+from native_diplomacy_runtime import validate_native_diplomacy_export
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
@@ -84,6 +88,8 @@ def native_build(preset, env):
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
     run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
@@ -91,9 +97,17 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_battle_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_frame_profile.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_campaign_profile.py", "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
@@ -431,17 +445,20 @@ def export(preset_name):
             readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
                 "Launch stellar-continuum-native.exe for the fullscreen galaxy preview.\n"
                 "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
+                "Use the left icon rail for Research, Shipyard, Construction and Relations; hover an icon for its name.\n"
                 "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
                 "Select a green fleet or its outliner entry, then right-click a destination to preview and confirm travel.\n"
                 "Shipyard shows available designs, authorization costs, population requirements and timed build orders.\n"
                 "Cancel pauses the campaign to review the current refund; confirm explicitly, then resume when ready.\n"
                 "The native campaign saves separately under LocalAppData/Stellar Continuum/NativePreview.\n"
                 "Use --save-path <path> for another slot, and --load to restore it; restored games start paused.\n"
-                "An installed Vulkan graphics driver is required. No Godot or .NET runtime is used.\n"
+                "An installed Vulkan graphics driver and Windows Media Foundation components are required. No Godot or .NET runtime is used.\n"
+                "Native music begins at the main menu and continues into the campaign; startup loading stays silent.\n"
                 "Known systems open orbital maps; owned planets show grouped colony information.\n"
                 "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots. Detailed 3D surfaces, audio and full gameplay controls remain in migration.\n\n"
+                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots.\n"
+                "Settings in the main and pause menus control audio; three scientist voice cues are integrated. Detailed 3D surfaces, broader casting and full gameplay controls remain in migration.\n\n"
                 + readme.read_text(encoding="utf-8"), encoding="utf-8")
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
@@ -458,6 +475,10 @@ def export(preset_name):
         smoke = relocated_smoke(output)
         if native_client:
             smoke.update(validate_native_client_export(output, env))
+            smoke.update(validate_native_navigation_export(output, env))
+            smoke.update(validate_native_support_export(output, env))
+            smoke.update(validate_native_battle_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_research_export(output, env))
             smoke.update(validate_native_fleet_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
@@ -475,6 +496,8 @@ def export(preset_name):
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_galaxy_export(output, env))
             smoke.update(validate_native_ship_art_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_diplomacy_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]

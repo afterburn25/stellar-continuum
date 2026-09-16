@@ -180,7 +180,103 @@ int main() try {
               confirm.kind == FleetWorkspaceCommandKind::Confirm,
           "Explicit travel confirmation was not routed.");
 
+  NativeFleetWorkspace engagement;
+  auto armed = player_view(true);
+  auto &warship = armed.own_fleets.front();
+  warship.role = stellar::core::FleetRole::Military;
+  warship.current_system_id = 0;
+  warship.combat_status = stellar::core::OwnCombatFleetStatus{};
+  warship.combat_status->is_armed = true;
+  const auto engage_click = [&] {
+    return engagement.handle({InputEventType::LeftPressed, center(layout.confirm)},
+                             1280, 720, markers, std::nullopt).kind;
+  };
+  engagement.set_view(armed);
+  DrawList engage_draw;
+  engagement.render(engage_draw, 1280, 720, markers);
+  require(has_text(engage_draw, "ENGAGE HOSTILES") &&
+              engage_click() == FleetWorkspaceCommandKind::Engage,
+          "Stationed armed fleet did not expose the authoritative engagement command.");
+  for (int unavailable = 0; unavailable < 4; ++unavailable) {
+    auto view = armed;
+    auto &fleet = view.own_fleets.front();
+    if (unavailable == 0) fleet.role = stellar::core::FleetRole::Scout;
+    if (unavailable == 1) fleet.current_system_id.reset();
+    if (unavailable == 2) fleet.destination_system_id = 42;
+    if (unavailable == 3) fleet.combat_status->is_armed = false;
+    engagement.set_view(std::move(view));
+    DrawList unavailable_draw;
+    engagement.render(unavailable_draw, 1280, 720, markers);
+    require(!has_text(unavailable_draw, "ENGAGE HOSTILES") &&
+                engage_click() != FleetWorkspaceCommandKind::Engage,
+            "Ineligible fleet exposed a tactical engagement action.");
+  }
+  engagement.set_view(armed);
+  engagement.set_preview(blocked, "Unknown system");
+  require(engage_click() != FleetWorkspaceCommandKind::Engage,
+          "Blocked travel preview accidentally started combat.");
+  auto ready = blocked;
+  ready.route_supported = ready.route_authoritative = ready.command_available = true;
+  engagement.set_preview(ready, "Unknown system");
+  require(engage_click() == FleetWorkspaceCommandKind::Confirm,
+          "Engagement replaced an explicit travel confirmation.");
+
   auto revised = player_view(true);
+  {
+    NativeFleetWorkspace recovery;
+    auto view = player_view(true);
+    view.own_fleets.front().recovery = NativeCivilianRecoveryQuote{
+        .campaign_generation=4, .observer_id=0, .fleet_id=10,
+        .role=stellar::core::FleetRole::Colony, .destination_body=4,
+        .settlement_body=4, .settlement_days=3.5};
+    const auto quote = *view.own_fleets.front().recovery;
+    recovery.set_view(view);
+    const auto click = [&](UiRect bounds) {
+      return recovery.handle({InputEventType::LeftPressed,center(bounds)},1280,720,{},std::nullopt);
+    };
+    const auto hold = click(layout.recovery_left);
+    require(hold.kind == FleetWorkspaceCommandKind::Recovery && hold.recovery_quote == quote &&
+            hold.recovery_action == NativeCivilianRecoveryAction::Hold && !hold.confirm_abandon,
+            "Hold click lost the displayed mission identity.");
+    const auto initial = click(layout.recovery_right);
+    require(initial.recovery_action == NativeCivilianRecoveryAction::ReturnToBase && !initial.confirm_abandon,
+            "First return click authorized abandonment.");
+    const NativeFleetOrderOutcome warning{false,
+        "Returning this vessel will abandon its paid colony authorization with no refund. "
+        "Current establishment progress: 3.5 days; all of it will be lost. "
+        "Colonists remain aboard. Confirm return to continue.",0,true};
+    recovery.set_recovery_result(quote,warning);
+    DrawList warning_draw;
+    recovery.render(warning_draw,1280,720,{});
+    require(has_text(warning_draw,warning.message) && has_text(warning_draw,"CONFIRM RETURN") &&
+            has_text(warning_draw,"CANCEL"), "Paid warning was truncated or cancellation unavailable.");
+    const auto confirm_return = click(layout.recovery_left);
+    require(confirm_return.confirm_abandon && confirm_return.recovery_quote == quote,
+            "Confirmation lost its original quote.");
+    require(click(layout.recovery_right).kind == FleetWorkspaceCommandKind::None &&
+            !recovery.recovery_confirmation_open(), "Repeated return click confirmed instead of cancelling.");
+    for(int change=0;change<5;++change) {
+      recovery.set_view(view);
+      recovery.set_recovery_result(quote,warning);
+      auto replacement=view;
+      if(change==0) replacement.selected_fleet_id=12;
+      if(change==1) replacement.own_fleets.front().recovery->mission_order_revision++;
+      if(change==2) replacement.own_fleets.front().recovery->settlement_days+=1.;
+      if(change==3) replacement.own_fleets.front().recovery.reset();
+      if(change==4) replacement.own_fleets.front().recovery->campaign_generation++;
+      recovery.set_view(std::move(replacement));
+      require(!recovery.recovery_confirmation_open(),"Changed mission retained confirmation.");
+    }
+    recovery.set_view(view);recovery.set_recovery_result(quote,warning);
+    (void)recovery.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
+    require(!recovery.recovery_confirmation_open(),"Focus loss retained destructive confirmation.");
+    for(const auto [w,h]:std::array{std::pair{1280,720},std::pair{1920,1080},std::pair{3840,2160}}){
+      const auto l=FleetWorkspaceLayout::for_viewport(w,h);
+      require(contained(l.confirm,l.recovery_left)&&contained(l.confirm,l.recovery_right)&&
+              l.recovery_left.x+l.recovery_left.width<l.recovery_right.x,
+              "Recovery buttons overlap or escape the action row.");
+    }
+  }
   revised.own_fleets.front().mission_order_revision = 1;
   workspace.set_view(std::move(revised));
   require(!workspace.preview(),

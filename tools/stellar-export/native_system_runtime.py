@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import tempfile
 
+from native_frame_profile import validate_cold_profile, validate_profile_frames, validate_steady_profile
+
 
 def _system_diagnostic(stdout):
     state = re.search(r"\bsystem=id=(\d+):body=(\d+):visible=(\d+):scale=([^:\s]+)"
@@ -30,10 +32,11 @@ def _system_diagnostic(stdout):
         raise RuntimeError("Native system did not render and select the expected known orbital view")
 
 
-def validate_native_system_export(folder: Path, env: dict[str, str]):
+def validate_native_system_export(folder: Path, env: dict[str, str], *, profile_frames: int = 0):
+    validate_profile_frames(profile_frames)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics = [], []
+    captures, diagnostics, profiles, cold_profiles = [], [], [], []
     baseline = None
     with tempfile.TemporaryDirectory(prefix="stellar-native-system-") as temporary:
         work = Path(temporary)
@@ -43,15 +46,20 @@ def validate_native_system_export(folder: Path, env: dict[str, str]):
             args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                     "--save-path", str(save), "--width", str(width), "--height", str(height),
                     "--system-smoke", str(capture)]
+            if profile_frames:
+                args.extend(("--profile-frames", str(profile_frames)))
             if reload:
                 args.append("--load")
             result = subprocess.run(args, cwd=work, env=clean_env, capture_output=True,
-                                    text=True, timeout=120)
+                                    text=True, timeout=120 + (profile_frames // 30 if profile_frames else 0))
             if result.returncode != 0:
                 raise RuntimeError(f"Native orbital input failed ({result.returncode}): {result.stderr}")
             if any(token not in result.stdout for token in ("gpu_driver=vulkan ", "systems=500 ", "save=ok ")):
                 raise RuntimeError("Native orbital view did not confirm Vulkan, fresh campaign and save")
             _system_diagnostic(result.stdout)
+            if profile_frames:
+                profiles.append(validate_steady_profile(result.stdout, profile_frames))
+                cold_profiles.append(validate_cold_profile(result.stdout))
             if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
                 raise RuntimeError("Native orbital view did not capture the rendered frame")
             if not save.is_file():
@@ -71,6 +79,10 @@ def validate_native_system_export(folder: Path, env: dict[str, str]):
             shutil.copy2(capture, evidence)
             captures.append(str(evidence))
             diagnostics.append(result.stdout.strip())
-    return {"nativeSystemPlayerInput": True, "nativeSystemBodyImages": True,
+    result = {"nativeSystemPlayerInput": True, "nativeSystemBodyImages": True,
             "nativeSystemPausedReload": True, "systemCaptures": captures,
             "systemDiagnostics": diagnostics}
+    if profile_frames:
+        result["systemProfiles"] = profiles
+        result["systemColdProfiles"] = cold_profiles
+    return result

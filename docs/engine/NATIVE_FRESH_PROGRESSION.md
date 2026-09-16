@@ -66,3 +66,50 @@ source is `native-tests/native_fresh_progression_tests.cpp`; the CMake entry is
 
 This proves a successful ordinary campaign path and a distinct failed-hypothesis
 path. It does not certify every seed, race, research strategy or galaxy size.
+
+## Developed-fleet profile save
+
+The opt-in `--profile-save <absolute-path>` run creates a fresh campaign using
+the same maintained recipe and only ordinary paid research, construction and shipyard
+commands. Seed 115501 reaches day 10154 with 500 systems, 9 total colonies
+(3 owned), treasury 346.233 and 24 ships (12 scouts and 12 science vessels). Developer
+offline stepping is explicit; no funds, capabilities or ships are granted.
+The 24-ship bound keeps the scenario within its real budget: an initial 32-ship
+attempt exhausted funds after 25 ships. All 24 accepted routes must enter actual
+transit before export. The output requires an absolute, nonexistent path with an
+existing parent, and is checked again before writing.
+
+After building the `stellar_native_fresh_progression_tests` target, run from
+the repository root (create `work` first if absent):
+
+```powershell
+& ./build-native/preview/stellar_native_fresh_progression_tests.exe `
+  "$PWD/data/research/v1" "$PWD/data/astronomy/hyg-nearby-500-v1.json" `
+  --profile-save "$PWD/work/developed-fleet-24-fixed.player17.json"
+```
+
+Use a new output name for another run. This is a maintained C++ test executable,
+not an unmanaged scratch checker. Failures report a cause and return nonzero.
+The generated save is local validation tooling, not a committed game asset.
+
+Every default positive/negative progression now restores and recaptures its full
+Player17 snapshot; profile export does this before writing. Values and array
+order must match, with no fields excluded. Object member order is immaterial:
+the Leadership dictionary sorts on restoration. Research errors include the
+decoder path and inner exception details in the terminal.
+
+This test caught a native save writer defect: populated outcome history used
+`"hypothesisSupported"` where the strict Player17 reader requires an integer.
+The writer now converts the typed outcome, tacit scope/stage and four foreign
+assessment enums at their schema paths. The strict reader and standalone
+research snapshot formats stay unchanged. Eight focused CTests and 17 Python
+profile checks pass; existing canonical JSON fixtures are unchanged.
+
+Four active/reload Vulkan runs at 720p and 1080p passed exact paused payload
+recapture. Over 600 frames at 8× speed, days advanced 10154→10234.2218632 and
+→10314.4471072; interval means were 16.713/16.714 ms, p95 17.401/17.604 and
+p99 18.516/18.560. All 24 ships moved in both intervals; they were still
+transiting after the first interval and arrived/stationed by the second. Evidence
+is `work/developed-fleet-24-profile.json` and
+`native-developed-fleet-fixed-validation.log`; source hash remains
+`b5a57777a4eacc57458ee92c5ebc74cc77aaea5409732e86d665e7151915a17f`.

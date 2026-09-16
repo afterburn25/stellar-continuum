@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_new_game_runtime import validate_native_new_game_export
+from native_new_game_runtime import _video_diagnostic, validate_native_new_game_export
 
 
 def fixture(path):
@@ -37,11 +37,56 @@ def bmp(width, height):
     size = 54 + length
     return (b"BM" + struct.pack("<IHHI", size, 0, 0, 54) +
             struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
-                        length, 2835, 2835, 0, 0) + pixels)
+            length, 2835, 2835, 0, 0) + pixels)
+
+
+class VideoDiagnosticTests(unittest.TestCase):
+    location = "startup"
+
+    def stdout(self, **overrides):
+        report = {"location": self.location, "opened": True, "four_rows": True,
+                  "previewed": True, "normal_capture": True, "confirm_capture": True,
+                  "escape_reverted": True, "kept": True, "restored": True}
+        report.update(overrides)
+        return "video_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_video_diagnostic(self):
+        self.assertEqual(_video_diagnostic(self.stdout(), self.location)["location"],
+                         self.location)
+
+    def test_missing_video_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic("gpu_driver=vulkan", self.location)
+
+    def test_missing_video_field_is_rejected(self):
+        report = json.loads(self.stdout().removeprefix("video_settings_check="))
+        del report["restored"]
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic("video_settings_check=" + json.dumps(report), self.location)
+
+    def test_false_video_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(kept=False), self.location)
+
+    def test_integer_video_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(previewed=1), self.location)
+
+    def test_duplicate_video_key_is_rejected(self):
+        duplicate = ('video_settings_check={"location":"startup","opened":true,'
+                     '"opened":true,"four_rows":true,"previewed":true,'
+                     '"normal_capture":true,"confirm_capture":true,'
+                     '"escape_reverted":true,"kept":true,"restored":true}')
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(duplicate, self.location)
+
+    def test_wrong_video_location_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(location="pause"), self.location)
 
 
 class NativeNewGameRuntimeTests(unittest.TestCase):
-    def exercise(self, fault=None):
+    def exercise(self, fault=None, *, audio_check=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); package = root / "package"; package.mkdir()
             source = root / "fixture.json"; fixture(source)
@@ -95,8 +140,10 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
                         if fault == "truncated" and name == "loading":
                             image = bytearray(image[:-32]); struct.pack_into("<I", image, 2, len(image)); image = bytes(image)
                         image_path.write_bytes(image)
-                    stdout = ("gpu_driver=vulkan systems=250 image_uploads=4 save=ok new_game=" +
-                              json.dumps(state, separators=(",", ":")))
+                    stdout = ((("audio_check=" + json.dumps({"assets_loaded": True, "music_starts": 1,
+                                "confirm_count": 2, "queued_music_bytes": 2048,
+                                "boot_services": 3, "stopped": True}, separators=(",", ":")) + "\n") if audio_check else "") +
+                              "gpu_driver=vulkan systems=250 image_uploads=4 save=ok new_game=" + json.dumps(state, separators=(",", ":")))
                 else:
                     generated = save
                     data = json.loads(generated.read_text())
@@ -107,13 +154,17 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
                     capture = Path(args[args.index("--smoke") + 1])
                     image = bmp(width - 1 if fault == "reload_geometry" else width, height)
                     capture.write_bytes(image)
-                    stdout = "gpu_driver=vulkan systems=250 image_uploads=4 save=ok"
+                    stdout = (("audio_check=" + json.dumps({"assets_loaded": True, "music_starts": 1,
+                               "confirm_count": 0, "queued_music_bytes": 2048,
+                               "boot_services": 0, "stopped": True}, separators=(",", ":")) + "\n"
+                              if audio_check else "") +
+                              "gpu_driver=vulkan systems=250 image_uploads=4 save=ok")
                 if fault == "renderer": stdout = stdout.replace("gpu_driver=vulkan", "gpu_driver=software")
                 if fault == "diagnostic_count": stdout = stdout.replace("systems=250", "systems=500")
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_new_game_runtime.subprocess.run", side_effect=run):
-                result = validate_native_new_game_export(package, {}, source)
+                result = validate_native_new_game_export(package, {}, source, audio_check=audio_check)
             self.assertEqual(len(calls), 2)
             self.assertIn("--new-game-smoke", calls[0]); self.assertNotIn("--load", calls[0])
             self.assertIn("--load", calls[1]); self.assertIn("--smoke", calls[1])
@@ -121,8 +172,18 @@ class NativeNewGameRuntimeTests(unittest.TestCase):
             self.assertTrue(result["nativeNewGameIndependentSave"])
             self.assertTrue(result["nativeNewGamePausedReload"])
             self.assertEqual(len(result["newGameCaptures"]), 4)
+            if audio_check:
+                self.assertIn("--audio-check", calls[0])
+                self.assertIn("--audio-check", calls[1])
+                self.assertTrue(result["nativeNewGameAudioCheck"])
+                self.assertEqual(result["newGameAudioChecks"]["reload"]["confirm_count"], 0)
+            else:
+                self.assertNotIn("nativeNewGameAudioCheck", result)
+                self.assertNotIn("--audio-check", calls[0])
+                self.assertNotIn("--audio-check", calls[1])
 
     def test_valid(self): self.exercise()
+    def test_optional_audio_check_runs_fresh_and_reload(self): self.exercise(audio_check=True)
     def test_entry_required(self):
         with self.assertRaises(RuntimeError): self.exercise("entry_opened")
     def test_setup_required(self):

@@ -251,6 +251,96 @@ void observer_and_commands(CampaignFrame &frame) {
           "A stale window rebound the controller to an older generation.");
 }
 
+void civilian_recovery(CampaignFrame &frame) {
+  NativeFleetController controller;
+  constexpr std::uint64_t generation = 30;
+  auto view = controller.build(frame, generation);
+  require(std::ranges::none_of(view.own_fleets, [](const auto &f) { return f.recovery.has_value(); }),
+          "Unselected outliner rows unnecessarily planned recovery routes.");
+  auto &world = frame.runtime().world().campaign();
+  auto &colony = *std::ranges::find_if(world.fleets, [&](const auto &f) {
+    return f.civilization_id == view.player_civilization_id && f.role == FleetRole::Colony;
+  });
+  const int id = colony.id;
+  const auto original = colony;
+  require(controller.select(frame, generation, id).accepted, "Cannot select recovery colony ship.");
+  const auto quote = [&] {
+    auto projected = controller.build(frame, generation);
+    const auto selected = std::ranges::find(projected.own_fleets, id, &NativeOwnFleet::id);
+    require(selected != projected.own_fleets.end() && selected->recovery &&
+            !selected->recovery_message.empty(), "Civilian recovery projection missing.");
+    return *selected->recovery;
+  };
+  auto first = quote();
+  require(controller.issue_civilian_recovery(frame, first, NativeCivilianRecoveryAction::Hold).accepted &&
+          colony.hold_requested && colony.destination_system_id == original.destination_system_id,
+          "Hold failed or replaced existing mission.");
+  require(!controller.issue_civilian_recovery(frame, first, NativeCivilianRecoveryAction::Resume).accepted &&
+          colony.hold_requested, "Old hold state could issue a new recovery action.");
+  require(controller.issue_civilian_recovery(frame, quote(), NativeCivilianRecoveryAction::Resume).accepted &&
+          !colony.hold_requested, "Resume failed.");
+  colony.destination_planetary_body_id = 4;
+  colony.settlement_body_id = 4;
+  colony.settlement_days_completed = 3.5;
+  const auto paid = colony;
+  const auto paid_quote = quote();
+  const auto warning = controller.issue_civilian_recovery(frame, paid_quote,
+      NativeCivilianRecoveryAction::ReturnToBase);
+  require(!warning.accepted && warning.requires_confirmation &&
+          warning.message.contains("no refund") && warning.message.contains("Colonists remain aboard") &&
+          colony.destination_planetary_body_id == paid.destination_planetary_body_id &&
+          colony.settlement_days_completed == 3.5 && !colony.return_to_base_requested,
+          "First return click abandoned paid work or omitted consequences.");
+  for (int changed = 0; changed != 9; ++changed) {
+    colony = paid;
+    auto stale = paid_quote;
+    if (changed == 0) ++stale.campaign_generation;
+    if (changed == 1) ++stale.observer_id;
+    if (changed == 2) ++colony.mission_order_revision;
+    if (changed == 3) colony.destination_planetary_body_id = 9;
+    if (changed == 4) colony.settlement_days_completed += 1;
+    if (changed == 5) colony.hold_requested = true;
+    if (changed == 6) colony.is_active = false;
+    if (changed == 7) colony.civilization_id += 1;
+    if (changed == 8) colony.role = FleetRole::Military;
+    const auto before = colony;
+    const auto denied = controller.issue_civilian_recovery(frame, stale,
+        NativeCivilianRecoveryAction::ReturnToBase, true);
+    require(!denied.accepted && !denied.requires_confirmation &&
+            colony.destination_planetary_body_id == before.destination_planetary_body_id &&
+            colony.settlement_days_completed == before.settlement_days_completed &&
+            colony.hold_requested == before.hold_requested &&
+            colony.return_to_base_requested == before.return_to_base_requested,
+            "Stale/foreign/inactive recovery confirmation mutated a mission.");
+  }
+  colony = paid;
+  const int scout_id = std::ranges::find_if(view.own_fleets, [](const auto &f) {
+    return f.role == FleetRole::Scout;
+  })->id;
+  require(controller.select(frame, generation, scout_id).accepted, "Cannot switch recovery selection.");
+  require(!controller.issue_civilian_recovery(frame, paid_quote,
+      NativeCivilianRecoveryAction::ReturnToBase, true).accepted &&
+      colony.settlement_days_completed == 3.5, "Changed selection retained destructive authorization.");
+  require(controller.select(frame, generation, id).accepted, "Cannot restore recovery selection.");
+  require(controller.issue_civilian_recovery(frame, quote(), NativeCivilianRecoveryAction::ReturnToBase, true).accepted &&
+          !colony.destination_planetary_body_id && !colony.settlement_body_id &&
+          colony.settlement_days_completed == 0 && colony.prevent_automatic_settlement &&
+          colony.embarked_population_millions == paid.embarked_population_millions,
+          "Confirmed return did not use Core abandonment rules or lost colonists.");
+  // Between systems the command must preserve the current leg and queue recovery.
+  colony = original;
+  colony.current_system_id.reset();
+  colony.destination_system_id = 1;
+  colony.planned_route_system_ids = {1};
+  colony.transit_phase = FleetTransitPhase::InterstellarWarp;
+  colony.transit_progress = .4;
+  require(controller.issue_civilian_recovery(frame, quote(), NativeCivilianRecoveryAction::ReturnToBase).accepted &&
+          colony.return_to_base_requested && !colony.current_system_id &&
+          colony.transit_progress == .4 && colony.planned_route_system_ids == std::vector<int>{1},
+          "Return teleported a travelling ship or skipped its current lane.");
+  colony = original;
+}
+
 void empty_fresh_campaign(const fs::path &research_root,
                           const fs::path &catalog_path) {
   auto world = seed_persistable_fresh_campaign(
@@ -273,6 +363,9 @@ int main(int argc, char **argv) try {
   auto frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                             fs::absolute(argv[4]));
   observer_and_commands(frame);
+  auto recovery_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
+                                    fs::absolute(argv[4]));
+  civilian_recovery(recovery_frame);
   empty_fresh_campaign(fs::absolute(argv[1]), fs::absolute(argv[2]));
   std::cout << "Native fleet ownership, intelligence secrecy, route denial, canonical order, frame transit and generation tests passed\n";
   return 0;

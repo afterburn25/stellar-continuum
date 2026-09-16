@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from native_galaxy_runtime import _bmp, validate_native_galaxy_export
+from test_native_frame_profile import cold_profile
 
 
 def diagnostic(mode="fresh"):
@@ -17,17 +18,37 @@ def diagnostic(mode="fresh"):
         "overview": {"deep_field": 1, "galaxy_layer": 1,
                      "regional_nebula": 0, "regional_points": 0,
                      "catalog_markers": 500, "known_markers": 2,
-                     "unknown_markers": 498, "revealed_unknown_labels": 0},
+                     "unknown_markers": 498, "revealed_unknown_labels": 0,
+                     "labels": {"candidates": 0, "measured": 0, "placed": 0,
+                                "selected_requested": 0, "selected_placed": 0,
+                                "label_overlaps": 0, "obstacle_overlaps": 0,
+                                "hud_overlaps": 0, "star_overlaps": 0,
+                                "outside_viewport": 0}},
         "regional": {"deep_field": 0, "galaxy_layer": 0,
                      "regional_nebula": 1, "regional_points": 356,
                      "catalog_markers": 4, "known_markers": 1,
-                     "unknown_markers": 3, "revealed_unknown_labels": 0},
+                     "unknown_markers": 3, "revealed_unknown_labels": 0,
+                     "labels": {"candidates": 2, "measured": 2, "placed": 2,
+                                "selected_requested": 1, "selected_placed": 1,
+                                "label_overlaps": 0, "obstacle_overlaps": 0,
+                                "hud_overlaps": 0, "star_overlaps": 0,
+                                "outside_viewport": 0}},
         "system": {"background_images": 0, "regional_points": 0},
     }
 
 
+def steady_profile(samples):
+    metrics = {"mean_ms": 2.0, "p50_ms": 1.0, "p95_ms": 3.0,
+               "p99_ms": 4.0, "max_ms": 5.0}
+    value = {"samples": samples}
+    for phase in ("interval", "update", "scene", "submission", "throttle", "present"):
+        value[phase] = dict(metrics)
+    value["readback"] = {key: 0.0 for key in metrics}
+    return value
+
+
 class NativeGalaxyRuntimeTests(unittest.TestCase):
-    def exercise(self, fault=None):
+    def exercise(self, fault=None, profile_frames=0):
         with tempfile.TemporaryDirectory(prefix="stellar-galaxy-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -49,6 +70,22 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
                 if fault == "scale": state["fitted_scale"] = float("nan")
                 if fault == "decoded": state["decoded_sources"] = 2
                 if fault == "knowledge": state["overview"]["known_markers"] = 3; state["overview"]["unknown_markers"] = 497
+                if fault == "labels_missing": state["overview"].pop("labels")
+                if fault == "labels_bool": state["overview"]["labels"]["placed"] = True
+                if fault == "labels_negative": state["overview"]["labels"]["measured"] = -1
+                if fault == "labels_budget": state["overview"]["labels"]["measured"] = 129
+                if fault == "labels_counts": state["overview"]["labels"]["placed"] = 5; state["overview"]["labels"]["measured"] = 4
+                if fault == "labels_selected": state["overview"]["labels"]["selected_placed"] = 3; state["overview"]["labels"]["selected_requested"] = 2
+                if fault == "labels_overlap": state["overview"]["labels"]["hud_overlaps"] = 1
+                if fault == "labels_offscreen": state["overview"]["labels"]["outside_viewport"] = 1
+                if fault == "labels_extra": state["overview"]["labels"]["extra"] = 1
+                if fault == "labels_zero_regional": state["regional"]["labels"]["placed"] = 0
+                if isinstance(fault, str) and fault.startswith("labels_audit_"):
+                    state["overview"]["labels"][fault.removeprefix("labels_audit_")] = 1
+                if fault == "labels_missing_field": state["overview"]["labels"].pop("placed")
+                if fault == "labels_measured_candidates": state["overview"]["labels"]["measured"] = 1; state["overview"]["labels"]["candidates"] = 0
+                if fault == "labels_selected_placed": state["overview"]["labels"]["selected_placed"] = 1; state["overview"]["labels"]["placed"] = 0
+                if fault == "labels_selected_requested": state["overview"]["labels"]["selected_requested"] = 1; state["overview"]["labels"]["candidates"] = 0
                 payload = {"FormatVersion": 17, "SavedAtUtc": "later" if reload else "early",
                            "SimulationDays": 0,
                            "Galaxy": {"Systems": list(range(500)),
@@ -62,8 +99,13 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
                     path = overview.with_name(overview.stem + suffix + overview.suffix)
                     if fault != "capture" or suffix != "-system": path.write_bytes(b"BM")
                 uploads = 0 if fault == "uploads" else 20
-                stdout = (f"gpu_driver=vulkan systems=500 image_uploads={uploads} save=ok "
-                          f"galaxy_art={json.dumps(state, separators=(',', ':'))}")
+                stdout = f"gpu_driver=vulkan systems=500 image_uploads={uploads} save=ok "
+                if profile_frames:
+                    self.assertEqual(args[args.index("--profile-frames") + 1], str(profile_frames))
+                    stdout += " steady_profile=" + json.dumps(steady_profile(profile_frames))
+                    if fault != "cold_profile":
+                        stdout += " cold_profile=" + json.dumps(cold_profile())
+                stdout += f" galaxy_art={json.dumps(state, separators=(',', ':'))}"
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             def fake_bmp(path, width, height):
@@ -73,14 +115,23 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
 
             with mock.patch("native_galaxy_runtime.subprocess.run", side_effect=launch), \
                  mock.patch("native_galaxy_runtime._bmp", side_effect=fake_bmp):
-                result = validate_native_galaxy_export(package, {})
+                result = validate_native_galaxy_export(package, {}, profile_frames=profile_frames)
             self.assertEqual(len(calls), 2)
             self.assertNotIn("--load", calls[0])
             self.assertIn("--load", calls[1])
             self.assertEqual(len(result["galaxyCaptures"]), 6)
             self.assertTrue(result["nativeGalaxyFittedArtwork"])
+            if profile_frames:
+                self.assertEqual(len(result["galaxyProfiles"]), 2)
+                self.assertEqual(result["galaxyColdProfiles"], [cold_profile(), cold_profile()])
+            else:
+                self.assertNotIn("galaxyProfiles", result)
+                self.assertNotIn("galaxyColdProfiles", result)
 
     def test_complete_actual_contract(self): self.exercise()
+    def test_requested_steady_profile_is_forwarded_and_validated(self): self.exercise(profile_frames=120)
+    def test_requested_profile_requires_cold_diagnostics(self):
+        with self.assertRaises(RuntimeError): self.exercise("cold_profile", profile_frames=120)
     def test_missing_overview_art_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("overview")
     def test_missing_regional_nebula_rejected(self):
@@ -89,6 +140,21 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("system")
     def test_unknown_label_leak_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("labels")
+    def test_label_contract_rejects_malformed_counts(self):
+        for fault in ("labels_missing", "labels_bool", "labels_negative", "labels_budget",
+                      "labels_counts", "labels_selected", "labels_overlap", "labels_offscreen",
+                      "labels_extra", "labels_zero_regional", "labels_missing_field",
+                      "labels_measured_candidates", "labels_selected_placed",
+                      "labels_selected_requested"):
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError):
+                self.exercise(fault)
+
+    def test_each_label_audit_violation_is_rejected(self):
+        for field in ("label_overlaps", "obstacle_overlaps", "hud_overlaps",
+                      "star_overlaps", "outside_viewport"):
+            with self.subTest(field=field):
+                with self.assertRaises(RuntimeError):
+                    self.exercise("labels_audit_" + field)
     def test_missing_wheel_input_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("wheel")
     def test_nonfinite_scale_rejected(self):

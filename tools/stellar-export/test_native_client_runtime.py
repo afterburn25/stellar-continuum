@@ -9,13 +9,65 @@ import unittest
 from unittest import mock
 
 import stellar as exporter
-from native_client_runtime import copy_native_client_runtime, validate_native_client_export
+from native_client_runtime import (_validate_capture, copy_native_client_runtime,
+                                   validate_native_client_export)
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
+from native_audio_assets import NATIVE_AUDIO_SOURCES
+from native_surface_art_assets import NATIVE_SURFACE_ART_SOURCES
+from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
 from native_research_runtime import validate_native_research_export
+
+
+class NativeAssetCheckoutTests(unittest.TestCase):
+    def test_reviewed_text_hashes_survive_git_checkout_settings(self):
+        # Reproduce an index containing normalized Git blobs, then check out
+        # with either developer setting. Hash verification stays byte-exact.
+        sources = {}
+
+        def collect(value):
+            if isinstance(value, dict):
+                if "source" in value and "sha256" in value:
+                    path = value["source"]
+                    if Path(path).suffix in (".md", ".txt", ".json"):
+                        sources[path] = value["sha256"]
+                if "source" in value and "sourceSha256" in value:
+                    sources[value["source"]] = value["sourceSha256"].lower()
+                for child in value.values():
+                    collect(child)
+
+        for manifest in (exporter.ROOT / "export").glob("native-*-assets.json"):
+            collect(json.loads(manifest.read_text(encoding="utf-8")))
+        self.assertTrue(sources, "No reviewed native text assets were found")
+        with tempfile.TemporaryDirectory(prefix="stellar-asset-checkout-") as temporary:
+            checkout = Path(temporary)
+
+            def git(*args):
+                subprocess.run(["git", *args], cwd=checkout, check=True,
+                               capture_output=True, timeout=30)
+
+            git("init", "--quiet")
+            (checkout / ".gitattributes").write_bytes(
+                (exporter.ROOT / ".gitattributes").read_bytes())
+            for source in sources:
+                target = checkout / source
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((exporter.ROOT / source).read_bytes().replace(b"\r\n", b"\n"))
+            git("-c", "core.autocrlf=false", "-c", "core.safecrlf=false", "add", "--", ".gitattributes", *sources)
+            for autocrlf in ("true", "false"):
+                # Git can skip an existing file whose stat entry is current;
+                # remove only these known fixture files to force a fresh checkout.
+                for source in sources:
+                    target = (checkout / source).resolve()
+                    self.assertTrue(target.is_relative_to(checkout.resolve()))
+                    target.unlink()
+                git("-c", f"core.autocrlf={autocrlf}", "checkout-index", "--all", "--force")
+                for source, expected in sources.items():
+                    with self.subTest(autocrlf=autocrlf, source=source):
+                        self.assertEqual(hashlib.sha256((checkout / source).read_bytes()).hexdigest(), expected)
 
 
 class NativeClientDependencyTests(unittest.TestCase):
@@ -109,6 +161,37 @@ class NativeClientDependencyTests(unittest.TestCase):
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
 
+        audio_records = {}
+        for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only audio " + key).encode())
+            audio_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.audio_declaration = self.root / "export/native-audio-assets.json"
+        self.audio_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": audio_records}))
+        surface_art_records = {}
+        for key, (source, destination) in NATIVE_SURFACE_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("fixture surface art " + key).encode())
+            surface_art_records[key] = {"source": source, "runtimePath": destination,
+                                        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.surface_art_declaration = self.root / "export/native-surface-art-assets.json"
+        self.surface_art_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": surface_art_records}))
+
+        navigation_records = {}
+        for key, (source, destination) in NATIVE_NAVIGATION_SOURCES.items():
+            record = {"source": source, "runtimePath": destination}
+            for path, hash_field in ((source, "sourceSha256"), (destination, "runtimeSha256")):
+                asset = self.root / path
+                asset.parent.mkdir(parents=True, exist_ok=True)
+                asset.write_bytes(("fixture navigation " + path).encode())
+                record[hash_field] = hashlib.sha256(asset.read_bytes()).hexdigest()
+            navigation_records[key] = record
+        (self.root / "export/native-navigation-assets.json").write_text(json.dumps(
+            {"schemaVersion": 1, "size": 256, "assets": navigation_records}))
+
 
 
     def inspect(self, binary, runtime=(), windows=()):
@@ -133,6 +216,18 @@ class NativeClientDependencyTests(unittest.TestCase):
 
     def test_tampered_species_portrait_blocks_package(self):
         (self.root / NATIVE_SPECIES_SOURCES["terran-baseline"][0]).write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+            self.copy()
+
+    def test_missing_species_communications_scene_blocks_package(self):
+        key = "terran-baseline-communications-v2"
+        (self.root / NATIVE_SPECIES_SOURCES[key][0]).unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native species"):
+            self.copy()
+
+    def test_tampered_species_communications_scene_blocks_package(self):
+        key = "pelagic-high-pressure-communications-v2"
+        (self.root / NATIVE_SPECIES_SOURCES[key][0]).write_bytes(b"changed")
         with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
             self.copy()
 
@@ -301,6 +396,50 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 
+    def test_missing_audio_blocks_package(self):
+        for source, destination in NATIVE_AUDIO_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native audio"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_audio_blocks_package(self):
+        for source, destination in NATIVE_AUDIO_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_audio_paths_cannot_expand_package_scope(self):
+        original = self.audio_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["main-music"][field] = "../outside.mp3"
+                self.audio_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native audio"):
+                    self.copy()
+        self.audio_declaration.write_text(original)
+
+    def test_audio_manifest_schema_and_set_are_strict(self):
+        original = self.audio_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.audio_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native audio"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["main-music"]
+        self.audio_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
     def test_missing_license_blocks_package(self):
         self.license.unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing native client dependency"):
@@ -369,6 +508,17 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Unreviewed native UI font path"):
             self.copy()
 
+    def test_application_media_foundation_imports_are_reviewed(self):
+        self.imports["stellar-continuum-native.exe"].extend(["MFPlat.DLL", "MFReadWrite.dll"])
+        result = copy_native_client_runtime(self.root, self.build, self.output, self.inspect)
+        self.assertIn("MFPlat.DLL", result["windowsImports"])
+        self.assertIn("MFReadWrite.dll", result["windowsImports"])
+
+    def test_sdl_cannot_inherit_application_audio_imports(self):
+        self.imports["SDL3.dll"].append("MFPlat.DLL")
+        with self.assertRaisesRegex(RuntimeError, "Unpackaged runtime dependencies"):
+            copy_native_client_runtime(self.root, self.build, self.output, self.inspect)
+
     def test_undeclared_client_import_is_rejected(self):
         self.imports["stellar-continuum-native.exe"].append("unreviewed.dll")
         with self.assertRaisesRegex(RuntimeError, "Unpackaged runtime dependencies"):
@@ -385,7 +535,19 @@ class NativeClientDependencyTests(unittest.TestCase):
 
 
 class NativeSessionExportTests(unittest.TestCase):
-    def exercise(self, mutate_load=False):
+    def test_vertical_stripes_are_rendered_variation(self):
+        with tempfile.TemporaryDirectory(prefix="stellar-bmp-") as temporary:
+            path = Path(temporary) / "stripes.bmp"
+            width, height = 4, 3
+            row = bytes([0, 0, 0, 255, 255, 255, 255, 255]) * 2
+            pixels = row * height
+            path.write_bytes(
+                b"BM" + struct.pack("<IHHI", 54 + len(pixels), 0, 0, 54) +
+                struct.pack("<IiiHHIIiiII", 40, width, height, 1, 32, 0,
+                            len(pixels), 2835, 2835, 0, 0) + pixels)
+            _validate_capture(path, width, height)
+
+    def exercise(self, mutate_load=False, capture_fault=None):
         with tempfile.TemporaryDirectory(prefix="stellar-session-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -393,6 +555,8 @@ class NativeSessionExportTests(unittest.TestCase):
             def launch(args, *, cwd, env, **unused):
                 save = Path(args[args.index("--save-path") + 1])
                 capture = Path(args[args.index("--smoke") + 1])
+                width = int(args[args.index("--width") + 1]); height = int(args[args.index("--height") + 1])
+                self.assertEqual((width, height), (1920, 1080) if "--load" in args else (1280, 720))
                 self.assertEqual(save.parent, cwd)
                 self.assertNotEqual(cwd, package)
                 self.assertEqual(capture.parent, cwd)
@@ -407,7 +571,27 @@ class NativeSessionExportTests(unittest.TestCase):
                     payload = {"FormatVersion": 17, "SavedAtUtc": "earlier", "SimulationDays": 42.25,
                                "Galaxy": {"Systems": list(range(500))}}
                 save.write_text(json.dumps(payload))
-                capture.write_bytes(b"BM" + bytes(54))
+                if capture_fault == "missing" and "--load" in args:
+                    pass
+                else:
+                    actual_width = width - 1 if capture_fault == "wrong_size" and "--load" in args else width
+                    stride = (actual_width * 3 + 3) & ~3
+                    pixels = bytes(range(251)) * (stride * height // 251 + 1)
+                    data = (b"BM" + struct.pack("<IHHI", 54 + stride * height, 0, 0, 54) +
+                            struct.pack("<IiiHHIIiiII", 40, actual_width, height, 1, 24, 0,
+                                        stride * height, 2835, 2835, 0, 0) + pixels[:stride * height])
+                    if capture_fault == "uniform" and "--load" in args:
+                        stride = actual_width * 4
+                        pixels = bytes([0, 0, 0, 255]) * actual_width * height
+                        data = (b"BM" + struct.pack("<IHHI", 54 + len(pixels), 0, 0, 54) +
+                                struct.pack("<IiiHHIIiiII", 40, actual_width, height, 1, 32, 0,
+                                            len(pixels), 2835, 2835, 0, 0) + pixels)
+                    if capture_fault == "malformed" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<I", data, 14, 16); data = bytes(data)
+                    if capture_fault == "overlap" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<I", data, 10, 20); data = bytes(data)
+                    if capture_fault == "truncated" and "--load" in args: data = data[:-20]
+                    capture.write_bytes(data)
                 return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 ", "")
             with mock.patch("native_client_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_client_export(package, {})
@@ -422,9 +606,33 @@ class NativeSessionExportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "changed during paused load"):
             self.exercise(mutate_load=True)
 
+    def test_reload_capture_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="missing")
+
+    def test_reload_capture_dimensions_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="wrong_size")
+
+    def test_reload_capture_payload_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="truncated")
+
+    def test_reload_capture_uniform_pixels_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "variation"):
+            self.exercise(capture_fault="uniform")
+
+    def test_reload_capture_malformed_dib_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "geometry"):
+            self.exercise(capture_fault="malformed")
+
+    def test_reload_capture_pixel_offset_cannot_overlap_dib(self):
+        with self.assertRaisesRegex(RuntimeError, "geometry"):
+            self.exercise(capture_fault="overlap")
+
 
 class NativeResearchExportTests(unittest.TestCase):
-    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False):
+    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False, capture_fault=None):
         with tempfile.TemporaryDirectory(prefix="stellar-research-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -434,6 +642,8 @@ class NativeResearchExportTests(unittest.TestCase):
                 self.assertNotEqual(cwd, package)
                 save = Path(args[args.index("--save-path") + 1])
                 capture = Path(args[args.index("--research-smoke") + 1])
+                width = int(args[args.index("--width") + 1]); height = int(args[args.index("--height") + 1])
+                self.assertEqual((width, height), (1920, 1080) if "--load" in args else (1280, 720))
                 self.assertEqual(save.parent, cwd)
                 self.assertEqual(capture.parent, cwd)
                 calls.append(args)
@@ -454,9 +664,25 @@ class NativeResearchExportTests(unittest.TestCase):
                         "AdaptiveResearch": {"Civilizations": [{"CivilizationId": 7,
                                                                   "Research": research}]}}
                 save.write_text(json.dumps(payload))
-                capture.write_bytes(b"BM" + bytes(54))
+                if capture_fault == "missing" and "--load" in args:
+                    pass
+                else:
+                    stride = (width * 3 + 3) & ~3
+                    pixels = bytes(range(251)) * (stride * height // 251 + 1)
+                    data = (b"BM" + struct.pack("<IHHI", 54 + stride * height, 0, 0, 54) +
+                            struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
+                                        stride * height, 2835, 2835, 0, 0) + pixels[:stride * height])
+                    if capture_fault == "wrong_size" and "--load" in args:
+                        data = bytearray(data); struct.pack_into("<i", data, 18, width - 1); data = bytes(data)
+                    if capture_fault == "truncated" and "--load" in args: data = data[:-20]
+                    capture.write_bytes(data)
+                    sidecar = capture.with_name(capture.stem + "-inspector-end.bmp")
+                    if capture_fault != "sidecar_missing" or "--load" not in args:
+                        sidecar.write_bytes(data)
                 saved = "preserved" if skipped_save and "--load" in args else "ok"
-                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1", "")
+                marker = "" if capture_fault == "marker_missing" and "--load" in args else "\nresearch_inspector={\"final_line_visible\":true,\"graph_stationary\":true}"
+                if capture_fault == "marker_malformed" and "--load" in args: marker = "\nresearch_inspector={bad}"
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1" + marker, "")
 
             with mock.patch("native_research_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_research_export(package, {})
@@ -483,6 +709,23 @@ class NativeResearchExportTests(unittest.TestCase):
     def test_skipping_loaded_save_is_not_a_roundtrip(self):
         with self.assertRaisesRegex(RuntimeError, "actual manual save"):
             self.exercise(skipped_save=True)
+
+    def test_research_reload_capture_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="missing")
+
+    def test_research_reload_capture_dimensions_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="wrong_size")
+
+    def test_research_reload_capture_payload_required(self):
+        with self.assertRaisesRegex(RuntimeError, "capture"):
+            self.exercise(capture_fault="truncated")
+
+    def test_research_inspector_sidecars_required(self):
+        for fault in ("sidecar_missing", "marker_missing", "marker_malformed"):
+            with self.subTest(fault=fault), self.assertRaisesRegex(RuntimeError, "inspector"):
+                self.exercise(capture_fault=fault)
 
 
 if __name__ == "__main__":

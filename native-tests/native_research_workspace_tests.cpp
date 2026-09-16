@@ -1,4 +1,5 @@
 #include "native_research_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <array>
 #include <cmath>
@@ -7,6 +8,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace stellar::native_map;
 using namespace stellar::native_research;
@@ -15,7 +17,8 @@ using namespace stellar::native_research_ui;
 namespace {
 
 void require(bool condition, const char *message) {
-  if (!condition) throw std::runtime_error(message);
+  if (!condition)
+    throw std::runtime_error(message);
 }
 
 [[nodiscard]] Point center(UiRect value) noexcept {
@@ -30,8 +33,7 @@ void require(bool condition, const char *message) {
 
 [[nodiscard]] bool contained(UiRect outer, Point point) noexcept {
   return point.x >= outer.x && point.y >= outer.y &&
-         point.x <= outer.x + outer.width &&
-         point.y <= outer.y + outer.height;
+         point.x <= outer.x + outer.width && point.y <= outer.y + outer.height;
 }
 
 [[nodiscard]] bool overlaps(UiRect left, UiRect right) noexcept {
@@ -49,8 +51,7 @@ void require(bool condition, const char *message) {
   window.formatted_treasury = "$5B UED";
   window.free_effective_labs = 12;
   window.total_effective_labs = 20;
-  window.domain_tabs = {{"", "All Research", 2},
-                        {"physics", "Physics", 2}};
+  window.domain_tabs = {{"", "All Research", 2}, {"physics", "Physics", 2}};
   NativeResearchNode active;
   active.id = "known-active";
   active.display_name = "Known Active Program";
@@ -106,7 +107,8 @@ void require(bool condition, const char *message) {
 void verify_layout(int width, int height) {
   const auto layout = ResearchWorkspaceLayout::for_viewport(width, height, 18);
   const UiRect viewport{0, 0, static_cast<float>(width),
-                       static_cast<float>(height)};
+                        static_cast<float>(height)};
+  const auto navigation = NativeUiLayout::for_viewport(width, height);
   require(contained(viewport, layout.surface) &&
               contained(viewport, layout.title) &&
               contained(viewport, layout.search) &&
@@ -116,6 +118,9 @@ void verify_layout(int width, int height) {
               contained(layout.inspector, layout.feedback) &&
               contained(layout.inspector, layout.action),
           "Research layout escaped the viewport.");
+  require(layout.graph.x >= navigation.research.x + navigation.research.width &&
+              layout.title.x >= navigation.research.x + navigation.research.width,
+          "Research content overlaps the navigation rail.");
   require(!overlaps(layout.search, layout.close) &&
               !overlaps(layout.graph, layout.inspector) &&
               !overlaps(layout.feedback, layout.action),
@@ -125,8 +130,8 @@ void verify_layout(int width, int height) {
 }
 
 void send(NativeResearchWorkspace &workspace, InputEventType type, Point point,
-          int width = 1280, int height = 720, Point delta = {},
-          float wheel = 0, std::string text = {}) {
+          int width = 1280, int height = 720, Point delta = {}, float wheel = 0,
+          std::string text = {}) {
   InputEvent event;
   event.type = type;
   event.position = point;
@@ -139,7 +144,8 @@ void send(NativeResearchWorkspace &workspace, InputEventType type, Point point,
 [[nodiscard]] bool rendered_text_contains(const DrawList &draw,
                                           std::string_view value) {
   for (const auto &label : draw.text)
-    if (label.value.contains(value)) return true;
+    if (label.value.contains(value))
+      return true;
   for (const auto &command : draw.overlay) {
     if (const auto *label = std::get_if<Text>(&command);
         label && label->value.contains(value))
@@ -167,6 +173,25 @@ void pan_graph(NativeResearchWorkspace &workspace, UiRect graph, Point delta) {
        {blank.x + delta.x, blank.y + delta.y});
 }
 
+[[nodiscard]] TextExtent measured_text(const Text &text) {
+  const auto character_width = std::max(1.f, text.font_pixel_size * .56f);
+  const auto columns = std::max(
+      1, static_cast<int>(std::floor(text.wrap_width / character_width)));
+  int lines = 1;
+  std::size_t line_length{};
+  for (const char character : text.value) {
+    if (character == '\n') {
+      ++lines;
+      line_length = 0;
+    } else if (++line_length > static_cast<std::size_t>(columns)) {
+      ++lines;
+      line_length = 1;
+    }
+  }
+  return {static_cast<int>(text.wrap_width),
+          lines * (text.font_pixel_size + 3)};
+}
+
 } // namespace
 
 int main() try {
@@ -177,25 +202,24 @@ int main() try {
 
   {
     auto real_tabs = sample_window();
-    real_tabs.domain_tabs = {
-        {"", "All Research", 82},
-        {"alternative", "Alternative Biochemistry", 1},
-        {"biosphere", "Biosphere Agriculture", 3},
-        {"biotechnology", "Biotechnology", 1},
-        {"computing", "Computing", 7},
-        {"cybernetics", "Cybernetics", 2},
-        {"trade", "Economic Trade", 1},
-        {"energy", "Energy", 6},
-        {"foundations", "Foundations", 9},
-        {"medicine", "Life Medicine", 8},
-        {"logistics", "Logistics", 3},
-        {"materials", "Materials", 8},
-        {"military", "Military", 5},
-        {"planetary", "Planetary", 5},
-        {"propulsion", "Propulsion", 2},
-        {"infrastructure", "Research Infrastructure", 5},
-        {"sensors", "Sensors Comms", 8},
-        {"social", "Social Admin", 2}};
+    real_tabs.domain_tabs = {{"", "All Research", 82},
+                             {"alternative", "Alternative Biochemistry", 1},
+                             {"biosphere", "Biosphere Agriculture", 3},
+                             {"biotechnology", "Biotechnology", 1},
+                             {"computing", "Computing", 7},
+                             {"cybernetics", "Cybernetics", 2},
+                             {"trade", "Economic Trade", 1},
+                             {"energy", "Energy", 6},
+                             {"foundations", "Foundations", 9},
+                             {"medicine", "Life Medicine", 8},
+                             {"logistics", "Logistics", 3},
+                             {"materials", "Materials", 8},
+                             {"military", "Military", 5},
+                             {"planetary", "Planetary", 5},
+                             {"propulsion", "Propulsion", 2},
+                             {"infrastructure", "Research Infrastructure", 5},
+                             {"sensors", "Sensors Comms", 8},
+                             {"social", "Social Admin", 2}};
     NativeResearchWorkspace tabs_workspace;
     tabs_workspace.open();
     tabs_workspace.set_window(std::move(real_tabs));
@@ -208,12 +232,15 @@ int main() try {
       const auto *drawn = find_overlay_text(tabs_draw, label);
       require(drawn && drawn->clip,
               "A long real research tab label was not rendered with a clip.");
-      const auto tab = std::ranges::find_if(
-          tabs_layout.tabs,
-          [&](const auto &candidate) { return candidate.bounds.contains(drawn->at); });
-      require(tab != tabs_layout.tabs.end() && contained(tab->bounds, *drawn->clip) &&
-                  drawn->clip->height >= 24.f,
-              "A long real research tab label escaped or lacked two-line height.");
+      const auto tab =
+          std::ranges::find_if(tabs_layout.tabs, [&](const auto &candidate) {
+            return candidate.bounds.contains(drawn->at);
+          });
+      require(
+          tab != tabs_layout.tabs.end() &&
+              contained(tab->bounds, *drawn->clip) &&
+              drawn->clip->height >= 24.f,
+          "A long real research tab label escaped or lacked two-line height.");
     }
   }
 
@@ -237,8 +264,7 @@ int main() try {
       delta.y = clipped_layout.graph.y + clipped_layout.graph.height -
                 original->y - original->height + 12.f;
     pan_graph(clipped_workspace, clipped_layout.graph, delta);
-    const auto moved =
-        clipped_workspace.card_bounds("known-active", 1280, 720);
+    const auto moved = clipped_workspace.card_bounds("known-active", 1280, 720);
     DrawList clipped_draw;
     clipped_workspace.render(clipped_draw, 1280, 720);
     const auto *title = find_overlay_text(clipped_draw, "Known Active Program");
@@ -257,6 +283,11 @@ int main() try {
 
   NativeResearchWorkspace workspace;
   workspace.open();
+  std::vector<std::string> measured_inspector_blocks;
+  workspace.set_text_measurer([&](const Text &label) {
+    measured_inspector_blocks.push_back(label.value);
+    return measured_text(label);
+  });
   require(workspace.take_refresh_request(), "Opening did not request a view.");
   workspace.set_window(sample_window());
   const auto layout = ResearchWorkspaceLayout::for_viewport(1280, 720, 2);
@@ -267,9 +298,9 @@ int main() try {
           "Search click did not capture and focus text input.");
   send(workspace, InputEventType::TextEntered, center(layout.search), 1280, 720,
        {}, 0, "warp");
-  require(workspace.query().search == "warp" &&
-              !workspace.take_refresh_request(),
-          "Text search rebuilt the Core projection instead of local visibility.");
+  require(
+      workspace.query().search == "warp" && !workspace.take_refresh_request(),
+      "Text search rebuilt the Core projection instead of local visibility.");
   DrawList filtered;
   workspace.render(filtered, 1280, 720);
   require(!rendered_text_contains(filtered, "Known Active Program"),
@@ -291,8 +322,8 @@ int main() try {
   const auto card = workspace.card_bounds("known-active", 1280, 720);
   require(card.has_value() && contained(layout.graph, *card),
           "Known card was not visible in the graph.");
-  const auto select_command = workspace.handle(
-      {InputEventType::LeftPressed, center(*card)}, 1280, 720);
+  const auto select_command =
+      workspace.handle({InputEventType::LeftPressed, center(*card)}, 1280, 720);
   require(select_command.captured &&
               select_command.kind == WorkspaceCommandKind::Select &&
               select_command.node_id == "known-active",
@@ -310,7 +341,8 @@ int main() try {
   auto stale_selection = sample_window();
   stale_selection.selected_node_id = "known-active";
   workspace.set_window(std::move(stale_selection));
-  require(workspace.selected_id() == std::optional<std::string>{"known-candidate"},
+  require(workspace.selected_id() ==
+              std::optional<std::string>{"known-candidate"},
           "A filtered refresh restored a hidden controller selection.");
   const auto filtered_action = workspace.handle(
       {InputEventType::LeftPressed, center(layout.action)}, 1280, 720);
@@ -323,11 +355,11 @@ int main() try {
   require(rendered_text_contains(candidate_render, "Planned staffing 4.0") &&
               rendered_text_contains(candidate_render,
                                      "Staffed duration unavailable") &&
-              !rendered_text_contains(candidate_render,
-                                      "Known Active Program"),
+              !rendered_text_contains(candidate_render, "Known Active Program"),
           "Filtered inspector exposed a hidden node or wrong planned cost.");
-  send(workspace,InputEventType::LeftPressed,center(layout.search));
-  for (std::size_t index = 0; index < std::string_view{"candidate"}.size(); ++index)
+  send(workspace, InputEventType::LeftPressed, center(layout.search));
+  for (std::size_t index = 0; index < std::string_view{"candidate"}.size();
+       ++index)
     send(workspace, InputEventType::BackspacePressed, center(layout.search));
   workspace.set_window(sample_window());
 
@@ -343,8 +375,8 @@ int main() try {
     send(workspace, InputEventType::BackspacePressed, center(layout.search));
   workspace.set_window(sample_window());
 
-  const Point graph_blank{layout.graph.x + 12, layout.graph.y +
-                                                   layout.graph.height - 12};
+  const Point graph_blank{layout.graph.x + 12,
+                          layout.graph.y + layout.graph.height - 12};
   send(workspace, InputEventType::LeftPressed, graph_blank);
   const auto before_drag = workspace.card_bounds("known-active", 1280, 720);
   send(workspace, InputEventType::PointerMove,
@@ -361,8 +393,8 @@ int main() try {
           "Edge-pan setup did not leave a partially visible card.");
   const Point clipped_hit{layout.graph.x + 2.f,
                           after_drag->y + after_drag->height * .5f};
-  const auto clipped_select = workspace.handle(
-      {InputEventType::LeftPressed, clipped_hit}, 1280, 720);
+  const auto clipped_select =
+      workspace.handle({InputEventType::LeftPressed, clipped_hit}, 1280, 720);
   require(clipped_select.kind == WorkspaceCommandKind::Select &&
               clipped_select.node_id == "known-active",
           "Visible clipped portion of a card was not clickable.");
@@ -374,45 +406,228 @@ int main() try {
 
   workspace.set_notice(
       "Program started with a deliberately long visible status message that "
-      "must remain above the action without covering it.",true);
+      "must remain above the action without covering it. Continued operational "
+      "review confirms that the authoritative program state remains "
+      "available.\n"
+      "LAST NOTICE LINE",
+      true);
+  measured_inspector_blocks.clear();
   DrawList rendered;
   workspace.render(rendered, 1280, 720);
-  require(rendered_text_contains(rendered, "Known Active Program") &&
-              rendered_text_contains(rendered, "Visible Capability") &&
-              rendered_text_contains(rendered, "$5B UED treasury") &&
-              rendered_text_contains(rendered,
-                                     "Authorization $1.2B UED") &&
-              rendered_text_contains(rendered,
-                                     "Operations Under $0.01 UED/day") &&
-              rendered_text_contains(rendered,
-                                     "Reserve to start $30.41M UED") &&
-              rendered_text_contains(rendered, "Progress 42%"),
-          "Research inspector omitted authoritative visible details.");
+  require(
+      rendered_text_contains(rendered, "Known Active Program") &&
+          rendered_text_contains(rendered, "Visible Capability") &&
+          rendered_text_contains(rendered, "$5B UED treasury") &&
+          rendered_text_contains(rendered, "Authorization $1.2B UED") &&
+          rendered_text_contains(rendered, "Operations Under $0.01 UED/day") &&
+          rendered_text_contains(rendered, "Reserve to start $30.41M UED") &&
+          rendered_text_contains(rendered, "Progress 42%"),
+      "Research inspector omitted authoritative visible details.");
+  require(measured_inspector_blocks.size() >= 4 &&
+              measured_inspector_blocks[0].contains("COST & TIME") &&
+              measured_inspector_blocks[1].contains("KNOWN CAPABILITIES") &&
+              measured_inspector_blocks[2].contains("REQUIREMENTS / STATUS") &&
+              measured_inspector_blocks[3].contains("PROGRAM NOTICE"),
+          "Inspector sections were not independently font-measured.");
   require(!rendered_text_contains(rendered, "internal-capability-id") &&
               !rendered_text_contains(rendered, "SECRET FUTURE") &&
               !rendered_text_contains(rendered, " cr") &&
               !rendered_text_contains(rendered, "CANCEL"),
           "Research UI disclosed an internal, unknown, or unsupported action.");
-  const auto *cost=find_overlay_text(rendered,"COST & TIME");
-  const auto *capabilities=find_overlay_text(rendered,"KNOWN CAPABILITIES");
-  const auto *blockers=find_overlay_text(rendered,"REQUIREMENTS / STATUS");
-  const auto *notice=find_overlay_text(rendered,"Program started with");
-  require(cost&&capabilities&&blockers&&notice&&cost->clip&&capabilities->clip&&
-              blockers->clip&&notice->clip,
-          "Maximal 720p inspector content did not receive bounded clips.");
-  require(!overlaps(*cost->clip,layout.feedback)&&
-              !overlaps(*capabilities->clip,layout.feedback)&&
-              !overlaps(*blockers->clip,layout.feedback)&&
-              contained(layout.feedback,*notice->clip)&&
-              !overlaps(layout.feedback,layout.action),
-          "Inspector details, feedback and action bands overlap at 720p.");
+  const auto *cost = find_overlay_text(rendered, "COST & TIME");
+  const auto *capabilities = find_overlay_text(rendered, "KNOWN CAPABILITIES");
+  require(cost && capabilities && cost->clip && capabilities->clip &&
+              !overlaps(*cost->clip, layout.feedback) &&
+              !overlaps(*capabilities->clip, layout.feedback),
+          "Initial 720p inspector sections escaped their scroll viewport.");
+  const auto graph_before_inspector_wheel =
+      workspace.card_bounds("known-active", 1280, 720);
+  send(workspace, InputEventType::Wheel, center(layout.inspector), 1280, 720,
+       {}, -100.f);
+  DrawList scrolled_to_end;
+  workspace.render(scrolled_to_end, 1280, 720);
+  const auto graph_after_inspector_wheel =
+      workspace.card_bounds("known-active", 1280, 720);
+  require(graph_before_inspector_wheel && graph_after_inspector_wheel &&
+              graph_before_inspector_wheel->x ==
+                  graph_after_inspector_wheel->x &&
+              graph_before_inspector_wheel->y == graph_after_inspector_wheel->y,
+          "Inspector wheel input panned the research graph.");
+  const auto *blockers =
+      find_overlay_text(scrolled_to_end, "REQUIREMENTS / STATUS");
+  const auto *notice = find_overlay_text(scrolled_to_end, "LAST NOTICE LINE");
+  require(
+      blockers && notice && blockers->clip && notice->clip &&
+          notice->value.contains("LAST NOTICE LINE") &&
+          notice->at.y + measured_text(*notice).height <=
+              notice->clip->y + notice->clip->height + .01f &&
+          !overlaps(*notice->clip, layout.feedback) &&
+          !overlaps(layout.feedback, layout.action),
+      "Inspector overscroll did not expose the complete final notice line.");
+  const auto notice_at_end = notice->at.y;
+  send(workspace, InputEventType::Wheel, center(layout.inspector), 1280, 720,
+       {}, 1.f);
+  DrawList reverse_scrolled;
+  workspace.render(reverse_scrolled, 1280, 720);
+  const auto *reverse_notice =
+      find_overlay_text(reverse_scrolled, "LAST NOTICE LINE");
+  require(
+      reverse_notice && reverse_notice->at.y > notice_at_end,
+      "Reverse inspector wheel did not recover immediately from overscroll.");
+  const auto pinned_action = workspace.handle(
+      {InputEventType::LeftPressed, center(layout.action)}, 1280, 720);
+  require(pinned_action.kind == WorkspaceCommandKind::Execute &&
+              pinned_action.intent == NativeResearchIntent::Pause,
+          "Scrolling displaced or blocked the pinned research action.");
+
+  const auto candidate_card =
+      workspace.card_bounds("known-candidate", 1280, 720);
+  require(candidate_card && overlaps(layout.graph, *candidate_card),
+          "Selection-reset test could not reach the candidate card.");
+  (void)workspace.handle({InputEventType::LeftPressed,
+                          {std::max(layout.graph.x, candidate_card->x) + 2.f,
+                           candidate_card->y + candidate_card->height * .5f}},
+                         1280, 720);
+  DrawList selection_reset;
+  workspace.render(selection_reset, 1280, 720);
+  const auto *candidate_cost =
+      find_overlay_text(selection_reset, "Authorization $900M UED");
+  require(candidate_cost && std::abs(candidate_cost->at.y - cost->at.y) < .01f,
+          "Selecting another program did not reset inspector scroll.");
+
+  auto active_refresh = sample_window();
+  active_refresh.selected_node_id = "known-active";
+  workspace.set_window(std::move(active_refresh));
+  DrawList active_top;
+  workspace.render(active_top, 1280, 720);
+  send(workspace, InputEventType::Wheel, center(layout.inspector), 1280, 720,
+       {}, -100.f);
+  DrawList active_end;
+  workspace.render(active_end, 1280, 720);
+  const auto *notice_before_refresh =
+      find_overlay_text(active_end, "LAST NOTICE LINE");
+  require(notice_before_refresh,
+          "Routine-refresh test could not reach the final inspector detail.");
+  const auto notice_before_refresh_y = notice_before_refresh->at.y;
+
+  auto revised = sample_window();
+  revised.selected_node_id = "known-active";
+  revised.research_revision++;
+  revised.nodes.front().total_progress = .47;
+  revised.nodes.front().assigned_effective_labs = 7;
+  workspace.set_window(std::move(revised));
+  DrawList preserved_refresh;
+  workspace.render(preserved_refresh, 1280, 720);
+  const auto *notice_after_refresh =
+      find_overlay_text(preserved_refresh, "LAST NOTICE LINE");
+  require(notice_after_refresh &&
+              std::abs(notice_after_refresh->at.y - notice_before_refresh_y) <
+                  .01f &&
+              notice_after_refresh->at.y +
+                      measured_text(*notice_after_refresh).height <=
+                  notice_after_refresh->clip->y +
+                      notice_after_refresh->clip->height + .01f,
+          "Routine research progress refresh snapped the inspector to top.");
+
+  auto compact = sample_window();
+  compact.selected_node_id = "known-active";
+  compact.research_revision += 2;
+  compact.nodes.front().cost.reset();
+  compact.nodes.front().known_capabilities.clear();
+  compact.nodes.front().blockers.clear();
+  workspace.set_window(std::move(compact));
+  DrawList compact_render;
+  workspace.render(compact_render, 1280, 720);
+  const auto *compact_notice =
+      find_overlay_text(compact_render, "LAST NOTICE LINE");
+  require(compact_notice && compact_notice->clip &&
+              compact_notice->at.y + measured_text(*compact_notice).height <=
+                  compact_notice->clip->y + compact_notice->clip->height + .01f,
+          "Shrinking refreshed content retained an unreachable overscroll.");
+
+  workspace.set_notice({}, false);
+  auto shortened = sample_window();
+  shortened.selected_node_id = "known-active";
+  shortened.research_revision += 3;
+  auto &short_node = shortened.nodes.front();
+  short_node.cost.reset();
+  short_node.known_capabilities.clear();
+  short_node.blockers.clear();
+  short_node.primary_action.enabled = false;
+  short_node.primary_action.reason =
+      "The selected program cannot proceed while its independently reported "
+      "facility, staffing, treasury, and prerequisite conditions remain "
+      "unavailable. Review the authoritative controller details before "
+      "attempting this action again. The current observer projection also "
+      "reports that laboratory allocation is below the required threshold, "
+      "that the necessary prototype site has not been commissioned, and that "
+      "the reserved operating funds are not yet available. These conditions "
+      "are supplied by the controller and must remain readable without "
+      "abbreviation. Continue reviewing every prerequisite before changing "
+      "the selected program or committing treasury resources.\n"
+      "LAST ACTION REASON LINE";
+  workspace.set_window(std::move(shortened));
+  DrawList shortened_first;
+  workspace.render(shortened_first, 1280, 720);
+  send(workspace, InputEventType::Wheel, center(layout.inspector), 1280, 720,
+       {}, -100.f);
+  DrawList shortened_end;
+  workspace.render(shortened_end, 1280, 720);
+  const auto *reason_end =
+      find_overlay_text(shortened_end, "LAST ACTION REASON LINE");
+  require(reason_end && reason_end->clip &&
+              reason_end->at.y + measured_text(*reason_end).height <=
+                  reason_end->clip->y + reason_end->clip->height + .01f &&
+              rendered_text_contains(shortened_end,
+                                     "Action unavailable. Scroll for details."),
+          "Shrinking content did not clamp scroll or expose the full action "
+          "reason.");
+
+  auto expanded = sample_window();
+  expanded.selected_node_id = "known-active";
+  expanded.research_revision += 4;
+  workspace.set_window(std::move(expanded));
+  DrawList expanded_render;
+  workspace.render(expanded_render, 1280, 720);
+
+  send(workspace, InputEventType::Wheel, center(layout.inspector), 1280, 720,
+       {}, -100.f);
+  DrawList revised_end;
+  workspace.render(revised_end, 1280, 720);
+  DrawList resized;
+  workspace.render(resized, 1920, 1080);
+  const auto resized_layout =
+      ResearchWorkspaceLayout::for_viewport(1920, 1080, 2);
+  const auto *resized_cost = find_overlay_text(resized, "COST & TIME");
+  const auto resized_detail_top =
+      resized_layout.inspector.y + 167.f * resized_layout.scale;
+  require(resized_cost &&
+              std::abs(resized_cost->at.y - resized_detail_top) < .01f,
+          "Research viewport change did not reset inspector scroll.");
+
+  send(workspace, InputEventType::Wheel, center(resized_layout.inspector), 1920,
+       1080, {}, -100.f);
+  DrawList resized_end;
+  workspace.render(resized_end, 1920, 1080);
+  auto generation = sample_window();
+  generation.campaign_generation = 8;
+  generation.research_revision += 2;
+  workspace.set_window(std::move(generation));
+  DrawList generation_reset;
+  workspace.render(generation_reset, 1920, 1080);
+  const auto *generation_cost =
+      find_overlay_text(generation_reset, "COST & TIME");
+  require(generation_cost &&
+              std::abs(generation_cost->at.y - resized_detail_top) < .01f &&
+              !rendered_text_contains(generation_reset, "LAST NOTICE LINE"),
+          "Campaign generation change retained inspector scroll or notice.");
   workspace.discard_campaign();
-  auto replacement=sample_window();
-  replacement.campaign_generation=8;
+  auto replacement = sample_window();
+  replacement.campaign_generation = 8;
   workspace.set_window(std::move(replacement));
   DrawList replaced;
-  workspace.render(replaced,1280,720);
-  require(!rendered_text_contains(replaced,"Program started with"),
+  workspace.render(replaced, 1280, 720);
+  require(!rendered_text_contains(replaced, "Program started with"),
           "Old campaign notice survived generation replacement.");
 
   std::cout << "Native research layout, mouse routing, UTF-8 search, graph "

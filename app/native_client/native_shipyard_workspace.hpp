@@ -43,6 +43,9 @@ public:
   void open() noexcept;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
+  [[nodiscard]] bool confirmation_open() const noexcept {
+    return cancel_confirmation_id_.has_value();
+  }
 
   void set_view(stellar::native_shipyard::NativeShipyardView view);
   void discard_campaign();

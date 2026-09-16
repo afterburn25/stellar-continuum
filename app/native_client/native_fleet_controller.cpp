@@ -58,6 +58,14 @@ struct PlayerContext {
   return InterstellarMissionKind::MilitaryDeployment;
 }
 
+[[nodiscard]] NativeCivilianRecoveryQuote recovery_quote(
+    const FleetState &fleet, std::uint64_t generation, int observer) {
+  return {generation, observer, fleet.id, fleet.mission_order_revision, fleet.role,
+          fleet.hold_requested, fleet.return_to_base_requested,
+          fleet.destination_system_id, fleet.destination_planetary_body_id,
+          fleet.settlement_body_id, fleet.settlement_days_completed};
+}
+
 [[nodiscard]] std::optional<double> transit_days(
     const FreshCampaignState &world, const FleetState &fleet,
     double distance_light_years) {
@@ -149,6 +157,22 @@ NativeFleetMapView NativeFleetController::build(
     result.selected_fleet_id = selected_fleet_id_;
   else
     selected_fleet_id_.reset();
+  if (result.selected_fleet_id) {
+    auto selected = std::ranges::find(result.own_fleets, *result.selected_fleet_id,
+                                     &NativeOwnFleet::id);
+    if (selected != result.own_fleets.end() && is_civilian_role(selected->role)) {
+      const auto *live = find_owned(player, selected->id);
+      selected->recovery = recovery_quote(*live, campaign_generation, player.player_id);
+      if (live->return_to_base_failure_reason)
+        selected->recovery_message = *live->return_to_base_failure_reason;
+      else if (live->return_to_base_requested)
+        selected->recovery_message = "Return to base queued. Routing uses actual fuel at the next system.";
+      else
+        // Route planning belongs to the explicit order, not a 10 Hz outliner
+        // refresh. Core reports reachability and paid-work confirmation there.
+        selected->recovery_message = "Return to the nearest reachable owned refuelling settlement. Paid colony work requires confirmation.";
+    }
+  }
   return result;
 }
 
@@ -312,6 +336,43 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
 std::optional<int> NativeFleetController::selection() const {
   require_owner();
   return selected_fleet_id_;
+}
+
+NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
+    CampaignFrame &frame, const NativeCivilianRecoveryQuote &quote,
+    NativeCivilianRecoveryAction action, bool confirm_abandon) {
+  require_owner();
+  if (!generation_ || *generation_ != quote.campaign_generation)
+    return {false, "The campaign changed; review this recovery order again."};
+  auto player = context(frame);
+  if (player.player_id != quote.observer_id || selected_fleet_id_ != quote.fleet_id)
+    return {false, "Fleet selection changed; review this recovery order again."};
+  auto *fleet = find_owned(player, quote.fleet_id);
+  if (!fleet || !is_civilian_role(fleet->role))
+    return {false, "Select an active owned civilian mission ship."};
+  if (recovery_quote(*fleet, *generation_, player.player_id) != quote)
+    return {false, "The mission changed; pause and review the recovery order again.",
+            fleet->mission_order_revision};
+  const auto id = fleet->id;
+  bool accepted{}, confirmation{};
+  std::string message;
+  if (action == NativeCivilianRecoveryAction::ReturnToBase) {
+    const auto outcome = player.runtime.core().issue_civilian_return_to_base_order(
+        &player.simulation, player.player_id, id, confirm_abandon);
+    accepted = outcome.accepted;
+    confirmation = outcome.requires_confirmation;
+    message = outcome.message;
+  } else if (action == NativeCivilianRecoveryAction::Hold ||
+             action == NativeCivilianRecoveryAction::Resume) {
+    const auto outcome = action == NativeCivilianRecoveryAction::Hold
+        ? player.runtime.core().issue_civilian_hold_order(&player.simulation, player.player_id, id)
+        : player.runtime.core().issue_civilian_resume_order(&player.simulation, player.player_id, id);
+    accepted = outcome.accepted;
+    message = outcome.message;
+  } else return {false, "Unknown civilian recovery action."};
+  const auto *current = find_owned(player, id);
+  return {accepted, std::move(message), current ? current->mission_order_revision : 0,
+          confirmation};
 }
 
 } // namespace stellar::native_fleet

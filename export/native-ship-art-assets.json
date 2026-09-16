@@ -34,7 +34,12 @@
     "credits": {
       "source": "docs/engine/NATIVE_SHIP_ART_SOURCES.md",
       "runtimePath": "Licenses/Ship-art-sources.md",
-      "sha256": "e2e343450805cd2e2948998ed644034f58f08b16a765443b935d04bd074dc864"
+      "sha256": "a485e317f305cd71309a77aa58fcbc7765733f0dfabc2bab2a8f7199b8ad3e50"
+    },
+    "patrol-corvette-tactical-v1": {
+      "source": "assets/visual/ships/patrol-corvette-tactical-v1.png",
+      "runtimePath": "assets/visual/ships/patrol-corvette-tactical-v1.png",
+      "sha256": "4e4cfd4d192dc9b94fcb65315d80ed408e049b656b2484980e69e533d2c7a711"
     }
   }
 }

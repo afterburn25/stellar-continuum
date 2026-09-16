@@ -1,8 +1,11 @@
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_triangle_mesh.hpp>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_render.h>
 #include <algorithm>
+#include <array>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <iterator>
@@ -12,6 +15,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #ifdef _WIN32
@@ -58,6 +62,25 @@ private:HDC dc_{};HGDIOBJ previous_{};
 [[nodiscard]] bool valid_clip(UiRect value) noexcept{return std::isfinite(value.x)&&std::isfinite(value.y)&&std::isfinite(value.width)&&std::isfinite(value.height)&&std::abs(value.x)<=65536.f&&std::abs(value.y)<=65536.f&&value.width>=0.f&&value.width<=65536.f&&value.height>=0.f&&value.height<=65536.f;}
 [[nodiscard]] bool valid_positive_rect(UiRect value)noexcept{return valid_clip(value)&&value.width>0.f&&value.height>0.f;}
 [[nodiscard]] bool valid_point(Point value)noexcept{return std::isfinite(value.x)&&std::isfinite(value.y);}
+constexpr int soft_circle_segments=20;
+using SoftCircleDirections=std::array<Point,soft_circle_segments+1>;
+using SoftCircleIndices=std::array<int,soft_circle_segments*3>;
+[[nodiscard]] const SoftCircleDirections &soft_circle_directions(){
+  static const SoftCircleDirections directions=[](){
+    SoftCircleDirections result{};
+    for(int index=0;index<=soft_circle_segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(soft_circle_segments);result[static_cast<std::size_t>(index)]={std::cos(angle),std::sin(angle)};}
+    return result;
+  }();
+  return directions;
+}
+[[nodiscard]] const SoftCircleIndices &soft_circle_indices(){
+  static const SoftCircleIndices indices=[](){
+    SoftCircleIndices result{};
+    for(int index=0;index<soft_circle_segments;++index){const auto offset=static_cast<std::size_t>(index)*3u;result[offset]=0;result[offset+1]=index+1;result[offset+2]=index+2;}
+    return result;
+  }();
+  return indices;
+}
 }
 
 struct Window::Storage {
@@ -65,9 +88,10 @@ struct Window::Storage {
   struct CachedImage {std::shared_ptr<const RgbaImage> owner;SDL_Texture *texture{};std::size_t resident_bytes{};std::uint64_t last_use{};};
   SDL_Window *window{};SDL_GPUDevice *device{};SDL_Renderer *renderer{};HDC text_dc{};
   std::filesystem::path private_font_path;bool private_font_added{};
+  std::vector<SDL_Vertex> triangle_vertices;
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
-  int width{},height{};bool initialized{},left_down{},focused{true},minimized{},vsync{},text_input_requested{},text_input_active{};Point pointer{};Uint64 fallback_interval_ns{},last_present_ns{};
+  int width{},height{};bool initialized{},left_down{},focused{true},minimized{},vsync{},text_input_requested{},text_input_active{};Point pointer{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   ~Storage(){
     for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
@@ -128,13 +152,44 @@ struct Window::Storage {
     const auto rendered=SDL_RenderTexture(renderer,cached.texture,nullptr,&destination);if(label.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL text clip reset failed");require(rendered,"SDL cached text draw failed");
   }
   void draw_image(const Image &command){
+    if(!std::isfinite(command.rotation_degrees))throw std::invalid_argument("Image rotation must be finite.");
     if(!valid_positive_rect(command.destination)||(command.clip&&!valid_clip(*command.clip)))throw std::invalid_argument("Image destination and clip bounds must be finite and within the drawable range.");
     if(!command.resource)throw std::invalid_argument("An image command requires an RGBA resource.");std::optional<SDL_FRect> source;
     if(command.source){const auto value=*command.source;if(!valid_positive_rect(value)||value.x<0.f||value.y<0.f||value.x+value.width>static_cast<float>(command.resource->width())||value.y+value.height>static_cast<float>(command.resource->height()))throw std::invalid_argument("Image source bounds must be finite and inside the resource.");source=sdl_rect(value);}
     auto &cached=image(command.resource);
     require(SDL_SetTextureColorMod(cached.texture,command.tint.r,command.tint.g,command.tint.b),"SDL image color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,command.tint.a),"SDL image alpha modulation failed");
     if(command.clip){const SDL_Rect clip{static_cast<int>(std::floor(command.clip->x)),static_cast<int>(std::floor(command.clip->y)),static_cast<int>(std::ceil(command.clip->width)),static_cast<int>(std::ceil(command.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL image clip setup failed");}
-    const auto destination=sdl_rect(command.destination);const auto rendered=SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination);if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
+    const auto destination=sdl_rect(command.destination);
+    const auto rendered=command.rotation_degrees==0.f
+        ?SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination)
+        :SDL_RenderTextureRotated(renderer,cached.texture,source?&*source:nullptr,&destination,
+            std::fmod(static_cast<double>(command.rotation_degrees),360.),nullptr,SDL_FLIP_NONE);
+    if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
+  }
+  void draw_triangle_mesh(const TriangleMesh &mesh) {
+    validate_triangle_mesh(mesh);
+    if (mesh.indices.empty() || (mesh.clip &&
+        (mesh.clip->width == 0.f || mesh.clip->height == 0.f))) return;
+    triangle_vertices.resize(mesh.vertices.size());
+    const SDL_FColor color{mesh.color.r / 255.f, mesh.color.g / 255.f,
+                           mesh.color.b / 255.f, mesh.color.a / 255.f};
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i)
+      triangle_vertices[i] = {{mesh.vertices[i].x, mesh.vertices[i].y}, color, {0.f, 0.f}};
+    if (mesh.clip) {
+      const auto left = static_cast<int>(std::floor(mesh.clip->x));
+      const auto top = static_cast<int>(std::floor(mesh.clip->y));
+      const SDL_Rect clip{left, top,
+          static_cast<int>(std::ceil(mesh.clip->x + mesh.clip->width)) - left,
+          static_cast<int>(std::ceil(mesh.clip->y + mesh.clip->height)) - top};
+      require(SDL_SetRenderClipRect(renderer, &clip), "SDL triangle clip setup failed");
+    }
+    const auto rendered = SDL_RenderGeometry(renderer, nullptr,
+        triangle_vertices.data(), static_cast<int>(triangle_vertices.size()),
+        mesh.indices.data(), static_cast<int>(mesh.indices.size()));
+    // Restore clip before propagating a submission failure to the entry point.
+    if (mesh.clip)
+      require(SDL_SetRenderClipRect(renderer, nullptr), "SDL triangle clip reset failed");
+    require(rendered, "SDL triangle mesh draw failed");
   }
 };
 
@@ -149,7 +204,7 @@ InputSnapshot Window::poll(){
   InputSnapshot input;require(SDL_GetWindowSizeInPixels(storage_->window,&storage_->width,&storage_->height),"SDL drawable pixel query failed");const auto convert=[&](float x,float y){Point result;require(SDL_RenderCoordinatesFromWindow(storage_->renderer,x,y,&result.x,&result.y),"SDL input coordinate conversion failed");return result;};SDL_Event event;
   while(SDL_PollEvent(&event)){switch(event.type){
     case SDL_EVENT_QUIT:input.quit_requested=true;break;
-    case SDL_EVENT_KEY_DOWN:if(!event.key.repeat&&event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(!event.key.repeat&&event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});break;
+    case SDL_EVENT_KEY_DOWN:if(!event.key.repeat){if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key)});}break;
     case SDL_EVENT_TEXT_INPUT:if(storage_->text_input_requested&&event.text.text)input.events.push_back({InputEventType::TextEntered,storage_->pointer,{},0.f,event.text.text});break;
     case SDL_EVENT_MOUSE_MOTION:{const auto prior=storage_->pointer;storage_->pointer=convert(event.motion.x,event.motion.y);input.events.push_back({InputEventType::PointerMove,storage_->pointer,{storage_->pointer.x-prior.x,storage_->pointer.y-prior.y}});break;}
     case SDL_EVENT_MOUSE_BUTTON_DOWN:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=true;input.events.push_back({InputEventType::LeftPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
@@ -162,17 +217,88 @@ InputSnapshot Window::poll(){
   input.drawable_width=storage_->width;input.drawable_height=storage_->height;input.pointer=storage_->pointer;input.focused=storage_->focused;input.minimized=storage_->minimized;return input;
 }
 void Window::set_text_input(bool enabled){storage_->text_input_requested=enabled;if(!storage_->focused)return;if(enabled==storage_->text_input_active)return;require(enabled?SDL_StartTextInput(storage_->window):SDL_StopTextInput(storage_->window),enabled?"SDL text input start failed":"SDL text input stop failed");storage_->text_input_active=enabled;}
+std::vector<DisplayMode> Window::display_modes()const{
+  int count{};const auto display=SDL_GetDisplayForWindow(storage_->window);
+  auto **modes=SDL_GetFullscreenDisplayModes(display,&count);
+  if(!modes)throw sdl_error("Display mode enumeration failed");
+  const std::unique_ptr<SDL_DisplayMode*,decltype(&SDL_free)> owner(modes,SDL_free);
+  std::vector<DisplayMode> result;
+  for(int i=0;i<count&&result.size()<256;++i){
+    const auto &mode=*modes[i];
+    if(mode.w<640||mode.h<360||!std::isfinite(mode.refresh_rate)||mode.refresh_rate<1.f)continue;
+    const DisplayMode value{mode.w,mode.h,mode.refresh_rate};
+    if(std::ranges::none_of(result,[&](const auto &item){return item.width==value.width&&item.height==value.height&&std::abs(item.refresh_hz-value.refresh_hz)<.01f;}))result.push_back(value);
+  }
+  std::ranges::sort(result,[](const auto&a,const auto&b){return std::tie(a.width,a.height,a.refresh_hz)>std::tie(b.width,b.height,b.refresh_hz);});
+  return result;
+}
+float Window::display_refresh_hz()const{
+  const auto *mode=SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(storage_->window));
+  return mode&&std::isfinite(mode->refresh_rate)&&mode->refresh_rate>1.f?mode->refresh_rate:60.f;
+}
+void Window::set_fullscreen_mode(bool exclusive,int width,int height,float refresh_hz){
+  if(width<0||height<0||!std::isfinite(refresh_hz)||refresh_hz<0.f)
+    throw std::invalid_argument("Invalid fullscreen resolution or refresh rate.");
+  int count{};const auto display=SDL_GetDisplayForWindow(storage_->window);
+  auto **modes=SDL_GetFullscreenDisplayModes(display,&count);
+  if(!modes)throw sdl_error("Display mode enumeration failed");
+  const std::unique_ptr<SDL_DisplayMode*,decltype(&SDL_free)> owner(modes,SDL_free);
+  const SDL_DisplayMode *selected=nullptr;
+  if(exclusive){
+    const auto *desktop=SDL_GetDesktopDisplayMode(display);
+    if(!desktop)throw sdl_error("Desktop display query failed");
+    if(width==0&&height==0){width=desktop->w;height=desktop->h;refresh_hz=desktop->refresh_rate;}
+    for(int i=0;i<count;++i){const auto *mode=modes[i];
+      if(mode->w==width&&mode->h==height&&(refresh_hz==0.f||std::abs(mode->refresh_rate-refresh_hz)<.02f)&&
+         (!selected||mode->refresh_rate>selected->refresh_rate))selected=mode;
+    }
+    if(!selected)throw std::invalid_argument("The selected resolution is no longer available on this display.");
+  }
+  require(SDL_SetWindowFullscreenMode(storage_->window,selected),"Fullscreen mode was rejected");
+  require(SDL_SetWindowFullscreen(storage_->window,true),"Fullscreen was rejected");
+  require(SDL_SyncWindow(storage_->window),"Fullscreen change did not complete");
+  if(!(SDL_GetWindowFlags(storage_->window)&SDL_WINDOW_FULLSCREEN))
+    throw std::runtime_error("The window manager did not enter fullscreen.");
+  const auto *actual=SDL_GetWindowFullscreenMode(storage_->window);
+  if(exclusive?(!actual||actual->w!=width||actual->h!=height||std::abs(actual->refresh_rate-selected->refresh_rate)>.02f):actual!=nullptr)
+    throw std::runtime_error("The window manager did not apply the selected display mode.");
+  if(exclusive){
+    const auto *current=SDL_GetCurrentDisplayMode(display);
+    if(!current||current->w!=width||current->h!=height||std::abs(current->refresh_rate-selected->refresh_rate)>.1f)
+      throw std::runtime_error("The display did not switch to the selected resolution and refresh rate.");
+  }
+  require(SDL_GetCurrentRenderOutputSize(storage_->renderer,&storage_->width,&storage_->height),"Changed display dimensions could not be read");
+  storage_->last_present_ns=0;
+}
+void Window::set_vsync(int mode){
+  if(mode!=0&&mode!=1&&mode!=-1)throw std::invalid_argument("Unsupported VSync mode.");
+  require(SDL_SetRenderVSync(storage_->renderer,mode),"Requested VSync mode is unavailable");
+  int actual{};require(SDL_GetRenderVSync(storage_->renderer,&actual),"VSync state query failed");
+  if(actual!=mode)throw std::runtime_error("The renderer did not apply the requested VSync mode.");
+  storage_->vsync=actual!=0;storage_->fallback_interval_ns=0;storage_->last_present_ns=0;
+}
+void Window::set_frame_cap(double hz){
+  if(!std::isfinite(hz)||hz<0.||hz>1000.)throw std::invalid_argument("Invalid frame cap.");
+  storage_->frame_cap_interval_ns=hz>=1.?static_cast<Uint64>(1000000000./hz):0;
+  storage_->last_present_ns=0;
+}
 TextExtent Window::measure_text(const Text &label){if(label.value.empty())return {};const auto &cached=storage_->text(label);return {cached.width,cached.height};}
-void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot){
+void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem::path>&screenshot,FrameTiming *timing){
+  if(timing)*timing={};
+  const auto elapsed_ms=[](const auto started){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();};
+  const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
   const auto draw_line=[&](const Line &line){if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");require(SDL_SetRenderDrawColor(storage_->renderer,line.color.r,line.color.g,line.color.b,line.color.a),"SDL line color failed");require(SDL_RenderLine(storage_->renderer,line.from.x,line.from.y,line.to.x,line.to.y),"SDL line draw failed");};
-  const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");constexpr int segments=20;std::vector<SDL_Vertex> vertices;std::vector<int> indices;vertices.reserve(segments+2);indices.reserve(segments*3);const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices.push_back({{circle.center.x,circle.center.y},center_color,{0,0}});for(int index=0;index<=segments;++index){const auto angle=2.f*std::numbers::pi_v<float>*static_cast<float>(index)/static_cast<float>(segments);const Point edge{circle.center.x+std::cos(angle)*circle.radius,circle.center.y+std::sin(angle)*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices.push_back({{edge.x,edge.y},edge_color,{0,0}});}for(int index=0;index<segments;++index){indices.push_back(0);indices.push_back(index+1);indices.push_back(index+2);}require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
+  const auto draw_circle=[&](const Circle &circle){if(!valid_point(circle.center)||!std::isfinite(circle.radius)||circle.radius<0.f)throw std::invalid_argument("Circle bounds must be finite and nonnegative.");std::array<SDL_Vertex,soft_circle_segments+2> vertices{};const SDL_FColor center_color{circle.color.r/255.f,circle.color.g/255.f,circle.color.b/255.f,circle.color.a/255.f};const SDL_FColor edge_color{center_color.r,center_color.g,center_color.b,0.f};vertices[0]={{circle.center.x,circle.center.y},center_color,{0,0}};const auto &directions=soft_circle_directions();for(int index=0;index<=soft_circle_segments;++index){const auto direction=directions[static_cast<std::size_t>(index)];const Point edge{circle.center.x+direction.x*circle.radius,circle.center.y+direction.y*circle.radius};if(!valid_point(edge))throw std::invalid_argument("Circle projection produced non-finite geometry.");vertices[static_cast<std::size_t>(index)+1u]={{edge.x,edge.y},edge_color,{0,0}};}const auto &indices=soft_circle_indices();require(SDL_RenderGeometry(storage_->renderer,nullptr,vertices.data(),static_cast<int>(vertices.size()),indices.data(),static_cast<int>(indices.size())),"SDL soft circle draw failed");};
   require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
   for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
-  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else storage_->draw_text(value);},command);}
-  if(screenshot){SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");}
-  if(!storage_->vsync){const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<storage_->fallback_interval_ns)SDL_DelayPrecise(storage_->fallback_interval_ns-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();}require(SDL_RenderPresent(storage_->renderer),"SDL present failed");
+  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
+  if(timing)timing->submission_ms=elapsed_ms(*submission_started);
+  if(screenshot){const auto readback_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;SDL_Surface *surface=SDL_RenderReadPixels(storage_->renderer,nullptr);if(!surface)throw sdl_error("SDL screenshot readback failed");const std::unique_ptr<SDL_Surface,decltype(&SDL_DestroySurface)> owner(surface,SDL_DestroySurface);const auto path=utf8_path(*screenshot);require(SDL_SaveBMP(surface,path.c_str()),"SDL screenshot write failed");if(timing)timing->readback_ms=elapsed_ms(*readback_started);}
+  const auto pace=std::max(storage_->frame_cap_interval_ns,storage_->vsync?Uint64{0}:storage_->fallback_interval_ns);
+  if(pace){const auto throttle_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;const auto now=SDL_GetTicksNS();if(storage_->last_present_ns&&now-storage_->last_present_ns<pace)SDL_DelayPrecise(pace-(now-storage_->last_present_ns));storage_->last_present_ns=SDL_GetTicksNS();if(timing)timing->throttle_ms=elapsed_ms(*throttle_started);}
+  const auto present_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;require(SDL_RenderPresent(storage_->renderer),"SDL present failed");if(timing)timing->present_ms=elapsed_ms(*present_started);
 }
-int Window::drawable_width()const noexcept{return storage_->width;}int Window::drawable_height()const noexcept{return storage_->height;}std::string Window::gpu_driver()const{const char *driver=SDL_GetGPUDeviceDriver(storage_->device);if(!driver)throw sdl_error("SDL GPU driver query failed");return driver;}std::string Window::presentation_mode()const{return storage_->vsync?"vsync":"display-refresh-fallback";}
+int Window::drawable_width()const noexcept{return storage_->width;}int Window::drawable_height()const noexcept{return storage_->height;}std::string Window::gpu_driver()const{const char *driver=SDL_GetGPUDeviceDriver(storage_->device);if(!driver)throw sdl_error("SDL GPU driver query failed");return driver;}std::string Window::presentation_mode()const{return storage_->vsync?"vsync":storage_->fallback_interval_ns?"display-refresh-fallback":storage_->frame_cap_interval_ns?"frame-cap":"unbounded";}
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
 std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
 } // namespace stellar::native_map

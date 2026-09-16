@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_client_runtime import _validate_capture
 
 _FIELDS = {
     "mode", "system_id", "body_id", "colony_id", "type_id", "site_id",
@@ -20,8 +21,27 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused",
+    "persisted_site", "paused", "render",
 }
+
+_RENDER_FIELDS = {"sites", "meshes", "triangles", "road_segments"}
+_MAX_RENDER_TRIANGLES = 8192
+_MAX_RENDER_ROAD_SEGMENTS = 192
+
+_POPULATED_SURFACE_SITES = (
+    # family, x, z, yaw, enabled, priority, condition, industry cost
+    ("power_generator", 210., 0., 0., True, 0, 1., 300.),
+    ("science_lab", 170., 123., 90., True, 0, 1., 400.),
+    ("habitat_complex", 65., 200., 180., True, 0, 1., 350.),
+    ("fabricator", -65., 200., 270., True, 1, 1., 450.),
+    ("science_lab", -170., 123., 0., False, 0, 1., 400.),
+    ("habitat_complex", -210., 0., 90., True, 0, .5, 350.),
+    ("fabricator", -170., -123., 180., True, 0, 1., 450.),
+    ("power_generator", -65., -200., 270., True, 0, 1., 300.),
+    # This last ordinary-priority demand creates power-allocation pressure.
+    # Runtime inspection verifies Core-derived power and staffing allocation.
+    ("science_lab", 65., -200., 0., True, 0, 1., 400.),
+)
 
 
 def _finite(value, label):
@@ -60,6 +80,20 @@ def _diagnostic(stdout: str, expected_mode: str):
         _finite(state.get(key), key)
     if state.get("persisted_site") is not True or state.get("paused") is not True:
         raise RuntimeError("Native surface did not prove a persisted paused site")
+    render = state.get("render")
+    if not isinstance(render, dict) or set(render) != _RENDER_FIELDS:
+        raise RuntimeError("Native surface reported an invalid render diagnostic")
+    for key in _RENDER_FIELDS:
+        value = render.get(key)
+        if type(value) is not int or value < 0:
+            raise RuntimeError(f"Native surface reported invalid render {key}")
+    if (render["sites"] < 1 or render["sites"] > state["site_count_saved"] or
+            render["meshes"] < 1 or render["triangles"] < 1 or
+            render["road_segments"] < 1 or
+            render["triangles"] > _MAX_RENDER_TRIANGLES or
+            render["road_segments"] > _MAX_RENDER_ROAD_SEGMENTS or
+            render["meshes"] > render["triangles"]):
+        raise RuntimeError("Native surface reported impossible render counters")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
                    "removal_confirmed", "refund_exact")
@@ -113,6 +147,124 @@ def _bmp(path: Path, width: int, height: int):
     if not pixels or min(pixels) == max(pixels):
         raise RuntimeError("Native surface capture contains no rendered variation")
 
+def _surface_art(stdout: str) -> dict:
+    rows = re.findall(r"(?m)^surface_art=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1: raise RuntimeError("Native surface art diagnostic is missing or duplicated")
+    try: state = json.loads(rows[0])
+    except ValueError as error: raise RuntimeError("Native surface art diagnostic is malformed") from error
+    fields = {"requested","ready","pending","deferred","failed","replaced","entries","cache_bytes","reserved_bytes","admitted","completed","canceled","terrain"}
+    if not isinstance(state, dict) or set(state) != fields or not isinstance(state["terrain"], list) or len(state["terrain"]) != 4: raise RuntimeError("Native surface art diagnostic has an invalid schema")
+    if any(type(state[k]) is not int or state[k] < 0 for k in fields - {"terrain"}): raise RuntimeError("Native surface art counters are invalid")
+    if (state["requested"] > 130 or state["entries"] < 1 or state["entries"] > 48 or state["cache_bytes"] + state["reserved_bytes"] > 24*1024*1024 or state["pending"] or state["deferred"] or state["failed"] or state["replaced"] < 2 or state["ready"] != state["requested"] or state["ready"] < 2 or state["replaced"] > state["ready"] or state["reserved_bytes"] != 0): raise RuntimeError("Native surface art diagnostic violates its bounded contract")
+    if any(type(v) not in (int, float) or not math.isfinite(v) for v in state["terrain"]): raise RuntimeError("Native surface art terrain is invalid")
+    return state
+
+
+def _surface_inspection(stdout, colony, required_statuses=()):
+    rows = re.findall(r"(?m)^surface_inspection=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1:
+        raise RuntimeError("Surface inspection evidence is missing or duplicated")
+    try:
+        state = json.loads(rows[0])
+    except ValueError as error:
+        raise RuntimeError("Surface inspection evidence is malformed") from error
+    fields = {"sites", "focused_id", "overview_zoom", "focus_zoom",
+              "refresh_preserved", "overview_restored"}
+    if not isinstance(state, dict) or set(state) != fields or not isinstance(state["sites"], list):
+        raise RuntimeError("Surface inspection schema is invalid")
+    canonical = {site["Id"]: site for site in colony["SurfaceBuildings"]}
+    seen, labels = set(), set()
+    for site in state["sites"]:
+        if not isinstance(site, dict) or set(site) != {
+                "id", "complete", "enabled", "condition", "powered", "staffed", "status", "label_visible"}:
+            raise RuntimeError("Surface operating site schema is invalid")
+        site_id = site["id"]
+        if type(site_id) is not int or site_id in seen or site_id not in canonical:
+            raise RuntimeError("Surface inspection lost unique canonical site identity")
+        seen.add(site_id)
+        source = canonical[site_id]
+        if (any(type(site[key]) is not bool for key in ("complete", "enabled", "powered", "staffed", "label_visible")) or
+                site["complete"] != source["IsComplete"] or site["enabled"] != source.get("IsEnabled", True) or
+                not _close(site["condition"], source.get("Condition", 1.)) or not site["label_visible"]):
+            raise RuntimeError("Surface inspector did not visibly report canonical operating state")
+        expected = ("CONSTRUCTION" if not site["complete"] else "DISABLED" if not site["enabled"] else
+                    "REPAIR NEEDED" if site["condition"] <= .15 else "NO WORKERS" if not site["staffed"] else
+                    "NO POWER" if not site["powered"] else "OPERATING")
+        if site["status"] != expected or (site["powered"] and not site["staffed"]):
+            raise RuntimeError("Surface inspector misrepresented the operational prerequisite")
+        labels.add(site["status"])
+    if seen != set(canonical) or not set(required_statuses).issubset(labels):
+        raise RuntimeError("Surface inspection missed required facilities or operating conditions")
+    if (type(state["focused_id"]) is not int or state["focused_id"] not in canonical or
+            state["refresh_preserved"] is not True or state["overview_restored"] is not True or
+            not 0 < _finite(state["overview_zoom"], "overview zoom") <
+                _finite(state["focus_zoom"], "focus zoom") <= 4):
+        raise RuntimeError("Surface inspection did not prove focus, refresh and overview recovery")
+    return state
+
+
+def _validate_surface_focus(capture, focus, width, height, terrain):
+    _validate_capture(focus, width, height)
+    base_rows, focused_rows = _bmp_rgb_rows(capture, width, height), _bmp_rgb_rows(focus, width, height)
+    x, y, w, h = terrain
+    changes = 0
+    for py in range(max(0, math.ceil(y)), min(height, math.floor(y+h))):
+        base, start, channels = base_rows[py]
+        other, alt_start, alt_channels = focused_rows[py]
+        for px in range(max(0, math.ceil(x)), min(width, math.floor(x+w))):
+            at, alt_at = start+px*channels, alt_start+px*alt_channels
+            changes += base[at:at+3] != other[alt_at:alt_at+3]
+            if changes >= 100:
+                return
+    raise RuntimeError("Focus Selected did not change the rendered surface")
+
+
+def _bmp_rgb_rows(path: Path, width: int, height: int):
+    data = path.read_bytes() if path.is_file() else b""
+    if len(data) < 54 or data[:2] != b"BM":
+        raise RuntimeError("Native surface art sidecar is not a BMP frame")
+    declared = struct.unpack_from("<I", data, 2)[0]
+    offset = struct.unpack_from("<I", data, 10)[0]
+    header = struct.unpack_from("<I", data, 14)[0]
+    actual_width, signed_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
+    compression = struct.unpack_from("<I", data, 30)[0]
+    channels = bits // 8
+    stride = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
+    required = stride * abs(signed_height)
+    if (declared != len(data) or offset < 54 or header < 40 or
+            actual_width != width or abs(signed_height) != height or planes != 1 or
+            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
+            offset + required > len(data)):
+        raise RuntimeError("Native surface art sidecar has invalid renderer geometry")
+
+    pixels = memoryview(data)
+    rows = []
+    for y in range(height):
+        stored_y = height - y - 1 if signed_height > 0 else y
+        start = offset + stored_y * stride
+        rows.append((pixels, start, channels))
+    return rows
+
+
+def _validate_surface_art_pixels(capture: Path, fallback: Path, width: int, height: int, terrain):
+    _validate_capture(capture, width, height)
+    _validate_capture(fallback, width, height)
+    base_rows = _bmp_rgb_rows(capture, width, height)
+    alt_rows = _bmp_rgb_rows(fallback, width, height)
+    x, y, w, h = terrain
+    if w <= 0 or h <= 0 or x < -2 or y < -2 or x + w > width + 2 or y + h > height + 2: raise RuntimeError("Native surface art terrain is outside the capture")
+    inside = outside = 0
+    for py in range(height):
+        base, base_start, base_channels = base_rows[py]
+        alt, alt_start, alt_channels = alt_rows[py]
+        for px in range(width):
+            base_at = base_start + px * base_channels
+            alt_at = alt_start + px * alt_channels
+            if base[base_at:base_at + 3] != alt[alt_at:alt_at + 3]:
+                if x - 2 <= px <= x + w + 2 and y - 2 <= py <= y + h + 2: inside += 1
+                else: outside += 1
+    if inside < 100 or outside: raise RuntimeError("Native surface art sidecar did not isolate building pixels")
+
 
 def _player_parts(payload):
     galaxy = payload.get("Galaxy", {})
@@ -157,6 +309,102 @@ def _normalized(payload):
     result = copy.deepcopy(payload)
     result.pop("SavedAtUtc", None)
     return result
+
+
+def _first_difference(left, right, path="$"):
+    if type(left) is not type(right):
+        return f"{path} changed type"
+    if isinstance(left, dict):
+        if set(left) != set(right):
+            return f"{path} changed fields"
+        for key in left:
+            difference = _first_difference(left[key], right[key], f"{path}.{key}")
+            if difference:
+                return difference
+        return ""
+    if isinstance(left, list):
+        if len(left) != len(right):
+            return f"{path} changed length from {len(left)} to {len(right)}"
+        for index, (left_item, right_item) in enumerate(zip(left, right)):
+            difference = _first_difference(left_item, right_item, f"{path}[{index}]")
+            if difference:
+                return difference
+        return ""
+    return "" if left == right else f"{path} changed value from {left!r} to {right!r}"
+
+
+def _surface_site(site_id, type_id, x, z, rotation, *, progress,
+                  complete, enabled=True, priority=0, condition=1.):
+    return {"Id": site_id, "TypeId": type_id, "X": x, "Z": z,
+            "RotationDegrees": rotation, "IndustryProgress": progress,
+            "IsComplete": complete, "IsEnabled": enabled,
+            "PendingUpgradeTypeId": None, "UpgradeDaysRemaining": 0.,
+            "OperatingPriority": priority, "Condition": condition,
+            "StoredPowerDays": 0.}
+
+
+def _populated_surface_fixture(payload, colony_id):
+    fixture = copy.deepcopy(payload)
+    colony = next((item for item in fixture["Galaxy"]["Colonies"]
+                   if item.get("Id") == colony_id), None)
+    if colony is None:
+        raise RuntimeError("Populated surface fixture lost its owned colony")
+    # This is validation-only authored surface state, derived after the
+    # standard fresh campaign. Population remains authoritative; staffing is
+    # derived by Core and has no per-building persisted field in Player17.
+    used_ids = [site.get("Id") for item in fixture["Galaxy"]["Colonies"]
+                for site in item.get("SurfaceBuildings", [])
+                if type(site.get("Id")) is int]
+    next_id = max(used_ids, default=-1) + 1
+    sites = [_surface_site(next_id + index, type_id, x, z, rotation,
+                           progress=cost, complete=True, enabled=enabled,
+                           priority=priority, condition=condition)
+             for index, (type_id, x, z, rotation, enabled, priority,
+                         condition, cost) in enumerate(_POPULATED_SURFACE_SITES)]
+    # Reload smoke requires one persisted unfinished site. Its highest ID makes
+    # selection deterministic without changing any completed representative.
+    sites.append(_surface_site(next_id + len(sites), "power_generator",
+                               170., -123., 0.,
+                               progress=75., complete=False))
+    colony["SurfaceBuildings"] = sites
+    return fixture
+
+
+def _verify_populated_surface(before, after, state, art):
+    before_colony = _base_colony(before)
+    after_colony = _base_colony(after)
+    difference = _first_difference(_normalized(before), _normalized(after))
+    if before_colony.get("Id") != state["colony_id"] or difference:
+        raise RuntimeError("Paused populated surface reload changed its Player17 fixture" +
+                           (f" at {difference}" if difference else ""))
+    sites = after_colony.get("SurfaceBuildings", [])
+    if len(sites) != len(_POPULATED_SURFACE_SITES) + 1:
+        raise RuntimeError("Populated surface fixture lost a representative site")
+    completed = [site for site in sites if site.get("IsComplete") is True]
+    if len(completed) != len(_POPULATED_SURFACE_SITES):
+        raise RuntimeError("Populated surface fixture changed completed-site identity")
+    for site, definition in zip(completed, _POPULATED_SURFACE_SITES):
+        (type_id, x, z, rotation, enabled, priority, condition, cost) = definition
+        if (site.get("TypeId") != type_id or site.get("IsComplete") is not True or
+                site.get("IsEnabled") is not enabled or
+                site.get("OperatingPriority") != priority or
+                not _close(site.get("X"), x) or not _close(site.get("Z"), z) or
+                not _close(site.get("RotationDegrees"), rotation) or
+                not _close(site.get("IndustryProgress"), cost) or
+                not _close(site.get("Condition"), condition)):
+            raise RuntimeError("Populated surface fixture changed a representative state")
+    anchor = max((site for site in sites if site.get("IsComplete") is False),
+                 key=lambda site: site.get("Id", -1), default=None)
+    if (anchor is None or anchor.get("TypeId") != "power_generator" or
+            not _close(anchor.get("IndustryProgress"), 75.)):
+        raise RuntimeError("Populated surface fixture lost its unfinished reload anchor")
+    expected_ready = len(sites) + 1  # All sites plus the surface hub.
+    if (art["requested"] != expected_ready or art["ready"] != expected_ready or
+            art["replaced"] != expected_ready):
+        raise RuntimeError("Populated surface did not draw every ready building raster")
+    if (state["site_id"] != anchor["Id"] or state["type_id"] != "power_generator" or
+            state["site_count_saved"] != len(sites) or state["progress"] <= 0):
+        raise RuntimeError("Populated surface reload selected the wrong persisted anchor")
 
 
 def _verify_ordered(before, after, state):
@@ -209,7 +457,8 @@ def _launch(args, cwd, env, label):
 def validate_native_surface_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics = [], []
+    captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
+    populated_captures, populated_diagnostics, focus_captures = [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-surface-") as temporary:
         work = Path(temporary)
         save = work / "fresh.player17.json"
@@ -234,12 +483,18 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 (1920, 1080, "--surface-reload-smoke", "paused_reload")):
             capture = work / f"surface-{mode}-{width}x{height}.bmp"
             result, uploads = _launch(common + ["--width", str(width), "--height", str(height),
-                                                flag, str(capture), "--load"],
+                                                flag, str(capture), "--load",
+                                                "--profile-frames", "120"],
                                       work, clean, mode)
             if uploads < 1:
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
+            art_diagnostics.append(_surface_art(result.stdout))
             _bmp(capture, width, height)
+            sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
+            _validate_capture(sidecar, width, height)
+            _validate_surface_art_pixels(capture, sidecar, width, height, art_diagnostics[-1]["terrain"])
+            (folder.parent / f"{folder.name}-surface-{width}x{height}.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
                 raise RuntimeError("Native surface wrote a noncurrent Player17 save")
@@ -247,6 +502,9 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 _verify_ordered(base, payload, state)
                 ordered_payload, ordered_state = payload, state
             else:
+                _surface_inspection(result.stdout, _base_colony(payload), {"CONSTRUCTION"})
+                _validate_surface_focus(capture, capture.with_name(capture.stem + "-focus.bmp"),
+                                        width, height, art_diagnostics[-1]["terrain"])
                 if _normalized(payload) != _normalized(ordered_payload):
                     raise RuntimeError("Paused surface reload changed the Player17 payload")
                 for key in ("system_id", "body_id", "colony_id", "type_id", "site_id",
@@ -257,10 +515,66 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             evidence = folder.parent / f"{folder.name}-surface-{width}x{height}.bmp"
             shutil.copy2(capture, evidence)
             captures.append(str(evidence)); diagnostics.append(result.stdout.strip())
+            art_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-without-buildings.bmp"; shutil.copy2(sidecar, art_evidence); art_captures.append(str(art_evidence))
+
+        populated_fixture = _populated_surface_fixture(
+            ordered_payload, ordered_state["colony_id"])
+        for width, height, low_workforce in ((1280, 720, False), (1920, 1080, False), (1280, 720, True)):
+            fixture = copy.deepcopy(populated_fixture)
+            if low_workforce:
+                _base_colony(fixture)["PopulationMillions"] = .08
+            save.write_text(json.dumps(fixture), encoding="utf-8")
+            # A test-authored primary must either load exactly or fail. A prior
+            # smoke backup must not turn an invalid fixture into false evidence.
+            save.with_name(save.name + ".bak").unlink(missing_ok=True)
+            variant = "workforce" if low_workforce else "populated"
+            capture = work / f"surface-{variant}-{width}x{height}.bmp"
+            result, uploads = _launch(
+                common + ["--width", str(width), "--height", str(height),
+                          "--surface-reload-smoke", str(capture), "--load",
+                          "--profile-frames", "120"],
+                work, clean, f"test-only populated {width}x{height}")
+            if uploads < 1:
+                raise RuntimeError("Populated surface did not prove image uploads")
+            state = _diagnostic(result.stdout, "paused_reload")
+            art = _surface_art(result.stdout)
+            _bmp(capture, width, height)
+            sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
+            _validate_surface_art_pixels(capture, sidecar, width, height,
+                                         art["terrain"])
+            after = json.loads(save.read_text(encoding="utf-8-sig"))
+            _verify_populated_surface(fixture, after, state, art)
+            required = {"OPERATING", "DISABLED", "CONSTRUCTION", "NO WORKERS" if low_workforce else "NO POWER"}
+            inspection = _surface_inspection(result.stdout, _base_colony(after), required)
+            focus = capture.with_name(capture.stem + "-focus.bmp")
+            _validate_surface_focus(capture, focus, width, height, art["terrain"])
+            stem = f"{folder.name}-surface-{variant}-{width}x{height}"
+            evidence = folder.parent / f"{stem}.bmp"
+            sidecar_evidence = folder.parent / f"{stem}-without-buildings.bmp"
+            shutil.copy2(capture, evidence)
+            shutil.copy2(sidecar, sidecar_evidence)
+            focus_evidence = folder.parent / f"{stem}-focus.bmp"
+            shutil.copy2(focus, focus_evidence)
+            focus_captures.append(str(focus_evidence))
+            (folder.parent / f"{stem}.log").write_text(
+                result.stdout + "\n" + result.stderr, encoding="utf-8")
+            populated_captures.append(str(evidence))
+            populated_diagnostics.append({"surface": state, "art": art, "inspection": inspection})
     return {"nativeSurfaceFreshOwnedEarth": True,
             "nativeSurfacePlayerInput": True,
             "nativeSurfacePausedReload": True,
             "surfaceCaptures": captures,
-            "surfaceDiagnostics": diagnostics,
+            "surfaceDiagnostics": diagnostics, "surfaceArtDiagnostics": art_diagnostics,
+            "surfaceArtCaptures": art_captures,
+            "surfacePopulatedFixture": "test-only authored Player17 derived from the standard fresh campaign",
+            "surfacePopulatedFamilies": ["power_generator", "science_lab",
+                                         "habitat_complex", "fabricator"],
+            "surfacePopulatedPersistedStates": ["complete", "enabled", "disabled",
+                                                "priority", "condition-repair"],
+            "surfacePopulatedDerivedStateProof":
+                "Core-derived power/staffing membership checked against the live view; each facility selected and its visible inspector label checked.",
+            "surfaceFocusCaptures": focus_captures,
+            "surfacePopulatedCaptures": populated_captures,
+            "surfacePopulatedDiagnostics": populated_diagnostics,
             "surfaceFixture": "unaltered standard fresh 500-system Player17 campaign",
             "surfaceDemolition": "completed-site demolition remains controller-test evidence"}

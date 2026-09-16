@@ -1,4 +1,54 @@
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
+add_executable(stellar_battle_workspace_tests
+  native-tests/native_battle_workspace_tests.cpp
+  app/native_client/native_battle_workspace.cpp)
+target_include_directories(stellar_battle_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_battle_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_battle_workspace COMMAND stellar_battle_workspace_tests)
+if(MSVC)
+  target_compile_options(stellar_battle_workspace_tests PRIVATE /W4 /WX /permissive-)
+endif()
+
+add_executable(stellar_native_battle_art_tests
+  native-tests/native_battle_art_tests.cpp
+  app/native_client/native_battle_art.cpp)
+target_include_directories(stellar_native_battle_art_tests PRIVATE
+  app/native_client engine/include)
+target_link_libraries(stellar_native_battle_art_tests PRIVATE stellar_core)
+add_test(NAME native_battle_art COMMAND stellar_native_battle_art_tests)
+if(MSVC)
+  target_compile_options(stellar_native_battle_art_tests PRIVATE
+    /W4 /WX /permissive-)
+endif()
+
+add_executable(stellar_native_support_tests
+  native-tests/native_support_tests.cpp app/native_client/native_support.cpp)
+target_include_directories(stellar_native_support_tests PRIVATE app/native_client)
+add_test(NAME native_support COMMAND stellar_native_support_tests)
+add_executable(stellar_native_support_service_tests
+  native-tests/native_support_service_tests.cpp
+  app/native_client/native_support.cpp app/native_client/native_support_service.cpp)
+target_include_directories(stellar_native_support_service_tests PRIVATE app/native_client)
+add_test(NAME native_support_service COMMAND stellar_native_support_service_tests)
+if(MSVC)
+  target_compile_options(stellar_native_support_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_support_service_tests PRIVATE /W4 /WX)
+endif()
+
+add_executable(stellar_native_notification_tests
+  native-tests/native_notification_tests.cpp app/native_client/native_notifications.cpp)
+target_include_directories(stellar_native_notification_tests PRIVATE app/native_client engine/include)
+add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
+add_executable(stellar_native_notification_events_tests
+  native-tests/native_notification_events_tests.cpp
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp)
+target_include_directories(stellar_native_notification_events_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_core stellar_native_campaign_feedback)
+add_test(NAME native_notification_events COMMAND stellar_native_notification_events_tests)
+if(MSVC)
+  target_compile_options(stellar_native_notification_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_notification_events_tests PRIVATE /W4 /WX)
+endif()
 add_executable(stellar_native_system_travel_tests
   native-tests/native_system_travel_tests.cpp
   app/native_client/native_system_travel.cpp app/native_client/native_system_view.cpp)
@@ -142,6 +192,27 @@ if(MSVC)
   target_compile_options(stellar_native_construction_workspace_tests PRIVATE /WX)
 endif()
 
+add_executable(stellar_native_diplomacy_controller_tests
+  native-tests/native_diplomacy_controller_tests.cpp
+  app/native_client/native_diplomacy_controller.cpp)
+target_include_directories(stellar_native_diplomacy_controller_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_diplomacy_controller_tests PRIVATE stellar_core stellar_json)
+add_test(NAME native_diplomacy_controller COMMAND stellar_native_diplomacy_controller_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_diplomacy_controller PROPERTIES TIMEOUT 90)
+add_executable(stellar_native_diplomacy_workspace_tests
+  native-tests/native_diplomacy_workspace_tests.cpp
+  app/native_client/native_diplomacy_workspace.cpp
+  app/native_client/native_diplomacy_controller.cpp)
+target_include_directories(stellar_native_diplomacy_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_diplomacy_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_diplomacy_workspace COMMAND stellar_native_diplomacy_workspace_tests)
+if(MSVC)
+  target_compile_options(stellar_native_diplomacy_controller_tests PRIVATE /WX)
+  target_compile_options(stellar_native_diplomacy_workspace_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_fresh_progression_tests
   native-tests/native_fresh_progression_tests.cpp
   app/native_client/native_research_controller.cpp
@@ -246,16 +317,27 @@ add_test(NAME native_settlement_workspace COMMAND stellar_settle_ui_tests)
 
 add_executable(stellar_surface_view_tests
   native-tests/native_surface_workspace_tests.cpp
+  app/native_client/native_surface_building_geometry.cpp
+  app/native_client/native_surface_building_layer.cpp
+  app/native_client/native_surface_scene.cpp
   app/native_client/native_surface_workspace.cpp
   app/native_client/native_colony_workspace.cpp)
 target_include_directories(stellar_surface_view_tests PRIVATE
   app/native_client
   engine/include)
-target_link_libraries(stellar_surface_view_tests PRIVATE stellar_core)
+target_link_libraries(stellar_surface_view_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_surface_workspace COMMAND stellar_surface_view_tests)
 if(MSVC)
   target_compile_options(stellar_surface_view_tests PRIVATE
     /W4 /WX /permissive-)
+endif()
+
+add_executable(stellar_native_triangle_mesh_tests
+  native-tests/native_triangle_mesh_tests.cpp)
+target_include_directories(stellar_native_triangle_mesh_tests PRIVATE engine/include)
+add_test(NAME native_triangle_mesh COMMAND stellar_native_triangle_mesh_tests)
+if(MSVC)
+  target_compile_options(stellar_native_triangle_mesh_tests PRIVATE /W4 /WX /permissive-)
 endif()
 
 
@@ -331,6 +413,11 @@ target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_image)
 target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_image)
 
 if(BUILD_TESTING)
+  add_executable(stellar_native_image_preparation_tests
+    native-tests/native_image_preparation_tests.cpp)
+  target_link_libraries(stellar_native_image_preparation_tests PRIVATE stellar_native_image)
+  add_test(NAME native_image_preparation COMMAND stellar_native_image_preparation_tests)
+  set_tests_properties(native_image_preparation PROPERTIES TIMEOUT 30)
   add_executable(stellar_celestial_tests
     native-tests/native_celestial_appearance_tests.cpp
     app/native_client/native_celestial_appearance.cpp)
@@ -352,6 +439,7 @@ if(BUILD_TESTING)
     stellar_native_image)
   target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_image)
   if(MSVC)
+    target_compile_options(stellar_native_image_preparation_tests PRIVATE /W4 /WX /permissive-)
     target_compile_options(stellar_celestial_tests PRIVATE /W4 /WX /permissive-)
   endif()
 endif()
@@ -362,6 +450,7 @@ add_executable(stellar_galaxy_backdrop_tests
 target_include_directories(stellar_galaxy_backdrop_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_backdrop COMMAND stellar_galaxy_backdrop_tests "${CMAKE_SOURCE_DIR}")
+set_tests_properties(native_galaxy_backdrop PROPERTIES TIMEOUT 45)
 
 add_executable(stellar_ship_art_tests
   native-tests/native_ship_art_tests.cpp
@@ -382,7 +471,28 @@ add_executable(stellar_galaxy_marker_tests
 target_include_directories(stellar_galaxy_marker_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_marker_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_star_markers COMMAND stellar_galaxy_marker_tests)
+
+add_executable(stellar_galaxy_label_tests
+  app/native_client/native_galaxy_labels.cpp
+  native-tests/native_galaxy_labels_tests.cpp)
+target_include_directories(stellar_galaxy_label_tests PRIVATE
+  app/native_client engine/include)
+add_test(NAME native_galaxy_labels COMMAND stellar_galaxy_label_tests)
+
+add_executable(stellar_territory_tests
+  app/native_client/native_territory_projection.cpp
+  app/native_client/native_territory_overlay.cpp
+  native-tests/native_territory_projection_tests.cpp)
+target_include_directories(stellar_territory_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_territory_tests PRIVATE stellar_native_image stellar_core)
+add_test(NAME native_territory_projection COMMAND stellar_territory_tests)
+set_tests_properties(native_territory_projection PROPERTIES TIMEOUT 120)
 if(MSVC)
   target_compile_options(stellar_galaxy_backdrop_tests PRIVATE /W4 /WX /permissive-)
   target_compile_options(stellar_galaxy_marker_tests PRIVATE /W4 /WX /permissive-)
+  target_compile_options(stellar_galaxy_label_tests PRIVATE /W4 /WX /permissive-)
+  target_compile_options(stellar_territory_tests PRIVATE /W4 /WX /permissive-)
 endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceBuildingGeometryTests.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceBuildingAssetsTests.cmake")
