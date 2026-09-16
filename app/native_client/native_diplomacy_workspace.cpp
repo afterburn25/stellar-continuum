@@ -1,4 +1,5 @@
 #include "native_diplomacy_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,17 +11,17 @@ namespace {
 using namespace stellar::native_diplomacy;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color accent{120, 197, 165, 255};
-constexpr Color gold{217, 182, 119, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color danger{243, 153, 130, 255};
+constexpr Color panel = native_ui::color::surface;
+constexpr Color inset = native_ui::color::surface_opaque;
+constexpr Color row = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color selected = native_ui::color::surface_raised;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color accent = native_ui::color::diplomacy;
+constexpr Color gold = native_ui::color::caution;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color danger = native_ui::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -557,31 +558,28 @@ void NativeDiplomacyWorkspace::render(
   if (!view_) return;
   const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
   const auto s = layout.scale;
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
+  native_ui::panel(out, layout.surface, native_ui::Tone::Diplomacy);
   text(out, layout.title, "RELATIONS", bright, layout.title_font_pixels);
   text(out, layout.date, view_->date, muted, layout.body_font_pixels,
        TextAlign::Right);
-  fill(out, layout.close, layout.close.contains(pointer_) ? hover : row);
-  stroke(out, layout.close, border);
-  text(out, layout.close, "RETURN", bright, layout.small_font_pixels,
-       TextAlign::Center);
+  native_ui::button(out, layout.close, "RETURN", pointer_,
+                    layout.small_font_pixels, native_ui::Tone::Diplomacy);
 
   // Contact directory
   fill(out, layout.contact_panel, inset);
   stroke(out, layout.contact_panel, border);
+  fill(out, {layout.contact_panel.x, layout.contact_panel.y, 3.f,
+             layout.contact_panel.height}, accent);
   text(out,
-       {layout.contact_panel.x + 8.f * s, layout.contact_panel.y + 8.f * s,
-        layout.contact_panel.width - 16.f * s, 22.f * s},
+       {layout.contact_panel.x + 10.f * s, layout.contact_panel.y + 8.f * s,
+        layout.contact_panel.width - 20.f * s, 22.f * s},
        "CONTACT DIRECTORY", accent, layout.small_font_pixels);
   for (std::size_t index = 0; index < std::size(filter_labels); ++index) {
     const auto bounds = filter_button(layout, index);
     const bool active = filter_ == filter_labels[index].first;
-    fill(out, bounds, active ? selected
-                             : bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, border);
-    text(out, bounds, filter_labels[index].second,
-         active ? bright : muted, layout.small_font_pixels, TextAlign::Center);
+    native_ui::button(out, bounds, filter_labels[index].second, pointer_,
+                      layout.small_font_pixels, native_ui::Tone::Diplomacy,
+                      active);
   }
   fill(out, layout.contact_rows, inset);
   stroke(out, layout.contact_rows, border);
@@ -604,6 +602,8 @@ void NativeDiplomacyWorkspace::render(
     fill(out, bounds, chosen ? selected
                              : bounds.contains(pointer_) ? hover : row);
     stroke(out, bounds, chosen ? accent : border);
+    if (chosen)
+      fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent);
     const auto clip = intersection(bounds, layout.contact_rows);
     if (!clip) continue;
     text(out, {bounds.x + 8.f * s, bounds.y + 5.f * s, bounds.width - 16.f * s,
@@ -633,6 +633,7 @@ void NativeDiplomacyWorkspace::render(
   // Transmission stage: portrait for identified contacts, signal arcs otherwise.
   fill(out, layout.stage, inset);
   stroke(out, layout.stage, border);
+  fill(out, {layout.stage.x, layout.stage.y, 3.f, layout.stage.height}, accent);
   text(out,
        {layout.stage.x + 10.f * s, layout.stage.y + 6.f * s,
         layout.stage.width - 20.f * s, 20.f * s},
@@ -695,7 +696,7 @@ void NativeDiplomacyWorkspace::render(
   text(out,
        {layout.stage_caption.x + 10.f * s, layout.stage_caption.y + 8.f * s,
         layout.stage_caption.width - 20.f * s, 22.f * s},
-       sel.political_status,
+       sel.political_status == "AtWar" ? "At war" : sel.political_status,
        sel.political_status == "AtWar" || sel.political_status == "Hostile"
            ? danger
            : bright,
@@ -715,6 +716,8 @@ void NativeDiplomacyWorkspace::render(
   // Relationship meters and actions.
   fill(out, layout.meter_panel, inset);
   stroke(out, layout.meter_panel, border);
+  fill(out, {layout.meter_panel.x, layout.meter_panel.y, 3.f,
+             layout.meter_panel.height}, accent);
   text(out,
        {layout.meter_panel.x + 8.f * s, layout.meter_panel.y + 8.f * s,
         layout.meter_panel.width - 16.f * s, 20.f * s},
@@ -723,9 +726,11 @@ void NativeDiplomacyWorkspace::render(
       {"TRUST", sel.trust},         {"RESPECT", sel.respect},
       {"FEAR", sel.fear},           {"HOSTILITY", sel.hostility},
       {"COOPERATION", sel.cooperation}};
-  const Color meter_colors[] = {{120, 197, 165, 255}, {119, 185, 211, 255},
-                                {217, 182, 119, 255}, {214, 124, 114, 255},
-                                {167, 150, 206, 255}};
+  const Color meter_colors[] = {native_ui::color::diplomacy,
+                                native_ui::color::selected,
+                                native_ui::color::caution,
+                                native_ui::color::danger,
+                                native_ui::color::science};
   for (std::size_t index = 0; index < 5; ++index) {
     const auto y = layout.meters.y + static_cast<float>(index) * 30.f * s;
     text(out, {layout.meters.x, y, layout.meters.width * .62f, 18.f * s},
@@ -742,7 +747,8 @@ void NativeDiplomacyWorkspace::render(
          TextAlign::Right);
     const UiRect bar{layout.meters.x, y + 20.f * s, layout.meters.width,
                      8.f * s};
-    fill(out, bar, {24, 39, 51, 255});
+    fill(out, bar, native_ui::color::canvas);
+    stroke(out, bar, native_ui::color::keyline);
     if (value)
       fill(out, {bar.x, bar.y,
                  bar.width * static_cast<float>(std::clamp(*value, 0., 1.)),
@@ -752,10 +758,9 @@ void NativeDiplomacyWorkspace::render(
   std::size_t action_index = 0;
   const auto draw_action = [&](const char *label, bool danger_button) {
     const auto bounds = action_button(layout, action_index++);
-    fill(out, bounds, bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, danger_button ? danger : border);
-    text(out, bounds, label, danger_button ? danger : bright,
-         layout.body_font_pixels, TextAlign::Center);
+    native_ui::button(out, bounds, label, pointer_, layout.body_font_pixels,
+                      danger_button ? native_ui::Tone::Danger
+                                    : native_ui::Tone::Diplomacy);
   };
   if (sel.present) {
     if (sel.has_visible_communication || sel.can_attempt_communication)
@@ -781,11 +786,9 @@ void NativeDiplomacyWorkspace::render(
   for (std::size_t index = 0; index < std::size(tab_labels); ++index) {
     const auto bounds = tab_button(layout, index);
     const bool active = tab_ == tab_labels[index].first;
-    fill(out, bounds, active ? selected
-                             : bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, border);
-    text(out, bounds, tab_labels[index].second, active ? accent : bright,
-         layout.small_font_pixels, TextAlign::Center);
+    native_ui::button(out, bounds, tab_labels[index].second, pointer_,
+                      layout.small_font_pixels, native_ui::Tone::Diplomacy,
+                      active);
   }
 
   // Detail region.

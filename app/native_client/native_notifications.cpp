@@ -1,4 +1,5 @@
 #include "native_notifications.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -18,28 +19,25 @@ using native_map::Text;
 using native_map::TextAlign;
 using native_map::UiRect;
 
-constexpr Color panel_color{10, 22, 36, 235};
-constexpr Color border_color{116, 174, 225, 255};
-constexpr Color title_color{154, 225, 255, 255};
-constexpr Color muted_color{154, 181, 211, 235};
-constexpr Color message_color{238, 244, 255, 255};
-constexpr Color button_color{14, 30, 48, 255};
-constexpr Color button_hover{24, 46, 70, 255};
+constexpr Color title_color = native_ui::color::text_primary;
+constexpr Color muted_color = native_ui::color::text_secondary;
+constexpr Color message_color = native_ui::color::text_primary;
 
 // Reference NotificationCenter.CategoryColor palette.
 Color category_color(const std::string &category) {
   std::string lowered(category);
   for (auto &c : lowered)
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  if (lowered == "research") return {180, 160, 228, 255};
-  if (lowered == "industry" || lowered == "construction" ||
-      lowered == "economy")
-    return {240, 197, 106, 255};
-  if (lowered == "ships") return {154, 225, 255, 255};
-  if (lowered == "exploration") return {143, 215, 176, 255};
-  if (lowered == "colony") return {143, 229, 177, 255};
-  if (lowered == "combat") return {238, 154, 145, 255};
-  return {154, 225, 255, 255};
+  if (lowered == "research") return native_ui::color::science;
+  if (lowered == "industry" || lowered == "construction")
+    return native_ui::color::construction;
+  if (lowered == "economy") return native_ui::color::economy;
+  if (lowered == "ships") return native_ui::color::selected;
+  if (lowered == "exploration") return native_ui::color::focus;
+  if (lowered == "colony") return native_ui::color::success;
+  if (lowered == "combat") return native_ui::color::danger;
+  if (lowered == "diplomacy") return native_ui::color::diplomacy;
+  return native_ui::color::text_secondary;
 }
 
 std::string upper(std::string value) {
@@ -179,18 +177,15 @@ void NativeNotificationView::render(
   const auto layout = notification_layout_for(items, width, height);
   const auto scale = layout.scale;
   const auto pad = 12.f * scale;
-  fill(out, layout.panel, panel_color);
-  stroke(out, layout.panel, border_color);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Selected);
   text(out, {layout.header.x, layout.header.y + 20.f * scale},
        "RECENT EVENTS", title_color, static_cast<int>(18.f * scale));
-  fill(out, layout.close_button,
-       layout.close_button.contains(pointer_) ? button_hover : button_color);
-  stroke(out, layout.close_button, border_color);
-  text(out,
-       {layout.close_button.x + layout.close_button.width * .5f,
-        layout.close_button.y + layout.close_button.height * .68f},
-       "X", muted_color, static_cast<int>(12.f * scale), 0.f,
-       TextAlign::Center);
+  text(out, {layout.close_button.x - 10.f * scale,
+             layout.header.y + 20.f * scale},
+       std::to_string(items.size()) + " RETAINED", muted_color,
+       static_cast<int>(10.f * scale), 0.f, TextAlign::Right);
+  native_ui::button(out, layout.close_button, "X", pointer_,
+                    static_cast<int>(12.f * scale));
   text(out,
        {layout.panel.x + pad,
         layout.header.y + layout.header.height + 14.f * scale},
@@ -211,12 +206,13 @@ void NativeNotificationView::render(
   for (std::size_t i = 0; i < layout.cards.size() && i < count; ++i) {
     const auto &card = layout.cards[i];
     const auto &item = items[items.size() - 1 - i];
-    fill(out, card, Color{16, 34, 52, 255});
-    stroke(out, card, Color{64, 96, 128, 255});
-    clipped_text(out, {card.x + 8.f * scale, card.y + 14.f * scale},
-                 upper(item.category), category_color(item.category),
-                 static_cast<int>(10.f * scale), card.width - 90.f * scale,
-                 card);
+    const auto tone = category_color(item.category);
+    fill(out, card, native_ui::color::surface_secondary);
+    stroke(out, card, native_ui::color::keyline);
+    fill(out, {card.x, card.y, 3.f, card.height}, tone);
+    clipped_text(out, {card.x + 10.f * scale, card.y + 14.f * scale},
+                 upper(item.category), tone, static_cast<int>(10.f * scale),
+                 card.width - 90.f * scale, card);
     clipped_text(out,
                  {card.x + card.width - 8.f * scale, card.y + 14.f * scale},
                  item.date, muted_color, static_cast<int>(10.f * scale), 0.f,
@@ -227,14 +223,9 @@ void NativeNotificationView::render(
     if (item.diplomatic_contact_id && i < layout.contact_buttons.size() &&
         layout.contact_buttons[i]) {
       const auto &button = *layout.contact_buttons[i];
-      fill(out, button,
-           button.contains(pointer_) ? button_hover : button_color);
-      stroke(out, button, border_color);
-      clipped_text(out,
-                   {button.x + button.width * .5f,
-                    button.y + button.height * .68f},
-                   "OPEN RELATIONS", title_color, static_cast<int>(11.f * scale),
-                   0.f, card, TextAlign::Center);
+      native_ui::button(out, button, "OPEN RELATIONS", pointer_,
+                        static_cast<int>(11.f * scale),
+                        native_ui::Tone::Diplomacy);
     }
   }
   (void)list_bottom;

@@ -1,4 +1,5 @@
 #include "native_startup_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,11 +12,11 @@
 namespace stellar::native_startup_ui {
 namespace {
 using namespace stellar::native_map;
-constexpr Color background{3,9,18,255},panel{8,20,36,252},raised{12,31,54,250};
-constexpr Color hover{24,61,94,252},selected{23,67,102,255};
-constexpr Color border{91,151,205,235},bright{235,244,255,255};
-constexpr Color muted{154,181,211,240},accent{122,230,190,255};
-constexpr Color warning{255,190,112,255};
+constexpr Color background=native_ui::color::canvas,panel=native_ui::color::surface,raised=native_ui::color::surface_secondary;
+constexpr Color hover=native_ui::color::surface_hover,selected=native_ui::color::surface_raised;
+constexpr Color border=native_ui::color::keyline_strong,bright=native_ui::color::text_primary;
+constexpr Color muted=native_ui::color::text_secondary,accent=native_ui::color::success;
+constexpr Color warning=native_ui::color::danger;
 constexpr std::array<std::string_view,5> loading_tips{
   "Tip: Space pauses or resumes time.",
   "Tip: Use the navigation rail to open research, construction, fleets, and relations.",

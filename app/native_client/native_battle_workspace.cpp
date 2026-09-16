@@ -1,4 +1,5 @@
 #include "native_battle_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,18 +17,18 @@ constexpr float minimum_zoom = .18f, maximum_zoom = 7.f;
 constexpr float selection_radius = 28.f;
 
 // Reference palette (VisualPalette).
-constexpr Color panel{7, 17, 32, 245};
-constexpr Color button_color{12, 31, 54, 245};
-constexpr Color hover_color{24, 61, 94, 250};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color text_primary{235, 244, 255, 255};
-constexpr Color text_secondary{151, 180, 207, 245};
-constexpr Color success{94, 229, 157, 255};
-constexpr Color unknown{124, 152, 176, 255};
-constexpr Color danger{255, 107, 96, 255};
-constexpr Color caution{245, 177, 82, 255};
-constexpr Color focus{102, 178, 255, 255};
-constexpr Color selected_color{245, 221, 114, 255};
+constexpr Color panel = native_ui::color::surface;
+constexpr Color button_color = native_ui::color::surface_secondary;
+constexpr Color hover_color = native_ui::color::surface_hover;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color text_primary = native_ui::color::text_primary;
+constexpr Color text_secondary = native_ui::color::text_secondary;
+constexpr Color success = native_ui::color::success;
+constexpr Color unknown = native_ui::color::unknown;
+constexpr Color danger = native_ui::color::danger;
+constexpr Color caution = native_ui::color::caution;
+constexpr Color focus = native_ui::color::selected;
+constexpr Color selected_color = native_ui::color::caution;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});

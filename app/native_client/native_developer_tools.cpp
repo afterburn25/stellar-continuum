@@ -1,4 +1,5 @@
 #include "native_developer_tools.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -18,13 +19,16 @@ using native_map::Text;
 using native_map::TextAlign;
 using native_map::UiRect;
 
-constexpr Color panel_color{10, 16, 28, 242}, border_color{59, 83, 118, 255};
-constexpr Color tile_color{17, 27, 47, 240}, title_color{233, 242, 252, 255};
-constexpr Color muted_color{148, 163, 184, 255},
-    accent_color{126, 231, 200, 255};
-constexpr Color gold_color{245, 197, 106, 255},
-    error_color{239, 172, 146, 255};
-constexpr Color button_color{13, 51, 52, 255}, hover_color{20, 66, 68, 255};
+constexpr Color panel_color = native_ui::color::surface;
+constexpr Color border_color = native_ui::color::keyline_strong;
+constexpr Color tile_color = native_ui::color::surface_secondary;
+constexpr Color title_color = native_ui::color::text_primary;
+constexpr Color muted_color = native_ui::color::text_secondary;
+constexpr Color accent_color = native_ui::color::success;
+constexpr Color gold_color = native_ui::color::caution;
+constexpr Color error_color = native_ui::color::danger;
+constexpr Color button_color = native_ui::color::surface_secondary;
+constexpr Color hover_color = native_ui::color::surface_hover;
 
 void fill(DrawList &out, UiRect rect, Color color) {
   out.overlay.emplace_back(FilledRectangle{rect, color});

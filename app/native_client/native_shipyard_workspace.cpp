@@ -1,4 +1,5 @@
 #include "native_shipyard_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,17 +13,16 @@ namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_shipyard;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color warning{255, 190, 112, 255};
-constexpr Color failure{255, 133, 123, 255};
+constexpr Color inset = native_ui::color::surface_opaque;
+constexpr Color row = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color selected = native_ui::color::surface_raised;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color good = native_ui::color::success;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color warning = native_ui::color::caution;
+constexpr Color failure = native_ui::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -86,13 +86,6 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   case FleetRole::Logistics: return "Logistics";
   }
   return "Ship";
-}
-
-[[nodiscard]] float progress_width(double fraction, float width) noexcept {
-  const auto progress = std::isfinite(fraction)
-                            ? std::clamp(fraction, 0., 1.)
-                            : 0.;
-  return width * static_cast<float>(progress);
 }
 
 [[nodiscard]] std::string visible_message(std::string value) {
@@ -359,26 +352,26 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
   last_ship_art_rows_ = 0;
   if (!visible_) return;
   const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
+  native_ui::panel(out, layout.surface, native_ui::Tone::Selected);
   text(out, layout.title, "PLAYER SHIPYARD", bright,
        layout.title_font_pixels, FontFace::Heading);
-  fill(out, layout.close,
-       layout.close.contains(pointer_) ? hover : row);
-  stroke(out, layout.close, border);
-  text(out, {layout.close.x, layout.close.y + 7.f * layout.scale,
-             layout.close.width, layout.close.height - 8.f * layout.scale},
-       "X", bright, layout.body_font_pixels, FontFace::Interface,
-       TextAlign::Center);
+  native_ui::button(out, layout.close, "X", pointer_,
+                    layout.body_font_pixels);
 
   const auto section = [&](UiRect bounds, std::string heading) {
     fill(out, bounds, inset);
     stroke(out, bounds, border);
-    text(out, {bounds.x + 8.f * layout.scale,
+    fill(out, {bounds.x, bounds.y, 3.f, bounds.height},
+         native_ui::color::selected);
+    text(out, {bounds.x + 10.f * layout.scale,
                bounds.y + 6.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 20.f * layout.scale},
-         std::move(heading), muted, layout.small_font_pixels,
-         FontFace::Heading);
+               bounds.width - 20.f * layout.scale, 20.f * layout.scale},
+         std::move(heading), native_ui::color::selected,
+         layout.small_font_pixels, FontFace::Heading);
+    fill(out, {bounds.x + 10.f * layout.scale,
+               bounds.y + 25.f * layout.scale,
+               bounds.width - 20.f * layout.scale, 1.f},
+         native_ui::color::keyline);
   };
   section(layout.designs, "KNOWN DESIGNS");
   section(layout.design_details, "DESIGN DETAILS");
@@ -405,10 +398,11 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                           design_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, design_rows);
       if (!clipped) continue;
+      const bool is_selected = selected_design_id_ == design.id;
       fill(out, *clipped,
-           selected_design_id_ == design.id
-               ? selected
-               : clipped->contains(pointer_) ? hover : row);
+           is_selected ? selected : clipped->contains(pointer_) ? hover : row);
+      if (is_selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height}, good);
       float text_left = bounds.x + 8.f * layout.scale;
       float text_width = bounds.width - 16.f * layout.scale;
       if (ship_art) {
@@ -504,10 +498,11 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);
       if (!clipped) continue;
+      const bool is_selected = selected_order_id_ == order_value.order_id;
       fill(out, *clipped,
-           selected_order_id_ == order_value.order_id
-               ? selected
-               : clipped->contains(pointer_) ? hover : row);
+           is_selected ? selected : clipped->contains(pointer_) ? hover : row);
+      if (is_selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height}, good);
       if (const auto line = intersection(
               *clipped,
               {bounds.x + 8.f * layout.scale,
@@ -544,15 +539,10 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
                          bounds.y + 62.f * layout.scale,
                          bounds.width - 16.f * layout.scale,
                          3.f * layout.scale};
-      if (const auto clipped_track = intersection(track, order_rows)) {
-        fill(out, *clipped_track, {23, 45, 67, 255});
-        const UiRect completed{
-            track.x, track.y,
-            progress_width(order_value.progress_fraction, track.width),
-            track.height};
-        if (const auto clipped_completed = intersection(completed, order_rows))
-          fill(out, *clipped_completed, good);
-      }
+      if (const auto clipped_track = intersection(track, order_rows))
+        native_ui::progress(out, *clipped_track,
+                            order_value.progress_fraction,
+                            native_ui::Tone::Selected);
     }
   }
 
@@ -611,15 +601,11 @@ void NativeShipyardWorkspace::render(DrawList &out, int width,
     if (!action_enabled) action_text = "BUILD UNAVAILABLE";
   }
   if (!action_text.empty()) {
-    fill(out, layout.action,
-         action_enabled && layout.action.contains(pointer_) ? hover : row);
-    stroke(out, layout.action, action_enabled ? good : border);
-    text(out, {layout.action.x + 8.f * layout.scale,
-               layout.action.y + 10.f * layout.scale,
-               layout.action.width - 16.f * layout.scale,
-               layout.action.height - 12.f * layout.scale},
-         std::move(action_text), action_enabled ? bright : muted,
-         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
+    native_ui::button(out, layout.action, std::move(action_text), pointer_,
+                      layout.body_font_pixels,
+                      selected_order_id_ ? native_ui::Tone::Danger
+                                         : native_ui::Tone::Selected,
+                      false, action_enabled);
   }
 }
 

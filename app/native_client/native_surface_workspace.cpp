@@ -1,4 +1,5 @@
 #include "native_surface_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/surface_construction.hpp>
 
@@ -18,15 +19,14 @@ using namespace stellar::native_map;
 using stellar::core::surface_area_half_size;
 using stellar::core::surface_hub_radius;
 
-constexpr Color panel{6, 16, 29, 252};
-constexpr Color inset{8, 24, 40, 250};
-constexpr Color row{12, 35, 57, 250};
-constexpr Color hover{22, 65, 92, 252};
-constexpr Color border{82, 148, 195, 245};
-constexpr Color text_color{235, 244, 255, 255};
-constexpr Color muted{151, 180, 207, 245};
-constexpr Color good{94, 229, 157, 255};
-constexpr Color warning{245, 177, 82, 255};
+constexpr Color inset = native_ui::color::surface_opaque;
+constexpr Color row = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color text_color = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color good = native_ui::color::success;
+constexpr Color warning = native_ui::color::caution;
 constexpr float palette_pitch = 78.f;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
@@ -103,11 +103,6 @@ void clipped_text(DrawList &out, UiRect bounds, UiRect clip,
   std::ostringstream out;
   out << std::fixed << std::setprecision(precision) << value;
   return out.str();
-}
-[[nodiscard]] float safe_progress(double value, float width) noexcept {
-  return static_cast<float>(std::isfinite(value) ? std::clamp(value, 0., 1.)
-                                                 : 0.) *
-         width;
 }
 } // namespace
 
@@ -575,18 +570,17 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   if (!visible_ || !view_) return;
   const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
   const auto &view = *view_;
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
-  fill(out, layout.back, layout.back.contains(pointer_) ? hover : row);
-  stroke(out, layout.back, border);
-  text(out, layout.back, "BACK", text_color, layout.small_font,
-       TextAlign::Center);
+  native_ui::panel(out, layout.surface, native_ui::Tone::Construction);
+  native_ui::button(out, layout.back, "BACK", pointer_, layout.small_font,
+                    native_ui::Tone::Selected);
   text(out, layout.title,
        view.colony_name + "  /  OPERATIONAL SURFACE", text_color,
        layout.heading_font);
 
   fill(out, layout.palette, inset);
   stroke(out, layout.palette, border);
+  fill(out, {layout.palette.x, layout.palette.y, 3.f,
+             layout.palette.height}, native_ui::color::construction);
   text(out, {layout.palette.x + 10.f * layout.scale,
              layout.palette.y + 9.f * layout.scale,
              layout.palette.width - 20.f * layout.scale, 24.f * layout.scale},
@@ -605,6 +599,8 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                           *selected_type_id_ == option.type_id;
     fill(out, *visible, selected ? hover : row);
     stroke(out, *visible, selected ? good : border);
+    if (selected)
+      fill(out, {visible->x, visible->y, 3.f, visible->height}, good);
     clipped_text(out, {original.x + 8.f * layout.scale,
                        original.y + 7.f * layout.scale,
                        original.width - 16.f * layout.scale,
@@ -733,11 +729,8 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
       const UiRect bar{bounds.x, bounds.y + bounds.height - 4.f,
                        bounds.width, 3.f};
       if (const auto track = intersection(bar, layout.terrain))
-        fill(out, *track, {22, 31, 39, 255});
-      if (const auto progress = intersection(
-              {bar.x, bar.y, safe_progress(site->progress_fraction, bar.width),
-               bar.height}, layout.terrain))
-        fill(out, *progress, good);
+        native_ui::progress(out, *track, site->progress_fraction,
+                            native_ui::Tone::Construction);
     }
   }
   if (selected_type_id_ && placement_quote_) {
@@ -771,6 +764,8 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
 
   fill(out, layout.inspector, inset);
   stroke(out, layout.inspector, border);
+  fill(out, {layout.inspector.x, layout.inspector.y, 3.f,
+             layout.inspector.height}, native_ui::color::construction);
   const auto ix = layout.inspector.x + 10.f * layout.scale;
   auto iy = layout.inspector.y + 10.f * layout.scale;
   const auto iw = layout.inspector.width - 20.f * layout.scale;
@@ -804,12 +799,10 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
         add(placement_quote_->message,
             placement_quote_->accepted ? good : warning,
             layout.small_font, 56.f);
-      fill(out, layout.rotate,
-           layout.rotate.contains(pointer_) ? hover : row);
-      stroke(out, layout.rotate, border);
-      text(out, layout.rotate,
-           "ROTATE  " + number(rotation_degrees_, 0) + " deg", text_color,
-           layout.small_font, TextAlign::Center);
+      native_ui::button(
+          out, layout.rotate,
+          "ROTATE  " + number(rotation_degrees_, 0) + " deg", pointer_,
+          layout.small_font, native_ui::Tone::Construction);
     }
   } else if (selected_building_id_) {
     const auto site = std::ranges::find(view.construction_sites,
@@ -856,13 +849,9 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
             muted, layout.small_font, 44.f);
       const auto action = [&](const stellar::native_map::UiRect &rect,
                               std::string_view label, const bool enabled) {
-        fill(out, rect,
-             !enabled ? inset
-                      : rect.contains(pointer_) ? hover : row);
-        stroke(out, rect, enabled ? border : inset);
-        text(out, rect, std::string(label),
-             enabled ? text_color : muted, layout.small_font,
-             TextAlign::Center);
+        native_ui::button(out, rect, std::string(label), pointer_,
+                          layout.small_font, native_ui::Tone::Construction,
+                          false, enabled);
       };
       if (site->can_upgrade)
         action(layout.upgrade,
@@ -878,12 +867,10 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
              site->enabled ? "SHUT DOWN" : "RESTART", true);
       action(layout.priority,
              site->prioritized ? "NORMAL PRIORITY" : "PRIORITIZE", true);
-      fill(out, layout.remove,
-           layout.remove.contains(pointer_) ? hover : row);
-      stroke(out, layout.remove, warning);
-      text(out, layout.remove,
-           site->complete ? "REVIEW DEMOLITION" : "REVIEW CANCELLATION",
-           text_color, layout.small_font, TextAlign::Center);
+      native_ui::button(
+          out, layout.remove,
+          site->complete ? "REVIEW DEMOLITION" : "REVIEW CANCELLATION",
+          pointer_, layout.small_font, native_ui::Tone::Danger);
     }
   } else {
     add("Choose a building or select an existing site.", muted,
@@ -908,16 +895,10 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
             muted, layout.small_font, 44.f);
       if (view.hub_upgrade_available &&
           view.hub_upgrade_days_remaining <= 0.) {
-        fill(out, layout.hub_upgrade,
-             !view.can_afford_hub_upgrade
-                 ? inset
-                 : layout.hub_upgrade.contains(pointer_) ? hover : row);
-        stroke(out, layout.hub_upgrade,
-               view.can_afford_hub_upgrade ? good : inset);
-        text(out, layout.hub_upgrade,
-             "UPGRADE " + view.hub_name,
-             view.can_afford_hub_upgrade ? text_color : muted,
-             layout.small_font, TextAlign::Center);
+        native_ui::button(
+            out, layout.hub_upgrade, "UPGRADE " + view.hub_name, pointer_,
+            layout.small_font, native_ui::Tone::Construction, false,
+            view.can_afford_hub_upgrade);
       }
     }
   }
@@ -930,8 +911,7 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   if (!std::holds_alternative<std::monostate>(confirmation_)) {
     fill(out, {0, 0, static_cast<float>(width), static_cast<float>(height)},
          {0, 0, 0, 168});
-    fill(out, layout.confirmation, panel);
-    stroke(out, layout.confirmation, warning);
+    native_ui::panel(out, layout.confirmation, native_ui::Tone::Caution);
     const auto cx = layout.confirmation.x + 18.f * layout.scale;
     auto cy = layout.confirmation.y + 17.f * layout.scale;
     const auto cw = layout.confirmation.width - 36.f * layout.scale;
@@ -971,23 +951,20 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
       text(out, {cx, cy, cw, 54.f * layout.scale}, removal->message,
            removal->accepted ? good : warning, layout.small_font);
     }
-    fill(out, layout.cancel,
-         layout.cancel.contains(pointer_) ? hover : row);
-    stroke(out, layout.cancel, border);
-    text(out, layout.cancel, "BACK", text_color, layout.small_font,
-         TextAlign::Center);
+    native_ui::button(out, layout.cancel, "BACK", pointer_,
+                      layout.small_font);
     const auto accepted = std::visit(
         [](const auto &value) {
           using T = std::decay_t<decltype(value)>;
           if constexpr (std::is_same_v<T, std::monostate>) return false;
           else return value.accepted;
         }, confirmation_);
-    fill(out, layout.confirm,
-         accepted && layout.confirm.contains(pointer_) ? hover : row);
-    stroke(out, layout.confirm, accepted ? good : muted);
-    text(out, layout.confirm, accepted ? "CONFIRM" : "UNAVAILABLE",
-         accepted ? text_color : muted, layout.small_font,
-         TextAlign::Center);
+    native_ui::button(out, layout.confirm,
+                      accepted ? "CONFIRM" : "UNAVAILABLE", pointer_,
+                      layout.small_font,
+                      accepted ? native_ui::Tone::Success
+                               : native_ui::Tone::Neutral,
+                      false, accepted);
   }
 }
 

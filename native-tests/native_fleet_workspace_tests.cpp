@@ -111,6 +111,14 @@ int main() try {
               row_select.kind == FleetWorkspaceCommandKind::Select &&
               row_select.fleet_id == 10,
           "Fleet outliner click did not emit an owned fleet selection.");
+  (void)workspace.handle(
+      {InputEventType::PointerMove,
+       {layout.list.x + 10.f, layout.list.y + 10.f}},
+      1280, 720, markers, std::nullopt);
+  DrawList hover_draw;
+  workspace.render(hover_draw, 1280, 720, markers);
+  require(has_text(hover_draw, "Select for readiness"),
+          "Fleet hover did not expose contextual guidance.");
 
   auto map_select = workspace.handle(
       {InputEventType::LeftPressed, {305, 300}}, 1280, 720, markers,

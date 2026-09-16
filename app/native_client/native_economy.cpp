@@ -1,4 +1,5 @@
 #include "native_economy.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -33,12 +34,12 @@ using native_map::Text;
 using native_map::TextAlign;
 using native_map::UiRect;
 
-constexpr Color panel_color{10, 16, 28, 242}, border_color{59, 83, 118, 255};
-constexpr Color tile_color{17, 27, 47, 240}, title_color{233, 242, 252, 255};
-constexpr Color muted_color{148, 163, 184, 255}, accent_color{126, 231, 200, 255};
-constexpr Color gold_color{245, 197, 106, 255}, income_color{143, 229, 177, 255};
-constexpr Color cost_color{238, 154, 145, 255}, button_color{13, 51, 52, 255};
-constexpr Color button_active_color{26, 82, 84, 255};
+constexpr Color tile_color = native_ui::color::surface_secondary;
+constexpr Color muted_color = native_ui::color::text_secondary;
+constexpr Color accent_color = native_ui::color::economy;
+constexpr Color gold_color = native_ui::color::economy;
+constexpr Color income_color = native_ui::color::success;
+constexpr Color cost_color = native_ui::color::danger;
 
 void fill(DrawList &out, UiRect rect, Color color) {
   out.overlay.emplace_back(FilledRectangle{rect, color});
@@ -306,18 +307,15 @@ void NativeEconomyPanel::render(DrawList &out, const NativeEconomyView &view,
   const auto layout = economy_layout_for(view, width, height);
   const auto scale = layout.scale;
   const auto pad = 12.f * scale;
-  fill(out, layout.panel, panel_color);
-  stroke(out, layout.panel, border_color);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Economy);
 
   text(out, {layout.header.x, layout.header.y}, "SOVEREIGN TREASURY",
        gold_color, layout.heading_font_pixels);
   text(out, {layout.header.x, layout.header.y + 24.f * scale},
        "Live civilian revenue and operating commitments", muted_color,
        layout.small_font_pixels);
-  fill(out, layout.close_button, button_color);
-  text(out, {layout.close_button.x + 8.f * scale,
-             layout.close_button.y + 4.f * scale},
-       "X", muted_color, layout.body_font_pixels + 1);
+  native_ui::button(out, layout.close_button, "X", {},
+                    layout.body_font_pixels + 1);
 
   if (!view.ready) {
     text(out, {layout.panel.x + pad,
@@ -337,18 +335,25 @@ void NativeEconomyPanel::render(DrawList &out, const NativeEconomyView &view,
     const auto &card = view.cards[i];
     const auto &rect = layout.cards[i];
     fill(out, rect, tile_color);
-    stroke(out, rect, border_color);
-    text(out, {rect.x + 9.f * scale, rect.y + 7.f * scale}, card.label,
+    stroke(out, rect, native_ui::color::keyline);
+    fill(out, {rect.x, rect.y, 3.f, rect.height},
+         card.warning ? cost_color : card_tones[i]);
+    text(out, {rect.x + 10.f * scale, rect.y + 7.f * scale}, card.label,
          muted_color, layout.small_font_pixels - 1);
-    text(out, {rect.x + 9.f * scale, rect.y + 24.f * scale}, card.value,
+    text(out, {rect.x + 10.f * scale, rect.y + 24.f * scale}, card.value,
          card.warning ? cost_color : card_tones[i],
          layout.body_font_pixels + 3);
   }
 
-  text(out, {layout.treasury_status.x, layout.treasury_status.y},
+  fill(out, layout.treasury_status, native_ui::color::surface_secondary);
+  fill(out, {layout.treasury_status.x, layout.treasury_status.y, 3.f,
+             layout.treasury_status.height},
+       view.treasury_healthy ? income_color : cost_color);
+  text(out, {layout.treasury_status.x + 9.f * scale,
+             layout.treasury_status.y + 5.f * scale},
        view.treasury_status,
        view.treasury_healthy ? income_color : cost_color,
-       layout.body_font_pixels, layout.treasury_status.width);
+       layout.body_font_pixels, layout.treasury_status.width - 18.f * scale);
 
   const auto priority_heading_y =
       layout.priority_status.y - 18.f * scale;
@@ -362,12 +367,9 @@ void NativeEconomyPanel::render(DrawList &out, const NativeEconomyView &view,
   for (int i = 0; i < 3; ++i) {
     const auto &rect = layout.priority_buttons[i];
     const bool active = static_cast<int>(view.industry_priority) == i;
-    fill(out, rect, active ? button_active_color : button_color);
-    stroke(out, rect, active ? accent_color : border_color);
-    text(out,
-         {rect.x + rect.width * .5f, rect.y + 8.f * scale},
-         priority_labels[i], active ? accent_color : title_color,
-         layout.small_font_pixels, 0.f, TextAlign::Center);
+    native_ui::button(out, rect, priority_labels[i], {-1.f, -1.f},
+                      layout.small_font_pixels, native_ui::Tone::Economy,
+                      active);
   }
 
   // DAILY CASH FLOW — two stacked groups matching the reference income and
