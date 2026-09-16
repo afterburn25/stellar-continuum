@@ -17,14 +17,26 @@ namespace stellar::core {
 
 // Capture is performed by the simulation owner. The resulting value owns a
 // detached, immutable Player17 DTO; worker jobs cannot borrow the live world.
+// A Developer capture shares the same canonical payload and only carries the
+// envelope markers the developer writer needs.
 class PreparedPlayerCampaignSave final {
 public:
   static PreparedPlayerCampaignSave capture(
       IntegratedAdaptiveCampaignRuntime &, const PlayerCampaignCaptureOptions &);
+  // Source: DeveloperCampaignPersistenceService.Capture — the campaign must
+  // carry developer provenance; the envelope records its ToolsUsed flag.
+  static PreparedPlayerCampaignSave capture_developer(
+      IntegratedAdaptiveCampaignRuntime &, const PlayerCampaignCaptureOptions &);
   [[nodiscard]] const PlayerCampaignPayloadV17Dto &payload() const noexcept;
+  [[nodiscard]] bool is_developer() const noexcept;
+  [[nodiscard]] bool tools_used() const noexcept;
 private:
-  explicit PreparedPlayerCampaignSave(PlayerCampaignPayloadV17Dto);
+  explicit PreparedPlayerCampaignSave(PlayerCampaignPayloadV17Dto,
+                                      bool developer = false,
+                                      bool tools_used = false);
   std::shared_ptr<const PlayerCampaignPayloadV17Dto> payload_;
+  bool developer_{};
+  bool tools_used_{};
 };
 
 void write_prepared_player_campaign(const std::filesystem::path &,
@@ -48,9 +60,12 @@ using PlayerCampaignPreparedWriter = std::function<void(
 // simulation. Call after_frame only with that frame's actual returned result.
 class PlayerCampaignSaveController final {
 public:
+  // developer_mode selects the Developer envelope capture path; the writer
+  // must then be a developer-envelope writer.
   explicit PlayerCampaignSaveController(
       CampaignAutosavePolicy policy = {},
-      PlayerCampaignPreparedWriter writer = write_prepared_player_campaign);
+      PlayerCampaignPreparedWriter writer = write_prepared_player_campaign,
+      bool developer_mode = false);
   ~PlayerCampaignSaveController();
   PlayerCampaignSaveController(const PlayerCampaignSaveController &) = delete;
   PlayerCampaignSaveController &operator=(const PlayerCampaignSaveController &) = delete;
@@ -81,6 +96,9 @@ private:
     bool preserved_backup{};
   };
   void require_owner() const;
+  [[nodiscard]] PreparedPlayerCampaignSave capture_prepared(
+      IntegratedAdaptiveCampaignRuntime &,
+      const PlayerCampaignCaptureOptions &) const;
   PlayerCampaignSaveResult failure(std::exception_ptr, double captured_day,
                                   const std::filesystem::path &, bool) const;
   std::thread::id owner_{std::this_thread::get_id()};
@@ -90,6 +108,7 @@ private:
   std::filesystem::path path_;
   std::uint64_t revision_{};
   bool configured_{};
+  bool developer_mode_{};
   bool preserve_backup_{};
   std::optional<Pending> pending_;
 };

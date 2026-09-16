@@ -2,7 +2,9 @@
 
 #include "native_campaign_calendar.hpp"
 
+#include <stellar/core/adaptive_research_authority.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
+#include <stellar/core/detail/adaptive_research_campaign_state_access.hpp>
 #include <stellar/core/diplomacy_state.hpp>
 
 #include <algorithm>
@@ -76,8 +78,22 @@ struct NativeCampaignSession::Live final {
        const std::filesystem::path &path, std::uint64_t revision,
        bool recovered, PlayerCampaignPreparedWriter writer,
        std::uint64_t cache_generation)
-      : frame(std::move(runtime), std::move(clock), CampaignFramePolicy::Player),
-        saves({}, std::move(writer)) {
+      // std::move only casts; the trailing provenance read still observes the
+      // valid runtime inside the delegated constructor call.
+      : Live(std::move(runtime), std::move(clock), path, revision, recovered,
+             std::move(writer), cache_generation,
+             runtime.world().campaign().developer_provenance.has_value()) {}
+
+  Live(IntegratedAdaptiveCampaignRuntime runtime, StrategicClock clock,
+       const std::filesystem::path &path, std::uint64_t revision,
+       bool recovered, PlayerCampaignPreparedWriter writer,
+       std::uint64_t cache_generation, bool developer)
+      : frame(std::move(runtime), std::move(clock),
+              developer ? CampaignFramePolicy::Developer
+                        : CampaignFramePolicy::Player),
+        saves(developer ? CampaignAutosavePolicy{720., 48.}
+                        : CampaignAutosavePolicy{},
+              std::move(writer), developer) {
     cache = NativeCampaignSession::build_cache(frame, cache_generation);
     saves.configure(path, revision, frame.clock().simulation_days(), recovered);
   }
@@ -261,6 +277,67 @@ bool NativeCampaignSession::load_pending() const {
 bool NativeCampaignSession::exit_ready() const {
   require_owner();
   return exit_ready_;
+}
+bool NativeCampaignSession::developer_mode() const {
+  require_owner();
+  return live_->frame.runtime().world().campaign()
+      .developer_provenance.has_value();
+}
+bool NativeCampaignSession::developer_tools_used() const {
+  require_owner();
+  const auto &provenance =
+      live_->frame.runtime().world().campaign().developer_provenance;
+  return provenance && provenance->tools_used;
+}
+
+DeveloperCommandResult NativeCampaignSession::run_developer_command(
+    const std::string_view command_id, const std::string &saved_at_utc) {
+  require_owner();
+  auto &frame = live_->frame;
+  auto &campaign = frame.runtime().world().campaign();
+  auto result = execute_developer_command(
+      campaign, command_id, [&frame](const double days) {
+        // Source Main.CoreIntegration.AdvanceDeveloperDays: ordinary
+        // simulation steps of at most .25 days through the live runtime.
+        for (auto remaining = days; remaining > 0.;) {
+          const auto step = std::min(.25, remaining);
+          frame.clock().restore(frame.clock().simulation_days() + step);
+          (void)frame.runtime().advance(step,
+                                        frame.clock().simulation_days());
+          remaining -= step;
+        }
+      });
+  if (!result.accepted) return result;
+  if (command_id == "unlock_technology" || command_id == "unlock_research") {
+    auto &research = frame.runtime().research();
+    auto &state = detail::AdaptiveResearchCampaignStateAccess::get_civilization(
+        research, campaign.player_civilization_id);
+    for (const auto capability :
+         {"orbital_industry", "spacecraft_construction",
+          "experimental_interstellar_transit"})
+      (void)research.runtime().authority().add_capability(state, capability);
+  }
+  // The command boundary writes one checkpoint after the entire action.
+  if (!checkpoint_now(saved_at_utc))
+    result.message += " Saving failed; retry Save before switching.";
+  notice_ = {SessionNoticeKind::Status, result.message, 1.};
+  return result;
+}
+
+bool NativeCampaignSession::checkpoint_now(const std::string &saved_at_utc) {
+  require_owner();
+  try {
+    if (!drain_live_save()) return false;
+    const auto result = live_->saves.save_manual(
+        live_->frame.runtime(),
+        {live_->frame.clock().simulation_days(), game_version_,
+         saved_at_utc});
+    publish_save_result(result, "Saved campaign");
+    return result.succeeded;
+  } catch (const std::exception &error) {
+    publish_failure(std::string("Save failed: ") + error.what());
+    return false;
+  }
 }
 
 PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {

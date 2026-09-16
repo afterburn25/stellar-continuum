@@ -42,8 +42,8 @@ void write_developer_save(const fs::path &path, const bool tools_used) {
       std::move(world));
   write_prepared_developer_campaign(
       path,
-      PreparedDeveloperCampaignSave::capture(runtime,
-                                             {1.5, "test", "2026-09-16T00:00:00Z"}),
+      PreparedPlayerCampaignSave::capture_developer(
+          runtime, {1.5, "test", "2026-09-16T00:00:00Z"}),
       false);
 }
 

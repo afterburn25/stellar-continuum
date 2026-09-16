@@ -3,6 +3,7 @@
 #include "native_notifications.hpp"
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/developer_commands.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
@@ -101,6 +102,20 @@ public:
   [[nodiscard]] const SessionNotice &notice() const;
   [[nodiscard]] bool load_pending() const;
   [[nodiscard]] bool exit_ready() const;
+  // Developer sessions carry campaign provenance; it selects the Developer
+  // frame policy, autosave policy and save envelope.
+  [[nodiscard]] bool developer_mode() const;
+  [[nodiscard]] bool developer_tools_used() const;
+
+  // Source: Main.UiRunDeveloperCommand — authorized Developer commands run
+  // through the canonical simulation, then one checkpoint write. The caller
+  // guards the open campaign menu before invoking.
+  [[nodiscard]] stellar::core::DeveloperCommandResult
+  run_developer_command(std::string_view command_id,
+                        const std::string &saved_at_utc);
+  // Reference TryPersistIntegratedCampaign for mode-switch checkpoints: an
+  // immediate capture+write that does not wait for a completed frame.
+  bool checkpoint_now(const std::string &saved_at_utc);
 
   [[nodiscard]] stellar::core::CampaignFrameResult
   advance(double real_delta_seconds, const std::string &saved_at_utc);

@@ -3,6 +3,7 @@
 #include "native_audio_device.hpp"
 #include "native_audio_settings.hpp"
 #include "native_battle_workspace.hpp"
+#include "native_developer_tools.hpp"
 #include "native_notifications.hpp"
 #include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
@@ -48,11 +49,14 @@
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/developer_campaign_save.hpp>
+#include <stellar/core/developer_campaign_session.hpp>
 #include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 
 #include <SDL3/SDL.h>
@@ -97,6 +101,7 @@ using namespace stellar::native_shipyard_ui;
 namespace native_audio = stellar::native_audio;
 namespace native_audio_settings = stellar::native_audio_settings;
 namespace native_battle_ui = stellar::native_battle_ui;
+namespace native_developer = stellar::native_developer;
 namespace native_inspection = stellar::native_inspection;
 namespace native_economy = stellar::native_economy;
 namespace native_logistics = stellar::native_logistics;
@@ -348,6 +353,96 @@ void label(DrawList &out, UiRect bounds, std::string value, Color color,
     research_root,options.save_path,STELLAR_GAME_VERSION);
 }
 
+[[nodiscard]] PlayerCampaignLoadOrigin developer_source_origin(
+    const DeveloperCampaignSource source) noexcept {
+  switch (source) {
+    case DeveloperCampaignSource::RecoveredFromBackup:
+    case DeveloperCampaignSource::ImportedLegacyDemoBackup:
+      return PlayerCampaignLoadOrigin::Backup;
+    default:
+      return PlayerCampaignLoadOrigin::Primary;
+  }
+}
+
+// Source: Main.GameModes UiSwitchToDeveloperMode/UiSwitchToPlayerMode — the
+// target mode loads-or-creates against its own save slot; the caller already
+// checkpointed the outgoing campaign.
+[[nodiscard]] std::unique_ptr<NativeCampaignSession> build_switched_session(
+    const bool to_developer, const std::filesystem::path &research_root,
+    const std::filesystem::path &catalog_path,
+    const std::filesystem::path &player_save_path) {
+  const PlayerCampaignRuntimeFactory make_runtime = [&research_root] {
+    return load_adaptive_research_strategic_runtime(research_root);
+  };
+  if (to_developer) {
+    const auto save_path =
+        developer_save_path_beside(player_save_path);
+    NativeCampaignSessionDependencies dependencies;
+    dependencies.save_writer = write_prepared_developer_campaign;
+    dependencies.loader =
+        [](const std::filesystem::path &path,
+           const PlayerCampaignRuntimeFactory &factory,
+           const std::function<
+               void(const PlayerCampaignRestorationProgress &)>
+               &progress) {
+          auto bootstrap =
+              load_existing_developer_campaign(path, factory, progress);
+          if (!bootstrap.loaded)
+            throw PlayerCampaignLoadError(
+                "No Developer campaign save is available.",
+                std::move(bootstrap.prior_attempts));
+          return LoadedPlayerCampaignV17{
+              std::move(*bootstrap.loaded),
+              developer_source_origin(bootstrap.source),
+              std::move(bootstrap.requested_path),
+              std::move(bootstrap.loaded_path),
+              std::move(bootstrap.prior_attempts)};
+        };
+    const auto catalog = load_nearby_catalog(catalog_path);
+    auto bootstrap = load_or_create_developer_campaign(
+        save_path, playable_demo_seed, catalog,
+        {utc_timestamp(), 250, 6, 1, "terran_baseline"}, make_runtime);
+    if (bootstrap.loaded)
+      return NativeCampaignSession::create_loaded(
+          {std::move(*bootstrap.loaded),
+           developer_source_origin(bootstrap.source),
+           std::move(bootstrap.requested_path),
+           std::move(bootstrap.loaded_path),
+           std::move(bootstrap.prior_attempts)},
+          research_root, save_path, STELLAR_GAME_VERSION,
+          std::move(dependencies));
+    return NativeCampaignSession::create_fresh(
+        IntegratedAdaptiveCampaignRuntime::create_fresh(
+            make_runtime(), std::move(*bootstrap.fresh)),
+        research_root, save_path, STELLAR_GAME_VERSION,
+        std::move(dependencies));
+  }
+  // Player target: load the player slot, or generate a fresh campaign when no
+  // player save exists (reference LoadOrCreate with a wall-clock seed).
+  {
+    std::error_code error{};
+    auto backup = player_save_path;
+    backup += ".bak";
+    if (std::filesystem::is_regular_file(player_save_path, error) ||
+        std::filesystem::is_regular_file(backup, error))
+      return NativeCampaignSession::create_loaded(
+          load_existing_player_campaign_v17(player_save_path,
+                                                  make_runtime),
+          research_root, player_save_path, STELLAR_GAME_VERSION);
+    const auto fallback_seed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    return NativeCampaignSession::create_fresh(
+        IntegratedAdaptiveCampaignRuntime::create_fresh(
+            make_runtime(),
+            seed_persistable_fresh_campaign(
+                fallback_seed, load_nearby_catalog(catalog_path),
+                {utc_timestamp(), 500, 6, 1, "terran_baseline"})),
+        research_root, player_save_path, STELLAR_GAME_VERSION);
+  }
+}
+
 struct GalaxyArtSceneEvidence {
   GalaxyBackdropRenderStats backdrop;
   std::size_t catalog_markers{};
@@ -370,8 +465,10 @@ struct ResearchStamp {
 class NativeCampaign final {
  public:
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,Window &window,int width,int height,
-                 const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer)
+                 const std::filesystem::path &asset_root,SystemTextMeasurer text_measurer,
+                 std::filesystem::path player_save_path={})
       : session_(std::move(session)),
+        player_save_path_(std::move(player_save_path)),
         window_(&window),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
@@ -1851,6 +1948,32 @@ class NativeCampaign final {
   // runs; the outer loop only exits once that save lands.
   void request_new_game(){if(!new_game_requested_){new_game_requested_=true;session_->request_save();}}
   [[nodiscard]] bool new_game_ready()const{return new_game_requested_&&session_->notice().kind==SessionNoticeKind::Saved;}
+  [[nodiscard]] bool developer_mode()const{return session_->developer_mode();}
+  [[nodiscard]] bool developer_tools_used()const{return session_->developer_tools_used();}
+  [[nodiscard]] std::filesystem::path player_save_path()const{
+    // Custom --save-path tests pass the anchor through the constructor; the
+    // default matches default_native_campaign_save_path().
+    return player_save_path_.empty()?default_native_campaign_save_path():player_save_path_;
+  }
+  [[nodiscard]] std::filesystem::path developer_save_path()const{
+    return developer_save_path_beside(player_save_path());
+  }
+  [[nodiscard]] static bool save_slot_exists(const std::filesystem::path &path){
+    std::error_code error{};
+    if(std::filesystem::is_regular_file(path,error))return true;
+    auto backup=path;backup+=".bak";return std::filesystem::is_regular_file(backup,error);
+  }
+  [[nodiscard]] bool developer_save_exists()const{return save_slot_exists(developer_save_path());}
+  [[nodiscard]] bool player_save_exists()const{return save_slot_exists(player_save_path());}
+  // Reference UiSwitchToDeveloperMode/UiSwitchToPlayerMode: the open campaign
+  // checkpoints to its own slot, then the outer loop replaces the session.
+  void request_developer_switch(){if(!mode_switch_requested_&&session_->checkpoint_now(utc_timestamp()))mode_switch_requested_=true;}
+  void request_player_switch(){request_developer_switch();}
+  [[nodiscard]] bool mode_switch_ready()const{return mode_switch_requested_;}
+  void run_developer_command(std::string_view command_id){
+    const auto outcome=session_->run_developer_command(command_id,utc_timestamp());
+    developer_result_=outcome.message;developer_result_accepted_=outcome.accepted;
+  }
   // Mid-session setup cancellation hands the (already saved) session back so
   // the campaign can resume, matching the reference mode-select cancel.
   [[nodiscard]] std::unique_ptr<NativeCampaignSession> release_session(){return std::move(session_);}
@@ -2021,7 +2144,7 @@ class NativeCampaign final {
       else if(!battle_active&&battle_workspace_.visible())battle_workspace_.close();
       if(battle_workspace_.visible()){battle_refresh_elapsed_+=elapsed;if(battle_refresh_elapsed_>=.1){const auto passed=battle_refresh_elapsed_;battle_refresh_elapsed_=0.;battle_workspace_.set_snapshot(session_->frame().tactical_snapshot(),passed);battle_workspace_.set_tactical_speed(session_->frame().tactical_clock().speed_multiplier(),session_->frame().tactical_resume_speed());}}
     }
-    const auto layout=NativeUiLayout::for_viewport(width,height);
+    const auto layout=NativeUiLayout::for_viewport(width,height,session_->developer_mode());
     for(const auto &event:input.events){
       if(battle_workspace_.visible()&&!menu_){
         const auto command=battle_workspace_.handle(event,width,height);
@@ -2114,6 +2237,12 @@ class NativeCampaign final {
           refresh_diplomacy(true);
         }
         if(result.captured)continue;
+      }
+      if(developer_tools_.visible()&&!menu_){
+        const auto command=developer_tools_.handle(event,width,height);
+        if(command.kind==native_developer::DeveloperToolsCommandKind::Run)
+          run_developer_command(command.command_id);
+        if(command.captured)continue;
       }
       if(logistics_view_.visible()&&!menu_){
         const auto &campaign=session_->frame().runtime().world().campaign();
@@ -2218,7 +2347,8 @@ class NativeCampaign final {
       }
 
       if(event.type==InputEventType::EscapePressed){
-        if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
+        if(developer_tools_.visible())developer_tools_.close();
+        else if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else if(surface_workspace_.visible())surface_workspace_.close();
         else if(colony_workspace_.visible())colony_workspace_.close();
@@ -2245,6 +2375,9 @@ class NativeCampaign final {
           case '2':clock.set_speed(StrategicSpeed::Fast);break;
           case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
           case '4':clock.set_speed(StrategicSpeed::Maximum);break;
+          // Reference UiResumeAtSpeed: the Demo rate is Developer-only;
+          // Player mode coerces the request to Normal.
+          case '5':clock.set_speed(session_->developer_mode()?StrategicSpeed::Demo:StrategicSpeed::Normal);break;
           case 't':case 'T':cycle_research_candidate();break;
           case 'r':case 'R':start_research_candidate();break;
           case 'c':case 'C':cycle_construction_candidate();break;
@@ -2335,6 +2468,9 @@ class NativeCampaign final {
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::NewGame)request_new_game();
+        else if(action==UiAction::Developer)request_developer_switch();
+        else if(action==UiAction::PlayerMode)request_player_switch();
+        else if(action==UiAction::DevTools){if(menu_)toggle_menu();developer_tools_.open();}
         else if(action==UiAction::Audio)audio_settings_.open(audio_mixer_.settings());
         else if(action==UiAction::Voice){audio_settings_.close();voice_settings_view_.open(voice_settings_);}
         else if(action==UiAction::Video){audio_settings_.close();voice_settings_view_.close();video_settings_view_.open(video_settings_);}
@@ -2465,7 +2601,7 @@ class NativeCampaign final {
       }
     }
     }
-    const auto layout = NativeUiLayout::for_viewport(width, height);
+    const auto layout = NativeUiLayout::for_viewport(width, height, session_->developer_mode());
     const Color panel{7, 17, 32, 238};
     const Color button{12, 31, 54, 245};
     const Color hover{24, 61, 94, 250};
@@ -2600,11 +2736,30 @@ class NativeCampaign final {
       draw_button(layout.save_button, "SAVE");
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.new_game_button, "NEW GAME");
+      if (layout.developer_menu) {
+        draw_button(layout.dev_tools_button, "DEV TOOLS");
+        draw_button(layout.player_button,
+                    player_save_exists() ? "RESUME PLAYER" : "START PLAYER");
+      } else {
+        draw_button(layout.developer_button,
+                    developer_save_exists() ? "RESUME DEVELOPER"
+                                            : "START DEVELOPER");
+      }
       draw_button(layout.audio_button, "AUDIO");
       draw_button(layout.voice_button, "VOICE");
       draw_button(layout.video_button, "VIDEO");
       draw_button(layout.support_button, "SUPPORT BUNDLE");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
+      // Source CampaignModeLabel: mode + tools marker under the menu buttons.
+      label(out, layout.mode_text,
+            session_->developer_mode()
+                ? (session_->developer_tools_used()
+                       ? "DEVELOPER MODE · TOOLS USED"
+                       : "DEVELOPER MODE · TOOLS UNUSED")
+                : "PLAYER MODE",
+            session_->developer_mode() ? Color{245, 197, 106, 255}
+                                       : Color{126, 231, 200, 255},
+            layout.metric_font_pixels, layout.scale);
       }
     }
     if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
@@ -2638,6 +2793,16 @@ class NativeCampaign final {
                   runtime.world().campaign(),&runtime.research(),
                   last_industry_allocation_),
           width,height);
+    }
+    // Reference DeveloperToolsLayer: floating panel, closes when the campaign
+    // menu opens or the session leaves Developer mode.
+    if(!menu_&&developer_tools_.visible()){
+      if(!session_->developer_mode())developer_tools_.close();
+      else
+        developer_tools_.render(
+            out,{true,session_->developer_tools_used(),developer_result_,
+                 developer_result_accepted_},
+            width,height,&pointer_);
     }
     if(!menu_&&missions_view_.visible()){
       const auto &campaign=session_->frame().runtime().world().campaign();
@@ -3435,10 +3600,12 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();video_settings_view_.close();notification_view_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);audio_settings_.close();voice_settings_view_.close();video_settings_view_.close();notification_view_.close();developer_tools_.close();if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
+  // Reference UiResumeAtSpeed: Demo is reachable only in Developer mode;
+  // Player mode coerces it to Normal and the cycle skips it entirely.
+  void cycle_speed(){auto &clock=session_->frame().clock();const bool dev=session_->developer_mode();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;case StrategicSpeed::Maximum:next=dev?StrategicSpeed::Demo:StrategicSpeed::Normal;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;}
   std::unique_ptr<NativeCampaignSession> session_;
@@ -3668,7 +3835,10 @@ class NativeCampaign final {
   int smoke_settlement_revision_{};double smoke_settlement_before_day_{},smoke_settlement_saved_day_{},smoke_settlement_progress_{},smoke_settlement_authorization_{},smoke_settlement_treasury_before_{},smoke_settlement_treasury_after_{};
   bool smoke_surface_mode_{},smoke_surface_reload_{},smoke_surface_palette_selected_{},smoke_surface_ghost_previewed_{},smoke_surface_placement_cancelled_{},smoke_surface_cancel_no_change_{},smoke_surface_placement_confirmed_{},smoke_surface_removal_previewed_{},smoke_surface_removal_confirmed_{},smoke_surface_refund_exact_{},smoke_surface_persisted_site_{},smoke_surface_managed_{};
   int smoke_surface_system_id_{},smoke_surface_body_id_{},smoke_surface_colony_id_{};std::optional<int> smoke_surface_site_id_;std::string smoke_surface_type_id_;std::size_t smoke_surface_site_count_before_{},smoke_surface_site_count_saved_{};float smoke_surface_x_{},smoke_surface_z_{},smoke_surface_rotation_{};double smoke_surface_authorization_{},smoke_surface_refund_{},smoke_surface_treasury_before_{},smoke_surface_treasury_after_place_{},smoke_surface_treasury_after_refund_{},smoke_surface_treasury_saved_{},smoke_surface_progress_{},smoke_surface_before_day_{},smoke_surface_saved_day_{};
-  bool menu_{};bool new_game_requested_{};bool smoke_save_pending_{};int smoke_audio_settings_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};bool new_game_requested_{};bool mode_switch_requested_{};bool smoke_save_pending_{};int smoke_audio_settings_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  native_developer::NativeDeveloperToolsPanel developer_tools_;
+  std::string developer_result_{};bool developer_result_accepted_{};
+  std::filesystem::path player_save_path_{};
   UiAction hovered_action_{UiAction::None};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
@@ -3714,7 +3884,8 @@ int main(int argc,char **argv){
       session=std::move(result.session);
     }
     NativeCampaign campaign(std::move(session),window,window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);});
+                             [&window](const Text &label){return window.measure_text(label);},
+                             options.save_path);
     campaign.enable_support_log({STELLAR_GAME_VERSION,SDL_GetPlatform(),
                                  window.gpu_driver(),
                                  SDL_GetNumLogicalCPUCores(),
@@ -3778,7 +3949,7 @@ int main(int argc,char **argv){
     }
     const auto startup_ms=std::chrono::duration<double,std::milli>(
         std::chrono::steady_clock::now()-startup_begin).count();
-    auto prior=std::chrono::steady_clock::now();int frames=0;std::vector<double> frame_ms;std::vector<double> cpu_ms;std::vector<double> draw_ms;bool discard_elapsed{};bool new_game=false;
+    auto prior=std::chrono::steady_clock::now();int frames=0;std::vector<double> frame_ms;std::vector<double> cpu_ms;std::vector<double> draw_ms;bool discard_elapsed{};bool new_game=false;bool mode_switch=false;
     while(true){
       const auto now=std::chrono::steady_clock::now();
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
@@ -3788,6 +3959,7 @@ int main(int argc,char **argv){
         discard_elapsed=true;
         if(!campaign.update(input,input.drawable_width,input.drawable_height,0.,false))break;
         if(campaign.new_game_ready()){new_game=true;break;}
+        if(campaign.mode_switch_ready()){mode_switch=true;break;}
         window.set_text_input(campaign.wants_text_input());
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         continue;
@@ -3799,6 +3971,7 @@ int main(int argc,char **argv){
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
                           elapsed))break;
       if(campaign.new_game_ready()){new_game=true;break;}
+      if(campaign.mode_switch_ready()){mode_switch=true;break;}
       if(options.new_game_restart_smoke){
         if(!new_game_restart&&frames==55&&!campaign.send_key('n',input.drawable_width,input.drawable_height))
           throw std::runtime_error("New Game restart smoke key input closed the campaign.");
@@ -3958,6 +4131,28 @@ int main(int argc,char **argv){
         std::cout<<'\n';
         break;
       }
+    }
+    if(mode_switch){
+      // Source UiSwitchToDeveloperMode/UiSwitchToPlayerMode: the outgoing
+      // campaign already checkpointed; the target loads-or-creates against
+      // its own slot, resumes at its mode speed, then checkpoints itself.
+      const bool to_developer=!campaign.developer_mode();
+      const auto player_path=campaign.player_save_path();
+      auto previous=campaign.release_session();
+      try{
+        auto next=build_switched_session(
+            to_developer,startup_config.host.research_root,
+            startup_config.host.catalog_path,player_path);
+        next->frame().clock().set_speed(to_developer?StrategicSpeed::Demo
+                                                    :StrategicSpeed::Normal);
+        (void)next->checkpoint_now(utc_timestamp());
+        session=std::move(next);
+      }catch(const std::exception &error){
+        std::cerr<<"Stellar Continuum native client: mode switch failed: "
+                 <<error.what()<<'\n';
+        session=std::move(previous);
+      }
+      continue;
     }
     if(!new_game)return 0;
     // Reference RequestNewCampaign: the previous campaign is saved (gated

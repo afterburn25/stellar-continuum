@@ -120,15 +120,58 @@ void verify(int width, int height, float expected_scale) {
           "Outside point activated the menu.");
 }
 
+void verify_developer_menu(int width, int height) {
+  const auto layout = NativeUiLayout::for_viewport(width, height, true);
+  const std::array<std::pair<UiRect, UiAction>, 11> menu{{
+      {layout.continue_button, UiAction::Continue},
+      {layout.dev_tools_button, UiAction::DevTools},
+      {layout.save_button, UiAction::Save},
+      {layout.load_button, UiAction::Load},
+      {layout.new_game_button, UiAction::NewGame},
+      {layout.player_button, UiAction::PlayerMode},
+      {layout.audio_button, UiAction::Audio},
+      {layout.voice_button, UiAction::Voice},
+      {layout.video_button, UiAction::Video},
+      {layout.support_button, UiAction::Support},
+      {layout.exit_button, UiAction::Exit},
+  }};
+  for (std::size_t index = 0; index < menu.size(); ++index) {
+    const auto [bounds, action] = menu[index];
+    require(contains_rect(layout.menu_panel, bounds),
+            "A Developer menu button escaped the panel.");
+    if (index > 0) {
+      require(!overlaps(menu[index - 1].first, bounds),
+              "Adjacent Developer menu buttons overlap.");
+    }
+    for (const auto point : interior_points(bounds)) {
+      require(layout.hit(point, true) == action,
+              "A point inside a Developer menu button missed its action.");
+      require(layout.hit(point, false) == UiAction::None,
+              "Closed Developer menu accepted a hidden button.");
+    }
+  }
+  // The player-mode menu must never route a click to the Developer
+  // controls, even inside the shared mode-button slot.
+  const auto player_layout = NativeUiLayout::for_viewport(width, height);
+  for (const auto point : interior_points(layout.dev_tools_button)) {
+    require(player_layout.hit(point, true) != UiAction::DevTools,
+            "Player menu leaked the Developer tools action.");
+    require(player_layout.hit(point, true) != UiAction::PlayerMode,
+            "Player menu leaked the mode-switch action.");
+  }
+}
+
 } // namespace
 
 int main() try {
-  verify(640, 360, .624f);
+  verify(640, 360, .547f);
   verify(1280, 720, 1.f);
   verify(1920, 1080, 1.2f);
   verify(1280, 1080, 1.2f);
   verify(2560, 1440, 1.6f);
   verify(3840, 2160, 2.4f);
+  verify_developer_menu(1280, 720);
+  verify_developer_menu(2560, 1440);
   std::cout << "Native UI 720p through 4K scaling, containment and full hit "
                "tests passed\n";
   return 0;

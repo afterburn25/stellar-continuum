@@ -153,6 +153,16 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
     "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/native-session-cases")
   set_tests_properties(native_campaign_session PROPERTIES TIMEOUT 180)
+
+  add_executable(stellar_native_developer_session_tests
+    native-tests/native_developer_session_tests.cpp app/native_client/native_campaign_session.cpp
+    app/native_client/native_notifications.cpp)
+  target_include_directories(stellar_native_developer_session_tests PRIVATE app/native_client engine/include)
+  target_link_libraries(stellar_native_developer_session_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
+  add_test(NAME native_developer_session COMMAND stellar_native_developer_session_tests
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json"
+    "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/native-session-cases")
+  set_tests_properties(native_developer_session PROPERTIES TIMEOUT 180)
 endif()
 if(MSVC)
   target_compile_options(stellar_native_platform PRIVATE /WX)
@@ -226,6 +236,7 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_audio.cpp
   app/native_client/native_audio_device.cpp
   app/native_client/native_audio_settings.cpp
+  app/native_client/native_developer_tools.cpp
   app/native_client/native_inspection.cpp
   app/native_client/native_economy.cpp
   app/native_client/native_logistics.cpp

@@ -21,6 +21,9 @@ inline constexpr std::string_view developer_save_file_name =
     "developer-autosave.json";
 inline constexpr std::string_view legacy_demo_save_file_name =
     "demo-autosave.json";
+// Source: PlayableDemoScenario.Seed — the repeatable human Earth/Sol demo
+// world used when no Developer or legacy demo save exists.
+inline constexpr std::int64_t playable_demo_seed = 20260908;
 
 enum class DeveloperCampaignSource {
   Created,
