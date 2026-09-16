@@ -12,7 +12,7 @@ from native_fleet_runtime import validate_native_fleet_export
 class NativeFleetExportTests(unittest.TestCase):
     def exercise(self, *, wrong_owner=False, unchanged=False, zero_advance=False,
                  mutate_load=False, skipped_save=False, already_routed=False,
-                 frozen_time=False, switched_player=False):
+                 frozen_time=False, switched_player=False, no_hover=False):
         with tempfile.TemporaryDirectory(prefix="stellar-fleet-export-test-") as temporary:
             root = Path(temporary)
             package = root / "package"
@@ -64,10 +64,12 @@ class NativeFleetExportTests(unittest.TestCase):
                 capture.write_bytes(b"BM" + bytes(54))
                 calls.append(args)
                 marker = "preserved" if skipped_save and replay else "ok"
+                hover = (":hover=1:inspect=1:civilian=1:overview=1:missions=1:2:sites=1:1"
+                         if not no_hover else "")
                 return subprocess.CompletedProcess(
                     args, 0,
                     "gpu_driver=vulkan systems=20 save=" + marker +
-                    " fleet=4:13:3:0.250000", "")
+                    " fleet=4:13:3:0.250000" + hover, "")
 
             with mock.patch("native_fleet_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_fleet_export(package, {}, fixture)
@@ -92,6 +94,10 @@ class NativeFleetExportTests(unittest.TestCase):
     def test_zero_transit_advancement_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "positive real transit advancement"):
             self.exercise(zero_advance=True)
+
+    def test_missing_hover_preview_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "hover preview"):
+            self.exercise(no_hover=True)
 
     def test_loaded_treasury_mutation_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "changed during paused load"):

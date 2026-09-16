@@ -102,6 +102,13 @@ std::string signature(const NativeColonyView &view) {
   append(out, view.required_habitat_systems);
   append(out, view.building_capacity);
   append(out, view.surface_hub_level);
+  append(out, view.hub_name);
+  append(out, view.hub_upgrade_available);
+  append(out, view.can_afford_hub_upgrade);
+  append(out, view.hub_upgrade_credit_budget_units);
+  append(out, view.hub_upgrade_industry_cost);
+  append(out, view.hub_upgrade_lock_reason);
+  append(out, view.hub_upgrade_days_remaining);
   append(out, view.habitat_support_reduction);
   append(out, view.environmental_wear_multiplier);
   append(out, view.power_supply);
@@ -153,6 +160,15 @@ std::string signature(const NativeColonyView &view) {
     append(out, site.remaining_construction_materials);
     append(out, site.pending_upgrade_type_id.value_or(""));
     append(out, site.upgrade_days_remaining);
+    append(out, site.can_upgrade);
+    append(out, site.upgrade_name);
+    append(out, site.upgrade_credit_budget_units);
+    append(out, site.upgrade_industry_cost);
+    append(out, site.can_afford_upgrade);
+    append(out, site.upgrade_lock_reason);
+    append(out, site.repair_industry_cost);
+    append(out, site.can_afford_repair);
+    append(out, site.essential_service);
   }
   for (const auto &option : view.available_buildings) {
     append(out, option.type_id);
@@ -250,6 +266,7 @@ NativeColonyViewResult NativeColonyController::build(
   view.population_species_id = colony->population_species_id;
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   view.solid_surface = shown_body->details && shown_body->details->has_solid_surface;
+  view.surface_visual_class = shown_body->visual_class;
   view.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);
   view.treasury_budget_units = current.economy.credits;
@@ -318,11 +335,54 @@ NativeColonyViewResult NativeColonyController::build(
                                   output.powered_building_ids.end());
   std::unordered_set<int> staffed(output.staffed_building_ids.begin(),
                                   output.staffed_building_ids.end());
+  bool is_capital_hub = false;
+  if (colony->kind == SettlementKind::Colony &&
+      colony->system_id == current.player.home_system_id) {
+    const Colony *capital = nullptr;
+    for (const auto &candidate : current.world.colonies)
+      if (candidate.civilization_id == current.player.id &&
+          candidate.kind == SettlementKind::Colony &&
+          candidate.system_id == current.player.home_system_id &&
+          (!capital || candidate.population_millions >
+                           capital->population_millions))
+        capital = &candidate;
+    is_capital_hub = capital && capital->id == colony->id;
+  }
+  view.hub_name = view.resource_outpost ? "Sealed outpost hub"
+                  : is_capital_hub    ? "Planetary hub"
+                                      : "Command center";
+  const auto hub_upgrade =
+      surface_hub_upgrade_cost(current.construction, *colony);
+  const auto hub_lock =
+      hub_upgrade ? surface_hub_upgrade_lock_reason(current.construction,
+                                                    current.player.id, *colony)
+                  : std::nullopt;
+  view.hub_upgrade_available = hub_upgrade.has_value();
+  view.hub_upgrade_credit_budget_units =
+      hub_upgrade ? hub_upgrade->credit_cost : 0.;
+  view.hub_upgrade_industry_cost =
+      hub_upgrade ? hub_upgrade->industry_cost : 0.;
+  view.hub_upgrade_lock_reason = hub_lock.value_or("");
+  view.can_afford_hub_upgrade =
+      hub_upgrade && !hub_lock &&
+      current.economy.credits + .0001 >= hub_upgrade->credit_cost &&
+      current.economy.industry + .0001 >= hub_upgrade->industry_cost;
+  view.hub_upgrade_days_remaining =
+      colony->surface_hub_upgrade_days_remaining;
   for (const auto &building : colony->surface_buildings) {
     const auto *definition = find_surface_building(building.type_id);
     if (!definition)
       throw std::runtime_error("An owned colony has an unknown surface building.");
     const auto stage = surface_construction_stage(building);
+    const auto *upgrade =
+        definition->upgrade_type_id
+            ? find_surface_building(*definition->upgrade_type_id)
+            : nullptr;
+    const auto upgrade_authorization = surface_upgrade_authorization_cost(
+        current.construction, *colony, *definition);
+    const auto upgrade_lock = surface_building_upgrade_lock_reason(
+        current.construction, current.player.id, *definition);
+    const auto repair_cost = surface_repair_industry_cost(building);
     view.construction_sites.push_back(
         {.building_id = building.id,
          .type_id = building.type_id,
@@ -351,7 +411,23 @@ NativeColonyViewResult NativeColonyController::build(
          .construction_stage_progress = stage.phase_progress,
          .remaining_construction_materials = stage.remaining_materials,
          .pending_upgrade_type_id = building.pending_upgrade_type_id,
-         .upgrade_days_remaining = building.upgrade_days_remaining});
+         .upgrade_days_remaining = building.upgrade_days_remaining,
+         .can_upgrade = building.is_complete && upgrade &&
+                        !building.pending_upgrade_type_id,
+         .upgrade_name = upgrade ? upgrade->name : "",
+         .upgrade_credit_budget_units = upgrade_authorization,
+         .upgrade_industry_cost = definition->upgrade_industry_cost,
+         .can_afford_upgrade =
+             building.is_complete && upgrade &&
+             current.economy.credits + .0001 >= upgrade_authorization &&
+             current.economy.industry + .0001 >=
+                 definition->upgrade_industry_cost,
+         .upgrade_lock_reason = upgrade_lock.value_or(""),
+         .repair_industry_cost = repair_cost,
+         .can_afford_repair =
+             current.economy.industry + .0001 >= repair_cost,
+         .essential_service =
+             surface_essential_service_priority(building.type_id) > 0});
   }
   std::ranges::sort(view.construction_sites, {}, &NativeSurfaceSite::building_id);
   for (const auto &definition : surface_building_catalog()) {

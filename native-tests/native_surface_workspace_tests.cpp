@@ -182,6 +182,75 @@ void site_removal_and_refresh() {
           "refresh retained a removed site or stale quote");
 }
 
+void building_actions() {
+  auto view = colony();
+  auto &site = view.construction_sites.front();
+  site.complete = true;
+  site.enabled = true;
+  site.condition = .6;
+  site.can_upgrade = true;
+  site.upgrade_name = "Advanced Fabricator";
+  site.upgrade_credit_budget_units = 42.;
+  site.upgrade_industry_cost = 210.;
+  site.can_afford_upgrade = true;
+  site.repair_industry_cost = 24.;
+  site.can_afford_repair = true;
+  view.hub_name = "Command center";
+  view.hub_upgrade_available = true;
+  view.can_afford_hub_upgrade = true;
+  NativeSurfaceWorkspace workspace;
+  workspace.open(view, 1280, 720);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
+  auto point = workspace.viewport().world_to_screen(90., 70., layout.terrain);
+  point.x += 11.f;
+  point.y += 11.f;
+  (void)workspace.handle({InputEventType::LeftPressed, point}, 1280, 720);
+  (void)workspace.handle({InputEventType::LeftReleased, point}, 1280, 720);
+  require(workspace.selected_building_id() == std::optional<int>{9},
+          "action fixture site was not selected");
+  const auto press = [&](UiRect rect) {
+    return workspace.handle({InputEventType::LeftPressed, center(rect)}, 1280,
+                            720);
+  };
+  require(press(layout.upgrade).kind ==
+              SurfaceWorkspaceCommandKind::UpgradeBuilding,
+          "UPGRADE did not emit an upgrade order");
+  require(press(layout.repair).kind ==
+              SurfaceWorkspaceCommandKind::RepairBuilding,
+          "REPAIR did not emit a repair order");
+  const auto shutdown = press(layout.toggle_operation);
+  require(shutdown.kind == SurfaceWorkspaceCommandKind::SetBuildingEnabled &&
+              shutdown.building_id == 9 && !shutdown.flag,
+          "SHUT DOWN did not emit an enabled=false order");
+  const auto prioritize = press(layout.priority);
+  require(prioritize.kind == SurfaceWorkspaceCommandKind::SetBuildingPriority &&
+              prioritize.building_id == 9 && prioritize.flag,
+          "PRIORITIZE did not emit a prioritized=true order");
+  site.can_afford_repair = false;
+  view.revision++;
+  workspace.set_view(view);
+  require(press(layout.repair).kind == SurfaceWorkspaceCommandKind::None,
+          "unaffordable repair emitted an order");
+  site.upgrade_lock_reason = "Requires orbital dockyard.";
+  workspace.set_view(view);
+  require(press(layout.upgrade).kind == SurfaceWorkspaceCommandKind::None,
+          "locked upgrade emitted an order");
+  site.can_afford_repair = true;
+  site.upgrade_lock_reason.clear();
+  workspace.set_view(view);
+  const auto empty = center(layout.terrain);
+  (void)workspace.handle({InputEventType::LeftPressed, empty}, 1280, 720);
+  (void)workspace.handle({InputEventType::LeftReleased, empty}, 1280, 720);
+  require(!workspace.selected_building_id(), "terrain click kept a selection");
+  require(press(layout.hub_upgrade).kind ==
+              SurfaceWorkspaceCommandKind::UpgradeHub,
+          "UPGRADE HUB did not emit a hub order");
+  view.can_afford_hub_upgrade = false;
+  workspace.set_view(view);
+  require(press(layout.hub_upgrade).kind == SurfaceWorkspaceCommandKind::None,
+          "unaffordable hub upgrade emitted an order");
+}
+
 void colony_surface_entry() {
   NativeColonyWorkspace colony_ui;
   colony_ui.open(colony());
@@ -242,6 +311,7 @@ int main() try {
   anchored_camera();
   input_and_confirmation();
   site_removal_and_refresh();
+  building_actions();
   colony_surface_entry();
   palette_clipping();
   pending_ghost_cancellation();

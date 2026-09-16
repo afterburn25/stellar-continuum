@@ -20,7 +20,7 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused",
+    "persisted_site", "paused", "scene_sprites", "managed",
 }
 
 
@@ -60,9 +60,11 @@ def _diagnostic(stdout: str, expected_mode: str):
         _finite(state.get(key), key)
     if state.get("persisted_site") is not True or state.get("paused") is not True:
         raise RuntimeError("Native surface did not prove a persisted paused site")
+    if type(state.get("scene_sprites")) is not int or state["scene_sprites"] < 2:
+        raise RuntimeError("Native surface did not rasterize hub and site sprites")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
-                   "removal_confirmed", "refund_exact")
+                   "removal_confirmed", "refund_exact", "managed")
     if expected_mode == "ordered":
         for key in interaction:
             if state.get(key) is not True:

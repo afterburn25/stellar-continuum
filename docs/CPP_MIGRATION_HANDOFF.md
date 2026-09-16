@@ -1,0 +1,448 @@
+# C++ migration handoff
+
+Concise cross-agent notes. Full milestone history lives in `docs/engine/MIGRATION_STATUS.md`;
+subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
+
+## Active branches
+
+- `engine/stellar-engine-migration` — shared migration branch (head `ac45d958`, engine 0.1.57). Do not push directly; feed via reviewed PRs.
+- `cpp/devin-swe2-native-conversion` — Devin/SWE-2 working branch: diplomacy, territory, orbital, surface, audio, tactical battle, audio-settings, keyboard-parity, notification-feed and support-bundle slices (engine 0.1.58), pending PR into the migration branch.
+- `work/stellar-engine-editor` — separate WPF editor tool (`editor/` only, 2 commits, non-conflicting).
+- `work/voice-engine-tts` — fully merged ancestor of migration head.
+
+## Battle presentation slice (`357872e8`, candidate for review)
+
+- `app/native_client/native_battle_workspace.{hpp,cpp}` — `NativeBattleWorkspace`:
+  full-screen tactical overlay ported from `MassiveCombatView`. Renders only the
+  observer-filtered `MassiveCombatSnapshot` it is handed; owns no battle state.
+  `handle` emits `IssueOrder`, `TogglePause`, `CycleSpeed`, `Fit`, `Menu`;
+  selection, box-select, targeting pick, pan/zoom and the event feed are
+  internal. `project()` is exposed for tests/smoke diagnostics.
+- `CampaignFrame`: `begin_tactical(fleet_id)`, `issue_tactical_order(order)`,
+  `tactical_snapshot()`; `CampaignMassiveCombat` gained the order forward.
+- `NativeFleetWorkspace` details panel: ENGAGE button on armed fleets →
+  `FleetWorkspaceCommand::Engage` → `begin_tactical`.
+- `main.cpp`: the update loop detects `world.active_combat_encounter`, opens
+  the workspace with the player observer id, refreshes it every 0.1 s of real
+  time, routes `BattleWorkspaceCommand`s via `execute_battle`, and renders the
+  battle last so it overlays other workspaces.
+- `NativeCampaignSession`: manual saves are now allowed after tactical frames
+  (`manual_capture_ready_` covers `CampaignFrameRoute::Tactical`), matching the
+  reference which captures mid-battle state directly. Autosave scheduling stays
+  strategic-only inside `PlayerCampaignSaveController::after_frame`.
+- `stellar-continuum-native.exe --battle-smoke <bmp>` (requires `--load` with an
+  active-encounter save): selects the owned formation, issues Hold, resumes the
+  tactical clock, saves mid-battle, prints `battle={formations, own, foreign,
+  redacted, vessels_hidden, own_inexact, selected, tokens, events, salvos,
+  tick, order_accepted}`.
+- `tools/author_battle_save.py` — dev helper authoring a two-front encounter
+  onto the Player17 row (war contact basis + at-war relationship + bound fleets
+  + unengaged foreign picket). `tools/stellar-export/native_battle_runtime.py`
+  carries the same authoring for the sealed validator.
+
+## Candidate-shortcut slice (candidate for review)
+
+- `main.cpp` `KeyPressed` dispatch gains T/R/C/B alongside Space, 1–4 and F6 —
+  T cycles the startable research candidates, R starts the current candidate,
+  C/B do the same for construction projects. Candidate sets come from each
+  controller's `primary_action.enabled`/`start.enabled` projection (view
+  ordering; the reference's plan-ranked ordering is not reproduced) and the
+  construction active-project guard matches the reference wording.
+- `NativeCampaignSession::publish_status` adds `SessionNoticeKind::Status` —
+  the reference `SetStatus` equivalent — used by the shortcut paths for
+  candidate names, acceptances and rejections.
+- `--research-smoke` sends T then R after the canonical button start and emits
+  `shortcut=1` when a status notice surfaced; `--construction-smoke` sends C
+  then B (status-only on both launches). `native_research_runtime.py` and the
+  construction path in `native_production_runtime.py` now require the flag,
+  with negative mock tests in `test_native_client_runtime.py` /
+  `test_native_production_runtime.py`.
+- N / NEW GAME is now ported (see below). F8 is covered by the
+  support-bundle slice below.
+
+## Mid-session New Game slice (candidate for review)
+
+- `N` and a new pause-menu NEW GAME row port `UiNewCampaign`: the live
+  campaign saves first (`request_new_game` → `request_save`; the outer
+  campaign-lifetime loop in `main` only exits the frame loop once the Saved
+  notice lands, and aborts the request on a Failure notice). The full startup
+  sandbox (`run_native_startup_entry`) then runs again — species/size/seed →
+  Create → generation — and a committed session replaces the campaign in
+  place. Cancelling setup calls `release_session` and resumes the saved
+  campaign, matching the reference's mode-select cancel.
+- `native_ui_layout` gained the 7th menu button (panel 378→425px, hit-tested).
+- `--new-game-restart-smoke` loads an anchor save, sends a real `N`
+  `KeyPressed` at frame 55, lets the save gate the transition, runs automated
+  sandbox setup (seed+1), and saves the second campaign — emitting a
+  `new_game_restart={…}` diagnostic (saved_previous, restarted, full startup
+  evidence, species/seed/system count, isolated slot path).
+- `native_new_game_runtime.py` now launches the restart smoke after the
+  fresh/reload proofs: it validates the diagnostic schema, the re-saved prior
+  campaign, the `…-native-N` slot with seed 143251, and the three restart
+  captures. `test_native_new_game_runtime.py` adds 7 negative tests (39
+  total).
+
+## Support bundle slice (candidate for review)
+
+- `app/native_client/native_support.{hpp,cpp}` — `NativeSupportLog` ports
+  `SupportLogger`: a 12-hex-char session id, `logs/game-<id>.log` +
+  `logs/system-<id>.txt` under `<save-dir>/`, and `export_bundle(save)` →
+  `support/support-<id>-<yyyymmdd-hhmmss>.zip` as a store-format (method 0)
+  ZIP with UTF-8 name flags — log, system info and save, matching the
+  reference's three entries. Verified by `native_support` tests (CRC32,
+  central-directory parse, content round-trip) and Python's `zipfile`.
+- `main.cpp`: `enable_support_log` is enabled per campaign after window
+  creation (system info from SDL: platform, CPU cores, RAM, GPU driver).
+  F8 and the new pause-menu SUPPORT BUNDLE button call
+  `export_support_bundle`, reporting the path via `publish_status`.
+- `--audio-smoke` now clicks SUPPORT BUNDLE, closes the menu and presses F8,
+  then emits `support=1` when a non-trivial `.zip` exists; the audio export
+  validator requires the flag and validates the bundle with `zipfile`. The
+  smoke lands a save before exporting so the bundle always carries its save
+  entry (this ordering fixed the earlier two-entry-ZIP export failure).
+
+## Voice slice (candidate for review)
+
+- `app/native_client/native_voice.{hpp,cpp}` — `NativeVoiceProfileRegistry`,
+  `NativeCharacterVoiceResolver` and `NativeVoiceRouter` port the reference
+  `VoiceEventRouter`/`CharacterVoiceResolver` over the reviewed
+  `Data/voice_profiles/{events,human,roles}.json` catalogue.
+- `app/native_client/native_voice_playback.{hpp,cpp}` —
+  `NativeVoicePlayback` ports `VoicePlaybackController` (queue/dedupe/
+  interrupt/expire/caption semantics); `NativeVoiceCache` validates hashed
+  PCM WAVs under a bounded byte budget; `native_voice_sapi.cpp` is the
+  Windows SAPI 5 backend (STA worker, 22.05 kHz 16-bit mono WAV, voice
+  selection by preferred id/description then gender/culture, 30 s timeout
+  and generation-based cancellation).
+- `app/native_client/native_voice_bridge.{hpp,cpp}` —
+  `NativeGameplayVoiceBridge` ports `GameplayVoiceEventBridge`/`Main.Voice`:
+  research/construction/ship/exploration/contact/combat/diplomacy/economy/
+  logistics routing, opening line, milestone tracking and baselines. It reads
+  only observer-authorized state (`build_view_for`, own events, own fleets).
+- `native_audio` gained the dedicated dialogue voice: `play_dialogue`,
+  `stop_dialogue`, `set_dialogue_volume`; the duck ramp is driven live by
+  `NativeVoicePlayback::ducking()`.
+- `main.cpp` `initialize_voice()` loads the catalogue, attaches the SAPI
+  backend, binds decode/play/stop to the mixer and wires the bridge into
+  `advance()`; captions render bottom-center and hide while the menu or
+  relations workspace is open. Missing catalogue files disable voice without
+  failing the campaign. `--audio-smoke` reports `voice_pipeline`,
+  `voice_backend`, `voice_lines`.
+- `native-tests/native_voice_tests.cpp` covers routing authorization,
+  dedupe/once/cooldown/frequency, deterministic variants, template
+  rejection, resolver species safety, settings round-trip, WAV validation,
+  and playback queue/subtitle behavior with a fake backend.
+- `app/native_client/native_voice_settings.{hpp,cpp}` —
+  `NativeVoiceSettingsView` ports the reference voice & subtitles panel
+  (VoicePlaybackController.Settings.cs): four toggles, three sliders,
+  subtitle-size and announcement-frequency cycles (selecting a frequency
+  restores chatter level, matching the reference), and Replay/Stop/Close
+  actions. `NativeVoicePlayback::replay_last()` ports `ReplayLast`. The
+  pause menu's VOICE button opens the view; every Apply sanitizes, pushes
+  to playback + the dialogue gain, and persists `voice-settings.json`.
+  `--audio-smoke` exercises the view end to end (`voice_settings=1`) and
+  the export validator requires it plus the persisted file.
+  `native-tests/native_voice_settings_tests.cpp` covers layout, toggles,
+  slider drag, choice cycles and action commands. The reference's
+  developer voice lab remains developer-only and unported.
+- `export/native-voice-assets.json` + `cmake/NativeVoiceAssets.cmake` gate
+  the three catalogue files by exact path and SHA-256;
+  `native_voice_runtime.native_voice_asset_files` packages them into sealed
+  exports (the export previously shipped no voice catalogue, which disabled
+  the pipeline and the settings persistence check in `--audio-smoke`).
+
+## Video settings
+
+- `app/native_client/native_video_settings.{hpp,cpp}` —
+  `NativeVideoSettingsView` ports the reference VIDEO panel
+  (MainMenuLayer.cs + VideoSettingsService): DISPLAY cycles borderless ↔
+  exclusive fullscreen (SDL `SDL_SetWindowFullscreenMode` at the desktop
+  mode), V-SYNC cycles Off/On/Adaptive (runtime `SDL_SetRenderVSync`), and
+  FRAME CAP cycles Automatic/60/120/144/Unlimited (present throttle in
+  `Window::draw`). Apply arms the reference's 15-second CONFIRM DISPLAY
+  rollback — Keep persists `video-settings.json` beside the save, Revert or
+  expiry restores the previous settings (the deadline ticks in
+  `NativeCampaign::update`). The reference's RESOLUTION row stays absent: it
+  is disabled upstream and its MSAA/3D-resolution rows only affect the
+  reference's 3D pipeline. `Window` gained `set_vsync`, `set_fullscreen` and
+  `set_frame_cap`; the vsync-unavailable refresh pacing fallback is retained
+  and composes with the cap. `--audio-smoke` exercises the view end to end
+  (`video_settings=1`) and the export validator requires it plus the
+  persisted file. `native-tests/native_video_settings_tests.cpp` covers
+  layout, persistence round-trip, choice cycles and the
+  apply/confirm/revert flow. `NativeCampaign` now holds `Window*` for
+  runtime display control.
+
+## Hover route preview
+
+- With an owned fleet selected, `PointerMove` over a star drives
+  `update_fleet_hover_preview` → `preview_selected_route` →
+  `fleet_workspace_.set_preview` — the reference's
+  `UiFleetDestinationPreview` readout. Hover previews force
+  `command_available=false` (display-only; CONFIRM never arms), and an armed
+  right-click preview takes precedence until confirmed or superseded. The
+  fleet smoke asserts `hover=1` and `native_fleet_runtime` requires it.
+
+## Inspection card slice (candidate for review)
+
+- `app/native_client/native_inspection.{hpp,cpp}` — `build_inspection(campaign,
+  player_civilization_id, system_id)` produces `NativeInspectionView` from the
+  player's knowledge row only (reference `Main.Inspection`/`SystemInspectionPanel`):
+  survey level + progress, guidance text for unknown/recon/fully-surveyed
+  states, intel facts (star class, archetype, distance from homeworld,
+  habitable/anomaly/rare-resource/pre-warp status) gated to full survey, and a
+  colony section that redacts foreign holdings unless the owner civilization is
+  identified. Own colonies additionally pull population/infrastructure/stability
+  and `economy_logistics` supply/demand lines when the economy row exists —
+  sparse campaigns omit logistics rather than surfacing an error.
+- `append_inspection_card` renders the bounded card bottom-left in the map
+  viewport via `DrawList`, replacing the old two-line selected-system readout.
+- The fleet smoke clicks a surveyed (or visible unoccupied) system and asserts
+  `inspect=1`; `native_fleet_runtime` requires the marker alongside `hover=1`.
+- `native_inspection` CTest covers unknown, detected, fully surveyed,
+  foreign-redacted, own-colony, and rendering/bounds cases.
+
+## Logistics panel slice (candidate for review)
+
+- `app/native_client/native_logistics.{hpp,cpp}` — ports
+  `Main.Logistics`/`LogisticsNetworkPanel`: `build_home_logistics` returns the
+  player civilization's home-system `HomeSystemLogisticsNetwork` as a
+  read-only view (system name, corridor count, supply/demand/delivered/
+  shortfall totals, up to eight node rows with reference kind labels and
+  Supply node/Fully supplied/Shortfall status), `logistics_summary_line` is
+  the `UiLogisticsSummary` status string, and `NativeLogisticsView` is a
+  toggleable SUPPLY NETWORK panel (2×2 metric tiles, guidance, node cards)
+  that contains its own pointer input like the notification panel.
+- Campaigns without a resolvable player economy row render the reference
+  "initializing" state instead of throwing; sparse fixtures omit the network.
+- `NativeUiLayout` gained `UiAction::Logistics` + the top-rail SUPPLY button
+  (inset +798·scale).
+- `stellar-continuum-native.exe --logistics-smoke <bmp>` (requires `--load`):
+  clicks the rail button, verifies the panel opened, captures the rendered
+  network and reports `logistics={panel,ready,nodes,corridors,supply,demand,
+  delivered,shortfall}`.
+- `tools/stellar-export/native_logistics_runtime.py` —
+  `validate_native_logistics_export(folder, env, player17_fixture)` runs the
+  smoke twice (fresh + reload) and asserts the ready network, node rows,
+  payload integrity and a non-blank capture.
+- `native_logistics` CTest covers the initializing state, home-network build,
+  kind labels, panel containment/close, and rendering.
+
+## Missions board slice (candidate for review)
+
+- `app/native_client/native_missions.{hpp,cpp}` — ports the
+  `ExplorationMissionPanel` missions tab: `build_mission_board` is the
+  `ExplorationReadModel.ActiveMissions` + `Main.Exploration` snapshot port —
+  owned, active scout/science/colony fleets ordered by id, `Take(8)`, each
+  card carrying fleet name, role, phase label, destination
+  (`DestinationSystemId ?? CurrentSystemId`, "Deep space" when neither
+  resolves), ETA (`{days:0.0} days remaining` / `Ready for orders` /
+  `ETA unavailable`) and the full `ExplorationMissionStatus.Build` summary
+  text. The evaluator port covers every reference branch: inactive fleets,
+  unfunded operating capacity, holds (at-station and post-arrival), transit
+  with chart-distance + local-transit + funding division, science
+  known/unknown detailed-survey estimates, scout reconnaissance, colony
+  no-colonists / manual-authorization / in-progress establishment / missing
+  species / survey gate / single-colony cap / no-viable-body / explicit-body
+  and best-available settlement resolution with the naturally-viable vs
+  habitat-fallback wording. All data comes from `FreshCampaignState` +
+  `Knowledge` — no foreign state is read.
+- `NativeMissionView` is a toggleable right-side panel (reference
+  `ContainPointerInput`) with the `MISSIONS & SETTLEMENT` header, the
+  reference Missions / Colony Sites tabs and display-only mission cards —
+  the reference cards have no click action. `NativeUiLayout` gained
+  `UiAction::Missions` + the top-rail MISSIONS button.
+- The Colony Sites tab ports `GetUiColonyOpportunityState` +
+  `BuildFleetOnlyDetails` / `BuildSelectedSiteDetails` /
+  `GetUiResourceOutpostOpportunityState` over the existing
+  `NativeSettlementMissionController::build` views: populated owned colony /
+  outpost fleets ordered by id, bounded 8-candidate site lists, ship/site
+  navigation, the reference detail text (viability, natural fit, unprotected
+  capacity, limiting factor, reach, authorization vs treasury, compacted
+  planner reason), the funding gate (`treasury + epsilon >= authorization`)
+  and the "Select ship on map" action (`UiFocusOwnedFleet` — selects the
+  fleet, closes the panel and centers the map camera). Owned-colony rows
+  list name / planet / system / population with a View action routed through
+  `open_overview_colony` (reference `UiOpenOwnedColony(colonyId, land:false)`).
+  The reference's Land/freight quick actions stay inside the colony and
+  logistics workspaces.
+- The fleet smoke clicks the MISSIONS rail button, verifies the panel and
+  emits `missions=<open>:<count>`; `native_fleet_runtime` and the
+  system-travel validator require `missions=1` with a non-empty board.
+- `native_missions` CTest covers owned-only filtering, traveling/held/
+  scouting/science-survey/colony-gate summaries, unfunded suspension, the
+  eight-card cap, layout bounds, close/containment and rendering.
+
+## Empire overview slice (candidate for review)
+
+- `app/native_client/native_overview.{hpp,cpp}` — ports the
+  `EmpireOverviewPanel` empire mode: `build_empire_overview` returns the
+  knowledge-gated selected-system name (`Unknown` until surveyed), the
+  homeworld distance in the reference `MetricFormat.InterstellarDistance`
+  form (metric primary + parsec suffix), the own-colony quick list (planet
+  name, system, population in the reference M/B wording) and the combined
+  fleet power. Foreign colonies and fleets are never read.
+- The reference panel shares its top-right slot with the ship inspector;
+  natively the fleet workspace panel owns that slot, so the overview renders
+  inside its detail area while no fleet is selected (ship detail stays the
+  workspace's own inspector). Colony rows emit
+  `FleetWorkspaceCommandKind::OpenColony` → `open_overview_colony`, the
+  `UiOpenOwnedColony(colonyId, land:false)` port: enter the owning system's
+  orbital view focused on the colony world via the new public
+  `NativeSystemWorkspace::select_body` (reference `FocusBody`).
+- `refresh_fleets` rebuilds the overview on its existing 0.1 s cadence;
+  `discard_campaign` clears it.
+- The fleet smoke clears the selection, asserts the colony rows, clicks the
+  first colony, verifies the system workspace opened at the owning system,
+  then returns to the map and emits `overview=1`. `native_fleet_runtime` and
+  the system-travel validator require the new token.
+- `native_overview` CTest covers own-only filtering, knowledge-gated names,
+  placeholders, layout bounds and rendering.
+
+## Civilian fleet controls slice (candidate for review)
+
+- Ports the reference `UiToggleSelectedCivilianFleetHold` /
+  `UiRequestSelectedCivilianReturnToBase` /
+  `UiSelectedCivilianReturnNeedsConfirmation` surfaces onto the core civilian
+  recovery API (`hold_civilian_fleet`, `resume_civilian_fleet`,
+  `preview_civilian_fleet_return`, `request_civilian_fleet_return`).
+- `native_fleet_controller`: `is_civilian_role` (Scout/Science/Colony),
+  `toggle_selected_civilian_hold`, `request_selected_civilian_return`, and
+  per-row `hold_requested` / `return_to_base_requested` /
+  `civilian_return_preview` view fields — the return preview is computed only
+  for the selected civilian fleet so the route planner never runs for hidden
+  rows. `NativeFleetOrderOutcome::requires_confirmation` carries the
+  paid-commitment gate.
+- `native_fleet_workspace`: HOLD / RESUME and RETURN TO BASE buttons on
+  civilian rows (`FleetWorkspaceCommand::{HoldResume,ReturnToBase}`),
+  `set_civilian_return_pending` switches the return button into the reference
+  confirmation prompt, and the detail panel renders the recovery status /
+  return preview lines.
+- `main.cpp` routes both commands through the controller; the smoke selects a
+  civilian fleet, verifies the hold→resume round trip and the return preview,
+  and emits `civilian=1` in the fleet status. `native_fleet_runtime` and the
+  system-travel validator parse the new token.
+- Lifetime note: `prepare_fleet_smoke` must copy fleet ids before clicking —
+  the row click refreshes `fleet_workspace_.view()`, invalidating any
+  reference or iterator into `own_fleets`.
+
+## Notification feed slice (candidate for review)
+
+- `app/native_client/native_notifications.{hpp,cpp}` — `NativeNotificationFeed`
+  (bounded 32 items, `publish(category, date, message, contact_id)`,
+  `unread_count(last_read)`, sequences survive `clear()`) and
+  `NativeNotificationView` (RECENT EVENTS panel; `handle` returns
+  `None`/`Close`/`OpenDiplomaticContact` commands and captures only input that
+  lands on the panel — reference `ContainPointerInput` behavior, no
+  outside-click dismiss). `NotificationLayout`/`notification_layout_for` are
+  public for tests and smoke drivers.
+- `NativeCampaignSession::notifications()` + `publish_notification(...)`;
+  `advance()` harvests the same step-event kinds the reference publishes plus
+  observer-filtered `recent_events` diplomacy bulletins (audience-gated;
+  contact id attached only for identified contacts). `seed_notification_history`
+  marks retained history seen on activation/load so stale events never
+  republish — the feed is session-scoped like the reference.
+- `NativeUiLayout` gained `UiAction::Notifications` + `notifications` rect;
+  the button shows the unread badge (gold when >0, "99+" cap). New items play
+  `NativeSfx::ui_confirm`-routed event audio via `play_event(category)`.
+- `NativeDiplomacyWorkspace::select_contact_civilization(int)` — the native
+  `UiOpenDiplomaticContact` equivalent.
+- `stellar-continuum-native.exe --notification-smoke <bmp>` (requires `--load`
+  with a diplomacy-bearing fixture): submits a proposal through RELATIONS,
+  opens the panel, captures it plus a `-contact` sidecar after OPEN RELATIONS
+  focuses the counterpart, prints `notifications={panel, items, unread,
+  diplomacy, contact, focused_civ}`.
+- `tools/stellar-export/native_notification_runtime.py` —
+  `validate_native_notification_export(folder, env, player17_fixture)` reuses
+  the diplomacy source authoring and asserts panel/unread/contact focus,
+  distinct captures, payload integrity and no retained-history flood.
+
+## Interfaces added in 0.1.58 (candidate for review)
+
+- `app/native_client/native_diplomacy_controller.{hpp,cpp}` — `NativeDiplomacyController`:
+  `build(frame, generation, contact_index)` returns `NativeDiplomacyView` (contacts,
+  selected details, proposals, agreements, history + `diplomacy_revision`);
+  `execute(frame, generation, revision, action, target, proposal_id)` revalidates the
+  quoted revision against a fresh signature before calling
+  `ObserverDiplomacyCommandService`. Signature covers contact awareness/identity,
+  relationship metrics, access, agreements, proposals and event ids — selection moves
+  never bump it. Owner-thread pinned like other controllers.
+- `app/native_client/native_diplomacy_workspace.{hpp,cpp}` — fullscreen RELATIONS
+  workspace. `handle` emits `SelectContact`, `Action`, `ProposalAction`,
+  `FocusSystem`, `Close`; `set_view` preserves selection by civilization id across
+  contact reordering (main re-projects once if the index shifted).
+- `NativeUiLayout` gained `UiAction::Diplomacy` + `diplomacy` rect (top bar, RELATIONS).
+- `NativeDiplomacyWorkspace::render` takes an optional `PortraitProvider`
+  (`string_view relative_asset_path -> shared_ptr<const RgbaImage>`); `nullptr` draws
+  the signal-waveform fallback. The workspace resolves
+  `assets/visual/species/<species>-communications-v2.png` (underscores→hyphens).
+- `stellar-continuum-native.exe --diplomacy-smoke <bmp>` (requires `--load`):
+  opens RELATIONS, selects the identified channel contact, drives the
+  negotiation modal to send a transit-access request, captures the workspace
+  plus a `-proposals` sidecar, prints `diplomacy={...}` (contacts, redaction,
+  channels, agreements, history, portrait, command outcome, proposal ids).
+- `tools/stellar-export/native_diplomacy_runtime.py` —
+  `validate_native_diplomacy_export(folder, env, player17_fixture)` authors an
+  unresolved-signal contact + pending incoming access petition onto the
+  fixture (tick = SimulationDays × 1000), runs the smoke twice (fresh +
+  paused reload), and verifies redaction, portrait, command acceptance,
+  proposal persistence and capture variance. Sealed in export
+  `StellarContinuum-windows-native-preview-7a04c0bc-20260915T124212249481Z`
+  (118 files, all four diplomacy flags true, `portrait=1`).
+- The communications portraits are now declared+packaged: nine entries in
+  `NATIVE_SPECIES_SOURCES`/`cmake/NativeSpeciesAssets.cmake` (four base JPGs,
+  four `*-communications-v2.png`, credits doc), all exact-hash.
+
+## Interfaces added in 0.1.57 (candidate for review)
+
+- `app/native_client/native_ship_art_assets.{hpp,cpp}` — `NativeShipArtAssets(asset_root)`:
+  `image_for(optional<design_id>, FleetRole)` returns `shared_ptr<const RgbaImage>`,
+  bounded 6 entries / 4 MiB, single decode per source, 224px box-average thumbnails.
+  `ship_artwork_for()` maps design_id then falls back to role; unknown roles throw.
+- `app/native_client/native_fleet_route_effects.{hpp,cpp}` — `append_fleet_route_effects(
+  DrawList&, fleets, shipyard_view, systems_by_id, camera)` returns
+  `FleetRouteEffectStats{routed_fleets, drawn_legs, chevron_segments, trail_strokes,
+  position_circles}`. Pure draw-command appender, testable headless.
+- `NativeOwnFleet` gained `std::optional<std::string> design_id` (presentation-only,
+  copied from `FleetState.design_id` in `NativeFleetController::build`).
+
+## Contract changes
+
+- `NativeFleetWorkspace::render` and `NativeShipyardWorkspace::render` take an optional
+  `const NativeShipArtAssets*` — pass `nullptr` for art-free rendering (existing tests do).
+- Own-fleet routes draw through unsurveyed systems (matches `Main.VisualMap.cs`): own
+  route geometry is player-authorized. Foreign fleet contacts remain unplaced;
+  unsurveyed system labels remain redacted elsewhere.
+- `copy_native_client_runtime` now requires `export/native-ship-art-assets.json` +
+  the six declared files; mocks must stub them (see `test_native_client_runtime` setUp).
+
+## Remaining blockers / next work
+
+- Diplomacy presentation: audited against the C# reference — the workspace has no
+  grievance display, demand/trade composer, or claims panel; claims render as dashed
+  arcs on the strategic map (ported in `ef7a4007`) and the native workspace covers
+  every section the reference renders. No further diplomacy port is currently owed.
+- Surface colony visuals — hub/buildings/roads/ghosts now render as rasterized
+  sprites (`58aaf475`); the remaining gap is the reference's free camera orbit
+  and terrain relief, not building art.
+- Voice — the full presentation pipeline landed (catalogue, router, playback,
+  SAPI backend, WAV cache, captions, mixer dialogue voice + ducking, gameplay
+  bridge, roster-based character resolution, settings window). Remaining: the
+  reference's optional manifest-gated offline-neural backend (SAPI is the
+  reference's own default fallback when the pack is absent).
+- Frame pacing ~17–21 ms mean / ~33 ms p95 under smoke; 60 FPS unproven.
+- `cleanMachineTest` still needs a separate machine/VM.
+- `graphicalParity=false` stays until visual parity evidence exists.
+
+## Systems intentionally not touched
+
+- Godot/C# `src/` reference (kept as behavioral baseline until parity gates pass).
+- `editor/` WPF tool (other workstream).
+- Legacy research runtime — retained for save compatibility; Adaptive Research is
+  authoritative.
+
+## Coordination
+
+- PR #325 (draft) + issue #324 are the communication hub; update, don't close.
+- Sealed export = `tools/stellar-export/stellar.py export windows-native-preview`.
+- Dev env: VS 2022 BuildTools `VsDevCmd` + `.tools/build-tools` venv (cmake/ninja/python).

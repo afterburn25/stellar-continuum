@@ -1,5 +1,8 @@
 #include "native_system_view.hpp"
 
+#include <stellar/core/adaptive_research_capability_adapters.hpp>
+#include <stellar/core/construction_projects.hpp>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -138,6 +141,56 @@ NativeSystemViewResult NativeSystemViewController::build(
     result.bodies.push_back(std::move(item));
   }
   std::ranges::sort(result.bodies, {}, &NativeSystemBody::id);
+  if (system->id == player->home_system_id) {
+    // Mirrors the reference spatial canvas: every orbital construction project
+    // is marked in the player's home system, including locked and planned
+    // sites, hosted at the most populous colony body (the resource network is
+    // positioned on the outer chart instead).
+    const auto &research = frame.runtime().research();
+    const auto query = [&research](int civilization, std::string_view id) {
+      return AdaptiveResearchConstructionCapabilityView(research)
+          .has_civilization_capability(civilization, id);
+    };
+    const ConstructionReadView read{world.civilizations, world.bodies,
+        world.construction, world.colonies, world.economies, {}, query};
+    const auto state = std::ranges::find(world.construction, observer,
+                                          &ConstructionState::civilization_id);
+    const Colony *host = nullptr;
+    for (const auto &colony : world.colonies) {
+      if (colony.civilization_id != observer || colony.system_id != system->id ||
+          !colony.planetary_body_id)
+        continue;
+      if (!host || colony.population_millions > host->population_millions)
+        host = &colony;
+    }
+    for (const auto &project : construction_project_catalog()) {
+      if (project.category != ConstructionCategory::Orbital) continue;
+      const bool complete =
+          state != world.construction.end() &&
+          std::ranges::find(state->completed_project_ids, project.id) !=
+              state->completed_project_ids.end();
+      const bool active = state != world.construction.end() &&
+                          state->active_project_id == project.id;
+      const bool available =
+          state != world.construction.end() &&
+          !construction_project_lock_reason(read, observer, project);
+      NativeSystemInfrastructureMarker marker{.project_id = project.id,
+          .label = project.name,
+          .state = complete ? NativeInfrastructureState::complete
+                   : active ? NativeInfrastructureState::active
+                   : available ? NativeInfrastructureState::available
+                               : NativeInfrastructureState::locked,
+          .progress = complete ? 1.
+                      : active && project.industry_cost > 0
+                          ? std::clamp(state->active_project_progress /
+                                           project.industry_cost,
+                                       0., 1.)
+                          : 0.};
+      if (project.id != "asteroid_resource_network" && host)
+        marker.host_body_id = host->planetary_body_id;
+      result.infrastructure.push_back(std::move(marker));
+    }
+  }
   return {std::move(result), {}};
 }
 

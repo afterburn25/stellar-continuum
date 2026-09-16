@@ -212,6 +212,12 @@ NativeConstructionWorkspace::selected_project_id() const noexcept {
   return selected_project_id_;
 }
 
+void NativeConstructionWorkspace::select_project(std::string project_id) {
+  selected_project_id_ = std::move(project_id);
+  cancel_confirmation_id_.reset();
+  reconcile_selection();
+}
+
 void NativeConstructionWorkspace::reconcile_selection() {
   if (!view_) return;
   if (selected_project_id_ &&

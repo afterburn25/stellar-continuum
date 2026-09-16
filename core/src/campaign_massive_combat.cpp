@@ -624,6 +624,18 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
   return events;
 }
 
+MassiveCombatOrderResult CampaignMassiveCombat::issue_order(
+    FreshCampaignState &galaxy, int civilization_id,
+    MassiveCombatOrder order) {
+  auto *encounter = galaxy.active_combat_encounter
+                        ? &*galaxy.active_combat_encounter
+                        : nullptr;
+  if (!encounter || encounter->reconciled)
+    return {false, "There is no active tactical encounter."};
+  return storage_->engine.issue_order(encounter->battle, civilization_id,
+                                      std::move(order));
+}
+
 MassiveCombatSnapshot CampaignMassiveCombat::observe(
     const FreshCampaignState &galaxy, int observer_civilization_id,
     bool scanning_capability) const {

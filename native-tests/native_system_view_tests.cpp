@@ -103,6 +103,24 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
     if(item.id==pluto_body_id) require(!item.sol_texture_key,"Pluto received an invented texture");
     else require(item.sol_texture_key.has_value(),"fully surveyed approved Sol body lost texture eligibility");
   }
+  require(sol.snapshot->infrastructure.size()==3,
+          "home system did not project every orbital construction marker");
+  const auto launch=std::ranges::find(sol.snapshot->infrastructure,"orbital_launch_complex",&NativeSystemInfrastructureMarker::project_id);
+  const auto shipyard=std::ranges::find(sol.snapshot->infrastructure,"orbital_shipyard",&NativeSystemInfrastructureMarker::project_id);
+  const auto network=std::ranges::find(sol.snapshot->infrastructure,"asteroid_resource_network",&NativeSystemInfrastructureMarker::project_id);
+  require(launch!=sol.snapshot->infrastructure.end()&&shipyard!=sol.snapshot->infrastructure.end()&&network!=sol.snapshot->infrastructure.end(),
+          "orbital infrastructure marker set is incomplete");
+  require(launch->state!=NativeInfrastructureState::locked&&shipyard->state==NativeInfrastructureState::locked&&network->state==NativeInfrastructureState::locked,
+          "fresh orbital construction states diverged from the reference gating");
+  require(!network->host_body_id,"resource network must stay on the outer chart");
+  if(std::ranges::any_of(world.colonies,[&](const auto &colony){return colony.civilization_id==observer&&colony.system_id==sol_system_id&&colony.planetary_body_id;}))
+    require(launch->host_body_id.has_value(),"hosted orbital marker lost its colony body anchor");
+  const auto foreign=std::ranges::find_if(world.systems,[&](const auto &system){return system.id!=sol_system_id&&world.knowledge.system_survey_level(observer,system.id)>=SystemSurveyLevel::partially_surveyed;});
+  if(foreign!=world.systems.end()){
+    const auto view=controller.build(campaign,1,foreign->id);
+    require(view.snapshot&&view.snapshot->infrastructure.empty(),
+            "orbital construction markers leaked outside the player home system");
+  }
   (void)controller.build(campaign,2,sol_system_id);
   require(controller.is_current_generation(2)&&!controller.is_current_generation(1),
           "campaign replacement did not invalidate the old generation");

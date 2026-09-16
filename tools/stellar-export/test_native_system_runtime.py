@@ -45,7 +45,8 @@ class NativeSystemExportTests(unittest.TestCase):
                 stdout = (f"gpu_driver=vulkan systems=500 image_uploads={images} save=ok "
                           f"system=id=0:body={body}:visible=9:scale={scale}"
                           f":entry=1:hit=1:pan={pan}:zoom=1:reset=1:back=1"
-                          f":pause_retained=1:speed_retained=1:gesture_cleared=1:paused=1:day_unchanged=1")
+                          f":pause_retained=1:speed_retained=1:gesture_cleared=1"
+                          f":focused=1:paused=1:day_unchanged=1")
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_system_runtime.subprocess.run", side_effect=launch):

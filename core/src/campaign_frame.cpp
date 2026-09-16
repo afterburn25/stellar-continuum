@@ -1,4 +1,5 @@
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/fleet_combat_intelligence.hpp>
 
 #include <cmath>
 #include <ranges>
@@ -63,6 +64,23 @@ CombatOrderResult CampaignFrame::begin_tactical(int fleet_id) {
   if (!result.accepted) return result;
   s.pre_combat_speed = s.clock.speed(); s.clock.set_speed(StrategicSpeed::Paused);
   s.tactical_owns_pause = true; s.tactical_clock.set_speed(1.); return result;
+}
+MassiveCombatOrderResult CampaignFrame::issue_tactical_order(
+    MassiveCombatOrder order) {
+  auto &s = *storage_; auto &world = s.runtime->world().campaign();
+  return s.tactical_runtime().issue_order(world, world.player_civilization_id,
+                                          std::move(order));
+}
+MassiveCombatSnapshot CampaignFrame::tactical_snapshot() {
+  auto &s = *storage_; auto &world = s.runtime->world().campaign();
+  if (!world.active_combat_encounter ||
+      world.active_combat_encounter->reconciled)
+    return {};
+  return s.tactical_runtime().observe(
+      world, world.player_civilization_id,
+      has_combat_scanner(
+          s.runtime->research().try_get_civilization(
+              world.player_civilization_id)));
 }
 CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
   auto &s = *storage_; auto &world = s.runtime->world().campaign(); CampaignFrameResult result;

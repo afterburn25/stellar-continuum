@@ -46,6 +46,9 @@ def validate_native_research_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError(f"Native research did not confirm renderer/campaign: {result.stdout}")
             if "save=ok " not in result.stdout:
                 raise RuntimeError("Native research did not confirm an actual manual save")
+            if not loading and " shortcut=1" not in result.stdout:
+                raise RuntimeError(
+                    "Native research did not exercise the T/R candidate shortcuts")
             if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
                 raise RuntimeError("Native research did not capture its rendered workspace")
             if not save.is_file():

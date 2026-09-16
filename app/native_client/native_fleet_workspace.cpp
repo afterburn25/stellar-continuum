@@ -127,6 +127,15 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
                      std::max(0.f, detail_space - fleet_height - 6.f * scale)};
+  const UiRect engage{details.x + details.width - 96.f * scale,
+                      details.y + details.height - 34.f * scale,
+                      92.f * scale, 30.f * scale};
+  // Civilian recovery buttons sit at the details bottom edge, left of ENGAGE
+  // (which never coexists with them — armed fleets are military).
+  const UiRect hold{details.x, details.y + details.height - 34.f * scale,
+                    76.f * scale, 30.f * scale};
+  const UiRect return_base{hold.x + hold.width + 8.f * scale, hold.y,
+                           138.f * scale, 30.f * scale};
   return {scale,
           static_cast<int>(std::lround(20.f * scale)),
           static_cast<int>(std::lround(14.f * scale)),
@@ -137,18 +146,25 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           details,
           route,
           feedback,
-          confirm};
+          confirm,
+          engage,
+          hold,
+          return_base};
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
   const auto generation_changed =
       view_ && view_->campaign_generation != view.campaign_generation;
+  const auto selection_changed =
+      !view_ || view_->selected_fleet_id != view.selected_fleet_id;
   if (generation_changed) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
     list_scroll_ = 0.f;
   }
+  if (generation_changed || selection_changed)
+    return_needs_confirmation_ = false;
   view_ = std::move(view);
   const auto selected = view_->selected_fleet_id
                             ? std::ranges::find(view_->own_fleets,
@@ -167,10 +183,12 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 
 void NativeFleetWorkspace::discard_campaign() {
   view_.reset();
+  overview_.reset();
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
   list_scroll_ = 0.f;
+  return_needs_confirmation_ = false;
 }
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
@@ -218,6 +236,18 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
+    if (const auto *fleet = selected_fleet();
+        fleet && fleet->combat_status && fleet->combat_status->is_armed &&
+        layout.engage.contains(event.position))
+      return {FleetWorkspaceCommandKind::Engage, true, fleet->id};
+    if (const auto *fleet = selected_fleet();
+        fleet && native_fleet::is_civilian_role(fleet->role)) {
+      if (layout.hold.contains(event.position))
+        return {FleetWorkspaceCommandKind::HoldResume, true, fleet->id};
+      if (!fleet->return_to_base_requested &&
+          layout.return_base.contains(event.position))
+        return {FleetWorkspaceCommandKind::ReturnToBase, true, fleet->id};
+    }
     if (view_) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
@@ -229,6 +259,20 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
           return {FleetWorkspaceCommandKind::Select, true,
                   view_->own_fleets[index].id};
       }
+    }
+    // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
+    if (overview_ && !selected_fleet_id()) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      const auto overview_layout =
+          native_overview::overview_layout_for(*overview_, content);
+      for (std::size_t index = 0;
+           index < overview_layout.colony_rows.size(); ++index)
+        if (overview_layout.colony_rows[index].contains(event.position))
+          return {FleetWorkspaceCommandKind::OpenColony, true, 0, 0, {},
+                  overview_->colonies[index].colony_id};
     }
     return {FleetWorkspaceCommandKind::None, true};
   }
@@ -332,11 +376,24 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
 
   const auto *fleet = selected_fleet();
   if (!fleet) {
-    text(out, layout.details,
-         "Select an owned fleet on the map or in the outliner.", muted,
-         layout.body_font_pixels);
+    // Reference EmpireOverviewPanel empire mode: the selected-system home
+    // reference plus the own-colony quick list fill the detail area.
+    if (overview_) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      native_overview::render_empire_overview(
+          out, *overview_,
+          native_overview::overview_layout_for(*overview_, content),
+          pointer_);
+    } else {
+      text(out, layout.details,
+           "Select an owned fleet on the map or in the outliner.", muted,
+           layout.body_font_pixels);
+    }
   } else {
-    const std::string details =
+    std::string details =
         fleet->name + "\n" + role_name(fleet->role) + "  |  " +
         transit_name(fleet->transit_phase) + "\nOwn strength " +
         number(fleet->combat_power) + "\nFuel " +
@@ -344,6 +401,14 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
         number(fleet->fuel_capacity_light_years, 2) + " ly\nMaximum leg " +
         number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
         number(fleet->strategic_speed, 2) + " ly/day";
+    // Reference ship inspector Recovery row: an earlier failed return reason
+    // wins over the live preview.
+    const std::string recovery =
+        fleet->return_to_base_failure_reason
+            ? *fleet->return_to_base_failure_reason
+            : fleet->civilian_return_preview;
+    if (native_fleet::is_civilian_role(fleet->role) && !recovery.empty())
+      details += "\nRecovery " + recovery;
     auto details_bounds = layout.details;
     if (ship_art) {
       const auto image = artwork(*fleet);
@@ -360,6 +425,48 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       }
     }
     text(out, details_bounds, details, bright, layout.small_font_pixels);
+    if (fleet->combat_status && fleet->combat_status->is_armed) {
+      fill(out, layout.engage,
+           layout.engage.contains(pointer_) ? hover_color : row_color);
+      stroke(out, layout.engage,
+             layout.engage.contains(pointer_) ? bright : border_color);
+      text(out,
+           {layout.engage.x, layout.engage.y + layout.engage.height * .3f,
+            layout.engage.width, layout.engage.height * .7f},
+           "ENGAGE", bright, layout.small_font_pixels, FontFace::Interface,
+           TextAlign::Center);
+    }
+    // Civilian recovery controls (reference CivilianHoldResume /
+    // CivilianReturnToBase buttons).
+    if (native_fleet::is_civilian_role(fleet->role)) {
+      fill(out, layout.hold,
+           layout.hold.contains(pointer_) ? hover_color : row_color);
+      stroke(out, layout.hold,
+             layout.hold.contains(pointer_) ? bright : border_color);
+      text(out,
+           {layout.hold.x, layout.hold.y + layout.hold.height * .3f,
+            layout.hold.width, layout.hold.height * .7f},
+           fleet->hold_requested ? "RESUME" : "HOLD", bright,
+           layout.small_font_pixels, FontFace::Interface, TextAlign::Center);
+      const bool return_disabled = fleet->return_to_base_requested;
+      fill(out, layout.return_base,
+           !return_disabled && layout.return_base.contains(pointer_)
+               ? hover_color
+               : row_color);
+      stroke(out, layout.return_base,
+             !return_disabled && layout.return_base.contains(pointer_)
+                 ? bright
+                 : border_color);
+      text(out,
+           {layout.return_base.x,
+            layout.return_base.y + layout.return_base.height * .3f,
+            layout.return_base.width, layout.return_base.height * .7f},
+           return_disabled ? "RETURN QUEUED"
+           : return_needs_confirmation_ ? "CONFIRM RETURN"
+                                        : "RETURN TO BASE",
+           return_disabled ? muted : bright, layout.small_font_pixels,
+           FontFace::Interface, TextAlign::Center);
+    }
     std::string route;
     if (preview_) {
       route = "ROUTE PREVIEW\nDestination " + target_display_name_ +

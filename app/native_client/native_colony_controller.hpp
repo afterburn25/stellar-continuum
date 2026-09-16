@@ -27,6 +27,14 @@ struct NativeSurfaceSite {
   double construction_stage_progress{}, remaining_construction_materials{};
   std::optional<std::string> pending_upgrade_type_id;
   double upgrade_days_remaining{};
+  bool can_upgrade{};
+  std::string upgrade_name;
+  double upgrade_credit_budget_units{}, upgrade_industry_cost{};
+  bool can_afford_upgrade{};
+  std::string upgrade_lock_reason;
+  double repair_industry_cost{};
+  bool can_afford_repair{};
+  bool essential_service{};
 };
 
 struct NativeSurfaceBuildOption {
@@ -42,6 +50,8 @@ struct NativeColonyView {
   int player_civilization_id{}, system_id{}, body_id{}, colony_id{};
   std::string colony_name, body_display_name, population_species_id;
   bool resource_outpost{}, solid_surface{};
+  native_system::NativeSystemBodyVisualClass surface_visual_class{
+      native_system::NativeSystemBodyVisualClass::unknown_planet};
   stellar::core::SovereignCurrencyDefinition currency;
   double treasury_budget_units{}, stored_industry{};
   std::string formatted_treasury;
@@ -57,6 +67,11 @@ struct NativeColonyView {
   double food_reserve_days{}, water_reserve_days{};
 
   int required_habitat_systems{}, building_capacity{}, surface_hub_level{};
+  std::string hub_name;
+  bool hub_upgrade_available{}, can_afford_hub_upgrade{};
+  double hub_upgrade_credit_budget_units{}, hub_upgrade_industry_cost{};
+  std::string hub_upgrade_lock_reason;
+  double hub_upgrade_days_remaining{};
   double habitat_support_reduction{}, environmental_wear_multiplier{};
   double power_supply{}, power_demand{}, stored_power_days{},
       power_storage_capacity_days{}, storage_charge_per_day{},

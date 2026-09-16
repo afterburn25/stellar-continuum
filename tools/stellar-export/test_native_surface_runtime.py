@@ -79,7 +79,9 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                              "placement_cancelled": not reload, "cancel_no_change": not reload,
                              "placement_confirmed": not reload, "removal_previewed": not reload,
                              "removal_confirmed": not reload, "refund_exact": not reload,
-                             "persisted_site": True, "paused": True}
+                             "managed": not reload,
+                             "persisted_site": True, "paused": True,
+                             "scene_sprites": 4}
                     if not reload:
                         payload["SavedAtUtc"] = "ordered"
                         payload["SimulationDays"] = .5
@@ -154,6 +156,8 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("persisted_site")
     def test_paused_required(self):
         with self.assertRaises(RuntimeError): self.exercise("paused")
+    def test_scene_sprites_required(self):
+        with self.assertRaises(RuntimeError): self.exercise("scene_sprites")
     def test_cancel_charge_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("cancel_charge")
     def test_wrong_charge_rejected(self):

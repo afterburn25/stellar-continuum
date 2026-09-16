@@ -14,9 +14,18 @@ enum class UiAction {
   Research,
   Shipyard,
   Construction,
+  Diplomacy,
+  Notifications,
+  Logistics,
+  Missions,
   Continue,
   Save,
   Load,
+  NewGame,
+  Audio,
+  Voice,
+  Video,
+  Support,
   Exit
 };
 
@@ -30,6 +39,10 @@ struct NativeUiLayout {
   UiRect research;
   UiRect shipyard;
   UiRect construction;
+  UiRect diplomacy;
+  UiRect notifications;
+  UiRect logistics;
+  UiRect missions;
   UiRect day_text;
   UiRect status_text;
   UiRect menu_panel;
@@ -37,6 +50,11 @@ struct NativeUiLayout {
   UiRect continue_button;
   UiRect save_button;
   UiRect load_button;
+  UiRect new_game_button;
+  UiRect audio_button;
+  UiRect voice_button;
+  UiRect video_button;
+  UiRect support_button;
   UiRect exit_button;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
@@ -45,7 +63,7 @@ struct NativeUiLayout {
     const auto screen_height = static_cast<float>(height);
     const auto requested_scale = std::max(1.f, screen_height / 900.f);
     const auto width_scale = std::max(.5f, (screen_width - 36.f) / 300.f);
-    const auto height_scale = std::max(.5f, (screen_height - 36.f) / 284.f);
+    const auto height_scale = std::max(.5f, (screen_height - 36.f) / 519.f);
     const auto scale = std::min({requested_scale, width_scale, height_scale});
     const auto center_x = screen_width * .5f;
     const auto center_y = screen_height * .5f;
@@ -53,11 +71,11 @@ struct NativeUiLayout {
     const auto button_width = 184.f * scale;
     const auto button_height = 38.f * scale;
     const auto gap = 9.f * scale;
-    const auto first_y = center_y - 38.f * scale;
     const UiRect panel{center_x - 150.f * scale,
-                       center_y - 126.f * scale,
+                       center_y - 236.f * scale,
                        300.f * scale,
-                       284.f * scale};
+                       519.f * scale};
+    const auto first_y = panel.y + 88.f * scale;
     const auto status_width = std::max(
         0.f, std::min(720.f * scale, screen_width - inset * 2.f));
 
@@ -71,6 +89,10 @@ struct NativeUiLayout {
         {inset + 200.f * scale, inset, 112.f * scale, 32.f * scale},
         {inset + 322.f * scale, inset, 112.f * scale, 32.f * scale},
         {inset + 444.f * scale, inset, 140.f * scale, 32.f * scale},
+        {inset + 594.f * scale, inset, 128.f * scale, 32.f * scale},
+        {inset + 732.f * scale, inset, 56.f * scale, 32.f * scale},
+        {inset + 798.f * scale, inset, 84.f * scale, 32.f * scale},
+        {inset + 892.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset, 56.f * scale, 230.f * scale, 22.f * scale},
         {inset, 80.f * scale, status_width, 44.f * scale},
         panel,
@@ -83,7 +105,17 @@ struct NativeUiLayout {
         {center_x - button_width * .5f,
          first_y + (button_height + gap) * 2.f, button_width, button_height},
         {center_x - button_width * .5f,
-         first_y + (button_height + gap) * 3.f, button_width, button_height}};
+         first_y + (button_height + gap) * 3.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 4.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 5.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 6.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 7.f, button_width, button_height},
+        {center_x - button_width * .5f,
+         first_y + (button_height + gap) * 8.f, button_width, button_height}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -91,6 +123,11 @@ struct NativeUiLayout {
       if (continue_button.contains(point)) return UiAction::Continue;
       if (save_button.contains(point)) return UiAction::Save;
       if (load_button.contains(point)) return UiAction::Load;
+      if (new_game_button.contains(point)) return UiAction::NewGame;
+      if (audio_button.contains(point)) return UiAction::Audio;
+      if (voice_button.contains(point)) return UiAction::Voice;
+      if (video_button.contains(point)) return UiAction::Video;
+      if (support_button.contains(point)) return UiAction::Support;
       if (exit_button.contains(point)) return UiAction::Exit;
       return UiAction::None;
     }
@@ -99,6 +136,10 @@ struct NativeUiLayout {
     if (research.contains(point)) return UiAction::Research;
     if (shipyard.contains(point)) return UiAction::Shipyard;
     if (construction.contains(point)) return UiAction::Construction;
+    if (diplomacy.contains(point)) return UiAction::Diplomacy;
+    if (notifications.contains(point)) return UiAction::Notifications;
+    if (logistics.contains(point)) return UiAction::Logistics;
+    if (missions.contains(point)) return UiAction::Missions;
     return UiAction::None;
   }
 };

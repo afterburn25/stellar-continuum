@@ -11,7 +11,16 @@ candidates, not a claim of finished artwork or cinematic communications scenes.
 - compact-high-gravity.jpg: Compact High-Gravity
 - cryogenic-hydrocarbon.jpg: Cryogenic Hydrocarbon
 
-Source and runtime paths are assets/visual/species/ for these exact four JPEGs.
+The diplomacy relations workspace also reuses the four communications
+transmission portraits registered in docs/ASSET_MANIFEST.md:
+
+- terran-baseline-communications-v2.png: Terran Baseline transmission
+- pelagic-high-pressure-communications-v2.png: Pelagic High-Pressure transmission
+- compact-high-gravity-communications-v2.png: Compact High-Gravity transmission
+- cryogenic-hydrocarbon-communications-v2.png: Cryogenic Hydrocarbon transmission
+
+Source and runtime paths are assets/visual/species/ for these exact four JPEGs
+and four PNGs.
 The native exporter pins their bytes in export/native-species-assets.json and
 includes this source note as Licenses/Species-visual-sources.md. It does not copy
 the surrounding directory, Godot imports or unrelated generated artwork.
