@@ -22,7 +22,7 @@ struct AudioSettingsLayout final {
   int body_font_pixels{};
   int heading_font_pixels{};
   stellar::native_map::UiRect panel, master_track, music_track, effects_track;
-  stellar::native_map::UiRect mute, defaults, cancel, save, status;
+  stellar::native_map::UiRect mute, defaults, cancel, save, status, video;
 
   [[nodiscard]] static AudioSettingsLayout for_viewport(int width, int height) noexcept;
 };
@@ -38,6 +38,7 @@ class NativeAudioSettings final {
   NativeAudioSettings(NativeAudioSettings&&) = delete;
   NativeAudioSettings& operator=(NativeAudioSettings&&) = delete;
 
+  void set_video_navigation(Confirm callback) { require_owner(); video_navigation_ = std::move(callback); }
   void open();
   [[nodiscard]] bool visible() const;
   // While visible this consumes every event, including events outside the panel.
@@ -62,6 +63,7 @@ class NativeAudioSettings final {
   std::filesystem::path path_;
   Apply apply_;
   Confirm confirm_;
+  Confirm video_navigation_;
   AudioPreferences values_;
   AudioPreferences saved_;
   std::string status_;

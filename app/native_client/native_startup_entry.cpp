@@ -1,5 +1,7 @@
 #include "native_startup_entry.hpp"
 #include "native_audio_settings.hpp"
+#include "native_video_controller.hpp"
+#include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 
 #include <algorithm>
@@ -66,6 +68,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (config.audio.service) config.audio.service();
     const bool audio_ready = !config.audio.assets_ready || config.audio.assets_ready();
     const auto input = window.poll();
+    if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {
       evidence.exit_requested = true;
       return {{}, true, std::move(evidence)};
@@ -173,6 +176,23 @@ StartupEntryResult run_native_startup_entry(Window &window,
             workspace.render(draw, width, height, measure, &portrait_provider, &artwork_provider);
             config.audio_settings->render(draw, width, height);
             window.draw(draw, automation->audio_settings_screenshot);
+          });
+    }
+    if (!automation->video_settings_screenshot.empty()) {
+      if (!config.audio_settings || !config.video_settings) throw std::runtime_error("Video settings validation requires the menu overlays.");
+      const auto route=[&](const InputEvent& event){
+        if(config.video_settings->visible())(void)config.video_settings->handle(event,width,height);
+        else if(config.audio_settings->visible())(void)config.audio_settings->handle(event,width,height);
+        else dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_video_settings::check_video_settings(*config.video_settings,
+          automation->video_settings_path,width,height,"startup",
+          [&]{route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_audio::AudioSettingsLayout::for_viewport(width,height).video)});},route,
+          [&](bool confirming){DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.video_settings->render(draw,width,height);
+            window.draw(draw,confirming?automation->video_confirm_screenshot:automation->video_settings_screenshot);
           });
     }
     if (automation->action != StartupEntryAutomationAction::Create) {
@@ -284,13 +304,16 @@ StartupEntryResult run_native_startup_entry(Window &window,
   for (;;) {
     if (config.audio.service) config.audio.service();
     const auto input = window.poll();
+    if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {
       evidence.exit_requested = true;
       return {{}, true, std::move(evidence)};
     }
     if (!input.renderable()) {
       for (const auto &event : input.events)
-        if (config.audio_settings && config.audio_settings->visible())
+        if (config.video_settings && config.video_settings->visible())
+          (void)config.video_settings->handle(event, input.drawable_width, input.drawable_height);
+        else if (config.audio_settings && config.audio_settings->visible())
           (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
         else (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
@@ -300,6 +323,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     bool exit{};
     for (const auto &event : input.events) {
+      if (config.video_settings && config.video_settings->visible()) {
+        (void)config.video_settings->handle(event, input.drawable_width, input.drawable_height);
+        continue;
+      }
       if (config.audio_settings && config.audio_settings->visible()) {
         (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
         continue;
@@ -351,6 +378,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
                      &portrait_provider, &artwork_provider);
     if (config.audio_settings)
       config.audio_settings->render(draw, input.drawable_width, input.drawable_height);
+    if (config.video_settings)
+      config.video_settings->render(draw, input.drawable_width, input.drawable_height);
     window.draw(draw);
   }
 }

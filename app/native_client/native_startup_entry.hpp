@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+namespace stellar::native_video_settings { class NativeVideoController; }
 namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
@@ -26,6 +27,7 @@ struct StartupEntryConfig {
   StartupAudioHooks audio;
   stellar::native_audio::NativeAudioSettings* audio_settings{};
   bool return_to_campaign_available{};
+  stellar::native_video_settings::NativeVideoController* video_settings{};
 };
 enum class StartupEntryAutomationAction { Create, ReturnToCampaign, Exit };
 struct StartupEntryAutomation {
@@ -34,6 +36,7 @@ struct StartupEntryAutomation {
   std::filesystem::path setup_screenshot, loading_screenshot;
   std::filesystem::path audio_settings_path, audio_settings_screenshot;
   StartupEntryAutomationAction action{StartupEntryAutomationAction::Create};
+  std::filesystem::path video_settings_path, video_settings_screenshot, video_confirm_screenshot;
 };
 struct StartupEntryEvidence {
   bool entry_opened{}, setup_opened{}, species_selected{}, size_selected{},

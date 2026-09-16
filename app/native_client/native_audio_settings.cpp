@@ -72,7 +72,8 @@ AudioSettingsLayout AudioSettingsLayout::for_viewport(int width, int height) noe
           {track_x, panel.y + panel.height - 96.f * scale, button_w, button_h},
           {track_x + button_w + gap, panel.y + panel.height - 96.f * scale, button_w, button_h},
           {track_x, panel.y + panel.height - 48.f * scale, track_w, button_h},
-          {track_x, panel.y + 82.f * scale, track_w, 22.f * scale}};
+          {track_x, panel.y + 82.f * scale, track_w, 22.f * scale},
+          {track_x + track_w - 122.f * scale, panel.y + 48.f * scale, 122.f * scale, 28.f * scale}};
 }
 
 NativeAudioSettings::NativeAudioSettings(std::filesystem::path path, Apply apply, Confirm confirm)
@@ -155,6 +156,7 @@ bool NativeAudioSettings::handle(const InputEvent& event, int width, int height)
   if (event.type == InputEventType::LeftReleased) { dragging_ = Dragged::None; return true; }
   if (event.type != InputEventType::LeftPressed) return true;
   const auto invoke_confirm = [&] { if (confirm_) confirm_(); };
+  if (video_navigation_ && layout.video.contains(event.position)) { cancel(); invoke_confirm(); video_navigation_(); return true; }
   if (layout.master_track.contains(event.position)) { dragging_ = Dragged::Master; set_from_track(dragging_, event.position, layout); return true; }
   if (layout.music_track.contains(event.position)) { dragging_ = Dragged::Music; set_from_track(dragging_, event.position, layout); return true; }
   if (layout.effects_track.contains(event.position)) { dragging_ = Dragged::Effects; set_from_track(dragging_, event.position, layout); return true; }
@@ -225,6 +227,7 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
     draw.overlay.emplace_back(StrokedRectangle{thumb, panel_stroke});
   }
   button(draw, layout.mute, values_.muted ? "UNMUTE (LEVELS RETAINED)" : "MUTE", layout.body_font_pixels, values_.muted);
+  if (video_navigation_) button(draw, layout.video, "VIDEO", layout.body_font_pixels);
   button(draw, layout.defaults, "DEFAULTS", layout.body_font_pixels);
   button(draw, layout.cancel, "CANCEL", layout.body_font_pixels);
   button(draw, layout.save, "SAVE", layout.body_font_pixels, true);
@@ -232,7 +235,7 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
   label(draw, {layout.status.x, layout.status.y}, notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
   if (!device_status_.empty()) {
     const UiRect diagnostic{layout.panel.x + 12.f * layout.scale, layout.panel.y + 54.f * layout.scale,
-                            std::max(0.f, layout.panel.width - 24.f * layout.scale), 22.f * layout.scale};
+                            std::max(0.f, layout.panel.width - (video_navigation_ ? 168.f : 24.f) * layout.scale), 22.f * layout.scale};
     draw.overlay.emplace_back(Text{{diagnostic.x, diagnostic.y}, "Playback: unavailable; check your audio device.", muted_color,
                                    std::max(12, layout.body_font_pixels - 2), diagnostic.width, diagnostic});
   }

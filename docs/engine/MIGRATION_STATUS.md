@@ -2,7 +2,7 @@
 
 Current Codex candidate (2026-09-15): PR #332 integrates native diplomacy,
 observer-safe territory, approved artwork, audio/settings/scientist cues,
-top-down colony construction, recent events, bounded diagnostic exports and
+top-down colony construction, transactional video settings, recent events, bounded diagnostic exports and
 corrected native tactical controls/persistence. See `../CPP_MIGRATION_HANDOFF.md`
 for current tests and checkpoint history. Tactical `357872e8` is selectively
 adapted with the corrections in `NATIVE_TACTICAL_WORKSPACE.md`; the native-only

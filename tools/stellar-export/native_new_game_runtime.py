@@ -91,6 +91,34 @@ def _diagnostic(stdout: str) -> dict:
     return state
 
 
+def _video_diagnostic(stdout: str, location: str) -> dict:
+    rows = re.findall(r"^video_settings_check=(.*)$", stdout, flags=re.MULTILINE)
+    if len(rows) != 1:
+        raise RuntimeError("Expected exactly one video settings diagnostic")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        report = json.loads(rows[0], object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Video settings diagnostic was not valid unique-key JSON") from error
+    flags = ("opened", "four_rows", "previewed", "normal_capture",
+             "confirm_capture", "escape_reverted", "kept", "restored")
+    expected_keys = {"location", *flags}
+    if (not isinstance(report, dict) or set(report) != expected_keys or
+            report.get("location") != location):
+        raise RuntimeError("Video settings diagnostic did not report the expected fields and location")
+    if any(report[name] is not True for name in flags):
+        raise RuntimeError("Video settings diagnostic did not complete the visible preview/keep/revert flow")
+    return report
+
+
 def _resolved_reported(value, work: Path, label: str) -> Path:
     if not isinstance(value, str) or not value:
         raise RuntimeError(f"Native New Game reported no {label}")
@@ -149,7 +177,7 @@ def _launch(args, cwd: Path, env: dict[str, str], label: str):
 
 def validate_native_new_game_export(folder: Path, env: dict[str, str],
                                     fixture_path: Path, *, audio_check=False,
-                                    audio_settings_check=False):
+                                    audio_settings_check=False, video_settings_check=False):
     if audio_settings_check and not audio_check:
         raise RuntimeError("Native audio settings check requires the audio check")
     anchor_payload = _source_payload(fixture_path)
@@ -178,6 +206,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             fresh_args.append("--audio-check")
         if audio_settings_check:
             fresh_args.append("--audio-settings-check")
+        if video_settings_check: fresh_args.append("--video-settings-check")
         fresh = _launch(fresh_args, cwd, clean, "fresh input")
         fresh_audio = parse_native_audio_check(fresh.stdout, fresh=True) if audio_check else None
         fresh_audio_settings = (parse_native_audio_settings_check(fresh.stdout, fresh=True)
@@ -211,6 +240,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if audio_settings_check:
             _bmp(fresh_settings_capture, 1280, 720)
             settings_bytes = verify_native_audio_settings_file(settings_path)
+        video_bytes = (anchor.parent / "video-settings.json").read_bytes() if video_settings_check else None
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
         _verify_campaign(generated_payload, state)
 
@@ -225,6 +255,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             reload_args.append("--audio-check")
         if audio_settings_check:
             reload_args.append("--audio-settings-check")
+        if video_settings_check: reload_args.append("--video-settings-check")
         loaded = _launch(reload_args, cwd, clean, "paused reload")
         reload_audio = parse_native_audio_check(loaded.stdout, fresh=False) if audio_check else None
         reload_audio_settings = (parse_native_audio_settings_check(loaded.stdout, fresh=False)
@@ -244,7 +275,19 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if before != after:
             raise RuntimeError("Generated campaign changed during paused reload/recapture")
 
+        video_checks = {}
+        if video_settings_check:
+            if (anchor.parent / "video-settings.json").read_bytes() != video_bytes:
+                raise RuntimeError("Video preferences changed across cold campaign reload")
+            for location, process in (("startup", fresh), ("pause", loaded)):
+                video_checks[location] = _video_diagnostic(process.stdout, location)
         capture_paths = [setup_capture, loading_capture, final_capture, reload_capture]
+        if video_settings_check:
+            for base, dimensions in ((final_capture, (1280, 720)), (reload_capture, (1920, 1080))):
+                for suffix in ("-video-settings", "-video-confirm"):
+                    path = base.with_stem(base.stem + suffix)
+                    _bmp(path, *dimensions)
+                    capture_paths.append(path)
         if audio_settings_check:
             capture_paths.extend((fresh_settings_capture, reload_settings_capture))
         for path in capture_paths:
@@ -266,4 +309,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             result["nativeAudioSettingsCheck"] = True
             result["audioSettingsChecks"] = {"fresh": fresh_audio_settings,
                                                "reload": reload_audio_settings}
+        if video_settings_check:
+            result["nativeVideoSettingsCheck"] = True
+            result["videoSettingsChecks"] = video_checks
         return result

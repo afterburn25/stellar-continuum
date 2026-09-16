@@ -75,6 +75,7 @@ struct DrawList {
 // Optional CPU wall-clock breakdown for a single draw. Submission and present
 // may include driver or GPU waits; these are not GPU execution measurements.
 struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
+struct DisplayMode { int width{},height{}; float refresh_hz{}; };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, KeyPressed, TextEntered,
@@ -109,6 +110,13 @@ class Window final {
   Window &operator=(const Window &) = delete;
   [[nodiscard]] InputSnapshot poll();
   void set_text_input(bool enabled);
+  [[nodiscard]] std::vector<DisplayMode> display_modes() const;
+  [[nodiscard]] float display_refresh_hz() const;
+  // Owner-thread operations. Driver rejection is reported to the host's
+  // transactional preview controller; no requested setting is reported saved.
+  void set_fullscreen_mode(bool exclusive,int width=0,int height=0,float refresh_hz=0);
+  void set_vsync(int mode);
+  void set_frame_cap(double hz);
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
             const std::optional<std::filesystem::path> &screenshot = std::nullopt,

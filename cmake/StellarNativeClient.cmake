@@ -1,6 +1,7 @@
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudio.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioSettings.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeVideoSettings.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSurfaceArtAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeNavigationAssets.cmake")
@@ -25,7 +26,7 @@ target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/n
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_navigation_art)
 add_dependencies(stellar-continuum-native stellar_native_navigation_assets)
-target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings stellar_native_campaign_feedback)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings stellar_native_video_settings stellar_native_campaign_feedback)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp

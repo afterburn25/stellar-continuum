@@ -5,6 +5,50 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Safe native video settings
+
+VIDEO is available through the existing main/pause Settings panel. Borderless
+and exclusive fullscreen, detected resolution/refresh pairs, verified V-Sync
+and Automatic/60/120/144/Unlimited pacing are owned outside campaign lifetime.
+Apply is a 15-second preview; Keep alone persists atomically. Escape, inactivity,
+expiry, rejected partial changes and write failures restore the previous mode.
+Failed rollback gets one safe fallback; repeated failure reports unknown display
+state and asks for restart without an automatic retry loop. Desktop default
+preserves desktop refresh. Resolution options support forward/back selection.
+
+This selectively adapts Devin 9b5ba16e. Ignored save errors, partial backend
+acceptance, wrong SDL mode selection, missing resolution choices and session-owned
+preferences were corrected. Preserve these interfaces when importing other
+Devin work; do not replace recorded scientist cues or merge the old settings
+lifecycle. No Core, Player17 or C# changes. Contract/reproduction:
+`docs/engine/NATIVE_VIDEO_SETTINGS.md`.
+
+Validation checkpoint: MSVC native build, 13 affected CTests and 54
+Python startup/restart/audio validator tests pass. Actual Vulkan display tests
+enumerate 227 modes on this machine, switch exclusive resolutions, restore
+borderless, reject invalid settings and measure frame-cap throttling. Relocated
+720p new-game / 1080p paused reload routes verify audio/video preview, rollback,
+Keep and persistence, original-save preservation, independent new slot and full
+paused Player17 equality except SavedAtUtc. Screenshots inspected; no overlapping
+controls. Windowed smoke checks do not prove fullscreen behavior themselves;
+the separate platform test covers that. No sustained-60-FPS claim.
+
+Evidence: `work/native-video-{build,ctest,python}.log`,
+`work/native-video-runtime.json`, and the `package-new-game-*-video-*.bmp`
+captures under `work/native-audio-validation`. Five relocated live New Game runs also pass, retaining save gating,
+Return/Exit handling and music/settings lifetime. Evidence:
+`work/native-video-restart.json`.
+Previous 1d42cee1 passed GitHub Actions 35046505665. The validation package is
+UNSEALED; shared base ac45d958 and PR332 remain unmerged.
+
+Next: observer-safe system inspection and explicit logistics failure/recovery.
+Devin 1c8e9744 surface management and 641955f0 system physical/environment fields
+were inventoried, not audited/imported. Review ownership and visibility before
+adapting commands or exposing foreign colony data. Broader 3D graphics and
+sustained performance work remain open; see prior checkpoints below.
+
+### Previous checkpoint: surface inspection
+
 ### Colony surface focus and truthful operating status
 
 Completed facilities no longer automatically claim to be operational. The

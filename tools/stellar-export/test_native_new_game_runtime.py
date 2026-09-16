@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_new_game_runtime import validate_native_new_game_export
+from native_new_game_runtime import _video_diagnostic, validate_native_new_game_export
 
 
 def fixture(path):
@@ -37,7 +37,52 @@ def bmp(width, height):
     size = 54 + length
     return (b"BM" + struct.pack("<IHHI", size, 0, 0, 54) +
             struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0,
-                        length, 2835, 2835, 0, 0) + pixels)
+            length, 2835, 2835, 0, 0) + pixels)
+
+
+class VideoDiagnosticTests(unittest.TestCase):
+    location = "startup"
+
+    def stdout(self, **overrides):
+        report = {"location": self.location, "opened": True, "four_rows": True,
+                  "previewed": True, "normal_capture": True, "confirm_capture": True,
+                  "escape_reverted": True, "kept": True, "restored": True}
+        report.update(overrides)
+        return "video_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_video_diagnostic(self):
+        self.assertEqual(_video_diagnostic(self.stdout(), self.location)["location"],
+                         self.location)
+
+    def test_missing_video_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic("gpu_driver=vulkan", self.location)
+
+    def test_missing_video_field_is_rejected(self):
+        report = json.loads(self.stdout().removeprefix("video_settings_check="))
+        del report["restored"]
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic("video_settings_check=" + json.dumps(report), self.location)
+
+    def test_false_video_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(kept=False), self.location)
+
+    def test_integer_video_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(previewed=1), self.location)
+
+    def test_duplicate_video_key_is_rejected(self):
+        duplicate = ('video_settings_check={"location":"startup","opened":true,'
+                     '"opened":true,"four_rows":true,"previewed":true,'
+                     '"normal_capture":true,"confirm_capture":true,'
+                     '"escape_reverted":true,"kept":true,"restored":true}')
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(duplicate, self.location)
+
+    def test_wrong_video_location_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _video_diagnostic(self.stdout(location="pause"), self.location)
 
 
 class NativeNewGameRuntimeTests(unittest.TestCase):
