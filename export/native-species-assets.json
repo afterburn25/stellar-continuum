@@ -24,7 +24,7 @@
     "credits": {
       "source": "docs/engine/NATIVE_SPECIES_ART_SOURCES.md",
       "runtimePath": "Licenses/Species-visual-sources.md",
-      "sha256": "d40e1ce4ac2e04b1e4e2f2843ddee44b28ebc8b11344570d2dfc08a1c0f272e2"
+      "sha256": "093dfd0268833486030cdbe104d21d5d9f93a55bf2323b290ef9f8da65fa8bad"
     },
     "terran-baseline-communications": {
       "source": "assets/visual/species/terran-baseline-communications-v2.png",
