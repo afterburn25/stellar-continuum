@@ -1,4 +1,5 @@
 #include "native_settlement_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
 
@@ -19,9 +20,9 @@ bool has_active_settlement_target(
 namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_colony;
-constexpr Color shade{0,4,10,190}, panel{7,18,33,255}, row{12,32,54,255};
-constexpr Color border{92,154,205,255}, text_color{235,244,255,255};
-constexpr Color muted{158,185,211,255}, good{102,232,164,255}, bad{245,183,93,255};
+constexpr Color shade=native_ui::color::shadow,panel=native_ui::color::surface_opaque,row=native_ui::color::surface_secondary;
+constexpr Color border=native_ui::color::keyline_strong,text_color=native_ui::color::text_primary;
+constexpr Color muted=native_ui::color::text_secondary,good=native_ui::color::success,bad=native_ui::color::caution;
 void fill(DrawList& out,UiRect rect,Color color){out.overlay.emplace_back(FilledRectangle{rect,color});}
 void stroke(DrawList& out,UiRect rect,Color color){out.overlay.emplace_back(StrokedRectangle{rect,color});}
 void label(DrawList&out,UiRect bounds,std::string value,Color color,int size,TextAlign align=TextAlign::Left){const float x=align==TextAlign::Center?bounds.x+bounds.width*.5f:bounds.x;out.overlay.emplace_back(Text{{x,bounds.y},std::move(value),color,size,bounds.width,bounds,align,FontFace::Interface});}

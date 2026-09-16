@@ -1,4 +1,5 @@
 #include "native_logistics.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -24,17 +25,14 @@ using native_map::Text;
 using native_map::TextAlign;
 using native_map::UiRect;
 
-constexpr Color panel_color{10, 22, 36, 235};
-constexpr Color border_color{116, 174, 225, 255};
-constexpr Color title_color{154, 225, 255, 255};
-constexpr Color muted_color{154, 181, 211, 235};
-constexpr Color message_color{238, 244, 255, 255};
-constexpr Color tile_color{16, 24, 38, 255};
-constexpr Color supply_color{143, 229, 177, 255};   // reference "8fe5b1"
-constexpr Color demand_color{240, 197, 106, 255};   // VisualUi.Gold
-constexpr Color delivered_color{140, 196, 255, 255};
-constexpr Color shortfall_color{238, 154, 145, 255};  // reference "ee9a91"
-constexpr Color button_hover{24, 46, 70, 255};
+constexpr Color title_color = native_ui::color::text_primary;
+constexpr Color muted_color = native_ui::color::text_secondary;
+constexpr Color message_color = native_ui::color::text_primary;
+constexpr Color tile_color = native_ui::color::surface_secondary;
+constexpr Color supply_color = native_ui::color::success;   // reference "8fe5b1"
+constexpr Color demand_color = native_ui::color::caution;   // VisualUi.Gold
+constexpr Color delivered_color = native_ui::color::selected;
+constexpr Color shortfall_color = native_ui::color::danger;  // reference "ee9a91"
 
 std::string_view condition_name(SupplyCondition condition) noexcept {
   switch (condition) {
@@ -261,8 +259,7 @@ void NativeLogisticsView::render(DrawList &out,
   if (!visible_) return;
   const auto layout = logistics_layout_for(logistics, width, height);
   const auto scale = layout.scale;
-  fill(out, layout.panel, panel_color);
-  stroke(out, layout.panel, border_color);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Economy);
 
   text(out, {layout.header.x, layout.header.y}, "SUPPLY NETWORK", title_color,
        std::max(11, static_cast<int>(21.f * scale)));
@@ -271,10 +268,8 @@ void NativeLogisticsView::render(DrawList &out,
                    upper(logistics.system_name), logistics.nodes.size(),
                    logistics.corridor_count),
        muted_color, std::max(9, static_cast<int>(12.f * scale)));
-  fill(out, layout.close_button, button_hover);
-  text(out, {layout.close_button.x + 8.f * scale,
-             layout.close_button.y + 4.f * scale},
-       "X", muted_color, std::max(10, static_cast<int>(14.f * scale)));
+  native_ui::button(out, layout.close_button, "X", {-1.f, -1.f},
+                    std::max(10, static_cast<int>(14.f * scale)));
 
   const char *titles[4] = {"SUPPLY / DAY", "DEMAND / DAY", "DELIVERED / DAY",
                            "SHORTFALL / DAY"};
@@ -287,6 +282,9 @@ void NativeLogisticsView::render(DrawList &out,
                                : supply_color};
   for (int i = 0; i < 4; ++i) {
     fill(out, layout.metrics[i], tile_color);
+    stroke(out, layout.metrics[i], native_ui::color::keyline);
+    fill(out, {layout.metrics[i].x, layout.metrics[i].y, 3.f,
+               layout.metrics[i].height}, colors[i]);
     text(out, {layout.metrics[i].x + 10.f * scale,
                layout.metrics[i].y + 8.f * scale},
          titles[i], muted_color, std::max(8, static_cast<int>(10.f * scale)));
@@ -316,6 +314,9 @@ void NativeLogisticsView::render(DrawList &out,
     const auto &card = layout.node_cards[i];
     const auto &node = logistics.nodes[i];
     fill(out, card, tile_color);
+    stroke(out, card, native_ui::color::keyline);
+    fill(out, {card.x, card.y, 3.f, card.height},
+         node.status == "Shortfall" ? shortfall_color : supply_color);
     text(out, {card.x + 10.f * scale, card.y + 8.f * scale}, upper(node.name),
          message_color, std::max(10, static_cast<int>(14.f * scale)),
          card.width - 120.f * scale);
@@ -323,12 +324,19 @@ void NativeLogisticsView::render(DrawList &out,
     text(out, {card.x + card.width - 10.f * scale, card.y + 10.f * scale},
          upper(node.status), shortfall ? shortfall_color : supply_color,
          std::max(8, static_cast<int>(10.f * scale)), 0.f, TextAlign::Right);
-    text(out, {card.x + 10.f * scale, card.y + 32.f * scale},
+    text(out, {card.x + 10.f * scale, card.y + 30.f * scale},
          std::format("{} · SUPPLY {:.2f} · DEMAND {:.2f} · DELIVERED {:.2f}",
                      upper(node.kind_label), node.supply_per_day,
                      node.demand_per_day, node.delivered_per_day),
          muted_color, std::max(8, static_cast<int>(11.f * scale)),
          card.width - 20.f * scale);
+    native_ui::progress(
+        out,
+        {card.x + 10.f * scale, card.y + card.height - 7.f * scale,
+         card.width - 20.f * scale, 3.f * scale},
+        node.demand_per_day <= 0. ? 1.
+                                  : node.delivered_per_day / node.demand_per_day,
+        shortfall ? native_ui::Tone::Danger : native_ui::Tone::Success);
   }
 }
 

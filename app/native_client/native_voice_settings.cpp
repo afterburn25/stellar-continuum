@@ -1,4 +1,5 @@
 #include "native_voice_settings.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,16 +11,12 @@ namespace {
 using namespace stellar::native_map;
 
 // Reference palette (VisualPalette / MainMenuLayer).
-constexpr Color panel{9, 20, 37, 250};
-constexpr Color button{14, 34, 58, 245};
-constexpr Color hover{26, 64, 98, 250};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color track_color{6, 14, 26, 255};
-constexpr Color fill_color{64, 130, 190, 255};
-constexpr Color text_primary{235, 244, 255, 255};
-constexpr Color text_muted{151, 180, 207, 245};
-constexpr Color gold{230, 190, 105, 255};
-constexpr Color checked{64, 190, 130, 255};
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color track_color = native_ui::color::canvas;
+constexpr Color text_primary = native_ui::color::text_primary;
+constexpr Color text_muted = native_ui::color::text_secondary;
+constexpr Color gold = native_ui::color::selected;
+constexpr Color checked = native_ui::color::success;
 
 constexpr std::array<std::string_view, 4> toggle_names = {
     "ENABLE VOICES", "SUBTITLES", "SPEAKER LABELS",
@@ -244,8 +241,7 @@ void NativeVoiceSettingsView::render(DrawList &out, const int width,
   const auto layout = VoiceSettingsLayout::for_viewport(width, height);
   fill(out, {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
        {4, 9, 18, 160});
-  fill(out, layout.panel, panel);
-  stroke(out, layout.panel, border);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Selected);
   text(out, {layout.title.x, layout.title.y}, "VOICE & SUBTITLES",
        text_primary, layout.title_font_pixels, TextAlign::Left,
        FontFace::Heading);
@@ -276,24 +272,22 @@ void NativeVoiceSettingsView::render(DrawList &out, const int width,
          {layout.slider_labels[index].x, layout.slider_labels[index].y},
          std::string(slider_names[static_cast<std::size_t>(index)]), gold,
          layout.small_font_pixels);
-    fill(out, track, track_color);
-    fill(out, {track.x, track.y, track.width * value, track.height},
-         fill_color);
-    stroke(out, track, index == dragging_ ? text_primary : border);
+    const UiRect bar{track.x, track.y + 10.f * layout.scale, track.width,
+                     8.f * layout.scale};
+    native_ui::progress(out, bar, value, native_ui::Tone::Selected);
+    stroke(out, track, index == dragging_ ? text_primary
+                                         : native_ui::color::keyline);
     text(out,
          {layout.slider_values[index].x + layout.slider_values[index].width,
           layout.slider_values[index].y},
          std::to_string(static_cast<int>(std::lround(value * 100.f))) + "%",
          text_muted, layout.small_font_pixels, TextAlign::Right);
   }
-  const auto draw_button = [&](UiRect bounds, std::string caption) {
-    fill(out, bounds, bounds.contains(pointer_) ? hover : button);
-    stroke(out, bounds, border);
-    text(out,
-         {bounds.x + bounds.width * .5f,
-          bounds.y + bounds.height * .5f - layout.body_font_pixels * .55f},
-         std::move(caption), text_primary, layout.body_font_pixels,
-         TextAlign::Center);
+  const auto draw_button = [&](UiRect bounds, std::string caption,
+                               native_ui::Tone tone =
+                                   native_ui::Tone::Selected) {
+    native_ui::button(out, bounds, std::move(caption), pointer_,
+                      layout.body_font_pixels, tone);
   };
   for (int index = 0; index < 2; ++index) {
     text(out,
@@ -306,7 +300,7 @@ void NativeVoiceSettingsView::render(DrawList &out, const int width,
                     : std::string(frequency_label(values_.frequency)));
   }
   draw_button(layout.replay, "REPLAY LAST ANNOUNCEMENT");
-  draw_button(layout.stop, "STOP");
+  draw_button(layout.stop, "STOP", native_ui::Tone::Caution);
   draw_button(layout.close, "CLOSE");
 }
 

@@ -1,4 +1,5 @@
 #include "native_audio_settings.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -9,15 +10,9 @@ namespace {
 using namespace stellar::native_map;
 
 // Reference palette (VisualPalette / MainMenuLayer).
-constexpr Color panel{9, 20, 37, 250};
-constexpr Color button{14, 34, 58, 245};
-constexpr Color hover{26, 64, 98, 250};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color track_color{6, 14, 26, 255};
-constexpr Color fill_color{64, 130, 190, 255};
-constexpr Color text_primary{235, 244, 255, 255};
-constexpr Color text_muted{151, 180, 207, 245};
-constexpr Color gold{230, 190, 105, 255};
+constexpr Color text_primary = native_ui::color::text_primary;
+constexpr Color text_muted = native_ui::color::text_secondary;
+constexpr Color gold = native_ui::color::selected;
 
 constexpr std::string_view slider_names[3] = {"MASTER", "MUSIC",
                                               "SOUND EFFECTS"};
@@ -161,8 +156,7 @@ void NativeAudioSettingsView::render(DrawList &out, const int width,
   const auto layout = AudioSettingsLayout::for_viewport(width, height);
   fill(out, {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
        {4, 9, 18, 160});
-  fill(out, layout.panel, panel);
-  stroke(out, layout.panel, border);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Selected);
   text(out, {layout.title.x, layout.title.y}, "AUDIO", text_primary,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   text(out, {layout.hint.x, layout.hint.y},
@@ -175,10 +169,11 @@ void NativeAudioSettingsView::render(DrawList &out, const int width,
     const auto value = std::clamp(*levels[index], 0.f, 1.f);
     text(out, {layout.labels[index].x, layout.labels[index].y},
          std::string(slider_names[index]), gold, layout.small_font_pixels);
-    fill(out, track, track_color);
-    fill(out,
-         {track.x, track.y, track.width * value, track.height}, fill_color);
-    stroke(out, track, index == dragging_ ? text_primary : border);
+    const UiRect bar{track.x, track.y + 13.f * layout.scale, track.width,
+                     8.f * layout.scale};
+    native_ui::progress(out, bar, value, native_ui::Tone::Selected);
+    stroke(out, track, index == dragging_ ? text_primary
+                                         : native_ui::color::keyline);
     text(out,
          {layout.values[index].x + layout.values[index].width,
           layout.values[index].y},
@@ -186,12 +181,8 @@ void NativeAudioSettingsView::render(DrawList &out, const int width,
          text_muted, layout.small_font_pixels, TextAlign::Right);
   }
   const auto draw_button = [&](UiRect bounds, std::string caption) {
-    fill(out, bounds, bounds.contains(pointer_) ? hover : button);
-    stroke(out, bounds, border);
-    text(out, {bounds.x + bounds.width * .5f,
-               bounds.y + bounds.height * .5f - layout.body_font_pixels * .55f},
-         std::move(caption), text_primary, layout.body_font_pixels,
-         TextAlign::Center);
+    native_ui::button(out, bounds, std::move(caption), pointer_,
+                      layout.body_font_pixels, native_ui::Tone::Selected);
   };
   draw_button(layout.done, "DONE");
   draw_button(layout.defaults, "RESTORE DEFAULTS");

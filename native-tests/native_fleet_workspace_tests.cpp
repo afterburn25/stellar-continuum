@@ -111,6 +111,14 @@ int main() try {
               row_select.kind == FleetWorkspaceCommandKind::Select &&
               row_select.fleet_id == 10,
           "Fleet outliner click did not emit an owned fleet selection.");
+  (void)workspace.handle(
+      {InputEventType::PointerMove,
+       {layout.list.x + 10.f, layout.list.y + 10.f}},
+      1280, 720, markers, std::nullopt);
+  DrawList hover_draw;
+  workspace.render(hover_draw, 1280, 720, markers);
+  require(has_text(hover_draw, "Select for readiness"),
+          "Fleet hover did not expose contextual guidance.");
 
   auto map_select = workspace.handle(
       {InputEventType::LeftPressed, {305, 300}}, 1280, 720, markers,
@@ -140,8 +148,9 @@ int main() try {
   DrawList blocked_draw;
   workspace.render(blocked_draw, 1280, 720, markers);
   require(has_text(blocked_draw, "ISS Wayfinder") &&
-              has_text(blocked_draw, "Own strength 7.2") &&
-              has_text(blocked_draw, "Fuel 18.75 / 40.00 ly") &&
+              has_text(blocked_draw, "COMBAT POWER") &&
+              has_text(blocked_draw, "7.2") &&
+              has_text(blocked_draw, "FUEL  18.75 / 40.00 ly") &&
               has_text(blocked_draw, "Maximum leg 24.00 ly") &&
               has_text(blocked_draw, "Destination Unknown system") &&
               has_text(blocked_draw, "Insufficient operational range") &&

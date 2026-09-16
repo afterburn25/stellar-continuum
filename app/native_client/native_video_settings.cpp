@@ -1,4 +1,5 @@
 #include "native_video_settings.hpp"
+#include "native_ui_theme.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -15,14 +16,10 @@ namespace {
 using namespace stellar::native_map;
 
 // Reference palette (VisualPalette / MainMenuLayer).
-constexpr Color panel{9, 20, 37, 250};
-constexpr Color button{14, 34, 58, 245};
-constexpr Color hover{26, 64, 98, 250};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color text_primary{235, 244, 255, 255};
-constexpr Color text_muted{151, 180, 207, 245};
-constexpr Color text_error{239, 172, 146, 255};
-constexpr Color gold{230, 190, 105, 255};
+constexpr Color text_primary = native_ui::color::text_primary;
+constexpr Color text_muted = native_ui::color::text_secondary;
+constexpr Color text_error = native_ui::color::danger;
+constexpr Color gold = native_ui::color::selected;
 
 constexpr std::array<std::string_view, 3> choice_names = {"DISPLAY", "V-SYNC",
                                                         "FRAME CAP"};
@@ -300,22 +297,18 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
   const auto layout = VideoSettingsLayout::for_viewport(width, height);
   fill(out, {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
        {4, 9, 18, 160});
-  fill(out, layout.panel, panel);
-  stroke(out, layout.panel, border);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Selected);
   text(out, {layout.title.x, layout.title.y}, "VIDEO", text_primary,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   text(out, {layout.hint.x, layout.hint.y},
        "Stellar Continuum always fills your display. Resolution, MSAA and 3D "
        "resolution follow the surface renderer.",
        text_muted, layout.small_font_pixels);
-  const auto draw_button = [&](UiRect bounds, std::string caption) {
-    fill(out, bounds, bounds.contains(pointer_) ? hover : button);
-    stroke(out, bounds, border);
-    text(out,
-         {bounds.x + bounds.width * .5f,
-          bounds.y + bounds.height * .5f - layout.body_font_pixels * .55f},
-         std::move(caption), text_primary, layout.body_font_pixels,
-         TextAlign::Center);
+  const auto draw_button = [&](UiRect bounds, std::string caption,
+                               native_ui::Tone tone =
+                                   native_ui::Tone::Selected) {
+    native_ui::button(out, bounds, std::move(caption), pointer_,
+                      layout.body_font_pixels, tone);
   };
   const std::array<std::string_view, 3> choice_values = {
       display_name(values_.display), vsync_name(values_.vsync),
@@ -338,8 +331,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
     fill(out,
          {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
          {0, 0, 0, 184});
-    fill(out, layout.confirm_panel, panel);
-    stroke(out, layout.confirm_panel, border);
+    native_ui::panel(out, layout.confirm_panel, native_ui::Tone::Caution);
     text(out, {layout.confirm_title.x, layout.confirm_title.y},
          "CONFIRM DISPLAY", text_primary, layout.title_font_pixels,
          TextAlign::Left, FontFace::Heading);
@@ -349,8 +341,8 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
                  std::max(0, static_cast<int>(std::ceil(rollback_remaining)))) +
              " seconds.",
          text_muted, layout.body_font_pixels);
-    draw_button(layout.keep, "KEEP");
-    draw_button(layout.revert, "REVERT");
+    draw_button(layout.keep, "KEEP", native_ui::Tone::Success);
+    draw_button(layout.revert, "REVERT", native_ui::Tone::Danger);
   }
 }
 

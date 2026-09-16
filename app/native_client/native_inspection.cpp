@@ -1,4 +1,5 @@
 #include "native_inspection.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cctype>
 #include <format>
@@ -18,6 +19,7 @@ using native_map::FilledRectangle;
 using native_map::Point;
 using native_map::StrokedRectangle;
 using native_map::Text;
+using native_map::TextAlign;
 using native_map::UiRect;
 
 NativeInspectionFact home_distance_fact(const FreshCampaignState &campaign,
@@ -73,8 +75,8 @@ std::string_view survey_level_name(SystemSurveyLevel level) noexcept {
   switch (level) {
   case SystemSurveyLevel::unknown: return "Unknown";
   case SystemSurveyLevel::detected: return "Detected";
-  case SystemSurveyLevel::partially_surveyed: return "PartiallySurveyed";
-  case SystemSurveyLevel::fully_surveyed: return "FullySurveyed";
+  case SystemSurveyLevel::partially_surveyed: return "Partially surveyed";
+  case SystemSurveyLevel::fully_surveyed: return "Fully surveyed";
   }
   return "Unknown";
 }
@@ -151,15 +153,15 @@ NativeSystemInspection build_system_inspection(
       {"SYSTEM TRAITS", [a = selected->archetype] {
          switch (a) {
          case StarArchetype::Standard: return "Standard";
-         case StarArchetype::ResourceRich: return "ResourceRich";
-         case StarArchetype::HabitableRich: return "HabitableRich";
-         case StarArchetype::BarrenFrontier: return "BarrenFrontier";
-         case StarArchetype::Nebula: return "Nebula";
-         case StarArchetype::NeutronPulsar: return "NeutronPulsar";
-         case StarArchetype::BlackHole: return "BlackHole";
-         case StarArchetype::AncientRuin: return "AncientRuin";
-         case StarArchetype::Dangerous: return "Dangerous";
-         case StarArchetype::Legendary: return "Legendary";
+         case StarArchetype::ResourceRich: return "Resource rich";
+         case StarArchetype::HabitableRich: return "Habitable region";
+         case StarArchetype::BarrenFrontier: return "Barren frontier";
+         case StarArchetype::Nebula: return "Nebular region";
+         case StarArchetype::NeutronPulsar: return "Neutron pulsar";
+         case StarArchetype::BlackHole: return "Black hole";
+         case StarArchetype::AncientRuin: return "Ancient ruins";
+         case StarArchetype::Dangerous: return "Hazardous region";
+         case StarArchetype::Legendary: return "Exceptional system";
          }
          return "Unknown";
        }(), true},
@@ -232,44 +234,49 @@ NativeSystemInspection build_system_inspection(
 native_map::UiRect append_inspection_card(
     native_map::DrawList &out, const NativeSystemInspection &inspection,
     Point bottom_left, float scale) {
-  const float width = 336.f * scale, pad = 14.f * scale;
+  const float width = 360.f * scale, pad = 14.f * scale;
   const float fact_rows = inspection.has_detailed_survey
                               ? (inspection.facts.size() + 1.f) / 2.f
                               : static_cast<float>(inspection.facts.size());
   const float height =
-      pad * 2.f + 40.f * scale + 12.f * scale + 34.f * scale +
+      pad * 2.f + 52.f * scale + 13.f * scale + 34.f * scale +
       22.f * scale + fact_rows * 34.f * scale + 64.f * scale;
   const UiRect panel{bottom_left.x, bottom_left.y - height, width, height};
-  out.overlay.emplace_back(FilledRectangle{panel, {8, 13, 22, 228}});
-  out.overlay.emplace_back(StrokedRectangle{panel, {64, 91, 128, 255}});
+  const auto tone = inspection.has_detailed_survey
+                        ? native_ui::Tone::Success
+                        : inspection.survey_status == "Unknown"
+                              ? native_ui::Tone::Unknown
+                              : native_ui::Tone::Caution;
+  native_ui::panel(out, panel, tone);
 
   float y = panel.y + pad;
   const float x = panel.x + pad, inner = width - pad * 2.f;
   out.overlay.emplace_back(Text{{x, y}, inspection.name,
-                                {238, 244, 255, 255}, 20, inner});
-  out.overlay.emplace_back(Text{{x, y + 22.f * scale}, inspection.survey_status,
-                                {140, 196, 255, 255}, 11, inner});
-  y += 40.f * scale;
+                                native_ui::color::text_primary, 20, inner,
+                                std::nullopt, TextAlign::Left,
+                                native_map::FontFace::Heading});
+  native_ui::status_chip(
+      out, {x, y + 24.f * scale, std::min(inner, 156.f * scale),
+            22.f * scale},
+      inspection.survey_status, 11, tone);
+  y += 52.f * scale;
 
   // Survey progress track.
-  const UiRect track{x, y, inner, 8.f * scale};
-  out.overlay.emplace_back(FilledRectangle{track, {30, 40, 56, 255}});
-  const float fill_width = static_cast<float>(
-      std::clamp(inspection.survey_progress, 0., 1.)) * track.width;
-  if (fill_width > 0.f)
-    out.overlay.emplace_back(FilledRectangle{
-        {track.x, track.y, fill_width, track.height}, {92, 168, 255, 255}});
-  y += 12.f * scale;
+  const UiRect track{x, y, inner, 7.f * scale};
+  native_ui::progress(out, track, inspection.survey_progress, tone);
+  y += 13.f * scale;
 
   out.overlay.emplace_back(Text{{x, y}, inspection.guidance,
-                                {154, 181, 211, 235}, 11, inner});
+                                native_ui::color::text_secondary, 12, inner});
   y += 34.f * scale;
 
   out.overlay.emplace_back(Text{{x, y}, "INTELLIGENCE SIGNALS",
-                                {140, 196, 255, 255}, 11, inner * .5f});
+                                native_ui::accent(tone), 12, inner * .5f,
+                                std::nullopt, TextAlign::Left,
+                                native_map::FontFace::Heading});
   out.overlay.emplace_back(FilledRectangle{
-      {x + inner * .52f, y + 6.f * scale, inner * .48f, 1.f},
-      {64, 91, 128, 255}});
+      {x + inner * .52f, y + 7.f * scale, inner * .48f, 1.f},
+      native_ui::color::keyline});
   y += 22.f * scale;
 
   for (std::size_t i = 0; i < inspection.facts.size(); ++i) {
@@ -277,25 +284,34 @@ native_map::UiRect append_inspection_card(
     const float col = static_cast<float>(i % 2), row = static_cast<float>(i / 2);
     const float fx = x + col * (inner * .5f), fy = y + row * 34.f * scale;
     out.overlay.emplace_back(Text{{fx, fy}, fact.label,
-                                  {154, 181, 211, 235}, 9, inner * .5f - 8.f});
+                                  native_ui::color::text_muted, 11,
+                                  inner * .5f - 8.f});
     out.overlay.emplace_back(Text{
-        {fx, fy + 12.f * scale}, fact.value,
-        fact.positive ? Color{225, 238, 250, 255} : Color{154, 181, 211, 235},
-        11, inner * .5f - 8.f});
+        {fx, fy + 14.f * scale}, fact.value,
+        fact.positive ? native_ui::color::text_primary
+                      : native_ui::color::text_secondary,
+        13, inner * .5f - 8.f});
   }
   y += fact_rows * 34.f * scale;
 
   const UiRect card{x, y, inner, 56.f * scale};
-  out.overlay.emplace_back(FilledRectangle{card, {16, 24, 38, 255}});
-  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 8.f * scale},
+  out.overlay.emplace_back(
+      FilledRectangle{card, native_ui::color::surface_secondary});
+  out.overlay.emplace_back(
+      StrokedRectangle{card, native_ui::color::keyline});
+  out.overlay.emplace_back(FilledRectangle{
+      {card.x, card.y, 3.f, card.height}, native_ui::color::success});
+  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 7.f * scale},
                                 "SETTLEMENT INTELLIGENCE",
-                                {154, 181, 211, 235}, 9, inner});
-  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 20.f * scale},
-                                inspection.colony_name, {238, 244, 255, 255},
-                                13, inner - 20.f * scale});
-  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 38.f * scale},
+                                native_ui::color::success, 11, inner});
+  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 21.f * scale},
+                                inspection.colony_name,
+                                native_ui::color::text_primary, 13,
+                                inner - 20.f * scale});
+  out.overlay.emplace_back(Text{{card.x + 10.f * scale, card.y + 39.f * scale},
                                 inspection.colony_details,
-                                {154, 181, 211, 235}, 10, inner - 20.f * scale});
+                                native_ui::color::text_secondary, 11,
+                                inner - 20.f * scale});
   return panel;
 }
 

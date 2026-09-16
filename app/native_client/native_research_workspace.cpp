@@ -1,4 +1,5 @@
 #include "native_research_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -17,17 +18,16 @@ namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_research;
 
-constexpr Color background{4, 10, 21, 255};
-constexpr Color surface{8, 20, 36, 252};
-constexpr Color raised{12, 31, 54, 250};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{23, 67, 102, 255};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color positive{154, 225, 188, 255};
-constexpr Color warning{255, 190, 112, 255};
-constexpr Color failure{255, 133, 123, 255};
+constexpr Color background = native_ui::color::canvas;
+constexpr Color raised = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color selected = native_ui::color::surface_raised;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color positive = native_ui::color::science;
+constexpr Color warning = native_ui::color::caution;
+constexpr Color failure = native_ui::color::danger;
 
 [[nodiscard]] bool contains_rect(UiRect outer, UiRect inner) noexcept {
   return inner.x >= outer.x && inner.y >= outer.y &&
@@ -119,15 +119,6 @@ void clipped_stroke(DrawList &out, UiRect bounds, UiRect clip, Color color) {
     if (const auto segment = clipped_line(from, to, clip))
       out.overlay.emplace_back(Line{segment->first, segment->second, color});
   }
-}
-
-void centered(DrawList &out, UiRect bounds, std::string value, Color color,
-              int pixels, float scale) {
-  const UiRect label{bounds.x + 6.f * scale,
-                     bounds.y +
-                         (bounds.height - static_cast<float>(pixels)) * .5f,
-                     bounds.width - 12.f * scale, bounds.height};
-  text(out, label, std::move(value), color, pixels, TextAlign::Center);
 }
 
 [[nodiscard]] std::string fixed(double value, int precision = 1) {
@@ -563,6 +554,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
   const auto layout = ResearchWorkspaceLayout::for_viewport(width, height,
                                                              tab_count);
   fill(out, layout.surface, background);
+  fill(out, {layout.surface.x, layout.surface.y, 4.f, layout.surface.height},
+       native_ui::color::science);
   text(out, layout.title, "RESEARCH NETWORK", bright,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   if (window_) {
@@ -577,6 +570,9 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
   }
   fill(out, layout.search, raised);
   stroke(out, layout.search, search_focused_ ? positive : border);
+  if (search_focused_)
+    fill(out, {layout.search.x, layout.search.y, 3.f, layout.search.height},
+         positive);
   text(out,
        {layout.search.x + 10.f * layout.scale,
         layout.search.y + 9.f * layout.scale,
@@ -584,36 +580,24 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
         layout.search.height - 10.f * layout.scale},
        query_.search.empty() ? "Search known research" : query_.search,
        query_.search.empty() ? muted : bright, layout.body_font_pixels);
-  fill(out, layout.close, layout.close.contains(pointer_) ? hover : raised);
-  stroke(out, layout.close, border);
-  centered(out, layout.close, "CLOSE", bright, layout.body_font_pixels,
-           layout.scale);
+  native_ui::button(out, layout.close, "CLOSE", pointer_,
+                    layout.body_font_pixels);
 
   if (window_) {
     for (const auto &tab : layout.tabs) {
       const auto &domain = window_->domain_tabs.at(tab.index);
       const auto active = domain.id.empty() ? !query_.domain_id
                                             : query_.domain_id == domain.id;
-      fill(out, tab.bounds,
-           active ? selected
-                  : tab.bounds.contains(pointer_) ? hover : raised);
-      stroke(out, tab.bounds, active ? positive : border);
-      const UiRect tab_label{tab.bounds.x + 6.f * layout.scale,
-                             tab.bounds.y + 4.f * layout.scale,
-                             tab.bounds.width - 12.f * layout.scale,
-                             tab.bounds.height - 8.f * layout.scale};
-      clipped_text(
-          out, tab_label, tab.bounds,
+      native_ui::button(
+          out, tab.bounds,
           domain.label + " " + std::to_string(domain.known_node_count),
-          active ? bright : muted, layout.small_font_pixels,
-          TextAlign::Center);
+          pointer_, layout.small_font_pixels, native_ui::Tone::Science,
+          active);
     }
   }
 
-  fill(out, layout.graph, surface);
-  stroke(out, layout.graph, border);
-  fill(out, layout.inspector, surface);
-  stroke(out, layout.inspector, border);
+  native_ui::panel(out, layout.graph, native_ui::Tone::Science);
+  native_ui::panel(out, layout.inspector, native_ui::Tone::Science);
 
   if (!window_) {
     text(out,
@@ -676,6 +660,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
     fill(out, clipping,
          chosen ? selected
                 : clipping.contains(pointer_) ? hover : raised);
+    if (chosen)
+      fill(out, {clipping.x, clipping.y, 3.f, clipping.height}, positive);
     clipped_stroke(out, bounds, layout.graph, chosen ? positive : border);
     clipped_text(out,
                  {bounds.x + 9.f * layout.scale,
@@ -689,22 +675,23 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
                   bounds.width - 18.f * layout.scale, 17.f * layout.scale},
                  clipping, node_state(node), node.active ? positive : muted,
                  layout.small_font_pixels);
-    const auto progress = static_cast<float>(std::clamp(node.total_progress, 0., 1.));
     const UiRect progress_bounds{
         bounds.x + 8.f * layout.scale,
-        bounds.y + bounds.height - 6.f * layout.scale,
-        (bounds.width - 16.f * layout.scale) * progress,
-        2.f * layout.scale};
+        bounds.y + bounds.height - 7.f * layout.scale,
+        bounds.width - 16.f * layout.scale, 3.f * layout.scale};
     if (const auto progress_clip = intersection(progress_bounds, layout.graph))
-      fill(out, *progress_clip, positive);
+      native_ui::progress(out, *progress_clip, node.total_progress,
+                          native_ui::Tone::Science);
   }
 
   const auto inspector_x = layout.inspector.x + 14.f * layout.scale;
   const auto inspector_width = layout.inspector.width - 28.f * layout.scale;
   auto inspector_y = layout.inspector.y + 14.f * layout.scale;
-  text(out, {inspector_x, inspector_y, inspector_width, 18.f * layout.scale},
-       "PROGRAM INSPECTOR", muted, layout.small_font_pixels);
-  inspector_y += 24.f * layout.scale;
+  native_ui::section_header(
+      out, {inspector_x, inspector_y, inspector_width, 22.f * layout.scale},
+      "PROGRAM INSPECTOR", layout.small_font_pixels,
+      native_ui::Tone::Science);
+  inspector_y += 30.f * layout.scale;
   const auto *node = selected_node();
   if (!node) {
     text(out, {inspector_x, inspector_y, inspector_width, 60.f * layout.scale},
@@ -719,13 +706,9 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
        node->domain_label + "  |  " + node_state(*node),
        node->active ? positive : muted, layout.small_font_pixels);
   inspector_y += 27.f * layout.scale;
-  fill(out, {inspector_x, inspector_y, inspector_width, 7.f * layout.scale},
-       raised);
-  fill(out, {inspector_x, inspector_y,
-             inspector_width *
-                 static_cast<float>(std::clamp(node->total_progress, 0., 1.)),
-             7.f * layout.scale},
-       positive);
+  native_ui::progress(
+      out, {inspector_x, inspector_y, inspector_width, 7.f * layout.scale},
+      node->total_progress, native_ui::Tone::Science);
   inspector_y += 17.f * layout.scale;
   auto progress_text =
       "Progress " + fixed(node->total_progress * 100., 0) + "%";
@@ -779,11 +762,9 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
   const auto action_text = action_label(node->primary_action.intent);
   if (!action_text.empty()) {
     const auto enabled = node->primary_action.enabled;
-    fill(out, layout.action,
-         enabled && layout.action.contains(pointer_) ? hover : raised);
-    stroke(out, layout.action, enabled ? positive : border);
-    centered(out, layout.action, action_text, enabled ? bright : muted,
-             layout.body_font_pixels, layout.scale);
+    native_ui::button(out, layout.action, action_text, pointer_,
+                      layout.body_font_pixels, native_ui::Tone::Science,
+                      false, enabled);
   }
   const auto feedback_text=!notice_.empty()
                                ?notice_
@@ -794,6 +775,21 @@ void NativeResearchWorkspace::render(DrawList &out, int width,
     text(out,layout.feedback,feedback_text,
          !notice_.empty()?(notice_accepted_?positive:failure):warning,
          layout.small_font_pixels);
+  for (const auto &candidate : window_->nodes) {
+    const auto placement = std::ranges::find(placements_, candidate.id,
+                                             &NodePlacement::id);
+    if (placement == placements_.end()) continue;
+    const auto bounds = transformed_card(*placement, layout);
+    if (!layout.graph.contains(pointer_) || !bounds.contains(pointer_)) continue;
+    native_ui::tooltip(
+        out, {pointer_.x + 12.f * layout.scale,
+              pointer_.y + 12.f * layout.scale},
+        candidate.display_name,
+        candidate.domain_label + " · " + node_state(candidate) +
+            ". Select for costs, staffing, capabilities and requirements.",
+        width, height, layout.scale, native_ui::Tone::Science);
+    break;
+  }
 }
 
 } // namespace stellar::native_research_ui
