@@ -7387,7 +7387,9 @@ int main(int argc,char **argv){
     const auto general_settings_path=settings_path.parent_path()/"general-settings.json";
     const auto initial_video=stellar::native_video_settings::NativeVideoSettings::load(video_settings_path);
     auto launch_video=initial_video;
-    if(options.windowed){launch_video.display=stellar::native_video_settings::VideoDisplayMode::Windowed;
+    // Capture dimensions belong to the test viewport, not the player's saved
+    // preferences. Normal --windowed launches still expose their actual mode.
+    if(options.windowed&&!options.smoke_screenshot){launch_video.display=stellar::native_video_settings::VideoDisplayMode::Windowed;
       launch_video.width=options.window_width;launch_video.height=options.window_height;launch_video.refresh_hz=0.f;}
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
