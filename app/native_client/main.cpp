@@ -977,6 +977,21 @@ class NativeCampaign final {
         throw std::runtime_error("Fleet smoke resume order did not land.");
       smoke_civilian_recovery_=true;
     }
+    // Reference UiFocusOwnedFleet: LOCATE keeps the selection and centers the
+    // strategic map on the fleet's authoritative position. Unarmed fleets
+    // draw the action in the right-edge command slot.
+    if(const auto selected_id=fleet_controller_.selection()){
+      click(center(layout.engage));
+      const auto &world_fleets=
+          session_->frame().runtime().world().campaign().fleets;
+      const auto located=std::ranges::find(world_fleets,*selected_id,
+                                           &FleetState::id);
+      if(located==world_fleets.end()||
+         std::abs(camera_.center.x-located->position.x)>1e-6||
+         std::abs(camera_.center.y-located->position.y)>1e-6)
+        throw std::runtime_error("Fleet smoke LOCATE did not center its fleet.");
+      smoke_fleet_located_=true;
+    }
     // EmpireOverviewPanel parity: with no fleet selected the detail area
     // lists own colonies; a colony row opens its system's orbital view.
     {
@@ -1825,6 +1840,7 @@ class NativeCampaign final {
        <<":hover="<<(smoke_fleet_hover_preview_?1:0)
        <<":inspect="<<(smoke_inspection_?1:0)
        <<":civilian="<<(smoke_civilian_recovery_?1:0)
+       <<":locate="<<(smoke_fleet_located_?1:0)
        <<":overview="<<(smoke_overview_?1:0)
        <<":missions="<<smoke_missions_<<":"<<smoke_mission_count_
        <<":sites="<<smoke_mission_sites_<<":"<<smoke_mission_site_selection_;
@@ -3305,6 +3321,37 @@ class NativeCampaign final {
         session_->publish_notification("Combat",outcome.message);
       refresh_fleets(true);
     }
+    // Reference UiIssueMilitaryOrder (non-tactical branch).
+    if(command.kind==FleetWorkspaceCommandKind::MilitaryHold||
+       command.kind==FleetWorkspaceCommandKind::MilitaryDefend||
+       command.kind==FleetWorkspaceCommandKind::MilitaryRetreat){
+      const auto type=command.kind==FleetWorkspaceCommandKind::MilitaryDefend
+          ?MilitaryOrderType::Defend
+          :command.kind==FleetWorkspaceCommandKind::MilitaryRetreat
+               ?MilitaryOrderType::Retreat
+               :MilitaryOrderType::Hold;
+      const auto outcome=fleet_controller_.issue_selected_military_order(
+          session_->frame(),session_->cache().generation,type);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(
+                                      outcome.message,observed_system_names()),
+                                  outcome.accepted);
+      refresh_fleets(true);
+      return;
+    }
+    // Reference UiFocusOwnedFleet: select + center the strategic map on the
+    // fleet's authoritative position.
+    if(command.kind==FleetWorkspaceCommandKind::Locate){
+      const auto &campaign=session_->frame().runtime().world().campaign();
+      if(const auto fleet=std::ranges::find(campaign.fleets,command.fleet_id,
+                                            &FleetState::id);
+         fleet!=campaign.fleets.end()){
+        camera_.center={fleet->position.x,fleet->position.y};
+        session_->publish_status(fleet->name+
+            " selected. Right-click a destination to set its course.");
+      }
+      refresh_fleets(true);
+      return;
+    }
   }
 
   void execute_battle(const native_battle_ui::BattleWorkspaceCommand &command){
@@ -3553,6 +3600,7 @@ class NativeCampaign final {
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_fleet_hover_preview_{},smoke_inspection_{},
+       smoke_fleet_located_{},
       smoke_civilian_recovery_{},smoke_overview_{};
   int smoke_missions_{},smoke_mission_count_{},smoke_mission_sites_{},
       smoke_mission_site_selection_{};

@@ -31,6 +31,10 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect confirm;
   stellar::native_map::UiRect engage;
+  stellar::native_map::UiRect order_hold;
+  stellar::native_map::UiRect order_defend;
+  stellar::native_map::UiRect order_retreat;
+  stellar::native_map::UiRect locate;
   stellar::native_map::UiRect hold;
   stellar::native_map::UiRect return_base;
 
@@ -45,6 +49,10 @@ enum class FleetWorkspaceCommandKind {
   Preview,
   Confirm,
   Engage,
+  MilitaryHold,
+  MilitaryDefend,
+  MilitaryRetreat,
+  Locate,
   HoldResume,
   ReturnToBase,
   OpenColony

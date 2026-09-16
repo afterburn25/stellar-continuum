@@ -38,7 +38,7 @@ def _fleet(payload: dict, fleet_id: int) -> tuple[dict, int]:
 def _diagnostic(stdout: str) -> tuple[int, int, int, float]:
     match = re.search(
         r" fleet=(\d+):(\d+):(\d+):([0-9.]+):hover=1:inspect=1:civilian=1"
-        r":overview=1:missions=1:(\d+):sites=(\d+):(\d+)",
+        r":locate=1:overview=1:missions=1:(\d+):sites=(\d+):(\d+)",
         stdout)
     if not match:
         raise RuntimeError(

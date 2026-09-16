@@ -200,6 +200,84 @@ int main() try {
               !has_text(replacement_draw, "Alpha Centauri"),
           "Fleet preview, notice, or selection survived campaign replacement.");
 
+  // Reference armed-fleet order row: Hold / Defend / Retreat / Locate /
+  // Engage (UiIssueMilitaryOrder / UiFocusOwnedFleet / UiEngageHostiles).
+  {
+    auto armed_view = player_view();
+    NativeOwnFleet warship;
+    warship.id = 30;
+    warship.name = "ISS Aegis";
+    warship.role = stellar::core::FleetRole::Military;
+    warship.position = {9, 4};
+    warship.current_system_id = 7;
+    stellar::core::OwnCombatFleetStatus status;
+    status.is_armed = true;
+    status.is_combat_effective = true;
+    warship.combat_status = status;
+    armed_view.own_fleets.push_back(std::move(warship));
+    armed_view.selected_fleet_id = 30;
+    workspace.set_view(std::move(armed_view));
+    DrawList armed_draw;
+    workspace.render(armed_draw, 1280, 720, markers);
+    require(has_text(armed_draw, "HOLD") && has_text(armed_draw, "DEFEND") &&
+                has_text(armed_draw, "RETREAT") &&
+                has_text(armed_draw, "LOCATE") &&
+                has_text(armed_draw, "ENGAGE"),
+            "Armed fleet details did not render its reference order row.");
+    const auto hold = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.order_hold)}, 1280, 720,
+        markers, std::nullopt);
+    require(hold.captured &&
+                hold.kind == FleetWorkspaceCommandKind::MilitaryHold &&
+                hold.fleet_id == 30,
+            "Armed HOLD did not emit a military hold order.");
+    const auto defend = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.order_defend)}, 1280, 720,
+        markers, std::nullopt);
+    require(defend.captured &&
+                defend.kind == FleetWorkspaceCommandKind::MilitaryDefend &&
+                defend.fleet_id == 30,
+            "Armed DEFEND did not emit a military defend order.");
+    const auto retreat = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.order_retreat)}, 1280,
+        720, markers, std::nullopt);
+    require(retreat.captured &&
+                retreat.kind == FleetWorkspaceCommandKind::MilitaryRetreat &&
+                retreat.fleet_id == 30,
+            "Armed RETREAT did not emit a military retreat order.");
+    const auto locate = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.locate)}, 1280, 720,
+        markers, std::nullopt);
+    require(locate.captured &&
+                locate.kind == FleetWorkspaceCommandKind::Locate &&
+                locate.fleet_id == 30,
+            "Armed LOCATE did not emit a locate command.");
+    const auto engage = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.engage)}, 1280, 720,
+        markers, std::nullopt);
+    require(engage.captured &&
+                engage.kind == FleetWorkspaceCommandKind::Engage &&
+                engage.fleet_id == 30,
+            "Armed ENGAGE did not emit an engage command.");
+  }
+
+  // Unarmed selections keep LOCATE in the right-edge command slot.
+  {
+    workspace.set_view(player_view(true));
+    DrawList unarmed_draw;
+    workspace.render(unarmed_draw, 1280, 720, markers);
+    require(has_text(unarmed_draw, "LOCATE") &&
+                !has_text(unarmed_draw, "DEFEND"),
+            "Unarmed fleet details omitted LOCATE or leaked order buttons.");
+    const auto locate = workspace.handle(
+        {InputEventType::LeftPressed, center(layout.engage)}, 1280, 720,
+        markers, std::nullopt);
+    require(locate.captured &&
+                locate.kind == FleetWorkspaceCommandKind::Locate &&
+                locate.fleet_id == 10,
+            "Unarmed LOCATE did not emit a locate command.");
+  }
+
   std::cout << "Native owned-fleet outliner, map hit, route preview, confirmation, "
                "empty-state and secrecy tests passed\n";
   return 0;

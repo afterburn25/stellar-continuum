@@ -130,6 +130,21 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const UiRect engage{details.x + details.width - 96.f * scale,
                       details.y + details.height - 34.f * scale,
                       92.f * scale, 30.f * scale};
+  // Strategic military orders sit at the details bottom-left for armed
+  // fleets (reference UiIssueMilitaryOrder Hold/Defend/Retreat buttons);
+  // LOCATE hugs the right edge ahead of ENGAGE and reuses the ENGAGE slot
+  // for unarmed selections (reference UiFocusOwnedFleet).
+  const float order_button_width = 76.f * scale;
+  const UiRect order_hold{details.x,
+                          details.y + details.height - 34.f * scale,
+                          order_button_width, 30.f * scale};
+  const UiRect order_defend{order_hold.x + order_button_width + 8.f * scale,
+                            order_hold.y, order_button_width, 30.f * scale};
+  const UiRect order_retreat{order_defend.x + order_button_width +
+                                 8.f * scale,
+                             order_hold.y, order_button_width, 30.f * scale};
+  const UiRect locate{engage.x - order_button_width - 8.f * scale, engage.y,
+                      order_button_width, 30.f * scale};
   // Civilian recovery buttons sit at the details bottom edge, left of ENGAGE
   // (which never coexists with them — armed fleets are military).
   const UiRect hold{details.x, details.y + details.height - 34.f * scale,
@@ -148,6 +163,10 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           feedback,
           confirm,
           engage,
+          order_hold,
+          order_defend,
+          order_retreat,
+          locate,
           hold,
           return_base};
 }
@@ -236,10 +255,23 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
-    if (const auto *fleet = selected_fleet();
-        fleet && fleet->combat_status && fleet->combat_status->is_armed &&
-        layout.engage.contains(event.position))
-      return {FleetWorkspaceCommandKind::Engage, true, fleet->id};
+    if (const auto *fleet = selected_fleet(); fleet) {
+      const bool armed =
+          fleet->combat_status && fleet->combat_status->is_armed;
+      if (armed) {
+        if (layout.order_hold.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryHold, true, fleet->id};
+        if (layout.order_defend.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryDefend, true, fleet->id};
+        if (layout.order_retreat.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryRetreat, true, fleet->id};
+        if (layout.engage.contains(event.position))
+          return {FleetWorkspaceCommandKind::Engage, true, fleet->id};
+        if (layout.locate.contains(event.position))
+          return {FleetWorkspaceCommandKind::Locate, true, fleet->id};
+      } else if (layout.engage.contains(event.position))
+        return {FleetWorkspaceCommandKind::Locate, true, fleet->id};
+    }
     if (const auto *fleet = selected_fleet();
         fleet && native_fleet::is_civilian_role(fleet->role)) {
       if (layout.hold.contains(event.position))
@@ -425,7 +457,29 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       }
     }
     text(out, details_bounds, details, bright, layout.small_font_pixels);
-    if (fleet->combat_status && fleet->combat_status->is_armed) {
+    const bool armed =
+        fleet->combat_status && fleet->combat_status->is_armed;
+    if (armed) {
+      const auto order_button = [&](UiRect bounds, const char *label) {
+        fill(out, bounds,
+             bounds.contains(pointer_) ? hover_color : row_color);
+        stroke(out, bounds,
+               bounds.contains(pointer_) ? bright : border_color);
+        text(out,
+             {bounds.x, bounds.y + bounds.height * .3f, bounds.width,
+              bounds.height * .7f},
+             label, bright, layout.small_font_pixels, FontFace::Interface,
+             TextAlign::Center);
+      };
+      // Reference UiIssueMilitaryOrder row: Hold / Defend / Retreat.
+      order_button(layout.order_hold, "HOLD");
+      order_button(layout.order_defend, "DEFEND");
+      order_button(layout.order_retreat, "RETREAT");
+      order_button(layout.locate, "LOCATE");
+      order_button(layout.engage, "ENGAGE");
+    } else {
+      // Reference UiFocusOwnedFleet: unarmed selections keep the Locate
+      // action in the right-edge command slot.
       fill(out, layout.engage,
            layout.engage.contains(pointer_) ? hover_color : row_color);
       stroke(out, layout.engage,
@@ -433,7 +487,7 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       text(out,
            {layout.engage.x, layout.engage.y + layout.engage.height * .3f,
             layout.engage.width, layout.engage.height * .7f},
-           "ENGAGE", bright, layout.small_font_pixels, FontFace::Interface,
+           "LOCATE", bright, layout.small_font_pixels, FontFace::Interface,
            TextAlign::Center);
     }
     // Civilian recovery controls (reference CivilianHoldResume /

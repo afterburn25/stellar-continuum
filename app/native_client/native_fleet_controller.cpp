@@ -1,6 +1,7 @@
 #include "native_fleet_controller.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
+#include <stellar/core/combat_simulation.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
@@ -347,6 +348,35 @@ NativeFleetOrderOutcome NativeFleetController::toggle_selected_civilian_hold(
             &player.simulation, player.player_id, fleet->id)
       : player.runtime.core().issue_civilian_hold_order(
             &player.simulation, player.player_id, fleet->id);
+  const auto current = find_owned(player, fleet->id);
+  return {outcome.accepted, outcome.message,
+          current ? current->mission_order_revision : 0};
+}
+
+// Reference UiIssueMilitaryOrder (non-tactical branch): Hold, Defend and
+// Retreat reach the coordinator as a strategic MilitaryOrder; Defend carries
+// the fleet's current system as its defended anchor exactly like the
+// reference's DefendSystemId assignment.
+NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
+    CampaignFrame &frame, const std::uint64_t campaign_generation,
+    const MilitaryOrderType type) {
+  require_owner();
+  if (!generation_ || *generation_ != campaign_generation)
+    return {false, "The campaign changed; refresh fleets before issuing an order."};
+  auto player = context(frame);
+  auto *fleet = selected_fleet_id_ ? find_owned(player, *selected_fleet_id_)
+                                   : nullptr;
+  if (!fleet)
+    return {false, "Select an owned fleet before issuing a combat order."};
+  if (!fleet->combat)
+    return {false, "Combat orders apply to armed military fleets.",
+            fleet->mission_order_revision};
+  const MilitaryOrder order{
+      type, std::nullopt,
+      type == MilitaryOrderType::Defend ? fleet->current_system_id
+                                        : std::nullopt};
+  const auto outcome = player.runtime.core().issue_military_order(
+      &player.simulation, player.player_id, fleet->id, order);
   const auto current = find_owned(player, fleet->id);
   return {outcome.accepted, outcome.message,
           current ? current->mission_order_revision : 0};

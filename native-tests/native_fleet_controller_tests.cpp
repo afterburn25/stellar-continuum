@@ -241,6 +241,29 @@ void observer_and_commands(CampaignFrame &frame) {
   const auto old_window = controller.issue_selected_route(frame, stale_preview);
   require(!old_window.accepted,
           "A preview from the replaced campaign generation was accepted.");
+
+  // Reference UiIssueMilitaryOrder (non-tactical branch): the coordinator
+  // decides; the fixture's unarmed profiles accept Hold but reject Defend.
+  require(controller.select(frame, generation + 1, scout->id).accepted,
+          "Owned fleet could not be reselected for military orders.");
+  const auto hold_order = controller.issue_selected_military_order(
+      frame, generation + 1, MilitaryOrderType::Hold);
+  require(hold_order.accepted, "Coordinator rejected a hold order.");
+  const auto hold_fleet =
+      std::ranges::find(world.fleets, scout->id, &FleetState::id);
+  require(hold_fleet != world.fleets.end() && hold_fleet->combat &&
+              hold_fleet->combat->order == MilitaryOrderType::Hold,
+          "Hold order did not land on the fleet's combat state.");
+  const auto defend_order = controller.issue_selected_military_order(
+      frame, generation + 1, MilitaryOrderType::Defend);
+  require(!defend_order.accepted && !defend_order.message.empty() &&
+              hold_fleet->combat->order == MilitaryOrderType::Hold,
+          "Unarmed defend order was accepted or mutated the combat state.");
+  const auto generation_check = controller.issue_selected_military_order(
+      frame, generation, MilitaryOrderType::Hold);
+  require(!generation_check.accepted,
+          "A stale-generation military order was accepted.");
+
   bool rejected_generation_rollback{};
   try {
     (void)controller.build(frame, generation);

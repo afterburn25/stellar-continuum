@@ -119,6 +119,12 @@ public:
                        const NativeFleetRoutePreview &preview);
   // Reference UiToggleSelectedCivilianFleetHold /
   // UiRequestSelectedCivilianReturnToBase.
+  // Reference UiIssueMilitaryOrder (non-tactical branch): the armed-fleet
+  // HOLD/DEFEND/RETREAT buttons issue a strategic MilitaryOrder through the
+  // coordinator. Defend anchors at the fleet's current system.
+  [[nodiscard]] NativeFleetOrderOutcome issue_selected_military_order(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      stellar::core::MilitaryOrderType type);
   [[nodiscard]] NativeFleetOrderOutcome toggle_selected_civilian_hold(
       stellar::core::CampaignFrame &, std::uint64_t campaign_generation);
   [[nodiscard]] NativeFleetOrderOutcome request_selected_civilian_return(
