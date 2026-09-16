@@ -7,6 +7,7 @@
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/surface_construction.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -113,6 +114,79 @@ void surface_operation_tests(const fs::path &research_root, const fs::path &cata
     return surface_site_status(*site).label;
   };
   const auto normal = project();
+  const auto unchanged = project();
+  require(unchanged.revision == normal.revision,
+          "an unchanged colony projection advanced its revision");
+  const auto site = [&](const NativeColonyView &view, const int id)
+      -> const NativeSurfaceSite & {
+    const auto found = std::ranges::find(view.construction_sites, id,
+                                         &NativeSurfaceSite::building_id);
+    require(found != view.construction_sites.end(),
+            "missing management projection site");
+    return *found;
+  };
+  const auto &generator = site(normal, 9001);
+  const auto &lab = site(normal, 9002);
+  const auto &damaged = site(normal, 9005);
+  require(generator.essential_service && !lab.essential_service &&
+              lab.can_upgrade && lab.pending_upgrade_type_id == std::nullopt &&
+              lab.upgrade_name ==
+                  find_surface_building("advanced_science_lab")->name &&
+              lab.upgrade_credit_budget_units ==
+                  surface_upgrade_authorization_cost(
+                      ConstructionReadView{world.civilizations, world.bodies,
+                                           world.construction, world.colonies,
+                                           world.economies, {}, {}},
+                      colony, *find_surface_building("science_lab")) &&
+              lab.upgrade_industry_cost ==
+                  find_surface_building("science_lab")->upgrade_industry_cost &&
+              damaged.repair_industry_cost ==
+                  surface_repair_industry_cost(colony.surface_buildings[4]),
+          "surface management projection diverged from canonical costs or service priority");
+  require(generator.can_upgrade && !generator.upgrade_lock_reason.empty(),
+          "surface upgrade lock was not projected for a visible upgrade path");
+  const auto hub_cost = surface_hub_upgrade_cost(
+      ConstructionReadView{world.civilizations, world.bodies,
+                           world.construction, world.colonies,
+                           world.economies, {}, {}},
+      colony);
+  require(!normal.hub_name.empty() && normal.hub_upgrade_available ==
+              hub_cost.has_value() &&
+              normal.hub_upgrade_credit_budget_units ==
+                  (hub_cost ? hub_cost->credit_cost : 0.) &&
+              normal.hub_upgrade_industry_cost ==
+                  (hub_cost ? hub_cost->industry_cost : 0.),
+          "hub management projection diverged from canonical upgrade costs");
+  const auto original_revision = normal.revision;
+  colony.surface_buildings[1].pending_upgrade_type_id = "advanced_science_lab";
+  colony.surface_buildings[1].upgrade_days_remaining = 4.;
+  const auto pending = project();
+  require(!site(pending, 9002).can_upgrade &&
+              site(pending, 9002).upgrade_days_remaining == 4. &&
+              pending.revision > original_revision,
+          "pending surface upgrade remained actionable or failed to invalidate revision");
+  colony.surface_buildings[1].pending_upgrade_type_id.reset();
+  colony.surface_buildings[1].upgrade_days_remaining = 0.;
+  auto &economy = *std::ranges::find(world.economies, player,
+                                      &CivilizationEconomy::civilization_id);
+  const auto credits = economy.credits;
+  const auto industry = economy.industry;
+  economy.credits = 0.;
+  economy.industry = 0.;
+  const auto unaffordable = project();
+  require(site(unaffordable, 9002).can_upgrade &&
+              !site(unaffordable, 9002).can_afford_upgrade &&
+              !site(unaffordable, 9005).can_afford_repair &&
+              unaffordable.revision > pending.revision,
+          "surface management affordability did not invalidate the quote");
+  economy.credits = credits;
+  economy.industry = industry;
+  colony.surface_hub_upgrade_days_remaining = 3.;
+  const auto pending_hub = project();
+  require(!pending_hub.hub_upgrade_available &&
+              pending_hub.hub_upgrade_days_remaining == 3.,
+          "pending hub expansion remained actionable");
+  colony.surface_hub_upgrade_days_remaining = 0.;
   require(label(normal, 9002) == "OPERATING" && label(normal, 9004) == "DISABLED" &&
               label(normal, 9005) == "REPAIR NEEDED" && label(normal, 9006) == "CONSTRUCTION",
           "facility completion was confused with operational readiness");

@@ -454,6 +454,175 @@ void surface_scene_rotation_and_families() {
           "advanced functional family fell back to the generic silhouette");
 }
 
+void management_controls_and_confirmation() {
+  constexpr int width = 1280, height = 720;
+  auto view = colony();
+  auto &site = view.construction_sites.front();
+  site.complete = true;
+  site.enabled = true;
+  site.prioritized = false;
+  site.condition = .5;
+  site.can_upgrade = true;
+  site.can_afford_upgrade = true;
+  site.upgrade_name = "Advanced Fabricator";
+  site.upgrade_credit_budget_units = 25.;
+  site.upgrade_industry_cost = 80.;
+  site.can_afford_repair = true;
+  site.repair_industry_cost = 15.;
+  view.hub_name = "Command center";
+  view.hub_upgrade_available = true;
+  view.can_afford_hub_upgrade = true;
+  view.hub_upgrade_credit_budget_units = 60.;
+  view.hub_upgrade_industry_cost = 250.;
+  NativeSurfaceWorkspace workspace;
+  workspace.open(view, width, height);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+  auto select_site = [&] {
+    auto point = workspace.viewport().world_to_screen(site.x, site.z,
+                                                       layout.terrain);
+    point.x += 11.f;
+    point.y += 11.f;
+    (void)workspace.handle({InputEventType::LeftPressed, point}, width, height);
+    (void)workspace.handle({InputEventType::LeftReleased, point}, width, height);
+    require(workspace.selected_building_id() == std::optional<int>{site.building_id},
+            "management fixture did not select its building");
+  };
+  select_site();
+  const auto expect_preview = [&](const UiRect button,
+                                  const NativeSurfaceManagementAction action,
+                                  const bool value) {
+    const auto command = workspace.handle(
+        {InputEventType::LeftPressed, center(button)}, width, height);
+    require(command.kind == SurfaceWorkspaceCommandKind::PreviewManagement &&
+                command.building_id == site.building_id &&
+                command.management_action == action && command.value == value,
+            "management button emitted the wrong bounded preview");
+  };
+  expect_preview(layout.upgrade, NativeSurfaceManagementAction::UpgradeBuilding,
+                 false);
+  expect_preview(layout.repair, NativeSurfaceManagementAction::RepairBuilding,
+                 false);
+  expect_preview(layout.toggle_operation,
+                 NativeSurfaceManagementAction::SetEnabled, false);
+  expect_preview(layout.priority, NativeSurfaceManagementAction::SetPriority,
+                 true);
+
+  workspace.open(view, width, height);
+  const auto hub = workspace.handle(
+      {InputEventType::LeftPressed, center(layout.hub_upgrade)}, width, height);
+  require(hub.kind == SurfaceWorkspaceCommandKind::PreviewManagement &&
+              hub.building_id == 0 &&
+              hub.management_action == NativeSurfaceManagementAction::UpgradeHub,
+          "hub upgrade button did not emit its canonical management preview");
+
+  workspace.open(view, width, height);
+  select_site();
+  auto blocked = view;
+  blocked.construction_sites.front().can_afford_upgrade = false;
+  workspace.set_view(blocked);
+  require(workspace.handle({InputEventType::LeftPressed, center(layout.upgrade)},
+                           width, height)
+                  .kind == SurfaceWorkspaceCommandKind::None,
+          "unaffordable upgrade emitted a Core-denied preview");
+  blocked.construction_sites.front().complete = false;
+  blocked.construction_sites.front().can_afford_repair = true;
+  workspace.set_view(blocked);
+  require(workspace.handle({InputEventType::LeftPressed, center(layout.toggle_operation)},
+                           width, height).kind == SurfaceWorkspaceCommandKind::None &&
+              workspace.handle({InputEventType::LeftPressed, center(layout.priority)},
+                               width, height).kind == SurfaceWorkspaceCommandKind::None,
+          "incomplete building exposed operation management actions");
+
+  workspace.open(view, width, height);
+  select_site();
+  NativeSurfaceManagementQuote quote;
+  quote.campaign_generation = view.campaign_generation;
+  quote.colony_revision = view.revision;
+  quote.quote_revision = 81;
+  quote.player_civilization_id = view.player_civilization_id;
+  quote.system_id = view.system_id;
+  quote.body_id = view.body_id;
+  quote.colony_id = view.colony_id;
+  quote.building_id = site.building_id;
+  quote.action = NativeSurfaceManagementAction::UpgradeBuilding;
+  quote.action_label = "UPGRADE BUILDING";
+  quote.building_name = site.name;
+  quote.accepted = true;
+  quote.message = "Ready";
+  workspace.set_management_quote(quote);
+  require(workspace.modal_open() && workspace.management_quote(),
+          "accepted management quote did not open the shared confirmation");
+  const auto confirmed = workspace.handle(
+      {InputEventType::LeftPressed, center(layout.confirm)}, width, height);
+  require(confirmed.kind == SurfaceWorkspaceCommandKind::ConfirmManagement &&
+              confirmed.quote_revision == quote.quote_revision,
+          "management confirmation lost its quote revision");
+  workspace.complete_management("Upgrade ordered");
+  require(!workspace.modal_open() && !workspace.management_quote() &&
+              workspace.selected_building_id() == std::optional<int>{site.building_id},
+          "completed management discarded the selected building");
+
+  workspace.set_management_quote(quote);
+  require(workspace.handle({InputEventType::EscapePressed}, width, height).kind ==
+              SurfaceWorkspaceCommandKind::CancelQuote && !workspace.management_quote(),
+          "Escape did not cancel the management confirmation");
+  workspace.set_management_quote(quote);
+  require(workspace.handle({InputEventType::LeftPressed, center(layout.cancel)},
+                           width, height).kind == SurfaceWorkspaceCommandKind::CancelQuote,
+          "confirmation Back did not cancel management");
+
+  for (const auto mutate : {0, 1, 2}) {
+    workspace.open(view, width, height);
+    workspace.set_management_quote(quote);
+    auto changed = view;
+    if (mutate == 0) ++changed.revision;
+    if (mutate == 1) ++changed.player_civilization_id;
+    if (mutate == 2) ++changed.colony_id;
+    workspace.set_view(std::move(changed));
+    require(!workspace.management_quote() && !workspace.modal_open(),
+            "changed colony binding retained a stale management confirmation");
+  }
+
+  workspace.open(view, width, height);
+  const auto before = workspace.viewport();
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.terrain)},
+                         width, height);
+  (void)workspace.handle({InputEventType::PointerCancelled,
+                          {layout.surface.x - 1.f, layout.surface.y - 1.f}},
+                         width, height);
+  require(workspace.viewport().center_x == before.center_x &&
+              workspace.viewport().center_z == before.center_z,
+          "pointer cancellation outside controls moved the camera");
+
+  select_site();
+  int measured{};
+  workspace.set_text_measurer([&](const Text &) {
+    ++measured;
+    return TextExtent{900, 180};
+  });
+  DrawList measured_draw;
+  workspace.render(measured_draw, width, height);
+  require(measured > 0,
+          "inspector did not use the supplied bounded text measurement");
+  require(workspace.handle({InputEventType::Wheel, center(layout.inspector), {}, -8},
+                           width, height).captured &&
+              workspace.handle({InputEventType::LeftPressed, center(layout.priority)},
+                               width, height).kind ==
+                  SurfaceWorkspaceCommandKind::PreviewManagement,
+          "inspector scrolling obscured a pinned management control");
+
+  for (const auto [test_width, test_height] :
+       {std::pair{1280, 720}, std::pair{1920, 1080}, std::pair{3840, 2160}}) {
+    const auto controls =
+        SurfaceWorkspaceLayout::for_viewport(test_width, test_height);
+    for (const auto button : {controls.upgrade, controls.repair,
+                              controls.toggle_operation, controls.priority,
+                              controls.hub_upgrade})
+      require(controls.inspector.contains(center(button)),
+              "management control escaped the inspector at a supported resolution");
+  }
+}
+
 void surface_camera_controls_and_refresh() {
   auto view = colony();
   auto distant = view.construction_sites.front();
@@ -821,6 +990,7 @@ int main() try {
   anchored_camera();
   input_and_confirmation();
   site_removal_and_refresh();
+  management_controls_and_confirmation();
   colony_surface_entry();
   palette_clipping();
   pending_ghost_cancellation();

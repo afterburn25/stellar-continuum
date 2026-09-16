@@ -3,9 +3,50 @@
 Concise cross-agent notes. Full milestone history lives in `docs/engine/MIGRATION_STATUS.md`;
 subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
-## Current integration checkpoint (2026-09-15)
+## Current integration checkpoint (2026-09-16)
 
-### Surveyed planet inspection and Focus Planet
+### Owned surface building management
+
+The native surface inspector now supports building upgrades, repair,
+shutdown/restart, operating priority and colony-hub upgrades. Each action opens
+a paused review showing canonical sovereign authorization, industry costs and
+consequences. Upgrades use Core timers; repair explicitly reports Core's current
+immediate restoration. Selection survives confirmation so results remain visible.
+Measured/clipped inspector rows scroll independently of pinned controls.
+
+This selectively adapts Devin 1c8e9744. Preview runs actual Core commands on copied
+world vectors without mutation; confirmation checks an owned single-use quote,
+all displayed fields, actual player/knowledge/colony/body/site membership,
+target state and a fresh Core assessment. Missing/moved planetary bodies, changed
+ownership/funds/prerequisites and stale/replayed/tampered quotes are rejected.
+No authoritative Core rule, Player17 schema or C# changes. Contract:
+docs/engine/NATIVE_SURFACE_MANAGEMENT.md.
+
+Validation: final MSVC build and all 15 surface/colony CTests pass. Python export
+discovery: 458 tests, 441 passed / 17 optional STELLAR_NATIVE_EXE tests skipped.
+Six relocated Vulkan surface launches cover fresh generation, placement/cancel,
+paused reload, populated 720p/1080p and reduced-workforce 720p. Management uses
+actual app input routing for cost review, cancel, operation reversal and priority
+reversal. Complete paused Player17 equality holds except SavedAtUtc; retained
+art/focus/status/pixel checks pass. Six new review/result captures were produced,
+with 720p/1080p visually inspected. Existing relocated colony/navigation checks
+also pass. Paid upgrade/hub/repair are controller-test evidence; no claim of a
+full graphical paid-action playthrough. Evidence:
+work/native-management-{build,ctest,python}.log,
+work/native-management-{runtime,colony,navigation}.json and
+work/native-audio-validation/package-surface-*-management-*.bmp.
+
+Next: review/adapt Devin 810d2a6d Economy panel using observer-safe canonical
+projections, clear income/upkeep/shortage breakdowns, bounded refresh and measured
+720p layout. Latest fetched Devin head e8672801 also adds armed-fleet orders and
+Locate; a0f3b102 checks BMP drawable dimensions. Generated discs bc681eb6,
+fe364430/aabde2b1, mission Land/Collect d9d23f57 and colony sites e49f4df0 remain
+unimported. Preserve approved Sol textures, recorded UK scientist cues and
+existing save/authority contracts. Shared base ac45d958 and PR332 remain
+unmerged; the test package is UNSEALED. Full 3D visuals and sustained performance
+remain unfinished.
+
+### Previous checkpoint: surveyed planet inspection and Focus Planet
 
 The native orbital inspector now groups metric physical facts, environment,
 and known moons/signals into measured label/value rows. Header, survey status,
@@ -33,17 +74,6 @@ Contract: docs/engine/NATIVE_BODY_INSPECTION.md. Evidence:
 work/native-body-{build,ctest,python}.log and
 work/native-body-{runtime,navigation,colony,travel}.json;
 package-system-*.bmp under work/native-audio-validation. Package remains UNSEALED.
-
-Next: review/adapt Devin 1c8e9744 surface management with current observer,
-campaign generation, colony membership and changed-state command validation.
-Preserve truthful Core workforce/power status and existing placement/cancellation.
-Latest fetched Devin head 810d2a6d additionally introduces an Economy panel;
-inventoried only, alongside bc681eb6 planet discs, fe364430 star discs and
-d9d23f57 mission Land/Collect. Preserve approved Sol textures, dry recorded UK
-scientist cues, bounded image lifecycle and observer authority. Shared base
-ac45d958 and PR332 remain unmerged. Broader 3D visuals and sustained performance
-remain unfinished. Previous 84df6d44 CI35054810208 was still in progress when
-checked; do not treat it as passed or poll-loop waiting on it.
 
 ### Previous checkpoint: native home-system supply workspace
 

@@ -143,7 +143,19 @@ SurfaceWorkspaceLayout::for_viewport(const int width,
            32.f * scale},
           {confirmation.x + 20.f * scale,
            confirmation.y + confirmation.height - 48.f * scale, 118.f * scale,
-           32.f * scale}};
+           32.f * scale},
+          {inspector.x + 10.f * scale, inspector.y + inspector.height - 141.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + inspector.width * .5f + 3.f * scale,
+           inspector.y + inspector.height - 141.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 10.f * scale, inspector.y + inspector.height - 101.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + inspector.width * .5f + 3.f * scale,
+           inspector.y + inspector.height - 101.f * scale,
+           (inspector.width - 26.f * scale) * .5f, 34.f * scale},
+          {inspector.x + 10.f * scale, inspector.y + inspector.height - 45.f * scale,
+           inspector.width - 20.f * scale, 34.f * scale}};
 }
 
 Point SurfaceViewport::world_to_screen(const double x, const double z,
@@ -251,9 +263,12 @@ void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
   selected_building_id_.reset();
   placement_quote_.reset();
   removal_quote_.reset();
+  management_quote_.reset();
   confirmation_ = std::monostate{};
   notice_.clear();
   palette_scroll_ = 0.f;
+  inspector_scroll_ = 0.f;
+  inspector_heights_.clear();
   rotation_degrees_ = 0.f;
   pending_preview_.reset();
   pressed_ = false;
@@ -276,17 +291,26 @@ void NativeSurfaceWorkspace::set_building_images(
 }
 
 void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
-  if (!view_ || view_->campaign_generation != view.campaign_generation ||
+  const bool identity_changed=!view_ || view_->campaign_generation != view.campaign_generation ||
+      view_->player_civilization_id != view.player_civilization_id ||
       view_->system_id != view.system_id || view_->body_id != view.body_id ||
-      view_->colony_id != view.colony_id)
-    set_building_images({});
+      view_->colony_id != view.colony_id;
+  if(identity_changed) {
+    set_building_images({}); selected_type_id_.reset(); selected_building_id_.reset();
+    inspector_scroll_=0.f; pressed_=dragging_=false;
+  }
   const auto changed = !view_ ||
                        view_->campaign_generation != view.campaign_generation ||
-                       view_->revision != view.revision;
+                       view_->revision != view.revision ||
+                       view_->player_civilization_id != view.player_civilization_id ||
+                       view_->system_id != view.system_id || view_->body_id != view.body_id ||
+                       view_->colony_id != view.colony_id;
   view_ = std::move(view);
   if (changed) {
+    inspector_heights_.clear();
     placement_quote_.reset();
     removal_quote_.reset();
+    management_quote_.reset();
     confirmation_ = std::monostate{};
     last_preview_position_.reset();
     pending_preview_.reset();
@@ -317,6 +341,7 @@ void NativeSurfaceWorkspace::close() noexcept {
   dragging_ = false;
   placement_quote_.reset();
   removal_quote_.reset();
+  management_quote_.reset();
   confirmation_ = std::monostate{};
   pending_preview_.reset();
   last_preview_position_.reset();
@@ -332,6 +357,7 @@ void NativeSurfaceWorkspace::discard_campaign() noexcept {
   selected_building_id_.reset();
   placement_quote_.reset();
   removal_quote_.reset();
+  management_quote_.reset();
   confirmation_ = std::monostate{};
   pending_preview_.reset();
   pressed_ = false;
@@ -365,9 +391,27 @@ void NativeSurfaceWorkspace::set_removal_quote(
   confirmation_ = *removal_quote_;
 }
 
+void NativeSurfaceWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
+  text_measurer_ = std::move(value); inspector_heights_.clear();
+}
+void NativeSurfaceWorkspace::set_management_quote(NativeSurfaceManagementQuote quote) {
+  placement_quote_.reset(); removal_quote_.reset();
+  pending_preview_.reset(); last_preview_position_.reset();
+  pressed_ = dragging_ = false;
+  management_quote_ = std::move(quote);
+  confirmation_ = *management_quote_;
+}
+void NativeSurfaceWorkspace::complete_management(std::string notice) {
+  placement_quote_.reset(); removal_quote_.reset(); management_quote_.reset();
+  confirmation_ = std::monostate{};
+  pending_preview_.reset(); last_preview_position_.reset();
+  pressed_ = dragging_ = false;
+  notice_ = std::move(notice);
+}
 void NativeSurfaceWorkspace::complete_command(std::string notice) {
   placement_quote_.reset();
   removal_quote_.reset();
+  management_quote_.reset();
   confirmation_ = std::monostate{};
   last_preview_position_.reset();
   pending_preview_.reset();
@@ -453,6 +497,7 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
       confirmation_ = std::monostate{};
       placement_quote_.reset();
       removal_quote_.reset();
+      management_quote_.reset();
       last_preview_position_.reset();
       pending_preview_.reset();
       return {SurfaceWorkspaceCommandKind::CancelQuote,
@@ -481,7 +526,9 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
       const auto kind =
           std::holds_alternative<NativeSurfacePlacementQuote>(confirmation_)
               ? SurfaceWorkspaceCommandKind::ConfirmPlacement
-              : SurfaceWorkspaceCommandKind::ConfirmRemoval;
+              : std::holds_alternative<NativeSurfaceManagementQuote>(confirmation_)
+                  ? SurfaceWorkspaceCommandKind::ConfirmManagement
+                  : SurfaceWorkspaceCommandKind::ConfirmRemoval;
       return {kind, true, false, {}, 0, 0, 0, 0, revision};
     }
     return {SurfaceWorkspaceCommandKind::None, true};
@@ -528,6 +575,13 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
     focus_selected(width, height);
     return {SurfaceWorkspaceCommandKind::None, true};
   }
+  if (event.type == InputEventType::Wheel && layout.inspector.contains(event.position)) {
+    const auto body_height = std::max(0.f, layout.inspector.height - 250.f * layout.scale);
+    inspector_scroll_ = std::clamp(inspector_scroll_ - event.wheel_y * 38.f * layout.scale,
+                                   0.f, std::max(0.f, inspector_content_height_ - body_height));
+    pressed_ = dragging_ = false;
+    return {SurfaceWorkspaceCommandKind::None, true};
+  }
   if (event.type == InputEventType::Wheel &&
       layout.palette.contains(event.position)) {
     const auto content = static_cast<float>(view_->available_buildings.size()) *
@@ -548,6 +602,7 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
   }
   if (event.type == InputEventType::LeftPressed) {
     if (const auto index = palette_hit(event.position, layout)) {
+      inspector_scroll_=0.f;
       selected_type_id_ = view_->available_buildings[*index].type_id;
       selected_building_id_.reset();
       placement_quote_.reset();
@@ -562,6 +617,26 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
       pending_preview_.reset();
       return {SurfaceWorkspaceCommandKind::None, true};
     }
+    const auto management = [&](NativeSurfaceManagementAction action, int id, bool value=false) {
+      SurfaceWorkspaceCommand command{SurfaceWorkspaceCommandKind::PreviewManagement, true};
+      command.building_id=id; command.management_action=action; command.value=value;
+      pressed_=dragging_=false; pending_preview_.reset(); last_preview_position_.reset();
+      return command;
+    };
+    if (selected_building_id_) {
+      const auto site=std::ranges::find(view_->construction_sites,*selected_building_id_,&NativeSurfaceSite::building_id);
+      if(site!=view_->construction_sites.end()) {
+        if(layout.upgrade.contains(event.position)&&site->can_upgrade&&site->can_afford_upgrade&&site->upgrade_lock_reason.empty())
+          return management(NativeSurfaceManagementAction::UpgradeBuilding,site->building_id);
+        if(layout.repair.contains(event.position)&&site->complete&&site->can_afford_repair&&site->condition<.999999)
+          return management(NativeSurfaceManagementAction::RepairBuilding,site->building_id);
+        if(layout.toggle_operation.contains(event.position)&&site->complete)
+          return management(NativeSurfaceManagementAction::SetEnabled,site->building_id,!site->enabled);
+        if(layout.priority.contains(event.position)&&site->complete)
+          return management(NativeSurfaceManagementAction::SetPriority,site->building_id,!site->prioritized);
+      }
+    } else if(!selected_type_id_&&layout.hub_upgrade.contains(event.position)&&view_->hub_upgrade_available&&view_->can_afford_hub_upgrade&&view_->hub_upgrade_days_remaining<=0.&&view_->hub_upgrade_lock_reason.empty())
+      return management(NativeSurfaceManagementAction::UpgradeHub,0);
     if (layout.remove.contains(event.position) && selected_building_id_)
       return {SurfaceWorkspaceCommandKind::PreviewRemoval,
               true,
@@ -614,6 +689,7 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
       return {SurfaceWorkspaceCommandKind::None, true};
     if (selected_type_id_)
       return placement_request(event.position, layout, true);
+    inspector_scroll_=0.f;
     selected_building_id_ = site_hit(event.position, layout);
     return {SurfaceWorkspaceCommandKind::None, true};
   }
@@ -829,12 +905,31 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   const auto ix = layout.inspector.x + 10.f * layout.scale;
   auto iy = layout.inspector.y + 10.f * layout.scale;
   const auto iw = layout.inspector.width - 20.f * layout.scale;
+  text(out,{ix,iy,iw,30.f*layout.scale},"SURFACE INSPECTOR",muted,layout.body_font);
+  const UiRect inspector_body{ix,iy+32.f*layout.scale,iw,
+      std::max(0.f,layout.inspector.height-250.f*layout.scale)};
+  struct InspectorRow { std::string value; Color color; int pixels; float y,height; };
+  std::vector<InspectorRow> inspector_rows;
+  float row_y=0.f;
   const auto add = [&](std::string value, Color color, int pixels, float step) {
-    text(out, {ix, iy, iw, step * layout.scale}, std::move(value), color,
-         pixels);
-    iy += step * layout.scale;
+    const auto key=std::to_string(pixels)+":"+std::to_string(iw)+":"+value;
+    auto found=inspector_heights_.find(key);
+    if(found==inspector_heights_.end()) {
+      if(inspector_heights_.size()>=256)inspector_heights_.clear();
+      const float height=text_measurer_?static_cast<float>(text_measurer_(Text{{},value,color,pixels,iw}).height):
+        std::ceil(static_cast<float>(value.size())/std::max(1.f,iw/(pixels*.6f)))*(pixels+4.f);
+      found=inspector_heights_.emplace(key,std::max(1.f,height)).first;
+    }
+    const auto pitch=std::max(step*layout.scale,found->second+5.f*layout.scale);
+    inspector_rows.push_back({std::move(value),color,pixels,row_y,found->second});
+    row_y+=pitch;
   };
-  add("SURFACE INSPECTOR", muted, layout.body_font, 30.f);
+  const auto action=[&](UiRect rect,std::string label,bool enabled) {
+    fill(out,rect,enabled?(rect.contains(pointer_)?hover:row):inset);
+    stroke(out,rect,enabled?border:Color{42,67,84,255});
+    text(out,{rect.x,rect.y+8.f*layout.scale,rect.width,rect.height-8.f*layout.scale},
+         std::move(label),enabled?text_color:muted,layout.small_font,TextAlign::Center);
+  };
   if (selected_type_id_) {
     const auto option =
         std::ranges::find(view.available_buildings, *selected_type_id_,
@@ -890,6 +985,23 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
                 number(site->remaining_construction_materials, 1),
             muted, layout.small_font, 19.f);
       add(std::string(status.detail), muted, layout.small_font, 35.f);
+      add(std::string("Priority  ")+(site->prioritized?"High":"Normal")+
+          (site->essential_service?" / Essential service":""),muted,layout.small_font,24.f);
+      if(site->upgrade_days_remaining>0.)
+        add("Upgrade: "+number(site->upgrade_days_remaining,1)+" game days remaining at full funding",warning,layout.small_font,28.f);
+      if(site->can_upgrade) {
+        add("Upgrade to "+site->upgrade_name,text_color,layout.small_font,25.f);
+        add("Authorization  "+view.currency.format(site->upgrade_credit_budget_units),muted,layout.small_font,24.f);
+        add("Industry required  "+number(site->upgrade_industry_cost,1),muted,layout.small_font,24.f);
+        if(!site->upgrade_lock_reason.empty())add(site->upgrade_lock_reason,warning,layout.small_font,26.f);
+        else if(!site->can_afford_upgrade)add("Insufficient treasury or materials.",warning,layout.small_font,24.f);
+      }
+      if(site->complete&&site->condition<.999999)
+        add("Repair materials  "+number(site->repair_industry_cost,1),muted,layout.small_font,24.f);
+      if(site->can_upgrade)action(layout.upgrade,"UPGRADE",site->can_afford_upgrade&&site->upgrade_lock_reason.empty());
+      action(layout.repair,"REPAIR",site->complete&&site->can_afford_repair&&site->condition<.999999);
+      action(layout.toggle_operation,site->enabled?"SHUT DOWN":"RESTART",site->complete);
+      action(layout.priority,site->prioritized?"NORMAL PRIORITY":"PRIORITIZE",site->complete);
       fill(out, layout.remove, layout.remove.contains(pointer_) ? hover : row);
       stroke(out, layout.remove, warning);
       text(out, layout.remove,
@@ -899,13 +1011,35 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   } else {
     add("Choose a building or select an existing site.", muted,
         layout.body_font, 48.f);
-    add("Drag to pan. Wheel zooms at the pointer.", muted, layout.small_font,
-        40.f);
+    add("Drag to pan. Wheel zooms at the pointer.", muted, layout.small_font,40.f);
+    add(view.hub_name+" / Level "+std::to_string(view.surface_hub_level),text_color,layout.body_font,30.f);
+    if(view.hub_upgrade_days_remaining>0.)
+      add("Upgrade: "+number(view.hub_upgrade_days_remaining,1)+" game days remaining",warning,layout.small_font,30.f);
+    else if(view.hub_upgrade_available) {
+      add("Authorization  "+view.currency.format(view.hub_upgrade_credit_budget_units),muted,layout.small_font,25.f);
+      add("Industry required  "+number(view.hub_upgrade_industry_cost,1),muted,layout.small_font,25.f);
+      if(!view.hub_upgrade_lock_reason.empty())add(view.hub_upgrade_lock_reason,warning,layout.small_font,30.f);
+      else if(!view.can_afford_hub_upgrade)add("Insufficient treasury or materials.",warning,layout.small_font,25.f);
+      action(layout.hub_upgrade,"UPGRADE HUB",view.can_afford_hub_upgrade&&view.hub_upgrade_lock_reason.empty());
+    }
+  }
+  inspector_content_height_=row_y;
+  inspector_scroll_=std::clamp(inspector_scroll_,0.f,std::max(0.f,row_y-inspector_body.height));
+  for(const auto& entry:inspector_rows) {
+    const UiRect bounds{inspector_body.x,inspector_body.y+entry.y-inspector_scroll_,iw,entry.height};
+    if(const auto clip=intersection(bounds,inspector_body))
+      clipped_text(out,bounds,*clip,entry.value,entry.color,entry.pixels);
+  }
+  if(row_y>inspector_body.height&&inspector_body.height>0.f) {
+    const auto thumb=std::min(inspector_body.height,std::max(20.f,inspector_body.height*inspector_body.height/row_y));
+    const auto offset=(inspector_body.height-thumb)*inspector_scroll_/(row_y-inspector_body.height);
+    fill(out,{layout.inspector.x+layout.inspector.width-5.f,inspector_body.y,2.f,inspector_body.height},border);
+    fill(out,{layout.inspector.x+layout.inspector.width-5.f,inspector_body.y+offset,2.f,thumb},good);
   }
   if (!notice_.empty())
     text(out,
          {ix,
-          layout.inspector.y + layout.inspector.height - 138.f * layout.scale,
+          layout.inspector.y + layout.inspector.height - 202.f * layout.scale,
           iw, 44.f * layout.scale},
          notice_, warning, layout.small_font);
 
@@ -952,6 +1086,18 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
       cy += 34.f * layout.scale;
       text(out, {cx, cy, cw, 54.f * layout.scale}, removal->message,
            removal->accepted ? good : warning, layout.small_font);
+    }
+    if (const auto* management=std::get_if<NativeSurfaceManagementQuote>(&confirmation_)) {
+      text(out,{cx,cy,cw,30.f*layout.scale},management->action_label,text_color,layout.heading_font);
+      cy+=36.f*layout.scale;
+      text(out,{cx,cy,cw,27.f*layout.scale},management->building_name,text_color,layout.body_font);
+      cy+=31.f*layout.scale;
+      text(out,{cx,cy,cw,25.f*layout.scale},"Authorization  "+management->formatted_authorization,muted,layout.body_font);
+      cy+=27.f*layout.scale;
+      text(out,{cx,cy,cw,25.f*layout.scale},"Industry cost  "+number(management->industry_cost,1),muted,layout.body_font);
+      cy+=28.f*layout.scale;
+      text(out,{cx,cy,cw,61.f*layout.scale},management->accepted?management->description:management->message,
+           management->accepted?good:warning,layout.small_font);
     }
     fill(out, layout.cancel, layout.cancel.contains(pointer_) ? hover : row);
     stroke(out, layout.cancel, border);

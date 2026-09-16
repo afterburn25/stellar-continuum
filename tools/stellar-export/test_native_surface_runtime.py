@@ -63,6 +63,24 @@ def logical_bmp(width, height, *, bits, top_down, offset, changed=frozenset()):
 
 
 class NativeSurfaceRuntimeTests(unittest.TestCase):
+    def test_management_requires_completed_target_and_safe_actual_actions(self):
+        from native_surface_runtime import _surface_management
+        colony = {"SurfaceBuildings": [{"Id": 9, "IsComplete": True}]}
+        proof = dict(available=True, site_id=9, cost_visible=True, cancel_no_change=True,
+                     operation_changed=True, priority_changed=True, restored=True, camera_unchanged=True)
+        encode = lambda value: "surface_management=" + json.dumps(value)
+        self.assertEqual(_surface_management(encode(proof), colony), proof)
+        for key in proof:
+            invalid = dict(proof); invalid[key] = False
+            with self.subTest(key=key), self.assertRaises(RuntimeError): _surface_management(encode(invalid), colony)
+        for invalid in ("", encode(proof)+"\n"+encode(proof), encode([])):
+            with self.assertRaises(RuntimeError): _surface_management(invalid, colony)
+        with self.assertRaises(RuntimeError): _surface_management(encode(proof), {"SurfaceBuildings": []})
+
+    def test_management_missing_proof_or_capture_is_rejected(self):
+        for fault in ("management_missing", "management_restored", "management_capture"):
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError): self.exercise(fault)
+
     def exercise(self, fault=None):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); package = root / "package"; package.mkdir()
@@ -203,11 +221,20 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                                       "overview_zoom": .7, "focus_zoom": 3.,
                                       "refresh_preserved": True, "overview_restored": True}
                         stdout += "\nsurface_inspection=" + json.dumps(inspection, separators=(",", ":"))
+                        complete = next((site for site in sites if site.get("IsComplete") is True), None)
+                        management = ({"available": True, "site_id": complete["Id"], "cost_visible": True,
+                                       "cancel_no_change": True, "operation_changed": True, "priority_changed": True,
+                                       "restored": True, "camera_unchanged": True} if complete else {"available": False})
+                        if fault == "management_restored": management["restored"] = False
+                        if fault != "management_missing": stdout += "\nsurface_management=" + json.dumps(management)
                 if fault != "capture":
                     image = bmp(width - 1 if fault == "geometry" else width, height)
                     if fault == "truncated":
                         image = bytearray(image[:-64]); struct.pack_into("<I", image, 2, len(image)); image = bytes(image)
                     capture.write_bytes(image)
+                    if fault != "management_capture":
+                        for stage in ("review", "result"):
+                            capture.with_name(capture.stem + "-management-" + stage + ".bmp").write_bytes(image)
                     sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
                     if fault != "art_missing_sidecar":
                         side = bytearray(image); stride = ((width * 24 + 31) // 32) * 4

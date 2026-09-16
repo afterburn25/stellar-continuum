@@ -40,7 +40,9 @@ discards a detached quote without spending money. An unfinished site's removal
 shows cancellation/refund wording; a completed site's removal shows demolition
 and its canonical zero refund. Research, available materials and authoritative
 construction progression remain in charge. The interface invents no completion
-time, instant construction, upgrade or repair operation.
+time or instant construction. The current candidate adds reviewed canonical
+upgrade, repair, operation and priority controls; see NATIVE_SURFACE_MANAGEMENT.md
+for authorization, UI and updated validation contracts.
 
 Generation and revision changes invalidate stale quotes. Integration review
 fixed a queued pointer preview overwriting a confirmation revision, cleared

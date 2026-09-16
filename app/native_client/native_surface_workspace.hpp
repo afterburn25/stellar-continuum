@@ -12,6 +12,8 @@
 #include <string>
 #include <utility>
 #include <variant>
+#include <functional>
+#include <unordered_map>
 
 namespace stellar::native_colony_ui {
 
@@ -20,7 +22,7 @@ struct SurfaceWorkspaceLayout {
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect surface, back, title, palette, palette_rows,
       terrain, inspector, overview, focus, rotate, remove, confirmation,
-      confirm, cancel;
+      confirm, cancel, upgrade, repair, toggle_operation, priority, hub_upgrade;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
 };
@@ -32,7 +34,9 @@ enum class SurfaceWorkspaceCommandKind {
   ConfirmPlacement,
   PreviewRemoval,
   ConfirmRemoval,
-  CancelQuote
+  CancelQuote,
+  PreviewManagement,
+  ConfirmManagement
 };
 
 struct SurfaceWorkspaceCommand {
@@ -42,6 +46,8 @@ struct SurfaceWorkspaceCommand {
   int building_id{};
   float x{}, z{}, rotation_degrees{};
   std::uint64_t quote_revision{};
+  stellar::native_colony::NativeSurfaceManagementAction management_action{};
+  bool value{};
 };
 
 class NativeSurfaceWorkspace final {
@@ -60,6 +66,10 @@ public:
       stellar::native_colony::NativeSurfacePlacementQuote,
       bool open_confirmation);
   void set_removal_quote(stellar::native_colony::NativeSurfaceRemovalQuote);
+  void set_management_quote(stellar::native_colony::NativeSurfaceManagementQuote);
+  void complete_management(std::string notice);
+  void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>);
+  const std::optional<stellar::native_colony::NativeSurfaceManagementQuote>& management_quote() const noexcept { return management_quote_; }
   void complete_command(std::string notice);
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_artwork_notice(std::string value) { artwork_notice_ = std::move(value); }
@@ -118,8 +128,13 @@ private:
       removal_quote_;
   std::variant<std::monostate,
                stellar::native_colony::NativeSurfacePlacementQuote,
-               stellar::native_colony::NativeSurfaceRemovalQuote>
+               stellar::native_colony::NativeSurfaceRemovalQuote,
+               stellar::native_colony::NativeSurfaceManagementQuote>
       confirmation_;
+  std::optional<stellar::native_colony::NativeSurfaceManagementQuote> management_quote_;
+  std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> text_measurer_;
+  mutable std::unordered_map<std::string, float> inspector_heights_;
+  mutable float inspector_content_height_{}, inspector_scroll_{};
   std::string notice_;
   std::string artwork_notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;

@@ -540,7 +540,7 @@ class NativeCampaign final {
         surface_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
         text_measurer_(text_measurer),
-        system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},std::move(text_measurer)) {
+        system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},text_measurer) {
     research_workspace_.set_text_measurer(text_measurer_);
     inspection_card_.set_text_measurer(text_measurer_);
     supply_workspace_.set_text_measurer(text_measurer_);
@@ -548,6 +548,7 @@ class NativeCampaign final {
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
+    surface_workspace_.set_text_measurer(std::move(text_measurer));
     system_workspace_.use_background_preparation(image_preparation_);
     surface_art_.use_background_preparation(image_preparation_);
     refresh_knowledge();
@@ -2716,6 +2717,64 @@ class NativeCampaign final {
     return evidence.str();
   }
 
+  std::string surface_management_smoke(int width,int height,const std::function<void(const DrawList&,bool)>& capture){
+    if(!surface_workspace_.view())throw std::runtime_error("Management proof requires an owned surface.");
+    const auto initial=*surface_workspace_.view();
+    const auto found=std::ranges::find_if(initial.construction_sites,[](const auto& site){return site.complete;});
+    if(found==initial.construction_sites.end())return "{\"available\":false}";
+    const auto target=*found;
+    const auto original=surface_workspace_.selected_building_id();
+    const auto layout=SurfaceWorkspaceLayout::for_viewport(width,height);
+    const auto camera=surface_workspace_.viewport();
+    const auto click=[&](Point point){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Management proof closed the game.");
+    };
+    click(surface_workspace_.viewport().world_to_screen(target.x,target.z,layout.terrain));
+    const auto current=[&](){
+      const auto& sites=surface_workspace_.view()->construction_sites;
+      const auto site=std::ranges::find(sites,target.building_id,&NativeSurfaceSite::building_id);
+      if(site==sites.end())throw std::runtime_error("Management proof lost its owned building.");
+      return *site;
+    };
+    const auto review=[&](UiRect button){
+      click(center(button));
+      if(!surface_workspace_.modal_open()||!surface_workspace_.management_quote()||!surface_workspace_.management_quote()->accepted)
+        throw std::runtime_error("Management button did not open an accepted cost review.");
+      const auto& quote=*surface_workspace_.management_quote();
+      const auto frame=scene(width,height);
+      const bool cost=std::ranges::any_of(frame.overlay,[&](const auto& item){
+        const auto* label=std::get_if<Text>(&item);
+        return label&&label->value=="Authorization  "+quote.formatted_authorization&&label->clip&&layout.confirmation.contains(label->at);
+      });
+      if(!cost)throw std::runtime_error("Management confirmation concealed its authorization.");
+      return frame;
+    };
+    const auto cancelled=review(layout.toggle_operation);
+    capture(cancelled,true);
+    click(center(layout.cancel));
+    if(surface_workspace_.modal_open()||current().enabled!=target.enabled||current().prioritized!=target.prioritized)
+      throw std::runtime_error("Cancelling a management review changed the building.");
+    (void)review(layout.toggle_operation);click(center(layout.confirm));
+    if(current().enabled==target.enabled)throw std::runtime_error("Confirmed operation toggle did not reach Core.");
+    capture(scene(width,height),false);
+    (void)review(layout.toggle_operation);click(center(layout.confirm));
+    if(current().enabled!=target.enabled)throw std::runtime_error("Operation toggle could not be reversed.");
+    (void)review(layout.priority);click(center(layout.confirm));
+    if(current().prioritized==target.prioritized)throw std::runtime_error("Confirmed priority did not reach Core.");
+    (void)review(layout.priority);click(center(layout.confirm));
+    if(current().prioritized!=target.prioritized)throw std::runtime_error("Priority could not be reversed.");
+    const auto restored=surface_workspace_.viewport();
+    if(restored.center_x!=camera.center_x||restored.center_z!=camera.center_z||restored.pixels_per_unit!=camera.pixels_per_unit)
+      throw std::runtime_error("Management input moved the camera.");
+    if(original){const auto item=std::ranges::find(initial.construction_sites,*original,&NativeSurfaceSite::building_id);
+      if(item!=initial.construction_sites.end())click(restored.world_to_screen(item->x,item->z,layout.terrain));}
+    std::ostringstream out;out<<"{\"available\":true,\"site_id\":"<<target.building_id
+      <<",\"cost_visible\":true,\"cancel_no_change\":true,\"operation_changed\":true,\"priority_changed\":true,\"restored\":true,\"camera_unchanged\":true}";
+    return out.str();
+  }
+
   [[nodiscard]] std::string surface_building_status(int width,int height)const{
     const auto stats=surface_buildings_.stats();
     std::ostringstream out;
@@ -3271,6 +3330,14 @@ class NativeCampaign final {
       gesture_.capture_for_ui();
       return;
     }
+    if(command.kind==SurfaceWorkspaceCommandKind::PreviewManagement){
+      session_->frame().clock().set_speed(StrategicSpeed::Paused);
+      auto quote=surface_controller_.preview_management(session_->frame(),generation,
+          *surface_workspace_.view(),command.management_action,command.building_id,command.value);
+      surface_workspace_.set_management_quote(std::move(quote));
+      gesture_.capture_for_ui();
+      return;
+    }
     if(command.kind==SurfaceWorkspaceCommandKind::PreviewRemoval){
       session_->frame().clock().set_speed(StrategicSpeed::Paused);
       auto quote=surface_controller_.preview_removal(
@@ -3298,6 +3365,12 @@ class NativeCampaign final {
              command.quote_revision)return;
       outcome=surface_controller_.confirm_removal(
           session_->frame(),generation,*surface_workspace_.removal_quote());
+    }else if(command.kind==SurfaceWorkspaceCommandKind::ConfirmManagement){
+      if(!surface_workspace_.management_quote()||surface_workspace_.management_quote()->quote_revision!=command.quote_revision)return;
+      outcome=surface_controller_.confirm_management(session_->frame(),generation,*surface_workspace_.management_quote());
+      surface_workspace_.complete_management(visible_notice(outcome.message));
+      refresh_surface(true);
+      return;
     }else return;
     surface_workspace_.complete_command(visible_notice(outcome.message));
     refresh_surface(true);
@@ -4235,6 +4308,11 @@ int main(int argc,char **argv){
           campaign.surface_building_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-buildings"));
           });
+        if(options.surface_reload_smoke)
+          std::cout<<"surface_management="<<campaign.surface_management_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool review){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,review?L"-management-review":L"-management-result"));
+              })<<'\n';
         if(options.battle_smoke)
           campaign.battle_art_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-ships"));

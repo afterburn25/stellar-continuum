@@ -36,6 +36,25 @@ struct NativeSurfaceRemovalQuote {
   std::string formatted_refund, message;
 };
 
+enum class NativeSurfaceManagementAction {
+  UpgradeBuilding,
+  RepairBuilding,
+  SetEnabled,
+  SetPriority,
+  UpgradeHub,
+};
+
+struct NativeSurfaceManagementQuote {
+  std::uint64_t campaign_generation{}, colony_revision{}, quote_revision{};
+  int player_civilization_id{}, system_id{}, body_id{}, colony_id{},
+      building_id{};
+  NativeSurfaceManagementAction action{};
+  bool value{}, accepted{};
+  std::string action_label, building_name, formatted_authorization,
+      description, message;
+  double authorization_budget_units{}, industry_cost{};
+};
+
 struct NativeSurfaceCommandOutcome {
   bool accepted{};
   std::string message;
@@ -56,6 +75,13 @@ public:
   [[nodiscard]] NativeSurfaceCommandOutcome confirm_removal(
       stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
       const NativeSurfaceRemovalQuote &);
+  [[nodiscard]] NativeSurfaceManagementQuote preview_management(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeColonyView &, NativeSurfaceManagementAction,
+      int building_id = 0, bool value = false);
+  [[nodiscard]] NativeSurfaceCommandOutcome confirm_management(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      const NativeSurfaceManagementQuote &);
   // Cancels only this controller's detached confirmation token.
   [[nodiscard]] bool cancel_quote(std::uint64_t campaign_generation,
                                   std::uint64_t quote_revision);
@@ -72,8 +98,27 @@ private:
     std::uint64_t colony_revision{};
     stellar::core::SurfaceBuildingRemovalAssessment assessment;
   };
-  using QuoteRecord = std::variant<PlacementRecord, RemovalRecord>;
+  struct ManagementSnapshot {
+    std::string building_type_id;
+    bool building_complete{}, building_enabled{};
+    int building_priority{};
+    double building_condition{}, building_upgrade_days_remaining{};
+    std::optional<std::string> pending_upgrade_type_id;
+    int hub_level{};
+    double hub_upgrade_days_remaining{};
+    [[nodiscard]] bool operator==(const ManagementSnapshot &) const = default;
+  };
+  struct ManagementRecord {
+    int system_id{}, body_id{};
+    std::uint64_t colony_revision{};
+    NativeSurfaceManagementQuote quote;
+    ManagementSnapshot snapshot;
+  };
+  using QuoteRecord =
+      std::variant<PlacementRecord, RemovalRecord, ManagementRecord>;
 
+  [[nodiscard]] static ManagementSnapshot management_snapshot(
+      const stellar::core::Colony &, NativeSurfaceManagementAction, int);
   void require_owner() const;
   void bind_generation(std::uint64_t);
   std::thread::id owner_{std::this_thread::get_id()};

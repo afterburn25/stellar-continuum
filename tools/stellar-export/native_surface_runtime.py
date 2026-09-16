@@ -454,11 +454,33 @@ def _launch(args, cwd, env, label):
     return result, int(uploads.group(1))
 
 
+def _surface_management(stdout, colony):
+    rows = re.findall(r"(?m)^surface_management=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1:
+        raise RuntimeError("Native surface management proof is missing or duplicated")
+    try:
+        value = json.loads(rows[0])
+    except (ValueError, TypeError) as error:
+        raise RuntimeError("Native surface management proof is malformed") from error
+    if not isinstance(value, dict):
+        raise RuntimeError("Native surface management proof is not an object")
+    completed = {site["Id"] for site in colony.get("SurfaceBuildings", []) if site.get("IsComplete") is True}
+    if not completed:
+        if value != {"available": False}:
+            raise RuntimeError("Unfinished colony claimed completed-building management")
+        return value
+    keys = ("available", "cost_visible", "cancel_no_change", "operation_changed", "priority_changed", "restored", "camera_unchanged")
+    if (set(value) != set(keys) | {"site_id"} or any(value.get(key) is not True for key in keys) or
+            type(value.get("site_id")) is not int or value["site_id"] not in completed):
+        raise RuntimeError("Native surface management did not prove safe reversible actions")
+    return value
+
+
 def validate_native_surface_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
     captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
-    populated_captures, populated_diagnostics, focus_captures = [], [], []
+    populated_captures, populated_diagnostics, focus_captures, management_captures = [], [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-surface-") as temporary:
         work = Path(temporary)
         save = work / "fresh.player17.json"
@@ -503,6 +525,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 ordered_payload, ordered_state = payload, state
             else:
                 _surface_inspection(result.stdout, _base_colony(payload), {"CONSTRUCTION"})
+                _surface_management(result.stdout, _base_colony(payload))
                 _validate_surface_focus(capture, capture.with_name(capture.stem + "-focus.bmp"),
                                         width, height, art_diagnostics[-1]["terrain"])
                 if _normalized(payload) != _normalized(ordered_payload):
@@ -546,6 +569,13 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             _verify_populated_surface(fixture, after, state, art)
             required = {"OPERATING", "DISABLED", "CONSTRUCTION", "NO WORKERS" if low_workforce else "NO POWER"}
             inspection = _surface_inspection(result.stdout, _base_colony(after), required)
+            management = _surface_management(result.stdout, _base_colony(after))
+            for stage in ("review", "result"):
+                source = capture.with_name(capture.stem + "-management-" + stage + ".bmp")
+                _bmp(source, width, height)
+                target = folder.parent / f"{folder.name}-surface-{variant}-{width}x{height}-management-{stage}.bmp"
+                shutil.copy2(source, target)
+                management_captures.append(str(target))
             focus = capture.with_name(capture.stem + "-focus.bmp")
             _validate_surface_focus(capture, focus, width, height, art["terrain"])
             stem = f"{folder.name}-surface-{variant}-{width}x{height}"
@@ -559,7 +589,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             (folder.parent / f"{stem}.log").write_text(
                 result.stdout + "\n" + result.stderr, encoding="utf-8")
             populated_captures.append(str(evidence))
-            populated_diagnostics.append({"surface": state, "art": art, "inspection": inspection})
+            populated_diagnostics.append({"surface": state, "art": art, "inspection": inspection, "management": management})
     return {"nativeSurfaceFreshOwnedEarth": True,
             "nativeSurfacePlayerInput": True,
             "nativeSurfacePausedReload": True,
@@ -574,6 +604,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             "surfacePopulatedDerivedStateProof":
                 "Core-derived power/staffing membership checked against the live view; each facility selected and its visible inspector label checked.",
             "surfaceFocusCaptures": focus_captures,
+            "surfaceManagementCaptures": management_captures,
             "surfacePopulatedCaptures": populated_captures,
             "surfacePopulatedDiagnostics": populated_diagnostics,
             "surfaceFixture": "unaltered standard fresh 500-system Player17 campaign",
