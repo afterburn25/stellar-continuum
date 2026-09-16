@@ -80,6 +80,45 @@ All ten sites and the hub must be ready and drawn at 720p/1080p, with exact
 paused payload preservation and clipped RGB comparison. The test removes only
 its temporary backup so fallback recovery cannot supply false evidence.
 
-This is not a dense gameplay-built city. Powered/staffed flags are Core-derived
-and not directly diagnosed. At fit-to-all scale the building silhouettes remain
-small, especially at 720p; visual finish still requires work.
+The validator now selects every fixture facility through native input and
+checks its actual inspector text. Flags are compared directly with Core's
+powered/staffed ID sets; persisted completion, enabled and condition fields
+are independently checked against the unchanged Player17 fixture. A third
+populated run lowers only the test colony population to 0.08 million to prove
+worker shortage separately from the standard gallery's power shortage. This
+is authored test state, not a change to new-game population or economy rules.
+
+## Surface inspection and camera contract
+
+`native_surface_status.hpp` supplies the shared scene/inspector status order:
+construction, disabled, condition at/below Core's minimum, no workers, no power,
+operating. Core does not power unstaffed or broken facilities, so a false power
+flag alone must not be described as a power shortage. Condition efficiency is
+the existing projected factor, not actual output percentage.
+
+`SurfaceWorkspaceLayout::overview` and `focus` are the same rectangles used by
+drawing, input and runtime replay. Overview fits x/z independently. Focus Selected
+centers the selected site and chooses a bounded detail scale; without selection
+it centers the hub. Routine set_view refresh preserves the camera. A modal
+quote captures these controls, just as it captures terrain input.
+
+`--surface-reload-smoke` now emits strict `surface_inspection` JSON and a
+`-focus.bmp` sidecar. It selects every site, verifies the label is clipped to
+the inspector, uses Focus Selected, refreshes, and restores Overview plus the
+original selection. The validator rejects missing/duplicated sites, changed
+canonical fields, missing labels, misleading status, invalid zoom and no-op
+focus pixels. Runtime inspection is bounded to 16 fixture sites. Ordinary
+player views retain the existing 128-site limit.
+
+The steady profile intentionally pans at different zooms, so its final camera
+need not equal Overview. Inspection first establishes Overview through input;
+image-layer-off and final captures both use the same restored camera. Focus
+readback and preparation waits stay outside the steady frame sample.
+
+Six actual Vulkan runs and seven affected CTests pass; 62 Python validator
+tests include malformed/forged evidence rejection. All populated galleries
+retain 11 ready structures within the existing image-cache budget and preserve
+the full paused payload except timestamp. Captures at 720p/1080p were inspected.
+This remains a fixed oblique presentation with prototype building designs;
+large authored cities, freely navigable 3D, manual roads and stronger material
+artwork remain open. It is not a sealed release or a 60 FPS certification.

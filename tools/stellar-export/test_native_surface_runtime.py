@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_surface_runtime import _validate_surface_art_pixels, validate_native_surface_export
+from native_surface_runtime import _surface_inspection, _validate_surface_art_pixels, validate_native_surface_export
 
 
 def base_payload():
@@ -187,6 +187,22 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                     stdout = ("gpu_driver=vulkan systems=500 image_uploads=9 save=ok\n" +
                               "surface_art=" + json.dumps(art, separators=(",", ":")) + "\n" +
                               "surface=" + json.dumps(state, separators=(",", ":")))
+                    if reload:
+                        inspection_sites = []
+                        low_labor = payload["Galaxy"]["Colonies"][0].get("PopulationMillions") == .08
+                        for index, site in enumerate(sites):
+                            complete, enabled = site["IsComplete"], site.get("IsEnabled", True)
+                            staffed = complete and enabled and (not low_labor or index == 0)
+                            powered = staffed and (low_labor or index != len(sites)-2)
+                            label = ("CONSTRUCTION" if not complete else "DISABLED" if not enabled else
+                                     "NO WORKERS" if not staffed else "NO POWER" if not powered else "OPERATING")
+                            inspection_sites.append({"id": site["Id"], "complete": complete, "enabled": enabled,
+                                "condition": site.get("Condition", 1.), "powered": powered, "staffed": staffed,
+                                "status": label, "label_visible": True})
+                        inspection = {"sites": inspection_sites, "focused_id": sites[0]["Id"],
+                                      "overview_zoom": .7, "focus_zoom": 3.,
+                                      "refresh_preserved": True, "overview_restored": True}
+                        stdout += "\nsurface_inspection=" + json.dumps(inspection, separators=(",", ":"))
                 if fault != "capture":
                     image = bmp(width - 1 if fault == "geometry" else width, height)
                     if fault == "truncated":
@@ -205,6 +221,7 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                                 at = 54 + (height - py - 1) * stride + px * 3; side[at] ^= 7
                         if fault == "art_header_only": side[6] ^= 1
                         sidecar.write_bytes(side)
+                        capture.with_name(capture.stem + "-focus.bmp").write_bytes(side)
                 if fault == "renderer": stdout = stdout.replace("gpu_driver=vulkan", "gpu_driver=software")
                 if fault == "uploads" and "--smoke" not in args: stdout = stdout.replace("image_uploads=9", "image_uploads=0")
                 calls.append(args)
@@ -212,7 +229,7 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
 
             with mock.patch("native_surface_runtime.subprocess.run", side_effect=run):
                 result = validate_native_surface_export(package, {})
-            self.assertEqual(len(calls), 5)
+            self.assertEqual(len(calls), 6)
             self.assertNotIn("--load", calls[0]); self.assertTrue(all("--load" in c for c in calls[1:]))
             self.assertNotIn("--profile-frames", calls[0])
             self.assertTrue(all(c[-2:] == ["--profile-frames", "120"] for c in calls[1:]))
@@ -220,17 +237,43 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
             self.assertTrue(result["nativeSurfacePlayerInput"])
             self.assertTrue(result["nativeSurfacePausedReload"])
             self.assertEqual(len(result["surfaceCaptures"]), 3)
-            self.assertEqual(len(result["surfacePopulatedCaptures"]), 2)
+            self.assertEqual(len(result["surfacePopulatedCaptures"]), 3)
+            self.assertEqual(len(result["surfaceFocusCaptures"]), 3)
             self.assertEqual(result["surfacePopulatedFamilies"],
                              ["power_generator", "science_lab",
                               "habitat_complex", "fabricator"])
             self.assertEqual(result["surfacePopulatedPersistedStates"],
                              ["complete", "enabled", "disabled", "priority",
                               "condition-repair"])
-            self.assertIn("Core-derived", result["surfacePopulatedDerivedStateLimit"])
+            self.assertIn("Core-derived", result["surfacePopulatedDerivedStateProof"])
             self.assertIn("test-only", result["surfacePopulatedFixture"])
 
     def test_order_reload(self): self.exercise()
+
+    def test_inspection_rejects_forged_or_incomplete_evidence(self):
+        colony = {"SurfaceBuildings": [{"Id": 5, "IsComplete": True, "IsEnabled": True, "Condition": 1.}]}
+        evidence = {"sites": [{"id": 5, "complete": True, "enabled": True, "condition": 1.,
+                               "staffed": False, "powered": False, "status": "NO WORKERS", "label_visible": True}],
+                    "focused_id": 5, "overview_zoom": .5, "focus_zoom": 3.,
+                    "refresh_preserved": True, "overview_restored": True}
+        encode = lambda value: "surface_inspection=" + json.dumps(value)
+        self.assertEqual(_surface_inspection(encode(evidence), colony)["focused_id"], 5)
+        for key, value in (("status", "OPERATING"), ("status", "NO POWER"), ("label_visible", False),
+                           ("id", 8), ("id", True), ("complete", False), ("enabled", False),
+                           ("condition", .5), ("condition", float("nan")), ("powered", True), ("staffed", 1)):
+            with self.subTest(key=key, value=value), self.assertRaises(RuntimeError):
+                bad = copy.deepcopy(evidence); bad["sites"][0][key] = value
+                _surface_inspection(encode(bad), colony)
+        for key, value in (("sites", []), ("sites", evidence["sites"]*2), ("focus_zoom", .5),
+                           ("focus_zoom", float("inf")), ("focused_id", 8),
+                           ("refresh_preserved", False), ("overview_restored", False)):
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                bad = copy.deepcopy(evidence); bad[key] = value
+                _surface_inspection(encode(bad), colony)
+        with self.assertRaises(RuntimeError):
+            _surface_inspection(encode(evidence), colony, {"NO POWER"})
+        with self.assertRaises(RuntimeError):
+            _surface_inspection(encode(evidence) + "\n" + encode(evidence), colony)
     def test_palette_required(self):
         with self.assertRaises(RuntimeError): self.exercise("palette_selected")
     def test_ghost_required(self):

@@ -112,6 +112,9 @@ void responsive_layout() {
             "terrain escaped surface");
     require(layout.surface.contains(center(layout.inspector)),
             "inspector escaped surface");
+    require(layout.surface.contains(center(layout.overview)) &&
+                layout.surface.contains(center(layout.focus)),
+            "surface camera controls escaped surface");
     require(layout.confirmation.contains(center(layout.confirm)),
             "confirm escaped modal");
     require(layout.confirmation.contains(center(layout.cancel)),
@@ -451,6 +454,130 @@ void surface_scene_rotation_and_families() {
           "advanced functional family fell back to the generic silhouette");
 }
 
+void surface_camera_controls_and_refresh() {
+  auto view = colony();
+  auto distant = view.construction_sites.front();
+  distant.building_id = 10;
+  distant.x = -320.f;
+  distant.z = 265.f;
+  distant.complete = distant.enabled = distant.powered = distant.staffed = true;
+  distant.condition = 1.;
+  view.construction_sites.push_back(distant);
+  NativeSurfaceWorkspace workspace;
+
+  for (const auto [width, height] : {std::pair{1280, 720},
+                                     {1920, 1080}, {2560, 1440},
+                                     {3840, 2160}}) {
+    workspace.open(view, width, height);
+    const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+    const auto overview = workspace.viewport();
+    for (const auto &site : view.construction_sites) {
+      const auto center = workspace.viewport().world_to_screen(
+          site.x, site.z, layout.terrain);
+      const auto radius = NativeSurfaceScene::footprint_radius(site) *
+                          static_cast<float>(workspace.viewport().pixels_per_unit);
+      require(center.x - radius >= layout.terrain.x &&
+                  center.x + radius <= layout.terrain.x + layout.terrain.width &&
+                  center.y - radius >= layout.terrain.y &&
+                  center.y + radius <= layout.terrain.y + layout.terrain.height,
+              "fit-all did not contain every persisted site");
+    }
+    const auto site_point = workspace.viewport().world_to_screen(
+        distant.x, distant.z, layout.terrain);
+    (void)workspace.handle({InputEventType::LeftPressed, site_point}, width,
+                           height);
+    (void)workspace.handle({InputEventType::LeftReleased, site_point}, width,
+                           height);
+    require(workspace.selected_building_id() == std::optional<int>{10},
+            "site hit did not share the visible surface geometry");
+    (void)workspace.handle({InputEventType::LeftPressed, center(layout.focus)},
+                           width, height);
+    require(std::abs(workspace.viewport().center_x - distant.x) < .001 &&
+                std::abs(workspace.viewport().center_z - distant.z) < .001,
+            "Focus Selected did not center the selected facility");
+    const auto focused = workspace.viewport();
+    view.revision += 1;
+    workspace.set_view(view);
+    require(workspace.viewport().center_x == focused.center_x &&
+                workspace.viewport().center_z == focused.center_z &&
+                workspace.viewport().pixels_per_unit == focused.pixels_per_unit,
+            "surface refresh replaced the focused camera");
+    (void)workspace.handle({InputEventType::LeftPressed, center(layout.overview)},
+                           width, height);
+    require(workspace.viewport().center_x == overview.center_x &&
+                workspace.viewport().center_z == overview.center_z &&
+                workspace.viewport().pixels_per_unit == overview.pixels_per_unit,
+            "Colony Overview did not restore the fit-all camera");
+  }
+
+  workspace.open(view, 1280, 720);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.terrain)},
+                         1280, 720);
+  (void)workspace.handle(
+      {InputEventType::PointerMove,
+       {center(layout.terrain).x + 70, center(layout.terrain).y + 40},
+       {70, 40}},
+      1280, 720);
+  (void)workspace.handle({InputEventType::LeftReleased,
+                          {center(layout.terrain).x + 70,
+                           center(layout.terrain).y + 40}},
+                         1280, 720);
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.focus)},
+                         1280, 720);
+  require(std::abs(workspace.viewport().center_x) < .001 &&
+              std::abs(workspace.viewport().center_z) < .001,
+          "Focus Selected without a site did not return to the colony hub");
+
+  NativeSurfacePlacementQuote quote;
+  quote.accepted = true;
+  quote.quote_revision = 44;
+  workspace.set_placement_quote(quote, true);
+  const auto modal_camera = workspace.viewport();
+  require(workspace.handle({InputEventType::LeftPressed, center(layout.focus)},
+                           1280, 720)
+                  .kind == SurfaceWorkspaceCommandKind::None &&
+              workspace.handle({InputEventType::Wheel, center(layout.terrain),
+                                {}, 2}, 1280, 720)
+                  .kind == SurfaceWorkspaceCommandKind::None &&
+              workspace.viewport().center_x == modal_camera.center_x &&
+              workspace.viewport().center_z == modal_camera.center_z &&
+              workspace.viewport().pixels_per_unit == modal_camera.pixels_per_unit,
+          "confirmation modal leaked camera or gameplay input");
+}
+
+void inspector_status_rows() {
+  auto view = colony();
+  auto &site = view.construction_sites.front();
+  site.complete = true;
+  site.enabled = true;
+  site.powered = false;
+  site.staffed = false;
+  site.condition = .1;
+  site.efficiency = 0.;
+  NativeSurfaceWorkspace workspace;
+  workspace.open(view, 1280, 720);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
+  const auto point = workspace.viewport().world_to_screen(site.x, site.z,
+                                                           layout.terrain);
+  (void)workspace.handle({InputEventType::LeftPressed, point}, 1280, 720);
+  (void)workspace.handle({InputEventType::LeftReleased, point}, 1280, 720);
+  DrawList draw;
+  workspace.render(draw, 1280, 720);
+  const auto has = [&](std::string_view value) {
+    return std::ranges::any_of(draw.overlay, [&](const auto &command) {
+      const auto *label = std::get_if<Text>(&command);
+      return label && label->value == value;
+    });
+  };
+  require(has("REPAIR NEEDED") && has("Power  Unavailable") &&
+              has("Workforce  Missing") && has("Enabled  Yes") &&
+              has("Condition  0.10") && has("Condition efficiency  0%"),
+          "inspector did not expose the canonical status and operational rows");
+  require(!has("Operational module"),
+          "inspector still claims every completed module is operational");
+}
+
 void workspace_ready_images_and_preview_identity() {
   using namespace stellar::native_surface_building;
   auto view = colony();
@@ -689,6 +816,8 @@ void surface_scene_route_cache_and_bounds() {
 
 int main() try {
   responsive_layout();
+  surface_camera_controls_and_refresh();
+  inspector_status_rows();
   anchored_camera();
   input_and_confirmation();
   site_removal_and_refresh();

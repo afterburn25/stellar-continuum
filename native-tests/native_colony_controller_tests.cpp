@@ -1,4 +1,5 @@
 #include "native_colony_controller.hpp"
+#include "native_surface_status.hpp"
 #include "native_settlement_mission_controller.hpp"
 
 #include "../../app/native_client/native_system_view.hpp"
@@ -66,6 +67,68 @@ void require_finite(const NativeColonyView &view) {
             return std::isfinite(value);
           }),
           "colony projection emitted non-finite operational telemetry");
+}
+
+void surface_operation_tests(const fs::path &research_root, const fs::path &catalog) {
+  using stellar::native_colony_ui::surface_site_status;
+  auto frame = make_frame(research_root, catalog, 127506);
+  auto &world = frame.runtime().world().campaign();
+  const auto player = world.player_civilization_id;
+  auto &colony = *std::ranges::find(world.colonies, player, &Colony::civilization_id);
+  require(colony.planetary_body_id.has_value(), "operation fixture lacks a body");
+  world.knowledge.mark_system_fully_surveyed(player, colony.system_id);
+  NativeSystemViewController systems;
+  const auto system = systems.build(frame, 7, colony.system_id);
+  NativeColonyController controller;
+  colony.population_millions = 1.;
+  colony.surface_buildings.clear();
+  for (int id = 1; id <= 6; ++id) {
+    SurfaceBuilding building;
+    building.id = 9000 + id;
+    building.type_id = id == 1 ? "power_generator" : "science_lab";
+    building.x = static_cast<float>(id * 70);
+    building.is_complete = id != 6;
+    building.is_enabled = id != 4;
+    building.condition = id == 5 ? minimum_operational_condition : 1.;
+    building.industry_progress = building.is_complete ?
+        find_surface_building(building.type_id)->industry_cost : 20.;
+    colony.surface_buildings.push_back(building);
+  }
+  const auto project = [&] {
+    const auto output = surface_colony_output(colony);
+    const auto result = controller.build(frame, 7, *system.snapshot,
+                                         *colony.planetary_body_id);
+    require(result.view.has_value(), "operation fixture was not projected");
+    for (const auto &site : result.view->construction_sites) {
+      require(site.powered == std::ranges::contains(output.powered_building_ids, site.building_id) &&
+                  site.staffed == std::ranges::contains(output.staffed_building_ids, site.building_id),
+              "surface status diverged from authoritative allocation");
+    }
+    return *result.view;
+  };
+  const auto label = [](const NativeColonyView &view, int id) {
+    const auto site = std::ranges::find(view.construction_sites, id,
+                                       &NativeSurfaceSite::building_id);
+    require(site != view.construction_sites.end(), "missing operational site");
+    return surface_site_status(*site).label;
+  };
+  const auto normal = project();
+  require(label(normal, 9002) == "OPERATING" && label(normal, 9004) == "DISABLED" &&
+              label(normal, 9005) == "REPAIR NEEDED" && label(normal, 9006) == "CONSTRUCTION",
+          "facility completion was confused with operational readiness");
+  colony.surface_buildings.front().is_enabled = false;
+  const auto low_power = project();
+  require(label(low_power, 9001) == "DISABLED" && label(low_power, 9002) == "OPERATING" &&
+              label(low_power, 9003) == "NO POWER" && low_power.revision > normal.revision,
+          "power allocation or revision was not visible to the player");
+  colony.surface_buildings.front().is_enabled = true;
+  colony.population_millions = .08;
+  const auto low_labor = project();
+  require(label(low_labor, 9001) == "OPERATING" && label(low_labor, 9002) == "NO WORKERS" &&
+              label(low_labor, 9005) == "REPAIR NEEDED" && low_labor.revision > low_power.revision,
+          "unstaffed or damaged site misleadingly reported a power shortage");
+  require(label(normal, 9002) == "OPERATING" && label(low_power, 9003) == "NO POWER",
+          "refresh mutated an earlier value-owned view");
 }
 
 void inspector_tests(const fs::path &research_root, const fs::path &catalog) {
@@ -415,11 +478,12 @@ int main(int argc, char **argv) try {
   const auto research_root = fs::absolute(argv[1]);
   const auto catalog = fs::absolute(argv[2]);
   inspector_tests(research_root, catalog);
+  surface_operation_tests(research_root, catalog);
   mission_case(research_root, catalog, false);
   mission_case(research_root, catalog, true);
   stale_mission_test(research_root, catalog);
   admission_revalidation_tests(research_root, catalog);
-  std::cout << "native colony controllers: 6/6 bounded cases passed\n";
+  std::cout << "native colony controllers: 7/7 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native colony controller tests failed: " << error.what() << '\n';

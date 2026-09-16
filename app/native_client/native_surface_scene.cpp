@@ -1,3 +1,4 @@
+#include "native_surface_status.hpp"
 #include "native_surface_scene.hpp"
 #include <algorithm>
 #include <array>
@@ -181,12 +182,14 @@ std::vector<Point> routed(Point start, Point end,
   return {};
 }
 Color status(const NativeSurfaceSite &s) {
-  if (!s.complete)
-    return warning;
-  if (!s.enabled || !s.powered)
-    return {188, 74, 83, 255};
-  if (!s.staffed)
-    return {85, 159, 179, 255};
+  switch (surface_site_status(s).kind) {
+  case SurfaceSiteStatusKind::Constructing: return warning;
+  case SurfaceSiteStatusKind::Disabled: return {130, 142, 155, 255};
+  case SurfaceSiteStatusKind::Damaged: return {234, 93, 105, 255};
+  case SurfaceSiteStatusKind::Unstaffed: return {85, 189, 220, 255};
+  case SurfaceSiteStatusKind::Unpowered: return {242, 148, 67, 255};
+  case SurfaceSiteStatusKind::Operating: return {110, 230, 157, 255};
+  }
   return light;
 }
 

@@ -5,58 +5,62 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
-### Save-gated New Game from a live native campaign
+### Colony surface focus and truthful operating status
 
-Pause-menu **New Game** now saves the current campaign before opening race and
-seed setup. A single-flight transition distinguishes Waiting/Saving/Ready;
-older autosave/manual completions and cancelled writers cannot authorize a
-later replacement. Strategic and tactical advancement and conflicting UI
-commands are suspended while pending. Save failure retains the live campaign,
-shows the error and requires an explicit retry. No global N shortcut was added.
+Completed facilities no longer automatically claim to be operational. The
+shared native status projection distinguishes construction, disabled, repair
+needed, no workers, no power and operating, in prerequisite order. Both scene
+markers and the selected inspector use it. Power and staffing remain membership
+in Core's allocation output; the inspector shows condition and the projected
+condition efficiency separately from actual production.
 
-Live setup skips the application boot artwork and menu-ready music hook.
-Back/Escape opens an entry screen with a distinct **Return to Campaign**;
-cancellation retains the same NativeCampaign, frame, camera, selection and
-cache. Exit to Windows is honored. Only a ready new session replaces the old
-object, and the startup host chooses an independent save slot. Audio/settings
-objects live outside this replacement loop. Core and Player17 rules are unchanged.
+The surface header now offers **Overview** and **Focus Selected** using shared
+render/hit rectangles. Overview fits horizontal and vertical extents separately;
+Focus Selected centers and enlarges the chosen facility (the hub when nothing
+is selected). Left-drag and wheel navigation remain available, routine colony
+refresh preserves the camera, and confirmation modals capture camera input.
+No authoritative Core, economy rule or Player17 field changed.
 
-Validation: final MSVC host build; nine affected CTests pass across the initial
-run and a corrected UI-layout recheck. The first layout run exposed a 640x360
-rail/gutter mismatch after adding a menu row; proportional rail sizing fixes it.
-Session tests cover old writes, cancelled-write retry, real blocked filesystem
-save destination, no automatic retry, durable exit, and exact tactical capture,
-cancellation identity and matched continuation. Workspace/layout checks cover
-720p through 4K. Python: 4 restart-proof tests and 33 cold New Game tests pass.
+Validation: final MSVC native build; seven affected CTests; 62 surface-validator
+Python tests pass. Controller tests exercise actual Core power/workforce
+allocation, disabled/damaged/unfinished precedence and immutable old views.
+Layout/input tests cover 720p, 1080p, 1440p and 4K. Six relocated Vulkan runs
+cover fresh construction, paid cancellation/refund, paused reload, populated
+720p/1080p surfaces and a low-workforce 720p fixture. Native input selects every
+fixture facility, checks its rendered inspector label and compares its flags
+with Core output. Focus captures prove enlargement, refresh preservation and
+Overview recovery; paired image-layer captures prove clipped building pixels.
+The complete paused Player17 payload remains unchanged except SavedAtUtc.
 
-The final relocated Vulkan executable passes five restart-suite runs: baseline,
-720p cancel, 1080p exit, 720p create, and 1080p paused reload. Previous normalized
-Player17 content is unchanged except SavedAtUtc. New seed 143250 / pelagic race /
-250 systems persists in a separate slot and reloads exactly. Cancel proves the
-same live canonical/camera snapshot; Exit returns process code 0. All three
-live setup paths report no boot replay or menu-ready recall and one music start.
-Two additional cold-start/reload runs pass with real audio/settings checks.
-Screenshots were inspected at 720p and 1080p; these are native input-event
-replays, not physical mouse injection. No claim of finished graphics or 60 FPS.
+All populated views report 11 ready/drawn structures, 2,883,584 cached bytes,
+and zero pending/deferred/failed/reserved work. 720p focus increases scale from
+1.07692 to 3.22388; 1080p from 1.68 to 4. Captures were visually inspected.
+The initial runtime proof incorrectly assumed a manually panned view was
+Overview; it now establishes Overview through input before comparing cameras
+and captures. This was an evidence correction, not a gameplay-rule change.
 
-Evidence: `work/native-new-campaign-final-build.log`,
-`native-new-campaign-ctest.log`, `native-new-campaign-layout-recheck.log`,
-`native-new-campaign-runtime.json`, `native-new-campaign-python.log`, and
-`native-new-campaign-cold-regression.json`; captures/raw logs are under
-`work/native-audio-validation/package-restart-*`. Reproduction and API contract:
-`docs/engine/NATIVE_NEW_CAMPAIGN_REVIEW.md`,
-`tools/stellar-export/native_restart_runtime.py`.
+Evidence: `work/native-surface-clarity-build.log`,
+`native-surface-clarity-ctest.log`, `native-surface-clarity-python.log`, and
+`native-surface-clarity-runtime.json`. Captures/raw logs are under
+`work/native-audio-validation/package-surface-*`. Reproduction and contracts:
+`docs/engine/NATIVE_SURFACE_BUILDING_PRESENTATION.md` and
+`tools/stellar-export/native_surface_runtime.py`.
 
-Previous published head 40391b5b passed CI run 35041298989. Local package remains
-UNSEALED, not a released download. Shared base ac45d958 and C# reference remain
-unchanged; PR332 remains unmerged. Devin is inventoried through a2a96294; newest
-empire/mission boards are not yet audited or imported. The b9e55e79 New Game
-idea is now selectively adapted with the lifecycle corrections above.
+Previous head 2cb82d83 passed GitHub Actions 35043992054. Its save-gated live
+New Game lifecycle remains intact; see `NATIVE_NEW_CAMPAIGN_REVIEW.md` for
+cancel/save failure/exit/unique-slot and exact roundtrip evidence. Shared base
+ac45d958, C# reference and PR332 merge state are unchanged. The local validation
+package remains UNSEALED and is not a released download. This remains an
+oblique surface image layer with prototype architecture, not finished 3D cities
+or a sustained 60 FPS certification.
 
-Next bounded priorities: improve surface overview legibility and expose true
-operating-state evidence; then observer-safe system inspection and explicit
-logistics failure states. Do not import foreign live colony stats on mere
-contact/survey, or replace recorded scientist cues with generic SAPI synthesis.
+Devin is inventoried through 9b5ba16e (VIDEO settings), including e49f4df0 colony
+sites and the newer empire/mission boards; those changes are not yet audited or
+imported. Next: review and integrate compatible native video settings with
+safe display rollback and the existing audio/settings lifecycle, then
+observer-safe system inspection and explicit logistics failure states.
+Preserve recorded British female scientist cues; do not import foreign live
+colony statistics based solely on contact/survey.
 
 ## Previous integration checkpoint: civilian recovery (2026-09-15)
 

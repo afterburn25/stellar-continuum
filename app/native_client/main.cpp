@@ -2,6 +2,7 @@
 #include "native_audio_director.hpp"
 #include "native_campaign_feedback.hpp"
 #include "native_surface_art_assets.hpp"
+#include "native_surface_status.hpp"
 #include "native_audio_settings.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
@@ -2362,6 +2363,104 @@ class NativeCampaign final {
     (void)scene(width,height);
   }
 
+  // Runtime-only evidence uses the same input routing and observer-owned view
+  // as a player. It neither advances Core nor authors operating state.
+  [[nodiscard]] std::string surface_inspection_smoke(int width,int height,
+      const std::function<void(const DrawList&,bool)>& draw){
+    if(!surface_workspace_.visible()||!surface_workspace_.view())
+      throw std::runtime_error("Surface inspection requires an owned colony.");
+    const auto initial=*surface_workspace_.view();
+    if(initial.construction_sites.empty()||initial.construction_sites.size()>16)
+      throw std::runtime_error("Surface inspection requires a bounded populated fixture.");
+    const auto layout=SurfaceWorkspaceLayout::for_viewport(width,height);
+    const auto original=surface_workspace_.selected_building_id();
+    const auto click=[&](Point point){
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=point;
+      input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Surface inspection unexpectedly closed the campaign.");
+    };
+    const auto select=[&](const NativeSurfaceSite& site){
+      click(surface_workspace_.viewport().world_to_screen(site.x,site.z,layout.terrain));
+      if(surface_workspace_.selected_building_id()!=std::optional{site.building_id})
+        throw std::runtime_error("Surface inspection could not pick the visible building.");
+    };
+    // Steady profiling intentionally pans at different zooms. Establish the
+    // player's Overview command as this proof's baseline, not that manual pan.
+    click(center(layout.overview));
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto colony=std::ranges::find(world.colonies,initial.colony_id,&Colony::id);
+    if(colony==world.colonies.end()||colony->civilization_id!=initial.player_civilization_id)
+      throw std::runtime_error("Surface inspection lost its ownership binding.");
+    const auto output=surface_colony_output(*colony);
+    std::ostringstream evidence;evidence<<std::boolalpha<<"{\"sites\":[";
+    bool first=true;
+    for(const auto &site:initial.construction_sites){
+      if(site.powered!=std::ranges::contains(output.powered_building_ids,site.building_id)||
+         site.staffed!=std::ranges::contains(output.staffed_building_ids,site.building_id))
+        throw std::runtime_error("Surface operating telemetry disagrees with Core allocation.");
+      select(site);
+      const auto rendered=scene(width,height);
+      const auto status=stellar::native_colony_ui::surface_site_status(site);
+      const bool visible=std::ranges::any_of(rendered.overlay,[&](const auto& command){
+        const auto* label=std::get_if<Text>(&command);
+        return label&&label->value==status.label&&label->clip&&layout.inspector.contains(label->at);
+      });
+      if(!visible)throw std::runtime_error("Selected facility status is missing from its inspector.");
+      if(!first)evidence<<',';first=false;
+      evidence<<"{\"id\":"<<site.building_id<<",\"complete\":"<<site.complete
+        <<",\"enabled\":"<<site.enabled<<",\"condition\":"<<site.condition
+        <<",\"powered\":"<<site.powered<<",\"staffed\":"<<site.staffed
+        <<",\"status\":\""<<status.label<<"\",\"label_visible\":"<<visible<<'}';
+    }
+    const auto target=std::ranges::find_if(initial.construction_sites,[](const auto& site){
+      return site.complete&&site.enabled&&(!site.powered||!site.staffed);
+    });
+    const auto &focused_site=target==initial.construction_sites.end()?initial.construction_sites.front():*target;
+    select(focused_site);
+    const auto overview=surface_workspace_.viewport();
+    click(center(layout.focus));
+    const auto focused=surface_workspace_.viewport();
+    if(focused.center_x!=focused_site.x||focused.center_z!=focused_site.z||
+       focused.pixels_per_unit<=overview.pixels_per_unit)
+      throw std::runtime_error("Focus Selected did not center and enlarge the chosen building.");
+    refresh_surface(true);
+    const auto same_camera=[](const auto& a,const auto& b){
+      return a.center_x==b.center_x&&a.center_z==b.center_z&&a.pixels_per_unit==b.pixels_per_unit;
+    };
+    if(!same_camera(focused,surface_workspace_.viewport()))
+      throw std::runtime_error("Surface refresh discarded the focused camera.");
+    const auto ready=[&]{
+      const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(8);
+      do{
+        update_surface_buildings(width,height);
+        if(surface_buildings_.ready())return;
+        draw(scene(width,height),false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }while(std::chrono::steady_clock::now()<deadline);
+      throw std::runtime_error("Focused surface artwork did not become ready within its bounded wait.");
+    };
+    ready();draw(scene(width,height),true);
+    click(center(layout.overview));
+    if(!same_camera(overview,surface_workspace_.viewport())){
+      const auto restored=surface_workspace_.viewport();
+      std::ostringstream error;error<<"Colony Overview failed to restore the overview camera: before "
+        <<overview.center_x<<','<<overview.center_z<<','<<overview.pixels_per_unit
+        <<" after "<<restored.center_x<<','<<restored.center_z<<','<<restored.pixels_per_unit;
+      throw std::runtime_error(error.str());
+    }
+    if(original){
+      const auto anchor=std::ranges::find(initial.construction_sites,*original,&NativeSurfaceSite::building_id);
+      if(anchor!=initial.construction_sites.end())select(*anchor);
+    }
+    ready();(void)scene(width,height);
+    evidence<<"],\"focused_id\":"<<focused_site.building_id
+      <<",\"overview_zoom\":"<<overview.pixels_per_unit<<",\"focus_zoom\":"<<focused.pixels_per_unit
+      <<",\"refresh_preserved\":true,\"overview_restored\":true}";
+    return evidence.str();
+  }
+
   [[nodiscard]] std::string surface_building_status(int width,int height)const{
     const auto stats=surface_buildings_.stats();
     std::ostringstream out;
@@ -3791,6 +3890,11 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.surface_reload_smoke)
+          std::cout<<"surface_inspection="<<campaign.surface_inspection_smoke(
+              window.drawable_width(),window.drawable_height(),[&](const DrawList& draw,bool capture_detail){
+                window.draw(draw,capture_detail?std::optional{sidecar_path(*options.smoke_screenshot,L"-focus")}:std::nullopt);
+              })<<'\n';
         if(options.surface_smoke||options.surface_reload_smoke)
           campaign.surface_building_smoke(window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){
             window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-without-buildings"));

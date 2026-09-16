@@ -19,7 +19,8 @@ struct SurfaceWorkspaceLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect surface, back, title, palette, palette_rows,
-      terrain, inspector, rotate, remove, confirmation, confirm, cancel;
+      terrain, inspector, overview, focus, rotate, remove, confirmation,
+      confirm, cancel;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
 };
@@ -93,6 +94,7 @@ public:
 
 private:
   void fit(int width, int height) noexcept;
+  void focus_selected(int width, int height) noexcept;
   void reconcile();
   [[nodiscard]] std::optional<std::size_t> palette_hit(
       stellar::native_map::Point, const SurfaceWorkspaceLayout&) const noexcept;

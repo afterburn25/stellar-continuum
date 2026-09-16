@@ -1,4 +1,5 @@
 #include "native_surface_workspace.hpp"
+#include "native_surface_status.hpp"
 #include "native_ui_layout.hpp"
 
 #include <stellar/core/surface_construction.hpp>
@@ -108,6 +109,9 @@ SurfaceWorkspaceLayout::for_viewport(const int width,
   const auto modal_h = 286.f * scale;
   const UiRect confirmation{(w - modal_w) * .5f, (h - modal_h) * .5f, modal_w,
                             modal_h};
+  const auto overview_width = 86.f * scale;
+  const auto focus_width = 100.f * scale;
+  const auto control_y = surface.y + 8.f * scale;
   return {scale,
           static_cast<int>(std::lround(22.f * scale)),
           static_cast<int>(std::lround(15.f * scale)),
@@ -116,12 +120,17 @@ SurfaceWorkspaceLayout::for_viewport(const int width,
           {surface.x + 8.f * scale, surface.y + 8.f * scale, 92.f * scale,
            32.f * scale},
           {surface.x + 112.f * scale, surface.y + 10.f * scale,
-           surface.width - 124.f * scale, 30.f * scale},
+           std::max(1.f, surface.width - 322.f * scale), 30.f * scale},
           palette,
           {palette.x + 8.f * scale, palette.y + 38.f * scale,
            palette.width - 16.f * scale, palette.height - 46.f * scale},
           terrain,
           inspector,
+          {surface.x + surface.width - (focus_width + overview_width +
+                                        20.f * scale),
+           control_y, overview_width, 32.f * scale},
+          {surface.x + surface.width - (focus_width + 10.f * scale), control_y,
+           focus_width, 32.f * scale},
           {inspector.x + 10.f * scale,
            inspector.y + inspector.height - 86.f * scale,
            inspector.width - 20.f * scale, 32.f * scale},
@@ -199,14 +208,38 @@ void NativeSurfaceWorkspace::fit(const int width, const int height) noexcept {
     }
   viewport_.center_x = (min_x + max_x) * .5;
   viewport_.center_z = (min_z + max_z) * .5;
-  const auto span =
-      std::clamp(std::max({max_x - min_x, max_z - min_z, 240.}), 240.,
-                 2. * static_cast<double>(surface_area_half_size));
+  const auto span_x = std::clamp(max_x - min_x, 240.,
+                                 2. * static_cast<double>(surface_area_half_size));
+  const auto span_z = std::clamp(max_z - min_z, 240.,
+                                 2. * static_cast<double>(surface_area_half_size));
   viewport_.pixels_per_unit =
-      .84 *
-      std::min(static_cast<double>(layout.terrain.width),
-               static_cast<double>(layout.terrain.height)) /
-      span;
+      .84 * std::min(static_cast<double>(layout.terrain.width) / span_x,
+                     static_cast<double>(layout.terrain.height) / span_z);
+}
+
+void NativeSurfaceWorkspace::focus_selected(const int width,
+                                            const int height) noexcept {
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+  if (selected_building_id_ && view_) {
+    const auto site = std::ranges::find(view_->construction_sites,
+                                        *selected_building_id_,
+                                        &NativeSurfaceSite::building_id);
+    if (site != view_->construction_sites.end()) {
+      viewport_.center_x = site->x;
+      viewport_.center_z = site->z;
+      const auto radius = NativeSurfaceScene::footprint_radius(*site) + 52.;
+      const auto detail = .72 * std::min(
+          static_cast<double>(layout.terrain.width) / (2. * radius),
+          static_cast<double>(layout.terrain.height) / (2. * radius));
+      viewport_.pixels_per_unit = std::clamp(detail, .08, 4.);
+      return;
+    }
+  }
+  viewport_.center_x = 0.;
+  viewport_.center_z = 0.;
+  viewport_.pixels_per_unit = std::clamp(.72 * std::min(
+      static_cast<double>(layout.terrain.width),
+      static_cast<double>(layout.terrain.height)) / 152., .08, 4.);
 }
 
 void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
@@ -485,6 +518,16 @@ SurfaceWorkspaceCommand NativeSurfaceWorkspace::handle(const InputEvent &event,
     close();
     return {SurfaceWorkspaceCommandKind::Close, true};
   }
+  if (event.type == InputEventType::LeftPressed &&
+      layout.overview.contains(event.position)) {
+    fit(width, height);
+    return {SurfaceWorkspaceCommandKind::None, true};
+  }
+  if (event.type == InputEventType::LeftPressed &&
+      layout.focus.contains(event.position)) {
+    focus_selected(width, height);
+    return {SurfaceWorkspaceCommandKind::None, true};
+  }
   if (event.type == InputEventType::Wheel &&
       layout.palette.contains(event.position)) {
     const auto content = static_cast<float>(view_->available_buildings.size()) *
@@ -598,6 +641,15 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
        TextAlign::Center);
   text(out, layout.title, view.colony_name + "  /  OPERATIONAL SURFACE",
        text_color, layout.heading_font);
+  fill(out, layout.overview,
+       layout.overview.contains(pointer_) ? hover : row);
+  stroke(out, layout.overview, border);
+  text(out, layout.overview, "OVERVIEW", text_color, layout.small_font,
+       TextAlign::Center);
+  fill(out, layout.focus, layout.focus.contains(pointer_) ? hover : row);
+  stroke(out, layout.focus, border);
+  text(out, layout.focus, "FOCUS SELECTED", text_color, layout.small_font,
+       TextAlign::Center);
 
   fill(out, layout.palette, inset);
   stroke(out, layout.palette, border);
@@ -816,21 +868,28 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
         std::ranges::find(view.construction_sites, *selected_building_id_,
                           &NativeSurfaceSite::building_id);
     if (site != view.construction_sites.end()) {
+      const auto status = surface_site_status(*site);
       add(site->name, text_color, layout.body_font, 26.f);
-      add(site->complete ? "Operational module" : site->construction_stage,
-          site->complete ? good : warning, layout.small_font, 23.f);
-      add("Position  " + number(site->x, 1) + ", " + number(site->z, 1), muted,
-          layout.small_font, 22.f);
-      add("Rotation  " + number(site->rotation_degrees, 0) + " deg", muted,
-          layout.small_font, 22.f);
+      add(std::string(status.label),
+          status.kind == SurfaceSiteStatusKind::Operating ? good : warning,
+          layout.small_font, 21.f);
+      add("Power  " + std::string(site->powered ? "Available" : "Unavailable"),
+          muted, layout.small_font, 19.f);
+      add("Workforce  " + std::string(site->staffed ? "Assigned" : "Missing"),
+          muted, layout.small_font, 19.f);
+      add("Enabled  " + std::string(site->enabled ? "Yes" : "No"), muted,
+          layout.small_font, 19.f);
+      add("Condition  " + number(site->condition, 2), muted,
+          layout.small_font, 19.f);
+      add("Condition efficiency  " + number(site->efficiency * 100., 0) + "%", muted,
+          layout.small_font, 19.f);
       add("Construction  " + number(site->progress_fraction * 100., 1) + "%",
-          text_color, layout.small_font, 22.f);
+          text_color, layout.small_font, 19.f);
       if (!site->complete)
         add("Materials remaining  " +
                 number(site->remaining_construction_materials, 1),
-            muted, layout.small_font, 22.f);
-      add("Completion depends on available construction materials.", muted,
-          layout.small_font, 46.f);
+            muted, layout.small_font, 19.f);
+      add(std::string(status.detail), muted, layout.small_font, 35.f);
       fill(out, layout.remove, layout.remove.contains(pointer_) ? hover : row);
       stroke(out, layout.remove, warning);
       text(out, layout.remove,
