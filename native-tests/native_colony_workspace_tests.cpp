@@ -243,6 +243,51 @@ void wheel_reaches_last_site_and_escape_closes() {
           closed.captured && !workspace.visible());
 }
 
+void freight_review_input_and_layout() {
+  for (const auto size : {Point{1280,720},Point{1920,1080},Point{3840,2160}}) {
+    const auto width=static_cast<int>(size.x),height=static_cast<int>(size.y);
+    const auto layout=ColonyWorkspaceLayout::for_viewport(width,height,true);
+    REQUIRE(contains(layout.surface,layout.collect_freight));
+    REQUIRE(!overlaps(layout.collect_freight,layout.open_surface));
+    REQUIRE(!overlaps(layout.title,layout.collect_freight));
+    REQUIRE(contains(layout.surface,layout.freight_review));
+    REQUIRE(contains(layout.freight_review,layout.freight_text));
+    REQUIRE(contains(layout.freight_review,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_text,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_cancel,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_notice,layout.site_rows));
+    NativeColonyWorkspace workspace;auto owned=view();owned.resource_outpost=true;
+    workspace.open(owned);
+    const auto click=[&](UiRect bounds){const auto point=center(bounds);(void)workspace.handle({InputEventType::LeftPressed,point},width,height);return workspace.handle({InputEventType::LeftReleased,point},width,height);};
+    REQUIRE(workspace.handle({InputEventType::LeftReleased,center(layout.collect_freight)},width,height).kind==ColonyWorkspaceCommandKind::None);
+    REQUIRE(click(layout.collect_freight).kind==ColonyWorkspaceCommandKind::ReviewFreight);
+    NativeOutpostFreightPreview quote;quote.campaign_generation=owned.campaign_generation;quote.revision=19;
+    quote.player_civilization_id=owned.player_civilization_id;quote.colony_id=owned.colony_id;
+    quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
+    quote.fleet_name="Mercury Freight";quote.home_name="Earth";quote.outpost_name="Mining Depot";
+    quote.cargo_capacity=1000;quote.stored_materials=100;quote.extraction_per_day=2;
+    workspace.set_freight_preview(quote);REQUIRE(workspace.freight_preview().has_value());
+    // A drag across different buttons must not dispatch.
+    (void)workspace.handle({InputEventType::LeftPressed,center(layout.freight_cancel)},width,height);
+    REQUIRE(workspace.handle({InputEventType::LeftReleased,center(layout.freight_confirm)},width,height).kind==ColonyWorkspaceCommandKind::None);
+    const auto confirmed=click(layout.freight_confirm);
+    REQUIRE(confirmed.kind==ColonyWorkspaceCommandKind::ConfirmFreight&&confirmed.quote_revision==19);
+    REQUIRE(click(layout.freight_cancel).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(!workspace.freight_preview()&&workspace.visible());
+    quote.accepted=false;quote.message="No idle freighter available.";workspace.set_freight_preview(quote);
+    REQUIRE(click(layout.freight_confirm).kind==ColonyWorkspaceCommandKind::None);
+    DrawList denied;workspace.render(denied,width,height);
+    REQUIRE(std::ranges::none_of(denied.overlay,[](const auto& item){const auto* t=std::get_if<Text>(&item);return t&&t->value=="DISPATCH FREIGHTER";}));
+    REQUIRE(workspace.handle({InputEventType::EscapePressed},width,height).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(workspace.visible()&&!workspace.freight_preview());
+    quote.accepted=true;workspace.set_freight_preview(quote);
+    (void)workspace.handle({InputEventType::PointerCancelled},width,height);REQUIRE(!workspace.freight_preview());
+    workspace.set_freight_preview(quote);auto changed=owned;changed.player_civilization_id++;
+    workspace.set_view(changed);REQUIRE(!workspace.freight_preview());
+    workspace.open(owned);workspace.set_freight_preview(quote);workspace.close();REQUIRE(!workspace.freight_preview());
+  }
+}
+
 void campaign_replacement_clears_owned_snapshot() {
   NativeColonyWorkspace workspace;
   workspace.open(view(7));
@@ -258,6 +303,7 @@ int main() {
     detail_scroll_reaches_outpost_rows_and_keeps_text_clipped();
     wheel_reaches_last_site_and_escape_closes();
     campaign_replacement_clears_owned_snapshot();
+    freight_review_input_and_layout();
     std::cout << "native colony workspace tests passed\n";
     return 0;
   } catch (const std::exception &error) {

@@ -2,7 +2,7 @@
 
 Branch of record: `engine/stellar-engine-migration` (head `ac45d958`, engine 0.1.57).
 Devin/SWE-2 working branch: `cpp/devin-swe2-native-conversion` (reviewed head
-`88de7e38` inventoried; support, notifications, tactical, strategic fleet orders/Locate, civilian recovery,
+`b023e384` inventoried; support, notifications, tactical, strategic fleet orders/Locate, civilian recovery,
 safe video settings, observer-safe system/planet inspection, home-system supply, surface management, sovereign economy and
 save-gated New Game selectively adapted. New voice and newest empire/mission
 boards remain unimported pending review).
@@ -16,7 +16,38 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
-### Surface relief and capture validation
+### Outpost freight collection
+
+Owned resource outposts now expose Collect materials from their existing colony
+screen. A paused review identifies the exact freighter, home, destination, cargo
+capacity, stock and extraction, and explains ongoing upkeep and timed delivery.
+Cancel is read-only; Dispatch uses the existing Core freight coordinator. The
+lowest-ID ship whose copied-state Core preflight succeeds is selected, so an
+unreachable ship cannot block a reachable one. Confirmation binds the reviewed
+ship and rejects stale, replayed, foreign, ambiguous, changed or unpaused orders.
+No Core, C# or Player17 schema changes. Contract: `docs/engine/NATIVE_OUTPOST_FREIGHT.md`.
+
+Validation: MSVC native build; all 8 focused CTests including Core freight parity;
+Python 485 total (468 passed / 17 optional executable checks skipped). Relocated
+Vulkan review/cancel/dispatch and full paused reload pass at 720p and 1080p, with
+6 exact-dimension captures. Review/cancel preserve the full canonical payload;
+dispatch changes only the selected ship's route/freight fields and transfers no
+cargo instantly. The 720p review and 1080p dispatch were visually inspected.
+Existing colony, surface construction/management/relief and both settlement-kind
+runtime suites pass on the same executable. Evidence: work/native-freight-*.log,
+work/native-freight-{runtime,colony,surface,settlement}.json.
+
+This selectively adapts Collect from Devin `d9d23f57`; owned-planet surface entry
+already supplies Land. The separate colony-sites board `e49f4df0` remains pending
+review against existing inspection/settlement navigation. Latest inventoried Devin
+head `b023e384` adds a developer command catalog and is not imported here. Shared
+base `ac45d958` and PR332 remain unmerged. The local package is UNSEALED; the
+same-system graphical freight fixture does not prove interstellar visual travel,
+which still relies on existing Core parity coverage. Next: review colony-site
+discoverability and the remaining native playthrough gaps without duplicating a
+mission planner or changing simulation authority.
+
+### Previous checkpoint: Surface relief and capture validation
 
 Native surface relief uses Core's existing heights to shade the approved terrain
 artwork. One 1024px / 4 MiB neutral mask is prepared asynchronously in fixed world

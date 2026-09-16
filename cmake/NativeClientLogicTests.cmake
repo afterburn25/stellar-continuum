@@ -368,6 +368,17 @@ if(MSVC)
     /W4 /WX /permissive-)
 endif()
 
+add_executable(stellar_native_outpost_freight_controller_tests
+  native-tests/native_outpost_freight_controller_tests.cpp
+  app/native_client/native_outpost_freight_controller.cpp)
+target_include_directories(stellar_native_outpost_freight_controller_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_outpost_freight_controller_tests PRIVATE stellar_core)
+add_test(NAME native_outpost_freight_controller COMMAND stellar_native_outpost_freight_controller_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+if(MSVC)
+  target_compile_options(stellar_native_outpost_freight_controller_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_surface_relief_tests
   native-tests/native_surface_relief_tests.cpp
   app/native_client/native_surface_relief.cpp)

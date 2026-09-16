@@ -99,6 +99,7 @@ endif()
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_colony_controller.cpp
+  app/native_client/native_outpost_freight_controller.cpp
   app/native_client/native_colony_workspace.cpp)
 
 target_sources(stellar-continuum-native PRIVATE

@@ -556,6 +556,7 @@ class NativeCampaign final {
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     planet_discs_.use_background_preparation(image_preparation_);
+    colony_workspace_.set_text_measurer(text_measurer);
     surface_workspace_.set_text_measurer(std::move(text_measurer));
     system_workspace_.use_background_preparation(image_preparation_);
     surface_workspace_.use_relief_preparation(image_preparation_);
@@ -1171,6 +1172,48 @@ class NativeCampaign final {
     smoke_colony_speed_retained_=colony_workspace_.visible()&&frame.clock().speed()==StrategicSpeed::Normal;
     click(center(ui.pause));
     if(!smoke_colony_selected_||!smoke_colony_opened_||!smoke_colony_back_||!smoke_colony_pause_retained_||!smoke_colony_speed_retained_||frame.clock().speed()!=StrategicSpeed::Paused||frame.clock().simulation_days()!=smoke_colony_day_)throw std::runtime_error("Colony smoke input routing or paused state was not preserved.");
+  }
+  void prepare_outpost_freight_smoke(int width,int height,bool reload){
+    if(!colony_workspace_.view()||!colony_workspace_.view()->resource_outpost)return;
+    const auto initial=*colony_workspace_.view();
+    auto& frame=session_->frame();auto& world=frame.runtime().world().campaign();
+    const PlayerCampaignCaptureOptions options{frame.clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"};
+    const auto state=[&]{return encode_player_campaign_v17_json(capture_player_campaign_v17(frame.runtime(),options));};
+    const auto before=state();
+    const auto click=[&](UiRect bounds){const auto point=center(bounds);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Freight input closed the campaign.");};
+    const auto layout=ColonyWorkspaceLayout::for_viewport(width,height,true);
+    NativeOutpostFreightPreview quote;bool reviewed=false,cancelled=false;
+    if(!reload){
+      click(layout.collect_freight);
+      if(!colony_workspace_.freight_preview()||!colony_workspace_.freight_preview()->accepted)
+        throw std::runtime_error("Freight review unavailable: "+(colony_workspace_.freight_preview()?colony_workspace_.freight_preview()->message:"no review"));
+      reviewed=state()==before;quote=*colony_workspace_.freight_preview();
+      smoke_freight_review_capture_=scene(width,height);
+      click(layout.freight_cancel);cancelled=!colony_workspace_.freight_preview()&&state()==before;
+      click(layout.collect_freight);
+      if(!colony_workspace_.freight_preview()||colony_workspace_.freight_preview()->fleet_id!=quote.fleet_id)
+        throw std::runtime_error("Freight rereview changed its selected idle ship.");
+      click(layout.freight_confirm);
+    }else{
+      const auto ship=std::ranges::find_if(world.fleets,[&](const auto& f){return f.civilization_id==initial.player_civilization_id&&f.freight_target_outpost_id==initial.colony_id;});
+      if(ship==world.fleets.end()||!ship->freight_home_colony_id)throw std::runtime_error("Freight reload lost its dispatch.");
+      quote.fleet_id=ship->id;quote.home_colony_id=*ship->freight_home_colony_id;
+      if(state()!=before)throw std::runtime_error("Freight reload changed paused state.");
+      colony_workspace_.set_freight_notice("Freight run restored. Unpause to continue travel, loading and delivery.");
+    }
+    const auto ship=std::ranges::find(world.fleets,quote.fleet_id,&FleetState::id);
+    const bool dispatched=ship!=world.fleets.end()&&ship->freight_target_outpost_id==initial.colony_id&&ship->freight_home_colony_id==quote.home_colony_id&&ship->cargo_materials==0.;
+    if(!dispatched||(!reload&&(!reviewed||!cancelled))||frame.clock().speed()!=StrategicSpeed::Paused||frame.clock().simulation_days()!=options.simulation_days)
+      throw std::runtime_error("Freight input failed readonly review/cancel, paused dispatch or retained cargo.");
+    std::ostringstream out;out<<std::boolalpha<<"{\"mode\":\""<<(reload?"reload":"dispatch")<<"\",\"player_id\":"<<initial.player_civilization_id
+      <<",\"colony_id\":"<<initial.colony_id<<",\"body_id\":"<<initial.body_id<<",\"system_id\":"<<initial.system_id
+      <<",\"fleet_id\":"<<quote.fleet_id<<",\"home_colony_id\":"<<quote.home_colony_id<<",\"reviewed\":"<<reviewed
+      <<",\"cancelled\":"<<cancelled<<",\"dispatched\":"<<dispatched<<",\"paused\":true,\"day_unchanged\":true}";
+    smoke_freight_evidence_=out.str();
+  }
+  void capture_outpost_freight_smoke(const std::function<void(const DrawList&)>& draw)const{
+    if(smoke_freight_review_capture_)draw(*smoke_freight_review_capture_);
+    if(!smoke_freight_evidence_.empty())std::cout<<"outpost_freight="<<smoke_freight_evidence_<<'\n';
   }
   void prepare_surface_smoke(int width,int height,bool reload){
     smoke_surface_mode_=true;smoke_surface_reload_=reload;
@@ -2490,7 +2533,7 @@ class NativeCampaign final {
     };
     for(const auto &event:input.events){
       if(session_->new_campaign_pending()) break;
-      if(event.type==InputEventType::PointerCancelled)fleet_workspace_.cancel_recovery();
+      if(event.type==InputEventType::PointerCancelled){fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
       if(video_settings_&&video_settings_->visible()){
         notification_view_.close();
         (void)video_settings_->handle(event,width,height);
@@ -2622,10 +2665,12 @@ class NativeCampaign final {
       if(colony_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
-        if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+        if(colony_workspace_.freight_preview()||(top_action!=UiAction::Pause&&top_action!=UiAction::Speed)){
           const auto command=colony_workspace_.handle(event,width,height);
           if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
-          else if(command.kind==ColonyWorkspaceCommandKind::OpenSurface)open_surface(width,height);
+          else if(command.kind==ColonyWorkspaceCommandKind::OpenSurface){outpost_freight_controller_.clear();open_surface(width,height);}
+          else if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight || command.kind==ColonyWorkspaceCommandKind::ConfirmFreight || command.kind==ColonyWorkspaceCommandKind::CancelFreight)
+            execute_colony_freight(command);
           if(command.captured)continue;
         }
       }
@@ -3552,6 +3597,28 @@ class NativeCampaign final {
     colony_entry_view_=*built.view;if(surface_workspace_.visible())surface_workspace_.set_view(*built.view);colony_workspace_.set_view(std::move(*built.view));system_workspace_.set_colony_body(colony_entry_view_->body_id);colony_refresh_elapsed_=0.;
   }
 
+  void execute_colony_freight(const ColonyWorkspaceCommand& command){
+    if(command.kind==ColonyWorkspaceCommandKind::CancelFreight){
+      outpost_freight_controller_.clear();colony_workspace_.cancel_freight();return;
+    }
+    if(!colony_workspace_.visible()||!colony_workspace_.view())return;
+    if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight){
+      session_->frame().clock().set_speed(StrategicSpeed::Paused);
+      colony_workspace_.set_freight_preview(outpost_freight_controller_.preview(
+          session_->frame(),session_->cache().generation,*colony_workspace_.view()));
+      gesture_.capture_for_ui();return;
+    }
+    if(!colony_workspace_.freight_preview()||
+       colony_workspace_.freight_preview()->revision!=command.quote_revision ||
+       session_->frame().clock().speed()!=StrategicSpeed::Paused){
+      outpost_freight_controller_.clear();colony_workspace_.cancel_freight();return;
+    }
+    const auto outcome=outpost_freight_controller_.issue(session_->frame(),session_->cache().generation,command.quote_revision);
+    colony_workspace_.cancel_freight();colony_workspace_.set_freight_notice(outcome.message);
+    if(outcome.accepted){publish_notification("Freight",outcome.message);if(audio_confirm_)audio_confirm_();refresh_fleets(true);refresh_system_travel(true);}
+    refresh_colony(true);
+  }
+
   void open_surface(int width,int height){
     if(!colony_workspace_.view()||!colony_workspace_.view()->solid_surface){
       return;
@@ -4014,7 +4081,7 @@ class NativeCampaign final {
   }
 
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
   [[nodiscard]] bool inspection_visible()const noexcept {
     return inspection_card_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_&&!system_workspace_.visible()&&
@@ -4126,6 +4193,9 @@ class NativeCampaign final {
       };
   NativeColonyController colony_controller_;
   NativeColonyWorkspace colony_workspace_;
+  NativeOutpostFreightController outpost_freight_controller_;
+  std::optional<DrawList> smoke_freight_review_capture_;
+  std::string smoke_freight_evidence_;
   NativeSurfaceConstructionController surface_controller_;
   NativeSurfaceWorkspace surface_workspace_;
   bool surface_relief_failure_logged_{};
@@ -4346,9 +4416,10 @@ int main(int argc,char **argv){
         if(!options.voice_check)campaign.prepare_system_travel_smoke(window.drawable_width(),
                                              window.drawable_height(),options.system_travel_reload_smoke);
       }
-      else if(options.colony_smoke||options.colony_reload_smoke)
-        campaign.prepare_colony_smoke(window.drawable_width(),
-                                       window.drawable_height(),options.colony_reload_smoke);
+      else if(options.colony_smoke||options.colony_reload_smoke){
+        campaign.prepare_colony_smoke(window.drawable_width(),window.drawable_height(),options.colony_reload_smoke);
+        campaign.prepare_outpost_freight_smoke(window.drawable_width(),window.drawable_height(),options.colony_reload_smoke);
+      }
       else if(options.settlement_smoke||options.settlement_reload_smoke)
         campaign.prepare_settlement_smoke(window.drawable_width(),
                                            window.drawable_height(),options.settlement_reload_smoke);
@@ -4591,6 +4662,8 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.colony_smoke||options.colony_reload_smoke)
+          campaign.capture_outpost_freight_smoke([&](const DrawList& draw){window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-freight-review"));});
         if(options.surface_smoke||options.surface_reload_smoke){
           const auto evidence=campaign.surface_relief_smoke(window.drawable_width(),window.drawable_height(),
               [&](const DrawList& draw,bool enabled){window.draw(draw,sidecar_path(*options.smoke_screenshot,

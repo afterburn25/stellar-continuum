@@ -1,5 +1,15 @@
 # Stellar Engine migration handoff
 
+Outpost freight checkpoint (2026-09-16): owned outposts expose a paused Collect
+materials review and exact-ship dispatch through existing Core. Copied-state
+preflight skips unreachable ships and catches invalid orders before live mutation;
+single-use confirmation protects observer, target, generation and mission state.
+MSVC, 8 CTests, Python485 (468 pass / 17 optional skips), 720p/1080p freight dispatch
+and full paused reload pass. Six freight captures; existing colony, surface and
+settlement runtime suites pass. See `NATIVE_OUTPOST_FREIGHT.md` and the current
+`../CPP_MIGRATION_HANDOFF.md`. No Core/C#/schema changes; UNSEALED local package,
+PR332 unmerged. Devin inventoried to b023e384; colony-sites board remains pending.
+
 Surface relief checkpoint (2026-09-16): native surface smoke runs now validate a neutral fixed world-space relief layer prepared asynchronously and cached across pan/zoom. Core remains untouched; saves and UI contracts are unchanged. The bounded top-down refinement is not full 3D/final graphics, sustained 60 FPS proof, or a sealed release. See `NATIVE_SURFACE_RELIEF.md`; MSVC, focused CTests, Python export and five surface cases pass. Next bounded review covers Land/Collect `d9d23f57` and colony sites `e49f4df0` against settlement/recovery/observer contracts; latest Devin `88de7e38`, shared `ac45d958`, PR #332 unmerged.
 
 Celestial detail checkpoint (2026-09-16): approved source planet discs are 512px,

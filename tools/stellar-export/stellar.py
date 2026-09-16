@@ -29,6 +29,7 @@ from native_supply_runtime import validate_native_supply_export
 from native_economy_runtime import validate_native_economy_export
 from native_system_travel_runtime import validate_native_system_travel_export
 from native_colony_runtime import validate_native_colony_export
+from native_freight_runtime import validate_native_freight_export
 from native_settlement_runtime import validate_native_settlement_export
 from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
@@ -100,6 +101,7 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_travel_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_freight_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
@@ -498,6 +500,7 @@ def export(preset_name):
             smoke.update(validate_native_supply_export(output, env))
             smoke.update(validate_native_economy_export(output, env))
             smoke.update(validate_native_colony_export(output, env))
+            smoke.update(validate_native_freight_export(output, env))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_surface_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
