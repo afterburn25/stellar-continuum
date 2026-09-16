@@ -215,6 +215,23 @@ NativeConstructionWorkspace::selected_project_id() const noexcept {
   return selected_project_id_;
 }
 
+std::optional<UiRect> NativeConstructionWorkspace::project_bounds(
+    std::string_view project_id, int width, int height) const {
+  if (!view_) return std::nullopt;
+  const auto found = std::ranges::find(view_->projects, project_id,
+                                       &NativeConstructionProject::id);
+  if (found == view_->projects.end()) return std::nullopt;
+  const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
+  const UiRect rows{layout.projects.x, layout.projects.y + 27.f * layout.scale,
+                    layout.projects.width,
+                    layout.projects.height - 27.f * layout.scale};
+  const auto index = static_cast<std::size_t>(found - view_->projects.begin());
+  const UiRect bounds{rows.x, rows.y + project_scroll_ +
+                                  static_cast<float>(index) * 58.f * layout.scale,
+                      rows.width, 54.f * layout.scale};
+  return intersection(bounds, rows);
+}
+
 void NativeConstructionWorkspace::reconcile_selection() {
   if (!view_) return;
   if (selected_project_id_ &&

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -252,6 +253,44 @@ void full_720p_content_keeps_cost_feedback_and_action_clipped() {
   REQUIRE(cost && readiness && action && capped_error);
 }
 
+void stale_order_notice_clears_only_when_the_canonical_order_changes() {
+  NativeShipyardWorkspace workspace;workspace.open();auto queued=view();queued.orders={order("science-order")};queued.orders.front().active=false;
+  workspace.set_view(queued);workspace.set_notice("Queued Deep-Space Science Vessel.",true);
+  auto progressing=queued;progressing.shipyard_revision++;progressing.orders.front().progress_fraction=.75;workspace.set_view(progressing);
+  DrawList retained;workspace.render(retained,1280,720);
+  REQUIRE(std::ranges::any_of(retained.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Queued Deep-Space");}));
+  auto completed=progressing;completed.shipyard_revision++;completed.orders.clear();completed.pending_build_count=0;workspace.set_view(completed);
+  DrawList cleared;workspace.render(cleared,1280,720);
+  REQUIRE(std::ranges::none_of(cleared.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Queued Deep-Space");}));
+  REQUIRE(std::ranges::any_of(cleared.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="No ships are under construction.";}));
+}
+
+void stale_cancellation_quote_clears_when_its_revision_changes() {
+  NativeShipyardWorkspace workspace;
+  workspace.open();
+  auto quoted = view();
+  quoted.orders = {order()};
+  workspace.set_view(quoted);
+  REQUIRE(workspace.arm_cancel_confirmation("order-1"));
+  DrawList before;
+  workspace.render(before, 1280, 720);
+  REQUIRE(std::ranges::any_of(before.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.contains("Confirm cancellation");
+  }));
+  auto refreshed = quoted;
+  refreshed.shipyard_revision++;
+  refreshed.orders.front().formatted_refund = "$8.00 SOL";
+  workspace.set_view(refreshed);
+  DrawList after;
+  workspace.render(after, 1280, 720);
+  REQUIRE(!workspace.confirmation_open());
+  REQUIRE(std::ranges::none_of(after.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.contains("Confirm cancellation");
+  }));
+}
+
 } // namespace
 
 int run_tests() {
@@ -260,6 +299,8 @@ int run_tests() {
   campaign_replacement_discards_old_order_context();
   empty_and_locked_states_render_without_invented_items();
   full_720p_content_keeps_cost_feedback_and_action_clipped();
+  stale_order_notice_clears_only_when_the_canonical_order_changes();
+  stale_cancellation_quote_clears_when_its_revision_changes();
   return 0;
 }
 

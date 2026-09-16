@@ -16,7 +16,26 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
-### Owned-colony navigation
+### First-ships graphical progression
+
+The no-grant seed-115501 replay passes the MSVC build, 13 affected CTests and
+Python 516 checks (499 pass / 17 optional executable skips). Native input reaches
+day 6568.5 after 26,274 quarter-day steps with 13 research, 3 construction and
+2 ship authorizations, completing scout 0 and science vessel 1. Fresh 720p and
+paused 1080p captures were inspected; full Player17 equality holds except
+`SavedAtUtc`. The earlier day than headless 6574 reflects .25-day graphical
+order boundaries versus one-day headless boundaries, with no rules changed.
+Existing navigation, research, shipyard and construction Vulkan suites pass.
+Stale queue and invalidated cancellation notices are fixed; immediate new
+command feedback survives. Final build, CTests, fresh/reload and shipyard runtime
+checks pass, with the corrected 720p capture inspected. Next gap: normal UI
+order for the earned scout through local
+departure, warp, arrival/exploration, then save/reload. See
+`engine/NATIVE_FIRST_SHIPS_UI.md`. No Core/C#/schema/approved-art changes.
+PR332 remains unmerged; the local package is UNSEALED. Task-local TEMP/TMP
+on D: avoided C: temporary-space exhaustion.
+
+### Previous checkpoint: Owned-colony navigation
 
 A compact planet icon now opens the player's colonies and resource outposts.
 Rows group colony/kind, world/system and population; View reuses the existing

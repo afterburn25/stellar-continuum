@@ -60,8 +60,10 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_json.hpp>
+#include <stellar/core/player_campaign_save.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/engine/runtime_paths.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -253,6 +255,7 @@ struct Options {
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
+  bool fresh_progression_smoke{},fresh_progression_reload_smoke{};
   bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{};
   std::optional<int> profile_frames;
@@ -310,6 +313,7 @@ struct Options {
     else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
     else if(arg==L"--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_smoke=true;result.windowed=true;}
     else if(arg==L"--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_reload_smoke=true;result.windowed=true;}
+    else if((arg==L"--fresh-progression-smoke"||arg==L"--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fresh_progression_smoke=arg==L"--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg==L"--fresh-progression-reload-smoke";result.windowed=true;}
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -353,6 +357,7 @@ struct Options {
     else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
     else if(arg=="--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_smoke=true;result.windowed=true;}
     else if(arg=="--diplomacy-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_reload_smoke=true;result.windowed=true;}
+    else if((arg=="--fresh-progression-smoke"||arg=="--fresh-progression-reload-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.fresh_progression_smoke=arg=="--fresh-progression-smoke";result.fresh_progression_reload_smoke=arg=="--fresh-progression-reload-smoke";result.windowed=true;}
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -370,7 +375,10 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
+  if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
+  if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -2337,6 +2345,429 @@ class NativeCampaign final {
           session_->frame().clock().speed()==StrategicSpeed::Paused;
     }
   }
+  void prepare_fresh_progression_smoke(int width, int height, bool reload,
+                                       const std::function<void()> &pump) {
+    constexpr double maximum_days = 10'958.;
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(600);
+    auto &frame = session_->frame();
+    auto &world = frame.runtime().world().campaign();
+    fresh_progression_reload_ = reload;
+    fresh_progression_before_days_ = frame.clock().simulation_days();
+    const PlayerCampaignCaptureOptions fixed_capture{
+        fresh_progression_before_days_, STELLAR_GAME_VERSION,
+        "2044-05-06T07:08:09Z"};
+    const auto captured = [&](const PlayerCampaignCaptureOptions &options) {
+      return encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(frame.runtime(), options)
+              .payload());
+    };
+    const auto before_payload = captured(fixed_capture);
+    const auto route = [&](std::vector<InputEvent> events) {
+      bool search_changed{};
+      for (auto &event : events)
+        if (event.type == InputEventType::TextEntered) {
+          std::ranges::replace(event.text, '_', ' ');
+          search_changed = true;
+        } else if (event.type == InputEventType::BackspacePressed)
+          search_changed = true;
+      InputSnapshot input;
+      input.drawable_width = width;
+      input.drawable_height = height;
+      input.pointer = events.empty() ? Point{} : events.back().position;
+      input.events = std::move(events);
+      if (!update(input, width, height, 0., false))
+        throw std::runtime_error(
+            "Fresh progression UI input closed the campaign.");
+      if (search_changed && research_workspace_.visible())
+        refresh_research(true);
+    };
+    const auto click = [&](Point point) {
+      route({{InputEventType::LeftPressed, point},
+             {InputEventType::LeftReleased, point}});
+    };
+    const auto ui = NativeUiLayout::for_viewport(width, height);
+    const auto pause = [&] {
+      if (frame.clock().speed() != StrategicSpeed::Paused)
+        click(center(ui.pause));
+      if (frame.clock().speed() != StrategicSpeed::Paused)
+        throw std::runtime_error("Fresh progression pause input was rejected.");
+    };
+    const auto resume_normal = [&] {
+      if (frame.clock().speed() == StrategicSpeed::Paused)
+        click(center(ui.pause));
+      if (frame.clock().speed() != StrategicSpeed::Normal)
+        route({{InputEventType::KeyPressed, {}, {}, 0.f, {}, 0, '1'}});
+      if (frame.clock().speed() != StrategicSpeed::Normal ||
+          frame.clock().effective_multiplier() != 1.)
+        throw std::runtime_error(
+            "Fresh progression requires the ordinary Normal clock.");
+    };
+    const auto owned_fleets = [&] {
+      return std::ranges::count(world.fleets, world.player_civilization_id,
+                                &FleetState::civilization_id);
+    };
+    const auto maturity = [&](std::string_view id) {
+      const auto &state = frame.runtime().research().get_civilization(
+          world.player_civilization_id);
+      const auto *node = state.try_get_node_state(id);
+      return node ? node->maturity : ResearchMaturity::rumored;
+    };
+    const auto service = [&] {
+      if (std::chrono::steady_clock::now() > deadline)
+        throw std::runtime_error(
+            "Fresh progression exceeded its 600-second wall bound.");
+      pump();
+    };
+    const auto advance_quarter = [&] {
+      const auto before = frame.clock().simulation_days();
+      if (frame.clock().speed() != StrategicSpeed::Normal ||
+          frame.clock().backlog_days() != 0.)
+        throw std::runtime_error("Fresh progression accumulated clock backlog "
+                                 "or left Normal speed before an offline step.");
+      const auto result = frame.advance(.25);
+      const auto after = frame.clock().simulation_days();
+      if (result.route != CampaignFrameRoute::Strategic ||
+          result.completed_substeps.size() != 1 ||
+          result.completed_substeps.front() != .25 || after - before != .25 ||
+          frame.clock().backlog_days() != 0.)
+        throw std::runtime_error(
+            "Fresh progression left single strategic quarter-day stepping.");
+      ++fresh_progression_quarter_steps_;
+      if (fresh_progression_quarter_steps_ % 128 == 0) {
+        if (research_workspace_.visible())
+          refresh_research(true);
+        if (construction_workspace_.visible())
+          refresh_construction(true);
+        if (shipyard_workspace_.visible())
+          refresh_shipyard(true);
+        refresh_fleets(true);
+        service();
+      }
+    };
+    const auto advance_until = [&](const std::function<bool()> &done,
+                                   std::string_view label) {
+      while (!done()) {
+        if (frame.clock().simulation_days() >= maximum_days)
+          throw std::runtime_error(
+              "Fresh progression exceeded the day bound at " +
+              std::string(label) + ".");
+        advance_quarter();
+      }
+      service();
+    };
+    const auto roundtrip = [&] {
+      const PlayerCampaignCaptureOptions options{
+          frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+          "2044-05-06T07:08:09Z"};
+      const auto bytes = captured(options);
+      auto restored = restore_player_campaign_v17_json(
+          load_adaptive_research_strategic_runtime(asset_root_ /
+                                                   "Data/research/v1"),
+          bytes);
+      if (restored.simulation_days() != options.simulation_days)
+        throw std::runtime_error(
+            "Fresh progression Player17 restore changed the clock.");
+      auto resumed = std::move(restored).activate();
+      const auto recaptured = encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(resumed, options).payload());
+      const auto first = nlohmann::json::parse(bytes),
+                 second = nlohmann::json::parse(recaptured);
+      if (first != second)
+        throw std::runtime_error(
+            "Fresh progression Player17 roundtrip changed the campaign: " +
+            nlohmann::json::diff(first, second).dump().substr(0, 4000));
+      fresh_progression_roundtrip_ = true;
+    };
+    const auto open_construction = [&] {
+      if (!construction_workspace_.visible())
+        click(center(ui.construction));
+      if (!construction_workspace_.visible() || !construction_workspace_.view())
+        throw std::runtime_error(
+            "Fresh progression could not open Construction.");
+    };
+    const auto open_shipyard = [&] {
+      if (!shipyard_workspace_.visible())
+        click(center(ui.shipyard));
+      if (!shipyard_workspace_.visible() || !shipyard_workspace_.view())
+        throw std::runtime_error("Fresh progression could not open Shipyard.");
+    };
+    const auto select_project = [&](std::string_view id) {
+      const auto layout =
+          ConstructionWorkspaceLayout::for_viewport(width, height);
+      for (int attempt = 0;
+           attempt < 128 &&
+           !construction_workspace_.project_bounds(id, width, height);
+           ++attempt)
+        route({{InputEventType::Wheel, center(layout.projects), {}, -1.f}});
+      const auto bounds =
+          construction_workspace_.project_bounds(id, width, height);
+      if (!bounds)
+        throw std::runtime_error("Construction project is not reachable "
+                                 "through its scrolled list: " +
+                                 std::string(id));
+      click(center(*bounds));
+      if (construction_workspace_.selected_project_id() != id)
+        throw std::runtime_error("Construction row selection failed: " +
+                                 std::string(id));
+    };
+    const auto authorize_project = [&](std::string_view id) {
+      open_construction();
+      refresh_construction(true);
+      select_project(id);
+      const auto project =
+          std::ranges::find(construction_workspace_.view()->projects, id,
+                            &NativeConstructionProject::id);
+      if (project == construction_workspace_.view()->projects.end())
+        throw std::runtime_error("Construction project disappeared: " +
+                                 std::string(id));
+      const auto layout =
+          ConstructionWorkspaceLayout::for_viewport(width, height);
+      if (project->start.enabled)
+        click(center(layout.primary_action));
+      else if (project->queue.enabled)
+        click(center(layout.secondary_action));
+      else
+        throw std::runtime_error("Construction project cannot be authorized: " +
+                                 std::string(id));
+      refresh_construction(true);
+      const auto actual =
+          std::ranges::find(construction_workspace_.view()->projects, id,
+                            &NativeConstructionProject::id);
+      if (actual == construction_workspace_.view()->projects.end() ||
+          (!actual->active && !actual->queued && !actual->complete))
+        throw std::runtime_error(
+            "Construction UI did not change canonical state: " +
+            std::string(id));
+      ++fresh_progression_construction_actions_;
+      service();
+    };
+    const auto open_research = [&] {
+      if (!research_workspace_.visible())
+        click(center(ui.research));
+      if (!research_workspace_.visible() || !research_workspace_.window())
+        throw std::runtime_error("Fresh progression could not open Research.");
+    };
+    const auto research_to = [&](std::string_view id, ResearchMaturity target) {
+      open_research();
+      const auto layout = ResearchWorkspaceLayout::for_viewport(
+          width, height, research_workspace_.window()->domain_tabs.size());
+      click(center(layout.search));
+      while (!research_workspace_.query().search.empty())
+        route({{InputEventType::BackspacePressed}});
+      const auto target_node = std::ranges::find(
+          research_workspace_.window()->nodes, id, &NativeResearchNode::id);
+      if (target_node == research_workspace_.window()->nodes.end())
+        throw std::runtime_error("Required research is not known: " +
+                                 std::string(id));
+      route({{InputEventType::TextEntered, {}, {}, 0.f,
+              target_node->display_name}});
+      auto bounds = research_workspace_.card_bounds(id, width, height);
+      if (!bounds)
+        throw std::runtime_error("Required research is not visible: " +
+                                 std::string(id));
+      const Point graph_center = center(layout.graph);
+      Point drag_start{layout.graph.x + layout.graph.width - 4.f,
+                       layout.graph.y + layout.graph.height - 4.f};
+      if (bounds->contains(drag_start))
+        drag_start = {layout.graph.x + 4.f,
+                      layout.graph.y + layout.graph.height - 4.f};
+      const Point delta{graph_center.x - center(*bounds).x,
+                        graph_center.y - center(*bounds).y};
+      route({{InputEventType::LeftPressed, drag_start},
+             {InputEventType::PointerMove,
+              {drag_start.x + delta.x, drag_start.y + delta.y},
+              delta},
+             {InputEventType::LeftReleased,
+              {drag_start.x + delta.x, drag_start.y + delta.y}}});
+      bounds = research_workspace_.card_bounds(id, width, height);
+      if (!bounds || !layout.graph.contains(center(*bounds)))
+        throw std::runtime_error("Research card panning did not expose " +
+                                 std::string(id));
+      click(center(*bounds));
+      if (research_workspace_.selected_id() != id)
+        throw std::runtime_error("Research card selection failed: " +
+                                 std::string(id));
+      click(center(layout.action));
+      const auto current = maturity(id);
+      const auto active = std::ranges::find(research_workspace_.window()->nodes,
+                                            id, &NativeResearchNode::id);
+      const bool reached_target =
+          static_cast<int>(current) >= static_cast<int>(target);
+      const bool active_after_action =
+          active != research_workspace_.window()->nodes.end() && active->active;
+      const bool archived = current == ResearchMaturity::archived;
+      if (archived || (!reached_target && !active_after_action))
+        throw std::runtime_error("Research UI did not start canonical work: " +
+                                 std::string(id));
+      ++fresh_progression_research_actions_;
+      advance_until(
+          [&] {
+            const auto value = maturity(id);
+            if (value == ResearchMaturity::archived)
+              throw std::runtime_error("Required research archived: " +
+                                       std::string(id));
+            return static_cast<int>(value) >= static_cast<int>(target);
+          },
+          id);
+      refresh_research(true);
+    };
+    const auto select_design = [&](std::string_view id) {
+      const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
+      for (int attempt = 0; attempt < 128 && !shipyard_workspace_.design_bounds(
+                                                 id, width, height);
+           ++attempt)
+        route({{InputEventType::Wheel, center(layout.designs), {}, -1.f}});
+      const auto bounds = shipyard_workspace_.design_bounds(id, width, height);
+      if (!bounds)
+        throw std::runtime_error(
+            "Ship design is not reachable through its scrolled list: " +
+            std::string(id));
+      click(center(*bounds));
+      if (shipyard_workspace_.selected_design_id() != id)
+        throw std::runtime_error("Ship design selection failed: " +
+                                 std::string(id));
+    };
+    const auto authorize_ship = [&](std::string_view id) {
+      open_shipyard();
+      refresh_shipyard(true);
+      select_design(id);
+      click(
+          center(ShipyardWorkspaceLayout::for_viewport(width, height).action));
+      refresh_shipyard(true);
+      if (std::ranges::none_of(
+              shipyard_workspace_.view()->orders,
+              [&](const auto &order) { return order.design_id == id; }))
+        throw std::runtime_error(
+            "Shipyard UI did not create the canonical order: " +
+            std::string(id));
+      ++fresh_progression_ship_actions_;
+      service();
+    };
+    if (reload) {
+      pause();
+      fresh_progression_no_instant_ships_ = true;
+      open_shipyard();
+      route({{InputEventType::EscapePressed}});
+      refresh_fleets(true);
+      if (owned_fleets() < 2)
+        throw std::runtime_error(
+            "Fresh progression reload lost its completed ships.");
+      open_shipyard();
+      if (captured(fixed_capture) != before_payload)
+        throw std::runtime_error(
+            "Paused reload browsing changed the full Player17 payload.");
+      for (const auto &fleet : world.fleets)
+        if (fleet.civilization_id == world.player_civilization_id &&
+            fleet.design_id == "warp_scout")
+          fresh_progression_scout_id_ = fleet.id;
+        else if (fleet.civilization_id == world.player_civilization_id &&
+                 fleet.design_id == "science_vessel")
+          fresh_progression_science_id_ = fleet.id;
+      if (fresh_progression_scout_id_ < 0 || fresh_progression_science_id_ < 0)
+        throw std::runtime_error(
+            "Paused reload could not identify both canonical ships.");
+      roundtrip();
+      fresh_progression_after_days_ = frame.clock().simulation_days();
+      InputSnapshot ready;
+      ready.drawable_width = width;
+      ready.drawable_height = height;
+      (void)update(ready, width, height, 0., true);
+      session_->request_save();
+      return;
+    }
+    if (fresh_progression_before_days_ != 0. || owned_fleets() != 0)
+      throw std::runtime_error(
+          "Fresh progression did not start at day zero without fleets.");
+    resume_normal();
+    authorize_project("orbital_launch_complex");
+    for (const auto &id :
+         {"in_space_assembly", "asteroid_prospecting", "asteroid_mining",
+          "vacuum_refining", "orbital_manufacturing", "orbital_shipyard"})
+      research_to(id, ResearchMaturity::mature);
+    authorize_project("orbital_shipyard");
+    for (const auto &id : {"gravitational_physics", "field_theory",
+                           "warp_metric_theory", "exotic_energy_coupling",
+                           "micro_field_distortion", "warp_field_control"})
+      research_to(id, ResearchMaturity::mature);
+    authorize_project("warp_test_facility");
+    advance_until(
+        [&] {
+          refresh_construction(true);
+          const auto found =
+              std::ranges::find(construction_workspace_.view()->projects,
+                                std::string("warp_test_facility"),
+                                &NativeConstructionProject::id);
+          return found != construction_workspace_.view()->projects.end() &&
+                 found->complete;
+        },
+        "warp_test_facility");
+    for (int index = 0; index < 4; ++index)
+      advance_quarter();
+    research_to("prototype_warp_drive", ResearchMaturity::demonstrated);
+    open_construction();
+    advance_until(
+        [&] {
+          refresh_construction(true);
+          const auto found = std::ranges::find(
+              construction_workspace_.view()->projects,
+              std::string("orbital_shipyard"), &NativeConstructionProject::id);
+          return found != construction_workspace_.view()->projects.end() &&
+                 found->complete;
+        },
+        "orbital_shipyard");
+    authorize_ship("warp_scout");
+    authorize_ship("science_vessel");
+    fresh_progression_no_instant_ships_ = owned_fleets() == 0;
+    if (!fresh_progression_no_instant_ships_)
+      throw std::runtime_error("Ship authorization created an instant fleet.");
+    advance_until([&] { return owned_fleets() >= 2; }, "first ships");
+    refresh_shipyard(true);
+    refresh_fleets(true);
+    for (const auto &fleet : world.fleets)
+      if (fleet.civilization_id == world.player_civilization_id &&
+          fleet.design_id == "warp_scout")
+        fresh_progression_scout_id_ = fleet.id;
+      else if (fleet.civilization_id == world.player_civilization_id &&
+               fleet.design_id == "science_vessel")
+        fresh_progression_science_id_ = fleet.id;
+    if (fresh_progression_scout_id_ < 0 || fresh_progression_science_id_ < 0)
+      throw std::runtime_error(
+          "Fresh progression could not identify both completed ships.");
+    pause();
+    open_shipyard();
+    roundtrip();
+    fresh_progression_after_days_ = frame.clock().simulation_days();
+    InputSnapshot ready;
+    ready.drawable_width = width;
+    ready.drawable_height = height;
+    if (!update(ready, width, height, 0., true))
+      throw std::runtime_error(
+          "Fresh progression could not establish its save boundary.");
+    session_->request_save();
+  }
+  [[nodiscard]] std::string fresh_progression_smoke_status() const {
+    std::ostringstream out;
+    out << std::setprecision(std::numeric_limits<double>::max_digits10)
+        << std::boolalpha << "{\"mode\":\""
+        << (fresh_progression_reload_ ? "paused_reload" : "fresh")
+        << "\",\"seed\":115501,\"player_id\":"
+        << session_->frame().runtime().world().campaign().player_civilization_id
+        << ",\"before_days\":" << fresh_progression_before_days_
+        << ",\"after_days\":" << fresh_progression_after_days_
+        << ",\"scout_id\":" << fresh_progression_scout_id_
+        << ",\"science_id\":" << fresh_progression_science_id_
+        << ",\"research_actions\":" << fresh_progression_research_actions_
+        << ",\"construction_actions\":"
+        << fresh_progression_construction_actions_
+        << ",\"ship_actions\":" << fresh_progression_ship_actions_
+        << ",\"no_instant_ships\":" << fresh_progression_no_instant_ships_
+        << ",\"offline_quarter_day_steps\":" << fresh_progression_quarter_steps_
+        << ",\"ui_input\":true,\"paused\":"
+        << (session_->frame().clock().speed() == StrategicSpeed::Paused)
+        << ",\"save_roundtrip\":" << fresh_progression_roundtrip_ << '}';
+    return out.str();
+  }
   void capture_surface_smoke_state(){
     if(!smoke_surface_site_id_)return;
     session_->frame().clock().set_speed(StrategicSpeed::Paused);
@@ -3929,10 +4360,10 @@ class NativeCampaign final {
       outcome=shipyard_controller_.cancel(session_->frame(),
           session_->cache().generation,view->shipyard_revision,command.id);
     else return;
-    shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
     last_shipyard_command_accepted_=outcome.accepted;
     if(outcome.accepted)publish_notification("Ships",outcome.message);
     refresh_shipyard(true);
+    shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
   }
 
   void refresh_construction(bool force){
@@ -4363,6 +4794,9 @@ class NativeCampaign final {
   bool smoke_construction_paused_for_quote_{};
   std::optional<std::string> smoke_construction_project_id_;
   bool last_research_command_accepted_{};
+  bool fresh_progression_reload_{},fresh_progression_no_instant_ships_{},fresh_progression_roundtrip_{};
+  int fresh_progression_scout_id_{-1},fresh_progression_science_id_{-1},fresh_progression_research_actions_{},fresh_progression_construction_actions_{},fresh_progression_ship_actions_{},fresh_progression_quarter_steps_{};
+  double fresh_progression_before_days_{},fresh_progression_after_days_{};
   std::optional<std::string> smoke_research_node_;
   int smoke_navigation_switches_{};
   double smoke_navigation_credits_before_{},smoke_navigation_credits_after_{};
@@ -4563,6 +4997,8 @@ int main(int argc,char **argv){
       else if(options.ship_art_smoke)
         campaign.prepare_ship_art_smoke(window.drawable_width(),
                                         window.drawable_height());
+      else if(options.fresh_progression_smoke||options.fresh_progression_reload_smoke)
+        campaign.prepare_fresh_progression_smoke(window.drawable_width(),window.drawable_height(),options.fresh_progression_reload_smoke,[&]{audio.service();audio_settings.set_device_status(audio.failure_message());auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("Fresh progression window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));});
       else
         campaign.prepare_smoke_ui();
 
@@ -4916,6 +5352,8 @@ int main(int argc,char **argv){
         if(options.campaign_profile&&(!campaign_started||!campaign_mid_requested||!campaign_mid_saved||!campaign_advanced_after_mid||!campaign_final_requested||campaign.campaign_profile_notice()!=SessionNoticeKind::Saved||campaign.campaign_profile_speed()!=StrategicSpeed::Paused))throw std::runtime_error("Campaign profile did not complete active simulation, saves, and final UI pause.");
         if(!campaign.smoke_save_succeeded())
           throw std::runtime_error("Native session smoke did not complete its manual save.");
+        if(options.fresh_progression_smoke||options.fresh_progression_reload_smoke)
+          std::cout<<"fresh_progression="<<campaign.fresh_progression_smoke_status()<<'\n';
         std::ranges::sort(frame_ms);
         const auto total=std::accumulate(frame_ms.begin(),frame_ms.end(),0.);
         const auto p95=frame_ms[static_cast<std::size_t>(

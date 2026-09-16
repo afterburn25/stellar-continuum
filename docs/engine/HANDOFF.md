@@ -1,5 +1,19 @@
 # Stellar Engine migration handoff
 
+First-ships graphical checkpoint (2026-09-16): no-grant seed 115501 now passes
+the MSVC build, 13 affected CTests and Python 516 (499 pass / 17 optional
+executable skips). Normal native input reaches day 6568.5 after 26,274 quarter-
+day steps, completing 13 research authorizations, 3 construction authorizations,
+2 ship orders, scout 0 and science vessel 1. Fresh 720p and paused 1080p
+captures were inspected; complete Player17 equality holds except `SavedAtUtc`.
+The earlier day than headless 6574 is explained by successive .25-day graphical
+boundaries versus one-day headless boundaries, with no rules changed. Existing
+navigation, research, shipyard and construction Vulkan suites pass. Stale queue
+and invalidated cancellation notices are fixed; final build, CTests and
+fresh/reload/shipyard runtime checks pass. The corrected capture was inspected.
+Next gap: order the earned scout through local departure,
+warp, arrival/exploration and save/reload. See `NATIVE_FIRST_SHIPS_UI.md`.
+
 Owned-colony roster checkpoint (2026-09-16): the compact navigation icon opens
 owned colonies/outposts with grouped identity/location/population and direct View
 entry. Survey privacy, live ownership and matched-input gates remain required;

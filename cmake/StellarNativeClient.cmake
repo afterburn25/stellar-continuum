@@ -27,7 +27,7 @@ add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_nativ
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
-target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core stellar_json Shell32 Ole32)
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_navigation_art)
 add_dependencies(stellar-continuum-native stellar_native_navigation_assets)
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings stellar_native_video_settings stellar_native_campaign_feedback)

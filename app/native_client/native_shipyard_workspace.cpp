@@ -174,10 +174,14 @@ void NativeShipyardWorkspace::close() noexcept {
 bool NativeShipyardWorkspace::visible() const noexcept { return visible_; }
 
 void NativeShipyardWorkspace::set_view(NativeShipyardView view) {
+  const bool had_confirmation = cancel_confirmation_id_.has_value();
   const auto generation_changed =
       view_ && view_->campaign_generation != view.campaign_generation;
   const auto revision_changed =
       view_ && view_->shipyard_revision != view.shipyard_revision;
+  const auto orders_changed = view_ && (view_->orders.size() != view.orders.size() ||
+      !std::ranges::equal(view_->orders,view.orders,{},&NativeShipyardOrder::order_id,&NativeShipyardOrder::order_id) ||
+      !std::ranges::equal(view_->orders,view.orders,[](const auto& left,const auto& right){return left.active==right.active;}));
   if (generation_changed) {
     selected_design_id_.reset();
     selected_order_id_.reset();
@@ -186,7 +190,13 @@ void NativeShipyardWorkspace::set_view(NativeShipyardView view) {
     design_scroll_ = 0.f;
     order_scroll_ = 0.f;
   }
-  if (revision_changed) cancel_confirmation_id_.reset();
+  if (revision_changed) {
+    cancel_confirmation_id_.reset();
+    if (had_confirmation) notice_.clear();
+  }
+  // Preserve immediate command feedback while its canonical order continues,
+  // but never leave a completed or changed queue described as pending.
+  if (orders_changed && notice_accepted_) notice_.clear();
   view_ = std::move(view);
   reconcile_selection();
 }
@@ -234,6 +244,25 @@ NativeShipyardWorkspace::selected_design_id() const noexcept {
 const std::optional<std::string> &
 NativeShipyardWorkspace::selected_order_id() const noexcept {
   return selected_order_id_;
+}
+
+std::optional<UiRect> NativeShipyardWorkspace::design_bounds(
+    std::string_view design_id, int width, int height) const {
+  if (!view_) return std::nullopt;
+  const auto found = std::ranges::find(view_->available_designs, design_id,
+                                       &NativeShipDesign::id);
+  if (found == view_->available_designs.end()) return std::nullopt;
+  const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
+  const UiRect rows{layout.designs.x, layout.designs.y + 27.f * layout.scale,
+                    layout.designs.width,
+                    layout.designs.height - 27.f * layout.scale};
+  const auto index = static_cast<std::size_t>(
+      found - view_->available_designs.begin());
+  const UiRect bounds{rows.x,
+                      rows.y + design_scroll_ +
+                          static_cast<float>(index) * 58.f * layout.scale,
+                      rows.width, 54.f * layout.scale};
+  return intersection(bounds, rows);
 }
 
 void NativeShipyardWorkspace::reconcile_selection() {
