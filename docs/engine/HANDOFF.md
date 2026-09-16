@@ -1,5 +1,23 @@
 # Stellar Engine migration handoff
 
+### First earned colony building (2026-09-16)
+
+Xanthe colony 9 now has its first paid, timed and operational fabricator.
+The 720p mouse path cancels without changing Player17, confirms one 50-unit
+authorization ($500M UED), completes 450 materials across 4460 exact frames,
+and reaches day 6832.1009387 with 1 industry/day and assigned power/workers.
+Paused 1080p reload preserves state except the timestamp. Empty-colony guidance
+shows current resources and a useful first module; the review message no longer
+claims authorization before confirmation. Core/C#/Player17/art remain unchanged.
+
+MSVC, nine CTests, 586 Python checks (569 pass, 17 optional skips), earned
+Vulkan continuation/reload, surface/navigation regressions and four clean CLI
+failures pass. See `NATIVE_EARNED_SURFACE.md` and `work/native-earned-surface-*`.
+Next source is `work/native-audio-validation/package-earned-surface-paused.player17.json`.
+Continue clearer construction/operations feedback and paid power/research
+expansion; the fabricator already uses both local power units. The package is
+unsealed; full 3D colony graphics and real-time pacing remain incomplete.
+
 ### Earned settlement establishment (2026-09-16)
 
 The maintained seed-115501 continuation starts at the completed science survey

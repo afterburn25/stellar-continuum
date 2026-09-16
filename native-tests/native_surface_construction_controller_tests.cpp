@@ -128,6 +128,12 @@ void quote_and_progress_tests(const fs::path &research_root,
   require(surface_signature(colony(frame, selected.colony.colony_id)) == sites_before &&
               economy(frame).credits == credits_before,
           "placement preview mutated campaign state");
+  const auto expected_preview =
+      "Authorize construction for " + quote.formatted_authorization +
+      ". Materials are consumed as work progresses.";
+  require(quote.message == expected_preview &&
+              quote.message.find("placed and authorized") == std::string::npos,
+          "accepted placement preview used committed-construction wording");
   const auto superseded = quote;
   const auto denied_preview = controller.preview_placement(
       frame, 1, selected.colony, "not-a-building", 0.f, 0.f, 0.f);
@@ -149,6 +155,10 @@ void quote_and_progress_tests(const fs::path &research_root,
   require(placed.accepted &&
               std::abs(economy(frame).credits - (credits_before - charge)) < 1e-9,
           "canonical placement did not deduct the quoted authorization");
+  require(placed.message == quote.building_name + " placed and authorized for " +
+                                 quote.formatted_authorization +
+                                 ". Construction uses available materials.",
+          "confirmed placement did not retain the canonical commit message");
   const auto site_id =
       colony(frame, selected.colony.colony_id).surface_buildings.back().id;
   const auto progress_before =

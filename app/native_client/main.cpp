@@ -253,6 +253,8 @@ struct Options {
   bool settlement_preparation_smoke{};
   bool surface_smoke{};
   bool surface_reload_smoke{};
+  enum class EarnedSurfaceMode { Resume, Paused };
+  std::optional<EarnedSurfaceMode> earned_surface_mode;
   bool new_game_smoke{},restart_smoke{};
   StartupEntryAutomationAction restart_action{StartupEntryAutomationAction::Create};
   bool galaxy_art_smoke{};
@@ -318,6 +320,7 @@ struct Options {
     else if(arg==L"--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_reload_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_reload_smoke=true;result.windowed=true;}
+    else if((arg==L"--earned-surface-smoke"||arg==L"--earned-surface-paused-smoke")&&i+1<argc){if(result.earned_surface_mode)throw std::invalid_argument("Choose one earned surface mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.earned_surface_mode=arg==L"--earned-surface-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
     else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
     else if(arg==L"--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_smoke=true;result.windowed=true;}
@@ -366,6 +369,7 @@ struct Options {
     else if(arg=="--settlement-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_reload_smoke=true;result.windowed=true;}
     else if(arg=="--surface-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_smoke=true;result.windowed=true;}
     else if(arg=="--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_reload_smoke=true;result.windowed=true;}
+    else if((arg=="--earned-surface-smoke"||arg=="--earned-surface-paused-smoke")&&i+1<argc){if(result.earned_surface_mode)throw std::invalid_argument("Choose one earned surface mode.");result.smoke_screenshot=argv[++i];result.earned_surface_mode=arg=="--earned-surface-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
     else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
     else if(arg=="--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_smoke=true;result.windowed=true;}
@@ -392,7 +396,7 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.earned_surface_mode.has_value())+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
@@ -411,6 +415,7 @@ struct Options {
   if(result.colony_reload_smoke&&!result.load)throw std::invalid_argument("--colony-reload-smoke requires --load with the paused colony save.");
   if((result.settlement_smoke||result.settlement_reload_smoke)&&!result.load)throw std::invalid_argument("Settlement smoke requires --load with a test-authored funded populated settlement vessel.");
   if((result.surface_smoke||result.surface_reload_smoke)&&!result.load)throw std::invalid_argument("Surface smoke requires --load with the isolated native campaign save.");
+  if(result.earned_surface_mode&&(!result.load||result.seed!=115501))throw std::invalid_argument("Earned surface smoke requires --load with the earned Xanthe colony save and --seed 115501.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
 }
@@ -3510,34 +3515,423 @@ class NativeCampaign final {
   }
   [[nodiscard]] const std::string &settlement_completion_smoke_status() const { return settlement_completion_proof_; }
 
-  void prepare_settlement_preparation_smoke(int width,int height,
+  void prepare_earned_surface_smoke(
+      int width, int height, Options::EarnedSurfaceMode mode,
       const std::function<void()> &pump,
-      const std::function<void(std::string_view)> &capture){
-    auto &frame=session_->frame();const auto &world=frame.runtime().world().campaign();
-    if(frame.clock().speed()!=StrategicSpeed::Paused)
-      throw std::runtime_error("Settlement preparation requires a paused earned campaign.");
-    const auto initial=stellar::native_settlement_preparation::build_settlement_preparation(
-        frame,session_->cache().generation,1,1001);
-    if(!initial||initial->site_can_found_current_colony||!initial->solid_surface||initial->rare_resource)
-      throw std::runtime_error("Settlement preparation requires the actual surveyed, unsuitable Ilyra.");
-    const PlayerCampaignCaptureOptions fixed_capture{frame.clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:19Z"};
-    const auto payload=[&]{return nlohmann::json::parse(encode_player_campaign_v17_json(
-        PreparedPlayerCampaignSave::capture(frame.runtime(),fixed_capture).payload()));};
-    const auto before=payload();
-    const auto route=[&](std::vector<InputEvent> events){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
-      input.pointer=events.empty()?Point{}:events.back().position;input.events=std::move(events);
-      if(!update(input,width,height,0.,false))throw std::runtime_error("Settlement preparation UI closed unexpectedly.");};
-    const auto click=[&](Point at){route({{InputEventType::LeftPressed,at},{InputEventType::LeftReleased,at}});};
-    const auto stable=[&]{if(payload()!=before)throw std::runtime_error("Settlement preparation changed the Player17 campaign.");};
-    const auto wait_art=[&]{const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
-      do{pump();if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Settlement artwork did not become ready.");}while(!artwork_ready());};
-    if(!enter_system(1,width,height))throw std::runtime_error("Surveyed system did not open.");
-    const auto spatial=project_system(*system_workspace_.snapshot());
-    const auto marker=std::ranges::find(spatial.bodies,1001,&SystemSpatialBodyMarker::body_id);
-    if(marker==spatial.bodies.end())throw std::runtime_error("Ilyra absent from the observed system.");
-    const auto point=system_workspace_.viewport()->world_to_screen(marker->offset_x,marker->offset_y);
-    const auto layout=SystemWorkspaceLayout::for_viewport(width,height);
-    if(!layout.world_field.contains({point.x,point.y})||system_workspace_.viewport()->hit_body(spatial,point.x,point.y)!=1001)
+      const std::function<void(std::string_view)> &capture) {
+    auto &frame = session_->frame();
+    const auto &world = frame.runtime().world().campaign();
+    constexpr int expected_player = 0, expected_system = 8,
+                  expected_body = 8004, expected_colony = 9;
+    const bool paused = mode == Options::EarnedSurfaceMode::Paused;
+    if (frame.clock().speed() != StrategicSpeed::Paused)
+      throw std::runtime_error("Earned surface requires a paused source.");
+    const auto saved = [&] {
+      return nlohmann::json::parse(encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(
+              frame.runtime(), {frame.clock().simulation_days(),
+                                STELLAR_GAME_VERSION, "2044-05-06T07:08:21Z"})
+              .payload()));
+    };
+    const auto original = saved();
+    const auto route = [&](std::vector<InputEvent> events) {
+      InputSnapshot in;
+      in.drawable_width = width;
+      in.drawable_height = height;
+      in.pointer = events.empty() ? Point{} : events.back().position;
+      in.events = std::move(events);
+      if (!update(in, width, height, 0., false))
+        throw std::runtime_error("Earned surface input closed the campaign.");
+    };
+    const auto click = [&](Point p) {
+      route({{InputEventType::LeftPressed, p},
+             {InputEventType::LeftReleased, p}});
+    };
+    if (world.player_civilization_id != expected_player)
+      throw std::runtime_error("Earned surface source has the wrong player.");
+    const auto colony =
+        std::ranges::find(world.colonies, expected_colony, &Colony::id);
+    if (colony == world.colonies.end() ||
+        colony->system_id != expected_system ||
+        colony->planetary_body_id != expected_body ||
+        colony->population_millions < 250.)
+      throw std::runtime_error("Earned surface requires Xanthe.");
+    if ((!paused && !colony->surface_buildings.empty()) ||
+        (paused && colony->surface_buildings.size() != 1))
+      throw std::runtime_error(
+          "Earned surface source has the wrong building state.");
+    if (!enter_system(expected_system, width, height))
+      throw std::runtime_error("Earned surface could not enter Xanthe system.");
+    const auto spatial = project_system(*system_workspace_.snapshot());
+    const auto marker = std::ranges::find(spatial.bodies, expected_body,
+                                          &SystemSpatialBodyMarker::body_id);
+    if (marker == spatial.bodies.end())
+      throw std::runtime_error("Earned surface body is absent.");
+    const auto body_point = system_workspace_.viewport()->world_to_screen(
+        marker->offset_x, marker->offset_y);
+    click({body_point.x, body_point.y});
+    if (system_workspace_.selected_body_id() != expected_body)
+      throw std::runtime_error("Earned surface body selection failed.");
+    refresh_colony_entry(true);
+    click(center(
+        SystemWorkspaceLayout::for_viewport(width, height).colony_action));
+    if (!colony_workspace_.visible() || !colony_workspace_.view() ||
+        colony_workspace_.view()->colony_id != expected_colony)
+      throw std::runtime_error("Earned surface colony action failed.");
+    const auto colony_readiness_deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    while (!artwork_ready()) {
+      if (std::chrono::steady_clock::now() > colony_readiness_deadline)
+        throw std::runtime_error("Earned colony artwork timed out.");
+      pump();
+    }
+    if (!paused)
+      capture("colony");
+    click(center(
+        ColonyWorkspaceLayout::for_viewport(width, height).open_surface));
+    if (!surface_workspace_.visible() || !surface_workspace_.view())
+      throw std::runtime_error(
+          "Earned surface did not open the actual colony surface.");
+    const auto readiness_deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    while (!artwork_ready()) {
+      if (std::chrono::steady_clock::now() > readiness_deadline)
+        throw std::runtime_error("Earned surface artwork timed out.");
+      pump();
+    }
+    const auto initial = *surface_workspace_.view();
+    const double before_days = frame.clock().simulation_days();
+    const double industry_before = initial.industry_per_day;
+    const auto option = std::ranges::find(initial.available_buildings,
+                                          std::string("fabricator"),
+                                          &NativeSurfaceBuildOption::type_id);
+    if (option == initial.available_buildings.end() ||
+        option->authorization_budget_units != 50. ||
+        option->industry_cost != 450. || option->power_demand != 2. ||
+        option->workforce_required_millions != .04)
+      throw std::runtime_error(
+          "Earned surface fabricator is not unlocked with canonical costs.");
+    const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+    const auto inspect_site = [&](NativeSurfaceSite inspected) {
+      const auto before_selection = saved();
+      if (surface_workspace_.selected_type_id())
+        route({{InputEventType::EscapePressed}});
+      const auto at = surface_workspace_.viewport().world_to_screen(
+          inspected.x, inspected.z, layout.terrain);
+      click(at);
+      if (surface_workspace_.selected_building_id() !=
+          std::optional<int>{inspected.building_id})
+        throw std::runtime_error(
+            "Earned surface could not select its fabricator.");
+      const auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(300);
+      // Selection changes the scene's requested building imagery; make one real
+      // draw before consulting readiness so a previously-ready frame cannot
+      // hide a late asset.
+      pump();
+      while (!artwork_ready()) {
+        if (std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error(
+              "Earned surface building artwork timed out.");
+        pump();
+      }
+      (void)scene(width, height);
+      const auto art = surface_buildings_.stats();
+      if (art.ready < 2 || art.failed || art.pending || art.deferred ||
+          surface_workspace_.scene_diagnostics().replaced_structures < 2)
+        throw std::runtime_error(
+            "Earned surface did not draw its prepared hub and fabricator.");
+      if (saved() != before_selection)
+        throw std::runtime_error(
+            "Earned surface building inspection changed the paused campaign.");
+    };
+    if (paused) {
+      const auto persisted = std::ranges::find_if(
+          initial.construction_sites, [](const NativeSurfaceSite &s) {
+            return s.type_id == "fabricator" && s.complete;
+          });
+      if (persisted == initial.construction_sites.end() ||
+          persisted->industry_cost != 450. ||
+          persisted->industry_progress != 450. || !persisted->powered ||
+          !persisted->staffed || !persisted->enabled ||
+          persisted->efficiency <= 0. || initial.industry_per_day <= 0.)
+        throw std::runtime_error(
+            "Paused earned surface lacks its completed powered fabricator.");
+      inspect_site(*persisted);
+      InputSnapshot tick;
+      tick.drawable_width = width;
+      tick.drawable_height = height;
+      (void)update(tick, width, height, 1., true);
+      if (saved() != original || frame.clock().simulation_days() != before_days)
+        throw std::runtime_error(
+            "Paused earned surface reload changed Player17.");
+      earned_surface_proof_ = nlohmann::json{
+          {"mode", "paused"},
+          {"player_id", expected_player},
+          {"system_id", expected_system},
+          {"body_id", expected_body},
+          {"colony_id", expected_colony},
+          {"building_id", persisted->building_id},
+          {"type_id", persisted->type_id},
+          {"x", persisted->x},
+          {"z", persisted->z},
+          {"rotation", persisted->rotation_degrees},
+          {"before_days", before_days},
+          {"after_days", before_days},
+          {"steps", 0},
+          {"step_days", 1. / 64.},
+          {"authorization", 0},
+          {"treasury_before", initial.treasury_budget_units},
+          {"treasury_after", initial.treasury_budget_units},
+          {"industry_cost", persisted->industry_cost},
+          {"industry_progress", persisted->industry_progress},
+          {"complete", persisted->complete},
+          {"powered", persisted->powered},
+          {"staffed", persisted->staffed},
+          {"enabled", persisted->enabled},
+          {"efficiency", persisted->efficiency},
+          {"industry_before", industry_before},
+          {"industry_after", initial.industry_per_day},
+          {"cancel_unchanged", true},
+          {"opened_surface", true},
+          {"roundtrip", true}}.dump();
+      session_->request_save();
+      return;
+    }
+    const auto option_index =
+        static_cast<std::size_t>(option - initial.available_buildings.begin());
+    click(
+        {layout.palette_rows.x + 14.f * layout.scale,
+         layout.palette_rows.y +
+             (static_cast<float>(option_index) * 78.f + 20.f) * layout.scale});
+    if (surface_workspace_.selected_type_id() !=
+        std::optional<std::string>{"fabricator"})
+      throw std::runtime_error(
+          "Earned surface palette did not select fabricator.");
+    std::optional<NativeSurfacePlacementQuote> quote;
+    for (float z = -70.f; z <= 70.f && !quote; z += 35.f)
+      for (float x = -70.f; x <= 70.f; x += 7.f) {
+        auto candidate = surface_controller_.preview_placement(
+            frame, session_->cache().generation, *surface_workspace_.view(),
+            "fabricator", x, z, 0.f);
+        if (candidate.accepted) {
+          quote = candidate;
+          break;
+        }
+      }
+    if (!quote)
+      throw std::runtime_error("Earned surface found no fabricator position.");
+    (void)surface_controller_.cancel_quote(session_->cache().generation,
+                                           quote->quote_revision);
+    const auto point = surface_workspace_.viewport().world_to_screen(
+        quote->x, quote->z, layout.terrain);
+    click(point);
+    if (!surface_workspace_.placement_quote() ||
+        !surface_workspace_.placement_quote()->accepted ||
+        surface_workspace_.placement_quote()->authorization_budget_units != 50.)
+      throw std::runtime_error(
+          "Earned surface quote failed canonical authorization.");
+    capture("review");
+    click(center(layout.cancel));
+    refresh_surface(true);
+    const bool cancelled =
+        surface_workspace_.view()->construction_sites.empty() &&
+        surface_workspace_.view()->treasury_budget_units ==
+            initial.treasury_budget_units &&
+        saved() == original;
+    if (!cancelled)
+      throw std::runtime_error(
+          "Earned surface cancel changed the paused colony.");
+    click(point);
+    if (!surface_workspace_.placement_quote() ||
+        !surface_workspace_.placement_quote()->accepted ||
+        surface_workspace_.placement_quote()->authorization_budget_units != 50.)
+      throw std::runtime_error("Earned surface quote reopen failed.");
+    click(center(layout.confirm));
+    auto site = std::ranges::find_if(
+        surface_workspace_.view()->construction_sites,
+        [](const auto &s) { return s.type_id == "fabricator"; });
+    if (site == surface_workspace_.view()->construction_sites.end() ||
+        site->complete || site->industry_cost != 450. ||
+        site->industry_progress != 0. ||
+        std::abs(surface_workspace_.view()->treasury_budget_units -
+                 (initial.treasury_budget_units - 50.)) > 1e-9)
+      throw std::runtime_error("Earned surface did not create the exact paid "
+                               "unfinished fabricator.");
+    const int id = site->building_id;
+    const float x = site->x, z = site->z, rotation = site->rotation_degrees;
+    const double treasury_after =
+        surface_workspace_.view()->treasury_budget_units;
+    constexpr double step_days = 1. / 64.;
+    std::uint64_t steps{};
+    bool captured{};
+    frame.clock().set_speed(StrategicSpeed::Normal);
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    while (!site->complete) {
+      if (++steps > 1024 * 64 || std::chrono::steady_clock::now() > deadline)
+        throw std::runtime_error(
+            "Earned surface did not finish within 1024 days / 300 seconds.");
+      const auto before = frame.clock().simulation_days();
+      const auto r = frame.advance(step_days);
+      if (r.completed_substeps != std::vector<double>{step_days} ||
+          frame.clock().simulation_days() - before != step_days ||
+          frame.clock().backlog_days() != 0.)
+        throw std::runtime_error("Earned surface lost exact stepping.");
+      publish_feedback(r);
+      refresh_surface(true);
+      site = std::ranges::find(surface_workspace_.view()->construction_sites,
+                               id, &NativeSurfaceSite::building_id);
+      if (site == surface_workspace_.view()->construction_sites.end())
+        throw std::runtime_error("Earned surface lost its building.");
+      if (!captured && site->industry_progress >= site->industry_cost * .1 &&
+          !site->complete) {
+        frame.clock().set_speed(StrategicSpeed::Paused);
+        inspect_site(*site);
+        capture("construction");
+        captured = true;
+        refresh_surface(true);
+        site = std::ranges::find(surface_workspace_.view()->construction_sites,
+                                 id, &NativeSurfaceSite::building_id);
+        if (site == surface_workspace_.view()->construction_sites.end())
+          throw std::runtime_error(
+              "Earned surface lost its building after capture.");
+        frame.clock().set_speed(StrategicSpeed::Normal);
+      }
+    }
+    frame.clock().set_speed(StrategicSpeed::Paused);
+    refresh_surface(true);
+    site = std::ranges::find(surface_workspace_.view()->construction_sites, id,
+                             &NativeSurfaceSite::building_id);
+    if (!captured ||
+        site == surface_workspace_.view()->construction_sites.end() ||
+        !site->complete || !site->powered || !site->staffed || !site->enabled ||
+        surface_workspace_.view()->industry_per_day <= industry_before)
+      throw std::runtime_error(
+          "Earned fabricator was not a staffed powered industry output.");
+    inspect_site(*site);
+    site = std::ranges::find(surface_workspace_.view()->construction_sites, id,
+                            &NativeSurfaceSite::building_id);
+    if (site == surface_workspace_.view()->construction_sites.end())
+      throw std::runtime_error("Earned surface lost its inspected fabricator.");
+    const PlayerCampaignCaptureOptions opts{frame.clock().simulation_days(),
+                                            STELLAR_GAME_VERSION,
+                                            "2044-05-06T07:08:21Z"};
+    auto restored = restore_player_campaign_v17_json(
+        load_adaptive_research_strategic_runtime(asset_root_ /
+                                                 "Data/research/v1"),
+        encode_player_campaign_v17_json(
+            PreparedPlayerCampaignSave::capture(frame.runtime(), opts)
+                .payload()));
+    auto resumed = std::move(restored).activate();
+    const bool roundtrip =
+        nlohmann::json::parse(encode_player_campaign_v17_json(
+            PreparedPlayerCampaignSave::capture(resumed, opts).payload())) ==
+        saved();
+    if (!roundtrip)
+      throw std::runtime_error("Earned surface Player17 roundtrip failed.");
+    earned_surface_proof_ = nlohmann::json{
+        {"mode", "resume"},
+        {"player_id", expected_player},
+        {"system_id", expected_system},
+        {"body_id", expected_body},
+        {"colony_id", expected_colony},
+        {"building_id", id},
+        {"type_id", site->type_id},
+        {"x", x},
+        {"z", z},
+        {"rotation", rotation},
+        {"before_days", before_days},
+        {"after_days", frame.clock().simulation_days()},
+        {"steps", steps},
+        {"step_days", step_days},
+        {"authorization", option->authorization_budget_units},
+        {"treasury_before", initial.treasury_budget_units},
+        {"treasury_after", treasury_after},
+        {"industry_cost", site->industry_cost},
+        {"industry_progress", site->industry_progress},
+        {"complete", site->complete},
+        {"powered", site->powered},
+        {"staffed", site->staffed},
+        {"enabled", site->enabled},
+        {"efficiency", site->efficiency},
+        {"industry_before", industry_before},
+        {"industry_after", surface_workspace_.view()->industry_per_day},
+        {"cancel_unchanged", cancelled},
+        {"opened_surface", true},
+        {"roundtrip",
+         roundtrip}}.dump();
+    session_->request_save();
+  }
+  [[nodiscard]] const std::string &earned_surface_smoke_status() const {
+    return earned_surface_proof_;
+  }
+
+  void prepare_settlement_preparation_smoke(
+      int width, int height, const std::function<void()> &pump,
+      const std::function<void(std::string_view)> &capture) {
+    auto &frame = session_->frame();
+    const auto &world = frame.runtime().world().campaign();
+    if (frame.clock().speed() != StrategicSpeed::Paused)
+      throw std::runtime_error(
+          "Settlement preparation requires a paused earned campaign.");
+    const auto initial =
+        stellar::native_settlement_preparation::build_settlement_preparation(
+            frame, session_->cache().generation, 1, 1001);
+    if (!initial || initial->site_can_found_current_colony ||
+        !initial->solid_surface || initial->rare_resource)
+      throw std::runtime_error("Settlement preparation requires the actual "
+                               "surveyed, unsuitable Ilyra.");
+    const PlayerCampaignCaptureOptions fixed_capture{
+        frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+        "2044-05-06T07:08:19Z"};
+    const auto payload = [&] {
+      return nlohmann::json::parse(encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(frame.runtime(), fixed_capture)
+              .payload()));
+    };
+    const auto before = payload();
+    const auto route = [&](std::vector<InputEvent> events) {
+      InputSnapshot input;
+      input.drawable_width = width;
+      input.drawable_height = height;
+      input.pointer = events.empty() ? Point{} : events.back().position;
+      input.events = std::move(events);
+      if (!update(input, width, height, 0., false))
+        throw std::runtime_error(
+            "Settlement preparation UI closed unexpectedly.");
+    };
+    const auto click = [&](Point at) {
+      route({{InputEventType::LeftPressed, at},
+             {InputEventType::LeftReleased, at}});
+    };
+    const auto stable = [&] {
+      if (payload() != before)
+        throw std::runtime_error(
+            "Settlement preparation changed the Player17 campaign.");
+    };
+    const auto wait_art = [&] {
+      const auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(30);
+      do {
+        pump();
+        if (std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error("Settlement artwork did not become ready.");
+      } while (!artwork_ready());
+    };
+    if (!enter_system(1, width, height))
+      throw std::runtime_error("Surveyed system did not open.");
+    const auto spatial = project_system(*system_workspace_.snapshot());
+    const auto marker = std::ranges::find(spatial.bodies, 1001,
+                                          &SystemSpatialBodyMarker::body_id);
+    if (marker == spatial.bodies.end())
+      throw std::runtime_error("Ilyra absent from the observed system.");
+    const auto point = system_workspace_.viewport()->world_to_screen(
+        marker->offset_x, marker->offset_y);
+    const auto layout = SystemWorkspaceLayout::for_viewport(width, height);
+    if (!layout.world_field.contains({point.x, point.y}) ||
+        system_workspace_.viewport()->hit_body(spatial, point.x, point.y) !=
+            1001)
       throw std::runtime_error("Ilyra is not independently clickable.");
     click({point.x,point.y});
     if(system_workspace_.selected_body_id()!=1001||!system_workspace_.settlement_preparation())
@@ -6374,6 +6768,7 @@ class NativeCampaign final {
   bool smoke_colony_reload_{},smoke_colony_selected_{},smoke_colony_opened_{},smoke_colony_back_{},smoke_colony_pause_retained_{},smoke_colony_speed_retained_{};
   double smoke_colony_day_{};
   std::string settlement_completion_proof_;
+  std::string earned_surface_proof_;
   bool smoke_settlement_mode_{},smoke_settlement_reload_{},smoke_settlement_selected_{},smoke_settlement_previewed_{},smoke_settlement_accepted_{};
   bool smoke_settlement_cancelled_{},smoke_settlement_cancel_no_charge_{},smoke_settlement_requires_authorization_{},smoke_settlement_no_instant_colony_{};
   std::optional<int> smoke_settlement_fleet_id_,smoke_settlement_system_id_,smoke_settlement_body_id_;
@@ -6528,6 +6923,10 @@ int main(int argc,char **argv){
       else if(options.surface_smoke||options.surface_reload_smoke)
         campaign.prepare_surface_smoke(window.drawable_width(),
                                        window.drawable_height(),options.surface_reload_smoke);
+      else if(options.earned_surface_mode)
+        campaign.prepare_earned_surface_smoke(window.drawable_width(),window.drawable_height(),*options.earned_surface_mode,
+          [&]{audio.service();auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("Earned surface window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
+          [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="review"?L"-review":tag=="colony"?L"-colony":L"-construction"));});
       else if(options.galaxy_art_smoke)
         campaign.prepare_galaxy_art_smoke(window.drawable_width(),
                                           window.drawable_height(),options.load);
@@ -6921,6 +7320,8 @@ int main(int argc,char **argv){
           std::cout<<"settlement_completion="<<campaign.settlement_completion_smoke_status()<<'\n';
         if(options.settlement_preparation_smoke)
           std::cout<<"settlement_preparation="<<campaign.settlement_preparation_smoke_status()<<'\n';
+        if(options.earned_surface_mode)
+          std::cout<<"earned_surface="<<campaign.earned_surface_smoke_status()<<'\n';
         if(options.first_survey_mode)
           std::cout<<"first_survey="<<campaign.first_survey_smoke_status()<<'\n';
         std::ranges::sort(frame_ms);

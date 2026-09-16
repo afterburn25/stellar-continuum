@@ -83,6 +83,20 @@ void panel_title(DrawList &out, UiRect bounds, UiRect clip, std::string value,
                  *visible, std::move(value), bright, pixels);
   }
 }
+[[nodiscard]] bool can_authorize_build(const NativeColonyView &view,
+                                       const NativeSurfaceBuildOption &option) {
+  return view.treasury_budget_units + 1e-9 >= option.authorization_budget_units;
+}
+[[nodiscard]] bool can_staff_build(const NativeColonyView &view,
+                                   const NativeSurfaceBuildOption &option) {
+  return view.workforce_available_millions + 1e-9 >=
+         view.workforce_demand_millions + option.workforce_required_millions;
+}
+[[nodiscard]] bool can_power_build(const NativeColonyView &view,
+                                   const NativeSurfaceBuildOption &option) {
+  return view.power_supply + option.power_supply + 1e-9 >=
+         view.power_demand + option.power_demand;
+}
 } // namespace
 
 ColonyWorkspaceLayout ColonyWorkspaceLayout::for_viewport(int width,
@@ -470,10 +484,62 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
              layout.sites.width - 20.f * layout.scale, 22.f * layout.scale},
        "SURFACE MODULES & CONSTRUCTION", bright, layout.body_font_pixels);
   if (view.construction_sites.empty()) {
-    text(out, {layout.site_rows.x, layout.site_rows.y,
-               layout.site_rows.width, 60.f * layout.scale},
-         "No surface modules or construction sites.", muted,
-         layout.body_font_pixels);
+    const UiRect guidance{layout.site_rows.x, layout.site_rows.y,
+                          layout.site_rows.width,
+                          std::min(layout.site_rows.height, 184.f * layout.scale)};
+    fill(out, guidance, row);
+    stroke(out, guidance, border);
+    const auto gx = guidance.x + 10.f * layout.scale;
+    auto gy = guidance.y + 9.f * layout.scale;
+    const auto guide = [&](std::string value, Color color = muted) {
+      clipped_text(out, {gx, gy, guidance.width - 20.f * layout.scale,
+                         19.f * layout.scale}, guidance, std::move(value), color,
+                   layout.small_font_pixels);
+      gy += 22.f * layout.scale;
+    };
+    guide("DEVELOP THIS COLONY", bright);
+    guide("No modules are active yet. Open Surface to choose a site.");
+    guide("Power " + number(view.power_supply, 1) + " / " +
+              number(view.power_demand, 1) + "  |  Materials " +
+              number(view.stored_industry, 1));
+    guide("Workforce " + billions(view.workforce_available_millions) +
+              " available  |  Treasury " + view.formatted_treasury);
+    if (view.available_buildings.empty()) {
+      guide("No eligible surface modules are currently available.", warning);
+    } else {
+      const auto power = std::ranges::find_if(
+          view.available_buildings,
+          [](const NativeSurfaceBuildOption &option) { return option.power_supply > 0.; });
+      const auto fabricator = std::ranges::find_if(
+          view.available_buildings,
+          [](const NativeSurfaceBuildOption &option) { return option.type_id == "fabricator"; });
+      const auto fabricator_ready = fabricator != view.available_buildings.end() &&
+                                    can_authorize_build(view, *fabricator) &&
+                                    can_staff_build(view, *fabricator) &&
+                                    can_power_build(view, *fabricator);
+      const auto choice = view.power_supply + 1e-9 < view.power_demand &&
+                              power != view.available_buildings.end()
+                          ? power
+                          : fabricator_ready ? fabricator
+                                             : view.available_buildings.begin();
+      const auto authorized = can_authorize_build(view, *choice);
+      const auto checks = authorized &&
+                          can_staff_build(view, *choice) && can_power_build(view, *choice);
+      guide("Available next: " + choice->name, bright);
+      guide(choice->formatted_authorization + " authorization  |  " +
+                number(choice->industry_cost, 1) + " materials  |  " +
+                billions(choice->workforce_required_millions) + " workforce",
+            checks ? good : muted);
+      guide(authorized ? "Construction uses incoming materials over time."
+                       : "More treasury is needed to authorize construction.",
+            authorized ? muted : warning);
+      if (view.power_supply + 1e-9 < view.power_demand && power != view.available_buildings.end())
+        guide("It adds power; review placement on the surface.", muted);
+      else if (choice == fabricator)
+        guide("It is available for local industry; review placement on the surface.", muted);
+      else
+        guide("Review its placement requirements on the surface.", muted);
+    }
   }
   for (std::size_t index = 0; index < view.construction_sites.size(); ++index) {
     const auto &site = view.construction_sites[index];

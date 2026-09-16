@@ -5,6 +5,30 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### First earned colony building
+
+Continue from `work/native-audio-validation/package-earned-surface-paused.player17.json`:
+seed 115501/player 0/system 8/body 8004/colony 9, day 6832.1009387, one
+paid completed fabricator, 1 industry/day, supplied with power and workers.
+The 720p continuation charged 50 budget units ($500M UED) once, then completed
+450 materials across 4460 Normal 1/64-day frames. The 1080p paused reload is
+unchanged except `SavedAtUtc`. Colony guidance, cost review, 10% construction
+and selected Operating inspector captures were inspected. Both structures use
+prepared imagery. No Core/C#/Player17/art changes or grants were made.
+
+The new maintained `native_earned_surface_runtime.py` gate follows earned
+settlement in the export pipeline. MSVC, nine focused CTests, 586 Python checks
+(569 pass, 17 optional skips), earned runtime, surface/navigation regressions
+and four clean CLI failures pass. Contract: `docs/engine/NATIVE_EARNED_SURFACE.md`;
+evidence: `work/native-earned-surface-*`. The local package is unsealed.
+
+Next: improve construction/operations feedback and extend paid power/research
+development. Both existing power units now serve the fabricator. Do not grant
+power or invent surface-complete Core events; Core emits no such event yet.
+Current partial-building inspector says Power Unavailable / Workforce Missing
+before allocation begins; clarify that construction status without hiding real
+operating shortages. Preserve the earned source and use canonical paid work.
+
 ### Earned settlement establishment
 
 The maintained no-grant seed-115501 continuation starts from the completed

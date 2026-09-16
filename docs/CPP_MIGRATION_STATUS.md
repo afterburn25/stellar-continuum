@@ -16,6 +16,27 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
+### First earned colony building
+
+Xanthe's empty earned colony now continues through mouse-driven paid fabricator
+placement, real material allocation and timed completion. The 720p run spends
+50 budget units ($500M UED), consumes 450 materials and advances 4460 exact
+1/64-day frames to day 6832.1009387. Actual output is 1 industry/day with power
+and workers; paused 1080p reload preserves Player17 except its timestamp.
+Empty-colony guidance explains available resources and a useful next module.
+Placement review now describes pending authorization instead of claiming success
+before confirmation. Prepared building imagery and actual construction/operating
+inspectors were visually checked. Core, C#, Player17 and approved art are unchanged.
+
+MSVC, nine focused CTests, 586 Python checks (569 pass, 17 optional skips),
+earned graphical continuation/reload, surface/navigation regressions and four
+clean CLI failures pass. See `docs/engine/NATIVE_EARNED_SURFACE.md` and
+`work/native-earned-surface-*` evidence. The package remains unsealed.
+Next: clarify construction/operations feedback and continue paid power/research
+expansion from `package-earned-surface-paused.player17.json`; the first
+fabricator uses all current local power. Detailed cities and real-time pacing
+remain unfinished.
+
 ### Earned settlement establishment
 
 The no-grant seed-115501 continuation from the full survey at day 6587.15625

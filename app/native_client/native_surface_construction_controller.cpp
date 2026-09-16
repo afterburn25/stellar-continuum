@@ -98,6 +98,12 @@ NativeSurfaceCommandOutcome stale() {
           "The campaign or surface quote changed; review it before confirming."};
 }
 
+std::string placement_preview_message(
+    const SurfaceBuildingPlacementAssessment &assessment) {
+  return "Authorize construction for " + assessment.formatted_authorization +
+         ". Materials are consumed as work progresses.";
+}
+
 struct PreviewWorld {
   std::vector<Civilization> civilizations;
   std::vector<PlanetaryBody> bodies;
@@ -386,7 +392,8 @@ NativeSurfaceConstructionController::preview_placement(
   result.industry_cost = assessment.industry_cost;
   result.formatted_authorization = assessment.formatted_authorization;
   result.accepted = assessment.accepted;
-  result.message = assessment.message;
+  result.message = assessment.accepted ? placement_preview_message(assessment)
+                                      : assessment.message;
   if (assessment.accepted)
     quotes_.emplace(result.quote_revision,
                     PlacementRecord{view.system_id, view.body_id, view.revision,
@@ -459,7 +466,7 @@ NativeSurfaceConstructionController::confirm_placement(
       quote.authorization_budget_units != assessment.authorization_cost ||
       quote.industry_cost != assessment.industry_cost ||
       quote.formatted_authorization != assessment.formatted_authorization ||
-      quote.message != assessment.message)
+      quote.message != placement_preview_message(assessment))
     return stale();
   auto current = context(frame);
   if (!live_binding(current, assessment.civilization_id, record.system_id,

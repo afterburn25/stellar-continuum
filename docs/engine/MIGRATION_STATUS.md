@@ -1,5 +1,24 @@
 # Stellar Engine migration status
 
+### First earned colony building checkpoint (2026-09-16)
+
+The native earned campaign now completes a paid Xanthe fabricator through
+normal surface input and canonical construction, then preserves it on reload.
+The 720p run pays 50 budget units ($500M UED), finishes 450 materials in
+4460 Normal 1/64-day frames and reaches day 6832.1009387 with actual output
+of 1 industry/day, power and workers. Paused 1080p Player17 is unchanged except
+its timestamp. New empty-colony guidance uses live resources and module costs;
+placement preview no longer claims that payment already happened. Prepared
+imagery, 10% construction and Operating inspector captures were checked.
+
+MSVC, nine focused CTests, 586 Python checks (569 pass, 17 optional skips),
+earned Vulkan continuation/reload, surface/navigation regressions and four CLI
+failures pass. Contract: `NATIVE_EARNED_SURFACE.md`; evidence:
+`work/native-earned-surface-*`. Core/C#/Player17/art remain unchanged.
+Next: improve construction/operations feedback and continue paid power/research
+expansion from the completed earned save. No sealed release, final graphical
+quality or sustained 60 FPS claim is made by this checkpoint.
+
 ### Earned settlement establishment checkpoint (2026-09-16)
 
 The no-grant seed-115501 chain continued from the full survey at day 6587.15625,

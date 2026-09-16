@@ -60,6 +60,15 @@ NativeSurfaceSite site(int id, bool complete = false) {
   return result;
 }
 
+NativeSurfaceBuildOption build_option(std::string type_id, std::string name,
+                                      double power_supply = 0.,
+                                      double power_demand = 0.) {
+  return {.type_id = std::move(type_id), .name = std::move(name),
+          .industry_cost = 40., .authorization_budget_units = 50.,
+          .formatted_authorization = "$500M UED", .power_supply = power_supply,
+          .power_demand = power_demand, .workforce_required_millions = .02};
+}
+
 NativeColonyView view(std::uint64_t generation = 1) {
   NativeColonyView result;
   result.campaign_generation = generation;
@@ -294,6 +303,71 @@ void campaign_replacement_clears_owned_snapshot() {
   workspace.discard_campaign();
   REQUIRE(!workspace.visible() && !workspace.view());
 }
+
+void empty_colony_guidance_uses_live_options_and_resolves_after_construction() {
+  auto empty = view();
+  empty.construction_sites.clear();
+  empty.power_supply = 1.;
+  empty.power_demand = 3.;
+  empty.available_buildings = {build_option("fabricator", "Fabricator", 0., 2.),
+                               build_option("power_generator", "Power Generator", 4.)};
+  NativeColonyWorkspace workspace;
+  workspace.open(empty);
+  DrawList draw;
+  workspace.render(draw, 1280, 720);
+  const auto has = [&draw](std::string_view value) {
+    return std::ranges::any_of(draw.overlay, [value](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value.find(value) != std::string::npos;
+    });
+  };
+  REQUIRE(has("DEVELOP THIS COLONY"));
+  REQUIRE(has("Available next: Power Generator"));
+  REQUIRE(has("$500M UED authorization"));
+  REQUIRE(has("incoming materials over time"));
+  empty.construction_sites = {site(1)};
+  workspace.set_view(empty);
+  DrawList resolved;
+  workspace.render(resolved, 1280, 720);
+  REQUIRE(std::ranges::none_of(resolved.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "DEVELOP THIS COLONY";
+  }));
+
+  empty.construction_sites.clear();
+  empty.available_buildings.clear();
+  workspace.set_view(empty);
+  DrawList unavailable;
+  workspace.render(unavailable, 1280, 720);
+  REQUIRE(std::ranges::any_of(unavailable.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.find("No eligible surface modules") != std::string::npos;
+  }));
+
+  // Authorization is credit-based: a newly founded colony can begin a
+  // fabricator while its construction materials accumulate over time.
+  empty.available_buildings = {build_option("fabricator", "Fabricator", 0., 2.)};
+  empty.power_supply = 6.;
+  empty.power_demand = 3.;
+  empty.stored_industry = 1.;
+  empty.treasury_budget_units = 120.;
+  workspace.set_view(empty);
+  DrawList low_stockpile;
+  workspace.render(low_stockpile, 1280, 720);
+  REQUIRE(std::ranges::any_of(low_stockpile.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "Available next: Fabricator";
+  }));
+
+  empty.treasury_budget_units = 10.;
+  workspace.set_view(empty);
+  DrawList no_funds;
+  workspace.render(no_funds, 1280, 720);
+  REQUIRE(std::ranges::any_of(no_funds.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.find("More treasury is needed") != std::string::npos;
+  }));
+}
 } // namespace
 
 int main() {
@@ -303,6 +377,7 @@ int main() {
     detail_scroll_reaches_outpost_rows_and_keeps_text_clipped();
     wheel_reaches_last_site_and_escape_closes();
     campaign_replacement_clears_owned_snapshot();
+    empty_colony_guidance_uses_live_options_and_resolves_after_construction();
     freight_review_input_and_layout();
     std::cout << "native colony workspace tests passed\n";
     return 0;
