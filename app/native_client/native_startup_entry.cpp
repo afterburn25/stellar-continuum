@@ -33,6 +33,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
   NativeStartupWorkspace workspace;
   const auto setup_view = host.setup();
   workspace.set_setup(setup_view);
+  workspace.set_return_to_campaign_available(
+      config.return_to_campaign_available);
+  if (config.return_to_campaign_available)
+    workspace.show_setup();
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>> portraits;
   NativeStartupWorkspace::PortraitProvider portrait_provider =
       [&](std::string_view relative) {
@@ -52,17 +56,22 @@ StartupEntryResult run_native_startup_entry(Window &window,
   // seven seconds while the four immutable startup images are staged. Smoke
   // automation disables only the minimum dwell; it still draws the boot frame
   // and loads the same resources before interacting with the menu.
-  const auto minimum_boot = automation ? std::chrono::milliseconds::zero()
-                                       : config.minimum_boot_artwork;
-  const auto boot_started = std::chrono::steady_clock::now();
-  auto boot = artwork_assets.image(StartupArtworkKind::ApplicationStartup);
-  std::size_t staged = 1;
-  for (;;) {
+  if (!config.return_to_campaign_available) {
+    const auto minimum_boot = automation ? std::chrono::milliseconds::zero()
+                                         : config.minimum_boot_artwork;
+    const auto boot_started = std::chrono::steady_clock::now();
+    auto boot = artwork_assets.image(StartupArtworkKind::ApplicationStartup);
+    std::size_t staged = 1;
+    for (;;) {
     if (config.audio.service) config.audio.service();
     const bool audio_ready = !config.audio.assets_ready || config.audio.assets_ready();
     const auto input = window.poll();
-    if (input.quit_requested) return {{}, true};
+    if (input.quit_requested) {
+      evidence.exit_requested = true;
+      return {{}, true, std::move(evidence)};
+    }
     if (input.renderable()) {
+      evidence.boot_presented = true;
       DrawList draw;
       const auto destination = startup_artwork_destination(
           boot->width(), boot->height(), input.drawable_width,
@@ -103,8 +112,12 @@ StartupEntryResult run_native_startup_entry(Window &window,
       ++staged;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    if (config.audio.menu_ready) {
+      config.audio.menu_ready();
+      evidence.menu_ready_called = true;
+    }
   }
-  if (config.audio.menu_ready) config.audio.menu_ready();
   const auto dispatch = [&](const StartupIntent &intent) {
     if (intent.kind != StartupIntentKind::None && config.audio.confirm)
       config.audio.confirm();
@@ -162,11 +175,57 @@ StartupEntryResult run_native_startup_entry(Window &window,
             window.draw(draw, automation->audio_settings_screenshot);
           });
     }
-    auto intent = workspace.handle(
-        {InputEventType::LeftPressed, center(entry_layout.new_campaign)}, width,
-        height, measure);
-    evidence.setup_opened = intent.kind == StartupIntentKind::OpenSetup &&
-                            workspace.screen() == StartupScreen::Setup;
+    if (automation->action != StartupEntryAutomationAction::Create) {
+      evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
+      if (workspace.screen() == StartupScreen::Setup) {
+        const auto back = workspace.handle({InputEventType::EscapePressed},
+                                           width, height, measure);
+        if (back.kind != StartupIntentKind::Back ||
+            workspace.screen() != StartupScreen::Entry)
+          throw std::runtime_error(
+              "Startup lifecycle automation could not return to Entry.");
+      }
+      if (workspace.screen() != StartupScreen::Entry)
+        throw std::runtime_error(
+            "Startup lifecycle automation requires the Entry screen.");
+      DrawList entry_draw;
+      workspace.render(entry_draw, width, height, measure, &portrait_provider,
+                       &artwork_provider);
+      window.draw(entry_draw, automation->setup_screenshot);
+      const auto target = automation->action ==
+                                  StartupEntryAutomationAction::ReturnToCampaign
+                              ? entry_layout.return_to_campaign
+                              : entry_layout.exit;
+      const auto intent = workspace.handle(
+          {InputEventType::LeftPressed, center(target)}, width, height, measure);
+      if (automation->action == StartupEntryAutomationAction::ReturnToCampaign) {
+        if (intent.kind != StartupIntentKind::ReturnToCampaign)
+          throw std::runtime_error(
+              "Startup lifecycle automation did not route Return to Campaign.");
+        if (config.audio.confirm) config.audio.confirm();
+        evidence.returned_to_campaign = true;
+        window.set_text_input(false);
+        return {{}, false, std::move(evidence), true};
+      }
+      if (intent.kind != StartupIntentKind::Exit)
+        throw std::runtime_error(
+            "Startup lifecycle automation did not route Exit to Windows.");
+      evidence.exit_requested = true;
+      window.set_text_input(false);
+      return {{}, true, std::move(evidence)};
+    }
+
+    StartupIntent intent;
+    if (workspace.screen() == StartupScreen::Entry) {
+      intent = workspace.handle(
+          {InputEventType::LeftPressed, center(entry_layout.new_campaign)},
+          width, height, measure);
+      evidence.setup_opened = intent.kind == StartupIntentKind::OpenSetup &&
+                              workspace.screen() == StartupScreen::Setup;
+    } else {
+      evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
+      intent = {StartupIntentKind::OpenSetup, evidence.setup_opened};
+    }
     const auto option = std::ranges::find(setup_view.species,
                                           automation->species_id,
                                           &NativeSpeciesSetupOption::id);
@@ -225,7 +284,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
   for (;;) {
     if (config.audio.service) config.audio.service();
     const auto input = window.poll();
-    if (input.quit_requested) return {{}, true};
+    if (input.quit_requested) {
+      evidence.exit_requested = true;
+      return {{}, true, std::move(evidence)};
+    }
     if (!input.renderable()) {
       for (const auto &event : input.events)
         if (config.audio_settings && config.audio_settings->visible())
@@ -248,12 +310,20 @@ StartupEntryResult run_native_startup_entry(Window &window,
       case StartupIntentKind::Exit:
         exit = true;
         break;
+      case StartupIntentKind::ReturnToCampaign:
+        if (config.audio.confirm) config.audio.confirm();
+        evidence.returned_to_campaign = true;
+        window.set_text_input(false);
+        return {{}, false, std::move(evidence), true};
       default:
         dispatch(intent);
         break;
       }
     }
-    if (exit) return {{}, true};
+    if (exit) {
+      evidence.exit_requested = true;
+      return {{}, true, std::move(evidence)};
+    }
     if (workspace.screen() == StartupScreen::Busy) {
       host.service();
       const auto state = host.poll();

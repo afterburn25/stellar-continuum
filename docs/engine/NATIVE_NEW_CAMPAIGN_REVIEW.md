@@ -5,6 +5,65 @@ This is a source review; that commit has not been imported or executed on the
 Codex integration branch. Its useful contribution is a save-gated transition
 from the live campaign back to race/galaxy setup, using a distinct save slot.
 
+## Integrated native lifecycle (2026-09-15)
+
+The corrections below are now implemented on the Codex integration branch,
+selectively adapting the New Game behavior without importing Devin's older
+main loop. No C# or authoritative Core changes are needed.
+
+`NativeCampaignSession::request_new_campaign()` requires a completed capture
+boundary. `NewCampaignTransition` is Inactive/Waiting/Saving/Ready/Failed.
+Waiting drains the single existing writer before admitting its own immutable
+manual capture; only that Saving completion reaches Ready. Cancelling clears
+transition authority, not the writer's durability work. A later request starts
+at Waiting and therefore cannot accept a cancelled writer's completion.
+`advance()` freezes while pending, including tactical reconciliation. The host
+also blocks conflicting UI commands, showing Cancel New Game instead. Any write
+failure leaves the original session open with its diagnostic and no retry loop.
+
+`StartupEntryConfig::return_to_campaign_available` selects live setup: no boot
+splash and no menu-ready callback. `StartupEntryResult` distinguishes a new
+session, `exit_requested`, and `return_to_campaign`. Back/escape in setup opens
+the entry screen, where Return is explicit and Escape returns to the campaign.
+Generation cancellation or failure also leaves Return reachable. Exit/window
+close remains a real application exit. The original NativeCampaign stays alive
+through setup and cancellation; successful replacement happens after activation.
+Audio/settings/window remain alive outside that loop. No global keyboard
+shortcut bypasses focused text fields or modal controls.
+
+### Evidence and reproduction
+
+- MSVC native build; CTests `native_campaign_session`, `native_ui_layout`,
+  `native_new_game_workspace`, `native_startup_session`,
+  `native_startup_workspace`, `native_startup_artwork`, `native_audio_settings`,
+  `native_audio_director`, `campaign_frame_parity` pass. UI layout was corrected
+  after its first 640x360 gutter regression; supported 720p–4K layouts pass.
+- Session tests force old and cancelled writer completion ordering, an actual
+  filesystem obstruction, explicit retry, exact active-battle preservation,
+  and matched continuation after cancellation. No Windows error dialog helper
+  is involved; these are maintained native test executables.
+- `verify_native_restart(package_folder, player17_fixture)` in
+  `tools/stellar-export/native_restart_runtime.py` runs five isolated relocated
+  Vulkan processes with narrow PATH and an unrelated working directory. It
+  normalizes an anchor, then checks cancel/exit/create and the new slot reload.
+  All outcomes preserve the original full Player17 payload except SavedAtUtc;
+  new setup uses pelagic_high_pressure, seed 143250, 250 systems.
+- Four validator regression tests reject missing/ambiguous outcomes, replayed
+  boot/music, lost cancellation identity, and changes to previous campaign data.
+- `validate_native_new_game_export(..., audio_check=True,
+  audio_settings_check=True)` passes two additional cold startup/reload runs;
+  its 33 Python tests also pass. These checks retain the approved cold splash,
+  audio policy, settings persistence and unique-slot behavior.
+- Raw evidence is in `work/native-new-campaign-*.log/.json` and
+  `work/native-audio-validation/package-restart-*`. Native input events use the
+  real UI hit regions; this is not physical mouse automation. Battle transition
+  evidence is a canonical runtime/session test, not a battle-screen capture.
+
+The local package is an unsealed validation artifact, not a release. Broader
+visual and gameplay gaps remain in the migration handoff.
+
+## Original review findings (addressed by the integration above)
+
 ## Required corrections and integration contracts
 
 - At the bottom of `main.cpp`, the restart result tests only `session` and

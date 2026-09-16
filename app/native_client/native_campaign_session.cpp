@@ -257,6 +257,37 @@ bool NativeCampaignSession::exit_ready() const {
   return exit_ready_;
 }
 
+NewCampaignTransition NativeCampaignSession::new_campaign_transition() const {
+  require_owner();
+  return new_campaign_transition_;
+}
+bool NativeCampaignSession::new_campaign_pending() const {
+  require_owner();
+  return new_campaign_transition_ == NewCampaignTransition::Waiting ||
+         new_campaign_transition_ == NewCampaignTransition::Saving ||
+         new_campaign_transition_ == NewCampaignTransition::Ready;
+}
+bool NativeCampaignSession::request_new_campaign() {
+  require_owner();
+  if (new_campaign_pending()) return false;
+  if (pending_load_ || exit_requested_ || exit_ready_ || !manual_capture_ready_) {
+    publish_failure("New Game is unavailable until the current campaign operation finishes");
+    return false;
+  }
+  save_requested_ = false;
+  new_campaign_transition_ = NewCampaignTransition::Waiting;
+  notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+  return true;
+}
+void NativeCampaignSession::cancel_new_campaign() {
+  require_owner();
+  if (!new_campaign_pending() && new_campaign_transition_ != NewCampaignTransition::Failed)
+    return;
+  // A writer in flight may finish, but cannot authorize any later request.
+  new_campaign_transition_ = NewCampaignTransition::Inactive;
+  notice_ = {SessionNoticeKind::None, "Current campaign retained", 0.};
+}
+
 PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {
   return [root = research_root_] {
     return load_adaptive_research_strategic_runtime(root);
@@ -275,12 +306,15 @@ void NativeCampaignSession::publish_save_result(
 }
 
 void NativeCampaignSession::publish_failure(std::string message) {
+  if (new_campaign_pending()) new_campaign_transition_ = NewCampaignTransition::Failed;
   std::cerr << "Stellar Continuum native session: " << message << '\n';
   notice_ = {SessionNoticeKind::Failure, std::move(message), 0.};
 }
 
 void NativeCampaignSession::publish_background_save_result(
     const PlayerCampaignSaveResult &result) {
+  if (result.succeeded && new_campaign_transition_ == NewCampaignTransition::Saving)
+    new_campaign_transition_ = NewCampaignTransition::Ready;
   const bool manual = std::exchange(manual_save_pending_, false);
   if (!result.succeeded) {
     // A queued action must not conceal a failed write with an immediate retry.
@@ -308,6 +342,8 @@ bool NativeCampaignSession::drain_live_save() {
 CampaignFrameResult NativeCampaignSession::advance(
     double real_delta_seconds, const std::string &saved_at_utc) {
   require_owner();
+  // Freeze even tactical reconciliation and preserve the completed capture boundary.
+  if (new_campaign_pending()) return {};
   manual_capture_ready_ = false;
   auto result = live_->frame.advance(real_delta_seconds);
   // A returned tactical frame has finished its owned advance/reconciliation.
@@ -333,6 +369,7 @@ CampaignFrameResult NativeCampaignSession::advance(
 
 void NativeCampaignSession::request_save() {
   require_owner();
+  if (new_campaign_pending()) return;
   if (pending_load_) {
     publish_failure("Wait for the current load before saving");
     return;
@@ -361,6 +398,7 @@ void NativeCampaignSession::begin_load() {
 
 void NativeCampaignSession::request_load() {
   require_owner();
+  if (new_campaign_pending()) return;
   if (pending_load_) {
     publish_failure("A campaign load is already in progress");
     return;
@@ -381,6 +419,7 @@ void NativeCampaignSession::request_load() {
 
 void NativeCampaignSession::request_exit() {
   require_owner();
+  cancel_new_campaign();
   if (pending_load_) {
     publish_failure("Wait for the current load before exiting");
     return;
@@ -458,6 +497,24 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
     publish_background_save_result(*completed);
     if (!completed->succeeded) {
       return replaced;
+    }
+  }
+
+  if (new_campaign_transition_ == NewCampaignTransition::Waiting &&
+      !live_->saves.pending()) {
+    try {
+      const PlayerCampaignCaptureOptions options{
+          live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
+      const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
+      if (failed) {
+        publish_save_result(*failed, "Saved campaign");
+      } else {
+        manual_save_pending_ = true;
+        new_campaign_transition_ = NewCampaignTransition::Saving;
+        notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+      }
+    } catch (const std::exception &error) {
+      publish_failure(std::string("Save before New Game failed: ") + error.what());
     }
   }
 

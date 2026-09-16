@@ -241,7 +241,8 @@ struct Options {
   bool settlement_reload_smoke{};
   bool surface_smoke{};
   bool surface_reload_smoke{};
-  bool new_game_smoke{};
+  bool new_game_smoke{},restart_smoke{};
+  StartupEntryAutomationAction restart_action{StartupEntryAutomationAction::Create};
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
   bool diplomacy_smoke{},diplomacy_reload_smoke{};
@@ -277,6 +278,7 @@ struct Options {
     else if(arg==L"--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::wstring_view(argv[++i]));
     else if(arg==L"--campaign-profile"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.campaign_profile=true;result.windowed=true;}
     else if(arg==L"--smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.menu_smoke=true;result.windowed=true;}
+    else if((arg==L"--restart-smoke"||arg==L"--restart-cancel-smoke"||arg==L"--restart-exit-smoke")&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.restart_smoke=true;result.windowed=true;result.load=true;result.restart_action=arg==L"--restart-cancel-smoke"?StartupEntryAutomationAction::ReturnToCampaign:arg==L"--restart-exit-smoke"?StartupEntryAutomationAction::Exit:StartupEntryAutomationAction::Create;}
     else if(arg==L"--new-game-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
     else if(arg==L"--navigation-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.navigation_smoke=true;result.windowed=true;}
@@ -314,6 +316,7 @@ struct Options {
     else if(arg=="--profile-frames"&&i+1<argc) result.profile_frames=parse_profile_frames(std::string_view(argv[++i]));
     else if(arg=="--campaign-profile"&&i+1<argc){result.smoke_screenshot=argv[++i];result.campaign_profile=true;result.windowed=true;}
     else if(arg=="--smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.menu_smoke=true;result.windowed=true;}
+    else if((arg=="--restart-smoke"||arg=="--restart-cancel-smoke"||arg=="--restart-exit-smoke")&&i+1<argc){result.smoke_screenshot=argv[++i];result.restart_smoke=true;result.windowed=true;result.load=true;result.restart_action=arg=="--restart-cancel-smoke"?StartupEntryAutomationAction::ReturnToCampaign:arg=="--restart-exit-smoke"?StartupEntryAutomationAction::Exit:StartupEntryAutomationAction::Create;}
     else if(arg=="--new-game-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
     else if(arg=="--navigation-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.navigation_smoke=true;result.windowed=true;}
@@ -339,13 +342,13 @@ struct Options {
   if(result.smoke_screenshot&&!result.save_path_overridden)throw std::invalid_argument("--smoke requires an isolated --save-path.");
   if(result.support_check&&!result.menu_smoke)throw std::invalid_argument("--support-check requires an isolated --smoke invocation.");
   if(result.battle_smoke&&!result.load)throw std::invalid_argument("--battle-smoke requires an isolated active-encounter save and --load.");
-  if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
+  if(result.audio_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.restart_smoke&&!result.menu_smoke&&!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--audio-check requires an isolated new-game, reload or system-travel smoke invocation.");
   if(result.voice_check&&(!result.audio_check||(!result.system_travel_smoke&&!result.system_travel_reload_smoke)))throw std::invalid_argument("--voice-check requires --audio-check with an isolated system-travel smoke.");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.new_game_smoke&&result.load)throw std::invalid_argument("--new-game-smoke cannot be combined with --load.");
   if(result.fleet_smoke&&!result.load)throw std::invalid_argument("--fleet-smoke requires --load with a player campaign fixture.");
   if(result.ship_art_smoke&&!result.load)throw std::invalid_argument("--ship-art-smoke requires --load with a player campaign fixture.");
@@ -538,6 +541,19 @@ class NativeCampaign final {
     audio_settings_=audio_settings;
     presentation_audio_=presentation_audio;
   }
+
+  [[nodiscard]] bool new_game_ready()const{return session_->new_campaign_transition()==NewCampaignTransition::Ready;}
+  [[nodiscard]] bool new_game_pending()const{return session_->new_campaign_pending();}
+  [[nodiscard]] const std::filesystem::path& save_path()const{return session_->save_path();}
+  [[nodiscard]] std::string restart_snapshot(){
+    std::ostringstream out;out<<std::setprecision(17)<<camera_.center.x<<','<<camera_.center.y<<','<<camera_.pixels_per_world
+      <<','<<selected_id_.value_or(-1)<<','<<session_->cache().generation<<','<<menu_
+      <<','<<research_workspace_.visible()<<','<<system_workspace_.visible()<<'|';
+    out<<encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),
+      {session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"}));
+    return out.str();
+  }
+  void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
 
   void prepare_smoke_ui(){if(!menu_)toggle_menu();smoke_save_pending_=true;}
   void repeat_unknown_lane_voice_input(int width,int height){
@@ -2014,6 +2030,15 @@ class NativeCampaign final {
       if(!session_notice.message.empty())support_.record("session",timestamp+" "+session_notice.message);
     }
     if(input.quit_requested)session_->request_exit();
+    if(session_->new_campaign_pending()){
+      const auto pending_layout=NativeUiLayout::for_viewport(width,height);
+      for(const auto& event:input.events)
+        if((event.type==InputEventType::EscapePressed)||
+           (event.type==InputEventType::LeftPressed&&pending_layout.continue_button.contains(event.position))){
+          cancel_new_game();if(audio_confirm_)audio_confirm_();break;
+        }
+      return true;
+    }
     refresh_battle(width,height,elapsed);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
@@ -2037,6 +2062,7 @@ class NativeCampaign final {
       }
     };
     for(const auto &event:input.events){
+      if(session_->new_campaign_pending()) break;
       if(event.type==InputEventType::PointerCancelled)fleet_workspace_.cancel_recovery();
       if(audio_settings_&&audio_settings_->visible()){
         notification_view_.close();
@@ -2252,6 +2278,7 @@ class NativeCampaign final {
         const auto action=layout.hit(event.position,menu_);bool captured=menu_||action!=UiAction::None;
         if(action!=UiAction::None&&audio_confirm_)audio_confirm_();
         if(action==UiAction::Continue)toggle_menu();
+        else if(action==UiAction::NewGame){gesture_.capture_for_ui();(void)session_->request_new_campaign();}
         else if(action==UiAction::Save)session_->request_save();
         else if(action==UiAction::Load)session_->request_load();
         else if(action==UiAction::Settings&&audio_settings_)audio_settings_->open();
@@ -2636,19 +2663,22 @@ class NativeCampaign final {
     }
     if (menu_) {
       stellar::native_ui_style::menu_panel(out, layout.menu_panel);
-      label(out, layout.menu_heading, "PAUSED", {238, 244, 255, 255},
+      label(out, layout.menu_heading, session_->new_campaign_pending()?"SAVING CAMPAIGN":"PAUSED", {238, 244, 255, 255},
             layout.heading_font_pixels, layout.scale, FontFace::Heading);
       const auto draw_button = [&](UiRect bounds, std::string text) {
         panel(out, bounds, bounds.contains(pointer_), false);
         control_label(out, bounds, std::move(text), {238, 244, 255, 255},
               layout.control_font_pixels, layout.scale,text_measurer_);
       };
-      draw_button(layout.continue_button, "CONTINUE");
+      draw_button(layout.continue_button, session_->new_campaign_pending()?"CANCEL NEW GAME":"CONTINUE");
+      if(!session_->new_campaign_pending()){
       draw_button(layout.save_button, "SAVE");
       draw_button(layout.load_button, "LOAD");
       draw_button(layout.settings_button, "SETTINGS");
       draw_button(layout.support_button, support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS");
+      draw_button(layout.new_game_button, "NEW GAME");
       draw_button(layout.exit_button, "EXIT TO WINDOWS");
+      }
       const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
       const UiRect footer{36.f*layout.scale,footer_y,
           static_cast<float>(width)-72.f*layout.scale,
@@ -3485,6 +3515,9 @@ int main(int argc,char **argv){
       session=std::move(result.session);
     }
     audio_menu_ready=true;audio.menu_ready();
+    bool restart_completed{};std::string restart_before;
+    const auto restart_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
+    while(session){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio);
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
@@ -3566,6 +3599,17 @@ int main(int argc,char **argv){
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
       prior=now;
       auto input=window.poll();
+      if(options.restart_smoke&&!restart_completed){
+        if(std::chrono::steady_clock::now()>restart_deadline)throw std::runtime_error("New Game lifecycle smoke timed out.");
+        if(frames>=2&&!campaign.new_game_pending()&&restart_before.empty()&&
+           (!options.audio_check||audio.assets_ready())){
+          restart_before=campaign.restart_snapshot();
+          const auto point=center(NativeUiLayout::for_viewport(input.drawable_width,input.drawable_height).new_game_button);
+          input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};
+        }
+        if(!restart_before.empty()&&campaign.campaign_profile_notice()==SessionNoticeKind::Failure)
+          throw std::runtime_error("New Game save failed during lifecycle smoke.");
+      }
       if(options.profile_frames&&(options.surface_smoke||options.surface_reload_smoke)){
         const auto terrain=SurfaceWorkspaceLayout::for_viewport(input.drawable_width,input.drawable_height).terrain;
         const auto point=center(terrain);
@@ -3618,6 +3662,47 @@ int main(int argc,char **argv){
       const auto update_begin=std::chrono::steady_clock::now();
       if(!campaign.update(input,input.drawable_width,input.drawable_height,
                           elapsed,!options.voice_check||voice_prepared))break;
+      if(campaign.new_game_ready()){
+        auto config=startup_config();config.return_to_campaign_available=true;
+        config.host.default_save_path=campaign.save_path();
+        audio.stop_voice();window.set_text_input(false);
+        std::optional<StartupEntryAutomation> automation;
+        if(options.restart_smoke){
+          window.draw(campaign.scene(input.drawable_width,input.drawable_height),sidecar_path(*options.smoke_screenshot,L"-saved"));
+          automation=StartupEntryAutomation{std::to_string(options.seed),"pelagic_high_pressure",250,
+              sidecar_path(*options.smoke_screenshot,L"-setup"),sidecar_path(*options.smoke_screenshot,L"-loading")};
+          automation->action=options.restart_action;
+        }
+        auto restart=run_native_startup_entry(window,std::move(config),automation?&*automation:nullptr);
+        if(options.restart_smoke){
+          std::cout<<"restart_renderer="<<window.gpu_driver()<<'\n';
+          const auto& evidence=restart.evidence;
+          if(evidence.boot_presented||evidence.menu_ready_called||!evidence.setup_opened)
+            throw std::runtime_error("Live New Game replayed boot/music or skipped setup.");
+          if(options.audio_check&&(audio.stats().failed||audio.stats().music_start_count!=1))
+            throw std::runtime_error("Live New Game interrupted or restarted main-menu music.");
+          std::cout<<"restart={\"setup_opened\":true,\"boot_replayed\":false,\"menu_ready_recalled\":false,\"exit\":"
+              <<(restart.exit_requested?"true":"false")<<",\"returned\":"<<(restart.return_to_campaign?"true":"false")
+              <<",\"created\":"<<(restart.session?"true":"false")<<",\"music_start_count\":"<<audio.stats().music_start_count<<"}\n";
+        }
+        if(restart.exit_requested)return 0;
+        if(restart.return_to_campaign){
+          campaign.cancel_new_game();prior=std::chrono::steady_clock::now();
+          if(options.restart_smoke){
+            if(campaign.restart_snapshot()!=restart_before)throw std::runtime_error("Cancel changed the original world, menu, camera or selection.");
+            window.draw(campaign.scene(input.drawable_width,input.drawable_height),*options.smoke_screenshot);
+            std::cout<<"restart_cancel=preserved_same_campaign\n";return 0;
+          }
+          discard_elapsed=true;continue;
+        }
+        if(!restart.session)throw std::runtime_error("New Game ended without a campaign or return outcome.");
+        if(options.restart_smoke){
+          if(restart.session->save_path()==campaign.save_path())throw std::runtime_error("New Game reused the original save slot.");
+          generated_save_path=restart.session->save_path();restart_completed=true;
+          std::cout<<"restart_new_save="<<utf8_path(*generated_save_path)<<'\n';
+        }
+        session=std::move(restart.session);break;
+      }
       const auto update_end=std::chrono::steady_clock::now();
       if(options.campaign_profile&&campaign.campaign_profile_notice()==SessionNoticeKind::Failure)throw std::runtime_error("Campaign profile encountered a session/save failure.");
       if(options.campaign_profile&&campaign_started&&frames==119&&campaign.campaign_profile_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile resume UI input did not select 8X.");
@@ -3834,6 +3919,7 @@ int main(int argc,char **argv){
       }
       if(waiting_for_artwork)++capture_frame;
     }
+    } // A successful New Game replaces the campaign only after activation.
     return 0;
   }catch(const std::exception &error){std::cerr<<"Stellar Continuum native client failed: "<<error.what()<<'\n';return 1;}catch(...){std::cerr<<"Stellar Continuum native client failed: unknown fatal error\n";return 1;}
 }

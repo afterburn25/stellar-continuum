@@ -5,6 +5,62 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-15)
 
+### Save-gated New Game from a live native campaign
+
+Pause-menu **New Game** now saves the current campaign before opening race and
+seed setup. A single-flight transition distinguishes Waiting/Saving/Ready;
+older autosave/manual completions and cancelled writers cannot authorize a
+later replacement. Strategic and tactical advancement and conflicting UI
+commands are suspended while pending. Save failure retains the live campaign,
+shows the error and requires an explicit retry. No global N shortcut was added.
+
+Live setup skips the application boot artwork and menu-ready music hook.
+Back/Escape opens an entry screen with a distinct **Return to Campaign**;
+cancellation retains the same NativeCampaign, frame, camera, selection and
+cache. Exit to Windows is honored. Only a ready new session replaces the old
+object, and the startup host chooses an independent save slot. Audio/settings
+objects live outside this replacement loop. Core and Player17 rules are unchanged.
+
+Validation: final MSVC host build; nine affected CTests pass across the initial
+run and a corrected UI-layout recheck. The first layout run exposed a 640x360
+rail/gutter mismatch after adding a menu row; proportional rail sizing fixes it.
+Session tests cover old writes, cancelled-write retry, real blocked filesystem
+save destination, no automatic retry, durable exit, and exact tactical capture,
+cancellation identity and matched continuation. Workspace/layout checks cover
+720p through 4K. Python: 4 restart-proof tests and 33 cold New Game tests pass.
+
+The final relocated Vulkan executable passes five restart-suite runs: baseline,
+720p cancel, 1080p exit, 720p create, and 1080p paused reload. Previous normalized
+Player17 content is unchanged except SavedAtUtc. New seed 143250 / pelagic race /
+250 systems persists in a separate slot and reloads exactly. Cancel proves the
+same live canonical/camera snapshot; Exit returns process code 0. All three
+live setup paths report no boot replay or menu-ready recall and one music start.
+Two additional cold-start/reload runs pass with real audio/settings checks.
+Screenshots were inspected at 720p and 1080p; these are native input-event
+replays, not physical mouse injection. No claim of finished graphics or 60 FPS.
+
+Evidence: `work/native-new-campaign-final-build.log`,
+`native-new-campaign-ctest.log`, `native-new-campaign-layout-recheck.log`,
+`native-new-campaign-runtime.json`, `native-new-campaign-python.log`, and
+`native-new-campaign-cold-regression.json`; captures/raw logs are under
+`work/native-audio-validation/package-restart-*`. Reproduction and API contract:
+`docs/engine/NATIVE_NEW_CAMPAIGN_REVIEW.md`,
+`tools/stellar-export/native_restart_runtime.py`.
+
+Previous published head 40391b5b passed CI run 35041298989. Local package remains
+UNSEALED, not a released download. Shared base ac45d958 and C# reference remain
+unchanged; PR332 remains unmerged. Devin is inventoried through a2a96294; newest
+empire/mission boards are not yet audited or imported. The b9e55e79 New Game
+idea is now selectively adapted with the lifecycle corrections above.
+
+Next bounded priorities: improve surface overview legibility and expose true
+operating-state evidence; then observer-safe system inspection and explicit
+logistics failure states. Do not import foreign live colony stats on mere
+contact/survey, or replace recorded scientist cues with generic SAPI synthesis.
+
+## Previous integration checkpoint: civilian recovery (2026-09-15)
+
+
 ### Civilian recovery and populated surface validation
 
 The fleet panel now exposes Hold/Resume and Return to Base for owned civilian

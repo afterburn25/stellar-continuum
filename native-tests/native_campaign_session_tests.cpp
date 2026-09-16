@@ -159,6 +159,109 @@ void save_load_and_transactional_failure(const fs::path &research_root,
           "Decode failure changed the live campaign.");
 }
 
+void new_campaign_save_fence(const fs::path &research_root,
+                             const std::string &source, const fs::path &directory) {
+  const auto path = directory / "new-game-fence.json";
+  write(path, source);
+  std::atomic_int entered{}, allowed{};
+  NativeCampaignSessionDependencies dependencies;
+  dependencies.save_writer = [&](const fs::path &destination,
+      const PreparedPlayerCampaignSave &prepared, bool preserve) {
+    const auto call = ++entered;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (allowed.load() < call) {
+      if (std::chrono::steady_clock::now() > deadline)
+        throw std::runtime_error("Test save fence was not released");
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    write_prepared_player_campaign(destination, prepared, preserve);
+  };
+  auto session = NativeCampaignSession::load_startup(research_root, path, "0.1.7-alpha", {}, dependencies);
+  struct Release final { std::atomic_int &value; ~Release(){value.store(100);} } release{allowed};
+  const auto service_until = [&](auto predicate) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!predicate() && std::chrono::steady_clock::now() < deadline) {
+      (void)session->service("2044-05-06T07:08:12Z", true);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(predicate(), "New Game save fence did not reach its expected state");
+  };
+  (void)session->advance(0., "2044-05-06T07:08:11Z");
+  session->request_save();
+  service_until([&]{return entered.load()==1;});
+  session->frame().runtime().world().campaign().seed += 33;
+  const auto expected_seed=session->frame().runtime().world().campaign().seed;
+  const auto day=session->frame().clock().simulation_days();
+  const auto generation=session->cache().generation;
+  const auto* world=&session->frame().runtime().world().campaign();
+  require(session->request_new_campaign(), "New Game rejected a completed frame");
+  require(!session->request_new_campaign(), "New Game admitted a duplicate transition");
+  session->frame().clock().set_speed(StrategicSpeed::Normal);
+  (void)session->advance(120., "2044-05-06T07:08:12Z");
+  session->request_load();session->request_save();
+  require(!session->load_pending() && session->frame().clock().simulation_days()==day &&
+      session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "Pending New Game allowed simulation, load or an older save to authorize it");
+  allowed=1;
+  service_until([&]{return entered.load()==2;});
+  require(session->new_campaign_transition()==NewCampaignTransition::Saving &&
+      Json::parse(read(path)).at("Galaxy").at("Seed")==expected_seed-33,
+      "An older save was mistaken for this transition's save");
+  session->cancel_new_campaign();
+  require(!session->new_campaign_pending(), "Cancel left the transition locked");
+  require(session->request_new_campaign(), "A cancelled transition could not be retried");
+  allowed=2;
+  service_until([&]{return entered.load()==3;});
+  require(session->new_campaign_transition()==NewCampaignTransition::Saving,
+      "A cancelled writer authorized a later New Game request");
+  allowed=3;
+  service_until([&]{return session->new_campaign_transition()==NewCampaignTransition::Ready;});
+  require(Json::parse(read(path)).at("Galaxy").at("Seed")==expected_seed && entered.load()==3,
+      "Ready New Game did not durably capture the requested campaign");
+  (void)session->advance(120., "2044-05-06T07:08:13Z");
+  session->cancel_new_campaign();
+  require(&session->frame().runtime().world().campaign()==world &&
+      session->cache().generation==generation && session->frame().clock().simulation_days()==day,
+      "Cancelling ready setup replaced or advanced the original campaign");
+  // A previous Saved notice must still require a fresh write.
+  require(session->request_new_campaign(), "Ready cancellation could not be retried");
+  require(session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "An existing Saved notice bypassed the transition capture");
+  session->cancel_new_campaign();
+}
+
+void new_campaign_filesystem_failure(const fs::path &research_root,
+                                     const std::string &source, const fs::path &directory) {
+  const auto path=directory/"new-game-disk-failure.json";
+  write(path, source);
+  auto session=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
+  (void)session->advance(0.,"2044-05-06T07:08:11Z");
+  const auto* world=&session->frame().runtime().world().campaign();
+  const auto preserved=directory/"new-game-preserved.json";
+  fs::rename(path,preserved);
+  require(fs::create_directory(path),"Could not create a real blocked save destination");
+  require(session->request_new_campaign(),"Could not request filesystem-failure case");
+  (void)session->service("2044-05-06T07:08:12Z",true);
+  wait_for_save(*session);
+  require(session->new_campaign_transition()==NewCampaignTransition::Failed &&
+      session->notice().kind==SessionNoticeKind::Failure && !session->notice().message.empty() &&
+      &session->frame().runtime().world().campaign()==world && read(preserved)==source && !session->exit_ready(),
+      "Filesystem failure discarded the live campaign, previous save or diagnostic");
+  for(int i=0;i<5;++i)(void)session->service("2044-05-06T07:08:13Z",true);
+  require(session->new_campaign_transition()==NewCampaignTransition::Failed,
+      "Failed New Game automatically retried");
+  require(fs::remove(path),"Cannot remove the empty test obstruction");
+  fs::rename(preserved,path);
+  require(session->request_new_campaign(),"Explicit recovery retry was rejected");
+  (void)session->service("2044-05-06T07:08:14Z",true);wait_for_save(*session);
+  require(session->new_campaign_transition()==NewCampaignTransition::Ready,
+      "Correcting the save destination did not recover New Game");
+  session->request_exit();
+  (void)session->service("2044-05-06T07:08:15Z",true);
+  require(session->exit_ready() && !session->new_campaign_pending(),
+      "Explicit exit after a prepared New Game failed to exit durably");
+}
+
 void failed_exit_stays_open(const fs::path &research_root,
                             const std::string &source,
                             const fs::path &directory) {
@@ -545,6 +648,32 @@ void tactical_save_reload_and_continuation(const fs::path &research_root,
   auto loaded=NativeCampaignSession::load_startup(research_root,path,"0.1.7-alpha");
   require(capture(*loaded)==paused&&loaded->frame().tactical_clock().speed_multiplier()==0.,
       "Tactical startup reload changed its save or resumed the encounter.");
+  const auto* original_frame=&session->frame();
+  const auto* original_encounter=&*session->frame().runtime().world().campaign().active_combat_encounter;
+  const auto* original_cache=&session->cache();
+  const auto original_generation=session->cache().generation;
+  require(session->request_new_campaign()&&
+      session->new_campaign_transition()==NewCampaignTransition::Waiting,
+      "An older tactical Saved notice authorized New Game without a fresh capture.");
+  (void)session->advance(120.,"2044-05-06T07:08:20Z");
+  require(capture(*session)==paused&&
+      session->frame().runtime().world().campaign().active_combat_encounter->battle.tick==starting_tick,
+      "Pending New Game advanced or changed the paused tactical encounter.");
+  const auto transition_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+  while(session->new_campaign_transition()!=NewCampaignTransition::Ready&&
+        std::chrono::steady_clock::now()<transition_deadline){
+    (void)session->service("2044-05-06T07:08:20Z",true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  require(session->new_campaign_transition()==NewCampaignTransition::Ready&&
+      capture(*session)==paused&&read(path)==paused,
+      "New Game did not durably preserve the exact paused tactical state.");
+  session->cancel_new_campaign();
+  require(&session->frame()==original_frame&&
+      &*session->frame().runtime().world().campaign().active_combat_encounter==original_encounter&&
+      &session->cache()==original_cache&&session->cache().generation==original_generation&&
+      capture(*session)==paused,
+      "Cancelling tactical New Game replaced or changed its live frame, encounter or cache.");
   frame.set_tactical_speed(2.);loaded->frame().set_tactical_speed(2.);
   for(const auto delta:{.13,.017,.25}){
     (void)session->advance(delta,"2044-05-06T07:08:20Z");
@@ -592,6 +721,8 @@ int main(int argc, char **argv) try {
           std::chrono::steady_clock::now().time_since_epoch().count()));
   require(fs::create_directory(directory), "Cannot claim session test directory.");
   save_load_and_transactional_failure(research_root, source, directory);
+  new_campaign_save_fence(research_root, source, directory);
+  new_campaign_filesystem_failure(research_root, source, directory);
   failed_exit_stays_open(research_root, source, directory);
   pending_save_precedes_load(research_root, source, directory, false);
   pending_save_precedes_load(research_root, source, directory, true);
