@@ -28,9 +28,12 @@ def _normalized(payload: dict) -> dict:
     return result
 
 
-def _canonical_progress_baseline(payload: dict) -> dict:
+def _canonical_progress_baseline(payload: dict, game_version: str) -> dict:
     """Mirror Player17's current fixture-to-native serialization boundary."""
+    if not isinstance(game_version, str) or not game_version.strip():
+        raise RuntimeError("Native diplomacy runtime configuration has no valid gameVersion")
     expected = copy.deepcopy(payload)
+    expected["GameVersion"] = game_version
     # player_campaign_json_tests.cpp establishes that Control is fixture-only
     # and native serialization round-trips X/Y through single precision.
     expected.pop("Control", None)
@@ -47,6 +50,18 @@ def _canonical_progress_baseline(payload: dict) -> dict:
                     visit(item)
     visit(expected)
     return expected
+
+
+def _runtime_game_version(folder: Path) -> str:
+    config_path = folder / "Configuration/runtime-config.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("Native diplomacy runtime configuration is missing or malformed") from error
+    version = config.get("gameVersion") if isinstance(config, dict) else None
+    if not isinstance(version, str) or not version.strip():
+        raise RuntimeError("Native diplomacy runtime configuration has no valid gameVersion")
+    return version
 
 
 def _preserve_fixture(validate):
@@ -211,6 +226,8 @@ def _notifications(stdout: str, mode: str, target_id: int) -> dict:
 
 
 def _verify_progress(before: dict, after: dict, proposal_id: int, target_id: int) -> None:
+    if after.get("GameVersion") != before.get("GameVersion"):
+        raise RuntimeError("Native diplomacy saved an unexpected game version")
     if _normalized(before) == _normalized(after):
         raise RuntimeError("Native diplomacy progress did not save the accepted proposal")
     changed = {key for key in set(before) | set(after) if before.get(key) != after.get(key)}
@@ -288,11 +305,12 @@ def validate_native_diplomacy_export(folder: Path, env: dict[str, str], fixture:
     system_root = Path(os.environ.get("SystemRoot", r"C:\\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
     captures, notification_captures, notification_checks, diagnostics = [], [], [], []
+    game_version = _runtime_game_version(folder)
     with tempfile.TemporaryDirectory(prefix="stellar-native-diplomacy-") as temporary:
         work = Path(temporary)
         save = work / "diplomacy.player17.json"
         save.write_text(json.dumps(authored, ensure_ascii=False), encoding="utf-8")
-        before = _canonical_progress_baseline(authored)
+        before = _canonical_progress_baseline(authored, game_version)
         for width, height, flag, mode, label in ((1280, 720, "--diplomacy-smoke", "progress", "known"),
                                                   (1920, 1080, "--diplomacy-reload-smoke", "paused_reload", "reload")):
             capture = work / f"diplomacy-{label}.bmp"

@@ -81,3 +81,19 @@ Game version is `0.1.8-alpha`; engine version remains `0.1.58`. The local runtim
 under `work/ui-restoration-runtime/package` is an **unsealed validation package**.
 This milestone has not produced a new release ZIP. Run the established complete
 export/sealing pipeline before handing out a download.
+
+### Alpha 0.1.8 export version boundary
+
+The first full export of `6ceef6ff` passed the 186 native tests and preceding
+runtime checks, then correctly stopped at diplomacy's strict save comparison.
+Its preserved Player17 fixture carries `GameVersion: 0.1.7-alpha`; a new save
+correctly carries the running `0.1.8-alpha`. After existing fixture serialization
+normalization, the only changed roots were Diplomacy, GameVersion and SavedAtUtc.
+
+The validator now takes the exact expected version from the packaged
+`Configuration/runtime-config.json`, checks saved metadata against it, and keeps
+all unrelated-state checks and exact paused-reload comparisons. Missing/malformed
+version configuration and incorrect versions still fail. The real 720p diplomacy
+acceptance and 1080p paused reload passed this corrected check. No game rules or
+save schema changed. The original failed export retains `EXPORT_FAILED.txt`; it
+is not reused as a distributable package. A new clean export is required.

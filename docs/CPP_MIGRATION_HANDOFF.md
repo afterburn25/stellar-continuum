@@ -7,6 +7,13 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ### Native presentation restoration / Alpha 0.1.8
 
+Release preparation found a strict-validator version-boundary issue: the retained
+fixture is 0.1.7, while current saves correctly identify 0.1.8. Diplomacy now checks
+against the exact packaged version and still rejects all unrelated state changes
+and paused-reload drift. Both actual diplomacy launches pass. The failed original
+export is preserved and not distributed; repeat the full clean export before
+handing out the new ZIP. See the presentation-restoration document for evidence.
+
 The current priority is repairing the player-facing regressions reported after
 the C++ conversion. The full-art main menu now leads to separate Story Campaign
 (Coming Soon) and Sandbox image cards. Sandbox starts with a fresh random numeric

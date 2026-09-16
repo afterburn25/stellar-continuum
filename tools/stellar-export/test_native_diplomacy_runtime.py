@@ -11,7 +11,8 @@ from native_diplomacy_runtime import validate_native_diplomacy_export, _notifica
 
 
 def source():
-    return {"FormatVersion": 17, "SavedAtUtc": "source", "SimulationDays": 0,
+    return {"FormatVersion": 17, "GameVersion": "0.1.7-alpha",
+            "SavedAtUtc": "source", "SimulationDays": 0,
             "Control": {"FixtureOnly": True},
             "Galaxy": {"PlayerCivilizationId": 0,
                        "Systems": [{"Id": 0, "X": .123456789, "Y": -.987654321}],
@@ -44,6 +45,10 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
+            configuration = package / "Configuration"
+            configuration.mkdir()
+            (configuration / "runtime-config.json").write_text(
+                json.dumps({"gameVersion": "0.1.8-alpha"}))
             fixture = Path(temporary) / "fixture.json"
             fixture.write_text(json.dumps({"Rows": []}))
             calls = []
@@ -55,6 +60,9 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 payload = json.loads(save.read_text())
                 reload = "--diplomacy-reload-smoke" in args
                 proposal = payload["Diplomacy"]["Proposals"][-1]
+                self.assertEqual(payload["GameVersion"],
+                                 "0.1.8-alpha" if reload else "0.1.7-alpha")
+                payload["GameVersion"] = "0.1.8-alpha"
                 if not reload:
                     payload.pop("Control", None)
                     system = payload["Galaxy"]["Systems"][0]
@@ -77,7 +85,9 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                     if fault == "proposal_terms": proposal["Summary"] = "tampered"
                     if fault == "duplicate_proposal": payload["Diplomacy"]["Proposals"].append(copy.deepcopy(proposal))
                     if fault == "diplomacy_root": payload["Diplomacy"]["Unrelated"] = True
+                    if fault == "wrong_version": payload["GameVersion"] = "0.1.9-alpha"
                 elif fault == "reload": payload["Galaxy"]["PlayerCivilizationId"] = 2
+                elif fault == "reload_version": payload["GameVersion"] = "0.1.9-alpha"
                 payload["SavedAtUtc"] = "saved-" + str(len(calls))
                 save.write_text(json.dumps(payload))
                 flag = "--diplomacy-reload-smoke" if reload else "--diplomacy-smoke"
@@ -137,7 +147,42 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
             self.assertEqual(len(result["diplomacyCaptures"]), 6)
             self.assertEqual(len(result["notificationCaptures"]), 4)
 
-    def test_progress_and_paused_reload(self): self.exercise()
+    def test_accepts_fixture_version_upgrade_and_paused_reload(self): self.exercise()
+    def test_rejects_wrong_saved_game_version(self):
+        with self.assertRaisesRegex(RuntimeError, "game version"): self.exercise("wrong_version")
+    def test_rejects_game_version_change_on_paused_reload(self):
+        with self.assertRaisesRegex(RuntimeError, "paused reload"): self.exercise("reload_version")
+    def test_rejects_missing_runtime_version_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "package"
+            package.mkdir()
+            fixture = Path(temporary) / "fixture.json"
+            fixture.write_text(json.dumps({"Rows": [{"Name": "valid-current17",
+                                                       "InputJson": json.dumps(source())}]}))
+            with self.assertRaisesRegex(RuntimeError, "configuration"):
+                validate_native_diplomacy_export(package, {}, fixture)
+    def test_rejects_malformed_runtime_version_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "package"
+            configuration = package / "Configuration"
+            configuration.mkdir(parents=True)
+            (configuration / "runtime-config.json").write_text("{")
+            fixture = Path(temporary) / "fixture.json"
+            fixture.write_text(json.dumps({"Rows": [{"Name": "valid-current17",
+                                                       "InputJson": json.dumps(source())}]}))
+            with self.assertRaisesRegex(RuntimeError, "configuration"):
+                validate_native_diplomacy_export(package, {}, fixture)
+    def test_rejects_missing_runtime_game_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "package"
+            configuration = package / "Configuration"
+            configuration.mkdir(parents=True)
+            (configuration / "runtime-config.json").write_text(json.dumps({"gameVersion": " "}))
+            fixture = Path(temporary) / "fixture.json"
+            fixture.write_text(json.dumps({"Rows": [{"Name": "valid-current17",
+                                                       "InputJson": json.dumps(source())}]}))
+            with self.assertRaisesRegex(RuntimeError, "gameVersion"):
+                validate_native_diplomacy_export(package, {}, fixture)
     def test_rejects_spoofed_reload_claim(self):
         with self.assertRaises(RuntimeError): self.exercise("spoof")
     def test_rejects_malformed_diagnostic(self):
