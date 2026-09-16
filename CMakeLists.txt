@@ -62,7 +62,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/civilian_recovery.cpp core/src/colonization_runtime.cpp core/src/survey_operations.cpp core/src/exploration_planning.cpp core/src/exploration_advance.cpp
   core/src/combat_simulation.cpp core/src/combat_command_runtime.cpp
   core/src/combat_readiness_detail.cpp core/src/own_combat_fleet_status.cpp
-  core/src/campaign_coordinator.cpp core/src/coordinator_commands.cpp
+  core/src/campaign_coordinator.cpp core/src/coordinator_commands.cpp core/src/developer_commands.cpp
   core/src/adaptive_research_catalog.cpp core/src/adaptive_research_applicability_catalog.cpp
   core/src/adaptive_research_facilities.cpp core/src/adaptive_research_progress_policy.cpp
   core/src/adaptive_research_state.cpp core/src/adaptive_research_eligibility.cpp
@@ -356,6 +356,10 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/native-tests/fixtures/persistable-fresh-campaign.json"
     "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
   set_tests_properties(persistable_fresh_campaign_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_developer_commands_tests native-tests/developer_commands_tests.cpp)
+  target_link_libraries(stellar_developer_commands_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME developer_commands_parity COMMAND stellar_developer_commands_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(developer_commands_parity PROPERTIES TIMEOUT 120)
   add_executable(stellar_freight_tests native-tests/freight_tests.cpp)
   target_link_libraries(stellar_freight_tests PRIVATE stellar_core stellar_json)
   add_test(NAME freight_parity COMMAND stellar_freight_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/freight.json")
