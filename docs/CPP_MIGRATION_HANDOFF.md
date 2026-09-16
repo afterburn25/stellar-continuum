@@ -5,7 +5,31 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
-### Celestial detail and capture validation
+### Surface relief and capture validation
+
+Native surface relief uses Core's existing heights to shade the approved terrain
+artwork. One 1024px / 4 MiB neutral mask is prepared asynchronously in fixed world
+coordinates and reused across pan/zoom. Campaign/body changes cancel pending work;
+failures latch with an explicit notice. No Core, C# or Player17 changes. Contract:
+`docs/engine/NATIVE_SURFACE_RELIEF.md`.
+
+Validation: MSVC default build and optional surface visual target; 10 focused CTests;
+Python 481 total, 464 passed / 17 optional executable checks skipped. Five relocated
+Vulkan surface cases pass at 720p/1080p, including populated and workforce-limited
+colonies. Ten paired captures show shading only inside terrain, with unchanged
+buildings/UI; each run reports one 4 MiB output and no pending/reserved/failed work.
+Existing construction, management, cancellation/refunds and complete paused Player17
+reload gates pass. The paired populated 720p captures were visually inspected.
+Evidence: work/native-relief-{build,visual-build,ctest,python}.log and
+work/native-relief-surface.json.
+
+This is a modest top-down refinement, not full 3D or finished surface art. No
+sustained 60 FPS or clean-machine certification; the local package is UNSEALED.
+Next: review Land/Collect `d9d23f57` and colony sites `e49f4df0` against current
+settlement, recovery and observer contracts. Latest inventoried Devin head
+`88de7e38`; shared base `ac45d958`; PR332 remains unmerged.
+
+### Previous checkpoint: Celestial detail and capture validation
 
 Approved Sol/Earth imagery is retained. Source-backed planet discs now render at
 512x512 and surveyed procedural bodies at 256x256, with the same 16 MiB cache.

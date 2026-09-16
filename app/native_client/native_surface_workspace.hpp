@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_relief.hpp"
 #include "native_surface_scene.hpp"
 #include "native_surface_viewport.hpp"
 
@@ -56,6 +57,9 @@ public:
   // only the ready result, keeping the UI headless and dependency-free.
   void set_terrain_image(
       std::shared_ptr<const stellar::native_map::RgbaImage>) noexcept;
+  void use_relief_preparation(
+      std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
+  void set_relief_suppressed(bool value) noexcept { relief_suppressed_ = value; }
   void set_building_images(SurfaceBuildingReadyProvider,
                           std::optional<ReadySurfaceBuildingImage> preview = std::nullopt);
   void open(stellar::native_colony::NativeColonyView, int width, int height);
@@ -95,6 +99,11 @@ public:
     return viewport_;
   }
   [[nodiscard]] NativeSurfaceSceneDiagnostics scene_diagnostics() const;
+  [[nodiscard]] stellar::native_surface::NativeSurfaceReliefStats
+  relief_stats() const noexcept { return relief_.stats(); }
+  [[nodiscard]] const std::string &relief_error() const noexcept {
+    return relief_.error();
+  }
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -144,6 +153,8 @@ private:
   mutable std::size_t scene_sites_{}, scene_meshes_{}, scene_triangles_{},
       scene_road_segments_{}, scene_replaced_structures_{};
   mutable NativeSurfaceScene scene_;
+  mutable stellar::native_surface::NativeSurfaceRelief relief_;
+  bool relief_suppressed_{};
 };
 
 } // namespace stellar::native_colony_ui

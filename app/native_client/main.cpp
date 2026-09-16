@@ -558,6 +558,7 @@ class NativeCampaign final {
     planet_discs_.use_background_preparation(image_preparation_);
     surface_workspace_.set_text_measurer(std::move(text_measurer));
     system_workspace_.use_background_preparation(image_preparation_);
+    surface_workspace_.use_relief_preparation(image_preparation_);
     surface_art_.use_background_preparation(image_preparation_);
     refresh_knowledge();
     fit_camera(width,height);
@@ -2812,6 +2813,7 @@ class NativeCampaign final {
 
   void update_surface_buildings(int width,int height){
     if(!surface_workspace_.visible()||!surface_workspace_.view()){
+      surface_relief_failure_logged_=false;
       if(surface_buildings_active_){
         surface_workspace_.set_building_images({});
         surface_buildings_.clear();surface_buildings_active_=false;
@@ -2825,6 +2827,13 @@ class NativeCampaign final {
     surface_workspace_.set_building_images(surface_buildings_.provider(),surface_buildings_.preview());
     if(surface_buildings_.stats().failed)
       surface_workspace_.set_artwork_notice("Detailed buildings unavailable. Reopen the surface to retry.");
+    else if(surface_workspace_.relief_stats().failed){
+      surface_workspace_.set_artwork_notice("Terrain shading unavailable. Reopen the surface to retry.");
+      if(!surface_relief_failure_logged_){
+        std::cerr<<"Native terrain shading unavailable: "<<surface_workspace_.relief_error()<<'\n';
+        surface_relief_failure_logged_=true;
+      }
+    }
   }
 
   void surface_building_smoke(int width,int height,const std::function<void(const DrawList&)>&draw){
@@ -2834,6 +2843,28 @@ class NativeCampaign final {
     draw(scene(width,height));
     surface_workspace_.set_building_images(surface_buildings_.provider(),surface_buildings_.preview());
     (void)scene(width,height);
+  }
+
+  std::string surface_relief_smoke(int width,int height,const std::function<void(const DrawList&,bool)>&draw){
+    const auto before=surface_workspace_.relief_stats();
+    if(!surface_workspace_.visible()||!before.ready||before.pending||before.deferred||before.failed||
+       before.cache_bytes!=stellar::native_surface::NativeSurfaceRelief::image_bytes||before.generated!=1)
+      throw std::runtime_error("Surface relief did not prepare and reuse one bounded world-space image: "+surface_workspace_.relief_error());
+    draw(scene(width,height),true);
+    surface_workspace_.set_relief_suppressed(true);
+    try{draw(scene(width,height),false);}catch(...){surface_workspace_.set_relief_suppressed(false);throw;}
+    surface_workspace_.set_relief_suppressed(false);
+    const auto after=surface_workspace_.relief_stats();
+    if(after.generated!=before.generated||after.cache_bytes!=before.cache_bytes)
+      throw std::runtime_error("Surface relief comparison regenerated or discarded its image.");
+    const auto terrain=SurfaceWorkspaceLayout::for_viewport(width,height).terrain;
+    std::ostringstream out;
+    out<<std::boolalpha<<"{\"requested\":"<<after.requested<<",\"ready\":"<<after.ready
+       <<",\"pending\":"<<after.pending<<",\"deferred\":"<<after.deferred<<",\"failed\":"<<after.failed
+       <<",\"cache_bytes\":"<<after.cache_bytes<<",\"reserved_bytes\":"<<after.reserved_bytes
+       <<",\"generated\":"<<after.generated<<",\"resolution\":"<<stellar::native_surface::NativeSurfaceRelief::image_resolution
+       <<",\"terrain\":["<<terrain.x<<','<<terrain.y<<','<<terrain.width<<','<<terrain.height<<"]}";
+    return out.str();
   }
 
   // Runtime-only evidence uses the same input routing and observer-owned view
@@ -3006,7 +3037,13 @@ class NativeCampaign final {
     return out.str();
   }
 
-  [[nodiscard]] bool artwork_ready()const noexcept{return surface_workspace_.visible()?surface_art_.cache_bytes()>0&&surface_buildings_.ready():system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();}
+  [[nodiscard]] bool artwork_ready()const noexcept{
+    if(surface_workspace_.visible()){
+      const auto relief=surface_workspace_.relief_stats();
+      return surface_art_.cache_bytes()>0&&surface_buildings_.ready()&&(relief.ready||relief.failed);
+    }
+    return system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();
+  }
 
   [[nodiscard]] DrawList scene(int width,int height){
     if(battle_workspace_.visible()&&!menu_){
@@ -4091,6 +4128,7 @@ class NativeCampaign final {
   NativeColonyWorkspace colony_workspace_;
   NativeSurfaceConstructionController surface_controller_;
   NativeSurfaceWorkspace surface_workspace_;
+  bool surface_relief_failure_logged_{};
   NativeSettlementMissionController settlement_controller_;
   NativeSettlementWorkspace settlement_workspace_;
   std::optional<NativeColonyView> colony_entry_view_;
@@ -4553,6 +4591,12 @@ int main(int argc,char **argv){
         campaign.prepare_diplomacy_map_capture(input.drawable_width,input.drawable_height);
       const bool capture=!waiting_for_artwork&&options.smoke_screenshot&&(options.campaign_profile?screenshot.has_value():((options.galaxy_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)?frames>=capture_frame+3:options.ship_art_smoke?frames>=capture_frame+2:frames>=capture_frame));
       if(capture){
+        if(options.surface_smoke||options.surface_reload_smoke){
+          const auto evidence=campaign.surface_relief_smoke(window.drawable_width(),window.drawable_height(),
+              [&](const DrawList& draw,bool enabled){window.draw(draw,sidecar_path(*options.smoke_screenshot,
+                  enabled?L"-relief":L"-without-relief"));});
+          std::cout<<"surface_relief="<<evidence<<'\n';
+        }
         if(options.system_smoke){
           const auto evidence=campaign.body_inspection_smoke(
               window.drawable_width(),window.drawable_height(),[&](const DrawList& draw){

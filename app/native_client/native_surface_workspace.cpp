@@ -257,6 +257,7 @@ void NativeSurfaceWorkspace::focus_selected(const int width,
 void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
                                   const int height) {
   set_building_images({});
+  relief_.clear();
   visible_ = true;
   view_ = std::move(view);
   selected_type_id_.reset();
@@ -282,6 +283,11 @@ void NativeSurfaceWorkspace::set_terrain_image(
   terrain_image_ = std::move(value);
 }
 
+void NativeSurfaceWorkspace::use_relief_preparation(
+    std::shared_ptr<stellar::native_map::ImagePreparationQueue> queue) {
+  relief_.use_background_preparation(std::move(queue));
+}
+
 void NativeSurfaceWorkspace::set_building_images(
     SurfaceBuildingReadyProvider provider,
     std::optional<ReadySurfaceBuildingImage> preview) {
@@ -298,6 +304,7 @@ void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
   if(identity_changed) {
     set_building_images({}); selected_type_id_.reset(); selected_building_id_.reset();
     inspector_scroll_=0.f; pressed_=dragging_=false;
+    relief_.clear();
   }
   const auto changed = !view_ ||
                        view_->campaign_generation != view.campaign_generation ||
@@ -335,6 +342,7 @@ void NativeSurfaceWorkspace::reconcile() {
 
 void NativeSurfaceWorkspace::close() noexcept {
   set_building_images({});
+  relief_.clear();
   scene_replaced_structures_ = 0;
   visible_ = false;
   pressed_ = false;
@@ -350,6 +358,7 @@ void NativeSurfaceWorkspace::close() noexcept {
 
 void NativeSurfaceWorkspace::discard_campaign() noexcept {
   set_building_images({});
+  relief_.clear();
   scene_replaced_structures_ = 0;
   visible_ = false;
   view_.reset();
@@ -817,6 +826,23 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
   // overlay actually reduces that chroma; multiplying a tint alone would not.
   if (terrain_image_)
     fill(out, layout.terrain, {92, 106, 108, 82});
+  if (!relief_suppressed_) {
+    if (const auto relief = relief_.request(
+            {view.campaign_generation, view.colony_id, view.body_id})) {
+      const auto top_left = viewport_.world_to_screen(
+          -surface_area_half_size, -surface_area_half_size, layout.terrain);
+      const auto bottom_right = viewport_.world_to_screen(
+          surface_area_half_size, surface_area_half_size, layout.terrain);
+      out.overlay.emplace_back(Image{relief,
+                                     {std::min(top_left.x, bottom_right.x),
+                                      std::min(top_left.y, bottom_right.y),
+                                      std::abs(bottom_right.x - top_left.x),
+                                      std::abs(bottom_right.y - top_left.y)},
+                                     std::nullopt,
+                                     {255, 255, 255, 255},
+                                     layout.terrain});
+    }
+  }
   stroke(out, layout.terrain, border);
   const auto world_min = viewport_.world_to_screen(
       -surface_area_half_size, -surface_area_half_size, layout.terrain);

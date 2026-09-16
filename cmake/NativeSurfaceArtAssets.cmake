@@ -47,6 +47,7 @@ if(BUILD_TESTING)
     app/native_client/native_surface_building_geometry.cpp
     app/native_client/native_surface_building_layer.cpp
     app/native_client/native_surface_scene.cpp
+    app/native_client/native_surface_relief.cpp
     app/native_client/native_surface_workspace.cpp)
   target_include_directories(stellar_native_surface_art_tests PRIVATE app/native_client)
   target_link_libraries(stellar_native_surface_art_tests PRIVATE stellar_native_image stellar_core)

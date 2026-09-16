@@ -144,6 +144,38 @@ def _surface_art(stdout: str) -> dict:
     return state
 
 
+def _surface_relief(stdout: str) -> dict:
+    rows = re.findall(r"(?m)^surface_relief=(\{[^\n]+\})$", stdout)
+    if len(rows) != 1:
+        raise RuntimeError("Native surface relief diagnostic is missing or duplicated")
+    try:
+        state = json.loads(rows[0])
+    except ValueError as error:
+        raise RuntimeError("Native surface relief diagnostic is malformed") from error
+    fields = {"requested", "ready", "pending", "deferred", "failed", "cache_bytes",
+              "reserved_bytes", "generated", "resolution", "terrain"}
+    if not isinstance(state, dict) or set(state) != fields:
+        raise RuntimeError("Native surface relief diagnostic has an invalid schema")
+    if any(type(state[key]) is not bool for key in
+           ("requested", "ready", "pending", "deferred", "failed")):
+        raise RuntimeError("Native surface relief flags are invalid")
+    if any(type(state[key]) is not int or state[key] < 0 for key in
+           ("cache_bytes", "reserved_bytes", "generated", "resolution")):
+        raise RuntimeError("Native surface relief counters are invalid")
+    terrain = state["terrain"]
+    if (not isinstance(terrain, list) or len(terrain) != 4 or
+            any(type(value) not in (int, float) or isinstance(value, bool) or
+                not math.isfinite(value) for value in terrain) or
+            terrain[2] <= 0 or terrain[3] <= 0):
+        raise RuntimeError("Native surface relief terrain is invalid")
+    if (state["requested"] is not True or state["ready"] is not True or
+            state["pending"] or state["deferred"] or state["failed"] or
+            state["cache_bytes"] != 4194304 or state["reserved_bytes"] != 0 or
+            state["generated"] != 1 or state["resolution"] != 1024):
+        raise RuntimeError("Native surface relief diagnostic violates its bounded contract")
+    return state
+
+
 def _surface_inspection(stdout, colony, required_statuses=()):
     rows = re.findall(r"(?m)^surface_inspection=(\{[^\n]+\})$", stdout)
     if len(rows) != 1:
@@ -480,6 +512,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
     captures, diagnostics, art_diagnostics, art_captures = [], [], [], []
+    relief_diagnostics, relief_captures = [], []
     populated_captures, populated_diagnostics, focus_captures, management_captures = [], [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-surface-") as temporary:
         work = Path(temporary)
@@ -512,10 +545,15 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
             art_diagnostics.append(_surface_art(result.stdout))
+            relief = _surface_relief(result.stdout)
             _bmp(capture, width, height, result.stdout)
             sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
             _validate_surface_art_pixels(capture, sidecar, width, height,
                                          art_diagnostics[-1]["terrain"], result.stdout)
+            relief_capture = capture.with_name(capture.stem + "-relief.bmp")
+            relief_fallback = capture.with_name(capture.stem + "-without-relief.bmp")
+            _validate_surface_art_pixels(relief_capture, relief_fallback, width, height,
+                                         relief["terrain"], result.stdout)
             (folder.parent / f"{folder.name}-surface-{width}x{height}.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
@@ -539,6 +577,12 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             shutil.copy2(capture, evidence)
             captures.append(str(evidence)); diagnostics.append(result.stdout.strip())
             art_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-without-buildings.bmp"; shutil.copy2(sidecar, art_evidence); art_captures.append(str(art_evidence))
+            relief_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-without-relief.bmp"
+            relief_full_evidence = folder.parent / f"{folder.name}-surface-{width}x{height}-relief.bmp"
+            shutil.copy2(relief_capture, relief_full_evidence)
+            shutil.copy2(relief_fallback, relief_evidence)
+            relief_captures.extend((str(relief_full_evidence), str(relief_evidence)))
+            relief_diagnostics.append(relief)
 
         populated_fixture = _populated_surface_fixture(
             ordered_payload, ordered_state["colony_id"])
@@ -561,10 +605,15 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError("Populated surface did not prove image uploads")
             state = _diagnostic(result.stdout, "paused_reload")
             art = _surface_art(result.stdout)
+            relief = _surface_relief(result.stdout)
             _bmp(capture, width, height, result.stdout)
             sidecar = capture.with_name(capture.stem + "-without-buildings.bmp")
             _validate_surface_art_pixels(capture, sidecar, width, height,
                                          art["terrain"], result.stdout)
+            relief_capture = capture.with_name(capture.stem + "-relief.bmp")
+            relief_fallback = capture.with_name(capture.stem + "-without-relief.bmp")
+            _validate_surface_art_pixels(relief_capture, relief_fallback, width, height,
+                                         relief["terrain"], result.stdout)
             after = json.loads(save.read_text(encoding="utf-8-sig"))
             _verify_populated_surface(fixture, after, state, art)
             required = {"OPERATING", "DISABLED", "CONSTRUCTION", "NO WORKERS" if low_workforce else "NO POWER"}
@@ -583,19 +632,28 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             sidecar_evidence = folder.parent / f"{stem}-without-buildings.bmp"
             shutil.copy2(capture, evidence)
             shutil.copy2(sidecar, sidecar_evidence)
+            relief_evidence = folder.parent / f"{stem}-without-relief.bmp"
+            relief_full_evidence = folder.parent / f"{stem}-relief.bmp"
+            shutil.copy2(relief_capture, relief_full_evidence)
+            shutil.copy2(relief_fallback, relief_evidence)
+            relief_captures.extend((str(relief_full_evidence), str(relief_evidence)))
+            relief_diagnostics.append(relief)
             focus_evidence = folder.parent / f"{stem}-focus.bmp"
             shutil.copy2(focus, focus_evidence)
             focus_captures.append(str(focus_evidence))
             (folder.parent / f"{stem}.log").write_text(
                 result.stdout + "\n" + result.stderr, encoding="utf-8")
             populated_captures.append(str(evidence))
-            populated_diagnostics.append({"surface": state, "art": art, "inspection": inspection, "management": management})
+            populated_diagnostics.append({"surface": state, "art": art, "relief": relief,
+                                          "inspection": inspection, "management": management})
     return {"nativeSurfaceFreshOwnedEarth": True,
             "nativeSurfacePlayerInput": True,
             "nativeSurfacePausedReload": True,
             "surfaceCaptures": captures,
             "surfaceDiagnostics": diagnostics, "surfaceArtDiagnostics": art_diagnostics,
             "surfaceArtCaptures": art_captures,
+            "surfaceReliefDiagnostics": relief_diagnostics,
+            "surfaceReliefCaptures": relief_captures,
             "surfacePopulatedFixture": "test-only authored Player17 derived from the standard fresh campaign",
             "surfacePopulatedFamilies": ["power_generator", "science_lab",
                                          "habitat_complex", "fabricator"],

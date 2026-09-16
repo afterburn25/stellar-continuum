@@ -1,5 +1,7 @@
 # Stellar Engine migration handoff
 
+Surface relief checkpoint (2026-09-16): native surface smoke runs now validate a neutral fixed world-space relief layer prepared asynchronously and cached across pan/zoom. Core remains untouched; saves and UI contracts are unchanged. The bounded top-down refinement is not full 3D/final graphics, sustained 60 FPS proof, or a sealed release. See `NATIVE_SURFACE_RELIEF.md`; MSVC, focused CTests, Python export and five surface cases pass. Next bounded review covers Land/Collect `d9d23f57` and colony sites `e49f4df0` against settlement/recovery/observer contracts; latest Devin `88de7e38`, shared `ac45d958`, PR #332 unmerged.
+
 Celestial detail checkpoint (2026-09-16): approved source planet discs are 512px,
 procedural discs 256px within the original 16 MiB cache and asynchronous queue.
 Capture evidence now binds each screenshot to its exact readback dimensions.

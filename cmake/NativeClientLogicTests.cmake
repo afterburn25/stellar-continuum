@@ -354,6 +354,7 @@ add_executable(stellar_surface_view_tests
   native-tests/native_surface_workspace_tests.cpp
   app/native_client/native_surface_building_geometry.cpp
   app/native_client/native_surface_building_layer.cpp
+  app/native_client/native_surface_relief.cpp
   app/native_client/native_surface_scene.cpp
   app/native_client/native_surface_workspace.cpp
   app/native_client/native_colony_workspace.cpp)
@@ -365,6 +366,17 @@ add_test(NAME native_surface_workspace COMMAND stellar_surface_view_tests)
 if(MSVC)
   target_compile_options(stellar_surface_view_tests PRIVATE
     /W4 /WX /permissive-)
+endif()
+
+add_executable(stellar_surface_relief_tests
+  native-tests/native_surface_relief_tests.cpp
+  app/native_client/native_surface_relief.cpp)
+target_include_directories(stellar_surface_relief_tests PRIVATE app/native_client)
+target_link_libraries(stellar_surface_relief_tests PRIVATE stellar_core stellar_native_image)
+add_test(NAME native_surface_relief COMMAND stellar_surface_relief_tests)
+set_tests_properties(native_surface_relief PROPERTIES TIMEOUT 60)
+if(MSVC)
+  target_compile_options(stellar_surface_relief_tests PRIVATE /W4 /WX /permissive-)
 endif()
 
 add_executable(stellar_native_triangle_mesh_tests

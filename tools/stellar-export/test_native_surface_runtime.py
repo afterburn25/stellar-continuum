@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_surface_runtime import _surface_inspection, _validate_surface_art_pixels, validate_native_surface_export
+from native_surface_runtime import (_surface_inspection, _surface_relief,
+                                    _validate_surface_art_pixels, validate_native_surface_export)
 
 
 def base_payload():
@@ -63,6 +64,26 @@ def logical_bmp(width, height, *, bits, top_down, offset, changed=frozenset()):
 
 
 class NativeSurfaceRuntimeTests(unittest.TestCase):
+    def test_surface_relief_diagnostic_contract(self):
+        valid = {"requested": True, "ready": True, "pending": False,
+                 "deferred": False, "failed": False, "cache_bytes": 4194304,
+                 "reserved_bytes": 0, "generated": 1, "resolution": 1024,
+                 "terrain": [100, 100, 100, 100]}
+        self.assertEqual(_surface_relief("surface_relief=" + json.dumps(valid)), valid)
+        for mutation in (
+                lambda value: value.pop("failed"),
+                lambda value: value.update(cache_bytes=4194305),
+                lambda value: value.update(generated=2),
+                lambda value: value.update(terrain=[100, 100, 0, 100]),
+                lambda value: value.update(requested=False)):
+            candidate = dict(valid); mutation(candidate)
+            with self.assertRaises(RuntimeError):
+                _surface_relief("surface_relief=" + json.dumps(candidate))
+        for text in ("", "surface_relief={bad}",
+                     "surface_relief=" + json.dumps(valid) + "\n" +
+                     "surface_relief=" + json.dumps(valid)):
+            with self.assertRaises(RuntimeError): _surface_relief(text)
+
     def test_management_requires_completed_target_and_safe_actual_actions(self):
         from native_surface_runtime import _surface_management
         colony = {"SurfaceBuildings": [{"Id": 9, "IsComplete": True}]}
@@ -129,6 +150,10 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                     art = {"requested": 2, "ready": 2, "pending": 0, "deferred": 0, "failed": 0,
                            "replaced": 2, "entries": 2, "cache_bytes": 1024, "reserved_bytes": 0,
                            "admitted": 2, "completed": 2, "canceled": 0, "terrain": [100, 100, 300, 300]}
+                    relief = {"requested": True, "ready": True, "pending": False,
+                              "deferred": False, "failed": False, "cache_bytes": 4194304,
+                              "reserved_bytes": 0, "generated": 1, "resolution": 1024,
+                              "terrain": [100, 100, 100, 100]}
                     if fault == "art_bad_terrain": art["terrain"] = [100, 100, "bad", 300]
                     if fault == "art_ready_mismatch": art["ready"] = 1
                     if fault == "art_zero_entries": art["entries"] = 0
@@ -204,6 +229,7 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                     capture = Path(args[args.index(flag) + 1])
                     stdout = ("gpu_driver=vulkan systems=500 image_uploads=9 save=ok\n" +
                               "surface_art=" + json.dumps(art, separators=(",", ":")) + "\n" +
+                              "surface_relief=" + json.dumps(relief, separators=(",", ":")) + "\n" +
                               "surface=" + json.dumps(state, separators=(",", ":")))
                     if reload:
                         inspection_sites = []
@@ -249,6 +275,24 @@ class NativeSurfaceRuntimeTests(unittest.TestCase):
                         if fault == "art_header_only": side[6] ^= 1
                         sidecar.write_bytes(side)
                         capture.with_name(capture.stem + "-focus.bmp").write_bytes(side)
+                        relief_capture = capture.with_name(capture.stem + "-relief.bmp")
+                        relief_fallback = capture.with_name(capture.stem + "-without-relief.bmp")
+                        relief_capture.write_bytes(image)
+                        relief_side = bytearray(image)
+                        for py in range(100, min(height, 200)):
+                            for px in range(100, min(width, 200)):
+                                at = 54 + (height - py - 1) * stride + px * 3
+                                relief_side[at] ^= 7
+                        relief_fallback.write_bytes(relief_side)
+                        if "--smoke" not in args:
+                            for path in (capture, sidecar,
+                                         *[capture.with_name(capture.stem + "-management-" + stage + ".bmp")
+                                           for stage in ("review", "result")],
+                                         capture.with_name(capture.stem + "-focus.bmp"),
+                                         relief_capture, relief_fallback):
+                                stdout += "\nnative_capture=" + json.dumps(
+                                    {"path": str(path), "width": width, "height": height},
+                                    separators=(",", ":"))
                 if fault == "renderer": stdout = stdout.replace("gpu_driver=vulkan", "gpu_driver=software")
                 if fault == "uploads" and "--smoke" not in args: stdout = stdout.replace("image_uploads=9", "image_uploads=0")
                 calls.append(args)
