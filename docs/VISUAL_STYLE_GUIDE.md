@@ -266,6 +266,28 @@ Current reusable resources:
 
 The UI branch should consume these resources rather than copying subtly different values into scenes. Layout and interaction remain UI-owned. Local Theme variants are acceptable for genuinely different components, but they should derive from the same token system.
 
+## 11.1 Native client integration
+
+The native SDL client consumes the same semantic roles through `app/native_client/native_ui_theme.hpp`. New native interfaces must use this layer instead of declaring another screen-specific palette. The shared layer provides:
+
+- canonical canvas, surface, keyline, text, selection and subsystem colors;
+- neutral, selected, success, caution, danger, unknown, science, economy, construction, diplomacy and military tones;
+- layered panels with restrained shadow, keyline and a non-color-only accent rail;
+- buttons with consistent idle, hover, active and disabled treatment;
+- section headers, status chips, bounded progress meters and contextual tooltips.
+
+Native screen composition follows a command hierarchy:
+
+1. the persistent top command rail exposes time controls and the major strategic workspaces;
+2. a workspace title and summary establish location and current state;
+3. lists select an object while a dedicated inspector presents decisions and detailed facts;
+4. primary actions remain visually separated at the panel edge;
+5. details use progressive disclosure, compact meters and status chips instead of undifferentiated text blocks where a graphic communicates state faster.
+
+At 1280×720, controls retain their existing hit targets and dense panels scroll or reduce columns rather than shrinking essential text. At larger resolutions, interface scale follows the established drawable-pixel layouts while map and celestial rendering retain the remaining space. Semantic states always pair color with a rail, border, label or meter shape.
+
+The native primitives append only a bounded number of rectangles, lines and text commands. They do not introduce continuous animation, per-frame texture creation or unbounded state. Tooltips are emitted only for the currently hovered command and are clamped to the drawable viewport.
+
 The production SVG contract is validated by `scripts/validate_visual_assets.py`, and the repository's normal `work/**` build additionally runs Godot headless editor/runtime smoke tests.
 
 That validator compares every runtime palette RGB value and the Theme's role colors,

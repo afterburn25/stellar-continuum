@@ -205,14 +205,23 @@ void progress_bar_clamps_nonfinite_fraction_inside_orders() {
   workspace.render(draw, 1280, 720);
   const auto layout = ConstructionWorkspaceLayout::for_viewport(1280, 720);
   bool thin_track{};
+  // The native_ui::panel drop shadow deliberately extends +4/+5 past the
+  // surface edge; every other fill must stay inside it.
+  const UiRect shadow{layout.surface.x + 4.f, layout.surface.y + 5.f,
+                      layout.surface.width, layout.surface.height};
   for (const auto &item : draw.overlay)
     if (const auto *rectangle = std::get_if<FilledRectangle>(&item)) {
       REQUIRE(std::isfinite(rectangle->bounds.x));
       REQUIRE(std::isfinite(rectangle->bounds.y));
       REQUIRE(std::isfinite(rectangle->bounds.width));
       REQUIRE(std::isfinite(rectangle->bounds.height));
-      REQUIRE(contains(layout.surface, rectangle->bounds));
-      if (rectangle->bounds.height <= 3.f * layout.scale) {
+      REQUIRE(contains(layout.surface, rectangle->bounds) ||
+              contains(shadow, rectangle->bounds));
+      // native_ui::progress draws its canvas-colored track inside orders;
+      // 1px theme keylines elsewhere are no longer tracks.
+      if (rectangle->bounds.height <= 3.f * layout.scale &&
+          rectangle->color.r == 5 && rectangle->color.g == 11 &&
+          rectangle->color.b == 18) {
         thin_track = true;
         REQUIRE(contains(layout.orders, rectangle->bounds));
       }

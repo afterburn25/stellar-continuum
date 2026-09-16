@@ -17,6 +17,9 @@ enum class NativeSystemBodyVisualClass {
   unknown_planet, unknown_moon, rocky, oceanic, frozen, hot_rocky,
   gas_giant, ice_giant, moon
 };
+// Approved ring archetypes: broad icy bands (Saturn), narrow faint rings
+// (Uranus/Jupiter), and a sparse asteroid debris band.
+enum class NativeSystemRingClass { none, broad, thin, debris };
 enum class NativePositiveSignature { rare_resource, anomaly, activity };
 
 struct NativeSystemBodyDetails {
@@ -40,6 +43,16 @@ struct NativeSystemBody {
   NativeSystemBodyVisualClass visual_class{NativeSystemBodyVisualClass::unknown_planet};
   // Present only for fully surveyed canonical Sol bodies with an approved asset.
   std::optional<std::string> sol_texture_key;
+  // Observer-safe ring assignment; none for unsurveyed or ringless bodies.
+  NativeSystemRingClass ring{NativeSystemRingClass::none};
+};
+
+enum class NativeInfrastructureState { locked, available, active, complete };
+struct NativeSystemInfrastructureMarker {
+  std::string project_id, label;
+  NativeInfrastructureState state{NativeInfrastructureState::locked};
+  double progress{};
+  std::optional<int> host_body_id;
 };
 
 struct NativeSystemSnapshot {
@@ -52,6 +65,9 @@ struct NativeSystemSnapshot {
   std::optional<stellar::core::StellarClass> primary_stellar_class,
       secondary_stellar_class, tertiary_stellar_class;
   std::vector<NativeSystemBody> bodies;
+  // Player-owned orbital construction markers. Home system only, matching the
+  // reference canvas: these are always the observer's own projects.
+  std::vector<NativeSystemInfrastructureMarker> infrastructure;
 };
 
 struct NativeSystemViewResult {
@@ -84,6 +100,7 @@ struct SystemSpatialBodyMarker {
   double orbital_eccentricity{}, orbital_inclination_degrees{};
   std::vector<NativePositiveSignature> positive_signatures;
   std::optional<std::string> sol_texture_key;
+  NativeSystemRingClass ring{NativeSystemRingClass::none};
 };
 struct SystemSpatialSnapshot {
   int system_id{};

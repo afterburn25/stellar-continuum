@@ -20,7 +20,7 @@ _FIELDS = {
     "before_days", "saved_days", "palette_selected", "ghost_previewed",
     "placement_cancelled", "cancel_no_change", "placement_confirmed",
     "removal_previewed", "removal_confirmed", "refund_exact",
-    "persisted_site", "paused",
+    "persisted_site", "paused", "scene_sprites", "relief_images", "managed",
 }
 
 
@@ -60,9 +60,13 @@ def _diagnostic(stdout: str, expected_mode: str):
         _finite(state.get(key), key)
     if state.get("persisted_site") is not True or state.get("paused") is not True:
         raise RuntimeError("Native surface did not prove a persisted paused site")
+    if type(state.get("scene_sprites")) is not int or state["scene_sprites"] < 2:
+        raise RuntimeError("Native surface did not rasterize hub and site sprites")
+    if type(state.get("relief_images")) is not int or state["relief_images"] < 1:
+        raise RuntimeError("Native surface did not render its terrain-relief hillshade")
     interaction = ("palette_selected", "ghost_previewed", "placement_cancelled",
                    "cancel_no_change", "placement_confirmed", "removal_previewed",
-                   "removal_confirmed", "refund_exact")
+                   "removal_confirmed", "refund_exact", "managed")
     if expected_mode == "ordered":
         for key in interaction:
             if state.get(key) is not True:
@@ -93,10 +97,17 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
+def _bmp(path: Path, stdout: str, width: int, height: int):
     data = path.read_bytes() if path.is_file() else b""
     if len(data) < 54 or data[:2] != b"BM":
         raise RuntimeError("Native surface did not capture a BMP frame")
+    # The capture is at drawable-pixel size; on high-DPI displays that is a
+    # multiple of the requested window size. The smoke reports the actual
+    # drawable so the BMP geometry is checked against the real render surface.
+    sizes = {(width, height)}
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        sizes.add((int(drawable.group(1)), int(drawable.group(2))))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -105,7 +116,7 @@ def _bmp(path: Path, width: int, height: int):
     row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
     required = row * abs(actual_height)
     if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
+            (actual_width, abs(actual_height)) not in sizes or planes != 1 or
             bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
             offset + required > len(data)):
         raise RuntimeError("Native surface capture has invalid renderer geometry")
@@ -219,7 +230,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
         result, _ = _launch(common + ["--width", "1280", "--height", "720",
                                       "--smoke", str(base_capture)], work, clean,
                             "fresh-base launch")
-        _bmp(base_capture, 1280, 720)
+        _bmp(base_capture, result.stdout, 1280, 720)
         if not save.is_file():
             raise RuntimeError("Native surface fresh-base launch wrote no Player17 save")
         base = json.loads(save.read_text(encoding="utf-8-sig"))
@@ -239,7 +250,7 @@ def validate_native_surface_export(folder: Path, env: dict[str, str]):
             if uploads < 1:
                 raise RuntimeError("Native surface workspace did not prove image uploads")
             state = _diagnostic(result.stdout, mode)
-            _bmp(capture, width, height)
+            _bmp(capture, result.stdout, width, height)
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
             if payload.get("FormatVersion") != 17:
                 raise RuntimeError("Native surface wrote a noncurrent Player17 save")

@@ -70,10 +70,17 @@ def _diagnostic(stdout: str, expected_mode: str, expected_kind: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
+def _bmp(path: Path, stdout: str, width: int, height: int):
     data = path.read_bytes() if path.is_file() else b""
     if len(data) < 54 or data[:2] != b"BM":
         raise RuntimeError("Native settlement did not capture a BMP frame")
+    # The capture is at drawable-pixel size; on high-DPI displays that is a
+    # multiple of the requested window size. The smoke reports the actual
+    # drawable so the BMP geometry is checked against the real render surface.
+    sizes = {(width, height)}
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        sizes.add((int(drawable.group(1)), int(drawable.group(2))))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -82,7 +89,7 @@ def _bmp(path: Path, width: int, height: int):
     row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
     required = row * abs(actual_height)
     if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
+            (actual_width, abs(actual_height)) not in sizes or planes != 1 or
             bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
             offset + required > len(data)):
         raise RuntimeError("Native settlement capture has invalid renderer geometry")
@@ -261,7 +268,7 @@ def validate_native_settlement_export(folder: Path, env: dict[str, str]):
                                  base_result.stdout)
         if not base_uploads:
             raise RuntimeError("Native settlement fresh-base launch lacked image-upload diagnostics")
-        _bmp(base_capture, 1280, 720)
+        _bmp(base_capture, base_result.stdout, 1280, 720)
         if not base_save.is_file():
             raise RuntimeError("Native settlement fresh-base launch wrote no Player17 save")
         base = json.loads(base_save.read_text(encoding="utf-8-sig"))
@@ -298,7 +305,7 @@ def validate_native_settlement_export(folder: Path, env: dict[str, str]):
                 if not uploads or int(uploads.group(1)) < 1:
                     raise RuntimeError("Native settlement did not prove orbital image uploads")
                 state = _diagnostic(result.stdout, label, kind)
-                _bmp(capture, width, height)
+                _bmp(capture, result.stdout, width, height)
                 payload = json.loads(save.read_text(encoding="utf-8-sig"))
                 payload_day = _finite(payload.get("SimulationDays"), "saved day")
                 if (payload.get("FormatVersion") != 17 or

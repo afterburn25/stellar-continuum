@@ -12,9 +12,13 @@ import stellar as exporter
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
+from native_audio_runtime import NATIVE_AUDIO_SOURCES
+from native_voice_runtime import NATIVE_VOICE_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
+from native_planet_art_runtime import NATIVE_PLANET_ART_SOURCES
+from native_star_art_runtime import NATIVE_STAR_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -108,6 +112,42 @@ class NativeClientDependencyTests(unittest.TestCase):
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
+        planet_art_records = {}
+        for key, (source, destination) in NATIVE_PLANET_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only planet art " + key).encode())
+            planet_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.planet_art_declaration = self.root / "export/native-planet-art-assets.json"
+        self.planet_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":planet_art_records}))
+        star_art_records = {}
+        for key, (source, destination) in NATIVE_STAR_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only star art " + key).encode())
+            star_art_records[key] = {"source": source, "runtimePath": destination,
+                                     "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.star_art_declaration = self.root / "export/native-star-art-assets.json"
+        self.star_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":star_art_records}))
+        audio_records = {}
+        for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only audio " + key).encode())
+            audio_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.audio_declaration = self.root / "export/native-audio-assets.json"
+        self.audio_declaration.write_text(json.dumps({"schemaVersion":1,"assets":audio_records}))
+        voice_records = {}
+        for key, (source, destination) in NATIVE_VOICE_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only voice " + key).encode())
+            voice_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.voice_declaration = self.root / "export/native-voice-assets.json"
+        self.voice_declaration.write_text(json.dumps({"schemaVersion":1,"assets":voice_records}))
 
 
 
@@ -301,6 +341,94 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 
+    def test_missing_planet_art_blocks_package(self):
+        for source, destination in NATIVE_PLANET_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native planet art"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_planet_art_blocks_package(self):
+        for source, destination in NATIVE_PLANET_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_planet_art_paths_cannot_expand_package_scope(self):
+        original = self.planet_art_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["gaia-world"][field] = "../outside.png"
+                self.planet_art_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native planet art"):
+                    self.copy()
+        self.planet_art_declaration.write_text(original)
+
+    def test_planet_art_manifest_schema_and_set_are_strict(self):
+        original = self.planet_art_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.planet_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native planet art"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["gaia-world"]
+        self.planet_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
+    def test_missing_star_art_blocks_package(self):
+        for source, destination in NATIVE_STAR_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native star art"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_star_art_blocks_package(self):
+        for source, destination in NATIVE_STAR_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_star_art_paths_cannot_expand_package_scope(self):
+        original = self.star_art_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["star-g-dwarf"][field] = "../outside.png"
+                self.star_art_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native star art"):
+                    self.copy()
+        self.star_art_declaration.write_text(original)
+
+    def test_star_art_manifest_schema_and_set_are_strict(self):
+        original = self.star_art_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.star_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native star art"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["star-g-dwarf"]
+        self.star_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
     def test_missing_license_blocks_package(self):
         self.license.unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing native client dependency"):
@@ -424,7 +552,8 @@ class NativeSessionExportTests(unittest.TestCase):
 
 
 class NativeResearchExportTests(unittest.TestCase):
-    def exercise(self, *, mutate_load=False, funded=True, progressed=True, skipped_save=False):
+    def exercise(self, *, mutate_load=False, funded=True, progressed=True,
+                 skipped_save=False, missing_shortcut=False):
         with tempfile.TemporaryDirectory(prefix="stellar-research-export-test-") as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -456,7 +585,8 @@ class NativeResearchExportTests(unittest.TestCase):
                 save.write_text(json.dumps(payload))
                 capture.write_bytes(b"BM" + bytes(54))
                 saved = "preserved" if skipped_save and "--load" in args else "ok"
-                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1", "")
+                shortcut = "" if missing_shortcut or "--load" in args else " shortcut=1"
+                return subprocess.CompletedProcess(args, 0, "gpu_driver=vulkan systems=500 save=" + saved + " research=known:active:0.1" + shortcut, "")
 
             with mock.patch("native_research_runtime.subprocess.run", side_effect=launch):
                 result = validate_native_research_export(package, {})
@@ -483,6 +613,10 @@ class NativeResearchExportTests(unittest.TestCase):
     def test_skipping_loaded_save_is_not_a_roundtrip(self):
         with self.assertRaisesRegex(RuntimeError, "actual manual save"):
             self.exercise(skipped_save=True)
+
+    def test_missing_candidate_shortcut_evidence_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "candidate shortcuts"):
+            self.exercise(missing_shortcut=True)
 
 
 if __name__ == "__main__":

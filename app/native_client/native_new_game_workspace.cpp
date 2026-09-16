@@ -1,4 +1,5 @@
 #include "native_new_game_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -13,17 +14,17 @@ namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_setup;
 
-constexpr Color background{3, 9, 18, 255};
-constexpr Color panel{8, 20, 36, 252};
-constexpr Color raised{12, 31, 54, 250};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{23, 67, 102, 255};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color accent{122, 230, 190, 255};
-constexpr Color gold{241, 195, 105, 255};
-constexpr Color warning{255, 190, 112, 255};
+constexpr Color background = native_ui::color::canvas;
+constexpr Color panel = native_ui::color::surface;
+constexpr Color raised = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color selected = native_ui::color::surface_raised;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color accent = native_ui::color::success;
+constexpr Color gold = native_ui::color::caution;
+constexpr Color warning = native_ui::color::danger;
 
 [[nodiscard]] std::optional<UiRect> intersection(UiRect a, UiRect b) noexcept {
   const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);

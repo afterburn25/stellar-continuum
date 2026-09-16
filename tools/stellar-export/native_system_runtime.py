@@ -15,7 +15,7 @@ def _system_diagnostic(stdout):
     state = re.search(r"\bsystem=id=(\d+):body=(\d+):visible=(\d+):scale=([^:\s]+)"
                       r":entry=1:hit=1:pan=1:zoom=1:reset=1:back=1"
                       r":pause_retained=1:speed_retained=1:gesture_cleared=1"
-                      r":paused=1:day_unchanged=1(?:\s|$)", stdout)
+                      r":focused=1:paused=1:day_unchanged=1(?:\s|$)", stdout)
     uploads = re.search(r"\bimage_uploads=(\d+)(?:\s|$)", stdout)
     if not state or not uploads:
         raise RuntimeError("Native system did not confirm orbital input and image rendering")

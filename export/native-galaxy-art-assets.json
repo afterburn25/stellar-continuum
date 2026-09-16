@@ -14,7 +14,7 @@
     "credits": {
       "source": "docs/engine/NATIVE_GALAXY_ART_SOURCES.md",
       "runtimePath": "Licenses/Galaxy-art-sources.md",
-      "sha256": "af55bc189b767f5ab6f0d78a7aaa54b4457dd17b9e6e5fa6f70c081754db087f"
+      "sha256": "d722ba1c797a5c991b7000c72936df5886e37956889d23ac978c9ed15ce104dc"
     },
     "regional-nebula-b": {
       "source": "assets/visual/space/regional-nebula-b.png",

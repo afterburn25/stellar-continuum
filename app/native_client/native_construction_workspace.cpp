@@ -1,4 +1,5 @@
 #include "native_construction_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,16 +13,16 @@ namespace {
 using namespace stellar::native_construction;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color failure{255, 133, 123, 255};
+constexpr Color panel = native_ui::color::surface;
+constexpr Color inset = native_ui::color::surface_opaque;
+constexpr Color row = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color selected = native_ui::color::surface_raised;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color good = native_ui::color::success;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color failure = native_ui::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -80,13 +81,6 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   if (project.queued)
     return "QUEUED " + std::to_string(project.queue_position);
   return "AVAILABLE";
-}
-[[nodiscard]] float progress_width(const NativeConstructionProject &project,
-                                   float width) noexcept {
-  const auto progress = std::isfinite(project.progress_fraction)
-                            ? std::clamp(project.progress_fraction, 0., 1.)
-                            : 0.;
-  return width * static_cast<float>(progress);
 }
 } // namespace
 
@@ -210,6 +204,12 @@ NativeConstructionWorkspace::view() const noexcept {
 const std::optional<std::string> &
 NativeConstructionWorkspace::selected_project_id() const noexcept {
   return selected_project_id_;
+}
+
+void NativeConstructionWorkspace::select_project(std::string project_id) {
+  selected_project_id_ = std::move(project_id);
+  cancel_confirmation_id_.reset();
+  reconcile_selection();
 }
 
 void NativeConstructionWorkspace::reconcile_selection() {
@@ -348,24 +348,25 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                                          int height) const {
   if (!visible_) return;
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
+  native_ui::panel(out, layout.surface, native_ui::Tone::Construction);
   text(out, layout.title, "PLAYER CONSTRUCTION", bright,
        layout.title_font_pixels, FontFace::Heading);
-  fill(out, layout.close, layout.close.contains(pointer_) ? hover : row);
-  stroke(out, layout.close, border);
-  text(out, {layout.close.x, layout.close.y + 7.f * layout.scale,
-             layout.close.width, layout.close.height - 8.f * layout.scale},
-       "X", bright, layout.body_font_pixels, FontFace::Interface,
-       TextAlign::Center);
+  native_ui::button(out, layout.close, "X", pointer_,
+                    layout.body_font_pixels);
   const auto section = [&](UiRect bounds, std::string heading) {
     fill(out, bounds, inset);
     stroke(out, bounds, border);
-    text(out, {bounds.x + 8.f * layout.scale,
+    fill(out, {bounds.x, bounds.y, 3.f, bounds.height},
+         native_ui::color::construction);
+    text(out, {bounds.x + 10.f * layout.scale,
                bounds.y + 6.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 20.f * layout.scale},
-         std::move(heading), muted, layout.small_font_pixels,
-         FontFace::Heading);
+               bounds.width - 20.f * layout.scale, 20.f * layout.scale},
+         std::move(heading), native_ui::color::construction,
+         layout.small_font_pixels, FontFace::Heading);
+    fill(out, {bounds.x + 10.f * layout.scale,
+               bounds.y + 25.f * layout.scale,
+               bounds.width - 20.f * layout.scale, 1.f},
+         native_ui::color::keyline);
   };
   section(layout.projects, "KNOWN PROJECTS");
   section(layout.details, "PROJECT DETAILS");
@@ -391,10 +392,12 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                           project_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, project_rows);
       if (!clipped) continue;
+      const bool is_selected = selected_project_id_ == project.id;
       fill(out, *clipped,
-           selected_project_id_ == project.id
-               ? selected
-               : clipped->contains(pointer_) ? hover : row);
+           is_selected ? selected : clipped->contains(pointer_) ? hover : row);
+      if (is_selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height},
+             native_ui::color::construction);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -422,19 +425,30 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          "Select a known project to review its requirements.", muted,
          layout.body_font_pixels);
   } else {
-    std::string details = project->name + "\n" +
-                          category_name(project->category) + "  |  " +
-                          state_name(*project) + "\n\n" + project->description;
+    const auto detail_x = layout.details.x + 12.f * layout.scale;
+    const auto detail_w = layout.details.width - 24.f * layout.scale;
+    text(out, {detail_x, layout.details.y + 36.f * layout.scale,
+               detail_w, 30.f * layout.scale},
+         project->name, bright, layout.body_font_pixels, FontFace::Heading);
+    text(out, {detail_x, layout.details.y + 62.f * layout.scale,
+               detail_w, 20.f * layout.scale},
+         category_name(project->category) + "  ·  " + state_name(*project),
+         project->complete || project->active ? good : muted,
+         layout.small_font_pixels);
+    fill(out, {detail_x, layout.details.y + 86.f * layout.scale, detail_w, 1.f},
+         native_ui::color::keyline);
+    text(out, {detail_x, layout.details.y + 100.f * layout.scale,
+               detail_w, 68.f * layout.scale},
+         project->description, muted, layout.small_font_pixels);
     if (!project->requirements.empty()) {
-      details += "\n\nRequirements";
+      std::string requirements;
       for (const auto &requirement : project->requirements)
-        details += "\n" + requirement;
+        requirements += (requirements.empty() ? "" : "\n") + requirement;
+      text(out, {detail_x, layout.details.y + 178.f * layout.scale,
+                 detail_w, layout.details.height - 190.f * layout.scale},
+           "REQUIREMENTS\n" + requirements, bright,
+           layout.small_font_pixels);
     }
-    text(out, {layout.details.x + 10.f * layout.scale,
-               layout.details.y + 32.f * layout.scale,
-               layout.details.width - 20.f * layout.scale,
-               layout.details.height - 42.f * layout.scale},
-         std::move(details), bright, layout.small_font_pixels);
   }
 
   const UiRect order_rows{layout.orders.x,
@@ -451,10 +465,12 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);
       if (!clipped) continue;
+      const bool is_selected = selected_project_id_ == value.id;
       fill(out, *clipped,
-           selected_project_id_ == value.id
-               ? selected
-               : clipped->contains(pointer_) ? hover : row);
+           is_selected ? selected : clipped->contains(pointer_) ? hover : row);
+      if (is_selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height},
+             native_ui::color::construction);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -486,14 +502,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          bounds.y + 62.f * layout.scale,
                          bounds.width - 16.f * layout.scale,
                          3.f * layout.scale};
-      if (const auto clipped_track = intersection(track, order_rows)) {
-        fill(out, *clipped_track, {23, 45, 67, 255});
-        const UiRect completed{track.x, track.y,
-                               progress_width(value, track.width),
-                               track.height};
-        if (const auto clipped_completed = intersection(completed, order_rows))
-          fill(out, *clipped_completed, good);
-      }
+      if (const auto clipped_track = intersection(track, order_rows))
+        native_ui::progress(out, *clipped_track, value.progress_fraction,
+                            native_ui::Tone::Construction);
     }
   if (status_order_.empty())
     text(out, {order_rows.x + 10.f * layout.scale,
@@ -533,32 +544,29 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
 
-  const auto action = [&](UiRect bounds, std::string label, bool enabled) {
-    fill(out, bounds, enabled && bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, enabled ? good : border);
-    text(out, {bounds.x + 6.f * layout.scale,
-               bounds.y + 10.f * layout.scale,
-               bounds.width - 12.f * layout.scale,
-               bounds.height - 12.f * layout.scale},
-         std::move(label), enabled ? bright : muted,
-         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
+  const auto action = [&](UiRect bounds, std::string label, bool enabled,
+                          native_ui::Tone tone) {
+    native_ui::button(out, bounds, std::move(label), pointer_,
+                      layout.body_font_pixels, tone, false, enabled);
   };
   if (project) {
     if (project->active || project->queued) {
-      action(layout.primary_action, state_name(*project), false);
+      action(layout.primary_action, state_name(*project), false,
+             native_ui::Tone::Construction);
       action(layout.secondary_action,
              cancel_confirmation_id_ == project->id
                  ? "CONFIRM CANCEL"
                  : "CANCEL + REFUND",
-             true);
+             true, native_ui::Tone::Danger);
     } else if (!project->complete) {
       action(layout.primary_action,
              project->start.will_queue ? "START / QUEUE" : "START NOW",
-             project->start.enabled);
-      action(layout.secondary_action, "QUEUE",
-             project->queue.enabled);
+             project->start.enabled, native_ui::Tone::Construction);
+      action(layout.secondary_action, "QUEUE", project->queue.enabled,
+             native_ui::Tone::Construction);
     } else {
-      action(layout.primary_action, "COMPLETED", false);
+      action(layout.primary_action, "COMPLETED", false,
+             native_ui::Tone::Success);
     }
   }
 }

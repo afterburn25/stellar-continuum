@@ -54,10 +54,13 @@ public:
   NativeGalaxyStarMarkerRenderer &
   operator=(const NativeGalaxyStarMarkerRenderer &) = delete;
 
+  // alpha dims the whole marker for observer-unexplored catalog systems,
+  // matching StrategicUnexploredStarAlpha in the C# reference.
   void append(stellar::native_map::DrawList &, stellar::native_map::Point center,
               float core_radius, const NativeGalaxyStarAppearance &,
               bool selected,
-              std::optional<stellar::native_map::UiRect> clip = std::nullopt);
+              std::optional<stellar::native_map::UiRect> clip = std::nullopt,
+              float alpha = 1.f);
   [[nodiscard]] NativeGalaxyStarMarkerStats stats() const noexcept;
   void clear() noexcept;
 

@@ -262,6 +262,86 @@ NativeSurfaceConstructionController::confirm_removal(
   return {result.accepted, result.message};
 }
 
+namespace {
+template <class Order>
+NativeSurfaceCommandOutcome run_order(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view, Order &&order) {
+  auto current = context(frame);
+  if (!bound_colony(current, view, generation))
+    return {false,
+            "The owned known settlement changed; refresh it before ordering."};
+  const auto result = order(current);
+  return {result.accepted, result.message};
+}
+} // namespace
+
+NativeSurfaceCommandOutcome
+NativeSurfaceConstructionController::upgrade_building(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view, const int building_id) {
+  require_owner();
+  bind_generation(generation);
+  quotes_.clear();
+  return run_order(frame, generation, view, [&](const Context &current) {
+    return upgrade_surface_building(current.command, current.player.id,
+                                    view.colony_id, building_id);
+  });
+}
+
+NativeSurfaceCommandOutcome
+NativeSurfaceConstructionController::repair_building(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view, const int building_id) {
+  require_owner();
+  bind_generation(generation);
+  quotes_.clear();
+  return run_order(frame, generation, view, [&](const Context &current) {
+    return repair_surface_building(current.command, current.player.id,
+                                   view.colony_id, building_id);
+  });
+}
+
+NativeSurfaceCommandOutcome
+NativeSurfaceConstructionController::set_building_enabled(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view, const int building_id, const bool enabled) {
+  require_owner();
+  bind_generation(generation);
+  quotes_.clear();
+  return run_order(frame, generation, view, [&](const Context &current) {
+    return set_surface_building_enabled(current.command, current.player.id,
+                                        view.colony_id, building_id, enabled);
+  });
+}
+
+NativeSurfaceCommandOutcome
+NativeSurfaceConstructionController::set_building_priority(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view, const int building_id,
+    const bool prioritized) {
+  require_owner();
+  bind_generation(generation);
+  quotes_.clear();
+  return run_order(frame, generation, view, [&](const Context &current) {
+    return set_surface_building_priority(current.command, current.player.id,
+                                         view.colony_id, building_id,
+                                         prioritized);
+  });
+}
+
+NativeSurfaceCommandOutcome NativeSurfaceConstructionController::upgrade_hub(
+    CampaignFrame &frame, const std::uint64_t generation,
+    const NativeColonyView &view) {
+  require_owner();
+  bind_generation(generation);
+  quotes_.clear();
+  return run_order(frame, generation, view, [&](const Context &current) {
+    return upgrade_surface_hub(current.command, current.player.id,
+                               view.colony_id);
+  });
+}
+
 bool NativeSurfaceConstructionController::cancel_quote(
     const std::uint64_t generation, const std::uint64_t quote_revision) {
   require_owner();

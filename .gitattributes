@@ -2,3 +2,11 @@
 data/astronomy/hyg-nearby-500-v1.json text eol=lf
 # Keep the reviewed upstream header byte-identical on Windows checkouts.
 third_party/nlohmann/json.hpp text eol=lf
+# The native asset manifests pin SHA-256 over the LF blobs; CRLF checkouts
+# break the reviewed-content verification.
+docs/SOL_VISUAL_SOURCES.md text eol=lf
+docs/engine/NATIVE_*_SOURCES.md text eol=lf
+assets/visual/fonts/OFL-Rajdhani.txt text eol=lf
+third_party/dr_mp3/LICENSE.txt text eol=lf
+third_party/dr_mp3/dr_mp3.h text eol=lf
+data/voice_profiles/*.json text eol=lf

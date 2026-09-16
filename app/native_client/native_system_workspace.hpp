@@ -3,8 +3,10 @@
 #include "native_system_view.hpp"
 #include "native_system_travel.hpp"
 #include "native_celestial_appearance.hpp"
+#include "native_orbital_structure.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -30,13 +32,15 @@ enum class SystemWorkspaceCommandKind {
   select_fleet,
   open_destination,
   open_colony,
-  settlement_target
+  settlement_target,
+  open_construction
 };
 struct SystemWorkspaceCommand {
   SystemWorkspaceCommandKind kind{SystemWorkspaceCommandKind::none};
   bool captured{};
   int target_id{-1};
   std::vector<int> hit_fleet_ids;
+  std::string project_id;
 };
 struct NativeSystemSettlementStatus {
   int fleet_id{};
@@ -50,6 +54,7 @@ struct SystemWorkspaceLayout {
   stellar::native_map::UiRect reset;
   stellar::native_map::UiRect inspector;
   stellar::native_map::UiRect colony_action;
+  stellar::native_map::UiRect infrastructure_action;
   stellar::native_map::UiRect world_field;
   [[nodiscard]] static SystemWorkspaceLayout for_viewport(int width,int height) noexcept;
 };
@@ -66,6 +71,24 @@ public:
     settlement_status_ = std::move(value);
   }
   void set_notice(std::string);
+  // Programmatic body selection (reference _systemSpatialCanvas.FocusBody):
+  // used by the empire overview's colony rows to open the owning system view
+  // already focused on the colony world. Returns false when the body is not
+  // in the current snapshot.
+  [[nodiscard]] bool select_body(int body_id) noexcept {
+    if (!snapshot_ ||
+        std::ranges::find(snapshot_->bodies, body_id,
+                          &stellar::native_system::NativeSystemBody::id) ==
+            snapshot_->bodies.end())
+      return false;
+    selected_body_id_ = body_id;
+    selected_project_id_.reset();
+    colony_body_id_.reset();
+    inspector_focus_ = InspectorFocus::body;
+    dragging_ = false;
+    notice_.clear();
+    return true;
+  }
   void close() noexcept;
   void discard_campaign() noexcept;
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}
@@ -81,22 +104,33 @@ public:
   [[nodiscard]] const std::string &notice()const noexcept{return notice_;}
   [[nodiscard]] std::size_t visible_body_count()const noexcept;
   [[nodiscard]] std::vector<stellar::native_system_travel::NativeLocalLaneGeometry> lane_geometry()const;
+  // Directory containing assets/visual/stars; empty keeps procedural stars.
+  void set_celestial_asset_root(std::filesystem::path root){celestial_appearance_.set_asset_root(std::move(root));}
   [[nodiscard]] SystemWorkspaceCommand handle(const stellar::native_map::InputEvent&,int width,int height);
   void render(stellar::native_map::DrawList&,int width,int height);
   void reset_fit(int width,int height);
 private:
-  enum class InspectorFocus { automatic, body, fleet };
+  enum class InspectorFocus { automatic, body, fleet, infrastructure };
   void resize(int width,int height);
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
+  [[nodiscard]] const stellar::native_system::NativeSystemInfrastructureMarker *selected_infrastructure()const noexcept;
+  [[nodiscard]] std::optional<stellar::native_map::Point>
+  infrastructure_position(
+      const stellar::native_system::NativeSystemInfrastructureMarker &,
+      std::size_t index) const;
+  [[nodiscard]] std::optional<std::string>
+  hit_infrastructure(stellar::native_map::Point) const;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
   SystemImageProvider image_provider_;
   SystemTextMeasurer text_measurer_;
   NativeCelestialAppearanceRenderer celestial_appearance_;
+  stellar::native_orbital::NativeOrbitalStructureRenderer structures_;
   std::optional<stellar::native_system::NativeSystemSnapshot> snapshot_;
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;
   std::optional<int> selected_body_id_;
+  std::optional<std::string> selected_project_id_;
   std::optional<int> colony_body_id_;
   std::optional<NativeSystemSettlementStatus> settlement_status_;
   std::optional<stellar::native_system_travel::NativeSystemTravelSnapshot> travel_;

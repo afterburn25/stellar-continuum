@@ -1,4 +1,5 @@
 #include "native_fleet_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -13,16 +14,15 @@ namespace {
 using namespace stellar::native_fleet;
 using namespace stellar::native_map;
 
-constexpr Color panel_color{7, 17, 32, 242};
-constexpr Color row_color{12, 31, 54, 248};
-constexpr Color hover_color{24, 61, 94, 252};
-constexpr Color selected_color{19, 73, 68, 252};
-constexpr Color border_color{91, 151, 205, 235};
-constexpr Color own_color{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color warning{255, 190, 112, 255};
-constexpr Color failure{255, 133, 123, 255};
+constexpr Color row_color = native_ui::color::surface_secondary;
+constexpr Color hover_color = native_ui::color::surface_hover;
+constexpr Color selected_color = native_ui::color::surface_raised;
+constexpr Color border_color = native_ui::color::keyline_strong;
+constexpr Color own_color = native_ui::color::success;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color warning = native_ui::color::caution;
+constexpr Color failure = native_ui::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -112,7 +112,7 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const auto inner_width = panel.width - 24.f * scale;
   const UiRect heading{inner_x, panel.y + 12.f * scale, inner_width,
                        28.f * scale};
-  const auto list_height = std::clamp(panel.height * .31f, 82.f * scale,
+  const auto list_height = std::clamp(panel.height * .24f, 82.f * scale,
                                       190.f * scale);
   const UiRect list{inner_x, heading.y + heading.height + 8.f * scale,
                     inner_width, list_height};
@@ -122,11 +122,35 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                         46.f * scale};
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
-  const auto fleet_height = detail_space * .43f;
+  const auto fleet_height = detail_space * .58f;
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
                      std::max(0.f, detail_space - fleet_height - 6.f * scale)};
+  const UiRect engage{details.x + details.width - 96.f * scale,
+                      details.y + details.height - 34.f * scale,
+                      92.f * scale, 30.f * scale};
+  // Strategic military orders sit at the details bottom-left for armed
+  // fleets (reference UiIssueMilitaryOrder Hold/Defend/Retreat buttons);
+  // LOCATE hugs the right edge ahead of ENGAGE and reuses the ENGAGE slot
+  // for unarmed selections (reference UiFocusOwnedFleet).
+  const float order_button_width = 76.f * scale;
+  const UiRect order_hold{details.x,
+                          details.y + details.height - 34.f * scale,
+                          order_button_width, 30.f * scale};
+  const UiRect order_defend{order_hold.x + order_button_width + 8.f * scale,
+                            order_hold.y, order_button_width, 30.f * scale};
+  const UiRect order_retreat{order_defend.x + order_button_width +
+                                 8.f * scale,
+                             order_hold.y, order_button_width, 30.f * scale};
+  const UiRect locate{engage.x - order_button_width - 8.f * scale, engage.y,
+                      order_button_width, 30.f * scale};
+  // Civilian recovery buttons sit at the details bottom edge, left of ENGAGE
+  // (which never coexists with them — armed fleets are military).
+  const UiRect hold{details.x, details.y + details.height - 34.f * scale,
+                    76.f * scale, 30.f * scale};
+  const UiRect return_base{hold.x + hold.width + 8.f * scale, hold.y,
+                           138.f * scale, 30.f * scale};
   return {scale,
           static_cast<int>(std::lround(20.f * scale)),
           static_cast<int>(std::lround(14.f * scale)),
@@ -137,18 +161,29 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           details,
           route,
           feedback,
-          confirm};
+          confirm,
+          engage,
+          order_hold,
+          order_defend,
+          order_retreat,
+          locate,
+          hold,
+          return_base};
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
   const auto generation_changed =
       view_ && view_->campaign_generation != view.campaign_generation;
+  const auto selection_changed =
+      !view_ || view_->selected_fleet_id != view.selected_fleet_id;
   if (generation_changed) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
     list_scroll_ = 0.f;
   }
+  if (generation_changed || selection_changed)
+    return_needs_confirmation_ = false;
   view_ = std::move(view);
   const auto selected = view_->selected_fleet_id
                             ? std::ranges::find(view_->own_fleets,
@@ -167,10 +202,12 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 
 void NativeFleetWorkspace::discard_campaign() {
   view_.reset();
+  overview_.reset();
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
   list_scroll_ = 0.f;
+  return_needs_confirmation_ = false;
 }
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
@@ -218,6 +255,31 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
+    if (const auto *fleet = selected_fleet(); fleet) {
+      const bool armed =
+          fleet->combat_status && fleet->combat_status->is_armed;
+      if (armed) {
+        if (layout.order_hold.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryHold, true, fleet->id};
+        if (layout.order_defend.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryDefend, true, fleet->id};
+        if (layout.order_retreat.contains(event.position))
+          return {FleetWorkspaceCommandKind::MilitaryRetreat, true, fleet->id};
+        if (layout.engage.contains(event.position))
+          return {FleetWorkspaceCommandKind::Engage, true, fleet->id};
+        if (layout.locate.contains(event.position))
+          return {FleetWorkspaceCommandKind::Locate, true, fleet->id};
+      } else if (layout.engage.contains(event.position))
+        return {FleetWorkspaceCommandKind::Locate, true, fleet->id};
+    }
+    if (const auto *fleet = selected_fleet();
+        fleet && native_fleet::is_civilian_role(fleet->role)) {
+      if (layout.hold.contains(event.position))
+        return {FleetWorkspaceCommandKind::HoldResume, true, fleet->id};
+      if (!fleet->return_to_base_requested &&
+          layout.return_base.contains(event.position))
+        return {FleetWorkspaceCommandKind::ReturnToBase, true, fleet->id};
+    }
     if (view_) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
@@ -229,6 +291,20 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
           return {FleetWorkspaceCommandKind::Select, true,
                   view_->own_fleets[index].id};
       }
+    }
+    // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
+    if (overview_ && !selected_fleet_id()) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      const auto overview_layout =
+          native_overview::overview_layout_for(*overview_, content);
+      for (std::size_t index = 0;
+           index < overview_layout.colony_rows.size(); ++index)
+        if (overview_layout.colony_rows[index].contains(event.position))
+          return {FleetWorkspaceCommandKind::OpenColony, true, 0, 0, {},
+                  overview_->colonies[index].colony_id};
     }
     return {FleetWorkspaceCommandKind::None, true};
   }
@@ -266,11 +342,10 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
          own_color});
   }
 
-  fill(out, layout.panel, panel_color);
-  stroke(out, layout.panel, border_color);
+  native_ui::panel(out, layout.panel, native_ui::Tone::Military);
   text(out, layout.heading, "PLAYER FLEETS", bright,
        layout.title_font_pixels, FontFace::Heading);
-  fill(out, layout.list, {5, 14, 27, 250});
+  fill(out, layout.list, native_ui::color::surface_opaque);
   stroke(out, layout.list, border_color);
   if (!view_ || view_->own_fleets.empty()) {
     text(out,
@@ -294,6 +369,8 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       fill(out, *clipped,
            selected ? selected_color
                     : clipped->contains(pointer_) ? hover_color : row_color);
+      if (selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height}, own_color);
       float text_left = row.x + 8.f * layout.scale;
       float text_width = row.width - 16.f * layout.scale;
       if (ship_art) {
@@ -332,34 +409,130 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
 
   const auto *fleet = selected_fleet();
   if (!fleet) {
-    text(out, layout.details,
-         "Select an owned fleet on the map or in the outliner.", muted,
-         layout.body_font_pixels);
+    // Reference EmpireOverviewPanel empire mode: the selected-system home
+    // reference plus the own-colony quick list fill the detail area.
+    if (overview_) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      native_overview::render_empire_overview(
+          out, *overview_,
+          native_overview::overview_layout_for(*overview_, content),
+          pointer_);
+    } else {
+      text(out, layout.details,
+           "Select an owned fleet on the map or in the outliner.", muted,
+           layout.body_font_pixels);
+    }
   } else {
-    const std::string details =
-        fleet->name + "\n" + role_name(fleet->role) + "  |  " +
-        transit_name(fleet->transit_phase) + "\nOwn strength " +
-        number(fleet->combat_power) + "\nFuel " +
-        number(fleet->fuel_remaining_light_years, 2) + " / " +
-        number(fleet->fuel_capacity_light_years, 2) + " ly\nMaximum leg " +
-        number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
-        number(fleet->strategic_speed, 2) + " ly/day";
+    fill(out, layout.details, native_ui::color::surface_opaque);
+    stroke(out, layout.details, native_ui::color::keyline);
+    fill(out, layout.route, native_ui::color::surface_opaque);
+    stroke(out, layout.route, native_ui::color::keyline);
     auto details_bounds = layout.details;
     if (ship_art) {
       const auto image = artwork(*fleet);
-      const float side = std::min(layout.details.height - 8.f * layout.scale,
+      const float side = std::min(layout.details.height - 16.f * layout.scale,
                                   96.f * layout.scale);
       if (image && side >= 8.f * layout.scale) {
         out.overlay.emplace_back(Image{
             image,
             {layout.details.x + layout.details.width - side -
-                 4.f * layout.scale,
-             layout.details.y + 4.f * layout.scale, side, side},
+                 8.f * layout.scale,
+             layout.details.y + 8.f * layout.scale, side, side},
             std::nullopt, {255, 255, 255, 255}, layout.details});
-        details_bounds.width -= side + 10.f * layout.scale;
+        details_bounds.width -= side + 14.f * layout.scale;
       }
     }
-    text(out, details_bounds, details, bright, layout.small_font_pixels);
+    const auto detail_x = details_bounds.x + 10.f * layout.scale;
+    const auto detail_w = details_bounds.width - 20.f * layout.scale;
+    text(out, {detail_x, details_bounds.y + 8.f * layout.scale, detail_w,
+               24.f * layout.scale},
+         fleet->name, bright, layout.body_font_pixels, FontFace::Heading);
+    text(out, {detail_x, details_bounds.y + 31.f * layout.scale, detail_w,
+               18.f * layout.scale},
+         role_name(fleet->role) + "  ·  " +
+             transit_name(fleet->transit_phase),
+         own_color, layout.small_font_pixels);
+    fill(out, {detail_x, details_bounds.y + 53.f * layout.scale, detail_w, 1.f},
+         native_ui::color::keyline);
+    text(out, {detail_x, details_bounds.y + 62.f * layout.scale, detail_w,
+               18.f * layout.scale},
+         "COMBAT POWER", muted, layout.small_font_pixels);
+    text(out, {detail_x, details_bounds.y + 79.f * layout.scale, detail_w,
+               22.f * layout.scale},
+         number(fleet->combat_power), bright, layout.body_font_pixels);
+    text(out, {detail_x, details_bounds.y + 107.f * layout.scale, detail_w,
+               18.f * layout.scale},
+         "FUEL  " + number(fleet->fuel_remaining_light_years, 2) + " / " +
+             number(fleet->fuel_capacity_light_years, 2) + " ly",
+         muted, layout.small_font_pixels);
+    native_ui::progress(
+        out,
+        {detail_x, details_bounds.y + 127.f * layout.scale, detail_w,
+         5.f * layout.scale},
+        fleet->fuel_capacity_light_years <= 0.
+            ? 0.
+            : fleet->fuel_remaining_light_years /
+                  fleet->fuel_capacity_light_years,
+        fleet->fuel_remaining_light_years + 1e-9 >=
+                fleet->maximum_leg_range_light_years
+            ? native_ui::Tone::Success
+            : native_ui::Tone::Caution);
+    text(out, {detail_x, details_bounds.y + 141.f * layout.scale, detail_w,
+               18.f * layout.scale},
+         "Maximum leg " + number(fleet->maximum_leg_range_light_years, 2) +
+             " ly  ·  Speed " + number(fleet->strategic_speed, 2) + " ly/day",
+         muted, layout.small_font_pixels);
+    // Reference ship inspector Recovery row: an earlier failed return reason
+    // wins over the live preview.
+    const std::string recovery =
+        fleet->return_to_base_failure_reason
+            ? *fleet->return_to_base_failure_reason
+            : fleet->civilian_return_preview;
+    if (native_fleet::is_civilian_role(fleet->role) && !recovery.empty() &&
+        details_bounds.height >= 250.f * layout.scale)
+      text(out, {detail_x, details_bounds.y + 176.f * layout.scale, detail_w,
+                 42.f * layout.scale},
+           "RECOVERY  " + recovery, warning, layout.small_font_pixels);
+    const bool armed =
+        fleet->combat_status && fleet->combat_status->is_armed;
+    if (armed) {
+      const auto order_button = [&](UiRect bounds, const char *label,
+                                    native_ui::Tone tone) {
+        native_ui::button(out, bounds, label, pointer_,
+                          layout.small_font_pixels, tone);
+      };
+      // Reference UiIssueMilitaryOrder row: Hold / Defend / Retreat.
+      order_button(layout.order_hold, "HOLD", native_ui::Tone::Military);
+      order_button(layout.order_defend, "DEFEND", native_ui::Tone::Military);
+      order_button(layout.order_retreat, "RETREAT", native_ui::Tone::Danger);
+      order_button(layout.locate, "LOCATE", native_ui::Tone::Selected);
+      order_button(layout.engage, "ENGAGE", native_ui::Tone::Danger);
+    } else {
+      // Reference UiFocusOwnedFleet: unarmed selections keep the Locate
+      // action in the right-edge command slot.
+      native_ui::button(out, layout.engage, "LOCATE", pointer_,
+                        layout.small_font_pixels, native_ui::Tone::Selected);
+    }
+    // Civilian recovery controls (reference CivilianHoldResume /
+    // CivilianReturnToBase buttons).
+    if (native_fleet::is_civilian_role(fleet->role)) {
+      native_ui::button(out, layout.hold,
+                        fleet->hold_requested ? "RESUME" : "HOLD", pointer_,
+                        layout.small_font_pixels, native_ui::Tone::Caution);
+      const bool return_disabled = fleet->return_to_base_requested;
+      native_ui::button(
+          out, layout.return_base,
+          return_disabled ? "RETURN QUEUED"
+          : return_needs_confirmation_ ? "CONFIRM RETURN"
+                                       : "RETURN TO BASE",
+          pointer_, layout.small_font_pixels,
+          return_needs_confirmation_ ? native_ui::Tone::Caution
+                                     : native_ui::Tone::Selected,
+          false, !return_disabled);
+    }
     std::string route;
     if (preview_) {
       route = "ROUTE PREVIEW\nDestination " + target_display_name_ +
@@ -376,8 +549,18 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     } else {
       route = "ROUTE PREVIEW\nRight-click a system to preview travel.";
     }
-    text(out, layout.route, std::move(route), bright,
-         layout.small_font_pixels);
+    text(out, {layout.route.x + 10.f * layout.scale,
+               layout.route.y + 8.f * layout.scale,
+               layout.route.width - 20.f * layout.scale,
+               layout.route.height - 16.f * layout.scale},
+         std::move(route), bright, layout.small_font_pixels);
+    if (fleet->destination_system_id)
+      native_ui::progress(
+          out,
+          {layout.route.x + 10.f * layout.scale,
+           layout.route.y + layout.route.height - 10.f * layout.scale,
+           layout.route.width - 20.f * layout.scale, 5.f * layout.scale},
+          fleet->transit_progress, native_ui::Tone::Selected);
   }
 
   const auto feedback = !notice_.empty()
@@ -390,16 +573,26 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
   if (preview_ && preview_->command_available) {
-    fill(out, layout.confirm,
-         layout.confirm.contains(pointer_) ? hover_color : selected_color);
-    stroke(out, layout.confirm, own_color);
-    text(out, {layout.confirm.x + 6.f * layout.scale,
-               layout.confirm.y + 9.f * layout.scale,
-               layout.confirm.width - 12.f * layout.scale,
-               layout.confirm.height - 12.f * layout.scale},
-         "CONFIRM TRAVEL", bright, layout.body_font_pixels,
-         FontFace::Interface, TextAlign::Center);
+    native_ui::button(out, layout.confirm, "CONFIRM TRAVEL", pointer_,
+                      layout.body_font_pixels, native_ui::Tone::Success,
+                      true);
   }
+  if (view_)
+    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
+      const auto &candidate = view_->own_fleets[index];
+      const UiRect row{layout.list.x,
+                       layout.list.y + list_scroll_ +
+                           static_cast<float>(index) * 45.f * layout.scale,
+                       layout.list.width, 41.f * layout.scale};
+      if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
+      native_ui::tooltip(
+          out, {layout.panel.x - 330.f * layout.scale, row.y}, candidate.name,
+          role_name(candidate.role) + " · " +
+              transit_name(candidate.transit_phase) +
+              ". Select for readiness, range, fuel and orders.",
+          width, height, layout.scale, native_ui::Tone::Military);
+      break;
+    }
 }
 
 const std::optional<NativeFleetMapView> &NativeFleetWorkspace::view() const noexcept {

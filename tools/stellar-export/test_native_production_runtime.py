@@ -141,7 +141,8 @@ class NativeProductionExportTests(unittest.TestCase):
                               mutate_reload=False, skipped_save=False,
                               frozen_time=False, no_debit=False,
                               authorization=350, nonfinite_treasury=False,
-                              unexpected_reload_input=False):
+                              unexpected_reload_input=False,
+                              missing_shortcut=False):
         with tempfile.TemporaryDirectory(prefix="stellar-construction-export-test-") as temporary:
             root = Path(temporary)
             package = root / "package"
@@ -184,9 +185,10 @@ class NativeProductionExportTests(unittest.TestCase):
                 runs += 1
                 save.write_text(json.dumps(payload), encoding="utf-8")
                 save_marker = "preserved" if skipped_save and runs == 2 else "ok"
+                shortcut = "" if missing_shortcut else " shortcut=1"
                 return subprocess.CompletedProcess(
                     args, 0, "gpu_driver=vulkan systems=20 "
-                    f"save={save_marker} construction={marker}", "")
+                    f"save={save_marker} construction={marker}{shortcut}", "")
 
             with mock.patch("native_production_runtime.subprocess.run",
                             side_effect=launch):
@@ -252,6 +254,10 @@ class NativeProductionExportTests(unittest.TestCase):
 
     def test_construction_ui_start_quote_and_reload(self):
         self.exercise_construction()
+
+    def test_construction_missing_shortcut_evidence_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "candidate shortcuts"):
+            self.exercise_construction(missing_shortcut=True)
 
     def test_construction_start_must_be_while_running(self):
         with self.assertRaisesRegex(RuntimeError, "start while running"):

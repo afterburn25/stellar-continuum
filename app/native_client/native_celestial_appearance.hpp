@@ -1,18 +1,25 @@
 #pragma once
 
+#include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 
+namespace stellar::native_system {
+enum class NativeSystemRingClass : int;
+}
 namespace stellar::native_system_ui {
 
 struct NativeStellarDiscAppearance {
   stellar::native_map::Color spectral_color{213, 217, 214, 255};
   bool black_hole{};
   std::uint32_t deterministic_seed{};
+  // Approved photographic sprite class; absent or BlackHole stays procedural.
+  std::optional<stellar::core::StellarClass> stellar_class;
 };
 
 struct NativeCelestialAppearanceStats {
@@ -28,6 +35,8 @@ public:
 
   NativeCelestialAppearanceRenderer();
   ~NativeCelestialAppearanceRenderer();
+  // Directory containing assets/visual/stars; empty keeps procedural discs.
+  void set_asset_root(std::filesystem::path);
   NativeCelestialAppearanceRenderer(NativeCelestialAppearanceRenderer &&) noexcept;
   NativeCelestialAppearanceRenderer &
   operator=(NativeCelestialAppearanceRenderer &&) noexcept;
@@ -42,11 +51,11 @@ public:
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
   void append_ring_back(
       stellar::native_map::DrawList &, stellar::native_map::Point center,
-      float planet_radius,
+      float planet_radius, stellar::native_system::NativeSystemRingClass,
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
   void append_ring_front(
       stellar::native_map::DrawList &, stellar::native_map::Point center,
-      float planet_radius,
+      float planet_radius, stellar::native_system::NativeSystemRingClass,
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
 
   [[nodiscard]] NativeCelestialAppearanceStats stats() const noexcept;

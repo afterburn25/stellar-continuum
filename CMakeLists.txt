@@ -62,7 +62,8 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/civilian_recovery.cpp core/src/colonization_runtime.cpp core/src/survey_operations.cpp core/src/exploration_planning.cpp core/src/exploration_advance.cpp
   core/src/combat_simulation.cpp core/src/combat_command_runtime.cpp
   core/src/combat_readiness_detail.cpp core/src/own_combat_fleet_status.cpp
-  core/src/campaign_coordinator.cpp core/src/coordinator_commands.cpp
+  core/src/campaign_coordinator.cpp core/src/coordinator_commands.cpp core/src/developer_commands.cpp
+  core/src/developer_campaign_json.cpp core/src/developer_campaign_save.cpp core/src/developer_campaign_session.cpp
   core/src/adaptive_research_catalog.cpp core/src/adaptive_research_applicability_catalog.cpp
   core/src/adaptive_research_facilities.cpp core/src/adaptive_research_progress_policy.cpp
   core/src/adaptive_research_state.cpp core/src/adaptive_research_eligibility.cpp
@@ -256,6 +257,7 @@ foreach(STELLAR_RESEARCH_FILE IN LISTS STELLAR_RESEARCH_RUNTIME_FILES)
 endforeach()
 install(FILES third_party/nlohmann/LICENSE.MIT DESTINATION Licenses RENAME nlohmann-JSON-MIT.txt)
 install(FILES third_party/dotnet/LICENSE.TXT DESTINATION Licenses RENAME dotnet-MIT.txt)
+install(FILES third_party/dr_mp3/LICENSE.txt DESTINATION Licenses RENAME dr_mp3-MIT-0.txt)
 if(BUILD_TESTING)
   if(WIN32)
     # Compile the isolated fault-injection variant separately; no hooks enter
@@ -355,6 +357,18 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/native-tests/fixtures/persistable-fresh-campaign.json"
     "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
   set_tests_properties(persistable_fresh_campaign_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_developer_commands_tests native-tests/developer_commands_tests.cpp)
+  target_link_libraries(stellar_developer_commands_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME developer_commands_parity COMMAND stellar_developer_commands_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(developer_commands_parity PROPERTIES TIMEOUT 120)
+  add_executable(stellar_developer_campaign_json_tests native-tests/developer_campaign_json_tests.cpp)
+  target_link_libraries(stellar_developer_campaign_json_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME developer_campaign_json_parity COMMAND stellar_developer_campaign_json_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(developer_campaign_json_parity PROPERTIES TIMEOUT 120)
+  add_executable(stellar_developer_campaign_session_tests native-tests/developer_campaign_session_tests.cpp)
+  target_link_libraries(stellar_developer_campaign_session_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME developer_campaign_session_parity COMMAND stellar_developer_campaign_session_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(developer_campaign_session_parity PROPERTIES TIMEOUT 120)
   add_executable(stellar_freight_tests native-tests/freight_tests.cpp)
   target_link_libraries(stellar_freight_tests PRIVATE stellar_core stellar_json)
   add_test(NAME freight_parity COMMAND stellar_freight_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/freight.json")
@@ -797,6 +811,9 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/src/Game")
   set_tests_properties(legacy_galaxy_payload_persistence_parity PROPERTIES TIMEOUT 300)
   add_executable(stellar_player_campaign_persistence_tests native-tests/player_campaign_persistence_tests.cpp)
+  if(MSVC)
+    target_compile_options(stellar_player_campaign_persistence_tests PRIVATE /bigobj)
+  endif()
   target_link_libraries(stellar_player_campaign_persistence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME player_campaign_persistence_parity COMMAND stellar_player_campaign_persistence_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-persistence.json"

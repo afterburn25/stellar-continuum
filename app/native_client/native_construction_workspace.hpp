@@ -53,6 +53,7 @@ public:
   void set_view(stellar::native_construction::NativeConstructionView view);
   void discard_campaign();
   void set_notice(std::string message, bool accepted);
+  void select_project(std::string project_id);
   [[nodiscard]] bool arm_cancel_confirmation(std::string_view project_id);
 
   [[nodiscard]] const std::optional<

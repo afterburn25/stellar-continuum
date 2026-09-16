@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <map>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -21,17 +22,20 @@ struct FloatColor {float r{},g{},b{},a{1.f};};
 struct Vector3 {float x{},y{},z{};};
 struct SourceDisc {float center_x{},center_y{},radius_x{},radius_y{};};
 
+[[nodiscard]] bool sprite_key(std::string_view key){
+  static constexpr std::array keys{"arid-world","barren-world","continental-world","cracked-world","desert-world","frozen-world","gaia-world","inferno-world","ocean-world","tomb-world","tropical-world","volcano-world","wormhole-anomaly",
+      "mercury","venus","earth","mars","jupiter","saturn","uranus","neptune","moon"};
+  return std::ranges::find(keys,key)!=keys.end();
+}
 [[nodiscard]] std::optional<SourceDisc> source_disc(std::string_view key){
-  if(key=="earth")return SourceDisc{.5280f,.5836f,.1851f,.1968f};
-  if(key=="mercury")return SourceDisc{.5f,.5f,.454f,.454f};
-  if(key=="uranus")return SourceDisc{.25f,.501f,.176f,.352f};
-  if(key=="moon")return SourceDisc{.529f,.503f,.398f,.398f};
-  if(key=="venus")return SourceDisc{.5f,.5f,.414f,.426f};
+  // pre-rendered sprite discs sit centered at r=300 on a 1024 canvas and are
+  // already lit, so they sample through the lighting-free crop path
+  if(sprite_key(key))return SourceDisc{.5f,.5f,300.f/1024.f,300.f/1024.f};
   return std::nullopt;
 }
-[[nodiscard]] bool canonical_key(std::string_view key){
-  static constexpr std::array keys{"mercury","venus","earth","mars","jupiter","saturn","uranus","neptune","moon"};
-  return std::ranges::find(keys,key)!=keys.end();
+[[nodiscard]] bool approved_key(std::string_view key){return sprite_key(key);}
+[[nodiscard]] std::filesystem::path asset_path(const std::filesystem::path &root,std::string_view key){
+  return root/"planets"/(std::string(key)+".png");
 }
 [[nodiscard]] bool unknown_class(NativeSystemBodyVisualClass value){return value==NativeSystemBodyVisualClass::unknown_planet||value==NativeSystemBodyVisualClass::unknown_moon;}
 [[nodiscard]] FloatColor class_color(NativeSystemBodyVisualClass value){
@@ -75,7 +79,7 @@ struct SourceDisc {float center_x{},center_y{},radius_x{},radius_y{};};
 struct NativePlanetDiscAssets::Storage {
   struct Key {std::uint64_t generation{};int body_id{};bool fully_surveyed{};NativeSystemBodyVisualClass visual_class{};std::optional<std::string> texture_key;std::uint32_t seed{};int lighting_step{};bool operator==(const Key&)const=default;};
   struct Entry {Key key;std::shared_ptr<const RgbaImage> image;std::uint64_t last_use{};};
-  explicit Storage(std::filesystem::path root){if(root.empty())throw std::invalid_argument("A Sol appearance asset directory is required.");asset_root=std::filesystem::absolute(std::move(root));}
+  explicit Storage(std::filesystem::path root){if(root.empty())throw std::invalid_argument("A visual appearance asset directory is required.");asset_root=std::filesystem::absolute(std::move(root));}
   std::filesystem::path asset_root;std::thread::id owner{std::this_thread::get_id()};std::optional<std::uint64_t> generation;std::vector<Entry> cache;std::size_t bytes{};std::uint64_t use{},decodes{},generated{};
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("Planet disc assets must be used on their owner thread.");}
   void bind(std::uint64_t value){if(generation&&value<*generation)throw std::invalid_argument("A stale campaign generation cannot replace planet disc assets.");if(!generation||*generation!=value){cache.clear();bytes=0;generation=value;}}
@@ -86,8 +90,8 @@ NativePlanetDiscAssets::NativePlanetDiscAssets(std::filesystem::path root):stora
 NativePlanetDiscAssets::~NativePlanetDiscAssets()=default;
 std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::image(const SystemBodyAppearance &appearance){
   storage_->require_owner();storage_->bind(appearance.campaign_generation);if(appearance.body_id<0)throw std::invalid_argument("Planet disc body identity must be nonnegative.");if(!std::isfinite(appearance.lighting_longitude))throw std::invalid_argument("Planet disc lighting must be finite.");if(!appearance.fully_surveyed&&!unknown_class(appearance.visual_class))throw std::invalid_argument("Reconnaissance bodies cannot request a known visual class.");if(appearance.texture_key&&(!appearance.fully_surveyed||unknown_class(appearance.visual_class)))throw std::invalid_argument("Observer-hidden bodies cannot request a Sol appearance asset.");if(unknown_class(appearance.visual_class))return {};
-  if(appearance.texture_key&&!canonical_key(*appearance.texture_key))throw std::invalid_argument("The observer-safe Sol appearance key is not approved.");const auto lighting_step=static_cast<int>(std::lround(std::remainder(appearance.lighting_longitude,2.f*std::numbers::pi_v<float>)*4096.f));Storage::Key key{appearance.campaign_generation,appearance.body_id,appearance.fully_surveyed,appearance.visual_class,appearance.texture_key,appearance.deterministic_seed,lighting_step};if(const auto found=std::ranges::find(storage_->cache,key,&Storage::Entry::key);found!=storage_->cache.end()){found->last_use=++storage_->use;return found->image;}
-  std::shared_ptr<const RgbaImage> source;if(appearance.texture_key){const auto path=storage_->asset_root/(*appearance.texture_key+".jpg");try{source=stellar::native_map::decode_rgba_image(path);}catch(const std::exception &error){const auto value=path.u8string();throw std::runtime_error("Planet appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(value.data()),value.size())+": "+error.what());}++storage_->decodes;}const auto result=generate_disc(appearance,source.get(),appearance.texture_key?source_disc(*appearance.texture_key):std::nullopt,lighting_step);source.reset();storage_->evict(result->byte_size());storage_->cache.push_back({std::move(key),result,++storage_->use});storage_->bytes+=result->byte_size();++storage_->generated;return result;
+  if(appearance.texture_key&&!approved_key(*appearance.texture_key))throw std::invalid_argument("The observer-safe appearance key is not approved.");const auto lighting_step=static_cast<int>(std::lround(std::remainder(appearance.lighting_longitude,2.f*std::numbers::pi_v<float>)*4096.f));Storage::Key key{appearance.campaign_generation,appearance.body_id,appearance.fully_surveyed,appearance.visual_class,appearance.texture_key,appearance.deterministic_seed,lighting_step};if(const auto found=std::ranges::find(storage_->cache,key,&Storage::Entry::key);found!=storage_->cache.end()){found->last_use=++storage_->use;return found->image;}
+  std::shared_ptr<const RgbaImage> source;if(appearance.texture_key){const auto path=asset_path(storage_->asset_root,*appearance.texture_key);try{source=stellar::native_map::decode_rgba_image(path);}catch(const std::exception &error){const auto value=path.u8string();throw std::runtime_error("Planet appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(value.data()),value.size())+": "+error.what());}++storage_->decodes;}const auto result=generate_disc(appearance,source.get(),appearance.texture_key?source_disc(*appearance.texture_key):std::nullopt,lighting_step);source.reset();storage_->evict(result->byte_size());storage_->cache.push_back({std::move(key),result,++storage_->use});storage_->bytes+=result->byte_size();++storage_->generated;return result;
 }
 void NativePlanetDiscAssets::discard_campaign()noexcept{storage_->cache.clear();storage_->bytes=0;storage_->generation.reset();}
 std::size_t NativePlanetDiscAssets::cache_entries()const noexcept{return storage_->cache.size();}std::size_t NativePlanetDiscAssets::cache_bytes()const noexcept{return storage_->bytes;}std::uint64_t NativePlanetDiscAssets::source_decode_count()const noexcept{return storage_->decodes;}std::uint64_t NativePlanetDiscAssets::generated_disc_count()const noexcept{return storage_->generated;}

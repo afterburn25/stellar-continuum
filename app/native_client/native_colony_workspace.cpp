@@ -1,4 +1,5 @@
 #include "native_colony_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,15 +13,15 @@ namespace {
 using namespace stellar::native_colony;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color warning{244, 189, 94, 255};
+constexpr Color panel = native_ui::color::surface;
+constexpr Color inset = native_ui::color::surface_opaque;
+constexpr Color row = native_ui::color::surface_secondary;
+constexpr Color hover = native_ui::color::surface_hover;
+constexpr Color border = native_ui::color::keyline_strong;
+constexpr Color bright = native_ui::color::text_primary;
+constexpr Color muted = native_ui::color::text_secondary;
+constexpr Color good = native_ui::color::success;
+constexpr Color warning = native_ui::color::caution;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -77,6 +78,10 @@ void panel_title(DrawList &out, UiRect bounds, UiRect clip, std::string value,
   if (const auto visible = intersection(bounds, clip)) {
     fill(out, *visible, inset);
     stroke(out, *visible, border);
+    fill(out, {visible->x, visible->y, 3.f, visible->height},
+         native_ui::color::selected);
+    fill(out, {bounds.x + 10.f, bounds.y + 31.f, bounds.width - 20.f, 1.f},
+         native_ui::color::keyline);
     clipped_text(out,
                  {bounds.x + 10, bounds.y + 8, bounds.width - 20, 24},
                  *visible, std::move(value), bright, pixels);
@@ -231,23 +236,15 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
   const auto site_scroll =
       std::clamp(site_scroll_,
                  std::min(0.f, layout.site_rows.height - site_content), 0.f);
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
+  native_ui::panel(out, layout.surface, native_ui::Tone::Selected);
   text(out, layout.title,
        view.colony_name + "  /  " + view.body_display_name,
        bright, layout.title_font_pixels);
-  fill(out, layout.close,
-       layout.close.contains(pointer_) ? hover : row);
-  stroke(out, layout.close, border);
-  text(out, layout.close, "BACK", bright, layout.small_font_pixels,
-       TextAlign::Center);
-  if (view.solid_surface) {
-    fill(out, layout.open_surface,
-         layout.open_surface.contains(pointer_) ? hover : row);
-    stroke(out, layout.open_surface, good);
-    text(out, layout.open_surface, "OPEN SURFACE", bright,
-         layout.small_font_pixels, TextAlign::Center);
-  }
+  native_ui::button(out, layout.close, "BACK", pointer_,
+                    layout.small_font_pixels);
+  if (view.solid_surface)
+    native_ui::button(out, layout.open_surface, "OPEN SURFACE", pointer_,
+                      layout.small_font_pixels, native_ui::Tone::Success);
 
   panel_title(out, summary, layout.details,
               view.resource_outpost ? "RESOURCE OUTPOST" : "COLONY",
@@ -271,6 +268,12 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
            std::to_string(view.construction_sites.size()) + "/" +
            std::to_string(view.building_capacity),
        muted, layout.small_font_pixels);
+  if (const auto track = intersection(
+          {sx, summary.y + summary.height - 15.f * layout.scale,
+           summary.width - 20.f * layout.scale, 6.f * layout.scale},
+          layout.details))
+    native_ui::progress(out, *track, view.infrastructure,
+                        native_ui::Tone::Selected);
 
   panel_title(out, sustenance, layout.details, "SUPPORT & LABOR",
               layout.body_font_pixels);
@@ -304,6 +307,14 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
   support("Surface workforce demand " +
           billions(view.workforce_demand_millions) + " / available " +
           billions(view.workforce_available_millions));
+  if (const auto track = intersection(
+          {ux, sustenance.y + sustenance.height - 12.f * layout.scale,
+           sustenance.width - 20.f * layout.scale, 6.f * layout.scale},
+          layout.details))
+    native_ui::progress(out, *track, view.sustenance_support_ratio,
+                        view.sustenance_support_ratio >= .999
+                            ? native_ui::Tone::Success
+                            : native_ui::Tone::Caution);
 
   panel_title(out, operations, layout.details, "ECONOMY & SURFACE OPERATIONS",
               layout.body_font_pixels);

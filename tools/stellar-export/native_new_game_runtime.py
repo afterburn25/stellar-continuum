@@ -27,6 +27,18 @@ _INTERACTION = (
 _SPECIES = "pelagic_high_pressure"
 _COUNT = 250
 _SEED = "143250"
+_RESTART_FIELDS = {
+    "saved_previous", "restarted", "entry_opened", "setup_opened",
+    "species_selected", "size_selected", "seed_entered", "create_requested",
+    "activated", "system_count", "species_id", "seed",
+    "generated_save_path", "previous_save_path", "unique_slot",
+}
+_RESTART_BOOL = (
+    "saved_previous", "restarted", "entry_opened", "setup_opened",
+    "species_selected", "size_selected", "seed_entered", "create_requested",
+    "activated", "unique_slot",
+)
+_RESTART_SEED = str(int(_SEED) + 1)
 
 
 def _source_payload(fixture: Path) -> dict:
@@ -43,10 +55,17 @@ def _source_payload(fixture: Path) -> dict:
     return payload
 
 
-def _bmp(path: Path, width: int, height: int):
+def _bmp(path: Path, stdout: str, width: int, height: int):
     data = path.read_bytes() if path.is_file() else b""
     if len(data) < 54 or data[:2] != b"BM":
         raise RuntimeError("Native New Game did not capture a BMP frame")
+    # The capture is at drawable-pixel size; on high-DPI displays that is a
+    # multiple of the requested window size. The smoke reports the actual
+    # drawable so the BMP geometry is checked against the real render surface.
+    sizes = {(width, height)}
+    drawable = re.search(r"(?:^|\s)drawable=(\d+)x(\d+)(?:\s|$)", stdout)
+    if drawable:
+        sizes.add((int(drawable.group(1)), int(drawable.group(2))))
     declared = struct.unpack_from("<I", data, 2)[0]
     offset = struct.unpack_from("<I", data, 10)[0]
     header = struct.unpack_from("<I", data, 14)[0]
@@ -55,7 +74,7 @@ def _bmp(path: Path, width: int, height: int):
     row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
     required = row * abs(actual_height)
     if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
+            (actual_width, abs(actual_height)) not in sizes or planes != 1 or
             bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
             offset + required > len(data)):
         raise RuntimeError("Native New Game capture has invalid renderer geometry")
@@ -87,6 +106,24 @@ def _diagnostic(stdout: str) -> dict:
     return state
 
 
+def _restart_diagnostic(stdout: str) -> dict:
+    match = re.search(r"(?:^|\s)new_game_restart=(\{[^\n]+\})(?:\s|$)", stdout)
+    if not match:
+        raise RuntimeError("Native mid-session New Game did not report its restart evidence")
+    try:
+        state = json.loads(match.group(1))
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("Native mid-session New Game diagnostic is malformed") from error
+    if set(state) != _RESTART_FIELDS:
+        raise RuntimeError("Native mid-session New Game diagnostic has an unexpected schema")
+    if any(state.get(key) is not True for key in _RESTART_BOOL):
+        raise RuntimeError("Native mid-session New Game did not save and complete its restart")
+    if (state.get("species_id") != _SPECIES or
+            state.get("system_count") != _COUNT or state.get("seed") != _RESTART_SEED):
+        raise RuntimeError("Native mid-session New Game changed its requested options")
+    return state
+
+
 def _resolved_reported(value, work: Path, label: str) -> Path:
     if not isinstance(value, str) or not value:
         raise RuntimeError(f"Native New Game reported no {label}")
@@ -101,7 +138,8 @@ def _resolved_reported(value, work: Path, label: str) -> Path:
     return resolved
 
 
-def _verify_campaign(payload: dict, state: dict):
+def _verify_campaign(payload: dict, state: dict, seed: str = _SEED,
+                     count: int = _COUNT):
     galaxy = payload.get("Galaxy", {})
     systems = galaxy.get("Systems")
     metadata = galaxy.get("GenerationMetadata")
@@ -110,15 +148,15 @@ def _verify_campaign(payload: dict, state: dict):
                if value.get("Id") == player_id and value.get("IsPlayer") is True]
     day = payload.get("SimulationDays")
     if (payload.get("FormatVersion") != 17 or not isinstance(systems, list) or
-            len(systems) != _COUNT or len(players) != 1):
+            len(systems) != count or len(players) != 1):
         raise RuntimeError("Generated save is not the requested Player17 campaign")
     if players[0].get("SpeciesId") != _SPECIES:
         raise RuntimeError("Generated player species differs from setup input")
-    if galaxy.get("Seed") != int(_SEED):
+    if galaxy.get("Seed") != int(seed):
         raise RuntimeError("Generated campaign seed differs from setup input")
-    if (not isinstance(metadata, dict) or metadata.get("EnteredSeed") != _SEED or
-            metadata.get("InternalSeed") != int(_SEED) or
-            metadata.get("SystemCount") != _COUNT or
+    if (not isinstance(metadata, dict) or metadata.get("EnteredSeed") != seed or
+            metadata.get("InternalSeed") != int(seed) or
+            metadata.get("SystemCount") != count or
             metadata.get("PlayerSpeciesId") != _SPECIES):
         raise RuntimeError("Generated campaign metadata differs from setup input")
     if isinstance(day, bool) or not isinstance(day, (int, float)) or not math.isfinite(day):
@@ -189,7 +227,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if not generated.is_file():
             raise RuntimeError("New Game did not create its reported independent save")
         for path in (setup_capture, loading_capture, final_capture):
-            _bmp(path, 1280, 720)
+            _bmp(path, fresh.stdout, 1280, 720)
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
         _verify_campaign(generated_payload, state)
 
@@ -199,7 +237,7 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             "--load", "--width", "1920", "--height", "1080", "--windowed",
             "--smoke", str(reload_capture),
         ], cwd, clean, "paused reload")
-        _bmp(reload_capture, 1920, 1080)
+        _bmp(reload_capture, loaded.stdout, 1920, 1080)
         if anchor.read_bytes() != anchor_bytes or not generated.is_file():
             raise RuntimeError("Reload changed the original anchor or removed generated save")
         reloaded_payload = json.loads(generated.read_text(encoding="utf-8"))
@@ -210,15 +248,60 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if before != after:
             raise RuntimeError("Generated campaign changed during paused reload/recapture")
 
-        for path in (setup_capture, loading_capture, final_capture, reload_capture):
+        restart_anchor = work / "重启-campaign.player17.json"
+        restart_anchor.write_text(json.dumps(anchor_payload, ensure_ascii=False),
+                                  encoding="utf-8")
+        restart_capture = work / "new-game-restart-1280x720.bmp"
+        restart_setup = work / "new-game-restart-1280x720-restart-setup.bmp"
+        restart_loading = work / "new-game-restart-1280x720-restart-loading.bmp"
+        restarted = _launch([
+            exe, "--asset-root", str(folder), "--save-path", str(restart_anchor),
+            "--seed", _SEED, "--width", "1280", "--height", "720",
+            "--windowed", "--new-game-restart-smoke", str(restart_capture),
+        ], cwd, clean, "mid-session restart")
+        restart_state = _restart_diagnostic(restarted.stdout)
+        previous = _resolved_reported(restart_state["previous_save_path"], work,
+                                      "previous path")
+        regenerated = _resolved_reported(restart_state["generated_save_path"], work,
+                                         "generated path")
+        if previous != restart_anchor.resolve() or regenerated == previous:
+            raise RuntimeError("Mid-session New Game did not preserve its prior campaign")
+        restart_prefix = restart_anchor.name.removesuffix(".player17.json") + "-native-"
+        restart_slot = (regenerated.name[len(restart_prefix):-len(".player17.json")]
+                        if regenerated.name.startswith(restart_prefix) and
+                        regenerated.name.endswith(".player17.json") else "")
+        if (regenerated.parent != restart_anchor.parent.resolve() or
+                not regenerated.name.startswith(restart_prefix) or
+                not regenerated.name.endswith(".player17.json") or
+                not restart_slot.isascii() or not restart_slot.isdigit() or
+                int(restart_slot) < 1):
+            raise RuntimeError("Mid-session New Game path is not its isolated native sibling")
+        for path in (restart_setup, restart_loading, restart_capture):
+            _bmp(path, restarted.stdout, 1280, 720)
+        if not regenerated.is_file():
+            raise RuntimeError("Mid-session New Game did not create its independent save")
+        _verify_campaign(json.loads(regenerated.read_text(encoding="utf-8")),
+                         restart_state, seed=_RESTART_SEED)
+        if not restart_anchor.is_file():
+            raise RuntimeError("Mid-session New Game removed the prior campaign save")
+        resaved = json.loads(restart_anchor.read_text(encoding="utf-8"))
+        resaved_systems = resaved.get("Galaxy", {}).get("Systems")
+        if (resaved.get("FormatVersion") != 17 or
+                not isinstance(resaved_systems, list) or not resaved_systems):
+            raise RuntimeError("Mid-session New Game did not re-save the prior campaign")
+
+        for path in (setup_capture, loading_capture, final_capture, reload_capture,
+                     restart_setup, restart_loading, restart_capture):
             evidence = folder.parent / (folder.name + "-" + path.name)
             shutil.copy2(path, evidence)
             captures.append(str(evidence))
-        diagnostics.extend((fresh.stdout.strip(), loaded.stdout.strip()))
+        diagnostics.extend((fresh.stdout.strip(), loaded.stdout.strip(),
+                            restarted.stdout.strip()))
         return {
             "nativeNewGamePlayerInput": True,
             "nativeNewGameIndependentSave": True,
             "nativeNewGamePausedReload": True,
+            "nativeNewGameMidSessionRestart": True,
             "newGameCaptures": captures,
             "newGameDiagnostics": diagnostics,
         }

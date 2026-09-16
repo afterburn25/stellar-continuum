@@ -1,6 +1,9 @@
 #pragma once
 
+#include "native_notifications.hpp"
+
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/developer_commands.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
@@ -16,6 +19,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace stellar::native_map {
@@ -27,6 +31,7 @@ enum class SessionNoticeKind {
   Saved,
   Loaded,
   Recovered,
+  Status,
   Failure,
 };
 
@@ -97,6 +102,20 @@ public:
   [[nodiscard]] const SessionNotice &notice() const;
   [[nodiscard]] bool load_pending() const;
   [[nodiscard]] bool exit_ready() const;
+  // Developer sessions carry campaign provenance; it selects the Developer
+  // frame policy, autosave policy and save envelope.
+  [[nodiscard]] bool developer_mode() const;
+  [[nodiscard]] bool developer_tools_used() const;
+
+  // Source: Main.UiRunDeveloperCommand — authorized Developer commands run
+  // through the canonical simulation, then one checkpoint write. The caller
+  // guards the open campaign menu before invoking.
+  [[nodiscard]] stellar::core::DeveloperCommandResult
+  run_developer_command(std::string_view command_id,
+                        const std::string &saved_at_utc);
+  // Reference TryPersistIntegratedCampaign for mode-switch checkpoints: an
+  // immediate capture+write that does not wait for a completed frame.
+  bool checkpoint_now(const std::string &saved_at_utc);
 
   [[nodiscard]] stellar::core::CampaignFrameResult
   advance(double real_delta_seconds, const std::string &saved_at_utc);
@@ -108,6 +127,23 @@ public:
   // when a fully validated load candidate replaced the live session.
   [[nodiscard]] bool service(const std::string &saved_at_utc,
                              bool menu_open);
+
+  // Bounded player-visible session history (reference PlayerNotificationFeed).
+  // Command paths publish accepted results through publish_notification;
+  // advance() harvests player-filtered step events automatically.
+  [[nodiscard]] const native_notifications::NativeNotificationFeed &
+  notifications() const noexcept {
+    return notifications_;
+  }
+  void publish_notification(std::string category, std::string message,
+                            std::optional<int> diplomatic_contact_id =
+                                std::nullopt);
+  // Reference SetStatus: a transient status line for keyboard and
+  // command-driven feedback (candidate cycling, speed changes, rejections).
+  void publish_status(std::string message) {
+    require_owner();
+    notice_ = {SessionNoticeKind::Status, std::move(message), 1.};
+  }
 
 private:
   struct Live;
@@ -129,6 +165,13 @@ private:
                            std::string success_message);
   void publish_failure(std::string message);
   void require_owner() const;
+  void harvest_notifications(const stellar::core::CampaignFrameResult &result,
+                             int player_id, double previous_funding);
+  // The feed carries only events that happen during the session (reference:
+  // the feed clears on campaign transitions and nothing republishes retained
+  // history). Seeding marks already-recorded diplomatic history as seen so a
+  // loaded campaign does not flood the panel with stale bulletins.
+  void seed_notification_history();
   [[nodiscard]] bool drain_live_save();
   std::unique_ptr<Live> live_;
   std::filesystem::path research_root_;
@@ -138,6 +181,8 @@ private:
   std::thread::id owner_{std::this_thread::get_id()};
   std::unique_ptr<PendingLoad> pending_load_;
   SessionNotice notice_;
+  native_notifications::NativeNotificationFeed notifications_;
+  std::unordered_set<std::int64_t> seen_diplomatic_events_;
   bool save_requested_{};
   bool exit_requested_{};
   bool exit_ready_{};

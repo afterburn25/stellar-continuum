@@ -1,11 +1,15 @@
 #include "native_celestial_appearance.hpp"
+#include "native_system_view.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <limits>
+#include <map>
 #include <ranges>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -112,26 +116,56 @@ std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
   }
   return RgbaImage::create(size, size, std::move(rgba));
 }
-std::shared_ptr<const RgbaImage> make_ring(bool front) {
+std::shared_ptr<const RgbaImage> make_ring(
+    bool front, stellar::native_system::NativeSystemRingClass kind) {
+  using Ring = stellar::native_system::NativeSystemRingClass;
   constexpr int size = NativeCelestialAppearanceRenderer::ring_texture_size;
   constexpr float extent = 2.30f, tilt = -.36f, flattening = .33f;
   const float c = std::cos(tilt), s = std::sin(tilt);
+  // inner edge on/off, outer edge on/off, opacity, tint, band character.
+  struct Profile { float in0, in1, out0, out1, alpha, r, g, b; bool clumps; };
+  const auto profile = [kind]() {
+    switch (kind) {
+      case Ring::thin:
+        return Profile{1.42f, 1.46f, 1.82f, 1.88f, .34f, .55f, .61f, .70f, false};
+      case Ring::debris:
+        return Profile{1.30f, 1.38f, 1.98f, 2.06f, .42f, .52f, .47f, .40f, true};
+      default:
+        return Profile{1.215f, 1.245f, 2.225f, 2.255f, .72f, .84f, .80f, .70f, false};
+    }
+  }();
   std::vector<std::uint8_t> rgba(static_cast<std::size_t>(size * size * 4));
   for (int y = 0; y < size; ++y) for (int x = 0; x < size; ++x) {
     const float sx = (2.f * (x + .5f) / size - 1.f) * extent;
     const float sy = (2.f * (y + .5f) / size - 1.f) * extent;
     const float local_x = c * sx + s * sy, local_y = -s * sx + c * sy;
     const float radial = std::sqrt(local_x * local_x + (local_y / flattening) * (local_y / flattening));
-    const float inner = smoothstep(1.215f, 1.245f, radial);
-    const float outer = 1.f - smoothstep(2.225f, 2.255f, radial);
+    const float inner = smoothstep(profile.in0, profile.in1, radial);
+    const float outer = 1.f - smoothstep(profile.out0, profile.out1, radial);
     if (inner <= 0.f || outer <= 0.f) continue;
-    const float cassini = 1.f - .94f * (1.f - smoothstep(.018f, .034f,
-                                      std::abs(radial - 1.88f)));
+    const float cassini = kind == Ring::broad
+        ? (1.f - .94f * (1.f - smoothstep(.018f, .034f,
+                                          std::abs(radial - 1.88f)))) *
+          (1.f - .55f * (1.f - smoothstep(.012f, .026f,
+                                          std::abs(radial - 1.55f)))) *
+          std::lerp(.55f, 1.f, smoothstep(1.24f, 1.55f, radial))
+        : 1.f;
     const float broad_bands = .72f + .13f * std::sin(radial * 31.f + .7f) +
                               .10f * std::sin(radial * 67.f - .9f);
-    const float fine_structure = .91f + .09f * std::sin(radial * 173.f);
-    const float variation = std::clamp(broad_bands * fine_structure, .36f, 1.f);
-    const float target_alpha = inner * outer * cassini * variation * .68f;
+    const float fine_structure = kind == Ring::thin
+        ? .35f + .65f * (1.f - std::abs(std::sin(radial * 95.f)))
+        : .91f + .09f * std::sin(radial * 173.f);
+    float variation = std::clamp(broad_bands * fine_structure, .36f, 1.f);
+    float clump_alpha = 1.f;
+    if (profile.clumps) {
+      const float theta = std::atan2(local_y / flattening, local_x);
+      clump_alpha = smoothstep(.30f, .62f,
+                               noise(radial * 7.3f, theta * 4.1f) * .72f +
+                               noise(radial * 23.f, theta * 11.f) * .28f);
+      variation *= .8f + .2f * noise(radial * 31.f, theta * 9.f);
+    }
+    const float target_alpha = inner * outer * cassini * variation *
+                               clump_alpha * profile.alpha;
     // Separate back/front textures are bilinearly sampled. A hard exclusive
     // split makes both samples transparent at the boundary and leaves a dark
     // crack outside the globe. Across this narrow overlap, choose straight
@@ -142,21 +176,46 @@ std::shared_ptr<const RgbaImage> make_ring(bool front) {
                             ? front_alpha
                             : (target_alpha - front_alpha) /
                                   std::max(.001f, 1.f - front_alpha);
-    pixel(rgba, size, x, y, .78f * variation, .72f * variation,
-          .58f * variation, alpha);
+    pixel(rgba, size, x, y, profile.r * variation, profile.g * variation,
+          profile.b * variation, alpha);
   }
   return RgbaImage::create(size, size, std::move(rgba));
 }
+std::optional<std::string> star_sprite_key(core::StellarClass kind) {
+  switch (kind) {
+    case core::StellarClass::MRedDwarf: return "star-m-dwarf";
+    case core::StellarClass::KOrangeDwarf: return "star-k-dwarf";
+    case core::StellarClass::GYellowDwarf: return "star-g-dwarf";
+    case core::StellarClass::FYellowWhiteDwarf: return "star-f-dwarf";
+    case core::StellarClass::AWhiteStar: return "star-a-white";
+    case core::StellarClass::HotBlueStar: return "star-hot-blue";
+    case core::StellarClass::Giant: return "star-giant";
+    case core::StellarClass::WhiteDwarf: return "star-white-dwarf";
+    case core::StellarClass::NeutronStar: return "star-neutron";
+    case core::StellarClass::Protostar: return "star-protostar";
+    case core::StellarClass::Pulsar: return "star-pulsar";
+    case core::StellarClass::BlackHole: default: return std::nullopt;
+  }
+}
 } // namespace
-
 struct NativeCelestialAppearanceRenderer::Storage {
-  struct Key { Color color{}; std::uint32_t seed{}; bool black_hole{}, ring{}, front{}; bool operator==(const Key&other)const noexcept{return color.r==other.color.r&&color.g==other.color.g&&color.b==other.color.b&&color.a==other.color.a&&seed==other.seed&&black_hole==other.black_hole&&ring==other.ring&&front==other.front;} };
+  struct Key { Color color{}; std::uint32_t seed{}; bool black_hole{}, ring{}, front{}; stellar::native_system::NativeSystemRingClass ring_kind{}; std::string file_key; bool operator==(const Key&other)const noexcept{return color.r==other.color.r&&color.g==other.color.g&&color.b==other.color.b&&color.a==other.color.a&&seed==other.seed&&black_hole==other.black_hole&&ring==other.ring&&front==other.front&&ring_kind==other.ring_kind&&file_key==other.file_key;} };
   struct Entry { Key key; std::shared_ptr<const RgbaImage> image; std::uint64_t use{}; };
   std::vector<Entry> entries;std::size_t bytes{},generated{};std::uint64_t use{};
+  std::filesystem::path asset_root;
+  std::map<std::string,std::shared_ptr<const RgbaImage>> sprites;
+  std::shared_ptr<const RgbaImage> sprite(const std::string&file_key) {
+    if(const auto found=sprites.find(file_key);found!=sprites.end())return found->second;
+    const auto path=(asset_root/"stars"/(file_key+".png")).u8string();
+    std::shared_ptr<const RgbaImage> image;
+    try{image=decode_rgba_image(std::string(reinterpret_cast<const char*>(path.data()),path.size()));}catch(const std::exception&error){throw std::runtime_error("Stellar appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(path.data()),path.size())+": "+error.what());}
+    return sprites.emplace(file_key,std::move(image)).first->second;
+  }
   std::shared_ptr<const RgbaImage> obtain(Key key) {
+    if(!key.file_key.empty())return sprite(key.file_key);
     const auto found=std::ranges::find(entries,key,&Entry::key);
     if(found!=entries.end()){found->use=++use;return found->image;}
-    auto image=key.ring?make_ring(key.front):make_star(key.color,key.black_hole,key.seed);
+    auto image=key.ring?make_ring(key.front,key.ring_kind):make_star(key.color,key.black_hole,key.seed);
     while(!entries.empty()&&(entries.size()>=NativeCelestialAppearanceRenderer::maximum_cached_resources||bytes+image->byte_size()>NativeCelestialAppearanceRenderer::maximum_cached_bytes)){
       const auto oldest=std::ranges::min_element(entries,{},&Entry::use);bytes-=oldest->image->byte_size();entries.erase(oldest);
     }
@@ -168,9 +227,12 @@ NativeCelestialAppearanceRenderer::NativeCelestialAppearanceRenderer():storage_(
 NativeCelestialAppearanceRenderer::~NativeCelestialAppearanceRenderer()=default;
 NativeCelestialAppearanceRenderer::NativeCelestialAppearanceRenderer(NativeCelestialAppearanceRenderer&&)noexcept=default;
 NativeCelestialAppearanceRenderer&NativeCelestialAppearanceRenderer::operator=(NativeCelestialAppearanceRenderer&&)noexcept=default;
+void NativeCelestialAppearanceRenderer::set_asset_root(std::filesystem::path root){storage_->asset_root=std::move(root);}
 void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point center,float radius,const NativeStellarDiscAppearance&a,double seconds,std::optional<UiRect>clip){
   if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0||!std::isfinite(seconds))throw std::invalid_argument("Stellar appearance geometry must be finite and positive.");
-  const auto image=storage_->obtain({a.spectral_color,a.deterministic_seed,a.black_hole,false,false});const float extent=radius*2.20f;
+  Storage::Key key{a.spectral_color,a.deterministic_seed,a.black_hole,false,false,{}};
+  if(!a.black_hole&&a.stellar_class&&!storage_->asset_root.empty())if(const auto sprite=star_sprite_key(*a.stellar_class))key.file_key=*sprite;
+  const auto image=storage_->obtain(std::move(key));const float extent=radius*2.20f;
   out.world.emplace_back(Image{image,{center.x-extent,center.y-extent,extent*2,extent*2},std::nullopt,{255,255,255,255},clip});
   if(a.black_hole)return;
   const float seed=static_cast<float>(a.deterministic_seed&65535u);
@@ -186,8 +248,8 @@ void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point c
   const float envelope=enabled?smoothstep(0,.28f,life)*(1.f-smoothstep(.58f,1.f,life)):0.f;
   if(envelope>0){const float bearing=(hash(epoch*3.17f+seed,19.3f)-.5f)*tau;const float half_width=.12f+.12f*hash(epoch+4.2f,seed);const float height=.10f+.17f*hash(seed*1.9f,epoch+7.6f);for(int strand=0;strand<2;++strand){Point prior{};for(int segment=0;segment<=18;++segment){const float u=segment/18.f,signed_angle=(u*2.f-1.f)*half_width;const float arch=std::sqrt(std::max(0.f,1.f-(signed_angle/half_width)*(signed_angle/half_width)));const float irregular=(noise(signed_angle*24.f+epoch,static_cast<float>(seconds)*.075f+seed)-.5f)*.032f;const float r=radius*(.96f+arch*height+irregular+strand*.025f);const float theta=bearing+signed_angle;Point next{center.x+std::cos(theta)*r,center.y+std::sin(theta)*r};if(segment){const auto visible=clip?clip_line(prior,next,*clip):std::optional<std::pair<Point,Point>>{{prior,next}};if(visible)out.world.emplace_back(Line{visible->first,visible->second,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,byte(envelope*(strand?.34f:.72f))}});}prior=next;}}}
 }
-void NativeCelestialAppearanceRenderer::append_ring_back(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,false}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
-void NativeCelestialAppearanceRenderer::append_ring_front(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,true}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
+void NativeCelestialAppearanceRenderer::append_ring_back(DrawList&out,Point center,float radius,stellar::native_system::NativeSystemRingClass kind,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,false,kind}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
+void NativeCelestialAppearanceRenderer::append_ring_front(DrawList&out,Point center,float radius,stellar::native_system::NativeSystemRingClass kind,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,true,kind}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
 NativeCelestialAppearanceStats NativeCelestialAppearanceRenderer::stats()const noexcept{return {storage_->entries.size(),storage_->bytes,storage_->generated};}
 void NativeCelestialAppearanceRenderer::clear()noexcept{storage_->entries.clear();storage_->bytes=0;}
 } // namespace stellar::native_system_ui

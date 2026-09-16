@@ -15,7 +15,7 @@ inline constexpr std::size_t maximum_planet_disc_bytes=16u*1024u*1024u;
 // returns immutable Engine image resources; neither Engine nor Core knows paths.
 class NativePlanetDiscAssets final {
 public:
-  explicit NativePlanetDiscAssets(std::filesystem::path sol_asset_root);
+  explicit NativePlanetDiscAssets(std::filesystem::path visual_asset_root);
   ~NativePlanetDiscAssets();
   NativePlanetDiscAssets(const NativePlanetDiscAssets&)=delete;
   NativePlanetDiscAssets&operator=(const NativePlanetDiscAssets&)=delete;

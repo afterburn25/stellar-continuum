@@ -1,6 +1,8 @@
 #pragma once
 
 #include "native_surface_construction_controller.hpp"
+#include "native_surface_relief.hpp"
+#include "native_surface_scene.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -15,7 +17,8 @@ struct SurfaceWorkspaceLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect surface, back, title, palette, palette_rows,
-      terrain, inspector, rotate, remove, confirmation, confirm, cancel;
+      terrain, inspector, rotate, remove, confirmation, confirm, cancel,
+      upgrade, repair, toggle_operation, priority, hub_upgrade;
   [[nodiscard]] static SurfaceWorkspaceLayout for_viewport(int width,
                                                             int height) noexcept;
 };
@@ -42,7 +45,12 @@ enum class SurfaceWorkspaceCommandKind {
   ConfirmPlacement,
   PreviewRemoval,
   ConfirmRemoval,
-  CancelQuote
+  CancelQuote,
+  UpgradeBuilding,
+  RepairBuilding,
+  SetBuildingEnabled,
+  SetBuildingPriority,
+  UpgradeHub
 };
 
 struct SurfaceWorkspaceCommand {
@@ -52,6 +60,7 @@ struct SurfaceWorkspaceCommand {
   int building_id{};
   float x{}, z{}, rotation_degrees{};
   std::uint64_t quote_revision{};
+  bool flag{};
 };
 
 class NativeSurfaceWorkspace final {
@@ -66,6 +75,7 @@ public:
   void set_removal_quote(stellar::native_colony::NativeSurfaceRemovalQuote);
   void complete_command(std::string notice);
   void set_notice(std::string value) { notice_ = std::move(value); }
+  [[nodiscard]] const std::string &notice() const noexcept { return notice_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView>&
@@ -83,6 +93,12 @@ public:
   removal_quote() const noexcept { return removal_quote_; }
   [[nodiscard]] const SurfaceViewport& viewport() const noexcept {
     return viewport_;
+  }
+  [[nodiscard]] std::size_t scene_cached_images() const noexcept {
+    return scene_.cached_images();
+  }
+  [[nodiscard]] std::size_t relief_cached_images() const noexcept {
+    return relief_.cached_images();
   }
 
   [[nodiscard]] SurfaceWorkspaceCommand handle(
@@ -120,6 +136,8 @@ private:
       confirmation_;
   std::string notice_;
   std::optional<SurfaceWorkspaceCommand> pending_preview_;
+  mutable stellar::native_surface::NativeSurfaceSceneRenderer scene_;
+  mutable stellar::native_surface::NativeSurfaceRelief relief_;
 };
 
 } // namespace stellar::native_colony_ui

@@ -1,4 +1,5 @@
 #include <stellar/core/player_campaign_save.hpp>
+#include <stellar/core/developer_campaign_json.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 
@@ -18,27 +19,48 @@ void require_save_path(const std::filesystem::path &path) {
       })) throw std::invalid_argument("A save path is required.");
 }
 }
-PreparedPlayerCampaignSave::PreparedPlayerCampaignSave(PlayerCampaignPayloadV17Dto payload)
-    : payload_(std::make_shared<const PlayerCampaignPayloadV17Dto>(std::move(payload))) {}
+PreparedPlayerCampaignSave::PreparedPlayerCampaignSave(
+    PlayerCampaignPayloadV17Dto payload, const bool developer,
+    const bool tools_used)
+    : payload_(std::make_shared<const PlayerCampaignPayloadV17Dto>(std::move(payload))),
+      developer_(developer), tools_used_(tools_used) {}
 PreparedPlayerCampaignSave PreparedPlayerCampaignSave::capture(
     IntegratedAdaptiveCampaignRuntime &runtime, const PlayerCampaignCaptureOptions &options) {
   return PreparedPlayerCampaignSave(capture_player_campaign_v17(runtime, options));
 }
+PreparedPlayerCampaignSave PreparedPlayerCampaignSave::capture_developer(
+    IntegratedAdaptiveCampaignRuntime &runtime, const PlayerCampaignCaptureOptions &options) {
+  const auto &provenance = runtime.world().campaign().developer_provenance;
+  return PreparedPlayerCampaignSave(
+      capture_developer_campaign_v17(runtime, options), true,
+      provenance && provenance->tools_used);
+}
 const PlayerCampaignPayloadV17Dto &PreparedPlayerCampaignSave::payload() const noexcept {
   return *payload_;
+}
+bool PreparedPlayerCampaignSave::is_developer() const noexcept {
+  return developer_;
+}
+bool PreparedPlayerCampaignSave::tools_used() const noexcept {
+  return tools_used_;
 }
 void write_prepared_player_campaign(const std::filesystem::path &path,
                                    const PreparedPlayerCampaignSave &prepared,
                                    bool preserve_existing_backup) {
   require_save_path(path);
+  if (prepared.is_developer())
+    throw std::invalid_argument(
+        "A Developer-envelope capture requires the Developer writer.");
   const auto json = encode_player_campaign_v17_json(prepared.payload());
   stellar::engine::write_file_atomically(path,
       std::as_bytes(std::span(json.data(), json.size())), {preserve_existing_backup});
 }
 
 PlayerCampaignSaveController::PlayerCampaignSaveController(
-    CampaignAutosavePolicy policy, PlayerCampaignPreparedWriter writer)
-    : scheduler_(policy), writer_(std::move(writer)) {
+    CampaignAutosavePolicy policy, PlayerCampaignPreparedWriter writer,
+    const bool developer_mode)
+    : scheduler_(policy), writer_(std::move(writer)),
+      developer_mode_(developer_mode) {
   if (!writer_) throw std::invalid_argument("A prepared campaign writer is required.");
 }
 PlayerCampaignSaveController::~PlayerCampaignSaveController() {
@@ -58,6 +80,13 @@ void PlayerCampaignSaveController::configure(std::filesystem::path path,
   scheduler_.reset(day);
   path_ = std::move(path); revision_ = revision;
   preserve_backup_ = recovered_from_backup; configured_ = true;
+}
+PreparedPlayerCampaignSave PlayerCampaignSaveController::capture_prepared(
+    IntegratedAdaptiveCampaignRuntime &runtime,
+    const PlayerCampaignCaptureOptions &options) const {
+  return developer_mode_
+             ? PreparedPlayerCampaignSave::capture_developer(runtime, options)
+             : PreparedPlayerCampaignSave::capture(runtime, options);
 }
 PlayerCampaignSaveResult PlayerCampaignSaveController::failure(
     std::exception_ptr exception, double day, const std::filesystem::path &path,
@@ -103,7 +132,7 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::after_fram
   if (pending_ || !scheduler_.is_due(day)) return completed;
   const bool preserve = preserve_backup_;
   try {
-    auto prepared = PreparedPlayerCampaignSave::capture(frame.runtime(), {day, game_version, saved_at_utc});
+    auto prepared = capture_prepared(frame.runtime(), {day, game_version, saved_at_utc});
     const auto destination = path_; const auto writer = writer_;
     // Allocate all pending metadata before submitting. No operation after
     // submit can throw and lose tracking of an already running write.
@@ -126,7 +155,7 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
   if (pending_) throw std::logic_error("Consume and report the pending autosave before a manual save.");
   const bool preserve = preserve_backup_;
   try {
-    const auto prepared = PreparedPlayerCampaignSave::capture(runtime, options);
+    const auto prepared = capture_prepared(runtime, options);
     writer_(path_, prepared, preserve);
     scheduler_.mark_success(options.simulation_days); preserve_backup_ = false;
     return {true, path_, options.simulation_days, preserve, {}, {}};

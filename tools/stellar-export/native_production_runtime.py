@@ -342,6 +342,9 @@ def validate_native_construction_export(folder: Path, env: dict[str, str],
             _validate_saved_campaign(payload, player_id, system_count,
                                      "Authored construction")
             marker = _construction_marker(stdout)
+            if " shortcut=1" not in stdout:
+                raise RuntimeError(
+                    "Native construction did not exercise the C/B candidate shortcuts")
             if not replay:
                 if (marker[0] != "started" or marker[2] != "orbital_shipyard" or
                         marker[3] != "start-running" or
