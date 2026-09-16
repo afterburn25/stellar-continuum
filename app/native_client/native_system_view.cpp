@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -56,6 +57,74 @@ std::optional<std::string> sol_texture(const PlanetaryBody &body,
     return static_cast<char>(std::tolower(value));
   });
   return key;
+}
+
+// Approved generated sprite pools per visual class (NATIVE_PLANET_ART_SOURCES
+// provenance). The pick is deterministic per body so every presentation sees
+// the same disc; gas/ice giants and unknown bodies keep the procedural path.
+std::optional<std::string> class_sprite(const NativeSystemBodyVisualClass value,
+                                        const int body_id) {
+  using Class = NativeSystemBodyVisualClass;
+  static constexpr std::string_view rocky[]{
+      "continental-world", "gaia-world", "desert-world",
+      "arid-world", "barren-world", "tomb-world"};
+  static constexpr std::string_view oceanic[]{"ocean-world", "tropical-world"};
+  static constexpr std::string_view frozen[]{"frozen-world"};
+  static constexpr std::string_view hot[]{
+      "inferno-world", "volcano-world", "cracked-world"};
+  static constexpr std::string_view moon[]{"barren-world", "tomb-world"};
+  const std::span<const std::string_view> pool = [value]() {
+    switch (value) {
+      case Class::rocky: return std::span<const std::string_view>(rocky);
+      case Class::oceanic: return std::span<const std::string_view>(oceanic);
+      case Class::frozen: return std::span<const std::string_view>(frozen);
+      case Class::hot_rocky: return std::span<const std::string_view>(hot);
+      case Class::moon: return std::span<const std::string_view>(moon);
+      default: return std::span<const std::string_view>();
+    }
+  }();
+  if (pool.empty()) return std::nullopt;
+  const auto index =
+      (static_cast<std::uint32_t>(body_id) * 2654435761u) % pool.size();
+  return std::string(pool[index]);
+}
+
+// Approved ring archetypes (NATIVE_PLANET_ART_SOURCES provenance). Canonical
+// Sol bodies carry their physical ring systems; other fully surveyed bodies
+// roll a deterministic seeded pick so only some worlds are ringed.
+NativeSystemRingClass body_ring(const std::optional<std::string> &key,
+                                const bool canonical_sol, const bool detailed,
+                                const int body_id,
+                                const NativeSystemBodyVisualClass value) {
+  using Class = NativeSystemBodyVisualClass;
+  using Ring = NativeSystemRingClass;
+  if (canonical_sol) {
+    if (key == "saturn") return Ring::broad;
+    if (key == "jupiter" || key == "uranus" || key == "neptune")
+      return Ring::thin;
+    return Ring::none;
+  }
+  if (!detailed || value == Class::unknown_planet ||
+      value == Class::unknown_moon)
+    return Ring::none;
+  auto roll = (static_cast<std::uint32_t>(body_id) + 0x9E3779B9u) * 2246822519u;
+  roll ^= roll >> 16;
+  if (roll % 6u != 0u) return Ring::none;
+  switch ((roll >> 8) % 3u) {
+    case 0u: return Ring::broad;
+    case 1u: return Ring::thin;
+    default: return Ring::debris;
+  }
+}
+
+// Layout spacing needed around a ringed body so rings never clip a moon orbit.
+float ring_extent(const NativeSystemRingClass ring) {
+  switch (ring) {
+    case NativeSystemRingClass::broad: return 2.8f;
+    case NativeSystemRingClass::thin:
+    case NativeSystemRingClass::debris: return 1.9f;
+    default: return 1.f;
+  }
 }
 
 float stable_angle(const int body_id) {
@@ -138,6 +207,12 @@ NativeSystemViewResult NativeSystemViewController::build(
           body.environment.has_solid_surface};
     item.visual_class = visual_class(body, detailed, canonical_sol);
     item.sol_texture_key = sol_texture(body, canonical_sol);
+    // Canonical Sol keeps its photographic textures; other fully surveyed
+    // systems get a deterministic generated sprite for their visual class.
+    if (!item.sol_texture_key && detailed && !canonical_sol)
+      item.sol_texture_key = class_sprite(item.visual_class, body.id);
+    item.ring = body_ring(item.sol_texture_key, canonical_sol, detailed,
+                          body.id, item.visual_class);
     result.bodies.push_back(std::move(item));
   }
   std::ranges::sort(result.bodies, {}, &NativeSystemBody::id);
@@ -236,7 +311,7 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
   std::map<int, float> family_extents;
   auto parent_extent = [](const NativeSystemBody &body) {
     const auto radius = body_display_radius(body.radius_earth, body.kind);
-    return body.sol_texture_key == "saturn" ? radius * 2.8f : radius;
+    return radius * ring_extent(body.ring);
   };
   for (const auto *planet : planets) {
     auto extent = parent_extent(*planet);
@@ -266,7 +341,7 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
         body.name, body.kind, body.visual_class, point.x, point.y, point.height,
         next_orbit, radius, body.orbital_eccentricity,
         body.orbital_inclination_degrees, body.positive_signatures,
-        body.sol_texture_key});
+        body.sol_texture_key, body.ring});
     positions.emplace(body.id, ParentPosition{point.x, point.y, parent_extent(body)});
   }
   std::vector<const NativeSystemBody *> moons;
@@ -290,7 +365,7 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
         parent.x + std::cos(angle) * orbit, parent.y + std::sin(angle) * orbit,
         0.f, orbit, radius, body->orbital_eccentricity,
         body->orbital_inclination_degrees, body->positive_signatures,
-        body->sol_texture_key});
+        body->sol_texture_key, body->ring});
   }
   float orbital_extent = 150.f;
   for (const auto &marker : result.bodies) {
@@ -347,7 +422,7 @@ std::optional<int> SystemSpatialViewport::hit_body(const SystemSpatialSnapshot &
     const auto point = world_to_screen(body.offset_x, body.offset_y);
     const auto distance = distance_squared(x, y, point.x, point.y);
     const auto radius = body_radius(body) *
-        (body.sol_texture_key == "saturn" ? 2.25f : 1.f) + 4.f;
+        std::min(ring_extent(body.ring), 2.25f) + 4.f;
     if (distance <= radius * radius && distance < nearest_distance) {
       nearest = body.body_id;
       nearest_distance = distance;

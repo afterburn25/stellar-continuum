@@ -17,6 +17,7 @@ from native_voice_runtime import NATIVE_VOICE_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
+from native_planet_art_runtime import NATIVE_PLANET_ART_SOURCES
 from native_research_runtime import validate_native_research_export
 
 
@@ -110,6 +111,15 @@ class NativeClientDependencyTests(unittest.TestCase):
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
+        planet_art_records = {}
+        for key, (source, destination) in NATIVE_PLANET_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only planet art " + key).encode())
+            planet_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.planet_art_declaration = self.root / "export/native-planet-art-assets.json"
+        self.planet_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":planet_art_records}))
         audio_records = {}
         for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
             asset = self.root / source
@@ -318,6 +328,50 @@ class NativeClientDependencyTests(unittest.TestCase):
         declaration = json.loads(original)
         declaration["assets"]["extra"] = declaration["assets"]["pathfinder-scout"]
         self.ship_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
+            self.copy()
+
+    def test_missing_planet_art_blocks_package(self):
+        for source, destination in NATIVE_PLANET_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing native planet art"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_tampered_planet_art_blocks_package(self):
+        for source, destination in NATIVE_PLANET_ART_SOURCES.values():
+            with self.subTest(source=source):
+                path = self.root / source
+                original = path.read_bytes()
+                path.write_bytes(b"altered")
+                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                    self.copy()
+                path.write_bytes(original)
+
+    def test_planet_art_paths_cannot_expand_package_scope(self):
+        original = self.planet_art_declaration.read_text()
+        for field in ("source", "runtimePath"):
+            with self.subTest(field=field):
+                declaration = json.loads(original)
+                declaration["assets"]["gaia-world"][field] = "../outside.png"
+                self.planet_art_declaration.write_text(json.dumps(declaration))
+                with self.assertRaisesRegex(RuntimeError, "Unreviewed native planet art"):
+                    self.copy()
+        self.planet_art_declaration.write_text(original)
+
+    def test_planet_art_manifest_schema_and_set_are_strict(self):
+        original = self.planet_art_declaration.read_text()
+        declaration = json.loads(original)
+        declaration["schemaVersion"] = 2
+        self.planet_art_declaration.write_text(json.dumps(declaration))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported native planet art"):
+            self.copy()
+        declaration = json.loads(original)
+        declaration["assets"]["extra"] = declaration["assets"]["gaia-world"]
+        self.planet_art_declaration.write_text(json.dumps(declaration))
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()
 

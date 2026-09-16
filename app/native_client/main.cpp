@@ -369,7 +369,7 @@ class NativeCampaign final {
         window_(&window),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
-        planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
+        planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual"),
         ship_art_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
         audio_mixer_(session_->save_path().parent_path()/"audio-settings.json"),

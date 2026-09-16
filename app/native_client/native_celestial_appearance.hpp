@@ -7,6 +7,9 @@
 #include <memory>
 #include <optional>
 
+namespace stellar::native_system {
+enum class NativeSystemRingClass : int;
+}
 namespace stellar::native_system_ui {
 
 struct NativeStellarDiscAppearance {
@@ -42,11 +45,11 @@ public:
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
   void append_ring_back(
       stellar::native_map::DrawList &, stellar::native_map::Point center,
-      float planet_radius,
+      float planet_radius, stellar::native_system::NativeSystemRingClass,
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
   void append_ring_front(
       stellar::native_map::DrawList &, stellar::native_map::Point center,
-      float planet_radius,
+      float planet_radius, stellar::native_system::NativeSystemRingClass,
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
 
   [[nodiscard]] NativeCelestialAppearanceStats stats() const noexcept;

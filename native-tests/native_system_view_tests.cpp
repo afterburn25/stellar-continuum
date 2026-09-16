@@ -40,7 +40,7 @@ NativeSystemSnapshot synthetic() {
       .system_id=44,.catalog_name="Geometry",.survey_level=SystemSurveyLevel::fully_surveyed,
       .survey_progress=1};
   auto saturn=body(8401,std::nullopt,0,"Saturn",PlanetaryBodyKind::Planet,9);
-  saturn.visual_class=NativeSystemBodyVisualClass::gas_giant;saturn.sol_texture_key="saturn";
+  saturn.visual_class=NativeSystemBodyVisualClass::gas_giant;saturn.sol_texture_key="saturn";saturn.ring=NativeSystemRingClass::broad;
   auto moon=body(8402,8401,0,"Moon",PlanetaryBodyKind::Moon,.27);
   moon.visual_class=NativeSystemBodyVisualClass::moon;moon.sol_texture_key="moon";
   auto pluto=body(8410,std::nullopt,9,"Pluto",PlanetaryBodyKind::DwarfPlanet,.186);
@@ -71,6 +71,7 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
   require(!recon.snapshot->bodies.empty(),"reconnaissance lost the orbital catalog");
   bool retained_positive=false;for(const auto &item:recon.snapshot->bodies) {
     require(!item.details&&!item.sol_texture_key,"reconnaissance exposed detailed body fields or textures");
+    require(item.ring==NativeSystemRingClass::none,"reconnaissance inferred a hidden ring system");
     require(item.visual_class==NativeSystemBodyVisualClass::unknown_planet||
             item.visual_class==NativeSystemBodyVisualClass::unknown_moon,
             "reconnaissance inferred a hidden body class");
@@ -96,13 +97,46 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
   const auto full=controller.build(campaign,1,system_id);
   require(full.snapshot&&full.snapshot->archetype&&full.snapshot->bodies.front().details,
           "full survey withheld detailed observer-safe fields");
+  {
+    // Non-Sol fully surveyed bodies must render only approved generated
+    // sprites: solid classes resolve a manifest key, giants stay procedural.
+    static constexpr std::string_view approved[]{
+        "arid-world","barren-world","continental-world","cracked-world",
+        "desert-world","frozen-world","gaia-world","inferno-world",
+        "ocean-world","tomb-world","tropical-world","volcano-world",
+        "wormhole-anomaly"};
+    using Class=NativeSystemBodyVisualClass;
+    for(const auto &item:full.snapshot->bodies){
+      const bool pooled=item.visual_class==Class::rocky||
+          item.visual_class==Class::oceanic||item.visual_class==Class::frozen||
+          item.visual_class==Class::hot_rocky||item.visual_class==Class::moon;
+      if(pooled)
+        require(item.sol_texture_key&&
+                std::ranges::find(approved,*item.sol_texture_key)!=std::end(approved),
+                "surveyed non-Sol body lacked an approved generated sprite");
+      else
+        require(!item.sol_texture_key,
+                "non-Sol giant received an invented appearance texture");
+    }
+  }
   const auto sol=controller.build(campaign,1,sol_system_id);
   require(sol.snapshot&&sol.snapshot->survey_level==SystemSurveyLevel::fully_surveyed,
           "fresh home Sol is not fully surveyed");
   for(const auto &item:sol.snapshot->bodies) {
     if(item.id==pluto_body_id) require(!item.sol_texture_key,"Pluto received an invented texture");
     else require(item.sol_texture_key.has_value(),"fully surveyed approved Sol body lost texture eligibility");
+    if(item.sol_texture_key=="saturn")
+      require(item.ring==NativeSystemRingClass::broad,"canonical Saturn lost its broad ring");
+    if(item.sol_texture_key=="jupiter"||item.sol_texture_key=="uranus"||
+       item.sol_texture_key=="neptune")
+      require(item.ring==NativeSystemRingClass::thin,"canonical giant lost its thin ring");
+    if(item.sol_texture_key=="earth"||item.sol_texture_key=="moon"||
+       item.sol_texture_key=="mercury")
+      require(item.ring==NativeSystemRingClass::none,"ringless Sol body gained a ring");
   }
+  for(const auto &item:full.snapshot->bodies)
+    require(item.ring==NativeSystemRingClass::none||item.visual_class!=NativeSystemBodyVisualClass::unknown_planet&&item.visual_class!=NativeSystemBodyVisualClass::unknown_moon,
+            "observer-hidden body disclosed a ring system");
   require(sol.snapshot->infrastructure.size()==3,
           "home system did not project every orbital construction marker");
   const auto launch=std::ranges::find(sol.snapshot->infrastructure,"orbital_launch_complex",&NativeSystemInfrastructureMarker::project_id);

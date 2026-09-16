@@ -407,7 +407,7 @@ if(BUILD_TESTING)
     native-tests/native_celestial_appearance_tests.cpp
     app/native_client/native_celestial_appearance.cpp)
   target_include_directories(stellar_celestial_tests PRIVATE
-    app/native_client engine/include)
+    app/native_client engine/include core/include)
   target_link_libraries(stellar_celestial_tests PRIVATE
     stellar_native_image)
   add_test(NAME native_celestial_appearance

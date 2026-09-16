@@ -1,6 +1,7 @@
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativePlanetArtAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
@@ -14,7 +15,7 @@ add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
   app/native_client/native_orbital_structure.cpp
   app/native_client/native_planet_disc_assets.cpp app/native_client/native_system_travel.cpp)
-add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_runtime_data)
+add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_native_planet_art_assets stellar_runtime_data)
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
@@ -36,7 +37,7 @@ if(BUILD_TESTING)
   target_include_directories(stellar_native_planet_disc_assets_tests PRIVATE app/native_client)
   target_link_libraries(stellar_native_planet_disc_assets_tests PRIVATE stellar_native_platform stellar_core)
   add_test(NAME native_planet_disc_assets COMMAND stellar_native_planet_disc_assets_tests
-    "${CMAKE_SOURCE_DIR}/assets/visual/sol")
+    "${CMAKE_SOURCE_DIR}/assets/visual")
   set_tests_properties(native_planet_disc_assets PROPERTIES TIMEOUT 90)
   if(MSVC)
     target_compile_options(stellar_native_planet_disc_assets_tests PRIVATE /WX)
