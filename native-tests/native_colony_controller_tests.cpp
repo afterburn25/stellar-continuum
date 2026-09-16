@@ -4,6 +4,8 @@
 
 #include "../../app/native_client/native_system_view.hpp"
 
+#include <stellar/core/adaptive_research_authority.hpp>
+#include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
@@ -63,7 +65,8 @@ void require_finite(const NativeColonyView &view) {
                         view.power_demand,
                         view.credits_per_day,
                         view.industry_per_day,
-                        view.science_per_day};
+                        view.science_per_day,
+                        view.active_research_lab_units};
   require(std::ranges::all_of(values, [](const double value) {
             return std::isfinite(value);
           }),
@@ -95,6 +98,7 @@ void surface_operation_tests(const fs::path &research_root, const fs::path &cata
         find_surface_building(building.type_id)->industry_cost : 20.;
     colony.surface_buildings.push_back(building);
   }
+  (void)frame.advance(1.);
   const auto project = [&] {
     const auto output = surface_colony_output(colony);
     const auto result = controller.build(frame, 7, *system.snapshot,
@@ -114,6 +118,25 @@ void surface_operation_tests(const fs::path &research_root, const fs::path &cata
     return surface_site_status(*site).label;
   };
   const auto normal = project();
+  const auto *research = frame.runtime().research().try_get_civilization(player);
+  require(research != nullptr, "operation fixture has no adaptive research state");
+  const auto context_id = "colony:" + std::to_string(colony.id);
+  int expected_active_facilities{};
+  double expected_effective_labs{};
+  const auto &institution_catalog =
+      frame.runtime().research_runtime().authority().expertise_catalog();
+  for (const auto &institution : research->expertise().institutions()) {
+    if (institution.context_id != std::optional<std::string>{context_id} ||
+        institution.active_count <= 0)
+      continue;
+    expected_active_facilities += institution.active_count;
+    expected_effective_labs += institution_catalog
+                                   .get_institution(institution.institution_archetype_id)
+                                   .effective_lab_units * institution.active_count;
+  }
+  require(normal.active_research_facilities == expected_active_facilities &&
+              std::abs(normal.active_research_lab_units - expected_effective_labs) < 1e-9,
+          "colony research capacity was not projected from active local institutions");
   const auto unchanged = project();
   require(unchanged.revision == normal.revision,
           "an unchanged colony projection advanced its revision");

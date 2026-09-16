@@ -77,6 +77,8 @@ struct NativeColonyView {
       storage_discharge_per_day{};
   double credits_per_day{}, upkeep_credits_per_day{}, industry_per_day{},
       science_per_day{}, cargo_transfer_capacity_per_day{};
+  int active_research_facilities{};
+  double active_research_lab_units{};
   std::string specialization_name, specialization_description;
   int specialization_complexes{};
   bool specialization_active{};

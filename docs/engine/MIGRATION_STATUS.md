@@ -1,5 +1,28 @@
 # Stellar Engine migration status
 
+### Earned power and research checkpoint (2026-09-16)
+
+The actual earned colony now advances from its completed fabricator to a paid
+power generator and science lab. The two UI reviews cancel without state changes,
+then charge 25/40 budget units exactly and finish 300/400 materials across
+3659/4876 Normal 1/64-day frames. Day 6965.4603137 has six power supplied, four
+required and all three modules operating. Actual Adaptive Research institution
+`construction:surface:9:3` adds one effective lab (empire total 12 to 13).
+Paused reload preserves the full Player17 payload except SavedAtUtc.
+
+UI improvements show colony totals separately from selected module costs,
+replace misleading daily science with actual active local facilities/lab capacity,
+explain construction allocations and refresh stale placement notices at completion.
+No simulation, C#, schema or approved-art changes. The maintained expansion gate
+is chained after the first earned surface save and preserves source provenance.
+
+MSVC, thirteen focused CTests and 594 Python checks (577 pass, 17 optional skips)
+pass. The Vulkan 720p expansion and 1080p reload retain eight captures and two
+checkpoints. See `NATIVE_EARNED_SURFACE_EXPANSION.md`, the current branch handoff
+and `work/native-earned-expansion-*`. Next: earned operations/capacity recovery
+and paid upgrades. No sealed download, professional visual finish, 30-minute
+pacing or sustained 60 FPS claim follows from accelerated validation.
+
 ### First earned colony building checkpoint (2026-09-16)
 
 The native earned campaign now completes a paid Xanthe fabricator through

@@ -74,7 +74,7 @@ public:
   void complete_management(std::string notice);
   void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>);
   const std::optional<stellar::native_colony::NativeSurfaceManagementQuote>& management_quote() const noexcept { return management_quote_; }
-  void complete_command(std::string notice);
+  void complete_command(std::string notice, bool accepted);
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_artwork_notice(std::string value) { artwork_notice_ = std::move(value); }
 
@@ -128,6 +128,7 @@ private:
   std::optional<stellar::native_colony::NativeColonyView> view_;
   std::optional<std::string> selected_type_id_;
   std::optional<int> selected_building_id_;
+  std::optional<int> construction_completion_watch_id_;
   float rotation_degrees_{};
   float palette_scroll_{};
   std::optional<std::pair<float, float>> last_preview_position_;

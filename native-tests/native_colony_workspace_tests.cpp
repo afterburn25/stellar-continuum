@@ -110,6 +110,8 @@ NativeColonyView view(std::uint64_t generation = 1) {
   result.upkeep_credits_per_day = .08;
   result.industry_per_day = 3.5;
   result.science_per_day = 2.0;
+  result.active_research_facilities = 2;
+  result.active_research_lab_units = 3.5;
   result.required_habitat_systems = 1;
   result.specialization_name = "Balanced settlement";
   result.specialization_description = "No dominant surface specialization";
@@ -169,7 +171,16 @@ void rendering_uses_canonical_sections_and_clipped_progress() {
         progress = true;
     }
   }
-  REQUIRE(support && projected && local_currency && power && modules && progress);
+  bool research_capacity{};
+  for (const auto &command : draw.overlay)
+    if (const auto *label = std::get_if<Text>(&command))
+      research_capacity |= label->value.find("Active research facilities 2 (3.5 effective labs)") !=
+                           std::string::npos;
+  REQUIRE(support && projected && local_currency && power && modules && progress && research_capacity);
+  REQUIRE(std::ranges::none_of(draw.overlay, [](const auto &command) {
+    const auto *label = std::get_if<Text>(&command);
+    return label && label->value.find("Research 2.00/day") != std::string::npos;
+  }));
 }
 
 void detail_scroll_reaches_outpost_rows_and_keeps_text_clipped() {

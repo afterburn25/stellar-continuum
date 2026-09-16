@@ -262,6 +262,7 @@ void NativeSurfaceWorkspace::open(NativeColonyView view, const int width,
   view_ = std::move(view);
   selected_type_id_.reset();
   selected_building_id_.reset();
+  construction_completion_watch_id_.reset();
   placement_quote_.reset();
   removal_quote_.reset();
   management_quote_.reset();
@@ -301,10 +302,20 @@ void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
       view_->player_civilization_id != view.player_civilization_id ||
       view_->system_id != view.system_id || view_->body_id != view.body_id ||
       view_->colony_id != view.colony_id;
+  std::optional<bool> selected_was_complete;
+  if (!identity_changed && selected_building_id_) {
+    const auto selected = std::ranges::find(
+        view_->construction_sites, *selected_building_id_,
+        &NativeSurfaceSite::building_id);
+    if (selected != view_->construction_sites.end())
+      selected_was_complete = selected->complete;
+  }
   if(identity_changed) {
     set_building_images({}); selected_type_id_.reset(); selected_building_id_.reset();
+    construction_completion_watch_id_.reset();
     inspector_scroll_=0.f; pressed_=dragging_=false;
     relief_.clear();
+    notice_.clear();
   }
   const auto changed = !view_ ||
                        view_->campaign_generation != view.campaign_generation ||
@@ -323,6 +334,29 @@ void NativeSurfaceWorkspace::set_view(NativeColonyView view) {
     pending_preview_.reset();
   }
   reconcile();
+  const auto completed_selected = [&]() -> const NativeSurfaceSite * {
+    if (selected_was_complete && !*selected_was_complete && selected_building_id_) {
+      const auto selected = std::ranges::find(
+          view_->construction_sites, *selected_building_id_,
+          &NativeSurfaceSite::building_id);
+      if (selected != view_->construction_sites.end() && selected->complete)
+        return &*selected;
+    }
+    if (construction_completion_watch_id_) {
+      const auto watched = std::ranges::find(
+          view_->construction_sites, *construction_completion_watch_id_,
+          &NativeSurfaceSite::building_id);
+      if (watched != view_->construction_sites.end() && watched->complete)
+        return &*watched;
+    }
+    return nullptr;
+  }();
+  if (completed_selected) {
+    const auto status = surface_site_status(*completed_selected);
+    notice_ = "Construction complete. " + std::string(status.label) +
+              ". " + std::string(status.detail);
+    construction_completion_watch_id_.reset();
+  }
 }
 
 void NativeSurfaceWorkspace::reconcile() {
@@ -350,6 +384,7 @@ void NativeSurfaceWorkspace::close() noexcept {
   placement_quote_.reset();
   removal_quote_.reset();
   management_quote_.reset();
+  construction_completion_watch_id_.reset();
   confirmation_ = std::monostate{};
   pending_preview_.reset();
   last_preview_position_.reset();
@@ -364,6 +399,7 @@ void NativeSurfaceWorkspace::discard_campaign() noexcept {
   view_.reset();
   selected_type_id_.reset();
   selected_building_id_.reset();
+  construction_completion_watch_id_.reset();
   placement_quote_.reset();
   removal_quote_.reset();
   management_quote_.reset();
@@ -417,7 +453,9 @@ void NativeSurfaceWorkspace::complete_management(std::string notice) {
   pressed_ = dragging_ = false;
   notice_ = std::move(notice);
 }
-void NativeSurfaceWorkspace::complete_command(std::string notice) {
+void NativeSurfaceWorkspace::complete_command(std::string notice, bool accepted) {
+  if (accepted && placement_quote_ && placement_quote_->accepted)
+    construction_completion_watch_id_ = placement_quote_->prepared_building_id;
   placement_quote_.reset();
   removal_quote_.reset();
   management_quote_.reset();
@@ -972,6 +1010,16 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
       add("Power supply/demand  " + number(option->power_supply, 1) + " / " +
               number(option->power_demand, 1),
           muted, layout.small_font, 22.f);
+      add("COLONY POWER  " + number(view.power_supply, 1) + " supply / " +
+              number(view.power_demand, 1) + " demand  |  Net available " +
+              number(view.power_supply - view.power_demand, 1),
+          view.power_supply + 1e-9 >= view.power_demand ? good : warning,
+          layout.small_font, 25.f);
+      add("COLONY OUTPUT  Industry " + number(view.industry_per_day, 2) +
+              "/day  |  Active research facilities " +
+              std::to_string(view.active_research_facilities) + " (" +
+              number(view.active_research_lab_units, 1) + " effective labs)",
+          muted, layout.small_font, 25.f);
       add("Footprint radius  " + number(option->footprint_radius, 0), muted,
           layout.small_font, 22.f);
       if (placement_quote_)
@@ -991,13 +1039,29 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
     if (site != view.construction_sites.end()) {
       const auto status = surface_site_status(*site);
       add(site->name, text_color, layout.body_font, 26.f);
+      add("COLONY POWER  " + number(view.power_supply, 1) + " supply / " +
+              number(view.power_demand, 1) + " demand  |  Net available " +
+              number(view.power_supply - view.power_demand, 1),
+          view.power_supply + 1e-9 >= view.power_demand ? good : warning,
+          layout.small_font, 25.f);
+      add("COLONY OUTPUT  Industry " + number(view.industry_per_day, 2) +
+              "/day  |  Active research facilities " +
+              std::to_string(view.active_research_facilities) + " (" +
+              number(view.active_research_lab_units, 1) + " effective labs)",
+          muted, layout.small_font, 25.f);
       add(std::string(status.label),
-          status.kind == SurfaceSiteStatusKind::Operating ? good : warning,
+          status.kind == SurfaceSiteStatusKind::Operating ? good
+          : status.kind == SurfaceSiteStatusKind::Constructing ? muted : warning,
           layout.small_font, 21.f);
-      add("Power  " + std::string(site->powered ? "Available" : "Unavailable"),
-          muted, layout.small_font, 19.f);
-      add("Workforce  " + std::string(site->staffed ? "Assigned" : "Missing"),
-          muted, layout.small_font, 19.f);
+      if (!site->complete) {
+        add("Power allocation after completion", muted, layout.small_font, 19.f);
+        add("Workers assigned after completion", muted, layout.small_font, 19.f);
+      } else {
+        add("Power  " + std::string(site->powered ? "Available" : "Unavailable"),
+            muted, layout.small_font, 19.f);
+        add("Workforce  " + std::string(site->staffed ? "Assigned" : "Missing"),
+            muted, layout.small_font, 19.f);
+      }
       add("Enabled  " + std::string(site->enabled ? "Yes" : "No"), muted,
           layout.small_font, 19.f);
       add("Condition  " + number(site->condition, 2), muted,

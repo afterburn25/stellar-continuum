@@ -1,5 +1,29 @@
 # Stellar Engine migration handoff
 
+### Earned colony power and research (2026-09-16)
+
+Xanthe's existing paid fabricator now supports earned generator/lab construction.
+The 720p UI cancels without mutation, confirms 25/40-unit payments, then Core
+completes 300/400 materials across 3659/4876 exact 1/64-day frames. The final
+day is 6965.4603137; power is six supplied/four required. The real local lab
+institution raises empire research capacity from 12 to 13 effective labs. All
+three buildings operate, and paused 1080p recovery preserves Player17 except its
+timestamp. No Core/C#/save-schema/art changes or grants.
+
+Construction now explains future power/worker allocation and replaces stale
+authorization text on completion. Colony/surface research labels show actual
+active local facilities and effective labs. Validation: MSVC, thirteen focused
+CTests, 594 Python checks (577 pass, 17 optional skips), earned 720p/1080p
+continuation/recovery and eight inspected stage/final captures. See
+`NATIVE_EARNED_SURFACE_EXPANSION.md` and `work/native-earned-expansion-*`.
+
+Next source: `work/native-audio-validation/package-earned-surface-expansion-paused.player17.json`.
+Continue earned shutdown/restart, research-capacity recovery and a paid timed
+upgrade when resources permit. Core emits no individual surface-module completion
+event; local notices observe actual projected state. The package is unsealed;
+prototype surface art, road presentation, naming, pacing and performance remain
+open. Previous dff2ce7d CI workflow 35103657517 passed; track the next head's CI.
+
 ### First earned colony building (2026-09-16)
 
 Xanthe colony 9 now has its first paid, timed and operational fabricator.

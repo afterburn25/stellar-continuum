@@ -5,6 +5,41 @@ subsystem state lives in `docs/CPP_MIGRATION_STATUS.md`.
 
 ## Current integration checkpoint (2026-09-16)
 
+### Earned colony power and research
+
+Continue from `work/native-audio-validation/package-earned-surface-expansion-paused.player17.json`:
+seed 115501/player 0/system 8/body 8004/colony 9, day 6965.4603137. The existing
+fabricator remains operational. Paid generator 2 and science lab 3 completed
+300/400 materials in 3659/4876 exact Normal 1/64-day frames. Their immediate
+authorizations were 25/40 budget units ($250M/$400M UED). Supply is now six,
+demand four; local capacity is one active research facility / one effective lab.
+Actual institution `construction:surface:9:3` raises empire labs from 12 to 13.
+Paused reload preserves the full Player17 payload except its timestamp.
+
+UI fixes distinguish module costs from colony totals, replace legacy research/day
+labels with actual local research capacity, clarify allocation during construction
+and replace stale authorization notices on observed completion. Real operating
+shortages remain visible. Core, C#, Player17 and approved artwork are unchanged.
+
+The maintained `native_earned_surface_expansion_runtime.py` follows the earned
+fabricator export gate; its proof binds exact debits, timed work, saved identities,
+the actual lab institution and immutable paused recovery. See
+`docs/engine/NATIVE_EARNED_SURFACE_EXPANSION.md` and `work/native-earned-expansion-*`.
+MSVC, thirteen focused Core/native CTests and 594 Python checks (577 pass,
+17 optional skips) pass. Graphical continuation and paused reload pass at
+720p/1080p, with eight captures and two saves retained.
+Original earned-fabricator, surface and navigation regressions also pass, as do
+five clean invalid-launch failures with no save overwrite. The local package remains
+unsealed and is not a release download. Previous published dff2ce7d passed CI
+workflow 35103657517; this checkpoint's CI must be tracked after publication.
+
+Next: earned colony operations/recovery. Verify reviewed shutdown and restart,
+actual loss/restoration of research capacity, and a paid timed upgrade when
+resources permit. Keep truthful player feedback and useful next choices central.
+Do not grant resources or invent Core events. Current terrain, prototype oblique
+buildings, roads and colony naming still need visual polish; 60 FPS and real-time
+pacing remain unproven. Shared base ac45d958 and Devin b023e384 are unchanged.
+
 ### First earned colony building
 
 Continue from `work/native-audio-validation/package-earned-surface-paused.player17.json`:

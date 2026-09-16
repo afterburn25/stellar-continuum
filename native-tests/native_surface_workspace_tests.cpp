@@ -724,6 +724,11 @@ void inspector_status_rows() {
   site.staffed = false;
   site.condition = .1;
   site.efficiency = 0.;
+  view.power_supply = 3.;
+  view.power_demand = 2.;
+  view.industry_per_day = 4.2;
+  view.active_research_facilities = 2;
+  view.active_research_lab_units = 3.;
   NativeSurfaceWorkspace workspace;
   workspace.open(view, 1280, 720);
   const auto layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
@@ -743,8 +748,135 @@ void inspector_status_rows() {
               has("Workforce  Missing") && has("Enabled  Yes") &&
               has("Condition  0.10") && has("Condition efficiency  0%"),
           "inspector did not expose the canonical status and operational rows");
+  require(has("COLONY POWER  3.0 supply / 2.0 demand  |  Net available 1.0") &&
+              has("COLONY OUTPUT  Industry 4.20/day  |  Active research facilities 2 (3.0 effective labs)"),
+          "completed-site inspector did not label whole-colony capacity");
   require(!has("Operational module"),
           "inspector still claims every completed module is operational");
+
+  auto unfinished = colony();
+  NativeSurfaceWorkspace construction_workspace;
+  construction_workspace.open(unfinished, 1280, 720);
+  const auto unfinished_layout = SurfaceWorkspaceLayout::for_viewport(1280, 720);
+  const auto unfinished_point = construction_workspace.viewport().world_to_screen(
+      unfinished.construction_sites.front().x, unfinished.construction_sites.front().z,
+      unfinished_layout.terrain);
+  (void)construction_workspace.handle({InputEventType::LeftPressed, unfinished_point}, 1280, 720);
+  (void)construction_workspace.handle({InputEventType::LeftReleased, unfinished_point}, 1280, 720);
+  DrawList construction_draw;
+  construction_workspace.render(construction_draw, 1280, 720);
+  const auto construction_has = [&](std::string_view value) {
+    return std::ranges::any_of(construction_draw.overlay, [&](const auto &command) {
+      const auto *label = std::get_if<Text>(&command);
+      return label && label->value == value;
+    });
+  };
+  require(construction_has("Power allocation after completion") &&
+              construction_has("Workers assigned after completion") &&
+              !construction_has("Power  Unavailable") &&
+              !construction_has("Workforce  Missing"),
+          "unfinished construction showed operational allocation shortages");
+
+  auto selected = colony();
+  selected.power_supply = 2.;
+  selected.power_demand = 2.;
+  selected.industry_per_day = 4.2;
+  selected.science_per_day = .6;
+  selected.active_research_facilities = 3;
+  selected.active_research_lab_units = 4.5;
+  NativeSurfaceWorkspace selection_workspace;
+  selection_workspace.open(selected, 1280, 720);
+  (void)selection_workspace.handle(
+      {InputEventType::LeftPressed,
+       {unfinished_layout.palette_rows.x + 10.f, unfinished_layout.palette_rows.y + 10.f}},
+      1280, 720);
+  DrawList selection_draw;
+  selection_workspace.render(selection_draw, 1280, 720);
+  const auto selected_has = [&](std::string_view value) {
+    return std::ranges::any_of(selection_draw.overlay, [&](const auto &command) {
+      const auto *label = std::get_if<Text>(&command);
+      return label && label->value == value;
+    });
+  };
+  require(selected_has("Power supply/demand  0.0 / 2.0") &&
+              selected_has("COLONY POWER  2.0 supply / 2.0 demand  |  Net available 0.0") &&
+              selected_has("COLONY OUTPUT  Industry 4.20/day  |  Active research facilities 3 (4.5 effective labs)"),
+          "selected building did not distinguish its costs from colony-wide totals");
+  require(!selected_has("Research 0.60/day"),
+          "surface inspector presented legacy science points as daily output");
+}
+
+void selected_construction_completion_updates_notice() {
+  constexpr int width = 1280, height = 720;
+  auto view = colony();
+  NativeSurfaceWorkspace workspace;
+  workspace.open(view, width, height);
+  const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+  auto point = workspace.viewport().world_to_screen(
+      view.construction_sites.front().x, view.construction_sites.front().z,
+      layout.terrain);
+  point.x += 11.f;
+  point.y += 11.f;
+  (void)workspace.handle({InputEventType::LeftPressed, point}, width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, point}, width, height);
+  NativeSurfacePlacementQuote quote;
+  quote.accepted = true;
+  quote.prepared_building_id = view.construction_sites.front().building_id;
+  workspace.set_placement_quote(quote, false);
+  workspace.complete_command("Science lab placed and authorized for $500M UED.", true);
+
+  auto completed = view;
+  ++completed.revision;
+  completed.construction_sites.front().complete = true;
+  completed.construction_sites.front().enabled = true;
+  completed.construction_sites.front().powered = false;
+  completed.construction_sites.front().staffed = true;
+  completed.construction_sites.front().condition = 1.;
+  workspace.set_view(completed);
+  DrawList updated;
+  workspace.render(updated, width, height);
+  const auto has = [&](std::string_view value) {
+    return std::ranges::any_of(updated.overlay, [&](const auto &command) {
+      const auto *label = std::get_if<Text>(&command);
+      return label && label->value.find(value) != std::string::npos;
+    });
+  };
+  require(has("Construction complete. NO POWER.") &&
+              !has("placed and authorized"),
+          "completion refresh retained a placement message or hid the actual power status");
+
+  NativeSurfaceWorkspace rejected;
+  rejected.open(view, width, height);
+  rejected.set_placement_quote(quote, false);
+  rejected.complete_command("The placement quote is no longer valid.", false);
+  rejected.set_view(completed);
+  DrawList rejected_draw;
+  rejected.render(rejected_draw, width, height);
+  require(std::ranges::none_of(rejected_draw.overlay, [](const auto &command) {
+    const auto *label = std::get_if<Text>(&command);
+    return label && label->value.find("Construction complete.") != std::string::npos;
+  }), "rejected confirmation registered a construction completion watch");
+
+  NativeSurfaceWorkspace loaded_complete;
+  loaded_complete.open(completed, width, height);
+  DrawList initial;
+  loaded_complete.render(initial, width, height);
+  require(std::ranges::none_of(initial.overlay, [](const auto &command) {
+    const auto *label = std::get_if<Text>(&command);
+    return label && label->value.find("Construction complete.") != std::string::npos;
+  }), "already-complete site was announced as a new completion");
+
+  workspace.set_notice("Stale placement notice");
+  auto other_colony = completed;
+  ++other_colony.colony_id;
+  ++other_colony.revision;
+  workspace.set_view(other_colony);
+  DrawList switched;
+  workspace.render(switched, width, height);
+  require(std::ranges::none_of(switched.overlay, [](const auto &command) {
+    const auto *label = std::get_if<Text>(&command);
+    return label && label->value.find("Stale placement notice") != std::string::npos;
+  }), "colony switch retained a stale surface notice");
 }
 
 void workspace_ready_images_and_preview_identity() {
@@ -987,6 +1119,7 @@ int main() try {
   responsive_layout();
   surface_camera_controls_and_refresh();
   inspector_status_rows();
+  selected_construction_completion_updates_notice();
   anchored_camera();
   input_and_confirmation();
   site_removal_and_refresh();

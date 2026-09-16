@@ -16,6 +16,27 @@ subsystem has a maintained parity/validation gate that runs in the sealed export
 
 ## Current integration checkpoint (2026-09-16)
 
+### Earned colony power and research
+
+The earned Xanthe continuation now pays for and completes a generator and science
+lab after its fabricator. Generator/lab authorizations are 25/40 budget units
+($250M/$400M UED); 300/400 materials complete in 3659/4876 exact frames. The save
+reaches day 6965.4603137 with six power supplied, four required, and one actual
+local research institution. Empire effective labs increase from 12 to 13. Separate
+paused 1080p recovery preserves Player17 apart from its timestamp.
+
+Colony and surface displays show actual local research capacity, rather than
+legacy daily science. Construction distinguishes future allocation from operating
+shortages and refreshes stale authorization messages on real completion. The new
+maintained export gate follows the earned fabricator save, validates exact payments,
+timed construction, actual research registration, prepared artwork and save recovery.
+MSVC, thirteen focused CTests and 594 Python checks (577 pass, 17 optional skips)
+pass. Eight 720p/1080p captures and two saves are retained under
+`work/native-earned-expansion-*`. Contract: `engine/NATIVE_EARNED_SURFACE_EXPANSION.md`.
+Core/C#/Player17/art are unchanged. Next: meaningful colony operations, capacity
+recovery and paid upgrades using this earned state. Unsealed local package; final
+3D graphics, real-time pacing and 60 FPS remain unproven.
+
 ### First earned colony building
 
 Xanthe's empty earned colony now continues through mouse-driven paid fabricator

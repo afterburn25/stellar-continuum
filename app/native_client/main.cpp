@@ -255,6 +255,7 @@ struct Options {
   bool surface_reload_smoke{};
   enum class EarnedSurfaceMode { Resume, Paused };
   std::optional<EarnedSurfaceMode> earned_surface_mode;
+  std::optional<EarnedSurfaceMode> earned_surface_expansion_mode;
   bool new_game_smoke{},restart_smoke{};
   StartupEntryAutomationAction restart_action{StartupEntryAutomationAction::Create};
   bool galaxy_art_smoke{};
@@ -321,6 +322,7 @@ struct Options {
     else if(arg==L"--surface-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_smoke=true;result.windowed=true;}
     else if(arg==L"--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.surface_reload_smoke=true;result.windowed=true;}
     else if((arg==L"--earned-surface-smoke"||arg==L"--earned-surface-paused-smoke")&&i+1<argc){if(result.earned_surface_mode)throw std::invalid_argument("Choose one earned surface mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.earned_surface_mode=arg==L"--earned-surface-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
+    else if((arg==L"--earned-surface-expansion-smoke"||arg==L"--earned-surface-expansion-paused-smoke")&&i+1<argc){if(result.earned_surface_expansion_mode)throw std::invalid_argument("Choose one earned surface expansion mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.earned_surface_expansion_mode=arg==L"--earned-surface-expansion-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
     else if(arg==L"--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg==L"--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.ship_art_smoke=true;result.windowed=true;}
     else if(arg==L"--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.diplomacy_smoke=true;result.windowed=true;}
@@ -370,6 +372,7 @@ struct Options {
     else if(arg=="--surface-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_smoke=true;result.windowed=true;}
     else if(arg=="--surface-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.surface_reload_smoke=true;result.windowed=true;}
     else if((arg=="--earned-surface-smoke"||arg=="--earned-surface-paused-smoke")&&i+1<argc){if(result.earned_surface_mode)throw std::invalid_argument("Choose one earned surface mode.");result.smoke_screenshot=argv[++i];result.earned_surface_mode=arg=="--earned-surface-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
+    else if((arg=="--earned-surface-expansion-smoke"||arg=="--earned-surface-expansion-paused-smoke")&&i+1<argc){if(result.earned_surface_expansion_mode)throw std::invalid_argument("Choose one earned surface expansion mode.");result.smoke_screenshot=argv[++i];result.earned_surface_expansion_mode=arg=="--earned-surface-expansion-smoke"?Options::EarnedSurfaceMode::Resume:Options::EarnedSurfaceMode::Paused;result.windowed=true;}
     else if(arg=="--galaxy-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.galaxy_art_smoke=true;result.windowed=true;}
     else if(arg=="--ship-art-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.ship_art_smoke=true;result.windowed=true;}
     else if(arg=="--diplomacy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.diplomacy_smoke=true;result.windowed=true;}
@@ -396,7 +399,7 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile&&!result.surface_smoke&&!result.surface_reload_smoke)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.earned_surface_mode.has_value())+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.surface_smoke)+static_cast<int>(result.surface_reload_smoke)+static_cast<int>(result.earned_surface_mode.has_value())+static_cast<int>(result.earned_surface_expansion_mode.has_value())+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
@@ -416,6 +419,7 @@ struct Options {
   if((result.settlement_smoke||result.settlement_reload_smoke)&&!result.load)throw std::invalid_argument("Settlement smoke requires --load with a test-authored funded populated settlement vessel.");
   if((result.surface_smoke||result.surface_reload_smoke)&&!result.load)throw std::invalid_argument("Surface smoke requires --load with the isolated native campaign save.");
   if(result.earned_surface_mode&&(!result.load||result.seed!=115501))throw std::invalid_argument("Earned surface smoke requires --load with the earned Xanthe colony save and --seed 115501.");
+  if(result.earned_surface_expansion_mode&&(!result.load||result.seed!=115501))throw std::invalid_argument("Earned surface expansion smoke requires --load with the earned paused Xanthe save and --seed 115501.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   return result;
 }
@@ -3867,6 +3871,395 @@ class NativeCampaign final {
     return earned_surface_proof_;
   }
 
+  void prepare_earned_surface_expansion_smoke(
+      int width, int height, Options::EarnedSurfaceMode mode,
+      const std::function<void()> &pump,
+      const std::function<void(std::string_view)> &capture) {
+    auto &frame = session_->frame();
+    const auto &world = frame.runtime().world().campaign();
+    const bool paused = mode == Options::EarnedSurfaceMode::Paused;
+    const auto snapshot = [&] {
+      return nlohmann::json::parse(encode_player_campaign_v17_json(
+          PreparedPlayerCampaignSave::capture(
+              frame.runtime(), {frame.clock().simulation_days(),
+                                STELLAR_GAME_VERSION, "2044-05-06T07:08:21Z"})
+              .payload()));
+    };
+    const auto original = snapshot();
+    const auto route = [&](std::vector<InputEvent> events) {
+      InputSnapshot input;
+      input.drawable_width = width;
+      input.drawable_height = height;
+      input.pointer = events.empty() ? Point{} : events.back().position;
+      input.events = std::move(events);
+      if (!update(input, width, height, 0., false))
+        throw std::runtime_error(
+            "Earned surface expansion input closed the campaign.");
+    };
+    const auto click = [&](Point point) {
+      route({{InputEventType::LeftPressed, point},
+             {InputEventType::LeftReleased, point}});
+    };
+    if (frame.clock().speed() != StrategicSpeed::Paused ||
+        world.player_civilization_id != 0)
+      throw std::runtime_error(
+          "Earned surface expansion requires paused player 0.");
+    const auto colony = std::ranges::find(world.colonies, 9, &Colony::id);
+    if (colony == world.colonies.end() || colony->system_id != 8 ||
+        colony->planetary_body_id != 8004 ||
+        colony->surface_buildings.size() != (paused ? 3u : 1u))
+      throw std::runtime_error("Earned surface expansion requires Xanthe's "
+                               "expected building state.");
+    if (!enter_system(8, width, height))
+      throw std::runtime_error(
+          "Earned surface expansion could not enter Xanthe.");
+    const auto spatial = project_system(*system_workspace_.snapshot());
+    const auto marker = std::ranges::find(spatial.bodies, 8004,
+                                          &SystemSpatialBodyMarker::body_id);
+    if (marker == spatial.bodies.end())
+      throw std::runtime_error("Earned surface expansion body is absent.");
+    const auto body = system_workspace_.viewport()->world_to_screen(
+        marker->offset_x, marker->offset_y);
+    click({body.x, body.y});
+    refresh_colony_entry(true);
+    click(center(
+        SystemWorkspaceLayout::for_viewport(width, height).colony_action));
+    if (!colony_workspace_.visible() || !colony_workspace_.view() ||
+        colony_workspace_.view()->colony_id != 9)
+      throw std::runtime_error("Earned surface expansion colony entry failed.");
+    click(center(
+        ColonyWorkspaceLayout::for_viewport(width, height).open_surface));
+    if (!surface_workspace_.visible() || !surface_workspace_.view())
+      throw std::runtime_error(
+          "Earned surface expansion did not open surface.");
+    const auto wait_art = [&] {
+      const auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(300);
+      pump();
+      while (!artwork_ready()) {
+        if (std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error(
+              "Earned surface expansion artwork timed out.");
+        pump();
+      }
+    };
+    wait_art();
+    const auto initial = *surface_workspace_.view();
+    const double before_days = frame.clock().simulation_days(),
+                 power_before = initial.power_supply,
+                 science_before = initial.science_per_day;
+    const double research_labs_before = current_research_stamp().total_labs;
+    const auto verify_lab = [&](int building_id) {
+      const auto &state = frame.runtime().research().get_civilization(0);
+      const auto institutions = state.expertise().institutions();
+      const auto key = "construction:surface:9:" + std::to_string(building_id);
+      const auto institution = std::ranges::find(
+          institutions, key,
+          &ResearchInstitutionRuntimeState::institution_instance_id);
+      if (institution == institutions.end() ||
+          institution->institution_archetype_id !=
+              "surface_science_laboratory" ||
+          institution->context_id != std::optional<std::string>{"colony:9"} ||
+          institution->total_count != 1 || institution->active_count != 1)
+        throw std::runtime_error("Earned science lab did not register its "
+                                 "active research institution.");
+      return *institution;
+    };
+    const auto verify_roundtrip = [&] {
+      const PlayerCampaignCaptureOptions options{
+          frame.clock().simulation_days(), STELLAR_GAME_VERSION,
+          "2044-05-06T07:08:21Z"};
+      auto restored = restore_player_campaign_v17_json(
+          load_adaptive_research_strategic_runtime(asset_root_ /
+                                                   "Data/research/v1"),
+          encode_player_campaign_v17_json(
+              PreparedPlayerCampaignSave::capture(frame.runtime(), options)
+                  .payload()));
+      auto resumed = std::move(restored).activate();
+      if (nlohmann::json::parse(encode_player_campaign_v17_json(
+              PreparedPlayerCampaignSave::capture(resumed, options)
+                  .payload())) != snapshot())
+        throw std::runtime_error(
+            "Earned surface expansion Player17 roundtrip failed.");
+      return true;
+    };
+    const auto layout = SurfaceWorkspaceLayout::for_viewport(width, height);
+    const auto select = [&](NativeSurfaceSite site) {
+      if (surface_workspace_.selected_type_id())
+        route({{InputEventType::EscapePressed}});
+      click(surface_workspace_.viewport().world_to_screen(site.x, site.z,
+                                                          layout.terrain));
+      if (surface_workspace_.selected_building_id() !=
+          std::optional<int>{site.building_id})
+        throw std::runtime_error("Earned expansion could not select site.");
+      wait_art();
+    };
+    const auto fabricator =
+        std::ranges::find_if(initial.construction_sites, [](const auto &s) {
+          return s.type_id == "fabricator" && s.complete && s.powered &&
+                 s.staffed && s.enabled;
+        });
+    if (fabricator == initial.construction_sites.end())
+      throw std::runtime_error(
+          "Earned expansion lacks operational fabricator.");
+    if (paused) {
+      const auto generator =
+          std::ranges::find_if(initial.construction_sites, [](const auto &s) {
+            return s.type_id == "power_generator" && s.complete && s.powered &&
+                   s.staffed && s.enabled;
+          });
+      const auto lab =
+          std::ranges::find_if(initial.construction_sites, [](const auto &s) {
+            return s.type_id == "science_lab" && s.complete && s.powered &&
+                   s.staffed && s.enabled;
+          });
+      if (generator == initial.construction_sites.end() ||
+          lab == initial.construction_sites.end() ||
+          std::abs(initial.power_supply - 6.) > 1e-9 ||
+          std::abs(initial.power_demand - 4.) > 1e-9 ||
+          initial.science_per_day <= 0.)
+        throw std::runtime_error(
+            "Paused expansion lacks completed operational structures.");
+      select(*lab);
+      InputSnapshot tick;
+      tick.drawable_width = width;
+      tick.drawable_height = height;
+      (void)update(tick, width, height, 1., true);
+      if (snapshot() != original)
+        throw std::runtime_error("Paused expansion changed Player17.");
+      const auto institution = verify_lab(lab->building_id);
+      const bool roundtrip = verify_roundtrip();
+      if (surface_workspace_.scene_diagnostics().replaced_structures < 4)
+        throw std::runtime_error(
+            "Paused expansion did not render all prepared structures.");
+      nlohmann::json persisted_stages = nlohmann::json::array();
+      for (const auto &site : initial.construction_sites)
+        persisted_stages.push_back(
+            {{"type_id", site.type_id},
+             {"building_id", site.building_id},
+             {"x", site.x},
+             {"z", site.z},
+             {"rotation", site.rotation_degrees},
+             {"authorization", 0},
+             {"treasury_before", initial.treasury_budget_units},
+             {"treasury_after", initial.treasury_budget_units},
+             {"industry_cost", site.industry_cost},
+             {"industry_progress", site.industry_progress},
+             {"complete", site.complete},
+             {"powered", site.powered},
+             {"staffed", site.staffed},
+             {"enabled", site.enabled},
+             {"efficiency", site.efficiency},
+             {"steps", 0},
+             {"step_days", 1. / 64.},
+             {"cancel_unchanged", true}});
+      earned_surface_expansion_proof_ = nlohmann::json{
+          {"mode", "paused"},
+          {"player_id", 0},
+          {"system_id", 8},
+          {"body_id", 8004},
+          {"colony_id", 9},
+          {"before_days", before_days},
+          {"after_days", before_days},
+          {"power_supply_before", initial.power_supply},
+          {"power_supply_after", initial.power_supply},
+          {"science_before", science_before},
+          {"science_after", initial.science_per_day},
+          {"research_instance_id", institution.institution_instance_id},
+          {"research_lab_active_count", institution.active_count},
+          {"research_labs_before", research_labs_before},
+          {"research_labs_after", current_research_stamp().total_labs},
+          {"fabricator_operational", true},
+          {"opened_surface", true},
+          {"roundtrip", roundtrip},
+          {"stages", persisted_stages}}.dump();
+      session_->request_save();
+      return;
+    }
+    nlohmann::json stages = nlohmann::json::array();
+    const auto build = [&](std::string_view type, double authorization,
+                           double cost, std::string_view prefix) {
+      const auto view = *surface_workspace_.view();
+      const auto stage_original = snapshot();
+      const auto option =
+          std::ranges::find(view.available_buildings, std::string(type),
+                            &NativeSurfaceBuildOption::type_id);
+      if (option == view.available_buildings.end() ||
+          option->authorization_budget_units != authorization ||
+          option->industry_cost != cost)
+        throw std::runtime_error("Earned expansion catalog mismatch.");
+      const auto index =
+          static_cast<std::size_t>(option - view.available_buildings.begin());
+      click({layout.palette_rows.x + 14.f * layout.scale,
+             layout.palette_rows.y +
+                 (static_cast<float>(index) * 78.f + 20.f) * layout.scale});
+      std::optional<NativeSurfacePlacementQuote> quote;
+      for (float z = -70; z <= 70 && !quote; z += 35)
+        for (float x = -70; x <= 70; x += 7) {
+          auto q = surface_controller_.preview_placement(
+              frame, session_->cache().generation, *surface_workspace_.view(),
+              std::string(type), x, z, 0);
+          if (q.accepted) {
+            quote = q;
+            break;
+          }
+        }
+      if (!quote)
+        throw std::runtime_error("Earned expansion found no position.");
+      (void)surface_controller_.cancel_quote(session_->cache().generation,
+                                             quote->quote_revision);
+      const auto point = surface_workspace_.viewport().world_to_screen(
+          quote->x, quote->z, layout.terrain);
+      click(point);
+      if (!surface_workspace_.placement_quote() ||
+          !surface_workspace_.placement_quote()->accepted ||
+          surface_workspace_.placement_quote()->authorization_budget_units !=
+              authorization)
+        throw std::runtime_error("Earned expansion review failed.");
+      capture(std::string(prefix) + "-review");
+      click(center(layout.cancel));
+      refresh_surface(true);
+      const bool cancelled = surface_workspace_.view()->treasury_budget_units ==
+                                 view.treasury_budget_units &&
+                             snapshot() == stage_original;
+      if (!cancelled)
+        throw std::runtime_error("Earned expansion cancel changed Player17.");
+      click(point);
+      click(center(layout.confirm));
+      auto site = std::ranges::find_if(
+          surface_workspace_.view()->construction_sites,
+          [&](const auto &s) { return s.type_id == type && !s.complete; });
+      if (site == surface_workspace_.view()->construction_sites.end() ||
+          site->industry_progress != 0. ||
+          std::abs(surface_workspace_.view()->treasury_budget_units -
+                   (view.treasury_budget_units - authorization)) > 1e-9)
+        throw std::runtime_error("Earned expansion did not create exact site.");
+      const int id = site->building_id;
+      const double treasury_after_authorization =
+          surface_workspace_.view()->treasury_budget_units;
+      std::uint64_t steps{};
+      bool partial{};
+      const auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(300);
+      frame.clock().set_speed(StrategicSpeed::Normal);
+      while (!site->complete) {
+        if (++steps > 1024 * 64 || std::chrono::steady_clock::now() > deadline)
+          throw std::runtime_error(
+              "Earned expansion exceeded its day or wall-clock bound.");
+        const auto before = frame.clock().simulation_days();
+        const auto result = frame.advance(1. / 64.);
+        if (result.completed_substeps != std::vector<double>{1. / 64.} ||
+            frame.clock().simulation_days() - before != 1. / 64. ||
+            frame.clock().backlog_days() != 0.)
+          throw std::runtime_error("Earned expansion lost exact stepping.");
+        publish_feedback(result);
+        if (steps % 64 == 0)
+          pump();
+        refresh_surface(true);
+        site = std::ranges::find(surface_workspace_.view()->construction_sites,
+                                 id, &NativeSurfaceSite::building_id);
+        if (site == surface_workspace_.view()->construction_sites.end())
+          throw std::runtime_error("Earned expansion lost site.");
+        if (!partial && site->progress_fraction >= .10 && !site->complete) {
+          frame.clock().set_speed(StrategicSpeed::Paused);
+          select(*site);
+          capture(std::string(prefix) + "-construction");
+          partial = true;
+          refresh_surface(true);
+          site =
+              std::ranges::find(surface_workspace_.view()->construction_sites,
+                                id, &NativeSurfaceSite::building_id);
+          frame.clock().set_speed(StrategicSpeed::Normal);
+        }
+      }
+      frame.clock().set_speed(StrategicSpeed::Paused);
+      refresh_surface(true);
+      site = std::ranges::find(surface_workspace_.view()->construction_sites,
+                               id, &NativeSurfaceSite::building_id);
+      if (!partial ||
+          site == surface_workspace_.view()->construction_sites.end() ||
+          !site->complete || !site->powered || !site->staffed || !site->enabled)
+        throw std::runtime_error("Earned expansion site did not operate.");
+      const auto completed_site = *site;
+      select(completed_site);
+      capture(std::string(prefix) + "-complete");
+      site = std::ranges::find(surface_workspace_.view()->construction_sites,
+                               id, &NativeSurfaceSite::building_id);
+      if (site == surface_workspace_.view()->construction_sites.end())
+        throw std::runtime_error(
+            "Earned expansion lost the inspected completed site.");
+      stages.push_back({{"type_id", site->type_id},
+                        {"building_id", id},
+                        {"x", site->x},
+                        {"z", site->z},
+                        {"rotation", site->rotation_degrees},
+                        {"authorization", authorization},
+                        {"treasury_before", view.treasury_budget_units},
+                        {"treasury_after", treasury_after_authorization},
+                        {"industry_cost", site->industry_cost},
+                        {"industry_progress", site->industry_progress},
+                        {"complete", site->complete},
+                        {"powered", site->powered},
+                        {"staffed", site->staffed},
+                        {"enabled", site->enabled},
+                        {"efficiency", site->efficiency},
+                        {"steps", steps},
+                        {"step_days", 1. / 64.},
+                        {"cancel_unchanged", cancelled}});
+    };
+    build("power_generator", 25., 300., "power");
+    const double power_after = surface_workspace_.view()->power_supply;
+    if (std::abs(power_after - power_before - 4.) > 1e-9)
+      throw std::runtime_error("Generator did not raise power supply by four.");
+    build("science_lab", 40., 400., "science");
+    const auto final = *surface_workspace_.view();
+    if (std::abs(final.science_per_day - science_before - 1.) > 1e-9)
+      throw std::runtime_error(
+          "Science lab did not update the surface science projection.");
+    const double research_labs_after = current_research_stamp().total_labs;
+    if (std::abs(research_labs_after - research_labs_before - 1.) > 1e-9)
+      throw std::runtime_error(
+          "Science lab did not add one effective research lab.");
+    const auto institution =
+        verify_lab(stages.at(1).at("building_id").get<int>());
+    const bool roundtrip = verify_roundtrip();
+    const auto final_fabricator =
+        std::ranges::find(final.construction_sites, fabricator->building_id,
+                          &NativeSurfaceSite::building_id);
+    if (final_fabricator == final.construction_sites.end() ||
+        !final_fabricator->complete || !final_fabricator->enabled ||
+        !final_fabricator->powered || !final_fabricator->staffed ||
+        final.industry_per_day < initial.industry_per_day ||
+        surface_workspace_.scene_diagnostics().replaced_structures < 4)
+      throw std::runtime_error(
+          "Expansion lost operating industry or prepared structure artwork.");
+    earned_surface_expansion_proof_ = nlohmann::json{
+        {"mode", "expansion"},
+        {"player_id", 0},
+        {"system_id", 8},
+        {"body_id", 8004},
+        {"colony_id", 9},
+        {"before_days", before_days},
+        {"after_days", frame.clock().simulation_days()},
+        {"power_supply_before", power_before},
+        {"power_supply_after", final.power_supply},
+        {"science_before", science_before},
+        {"science_after", final.science_per_day},
+        {"research_instance_id", institution.institution_instance_id},
+        {"research_lab_active_count", institution.active_count},
+        {"research_labs_before", research_labs_before},
+        {"research_labs_after", research_labs_after},
+        {"fabricator_operational", true},
+        {"opened_surface", true},
+        {"roundtrip", roundtrip},
+        {"stages", stages}}.dump();
+    session_->request_save();
+  }
+  [[nodiscard]] const std::string &
+  earned_surface_expansion_smoke_status() const {
+    return earned_surface_expansion_proof_;
+  }
+
   void prepare_settlement_preparation_smoke(
       int width, int height, const std::function<void()> &pump,
       const std::function<void(std::string_view)> &capture) {
@@ -6138,7 +6531,7 @@ class NativeCampaign final {
       refresh_surface(true);
       return;
     }else return;
-    surface_workspace_.complete_command(visible_notice(outcome.message));
+    surface_workspace_.complete_command(visible_notice(outcome.message), outcome.accepted);
     refresh_surface(true);
   }
 
@@ -6769,6 +7162,7 @@ class NativeCampaign final {
   double smoke_colony_day_{};
   std::string settlement_completion_proof_;
   std::string earned_surface_proof_;
+  std::string earned_surface_expansion_proof_;
   bool smoke_settlement_mode_{},smoke_settlement_reload_{},smoke_settlement_selected_{},smoke_settlement_previewed_{},smoke_settlement_accepted_{};
   bool smoke_settlement_cancelled_{},smoke_settlement_cancel_no_charge_{},smoke_settlement_requires_authorization_{},smoke_settlement_no_instant_colony_{};
   std::optional<int> smoke_settlement_fleet_id_,smoke_settlement_system_id_,smoke_settlement_body_id_;
@@ -6927,6 +7321,10 @@ int main(int argc,char **argv){
         campaign.prepare_earned_surface_smoke(window.drawable_width(),window.drawable_height(),*options.earned_surface_mode,
           [&]{audio.service();auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("Earned surface window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
           [&](std::string_view tag){window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,tag=="review"?L"-review":tag=="colony"?L"-colony":L"-construction"));});
+      else if(options.earned_surface_expansion_mode)
+        campaign.prepare_earned_surface_expansion_smoke(window.drawable_width(),window.drawable_height(),*options.earned_surface_expansion_mode,
+          [&]{audio.service();auto progress_input=window.poll();if(!campaign.update(progress_input,progress_input.drawable_width,progress_input.drawable_height,0.,false))throw std::runtime_error("Earned expansion window closed before completion.");if(progress_input.renderable())window.draw(campaign.scene(progress_input.drawable_width,progress_input.drawable_height));},
+          [&](std::string_view tag){const auto suffix=std::wstring(L"-")+std::wstring(tag.begin(),tag.end());window.draw(campaign.scene(window.drawable_width(),window.drawable_height()),sidecar_path(*options.smoke_screenshot,suffix.c_str()));});
       else if(options.galaxy_art_smoke)
         campaign.prepare_galaxy_art_smoke(window.drawable_width(),
                                           window.drawable_height(),options.load);
@@ -7322,6 +7720,8 @@ int main(int argc,char **argv){
           std::cout<<"settlement_preparation="<<campaign.settlement_preparation_smoke_status()<<'\n';
         if(options.earned_surface_mode)
           std::cout<<"earned_surface="<<campaign.earned_surface_smoke_status()<<'\n';
+        if(options.earned_surface_expansion_mode)
+          std::cout<<"earned_surface_expansion="<<campaign.earned_surface_expansion_smoke_status()<<'\n';
         if(options.first_survey_mode)
           std::cout<<"first_survey="<<campaign.first_survey_smoke_status()<<'\n';
         std::ranges::sort(frame_ms);

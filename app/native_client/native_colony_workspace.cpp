@@ -445,8 +445,9 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
   operation("Projected surface production  " +
             view.currency.format_rate(view.credits_per_day));
   operation("Industry " + number(view.industry_per_day, 2) +
-            "/day  |  Research " + number(view.science_per_day, 2) +
-            "/day");
+            "/day  |  Active research facilities " +
+            std::to_string(view.active_research_facilities) + " (" +
+            number(view.active_research_lab_units, 1) + " effective labs)");
   operation("Surface upkeep " +
             view.currency.format_rate(view.upkeep_credits_per_day) +
             "  |  Habitat systems " +

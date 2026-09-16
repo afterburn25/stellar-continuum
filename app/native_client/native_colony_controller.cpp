@@ -1,6 +1,8 @@
 #include "native_colony_controller.hpp"
 
+#include <stellar/core/adaptive_research_authority.hpp>
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
+#include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/freight.hpp>
 #include <stellar/core/surface_construction.hpp>
 
@@ -123,6 +125,8 @@ std::string signature(const NativeColonyView &view) {
   append(out, view.industry_per_day);
   append(out, view.science_per_day);
   append(out, view.cargo_transfer_capacity_per_day);
+  append(out, view.active_research_facilities);
+  append(out, view.active_research_lab_units);
   append(out, view.specialization_name);
   append(out, view.specialization_description);
   append(out, view.specialization_complexes);
@@ -324,6 +328,23 @@ NativeColonyViewResult NativeColonyController::build(
                               : output.industry_per_day *
                                     current.economy.last_base_operations_funding_fraction;
   view.science_per_day = output.science_per_day;
+  const auto *research_state =
+      current.runtime.research().try_get_civilization(current.player.id);
+  if (research_state) {
+    const auto context_id = "colony:" + std::to_string(colony->id);
+    const auto &institutions =
+        current.runtime.research_runtime().authority().expertise_catalog();
+    for (const auto &institution : research_state->expertise().institutions()) {
+      if (institution.context_id != std::optional<std::string>{context_id} ||
+          institution.active_count <= 0)
+        continue;
+      const auto &definition =
+          institutions.get_institution(institution.institution_archetype_id);
+      view.active_research_facilities += institution.active_count;
+      view.active_research_lab_units +=
+          definition.effective_lab_units * institution.active_count;
+    }
+  }
   view.cargo_transfer_capacity_per_day =
       FreightSimulation::port_transfer_capacity_per_day(*colony);
   view.specialization_name = specialization.name;

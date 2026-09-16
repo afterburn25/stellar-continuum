@@ -36,6 +36,7 @@ from native_first_survey_runtime import validate_native_first_survey_export
 from native_settlement_preparation_runtime import validate_native_settlement_preparation_export
 from native_earned_settlement_runtime import validate_native_earned_settlement_export
 from native_earned_surface_runtime import validate_native_earned_surface_export
+from native_earned_surface_expansion_runtime import validate_native_earned_surface_expansion_export
 from native_settlement_runtime import validate_native_settlement_export
 from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
@@ -520,6 +521,8 @@ def export(preset_name):
                 output / "Data/astronomy/hyg-nearby-500-v1.json"))
             smoke.update(validate_native_earned_surface_export(
                 output, env, Path(smoke["settlementCompletionSaveCaptures"][-1])))
+            smoke.update(validate_native_earned_surface_expansion_export(
+                output, env, Path(smoke["earnedSurfaceSaveCaptures"][-1])))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_surface_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
