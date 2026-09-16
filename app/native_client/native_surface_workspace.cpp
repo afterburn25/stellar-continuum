@@ -634,15 +634,17 @@ void NativeSurfaceWorkspace::render(DrawList &out, const int width,
     }
   }();
   fill(out, layout.terrain, terrain_tint);
-  // Reference PlanetSurfaceView terrain relief: a cached hillshade of the
-  // authoritative surface_terrain_height heightfield underlays the flat
-  // palette fill (top-down approximation until the free orbit camera lands).
+  // Reference PlanetSurfaceView terrain: a cached rendering of the
+  // authoritative surface_terrain_height heightfield with the body's
+  // seeded palette bands and civic paving underlays the flat palette
+  // fill (top-down approximation until the free orbit camera lands).
   if (const auto relief =
           relief_.image(viewport_.center_x, viewport_.center_z,
                         viewport_.pixels_per_unit,
                         static_cast<int>(std::lround(layout.terrain.width)),
                         static_cast<int>(std::lround(layout.terrain.height)),
-                        terrain_tint))
+                        view.surface_palette_class,
+                        native_surface::terrain_seed(view.body_id)))
     out.overlay.emplace_back(Image{relief, layout.terrain, std::nullopt,
                                    {255, 255, 255, 255}, layout.terrain});
   stroke(out, layout.terrain, border);

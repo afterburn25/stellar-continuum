@@ -267,6 +267,47 @@ NativeColonyViewResult NativeColonyController::build(
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   view.solid_surface = shown_body->details && shown_body->details->has_solid_surface;
   view.surface_visual_class = shown_body->visual_class;
+  // Reference Main.Surface.cs SurfaceVisualClass order: the terrain palette
+  // keys off the surveyed environment, not the coarse map visual class.
+  view.surface_palette_class = [&] {
+    using native_surface::NativeSurfacePaletteClass;
+    using stellar::core::PlanetaryAtmosphereRegime;
+    using stellar::core::PlanetarySolventRegime;
+    if (shown_body->details) {
+      const auto &environment = *shown_body->details;
+      if (environment.is_immersed_environment)
+        return NativeSurfacePaletteClass::oceanic;
+      if (environment.temperature_kelvin < 200.)
+        return NativeSurfacePaletteClass::frozen;
+      if (environment.temperature_kelvin > 410.)
+        return NativeSurfacePaletteClass::hot;
+      if (environment.atmosphere == PlanetaryAtmosphereRegime::Vacuum)
+        return NativeSurfacePaletteClass::airless;
+      if (environment.available_solvent ==
+              PlanetarySolventRegime::Water &&
+          (environment.atmosphere ==
+               PlanetaryAtmosphereRegime::OxygenNitrogen ||
+           environment.atmosphere ==
+               PlanetaryAtmosphereRegime::OxygenRich))
+        return NativeSurfacePaletteClass::temperate;
+      if (environment.atmosphere == PlanetaryAtmosphereRegime::Reducing)
+        return NativeSurfacePaletteClass::reducing;
+      return NativeSurfacePaletteClass::rocky;
+    }
+    switch (shown_body->visual_class) {
+      case native_system::NativeSystemBodyVisualClass::frozen:
+        return NativeSurfacePaletteClass::frozen;
+      case native_system::NativeSystemBodyVisualClass::oceanic:
+        return NativeSurfacePaletteClass::oceanic;
+      case native_system::NativeSystemBodyVisualClass::hot_rocky:
+        return NativeSurfacePaletteClass::hot;
+      case native_system::NativeSystemBodyVisualClass::moon:
+      case native_system::NativeSystemBodyVisualClass::unknown_moon:
+        return NativeSurfacePaletteClass::airless;
+      default:
+        return NativeSurfacePaletteClass::rocky;
+    }
+  }();
   view.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);
   view.treasury_budget_units = current.economy.credits;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "native_surface_relief.hpp"
 #include "native_system_view.hpp"
 
 #include <stellar/core/campaign_frame.hpp>
@@ -52,6 +53,8 @@ struct NativeColonyView {
   bool resource_outpost{}, solid_surface{};
   native_system::NativeSystemBodyVisualClass surface_visual_class{
       native_system::NativeSystemBodyVisualClass::unknown_planet};
+  native_surface::NativeSurfacePaletteClass surface_palette_class{
+      native_surface::NativeSurfacePaletteClass::rocky};
   stellar::core::SovereignCurrencyDefinition currency;
   double treasury_budget_units{}, stored_industry{};
   std::string formatted_treasury;
