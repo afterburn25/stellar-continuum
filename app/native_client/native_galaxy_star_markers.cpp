@@ -57,21 +57,22 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
       const float py = (2.f * (y + .5f) / size - 1.f);
       const float radius = std::hypot(px, py);
       const float edge = 1.f - std::clamp((radius - .78f) / .20f, 0.f, 1.f);
-      const float glow = std::exp(-radius * 4.6f) * .48f;
+      // A resolved, bright core with a short limb transition. A broad Gaussian
+      // core reads as a blurred blotch once the map magnifies its sprite.
+      const float core_width = style.compact ? .105f : .145f;
+      const float core = std::exp(-std::pow(radius / core_width, 4.f));
+      const float glow = std::exp(-radius * radius / .095f) * .15f;
       const float ray_x = antialiased_line(std::abs(py), .012f) *
                           std::pow(std::max(0.f, 1.f - std::abs(px)), 1.45f) *
-                          .68f;
+                          .90f;
       const float ray_y = antialiased_line(std::abs(px), .010f) *
                           std::pow(std::max(0.f, 1.f - std::abs(py)), 1.6f) *
-                          (style.compact ? .48f : .28f);
+                          (style.compact ? .70f : .62f);
       const float diagonal = style.beam
                                  ? antialiased_line(std::abs(px + py * .55f),
                                                     .010f) *
                                        std::max(0.f, 1.f - radius) * .62f
                                  : 0.f;
-      const float core_width = style.compact ? .105f : .145f;
-      const float core = std::exp(-(radius * radius) /
-                                  (2.f * core_width * core_width));
       const float lens = style.dark_center
                              ? std::max(0.f, 1.f - std::abs(radius - .25f) / .065f)
                              : 0.f;
@@ -82,23 +83,20 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
           std::max({glow, ray_x, ray_y, diagonal,
                     style.dark_center ? std::max(lens, horizon) : core}),
           0.f, 1.f);
-      const float contrast = edge * .30f *
-          std::exp(-std::pow((radius - .37f) / .13f, 2.f));
-      const float alpha = std::max(light_alpha, contrast);
+      const float alpha = light_alpha;
       if (alpha < .002f) continue;
-      const float white = style.dark_center ? lens * .20f : core * .52f;
-      const float light_mix = light_alpha / (light_alpha + contrast + .0001f);
+      const float white = style.dark_center ? lens * .20f :
+          core * (.96f - .52f * std::clamp(radius / core_width, 0.f, 1.f));
       const auto offset = static_cast<std::size_t>((y * size + x) * 4);
       if (horizon > .5f) {
         pixels[offset] = pixels[offset + 1] = 3;
         pixels[offset + 2] = 7;
       } else {
-        const float red = std::min(1.f, (style.color.r / 255.f) * .92f + white);
-        const float green = std::min(1.f, (style.color.g / 255.f) * .92f + white);
-        const float blue = std::min(1.f, (style.color.b / 255.f) * .92f + white);
-        pixels[offset] = channel(red * light_mix + .012f * (1.f - light_mix));
-        pixels[offset + 1] = channel(green * light_mix + .020f * (1.f - light_mix));
-        pixels[offset + 2] = channel(blue * light_mix + .035f * (1.f - light_mix));
+        // Straight alpha: keep the spectral rim and rays luminous rather than
+        // mixing a dark contrast annulus into the star's own emitted light.
+        pixels[offset] = channel((style.color.r / 255.f) * (1.f - white) + white);
+        pixels[offset + 1] = channel((style.color.g / 255.f) * (1.f - white) + white);
+        pixels[offset + 2] = channel((style.color.b / 255.f) * (1.f - white) + white);
       }
       pixels[offset + 3] = channel(alpha);
     }

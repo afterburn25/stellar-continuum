@@ -77,3 +77,12 @@ star rendering is unchanged. Camera regression checks cover 720p through 4K;
 the real galaxy smoke verifies home framing, overview limits, pointer-anchored
 zoom, regional panning, and star growth before entering a system.
 
+Map markers use shared 256-pixel profiles with a compact white-hot center,
+spectral rim and narrow diffraction rays. The previous broad Gaussian and dark
+contrast annulus are removed. A short core falloff keeps magnified stars crisp
+without hard planet-like discs or rectangular edges. Unexplored markers remain
+neutral and less bright than explored stars, but are now legible at 62% opacity;
+their names, spectral classes and multiplicity remain observer-filtered.
+The complete 13-style cache is capped at 3.25 MiB regardless of galaxy size.
+Pixel checks cover core brightness, halo falloff, rays and transparent borders.
+

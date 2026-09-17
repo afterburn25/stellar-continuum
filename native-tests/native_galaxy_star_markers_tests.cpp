@@ -52,24 +52,31 @@ void shared_discrete_resources() {
               std::holds_alternative<Image>(first.world[1]),
           "single star did not order its contrast disc before its image");
   const auto resource = image_at(first, 1).resource;
-  require(resource->width() == 64 && resource->height() == 64,
-          "galaxy marker resource exceeded its small fixed tier");
-  require(alpha(*resource, 0, 0) == 0 && alpha(*resource, 32, 32) > 220,
+  constexpr int size = NativeGalaxyStarMarkerRenderer::texture_size;
+  constexpr int center = size / 2;
+  require(resource->width() == size && resource->height() == size,
+          "galaxy marker resource exceeded its fixed resolution tier");
+  require(alpha(*resource, 0, 0) == 0 && alpha(*resource, center, center) > 250,
           "galaxy marker has a square frame or lacks a crisp core");
   require_transparent_border(*resource);
-  require(alpha(*resource, 32, 32) > alpha(*resource, 36, 32) &&
-              alpha(*resource, 36, 32) > alpha(*resource, 40, 32),
-          "stellar core was a hard flat disc instead of a smooth light profile");
-  require(alpha(*resource, 8, 32) > 14 &&
-              alpha(*resource, 8, 32) > alpha(*resource, 8, 24),
+  require(alpha(*resource, center + 6, center + 4) > 245 &&
+              alpha(*resource, center + 24, center + 16) < 35,
+          "stellar core faded gradually into a blurred patch instead of a short luminous limb");
+  require(alpha(*resource, size / 8, center) > 14 &&
+              alpha(*resource, size / 8, center) > alpha(*resource, size / 8, size * 3 / 8),
           "thin horizontal diffraction ray was not antialiased visibly");
-  require(alpha(*resource, 32, 8) > 6 &&
-              alpha(*resource, 32, 8) > alpha(*resource, 24, 8),
+  require(alpha(*resource, center, size / 8) > 6 &&
+              alpha(*resource, center, size / 8) > alpha(*resource, size * 3 / 8, size / 8),
           "thin vertical diffraction ray was not antialiased visibly");
-  require(red(*resource, 8, 32) > 200,
+  require(red(*resource, size / 8, center) > 240,
           "faint ray color was darkened a second time before alpha blending");
-  require(alpha(*resource, 44, 40) > 30 && red(*resource, 44, 40) < 150,
-          "radial contrast annulus cannot separate a marker from bright artwork");
+  require(alpha(*resource, center + 48, center + 32) < 10,
+          "a broad contrast ring or dense halo dulled the star's silhouette");
+  const auto core_pixel = static_cast<std::size_t>((center * size + center) * 4);
+  require(resource->pixels()[core_pixel] > 245 &&
+              resource->pixels()[core_pixel + 1] > 245 &&
+              resource->pixels()[core_pixel + 2] > 245,
+          "star lost its brilliant white-hot center");
   DrawList moved;
   renderer.append(moved, {410, 330}, 5.f,
                   {GalaxyStarVisualClass::g_yellow_dwarf}, false);
@@ -90,7 +97,7 @@ void compact_and_multiplicity_cues() {
   renderer.append(black_hole, {50, 50}, 3.f,
                   {GalaxyStarVisualClass::black_hole}, false);
   const auto &hole = *image_at(black_hole, 1).resource;
-  const auto center = static_cast<std::size_t>((32 * 64 + 32) * 4);
+  const auto center = static_cast<std::size_t>(((hole.height() / 2) * hole.width() + hole.width() / 2) * 4);
   require(hole.pixels()[center] < 80 && hole.pixels()[center + 1] < 80,
           "black-hole marker did not retain its dark center");
   DrawList pulsar;

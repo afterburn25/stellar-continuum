@@ -6108,7 +6108,7 @@ class NativeCampaign final {
       galaxy_star_markers_.append(
           out, point, core_radius, appearance, selected_system,
           UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)},
-          known ? 1.f : .28f);
+          known ? 1.f : .62f);
 
       // Names may cross the faint corona, but never the bright stellar core.
       // Reserving the full transparent sprite hid every nearby label at zoom.
