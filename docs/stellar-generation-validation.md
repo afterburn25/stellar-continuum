@@ -50,6 +50,8 @@ The complete CTest suite passed all 192 tests. The native package dependency sui
 
 The maintained earned-settlement replay now binds its start to the actual completed scout/science survey checkpoint instead of the old fixed day 6587.15625. It preserves the 5,000-day, 24-system and 300-second bounds, exact Normal-speed steps, paid vessel construction, population reservation, timed travel/establishment and save roundtrips. The graphical check centers an eligible offscreen system before exercising the normal double-click/order path. Eight Python settlement-validator tests cover the checkpoint chain, changed valid source dates, mismatched dates and out-of-bound evidence. These were test-harness assumptions exposed by changed physical routes and planet suitability; no gameplay validation was skipped.
 
+The subsequent earned construction/expansion checks follow the actual founded colony's system/body, rather than hardcoding the former Xanthe test world. They bind proofs to source identity and the existing environment-dependent construction prices. Fabricator, power generator and science lab checks retain exact charges, industry requirements, timed completion, operating output, research connections and immutable paused reload assertions. The Python earned-settlement/construction/expansion suites contain 28 tests, including rejected identity changes and incorrectly charged environmental costs.
+
 Actual Vulkan captures were inspected at 720p and 1080p, including galaxy creation, the galaxy/regional/system transitions, close/distant stellar artwork and 2,500-system ring and elliptical maps. The measured 2,500-system ring pass at 1920×1080 had a steady mean interval of 16.714 ms (about 59.8 FPS with presentation pacing), p95 16.859 ms and p99 17.025 ms over 180 measured frames. Scene construction averaged 0.352 ms. This is a measured machine/workload result, not a universal 60 FPS guarantee; cold uploads, saves and capture readbacks are recorded separately.
 
 Raw development evidence lives under `work/stellar-*.log`, `work/stellar-*-diagnostics.txt`, `work/stellar-*.bmp` and `work/stellar-morphology-captures/`. Developer reports contain hidden generated objects and are never fed into normal player screens. The standard export additionally gates the release on the complete CTest suite, Python packaging tests and relocated runtime save/load/render checks; the export log is the authoritative release-gate record.
@@ -146,5 +148,9 @@ The requested population percentages and central state odds are game-tuning valu
 - `native-tests/native_earned_settlement_tests.cpp`
 - `tools/stellar-export/native_client_runtime.py`
 - `tools/stellar-export/native_earned_settlement_runtime.py`
+- `tools/stellar-export/native_earned_surface_runtime.py`
+- `tools/stellar-export/native_earned_surface_expansion_runtime.py`
 - `tools/stellar-export/test_native_client_runtime.py`
 - `tools/stellar-export/test_native_earned_settlement_runtime.py`
+- `tools/stellar-export/test_native_earned_surface_runtime.py`
+- `tools/stellar-export/test_native_earned_surface_expansion_runtime.py`

@@ -67,7 +67,7 @@ class EarnedSurfaceRuntimeTests(unittest.TestCase):
     def test_rejects_wrong_body_incomplete_and_foreign_site(self):
         before, after = self.completed(); report = proof("resume", before, after)
         bad = copy.deepcopy(report); bad["body_id"] = 8005
-        with self.assertRaises(RuntimeError): runtime._proof("earned_surface=" + json.dumps(bad), "resume")
+        with self.assertRaises(RuntimeError): runtime._bind_resume_source(bad, runtime._source_state(before))
         incomplete = copy.deepcopy(after); incomplete["Galaxy"]["Colonies"][1]["SurfaceBuildings"][0]["IsComplete"] = False
         with self.assertRaises(RuntimeError): runtime._saved_site(incomplete, report, before)
         foreign = copy.deepcopy(after); foreign["Galaxy"]["Colonies"][1]["SurfaceBuildings"][0]["Id"] = 99
@@ -78,6 +78,37 @@ class EarnedSurfaceRuntimeTests(unittest.TestCase):
         before["Galaxy"]["Fleets"] = [{"Id": 1, "CivilizationId": 0}, {"Id": 2, "CivilizationId": 1}]
         after["Galaxy"]["Fleets"] = [{"Id": 2, "CivilizationId": 0}, {"Id": 1, "CivilizationId": 1}]
         with self.assertRaises(RuntimeError): runtime._saved_site(after, proof("resume", before, after), before)
+
+    def test_generated_earned_world_is_bound_instead_of_hardcoded_xanthe(self):
+        before, after = self.completed()
+        for payload in (before, after):
+            payload["Galaxy"]["Colonies"][1].update(SystemId=44, PlanetaryBodyId=44010)
+        report = proof("resume", before, after)
+        report.update(system_id=44, body_id=44010)
+        runtime._proof("earned_surface=" + json.dumps(report), "resume")
+        runtime._bind_resume_source(report, runtime._source_state(before))
+        runtime._saved_site(after, report, before)
+        report["body_id"] = 44011
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            runtime._bind_resume_source(report, runtime._source_state(before))
+
+    def test_authorization_binds_saved_environment_instead_of_earth_cost(self):
+        before, after = self.completed()
+        for payload in (before, after):
+            payload["Galaxy"]["PlanetaryBodies"] = [{"Id": 8004, "SystemId": 8,
+                "Environment": {"GravityG": .75, "TemperatureKelvin": 269.,
+                                "PressureKPa": 75., "Atmosphere": 1, "RadiationHazard": .08}}]
+        after["Galaxy"]["Economies"][0]["Credits"] -= 2.5
+        report = proof("resume", before, after)
+        report.update(authorization=52.5, treasury_after=3821.298)
+        state = runtime._source_state(before)
+        self.assertEqual(state["authorization"], 52.5)
+        runtime._proof("earned_surface=" + json.dumps(report), "resume", state["authorization"])
+        runtime._bind_resume_source(report, state)
+        runtime._saved_site(after, report, before)
+        report["authorization"] = 50
+        with self.assertRaisesRegex(RuntimeError, "construction cost"):
+            runtime._bind_resume_source(report, state)
 
     def test_paused_requires_actual_persisted_output_and_no_mutation(self):
         before, after = self.completed(); paused = copy.deepcopy(after); paused["SavedAtUtc"] = "paused"

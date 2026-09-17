@@ -1,4 +1,4 @@
-"""Durable proof for building the earned Xanthe fabricator through native UI."""
+"""Durable proof for building the earned colony's fabricator through native UI."""
 from __future__ import annotations
 
 import json
@@ -21,7 +21,32 @@ _FIELDS = {"mode", "player_id", "system_id", "body_id", "colony_id", "building_i
            "cancel_unchanged", "opened_surface", "roundtrip"}
 _STEP = 1 / 64
 _MAX_STEPS = 1024 * 64
-_IDENTITY = (0, 8, 8004, 9)
+_IDENTITY_FIELDS = ("player_id", "system_id", "body_id", "colony_id")
+
+
+def _colony_identity(colony):
+    return tuple(_integer(colony.get(key), key) for key in
+                 ("CivilizationId", "SystemId", "PlanetaryBodyId", "Id"))
+
+
+def _construction_multiplier(payload, colony):
+    """Independently verify the existing surface authorization terms from save data."""
+    bodies = payload.get("Galaxy", {}).get("PlanetaryBodies", [])
+    body = next((b for b in bodies if isinstance(b, dict) and
+                 b.get("Id") == colony.get("PlanetaryBodyId") and
+                 b.get("SystemId") == colony.get("SystemId")), None)
+    if body is None:
+        return 1.0  # Canonical legacy behavior when there is no body record.
+    environment = body.get("Environment", {})
+    gravity, pressure, temperature, radiation = (
+        _number(environment.get(key), key) for key in
+        ("GravityG", "PressureKPa", "TemperatureKelvin", "RadiationHazard"))
+    factor = 1 + min(.35, abs(gravity - 1) * .20)
+    factor += .20 if environment.get("Atmosphere") == 0 else 0
+    factor += .15 if pressure < 20 or pressure > 300 else 0
+    factor += .15 if temperature < 240 or temperature > 330 else 0
+    factor += min(.15, (radiation - .10) * .30) if radiation > .10 else 0
+    return math.floor(min(2., max(1., factor)) * 100 + .5) / 100
 
 
 def _number(value, name: str) -> float:
@@ -36,7 +61,7 @@ def _integer(value, name: str, minimum: int = 0) -> int:
     return value
 
 
-def _proof(stdout: str, mode: str) -> dict:
+def _proof(stdout: str, mode: str, authorization: float = 50.0) -> dict:
     rows = re.findall(r"(?m)^earned_surface=(\{[^\n]+\})$", stdout)
     if len(rows) != 1:
         raise RuntimeError("Earned surface did not report exactly one proof")
@@ -46,9 +71,10 @@ def _proof(stdout: str, mode: str) -> dict:
         raise RuntimeError("Earned surface proof is malformed") from error
     if not isinstance(proof, dict) or set(proof) != _FIELDS or proof.get("mode") != mode:
         raise RuntimeError("Earned surface proof has the wrong schema")
-    for key, expected in zip(("player_id", "system_id", "body_id", "colony_id"), _IDENTITY):
-        if _integer(proof.get(key), key) != expected:
-            raise RuntimeError("Earned surface proof has the wrong Xanthe identity")
+    for key in _IDENTITY_FIELDS:
+        _integer(proof.get(key), key)
+    if proof["player_id"] != 0 or proof["colony_id"] != 9:
+        raise RuntimeError("Earned surface proof has the wrong player or earned colony")
     _integer(proof.get("building_id"), "building_id")
     if not isinstance(proof.get("type_id"), str) or proof["type_id"] != "fabricator":
         raise RuntimeError("Earned surface proof has the wrong building type")
@@ -76,7 +102,7 @@ def _proof(stdout: str, mode: str) -> dict:
                  proof["enabled"] is True and proof["efficiency"] > 0 and
                  proof["industry_after"] > 0 and proof["industry_before"] == proof["industry_after"])
     else:
-        valid = (proof["building_id"] >= 0 and proof["steps"] > 0 and proof["authorization"] == 50 and
+        valid = (proof["building_id"] >= 0 and proof["steps"] > 0 and proof["authorization"] == authorization and
                  proof["treasury_before"] >= proof["authorization"] and
                  math.isclose(proof["treasury_before"] - proof["treasury_after"], proof["authorization"], abs_tol=1e-7) and
                  math.isclose(proof["industry_progress"], proof["industry_cost"], abs_tol=1e-7) and
@@ -97,15 +123,17 @@ def _source_state(payload: dict) -> dict:
     if not isinstance(colonies, list) or not isinstance(economies, list):
         raise RuntimeError("Earned surface source has malformed colonies or economies")
     colony = [x for x in colonies if isinstance(x, dict) and x.get("Id") == 9 and x.get("CivilizationId") == 0]
-    if len(colony) != 1 or colony[0].get("SystemId") != 8 or colony[0].get("PlanetaryBodyId") != 8004 or not isinstance(colony[0].get("SurfaceBuildings"), list) or colony[0]["SurfaceBuildings"]:
-        raise RuntimeError("Earned surface source is not the empty Xanthe colony")
+    if len(colony) != 1 or not isinstance(colony[0].get("SurfaceBuildings"), list) or colony[0]["SurfaceBuildings"]:
+        raise RuntimeError("Earned surface source is not the empty earned colony")
     if _number(colony[0].get("PopulationMillions"), "source population") < 250:
         raise RuntimeError("Earned surface source lacks the earned 250M colony")
     economy = [x for x in economies if isinstance(x, dict) and x.get("CivilizationId") == 0]
     if len(economy) != 1 or _number(economy[0].get("Credits"), "source treasury") < 50 or _number(economy[0].get("Industry"), "source industry") < 0:
         raise RuntimeError("Earned surface source cannot pay for the fabricator")
     arrays = {key: value for key, value in galaxy.items() if isinstance(value, list)}
-    return {"days": _number(payload.get("SimulationDays"), "source days"),
+    return {"identity": _colony_identity(colony[0]),
+            "authorization": 50.0 * _construction_multiplier(payload, colony[0]),
+            "days": _number(payload.get("SimulationDays"), "source days"),
             "treasury": _number(economy[0].get("Credits"), "source treasury"),
             "colony_ids": [(x.get("Id"), x.get("CivilizationId"), x.get("SystemId"), x.get("PlanetaryBodyId")) for x in colonies],
             "entity_counts": {key: len(value) for key, value in arrays.items()},
@@ -139,6 +167,8 @@ def _saved_site(payload: dict, proof: dict, before: dict) -> None:
     if not math.isclose(_number(payload.get("SimulationDays"), "saved days"), proof["after_days"], rel_tol=0, abs_tol=1e-6):
         raise RuntimeError("Earned surface proof does not bind saved time")
     previous = _source_state(before)
+    if tuple(proof[key] for key in _IDENTITY_FIELDS) != previous["identity"]:
+        raise RuntimeError("Earned surface proof changed the source colony identity")
     if [(x.get("Id"), x.get("CivilizationId"), x.get("SystemId"), x.get("PlanetaryBodyId")) for x in colonies] != previous["colony_ids"]:
         raise RuntimeError("Earned surface changed colony identities")
     arrays = {key: value for key, value in galaxy.items() if isinstance(value, list)}
@@ -168,6 +198,10 @@ def _launch(package: Path, work: Path, env: dict[str, str], save: Path, capture:
 
 
 def _bind_resume_source(proof: dict, source: dict) -> None:
+    if tuple(proof[key] for key in _IDENTITY_FIELDS) != source["identity"]:
+        raise RuntimeError("Earned surface proof changed the source colony identity")
+    if proof["authorization"] != source["authorization"]:
+        raise RuntimeError("Earned surface proof changed the source construction cost")
     if (not math.isclose(proof["before_days"], source["days"], rel_tol=0, abs_tol=1e-7) or
             not math.isclose(proof["treasury_before"], source["treasury"], rel_tol=0, abs_tol=1e-7)):
         raise RuntimeError("Earned surface resume proof does not bind source time or treasury")
@@ -207,7 +241,7 @@ def validate_native_earned_surface_export(package: Path, env: dict[str, str], so
         work = Path(temporary); save = work / "earned-surface.player17.json"; shutil.copy2(source, save)
         resume_capture = work / "earned-surface-1280x720.bmp"
         result = _launch(package, work, _environment(env), save, resume_capture, "--earned-surface-smoke", 1280, 720)
-        resume = _proof(result.stdout, "resume"); after = _read_json(save, "Earned surface completed save")
+        resume = _proof(result.stdout, "resume", source_state["authorization"]); after = _read_json(save, "Earned surface completed save")
         _bind_resume_source(resume, source_state)
         _saved_site(after, resume, before); validate_bmp(resume_capture, 1280, 720, "earned surface", stdout=result.stdout)
         for capture in (resume_capture, resume_capture.with_name(resume_capture.stem + "-colony.bmp"), resume_capture.with_name(resume_capture.stem + "-review.bmp"), resume_capture.with_name(resume_capture.stem + "-construction.bmp")):

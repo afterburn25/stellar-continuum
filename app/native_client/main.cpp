@@ -3638,8 +3638,7 @@ class NativeCampaign final {
       const std::function<void(std::string_view)> &capture) {
     auto &frame = session_->frame();
     const auto &world = frame.runtime().world().campaign();
-    constexpr int expected_player = 0, expected_system = 8,
-                  expected_body = 8004, expected_colony = 9;
+    constexpr int expected_player = 0, expected_colony = 9;
     const bool paused = mode == Options::EarnedSurfaceMode::Paused;
     if (frame.clock().speed() != StrategicSpeed::Paused)
       throw std::runtime_error("Earned surface requires a paused source.");
@@ -3669,16 +3668,17 @@ class NativeCampaign final {
     const auto colony =
         std::ranges::find(world.colonies, expected_colony, &Colony::id);
     if (colony == world.colonies.end() ||
-        colony->system_id != expected_system ||
-        colony->planetary_body_id != expected_body ||
+        colony->civilization_id != expected_player || !colony->planetary_body_id ||
+        world.knowledge.system_survey_level(expected_player, colony->system_id) != SystemSurveyLevel::fully_surveyed ||
         colony->population_millions < 250.)
-      throw std::runtime_error("Earned surface requires Xanthe.");
+      throw std::runtime_error("Earned surface requires the populated, surveyed earned colony.");
+    const int expected_system = colony->system_id, expected_body = *colony->planetary_body_id;
     if ((!paused && !colony->surface_buildings.empty()) ||
         (paused && colony->surface_buildings.size() != 1))
       throw std::runtime_error(
           "Earned surface source has the wrong building state.");
     if (!enter_system(expected_system, width, height))
-      throw std::runtime_error("Earned surface could not enter Xanthe system.");
+      throw std::runtime_error("Earned surface could not enter the earned colony system.");
     const auto spatial = project_system(*system_workspace_.snapshot());
     const auto marker = std::ranges::find(spatial.bodies, expected_body,
                                           &SystemSpatialBodyMarker::body_id);
@@ -3719,11 +3719,12 @@ class NativeCampaign final {
     const auto initial = *surface_workspace_.view();
     const double before_days = frame.clock().simulation_days();
     const double industry_before = initial.industry_per_day;
+    const double fabricator_authorization = 50. * initial.construction_multiplier;
     const auto option = std::ranges::find(initial.available_buildings,
                                           std::string("fabricator"),
                                           &NativeSurfaceBuildOption::type_id);
     if (option == initial.available_buildings.end() ||
-        option->authorization_budget_units != 50. ||
+        option->authorization_budget_units != fabricator_authorization ||
         option->industry_cost != 450. || option->power_demand != 2. ||
         option->workforce_required_millions != .04)
       throw std::runtime_error(
@@ -3845,7 +3846,7 @@ class NativeCampaign final {
     click(point);
     if (!surface_workspace_.placement_quote() ||
         !surface_workspace_.placement_quote()->accepted ||
-        surface_workspace_.placement_quote()->authorization_budget_units != 50.)
+        surface_workspace_.placement_quote()->authorization_budget_units != fabricator_authorization)
       throw std::runtime_error(
           "Earned surface quote failed canonical authorization.");
     capture("review");
@@ -3862,7 +3863,7 @@ class NativeCampaign final {
     click(point);
     if (!surface_workspace_.placement_quote() ||
         !surface_workspace_.placement_quote()->accepted ||
-        surface_workspace_.placement_quote()->authorization_budget_units != 50.)
+        surface_workspace_.placement_quote()->authorization_budget_units != fabricator_authorization)
       throw std::runtime_error("Earned surface quote reopen failed.");
     click(center(layout.confirm));
     auto site = std::ranges::find_if(
@@ -3872,7 +3873,7 @@ class NativeCampaign final {
         site->complete || site->industry_cost != 450. ||
         site->industry_progress != 0. ||
         std::abs(surface_workspace_.view()->treasury_budget_units -
-                 (initial.treasury_budget_units - 50.)) > 1e-9)
+                 (initial.treasury_budget_units - fabricator_authorization)) > 1e-9)
       throw std::runtime_error("Earned surface did not create the exact paid "
                                "unfinished fabricator.");
     const int id = site->building_id;
@@ -4018,16 +4019,18 @@ class NativeCampaign final {
       throw std::runtime_error(
           "Earned surface expansion requires paused player 0.");
     const auto colony = std::ranges::find(world.colonies, 9, &Colony::id);
-    if (colony == world.colonies.end() || colony->system_id != 8 ||
-        colony->planetary_body_id != 8004 ||
+    if (colony == world.colonies.end() || colony->civilization_id != 0 ||
+        !colony->planetary_body_id ||
+        world.knowledge.system_survey_level(0, colony->system_id) != SystemSurveyLevel::fully_surveyed ||
         colony->surface_buildings.size() != (paused ? 3u : 1u))
-      throw std::runtime_error("Earned surface expansion requires Xanthe's "
+      throw std::runtime_error("Earned surface expansion requires the earned colony's "
                                "expected building state.");
-    if (!enter_system(8, width, height))
+    const int expected_system = colony->system_id, expected_body = *colony->planetary_body_id;
+    if (!enter_system(expected_system, width, height))
       throw std::runtime_error(
-          "Earned surface expansion could not enter Xanthe.");
+          "Earned surface expansion could not enter the earned colony system.");
     const auto spatial = project_system(*system_workspace_.snapshot());
-    const auto marker = std::ranges::find(spatial.bodies, 8004,
+    const auto marker = std::ranges::find(spatial.bodies, expected_body,
                                           &SystemSpatialBodyMarker::body_id);
     if (marker == spatial.bodies.end())
       throw std::runtime_error("Earned surface expansion body is absent.");
@@ -4169,8 +4172,8 @@ class NativeCampaign final {
       earned_surface_expansion_proof_ = nlohmann::json{
           {"mode", "paused"},
           {"player_id", 0},
-          {"system_id", 8},
-          {"body_id", 8004},
+          {"system_id", expected_system},
+          {"body_id", expected_body},
           {"colony_id", 9},
           {"before_days", before_days},
           {"after_days", before_days},
@@ -4194,6 +4197,7 @@ class NativeCampaign final {
                            double cost, std::string_view prefix) {
       const auto view = *surface_workspace_.view();
       const auto stage_original = snapshot();
+      authorization *= view.construction_multiplier;
       const auto option =
           std::ranges::find(view.available_buildings, std::string(type),
                             &NativeSurfaceBuildOption::type_id);
@@ -4349,8 +4353,8 @@ class NativeCampaign final {
     earned_surface_expansion_proof_ = nlohmann::json{
         {"mode", "expansion"},
         {"player_id", 0},
-        {"system_id", 8},
-        {"body_id", 8004},
+        {"system_id", expected_system},
+        {"body_id", expected_body},
         {"colony_id", 9},
         {"before_days", before_days},
         {"after_days", frame.clock().simulation_days()},

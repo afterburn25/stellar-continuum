@@ -1,4 +1,4 @@
-"""Durable proof for expanding the earned Xanthe surface through native UI."""
+"""Durable proof for expanding the earned colony through native UI."""
 
 from __future__ import annotations
 import json
@@ -8,7 +8,7 @@ import re
 import shutil
 import tempfile
 from native_bmp import validate_bmp
-from native_earned_surface_runtime import _integer, _launch, _number
+from native_earned_surface_runtime import _integer, _launch, _number, _colony_identity, _construction_multiplier, _IDENTITY_FIELDS
 from native_first_exploration_runtime import (
     _environment,
     _read_json,
@@ -59,7 +59,6 @@ _STAGE_FIELDS = {
 }
 _STEP = 1 / 64
 _STAGES = (("power_generator", 25.0, 300.0), ("science_lab", 40.0, 400.0))
-_IDENTITY = (0, 8, 8004, 9)
 
 
 def _research(payload: dict) -> tuple[dict, list[dict], float]:
@@ -111,7 +110,7 @@ def _source(payload: dict) -> dict:
         or galaxy.get("Seed") != 115501
         or (galaxy.get("PlayerCivilizationId") != 0)
     ):
-        raise RuntimeError("Earned surface expansion source is not Player17 Xanthe")
+        raise RuntimeError("Earned surface expansion source is not the Player17 earned colony")
     colonies = galaxy.get("Colonies")
     economies = galaxy.get("Economies")
     if not isinstance(colonies, list) or not isinstance(economies, list):
@@ -140,8 +139,6 @@ def _source(payload: dict) -> dict:
     )
     if (
         len(colony) != 1
-        or colony[0].get("SystemId") != 8
-        or colony[0].get("PlanetaryBodyId") != 8004
         or (not isinstance(sites, list))
         or (len(sites) != 1)
         or (len(fabricators) != 1)
@@ -160,6 +157,8 @@ def _source(payload: dict) -> dict:
     fabricator = fabricators[0]
     arrays = {key: value for key, value in galaxy.items() if isinstance(value, list)}
     return {
+        "identity": _colony_identity(colony[0]),
+        "construction_multiplier": _construction_multiplier(payload, colony[0]),
         "days": _number(payload.get("SimulationDays"), "source days"),
         "treasury": _number(economy[0].get("Credits"), "source treasury"),
         "fabricator_id": _integer(fabricators[0].get("Id"), "fabricator id"),
@@ -180,7 +179,7 @@ def _source(payload: dict) -> dict:
     }
 
 
-def _proof(stdout: str, mode: str) -> dict:
+def _proof(stdout: str, mode: str, construction_multiplier: float = 1.0) -> dict:
     rows = re.findall("(?m)^earned_surface_expansion=(\\{[^\\n]+\\})$", stdout)
     if len(rows) != 1:
         raise RuntimeError("Earned surface expansion did not report exactly one proof")
@@ -194,13 +193,10 @@ def _proof(stdout: str, mode: str) -> dict:
         or value.get("mode") != mode
     ):
         raise RuntimeError("Earned surface expansion proof has the wrong schema")
-    for key, expected in zip(
-        ("player_id", "system_id", "body_id", "colony_id"), _IDENTITY
-    ):
-        if _integer(value.get(key), key) != expected:
-            raise RuntimeError(
-                "Earned surface expansion proof has wrong Xanthe identity"
-            )
+    for key in _IDENTITY_FIELDS:
+        _integer(value.get(key), key)
+    if value["player_id"] != 0 or value["colony_id"] != 9:
+        raise RuntimeError("Earned surface expansion proof has wrong player or earned colony")
     for key in (
         "before_days",
         "after_days",
@@ -264,7 +260,7 @@ def _proof(stdout: str, mode: str) -> dict:
         ):
             _number(stage.get(key), key)
         steps = _integer(stage.get("steps"), "stage steps")
-        expected_authorization = 0 if mode == "paused" else authorization
+        expected_authorization = 0 if mode == "paused" else authorization * construction_multiplier
         if (
             stage["authorization"] != expected_authorization
             or stage["industry_cost"] != cost
@@ -339,6 +335,8 @@ def _proof(stdout: str, mode: str) -> dict:
 
 
 def _save(payload: dict, proof: dict, source: dict) -> None:
+    if tuple(proof[key] for key in _IDENTITY_FIELDS) != source["identity"]:
+        raise RuntimeError("Earned surface expansion changed the source colony identity")
     galaxy = payload.get("Galaxy")
     if (
         payload.get("FormatVersion") != 17
@@ -371,6 +369,8 @@ def _save(payload: dict, proof: dict, source: dict) -> None:
         None,
     )
     sites = colony.get("SurfaceBuildings") if isinstance(colony, dict) else None
+    if colony is None or _colony_identity(colony) != source["identity"]:
+        raise RuntimeError("Earned surface expansion moved the saved colony")
     if not isinstance(sites, list) or len(sites) != 3:
         raise RuntimeError("Earned surface expansion save has wrong site count")
     expected = {
@@ -537,7 +537,7 @@ def validate_native_earned_surface_expansion_export(
             1280,
             720,
         )
-        resume = _proof(result.stdout, "expansion")
+        resume = _proof(result.stdout, "expansion", source["construction_multiplier"])
         after = _read_json(save, "Earned surface expansion completed save")
         if not math.isclose(
             resume["before_days"], source["days"], rel_tol=0, abs_tol=1e-07

@@ -190,6 +190,23 @@ class EarnedSurfaceExpansionTests(unittest.TestCase):
         runtime._proof("earned_surface_expansion=" + json.dumps(value), "expansion")
         runtime._save(after, value, runtime._source(before))
 
+    def test_expansion_follows_the_actual_earned_planet(self):
+        before, after = completed()
+        for payload in (before, after):
+            payload["Galaxy"]["Colonies"][0].update(SystemId=44, PlanetaryBodyId=44010)
+        value = proof("expansion", before, after)
+        value.update(system_id=44, body_id=44010)
+        runtime._proof("earned_surface_expansion=" + json.dumps(value), "expansion")
+        state = runtime._source(before)
+        runtime._save(after, value, state)
+        value["body_id"] = 44011
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            runtime._save(after, value, state)
+        value["body_id"] = 44010
+        after["Galaxy"]["Colonies"][0]["PlanetaryBodyId"] = 44011
+        with self.assertRaisesRegex(RuntimeError, "moved"):
+            runtime._save(after, value, state)
+
     def test_rejects_bad_cost_time_output_and_site(self):
         before, after = completed()
         for mutate in (
