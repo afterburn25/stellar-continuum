@@ -5552,6 +5552,7 @@ class NativeCampaign final {
         gesture_.capture_for_ui();
         continue;
       }
+      if(!map_hud_visible()){hud_pressed_colony_.reset();hud_switch_pressed_=false;}
       if(map_hud_visible()){
         const auto hud=CommandHudLayout::make(width,height);
         const auto& rows=colony_roster_.view().rows;

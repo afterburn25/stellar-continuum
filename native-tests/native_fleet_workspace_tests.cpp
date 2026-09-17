@@ -78,6 +78,9 @@ int main() try {
                   std::pair{1920, 1080}, std::pair{2560, 1440},
                   std::pair{3840, 2160}}) {
     const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+    if(height>=720)require(layout.route.height>=65.f*layout.scale &&
+        layout.details.height>=130.f*layout.scale,
+        "Compact fleet panel clipped route ETA or selected fleet telemetry.");
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
     require(contained(viewport, layout.panel) &&
@@ -151,9 +154,9 @@ int main() try {
   DrawList blocked_draw;
   workspace.render(blocked_draw, 1280, 720, markers);
   require(has_text(blocked_draw, "ISS Wayfinder") &&
-              has_text(blocked_draw, "Own strength 7.2") &&
+              has_text(blocked_draw, "Strength 7.2") &&
               has_text(blocked_draw, "Fuel 18.75 / 40.00 ly") &&
-              has_text(blocked_draw, "Maximum leg 24.00 ly") &&
+              has_text(blocked_draw, "Range 24.00 ly") &&
               has_text(blocked_draw, "Destination Unknown system") &&
               has_text(blocked_draw, "Insufficient operational range") &&
               !has_text(blocked_draw, "CONFIRM TRAVEL") &&
@@ -322,7 +325,7 @@ int main() try {
     strategic.render(tactical_draw,1280,720,{});
     require(has_text(tactical_draw,"HOLD")&&has_text(tactical_draw,"DEFEND")&&
                 has_text(tactical_draw,"RETREAT")&&has_text(tactical_draw,"LOCATE")&&
-                has_text(tactical_draw,"Current tactical order Hold"),
+                has_text(tactical_draw,"Order Hold"),
             "Eligible armed fleet did not show strategic choices and Locate.");
     strategic.set_notice("Persistent command result.",true);
     (void)strategic.handle({InputEventType::PointerMove,center(layout.order_hold)},1280,720,{},std::nullopt);

@@ -47,7 +47,7 @@ inline void render_context_plate(DrawList& out,const CommandHudLayout& l,
   stellar::native_ui_style::panel(out,l.switch_view,l.switch_view.contains(pointer),false);
   if(destination)out.overlay.emplace_back(Image{destination,
       {l.switch_view.x+3*s,l.switch_view.y+3*s,l.switch_view.width-6*s,l.switch_view.height-6*s},
-      std::nullopt,can_enter?Color{255,255,255,255}:Color{115,132,142,255}});
+      std::nullopt,Color{255,255,255,255}});
   else {
     const Point center{l.switch_view.x+l.switch_view.width*.5f,l.switch_view.y+l.switch_view.height*.5f};
     const Color orbit{74,133,162,255};

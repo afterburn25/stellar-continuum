@@ -111,8 +111,8 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const auto inner_width = panel.width - 24.f * scale;
   const UiRect heading{inner_x, panel.y + 12.f * scale, inner_width,
                        22.f * scale};
-  const auto list_height = std::clamp(panel.height * .20f, 68.f * scale,
-                                      134.f * scale);
+  const auto list_height = std::clamp(panel.height * .16f, 68.f * scale,
+                                      112.f * scale);
   const UiRect list{inner_x, heading.y + heading.height + 8.f * scale,
                     inner_width, list_height};
   const UiRect confirm{inner_x, panel.y + panel.height - 48.f * scale,
@@ -122,8 +122,8 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
   // Keep seven telemetry lines plus the pinned order rail legible at 720p.
-  const auto fleet_height = std::min(detail_space * .72f,
-                                      std::max(detail_space * .43f, 180.f * scale));
+  const auto fleet_height = std::min(180.f * scale,
+                                      std::max(0.f,detail_space - 78.f * scale));
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
@@ -530,14 +530,14 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
   } else {
     std::string details =
         fleet->name + "\n" + role_name(fleet->role) + "  |  " +
-        transit_name(fleet->transit_phase) + "\nOwn strength " +
+        transit_name(fleet->transit_phase) + "\nStrength " +
         number(fleet->combat_power) + "\nFuel " +
         number(fleet->fuel_remaining_light_years, 2) + " / " +
-        number(fleet->fuel_capacity_light_years, 2) + " ly\nMaximum leg " +
+        number(fleet->fuel_capacity_light_years, 2) + " ly\nRange " +
         number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
         number(fleet->strategic_speed, 2) + " ly/day";
     if (fleet->military_order_quote)
-      details += "\nCurrent tactical order " +
+      details += "\nOrder " +
           military_order_name(fleet->military_order_quote->current_order);
     const bool armed_order = !preview_ && !pending_return_ &&
         fleet->military_order_quote.has_value();
@@ -549,8 +549,8 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     if (ship_art) {
       const auto image = artwork(*fleet);
       const float side = std::min(details_bounds.height - 8.f * layout.scale,
-                                  96.f * layout.scale);
-      if (image && side >= 8.f * layout.scale && details_bounds.width>300.f*layout.scale) {
+                                  (details_bounds.width>300.f*layout.scale?96.f:52.f) * layout.scale);
+      if (image && side >= 8.f * layout.scale) {
         out.overlay.emplace_back(Image{
             image,
             {details_bounds.x + details_bounds.width - side -
