@@ -689,7 +689,7 @@ class NativeCampaign final {
     if(military==fleets.end())throw std::runtime_error("Military proof needs an owned armed fixture.");
     const int fleet_id=military->id;
     const auto index=static_cast<std::size_t>(military-fleets.begin());
-    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
+    click(scroll_fleet_row_into_view(index,width,height));
     if(fleet_controller_.selection()!=fleet_id)throw std::runtime_error("Military mouse selection failed.");
     const auto live=[&]()->const FleetState&{
       const auto& all=session_->frame().runtime().world().campaign().fleets;
@@ -1547,6 +1547,19 @@ class NativeCampaign final {
     click(center(layout.pause));smoke_system_travel_pause_retained_=system_workspace_.visible()&&session_->frame().clock().speed()==StrategicSpeed::Paused;const auto paused_fleet=std::ranges::find(world.fleets,*smoke_system_travel_fleet_id_,&FleetState::id);if(paused_fleet==world.fleets.end())throw std::runtime_error("System travel smoke lost its canonical fleet before the pause check.");smoke_system_travel_after_x_=paused_fleet->local_transit_position.x;smoke_system_travel_after_y_=paused_fleet->local_transit_position.y;smoke_system_travel_after_day_=session_->frame().clock().simulation_days();const auto paused_canonical=paused_fleet->local_transit_position;const auto paused_screen=after_screen;InputSnapshot paused_tick;paused_tick.drawable_width=width;paused_tick.drawable_height=height;(void)update(paused_tick,width,height,1.,true);const auto stable_fleet=std::ranges::find(world.fleets,*smoke_system_travel_fleet_id_,&FleetState::id);const auto stable_snapshot=system_workspace_.travel_snapshot();if(stable_fleet==world.fleets.end()||!stable_snapshot)throw std::runtime_error("System travel smoke lost the paused fleet.");const auto stable_marker=std::ranges::find(stable_snapshot->fleets,*smoke_system_travel_fleet_id_,&NativeLocalFleetMarker::fleet_id);if(stable_marker==stable_snapshot->fleets.end())throw std::runtime_error("System travel smoke lost the paused fleet marker.");const auto stable_screen=local_fleet_anchor(*stable_marker,project_system(*system_workspace_.snapshot()),*system_workspace_.viewport());smoke_system_travel_paused_stable_=stable_fleet->local_transit_position.x==paused_canonical.x&&stable_fleet->local_transit_position.y==paused_canonical.y&&stable_screen.x==paused_screen.x&&stable_screen.y==paused_screen.y&&session_->frame().clock().simulation_days()==smoke_system_travel_after_day_;
     const auto order_unchanged=stable_fleet->mission_order_revision==smoke_system_travel_mission_revision_&&stable_fleet->destination_system_id==smoke_system_travel_destination_id_;if(!smoke_system_travel_selected_||!smoke_system_travel_canonical_moved_||!smoke_system_travel_rendered_moved_||!smoke_system_travel_pause_retained_||!smoke_system_travel_paused_stable_||!smoke_system_travel_known_opened_||!smoke_system_travel_unknown_denied_||!smoke_system_travel_knowledge_unchanged_||!order_unchanged||smoke_system_travel_after_day_<=smoke_system_travel_before_day_)throw std::runtime_error("System travel smoke did not prove navigation, selection, canonical movement, rendered movement, and paused stability.");
   }
+  Point scroll_fleet_row_into_view(std::size_t index,int width,int height){
+    const auto layout=FleetWorkspaceLayout::for_viewport(width,height);
+    const auto count=fleet_workspace_.view()?fleet_workspace_.view()->own_fleets.size():0;
+    if(index>=count)throw std::runtime_error("Fleet input replay requested an absent row.");
+    const auto row_height=45.f*layout.scale;
+    const auto offset=std::clamp(static_cast<float>(index)*row_height-(layout.list.height-row_height)*.5f,
+        0.f,std::max(0.f,static_cast<float>(count)*row_height-layout.list.height));
+    InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=center(layout.list);
+    input.events={{InputEventType::Wheel,input.pointer,{},100000.f},
+        {InputEventType::Wheel,input.pointer,{},-offset/(36.f*layout.scale)}};
+    if(!update(input,width,height,0.,false))throw std::runtime_error("Fleet row scrolling exited the campaign.");
+    return {layout.list.x+12.f*layout.scale,layout.list.y+static_cast<float>(index)*row_height-offset+20.f*layout.scale};
+  }
   void prepare_settlement_smoke(int width,int height,bool reload){
     smoke_settlement_mode_=true;smoke_settlement_reload_=reload;
     auto click=[&](Point point,InputEventType press=InputEventType::LeftPressed,std::uint8_t count=1){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{press,point,{},0,{},count},{press==InputEventType::RightPressed?InputEventType::RightReleased:InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Settlement smoke input closed the campaign.");};
@@ -1562,8 +1575,9 @@ class NativeCampaign final {
     const auto fleet_index=static_cast<std::size_t>(fleet-fleet_workspace_.view()->own_fleets.begin());
     const auto fleet_current_system_id=fleet->current_system_id;
     const auto fleet_layout=FleetWorkspaceLayout::for_viewport(width,height);
-    click({fleet_layout.list.x+12.f*fleet_layout.scale,fleet_layout.list.y+(static_cast<float>(fleet_index)*45.f+20.f)*fleet_layout.scale});
+    click(scroll_fleet_row_into_view(fleet_index,width,height));
     smoke_settlement_selected_=fleet_controller_.selection()==smoke_settlement_fleet_id_;
+    if(!smoke_settlement_selected_)throw std::runtime_error("Settlement input could not select its visible fleet row.");
     if(reload){
       smoke_settlement_system_id_=chosen->destination_system_id
           ?chosen->destination_system_id:fleet_current_system_id;
@@ -1919,8 +1933,7 @@ class NativeCampaign final {
     const auto selected_current_system=selected->current_system_id;
     const auto selected_destination=selected->destination_system_id;
     const auto layout=FleetWorkspaceLayout::for_viewport(width,height);
-    click({layout.list.x+12.f*layout.scale,
-           layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
+    click(scroll_fleet_row_into_view(index,width,height));
     if(fleet_controller_.selection()!=std::optional<int>{selected_fleet_id})
       throw std::runtime_error("Fleet smoke mouse selection failed.");
     smoke_fleet_id_=selected_fleet_id;
@@ -1964,7 +1977,7 @@ class NativeCampaign final {
     if(civilian==recovery_fleets.end())throw std::runtime_error("Fleet smoke lacks a second civilian ship.");
     const int recovery_id=civilian->id;
     const auto recovery_index=static_cast<std::size_t>(civilian-recovery_fleets.begin());
-    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(recovery_index)*45.f+20.f)*layout.scale});
+    click(scroll_fleet_row_into_view(recovery_index,width,height));
     const auto state=[&]()->const FleetState &{
       const auto &live=session_->frame().runtime().world().campaign().fleets;
       const auto found=std::ranges::find(live,recovery_id,&FleetState::id);
@@ -1994,7 +2007,7 @@ class NativeCampaign final {
        encode_player_campaign_v17_json(capture_player_campaign_v17(session_->frame().runtime(),capture_options))!=payload)
       throw std::runtime_error("Civilian Locate changed gameplay, selection, or zoom.");
     smoke_fleet_located_=true;
-    click({layout.list.x+12.f*layout.scale,layout.list.y+(static_cast<float>(index)*45.f+20.f)*layout.scale});
+    click(scroll_fleet_row_into_view(index,width,height));
   }
   void prepare_shipyard_smoke(int width,int height){
     const auto click=[&](Point point){
