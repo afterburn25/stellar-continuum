@@ -77,6 +77,7 @@ struct NativeUiLayout {
   UiRect colonies;
   UiRect explore;
   UiRect menu;
+  UiRect zoom_text;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
@@ -145,7 +146,8 @@ struct NativeUiLayout {
         {inset, rail_y + (rail_size + rail_gap) * 5.f, rail_size, rail_size},
         {inset, rail_y + (rail_size + rail_gap) * 10.f, rail_size, rail_size},
         {inset, rail_y + (rail_size + rail_gap) * 9.f, rail_size, rail_size},
-        {inset, rail_y + (rail_size + rail_gap) * 13.f, rail_size, rail_size}};
+        {inset, rail_y + (rail_size + rail_gap) * 13.f, rail_size, rail_size},
+        {inset + 242.f * scale, 52.f * scale, 210.f * scale, 20.f * scale}};
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {

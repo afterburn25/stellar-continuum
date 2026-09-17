@@ -1,4 +1,5 @@
 #include "native_galaxy_backdrop.hpp"
+#include <stellar/core/galaxy_catalog.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -107,12 +108,12 @@ void frame_and_blend() {
   const auto data = catalog();
   const auto frame = galaxy_artwork_world_frame(data.system_positions,
                                                  data.galactic_core, 21.);
-  require(frame.width == frame.height && frame.width > 300.,
-          "Galaxy frame was not a padded square.");
+  require(std::abs(frame.width / frame.height - 1456. / 816.) < 1e-9 && frame.width > 300.,
+          "Galaxy frame stretched the approved wide spiral artwork.");
   for (const auto point : data.system_positions) {
     const auto dx = point.x - (frame.left + frame.width * .5);
-    const auto dy = (point.y - (frame.top + frame.height * .5)) / .72;
-    require(std::hypot(dx, dy) < frame.width * .5 * .81818182 / 1.04 + .001,
+    const auto dy = (point.y - (frame.top + frame.height * .47)) / .54;
+    require(std::hypot(dx, dy) < frame.width * .5 * .80 / 1.04 + .001,
             "Galaxy frame does not contain its canonical catalog.");
   }
   for (const auto fitted : {.001, .1, 1., 10., 1000.}) {
@@ -146,8 +147,48 @@ void cached_assets_and_alpha(const std::filesystem::path &root) {
   require(alpha(0, 0) < 8 && alpha(galaxy->width() - 1, 0) < 8 &&
               alpha(0, galaxy->height() - 1) < 8,
           "Approved galaxy layer has an opaque rectangular border.");
+  for (int x = 0; x < galaxy->width(); ++x)
+    require(alpha(x, 0) == 0 && alpha(x, galaxy->height() - 1) == 0,
+            "Galaxy top or bottom edge left a visible frame.");
+  for (int y = 0; y < galaxy->height(); ++y)
+    require(alpha(0, y) == 0 && alpha(galaxy->width() - 1, y) == 0,
+            "Galaxy side edge left a visible frame.");
   require(alpha(galaxy->width() / 2, galaxy->height() / 2) > 200,
           "Approved galaxy layer lacks its visible center.");
+}
+
+void all_galaxy_sizes_fit_without_changing_distances(const std::filesystem::path &root) {
+  using namespace stellar::core;
+  const auto catalog = load_nearby_catalog(root / "data/astronomy/hyg-nearby-500-v1.json");
+  double previous_width = 0.;
+  for (const int count : {250, 500, 1000, 2500}) {
+    const auto stars = generate_stellar_catalog(9172026, count, catalog);
+    const auto core = full_galaxy_core(count);
+    std::vector<WorldPoint> points;
+    for (const auto& star : stars) points.push_back({star.position.x, star.position.y});
+    const auto original = points;
+    const auto frame = galaxy_artwork_world_frame(points, WorldPoint{core.position.x, core.position.y}, core.exclusion_radius);
+    require(frame.width > previous_width, "Larger star counts did not grow the fitted galaxy.");
+    previous_width = frame.width;
+    require(std::abs(full_galaxy_radius(count) * full_galaxy_radius(count) / count - 32.768) < .001,
+            "Galaxy area did not track population to preserve spacing.");
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      require(points[i].x == original[i].x && points[i].y == original[i].y,
+              "Artwork fitting moved an authoritative system.");
+      const auto dx = points[i].x - core.position.x;
+      const auto dy = (points[i].y - core.position.y) / .54;
+      require(std::hypot(dx, dy) < frame.width * .4,
+              "A system lies outside the spiral's visible disc.");
+    }
+    for (const auto extent : {std::pair{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}}) {
+      const auto camera = galaxy_artwork_fit_camera(frame, extent.first, extent.second);
+      for (const auto point : points) {
+        const auto projected = camera.project(point, extent.first, extent.second);
+        require(projected.x >= 0 && projected.x <= extent.first && projected.y >= 0 && projected.y <= extent.second,
+                "Fitted galaxy cropped a system at a supported resolution.");
+      }
+    }
+  }
 }
 
 void overview_regional_and_view_gate(const std::filesystem::path &root) {
@@ -360,12 +401,13 @@ int main(int argc, char **argv) {
     frame_and_blend();
     const std::filesystem::path root(argv[1]);
     cached_assets_and_alpha(root);
+    all_galaxy_sizes_fit_without_changing_distances(root);
     overview_regional_and_view_gate(root);
     secrecy_generation_and_order(root);
     background_layers_and_pixels(root);
     background_capacity_cancel_and_failure(root);
     oversized_artwork_is_never_cached();
-    std::cout << "native galaxy backdrop: 7/7 cases passed\n";
+    std::cout << "native galaxy backdrop: 8/8 cases passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << "native galaxy backdrop failure: " << error.what() << '\n';

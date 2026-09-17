@@ -81,8 +81,28 @@ Map markers use shared 256-pixel profiles with a compact white-hot center,
 spectral rim and narrow diffraction rays. The previous broad Gaussian and dark
 contrast annulus are removed. A short core falloff keeps magnified stars crisp
 without hard planet-like discs or rectangular edges. Unexplored markers remain
-neutral and less bright than explored stars, but are now legible at 62% opacity;
+neutral and slightly less bright than explored stars, but are now bright points at 86% opacity;
 their names, spectral classes and multiplicity remain observer-filtered.
 The complete 13-style cache is capped at 3.25 MiB regardless of galaxy size.
 Pixel checks cover core brightness, halo falloff, rays and transparent borders.
+
+The galaxy overview now uses the user's supplied spiral artwork. Its original
+wide aspect ratio is preserved, its black matte is blended out during background
+preparation, and its visible disc is fitted around the authoritative star field.
+The existing count-dependent radius (proportional to the square root of system
+count) and generated-system spacing remain intact for 250/500/1000/2500 systems.
+This preserves neighborhood distances and saved routes while scaling the artwork
+to the campaign, with the core still covered by observer fog.
+
+A temporary `Map zoom` readout reports magnification relative to the full-galaxy
+overview (`1.0x`). It occupies its own responsive HUD area and reserves space
+against star labels. It is hidden on the other workspaces.
+
+Ordinary mouse leave, focus loss and minimization clear stale hover coordinates;
+captured map drags can still cross the window edge. Platform input replay covers
+leave, return, captured dragging and focus changes. This fixes in-game hover
+state, not the separately reported and still unconfirmed desktop cursor glow.
+Automated screenshot runs ignore physical player-input events while retaining
+window lifecycle events and their scripted interactions, so typing in another
+application cannot accidentally unpause a capture fixture.
 

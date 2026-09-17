@@ -6,20 +6,20 @@
       "runtimePath": "assets/visual/space/deep-field-v2.png",
       "sha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5"
     },
-    "milky-way-layer-v2": {
-      "source": "assets/visual/space/milky-way-layer-v2.png",
-      "runtimePath": "assets/visual/space/milky-way-layer-v2.png",
-      "sha256": "c9b207419192e7575c63036d0e89ba91e769b72bdc7f14c8c4527ac8e0656fb5"
-    },
     "credits": {
       "source": "docs/engine/NATIVE_GALAXY_ART_SOURCES.md",
       "runtimePath": "Licenses/Galaxy-art-sources.md",
-      "sha256": "af55bc189b767f5ab6f0d78a7aaa54b4457dd17b9e6e5fa6f70c081754db087f"
+      "sha256": "3bdd1d628818badbb98047fb1c6ed0a73f06a74a809c38a1e454ce5e60f63852"
     },
     "regional-nebula-b": {
       "source": "assets/visual/space/regional-nebula-b.png",
       "runtimePath": "assets/visual/space/regional-nebula-b.png",
       "sha256": "ef875888a982bff5331a5c9450c0ac15c77cc0dadea8f1624ca18a32cf3b948d"
+    },
+    "spiral-galaxy-v3": {
+      "source": "assets/visual/space/spiral-galaxy-v3.png",
+      "runtimePath": "assets/visual/space/spiral-galaxy-v3.png",
+      "sha256": "a11ba4111ed57a73c602b124af1ed888cbda854aa129f058b7490ecdc2cb3488"
     }
   }
 }

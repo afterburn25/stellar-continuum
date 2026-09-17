@@ -64,6 +64,7 @@ void verify(int width, int height, float expected_scale) {
               contains_rect(viewport, layout.notifications) &&
               contains_rect(viewport, layout.day_text) &&
               contains_rect(viewport, layout.status_text) &&
+              contains_rect(viewport, layout.zoom_text) &&
               contains_rect(viewport, layout.menu_panel) &&
               contains_rect(layout.menu_panel, layout.menu_heading),
           "A UI rectangle escaped the drawable viewport.");
@@ -101,7 +102,9 @@ void verify(int width, int height, float expected_scale) {
               !overlaps(layout.speed, layout.day_text) &&
               !overlaps(layout.pause, layout.status_text) &&
               !overlaps(layout.speed, layout.status_text) &&
-              !overlaps(layout.day_text, layout.status_text),
+              !overlaps(layout.day_text, layout.status_text) &&
+              !overlaps(layout.zoom_text, layout.day_text) &&
+              !overlaps(layout.zoom_text, layout.status_text),
           "Top controls or metrics overlap.");
   require(layout.control_font_pixels >= layout.metric_font_pixels &&
               layout.heading_font_pixels > layout.control_font_pixels,

@@ -5328,7 +5328,7 @@ class NativeCampaign final {
     if(support_.poll())support_notice_seconds_=20.;
     feedback_.advance(elapsed);
     if(surface_workspace_.visible())surface_workspace_.set_terrain_image(surface_art_.request_image());
-    pointer_=input.pointer;
+    pointer_=input.focused&&input.renderable()?input.pointer:Point{-1.f,-1.f};
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
       support_.record("session",timestamp+" Campaign activated.");
@@ -6108,7 +6108,7 @@ class NativeCampaign final {
       galaxy_star_markers_.append(
           out, point, core_radius, appearance, selected_system,
           UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)},
-          known ? 1.f : .62f);
+          known ? 1.f : .86f);
 
       // Names may cross the faint corona, but never the bright stellar core.
       // Reserving the full transparent sprite hid every nearby label at zoom.
@@ -6196,6 +6196,7 @@ class NativeCampaign final {
     reserve_hud(ui_layout.explore);reserve_hud(ui_layout.menu);
     reserve_hud(ui_layout.day_text);
     reserve_hud(ui_layout.status_text);
+    reserve_hud(ui_layout.zoom_text);
     if (menu_) reserve_hud(ui_layout.menu_panel);
     if (selected_id_)
       reserve_hud({14.f, screen_height - 88.f, 320.f, 74.f});
@@ -6336,6 +6337,18 @@ class NativeCampaign final {
                      session_->frame().clock().simulation_days())),
         {154, 181, 211, 235}, layout.metric_font_pixels,
         layout.day_text.width, layout.day_text});
+    if(!system_workspace_.visible()&&!research_workspace_.visible()&&
+       !colony_workspace_.visible()&&!diplomacy_workspace_.visible()&&
+       !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
+       !economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_){
+      std::ostringstream zoom;
+      zoom << "Map zoom " << std::fixed << std::setprecision(1)
+           << camera_.pixels_per_world / fitted_pixels_per_world_ << "x";
+      out.overlay.emplace_back(Text{
+          {layout.zoom_text.x, layout.zoom_text.y + 2.f * layout.scale},
+          zoom.str(), {184, 223, 239, 255}, layout.metric_font_pixels,
+          layout.zoom_text.width, layout.zoom_text});
+    }
     if(inspection_visible())inspection_card_.render(out,inspection_bounds(width,height));
     const auto &notice = session_->notice();
     const bool preparing_galaxy=!system_workspace_.visible()&&
@@ -7690,6 +7703,13 @@ int main(int argc,char **argv){
       const auto measured_elapsed=std::chrono::duration<double>(now-prior).count();
       prior=now;
       auto input=window.poll();
+      // Automated captures drive their own player-input sequences below. Keep
+      // window lifecycle events, but don't let typing in another app while a
+      // test window opens accidentally toggle pause or order a fleet.
+      if(options.smoke_screenshot)
+        std::erase_if(input.events,[](const InputEvent& event){
+          return event.type!=InputEventType::PointerCancelled;
+        });
       if(options.restart_smoke&&!restart_completed){
         if(std::chrono::steady_clock::now()>restart_deadline)throw std::runtime_error("New Game lifecycle smoke timed out.");
         if(frames>=2&&!campaign.new_game_pending()&&restart_before.empty()&&

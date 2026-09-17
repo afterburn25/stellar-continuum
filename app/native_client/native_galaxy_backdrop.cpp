@@ -17,8 +17,12 @@ using namespace stellar::native_map;
 
 constexpr std::size_t regional_star_count = 260;
 constexpr std::size_t clustered_star_count = 96;
-constexpr double vertical_disc_ratio = .72;
-constexpr double visible_disc_half_width = .81818182;
+// The approved spiral is a wide, inclined disc. Fit its visible oval, rather
+// than stretching the source into the old square image's coordinate frame.
+constexpr double galaxy_art_aspect = 1456. / 816.;
+constexpr double vertical_disc_ratio = .54;
+constexpr double visible_disc_half_width = .80;
+constexpr double image_core_y = .47;
 
 [[nodiscard]] std::string utf8(const std::filesystem::path &path) {
   const auto encoded = path.u8string();
@@ -142,8 +146,9 @@ GalaxyBackdropFrame galaxy_artwork_world_frame(
     const auto dy = (point.y - center.y) / vertical_disc_ratio;
     required = std::max(required, std::hypot(dx, dy));
   }
-  const auto side = std::max(1., required * 2. * 1.04 / visible_disc_half_width);
-  return {center.x - side * .5, center.y - side * .5, side, side};
+  const auto width = std::max(1., required * 2. * 1.04 / visible_disc_half_width);
+  const auto height = width / galaxy_art_aspect;
+  return {center.x - width * .5, center.y - height * image_core_y, width, height};
 }
 
 Camera galaxy_artwork_fit_camera(const GalaxyBackdropFrame &frame,
@@ -193,7 +198,7 @@ NativeGalaxyBackdropAssets::ArtworkSource NativeGalaxyBackdropAssets::source(
     case ArtworkKind::deep_field:
       return {asset_root_ / "assets/visual/space/deep-field-v2.png", "Galaxy deep field"};
     case ArtworkKind::galaxy_layer:
-      return {asset_root_ / "assets/visual/space/milky-way-layer-v2.png", "Galaxy layer"};
+      return {asset_root_ / "assets/visual/space/spiral-galaxy-v3.png", "Galaxy layer"};
     case ArtworkKind::regional_nebula:
       return {asset_root_ / "assets/visual/space/regional-nebula-b.png", "Regional nebula"};
   }
@@ -206,6 +211,28 @@ std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::decode_source(
     auto image = decode_rgba_image(source.path);
     if (image->byte_size() > maximum_prepared_image_bytes)
       throw std::length_error("Galaxy artwork exceeds the prepared image byte limit.");
+    if (source.path.filename() == "spiral-galaxy-v3.png") {
+      // The supplied RGB artwork has a near-black matte. Convert that matte
+      // into straight alpha during background preparation, retaining luminous
+      // arm detail while letting the deep field show through empty space.
+      // Keep the source PNG byte-for-byte unchanged in the asset manifest.
+      auto pixels = image->pixels();
+      for (int y = 0; y < image->height(); ++y) {
+        for (int x = 0; x < image->width(); ++x) {
+          const auto i = (static_cast<std::size_t>(y) * image->width() + x) * 4u;
+          const auto peak = std::max({pixels[i], pixels[i + 1], pixels[i + 2]});
+          const auto light = std::max(0, static_cast<int>(peak) - 8);
+          const auto edge = std::clamp(std::min({x, y, image->width() - 1 - x,
+                                               image->height() - 1 - y}) / 16.f, 0.f, 1.f);
+          for (std::size_t c = 0; c < 3; ++c)
+            pixels[i + c] = light == 0 ? 0 : static_cast<std::uint8_t>(
+                std::max(0, static_cast<int>(pixels[i + c]) - 8) * 255 / light);
+          pixels[i + 3] = static_cast<std::uint8_t>(std::lround(
+              light / 247.f * pixels[i + 3] * edge));
+        }
+      }
+      return RgbaImage::create(image->width(), image->height(), std::move(pixels));
+    }
     return image;
   } catch (const std::exception &error) {
     throw std::runtime_error(std::string(source.label) + " failed to decode: " +

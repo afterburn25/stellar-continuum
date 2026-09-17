@@ -74,12 +74,24 @@ int main(int argc,char **argv){
     check(ordered.events.size()==3,"same-poll pointer sequence was collapsed");
     if(ordered.events.size()==3){check(ordered.events[0].type==InputEventType::LeftPressed,"press was not first");check(ordered.events[0].click_count==2,"SDL click count was not retained");check(ordered.events[1].type==InputEventType::PointerMove,"move was not second");check(ordered.events[2].type==InputEventType::LeftReleased,"release was not third");check(ordered.events[0].position.x!=ordered.events[2].position.x,"press position was replaced by release position");}
     SDL_Event right_down{};right_down.type=SDL_EVENT_MOUSE_BUTTON_DOWN;right_down.button.button=SDL_BUTTON_RIGHT;right_down.button.x=240;right_down.button.y=160;push(right_down);SDL_Event right_up{};right_up.type=SDL_EVENT_MOUSE_BUTTON_UP;right_up.button.button=SDL_BUTTON_RIGHT;right_up.button.x=240;right_up.button.y=160;push(right_up);const auto right_click=window.poll();check(right_click.events.size()==2,"right-click events were dropped");if(right_click.events.size()==2){check(right_click.events[0].type==InputEventType::RightPressed,"right press was not ordered");check(right_click.events[1].type==InputEventType::RightReleased,"right release was not ordered");}
-    push(down);SDL_Event focus{};focus.type=SDL_EVENT_WINDOW_FOCUS_LOST;push(focus);push(move);
+    SDL_Event leave{};leave.type=SDL_EVENT_WINDOW_MOUSE_LEAVE;push(leave);
+    const auto outside=window.poll();
+    check(outside.pointer.x<0.f&&outside.pointer.y<0.f,"mouse leave retained stale hover coordinates");
+    check(outside.events.size()==1&&outside.events.front().type==InputEventType::PointerCancelled,"mouse leave did not cancel hover");
+    push(move);const auto returned=window.poll();
+    check(returned.pointer.x>=0.f&&returned.pointer.y>=0.f,"pointer motion did not restore hover after returning");
+    push(down);push(leave);push(move);push(up);const auto captured=window.poll();
+    check(captured.events.size()==3&&captured.events.back().type==InputEventType::LeftReleased,"cross-window drag was cancelled by mouse leave");
+    SDL_Event focus{};focus.type=SDL_EVENT_WINDOW_FOCUS_LOST;push(focus);
+    const auto unfocused=window.poll();
+    check(!unfocused.focused&&unfocused.pointer.x<0.f&&unfocused.pointer.y<0.f,"focus loss retained stale hover coordinates");
+    push(down);push(focus);push(move);
     const auto cancelled=window.poll();
     check(cancelled.events.size()==3,"focus loss and hover motion were not preserved");
     if(cancelled.events.size()==3){check(cancelled.events[1].type==InputEventType::PointerCancelled,"focus loss did not emit cancellation");check(cancelled.events[2].type==InputEventType::PointerMove,"post-cancel hover motion was dropped");check(cancelled.pointer.x==cancelled.events[2].position.x,"snapshot did not retain final drawable pointer");}
     SDL_Event minimized{};minimized.type=SDL_EVENT_WINDOW_MINIMIZED;push(minimized);
     const auto inactive=window.poll();check(!inactive.renderable(),"minimized window remained renderable");
+    check(inactive.pointer.x<0.f&&inactive.pointer.y<0.f,"minimize retained stale hover coordinates");
     SDL_Event restored{};restored.type=SDL_EVENT_WINDOW_RESTORED;push(restored);
     const auto active=window.poll();check(active.renderable(),"restored window did not become renderable");
     window.set_text_input(true);SDL_Event text_input{};text_input.type=SDL_EVENT_TEXT_INPUT;text_input.text.text="research";push(text_input);SDL_Event backspace{};backspace.type=SDL_EVENT_KEY_DOWN;backspace.key.key=SDLK_BACKSPACE;push(backspace);const auto editing=window.poll();check(editing.events.size()==2,"ordered text editing events were lost");if(editing.events.size()==2){check(editing.events[0].type==InputEventType::TextEntered&&editing.events[0].text=="research","UTF-8 text event was not preserved");check(editing.events[1].type==InputEventType::BackspacePressed,"Backspace event was not preserved");}window.set_text_input(false);

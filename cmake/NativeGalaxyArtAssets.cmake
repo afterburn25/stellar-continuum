@@ -6,7 +6,7 @@ if(NOT STELLAR_GALAXY_ART_SCHEMA EQUAL 1 OR NOT STELLAR_GALAXY_ART_COUNT EQUAL 4
   message(FATAL_ERROR "Unsupported native galaxy art asset declaration")
 endif()
 add_custom_target(stellar_native_galaxy_art_assets)
-foreach(STELLAR_GALAXY_ART_KEY IN ITEMS deep-field-v2 milky-way-layer-v2 regional-nebula-b credits)
+foreach(STELLAR_GALAXY_ART_KEY IN ITEMS deep-field-v2 spiral-galaxy-v3 regional-nebula-b credits)
   if(STELLAR_GALAXY_ART_KEY STREQUAL "credits")
     set(STELLAR_GALAXY_ART_EXPECTED_SOURCE "docs/engine/NATIVE_GALAXY_ART_SOURCES.md")
     set(STELLAR_GALAXY_ART_EXPECTED_RUNTIME "Licenses/Galaxy-art-sources.md")
