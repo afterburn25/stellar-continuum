@@ -3,6 +3,7 @@
 #include "native_system_view.hpp"
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/colony_biology.hpp>
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -27,6 +28,16 @@ struct NativeSurfaceSite {
   double construction_stage_progress{}, remaining_construction_materials{};
   std::optional<std::string> pending_upgrade_type_id;
   double upgrade_days_remaining{};
+  // Eligibility and live cost information for the canonical upgrade/repair orders.
+  bool can_upgrade{};
+  std::string upgrade_name;
+  double upgrade_credit_budget_units{}, upgrade_industry_cost{};
+  bool can_afford_upgrade{};
+  std::string upgrade_lock_reason;
+  double repair_industry_cost{};
+  bool can_afford_repair{};
+  bool essential_service{};
+  int slot_index{};
 };
 
 struct NativeSurfaceBuildOption {
@@ -41,7 +52,7 @@ struct NativeColonyView {
   std::uint64_t campaign_generation{}, revision{};
   int player_civilization_id{}, system_id{}, body_id{}, colony_id{};
   std::string colony_name, body_display_name, population_species_id;
-  bool resource_outpost{}, solid_surface{};
+  bool resource_outpost{}, solid_surface{}, homeworld{};
   stellar::core::SovereignCurrencyDefinition currency;
   double treasury_budget_units{}, stored_industry{};
   std::string formatted_treasury;
@@ -57,12 +68,19 @@ struct NativeColonyView {
   double food_reserve_days{}, water_reserve_days{};
 
   int required_habitat_systems{}, building_capacity{}, surface_hub_level{};
+  std::string hub_name;
+  bool hub_upgrade_available{}, can_afford_hub_upgrade{};
+  double hub_upgrade_credit_budget_units{}, hub_upgrade_industry_cost{};
+  std::string hub_upgrade_lock_reason;
+  double hub_upgrade_days_remaining{};
   double habitat_support_reduction{}, environmental_wear_multiplier{};
   double power_supply{}, power_demand{}, stored_power_days{},
       power_storage_capacity_days{}, storage_charge_per_day{},
       storage_discharge_per_day{};
   double credits_per_day{}, upkeep_credits_per_day{}, industry_per_day{},
       science_per_day{}, cargo_transfer_capacity_per_day{};
+  int active_research_facilities{};
+  double active_research_lab_units{};
   std::string specialization_name, specialization_description;
   int specialization_complexes{};
   bool specialization_active{};
@@ -74,6 +92,10 @@ struct NativeColonyView {
       extraction_yield_multiplier{};
   std::string deposit_material_name, deposit_grade, outpost_status;
 
+  std::string system_name, population_species_name;
+  stellar::native_system::NativeSystemBody planet;
+  stellar::core::CreditFlowSnapshot local_credit_flow;
+  double operating_funding{}, operating_arrears{}, empire_credit_flow{}, empire_industry_flow{}, construction_multiplier{};
   std::vector<NativeSurfaceSite> construction_sites;
   std::vector<NativeSurfaceBuildOption> available_buildings;
 };

@@ -1,4 +1,5 @@
 #include "native_construction_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -98,8 +99,10 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
   const auto fit = std::max(.55f, std::min(w / 1040.f, h / 650.f));
   const auto scale = std::min(requested, fit);
   const auto margin = 14.f * scale;
+  const auto left_margin = native_navigation_content_left * scale;
   const auto top = 60.f * scale;
-  const UiRect surface{margin, top, std::max(1.f, w - margin * 2.f),
+  const UiRect surface{left_margin, top,
+                       std::max(1.f, w - left_margin - margin),
                        std::max(1.f, h - top - margin)};
   const auto inner_x = surface.x + 14.f * scale;
   const auto inner_y = surface.y + 54.f * scale;
@@ -210,6 +213,23 @@ NativeConstructionWorkspace::view() const noexcept {
 const std::optional<std::string> &
 NativeConstructionWorkspace::selected_project_id() const noexcept {
   return selected_project_id_;
+}
+
+std::optional<UiRect> NativeConstructionWorkspace::project_bounds(
+    std::string_view project_id, int width, int height) const {
+  if (!view_) return std::nullopt;
+  const auto found = std::ranges::find(view_->projects, project_id,
+                                       &NativeConstructionProject::id);
+  if (found == view_->projects.end()) return std::nullopt;
+  const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
+  const UiRect rows{layout.projects.x, layout.projects.y + 27.f * layout.scale,
+                    layout.projects.width,
+                    layout.projects.height - 27.f * layout.scale};
+  const auto index = static_cast<std::size_t>(found - view_->projects.begin());
+  const UiRect bounds{rows.x, rows.y + project_scroll_ +
+                                  static_cast<float>(index) * 58.f * layout.scale,
+                      rows.width, 54.f * layout.scale};
+  return intersection(bounds, rows);
 }
 
 void NativeConstructionWorkspace::reconcile_selection() {

@@ -64,6 +64,9 @@ struct NativeResearchNode {
   std::optional<NativeResearchCost> cost;
   NativeResearchAction primary_action;
   NativeResearchAction cancel_action;
+  std::string purpose;
+  std::string benefits;
+  double research_points{};
 };
 
 struct NativeResearchDomainTab {

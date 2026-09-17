@@ -6,6 +6,7 @@
 #include <iterator>
 #include <limits>
 #include <random>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -16,8 +17,12 @@ using namespace stellar::native_map;
 
 constexpr std::size_t regional_star_count = 260;
 constexpr std::size_t clustered_star_count = 96;
-constexpr double vertical_disc_ratio = .72;
-constexpr double visible_disc_half_width = .81818182;
+// The approved spiral is a wide, inclined disc. Fit its visible oval, rather
+// than stretching the source into the old square image's coordinate frame.
+constexpr double galaxy_art_aspect = 1456. / 816.;
+constexpr double vertical_disc_ratio = .54;
+constexpr double visible_disc_half_width = .80;
+constexpr double image_core_y = .47;
 
 [[nodiscard]] std::string utf8(const std::filesystem::path &path) {
   const auto encoded = path.u8string();
@@ -141,8 +146,9 @@ GalaxyBackdropFrame galaxy_artwork_world_frame(
     const auto dy = (point.y - center.y) / vertical_disc_ratio;
     required = std::max(required, std::hypot(dx, dy));
   }
-  const auto side = std::max(1., required * 2. * 1.04 / visible_disc_half_width);
-  return {center.x - side * .5, center.y - side * .5, side, side};
+  const auto width = std::max(1., required * 2. * 1.04 / visible_disc_half_width);
+  const auto height = width / galaxy_art_aspect;
+  return {center.x - width * .5, center.y - height * image_core_y, width, height};
 }
 
 Camera galaxy_artwork_fit_camera(const GalaxyBackdropFrame &frame,
@@ -168,39 +174,139 @@ Camera galaxy_artwork_fit_camera(const GalaxyBackdropFrame &frame,
 NativeGalaxyBackdropAssets::NativeGalaxyBackdropAssets(std::filesystem::path root)
     : asset_root_(std::move(root)) {
   if (asset_root_.empty()) throw std::invalid_argument("Galaxy artwork asset root is required.");
+  asset_root_=std::filesystem::absolute(std::move(asset_root_));
 }
 
-std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::deep_field() {
-  if (!deep_field_) {
-    const auto path = asset_root_ / "assets/visual/space/deep-field-v2.png";
-    try { deep_field_ = decode_rgba_image(path); }
-    catch (const std::exception &error) { throw std::runtime_error("Galaxy deep field failed to decode: " + utf8(path) + ": " + error.what()); }
-    ++decoded_;
-  }
-  return deep_field_;
+void NativeGalaxyBackdropAssets::require_owner() const {
+  if (std::this_thread::get_id() != owner_)
+    throw std::logic_error("Galaxy backdrop assets must be used on their owner thread.");
 }
 
-std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::galaxy_layer() {
-  if (!galaxy_layer_) {
-    const auto path = asset_root_ / "assets/visual/space/milky-way-layer-v2.png";
-    try { galaxy_layer_ = decode_rgba_image(path); }
-    catch (const std::exception &error) { throw std::runtime_error("Galaxy layer failed to decode: " + utf8(path) + ": " + error.what()); }
-    ++decoded_;
+std::shared_ptr<const RgbaImage> &NativeGalaxyBackdropAssets::slot(
+    const ArtworkKind kind) {
+  switch (kind) {
+    case ArtworkKind::deep_field: return deep_field_;
+    case ArtworkKind::galaxy_layer: return galaxy_layer_;
+    case ArtworkKind::regional_nebula: return regional_nebula_;
   }
-  return galaxy_layer_;
+  throw std::logic_error("Galaxy artwork kind is invalid.");
 }
 
-std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::regional_nebula() {
-  if (!regional_nebula_) {
-    const auto path = asset_root_ / "assets/visual/space/regional-nebula-b.png";
-    try { regional_nebula_ = decode_rgba_image(path); }
-    catch (const std::exception &error) { throw std::runtime_error("Regional nebula failed to decode: " + utf8(path) + ": " + error.what()); }
-    ++decoded_;
+NativeGalaxyBackdropAssets::ArtworkSource NativeGalaxyBackdropAssets::source(
+    const ArtworkKind kind) const {
+  switch (kind) {
+    case ArtworkKind::deep_field:
+      return {asset_root_ / "assets/visual/space/deep-field-v2.png", "Galaxy deep field"};
+    case ArtworkKind::galaxy_layer:
+      return {asset_root_ / "assets/visual/space/spiral-galaxy-v3.png", "Galaxy layer"};
+    case ArtworkKind::regional_nebula:
+      return {asset_root_ / "assets/visual/space/regional-nebula-b.png", "Regional nebula"};
   }
-  return regional_nebula_;
+  throw std::logic_error("Galaxy artwork kind is invalid.");
 }
+
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::decode_source(
+    const ArtworkSource &source) {
+  try {
+    auto image = decode_rgba_image(source.path);
+    if (image->byte_size() > maximum_prepared_image_bytes)
+      throw std::length_error("Galaxy artwork exceeds the prepared image byte limit.");
+    if (source.path.filename() == "spiral-galaxy-v3.png") {
+      // The supplied RGB artwork has a near-black matte. Convert that matte
+      // into straight alpha during background preparation, retaining luminous
+      // arm detail while letting the deep field show through empty space.
+      // Keep the source PNG byte-for-byte unchanged in the asset manifest.
+      auto pixels = image->pixels();
+      for (int y = 0; y < image->height(); ++y) {
+        for (int x = 0; x < image->width(); ++x) {
+          const auto i = (static_cast<std::size_t>(y) * image->width() + x) * 4u;
+          const auto peak = std::max({pixels[i], pixels[i + 1], pixels[i + 2]});
+          const auto light = std::max(0, static_cast<int>(peak) - 8);
+          const auto edge = std::clamp(std::min({x, y, image->width() - 1 - x,
+                                               image->height() - 1 - y}) / 16.f, 0.f, 1.f);
+          for (std::size_t c = 0; c < 3; ++c)
+            pixels[i + c] = light == 0 ? 0 : static_cast<std::uint8_t>(
+                std::max(0, static_cast<int>(pixels[i + c]) - 8) * 255 / light);
+          pixels[i + 3] = static_cast<std::uint8_t>(std::lround(
+              light / 247.f * pixels[i + 3] * edge));
+        }
+      }
+      return RgbaImage::create(image->width(), image->height(), std::move(pixels));
+    }
+    return image;
+  } catch (const std::exception &error) {
+    throw std::runtime_error(std::string(source.label) + " failed to decode: " +
+                             utf8(source.path) + ": " + error.what());
+  }
+}
+
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::synchronous(
+    const ArtworkKind kind) {
+  require_owner();
+  auto &result = slot(kind);
+  if (result) return result;
+  if (const auto pending = std::ranges::find(pending_, kind, &Pending::kind);
+      pending != pending_.end())
+    pending_.erase(pending);
+  auto image = decode_source(source(kind));
+  result = std::move(image);
+  ++decoded_;
+  return result;
+}
+
+void NativeGalaxyBackdropAssets::collect_ready() {
+  for (std::size_t index{}; index < pending_.size();) {
+    if (!pending_[index].ticket.ready()) {
+      ++index;
+      continue;
+    }
+    const auto kind = pending_[index].kind;
+    auto ticket = std::move(pending_[index].ticket);
+    pending_.erase(pending_.begin() + static_cast<std::ptrdiff_t>(index));
+    auto image = ticket.take();
+    if (image->byte_size() > maximum_prepared_image_bytes)
+      throw std::length_error("Galaxy artwork exceeds the prepared image byte limit.");
+    auto &result = slot(kind);
+    if (!result) {
+      result = std::move(image);
+      ++decoded_;
+    }
+  }
+}
+
+void NativeGalaxyBackdropAssets::use_background_preparation(
+    std::shared_ptr<ImagePreparationQueue> queue) {
+  require_owner();
+  cancel_preparation();
+  preparation_ = std::move(queue);
+}
+
+void NativeGalaxyBackdropAssets::cancel_preparation() noexcept { pending_.clear(); }
+std::size_t NativeGalaxyBackdropAssets::pending_count() const noexcept { return pending_.size(); }
+
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::request(
+    const ArtworkKind kind) {
+  require_owner();
+  collect_ready();
+  if (auto &result = slot(kind); result) return result;
+  if (!preparation_) return synchronous(kind);
+  if (std::ranges::find(pending_, kind, &Pending::kind) != pending_.end()) return {};
+  const auto artwork = source(kind);
+  auto ticket = preparation_->submit(maximum_prepared_image_bytes,
+      [artwork] { return decode_source(artwork); });
+  if (!ticket) return {};
+  pending_.push_back({kind, std::move(*ticket)});
+  return {};
+}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::deep_field(){return synchronous(ArtworkKind::deep_field);}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::galaxy_layer(){return synchronous(ArtworkKind::galaxy_layer);}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::regional_nebula(){return synchronous(ArtworkKind::regional_nebula);}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::request_deep_field(){return request(ArtworkKind::deep_field);}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::request_galaxy_layer(){return request(ArtworkKind::galaxy_layer);}
+std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::request_regional_nebula(){return request(ArtworkKind::regional_nebula);}
 
 std::shared_ptr<const RgbaImage> NativeGalaxyBackdropAssets::undisclosed_core_fog() {
+  require_owner();
   if (!core_fog_) core_fog_ = make_core_fog();
   return core_fog_;
 }
@@ -246,35 +352,45 @@ void NativeGalaxyBackdrop::set_galactic_core_discovered(
   catalog_->galactic_core_discovered = discovered;
 }
 
-void NativeGalaxyBackdrop::discard_campaign() noexcept { catalog_.reset(); artwork_frame_.reset(); regional_points_.clear();last_stats_={}; }
+void NativeGalaxyBackdrop::discard_campaign() noexcept { assets_->cancel_preparation();catalog_.reset(); artwork_frame_.reset(); regional_points_.clear();last_stats_={};artwork_ready_=true; }
 
 void NativeGalaxyBackdrop::append(DrawList &out, const GalaxyBackdropView &view) {
   last_stats_ = {};
-  if (!view.galaxy_view) return;
+  if (!view.galaxy_view) {artwork_ready_=true;return;}
   if (!catalog_ || !artwork_frame_ || view.campaign_generation != catalog_->campaign_generation)
     throw std::invalid_argument("Galaxy backdrop view does not match its bound campaign.");
   if (view.viewport_width <= 0 || view.viewport_height <= 0)
     throw std::invalid_argument("Galaxy backdrop viewport must be positive.");
   const auto blend=galaxy_overview_blend(view.camera.pixels_per_world,view.fitted_pixels_per_world);
+  artwork_ready_=true;
   last_stats_.overview_blend=blend;
   const UiRect viewport{0,0,static_cast<float>(view.viewport_width),static_cast<float>(view.viewport_height)};
   if (blend > .002) {
-    auto deep=assets_->deep_field();
-    out.world.emplace_back(Image{deep,cover(*deep,view.viewport_width,view.viewport_height),std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*.58*blend))},viewport});
-    last_stats_.deep_field_images=1;
+    auto deep=assets_->request_deep_field();
+    if (deep) {
+      out.world.emplace_back(Image{deep,cover(*deep,view.viewport_width,view.viewport_height),std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*.58*blend))},viewport});
+      last_stats_.deep_field_images=1;
+    } else artwork_ready_=false;
     const auto &frame=*artwork_frame_;
     const auto top_left=view.camera.project({frame.left,frame.top},view.viewport_width,view.viewport_height);
     const auto destination=UiRect{top_left.x,top_left.y,static_cast<float>(frame.width*view.camera.pixels_per_world),static_cast<float>(frame.height*view.camera.pixels_per_world)};
-    if (intersects(destination,viewport)) {out.world.emplace_back(Image{assets_->galaxy_layer(),destination,std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*blend))},viewport});last_stats_.galaxy_layer_images=1;}
+    if (intersects(destination,viewport)) {
+      if (auto galaxy=assets_->request_galaxy_layer()) {
+        out.world.emplace_back(Image{galaxy,destination,std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*blend))},viewport});
+        last_stats_.galaxy_layer_images=1;
+      } else artwork_ready_=false;
+    }
   }
   const auto regional=std::clamp(1.-blend*2.,0.,1.);
   last_stats_.regional_opacity=regional;
   if (regional>.002) {
-    auto nebula=assets_->regional_nebula();
-    out.world.emplace_back(Image{nebula,
+    auto nebula=assets_->request_regional_nebula();
+    if (nebula) {
+      out.world.emplace_back(Image{nebula,
       regional_cover(*nebula,view.viewport_width,view.viewport_height,view.camera),
       std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*.56*regional))},viewport});
-    last_stats_.regional_nebula_images=1;
+      last_stats_.regional_nebula_images=1;
+    } else artwork_ready_=false;
     const auto parallax=.012+std::min(.045,view.camera.pixels_per_world*.0012);
     const auto px=static_cast<float>(-view.camera.center.x*view.camera.pixels_per_world*parallax);
     const auto py=static_cast<float>(-view.camera.center.y*view.camera.pixels_per_world*parallax);
@@ -294,7 +410,7 @@ void NativeGalaxyBackdrop::append(DrawList &out, const GalaxyBackdropView &view)
   }
 }
 
-void NativeGalaxyBackdrop::clear_render_stats() noexcept { last_stats_ = {}; }
+void NativeGalaxyBackdrop::clear_render_stats() noexcept { last_stats_ = {};artwork_ready_=true; }
 GalaxyBackdropRenderStats NativeGalaxyBackdrop::last_render_stats() const noexcept { return last_stats_; }
 
 std::optional<GalaxyBackdropFrame> NativeGalaxyBackdrop::artwork_frame() const { return artwork_frame_; }
@@ -303,6 +419,7 @@ Camera NativeGalaxyBackdrop::fit_camera(const int width, const int height) const
   return galaxy_artwork_fit_camera(*artwork_frame_, width, height);
 }
 std::size_t NativeGalaxyBackdrop::regional_point_count() const noexcept { return regional_points_.size(); }
+bool NativeGalaxyBackdrop::artwork_ready()const noexcept{return artwork_ready_;}
 
 void promote_legacy_galaxy_foreground(DrawList &out,
                                       const std::size_t insertion_index) {

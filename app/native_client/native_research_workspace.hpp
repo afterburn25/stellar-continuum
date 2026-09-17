@@ -4,7 +4,9 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <optional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,6 +50,12 @@ struct ResearchWorkspaceLayout {
 
 class NativeResearchWorkspace final {
 public:
+  using TextMeasurer = std::function<stellar::native_map::TextExtent(
+      const stellar::native_map::Text &)>;
+  using ArtworkResolver = std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(
+      std::string_view node_id, bool portrait)>;
+  void set_text_measurer(TextMeasurer measure);
+  void set_artwork_resolver(ArtworkResolver resolve);
   void open();
   void close();
   [[nodiscard]] bool visible() const noexcept;
@@ -55,16 +63,17 @@ public:
 
   void set_window(stellar::native_research::NativeResearchWindow window);
   void discard_campaign();
-  [[nodiscard]] const stellar::native_research::NativeResearchQuery &query()
-      const noexcept;
+  [[nodiscard]] const stellar::native_research::NativeResearchQuery &
+  query() const noexcept;
   [[nodiscard]] bool take_refresh_request() noexcept;
   [[nodiscard]] const std::optional<
-      stellar::native_research::NativeResearchWindow> &window() const noexcept;
+      stellar::native_research::NativeResearchWindow> &
+  window() const noexcept;
   [[nodiscard]] const std::optional<std::string> &selected_id() const noexcept;
 
   [[nodiscard]] WorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
-  void render(stellar::native_map::DrawList &out, int width, int height) const;
+  void render(stellar::native_map::DrawList &out, int width, int height);
   void set_notice(std::string message, bool accepted);
 
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
@@ -88,15 +97,18 @@ private:
   void select(std::string node_id);
   [[nodiscard]] const stellar::native_research::NativeResearchNode *
   selected_node() const noexcept;
-  [[nodiscard]] stellar::native_map::UiRect transformed_card(
-      const NodePlacement &placement, const ResearchWorkspaceLayout &layout) const;
+  [[nodiscard]] stellar::native_map::UiRect
+  transformed_card(const NodePlacement &placement,
+                   const ResearchWorkspaceLayout &layout) const;
 
   bool visible_{};
   bool search_focused_{};
   bool dragging_{};
   bool refresh_requested_{};
+  bool center_selection_{};
   stellar::native_map::Point pointer_{};
   stellar::native_map::Point pan_{24.f, 30.f};
+  float zoom_{1.f};
   stellar::native_research::NativeResearchQuery query_;
   std::optional<stellar::native_research::NativeResearchWindow> window_;
   std::optional<std::string> selected_node_id_;
@@ -105,6 +117,11 @@ private:
   std::string topology_signature_;
   std::string notice_;
   bool notice_accepted_{};
+  float inspector_scroll_{};
+  float inspector_scroll_limit_{};
+  int inspector_viewport_width_{}, inspector_viewport_height_{};
+  TextMeasurer text_measurer_;
+  ArtworkResolver artwork_resolver_;
 };
 
 } // namespace stellar::native_research_ui

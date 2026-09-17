@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include "native_new_campaign_setup.hpp"
 
@@ -27,8 +28,9 @@ struct NativeNewGameLayout {
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, heading, cancel, mode_story, mode_sandbox,
       species, species_rows, details, details_content, size_group, seed_label,
-      seed_input, create, portrait;
+      seed_input, randomize_seed, restore_defaults, create, portrait;
   std::array<stellar::native_map::UiRect, 4> size_buttons{};
+  stellar::native_map::UiRect copy_setup;
   [[nodiscard]] static NativeNewGameLayout for_viewport(int width,
                                                          int height) noexcept;
 };
@@ -45,7 +47,12 @@ enum class NativeNewGameIntentKind {
   Cancel,
   SelectSpecies,
   SelectSize,
+  SelectRivals,
+  SelectAncients,
   SeedEdited,
+  RandomizeSeed,
+  RestoreDefaults,
+  CopySetup,
   Create
 };
 
@@ -53,7 +60,7 @@ struct NativeNewGameIntent {
   NativeNewGameIntentKind kind{NativeNewGameIntentKind::None};
   bool captured{};
   std::string species_id, seed_text;
-  int system_count{};
+  int system_count{}, pre_warp_civilization_count{}, ancient_civilization_count{};
 };
 
 class NativeNewGameWorkspace final {
@@ -63,9 +70,11 @@ public:
   using PortraitProvider = std::function<std::shared_ptr<
       const stellar::native_map::RgbaImage>(std::string_view asset_path)>;
 
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_view(stellar::native_setup::NativeNewCampaignSetupView);
   void clear() noexcept;
   void set_assessment_message(std::string message, bool accepted);
+  void randomize_seed();
 
   [[nodiscard]] const std::optional<
       stellar::native_setup::NativeNewCampaignSetupView> &
@@ -77,6 +86,12 @@ public:
   }
   [[nodiscard]] int selected_system_count() const noexcept {
     return selected_system_count_;
+  }
+  [[nodiscard]] int selected_pre_warp_civilization_count() const noexcept {
+    return selected_pre_warp_civilization_count_;
+  }
+  [[nodiscard]] int selected_ancient_civilization_count() const noexcept {
+    return selected_ancient_civilization_count_;
   }
   [[nodiscard]] const std::string &seed_text() const noexcept {
     return seed_text_;
@@ -96,19 +111,22 @@ public:
                   {}) const;
 
 private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   [[nodiscard]] std::optional<std::size_t> species_hit(
       stellar::native_map::Point,
       const NativeNewGameMeasuredLayout &) const noexcept;
   [[nodiscard]] std::optional<std::size_t> size_hit(
       stellar::native_map::Point, const NativeNewGameLayout &) const noexcept;
   void reconcile();
+  void restore_defaults();
   void reset_interaction() noexcept;
 
   std::optional<stellar::native_setup::NativeNewCampaignSetupView> view_;
   std::string selected_species_id_, seed_text_, message_;
-  int selected_system_count_{};
+  int selected_system_count_{}, selected_pre_warp_civilization_count_{},
+      selected_ancient_civilization_count_{};
   float species_scroll_{}, detail_scroll_{};
-  bool seed_focused_{}, assessment_accepted_{}, pressed_{};
+  bool seed_focused_{}, seed_replace_pending_{}, assessment_accepted_{}, pressed_{};
   stellar::native_map::Point pointer_{};
 };
 

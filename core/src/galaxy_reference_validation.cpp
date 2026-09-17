@@ -179,7 +179,7 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
          *colony.remaining_extractable_materials < 0))
       data_error("Settlement " + std::to_string(colony.id) +
                  " has an invalid remaining resource deposit.");
-    if (colony.surface_hub_level < 1 || colony.surface_hub_level > 3)
+    if (colony.surface_hub_level < 0 || colony.surface_hub_level > 3)
       data_error("Settlement " + std::to_string(colony.id) +
                  " has an invalid surface hub level.");
     if (!std::isfinite(colony.stored_food_population_days_millions) ||
@@ -241,7 +241,8 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
   for (const auto &fleet : world.fleets) {
     if (fleet.tactical_loadout) validate_loadout(*fleet.tactical_loadout);
     if (fleet.tactical_vessel) validate_vessel(*fleet.tactical_vessel);
-    if (fleet.tactical_vessel && fleet.tactical_vessel->id != fleet.id)
+    if (fleet.tactical_vessel &&
+        fleet.tactical_vessel->id != campaign_vessel_id_for_fleet(fleet.id))
       data_error("Fleet " + std::to_string(fleet.id) +
                  " has tactical state for a different vessel identity.");
     if (fleet.design_id) {

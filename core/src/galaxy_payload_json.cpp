@@ -594,6 +594,7 @@ SurfaceBuilding decode_surface_building(const Value &value,
     else if (name == "OperatingPriority") result.operating_priority = integer<int>(member, p);
     else if (name == "Condition") result.condition = number(member, p);
     else if (name == "StoredPowerDays") result.stored_power_days = number(member, p);
+    else if (name == "SlotIndex") result.slot_index = optional_value<int>(member, p, integer<int>);
   }
   return result;
 }
@@ -1506,7 +1507,7 @@ Json encode_civilization(const CivilizationPersistenceDto &value) {
 }
 
 Json encode_surface_building(const SurfaceBuilding &value) {
-  return {{"Id", value.id},
+  Json result = {{"Id", value.id},
           {"TypeId", value.type_id},
           {"X", value.x},
           {"Z", value.z},
@@ -1519,6 +1520,8 @@ Json encode_surface_building(const SurfaceBuilding &value) {
           {"OperatingPriority", value.operating_priority},
           {"Condition", value.condition},
           {"StoredPowerDays", value.stored_power_days}};
+  if(value.slot_index)result["SlotIndex"]=*value.slot_index;
+  return result;
 }
 
 Json encode_colony(const ColonySaveDto &value) {

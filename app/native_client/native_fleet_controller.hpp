@@ -14,6 +14,77 @@
 
 namespace stellar::native_fleet {
 
+[[nodiscard]] constexpr bool is_civilian_role(stellar::core::FleetRole role) noexcept {
+  using stellar::core::FleetRole;
+  return role == FleetRole::Scout || role == FleetRole::Science ||
+         role == FleetRole::Colony;
+}
+
+// Presentation commands bind the displayed mission, never whichever fleet
+// happens to be selected when an old confirmation reaches the owner thread.
+struct NativeCivilianRecoveryQuote {
+  std::uint64_t campaign_generation{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  stellar::core::FleetRole role{};
+  bool hold_requested{}, return_requested{};
+  std::optional<int> destination_system, destination_body, settlement_body;
+  double settlement_days{};
+  bool operator==(const NativeCivilianRecoveryQuote &) const = default;
+};
+
+enum class NativeCivilianRecoveryAction { Hold, Resume, ReturnToBase };
+
+struct NativeMilitaryOrderQuote {
+  std::uint64_t campaign_generation{};
+  std::uint64_t token{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  stellar::core::FleetRole role{};
+  std::optional<int> current_system_id, destination_system_id, defend_system_id;
+  stellar::core::FleetTransitPhase transit_phase{};
+  // Continuous progress is not authorization: a moving ship must remain clickable.
+  std::vector<int> planned_route_system_ids;
+  stellar::core::MilitaryOrderType current_order{stellar::core::MilitaryOrderType::Hold};
+  std::optional<int> target_fleet_id;
+  bool retreat_started{};
+  bool armed{}, combat_effective{}, disengaged{}, tactical_encounter_active{};
+  bool operator==(const NativeMilitaryOrderQuote &) const = default;
+};
+
+struct NativeFleetLocateQuote {
+  std::uint64_t campaign_generation{};
+  int observer_id{}, fleet_id{}, mission_order_revision{};
+  bool operator==(const NativeFleetLocateQuote &) const = default;
+};
+
+struct NativeFleetLocateOutcome {
+  bool accepted{};
+  std::string message;
+  int fleet_id{};
+  std::optional<int> current_system_id;
+  stellar::core::Vec2 position{};
+};
+
+// Read-only evidence of the automatic local reconnaissance performed by a
+// stationed scout. This deliberately carries no system identity: the fleet's
+// own current system is the only authorized context for the presentation.
+struct NativeScoutReconnaissanceStatus {
+  double days_completed{};
+  double required_days{};
+  bool held{};
+  bool completed{};
+  bool fully_surveyed{};
+  bool operator==(const NativeScoutReconnaissanceStatus &) const = default;
+};
+
+// Detached progress for the automatic detailed survey of the science fleet's
+// current system. No system/body details or duration estimate cross this seam.
+struct NativeScienceSurveyStatus {
+  double progress{};
+  bool held{};
+  bool completed{};
+  bool operator==(const NativeScienceSurveyStatus &) const = default;
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -32,6 +103,12 @@ struct NativeOwnFleet {
   int mission_order_revision{};
   std::optional<stellar::core::OwnCombatFleetStatus> combat_status;
   double combat_power{};
+  std::optional<NativeCivilianRecoveryQuote> recovery;
+  std::optional<NativeMilitaryOrderQuote> military_order_quote;
+  std::optional<NativeFleetLocateQuote> locate;
+  std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
+  std::optional<NativeScienceSurveyStatus> science_survey;
+  std::string recovery_message;
 };
 
 // A historic intelligence record owns no current position. The strategic
@@ -74,6 +151,7 @@ struct NativeFleetOrderOutcome {
   bool accepted{};
   std::string message;
   int mission_order_revision{};
+  bool requires_confirmation{};
 };
 
 class NativeFleetController final {
@@ -100,6 +178,14 @@ public:
   [[nodiscard]] NativeFleetOrderOutcome
   issue_selected_route(stellar::core::CampaignFrame &,
                        const NativeFleetRoutePreview &preview);
+  [[nodiscard]] NativeFleetOrderOutcome issue_civilian_recovery(
+      stellar::core::CampaignFrame &, const NativeCivilianRecoveryQuote &,
+      NativeCivilianRecoveryAction, bool confirm_abandon = false);
+  [[nodiscard]] NativeFleetOrderOutcome issue_selected_military_order(
+      stellar::core::CampaignFrame &, const NativeMilitaryOrderQuote &,
+      stellar::core::MilitaryOrderType);
+  [[nodiscard]] NativeFleetLocateOutcome locate_selected(
+      stellar::core::CampaignFrame &, const NativeFleetLocateQuote &);
   [[nodiscard]] std::optional<int> selection() const;
 
 private:
@@ -109,6 +195,8 @@ private:
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::optional<int> selected_fleet_id_;
+  std::optional<NativeMilitaryOrderQuote> military_order_quote_;
+  std::uint64_t next_military_quote_token_{1};
 };
 
 } // namespace stellar::native_fleet

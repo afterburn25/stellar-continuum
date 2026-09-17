@@ -36,6 +36,9 @@ struct SessionNotice {
   double progress{};
 };
 
+// Only this transition's own capture/write may unlock setup; older writes cannot.
+enum class NewCampaignTransition { Inactive, Waiting, Saving, Ready, Failed };
+
 struct NativeCampaignCache {
   // Pointers borrow the current live CampaignFrame. They become invalid as soon
   // as service() successfully activates another campaign. Callers must compare
@@ -97,6 +100,10 @@ public:
   [[nodiscard]] const SessionNotice &notice() const;
   [[nodiscard]] bool load_pending() const;
   [[nodiscard]] bool exit_ready() const;
+  [[nodiscard]] NewCampaignTransition new_campaign_transition() const;
+  [[nodiscard]] bool new_campaign_pending() const;
+  [[nodiscard]] bool request_new_campaign();
+  void cancel_new_campaign();
 
   [[nodiscard]] stellar::core::CampaignFrameResult
   advance(double real_delta_seconds, const std::string &saved_at_utc);
@@ -127,6 +134,8 @@ private:
   void begin_load();
   void publish_save_result(const stellar::core::PlayerCampaignSaveResult &,
                            std::string success_message);
+  void publish_background_save_result(
+      const stellar::core::PlayerCampaignSaveResult &);
   void publish_failure(std::string message);
   void require_owner() const;
   [[nodiscard]] bool drain_live_save();
@@ -142,6 +151,8 @@ private:
   bool exit_requested_{};
   bool exit_ready_{};
   bool manual_capture_ready_{};
+  bool manual_save_pending_{};
+  NewCampaignTransition new_campaign_transition_{NewCampaignTransition::Inactive};
 };
 
 [[nodiscard]] std::filesystem::path default_native_campaign_save_path();

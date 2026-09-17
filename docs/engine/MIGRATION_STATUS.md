@@ -1,5 +1,221 @@
 # Stellar Engine migration status
 
+### Native presentation restoration checkpoint (2026-09-16)
+
+Alpha 0.1.8 restores the full-art startup/menu flow, separate game-mode image
+cards, random numeric seeds and supported sandbox options. Fourteen photographic
+navigation entries, icon playback controls, detailed system stars, forest-green
+arrows and illustrated, explanatory research improve the native presentation.
+The existing 99-image catalog is preserved with provenance; current research
+bindings and explicit navigation images alone enter the package. Core, C# and
+Player17 are unchanged. MSVC, all 186 CTests, Python (581 pass / 17 optional skips), and relocated
+720p/1080p research/navigation/system/startup-audio checks pass. Native test details,
+actual visual review and remaining parity limits are documented in
+`NATIVE_PRESENTATION_RESTORATION.md`. No sealed download is claimed here.
+
+### Earned power and research checkpoint (2026-09-16)
+
+The actual earned colony now advances from its completed fabricator to a paid
+power generator and science lab. The two UI reviews cancel without state changes,
+then charge 25/40 budget units exactly and finish 300/400 materials across
+3659/4876 Normal 1/64-day frames. Day 6965.4603137 has six power supplied, four
+required and all three modules operating. Actual Adaptive Research institution
+`construction:surface:9:3` adds one effective lab (empire total 12 to 13).
+Paused reload preserves the full Player17 payload except SavedAtUtc.
+
+UI improvements show colony totals separately from selected module costs,
+replace misleading daily science with actual active local facilities/lab capacity,
+explain construction allocations and refresh stale placement notices at completion.
+No simulation, C#, schema or approved-art changes. The maintained expansion gate
+is chained after the first earned surface save and preserves source provenance.
+
+MSVC, thirteen focused CTests and 594 Python checks (577 pass, 17 optional skips)
+pass. The Vulkan 720p expansion and 1080p reload retain eight captures and two
+checkpoints. See `NATIVE_EARNED_SURFACE_EXPANSION.md`, the current branch handoff
+and `work/native-earned-expansion-*`. Next: earned operations/capacity recovery
+and paid upgrades. No sealed download, professional visual finish, 30-minute
+pacing or sustained 60 FPS claim follows from accelerated validation.
+
+### First earned colony building checkpoint (2026-09-16)
+
+The native earned campaign now completes a paid Xanthe fabricator through
+normal surface input and canonical construction, then preserves it on reload.
+The 720p run pays 50 budget units ($500M UED), finishes 450 materials in
+4460 Normal 1/64-day frames and reaches day 6832.1009387 with actual output
+of 1 industry/day, power and workers. Paused 1080p Player17 is unchanged except
+its timestamp. New empty-colony guidance uses live resources and module costs;
+placement preview no longer claims that payment already happened. Prepared
+imagery, 10% construction and Operating inspector captures were checked.
+
+MSVC, nine focused CTests, 586 Python checks (569 pass, 17 optional skips),
+earned Vulkan continuation/reload, surface/navigation regressions and four CLI
+failures pass. Contract: `NATIVE_EARNED_SURFACE.md`; evidence:
+`work/native-earned-surface-*`. Core/C#/Player17/art remain unchanged.
+Next: improve construction/operations feedback and continue paid power/research
+expansion from the completed earned save. No sealed release, final graphical
+quality or sustained 60 FPS claim is made by this checkpoint.
+
+### Earned settlement establishment checkpoint (2026-09-16)
+
+The no-grant seed-115501 chain continued from the full survey at day 6587.15625,
+visited systems 2, 3 and 8, fully surveyed Ross 154 and selected viable Xanthe
+body 8004. Paid canonical shipbuilding produced colony vessel 2 with 250M
+passengers at day 6725.765625; Core founded colony 9 at day 6762.421875 and
+consumed the vessel. The 720p UI quote cost 120 simulation budget units
+($1.2B UED), was cancelled without charge, then confirmed normally. Latest
+graphical run: day 6726.7884387 to 6762.4134387 in 2280 Normal 1/64-day steps.
+Paused 1080p reload matches except `SavedAtUtc`; timer 5/30, colony entry and
+normal feedback were inspected. A prior 2282-step proof also passed; the
+difference is normal clock fractional variation.
+
+The rebuilt MSVC run and all 10 focused CTests pass. Python final validation
+reports 577 checks (560 pass, 17 optional skips). The maintained earned wrapper,
+navigation, system, preparation and authored ordering checks pass, as do four
+CLI cases.
+Next: build the first paid Xanthe surface module through canonical timers and
+save/reload without grants or Core/C#/Player17/approved-art changes.
+
+### Settlement preparation checkpoint (2026-09-16)
+
+The earned full-survey save now drives a read-only review for non-owned Ilyra
+body 1001. The inspector exposes canonical suitability/site facts, habitat
+needs, colony/outpost costs, distinct ship/expedition costs, minimum build
+workdays and population reservation. View Shipyard reuses existing navigation;
+owned-colony priority and strict observer/generation/system/body/full-survey
+binding prevent stale views. No new modal, grants, spending or build action was
+added; Core, C#, Player17 and approved art are unchanged.
+
+Seed 115501/player 0 at day 6587.15625 passed two serial 1280x720 and 1920x1080
+runs with full Player17 equality except `SavedAtUtc`, eight images and two
+saves. MSVC, eight focused CTests, Python 564 checks (547 pass, 17 optional
+skips), final navigation, system, shipyard and four-process earned-survey
+regressions passed, including malformed CLI coverage. Evidence is under
+`work/native-settlement-preparation-*`. The site is too harsh and has no rare
+deposit. Historical prior blocked step: earning a viable site and establishing
+it is now resolved by the earned settlement checkpoint above. Never fabricate a
+planet or grant eligibility.
+
+### First earned science survey
+
+The paid science vessel now has local survey progress, Hold and completion
+feedback. The system card correctly distinguishes completed reconnaissance from
+an unfinished detailed survey. The native replay continues the earned scout save:
+one actual UI travel order, departure/warp/arrival, partial survey, paused reload,
+completion and another paused reload. Core, C#, Player17 and approved art remain
+unchanged. Planet readings stay Unconfirmed until full survey; selection and
+scrolling are read-only. Completion uses normal notification/voice dispatch.
+
+Sol-to-Proxima science vessel 1 advances day 6572.359375 to 6574.84375 in 159
+exact 1/64-day steps, then finishes at 6587.15625 in 788 further steps. Revision
+0→1 changes only once; scout 0 remains unchanged. Both paused reloads preserve
+the complete Player17 payload except SavedAtUtc. Six inspected images and four
+distinct saves are retained. The inspector sidecar now waits for artwork readiness.
+
+Final MSVC build passes; 10 affected CTests pass (seven rerun after the last UI
+changes); Python 552 checks, 535 pass/17 optional skips. Relocated four-process
+survey and navigation/fleet/system/earned-scout graphical regressions pass.
+Three malformed command lines fail cleanly. Evidence: work/native-first-survey-*
+logs and JSON. Contract: `NATIVE_FIRST_SURVEY_UI.md`.
+PR332 stays unmerged; the local package is UNSEALED, not a release download.
+Shared base/Devin remain ac45d958/b023e384.
+
+The settlement-preparation checkpoint above supersedes this survey checkpoint's
+next-step note. Native system artwork, readable map scale and broader visual
+finish remain open; these captures prove the gameplay path, not final graphics
+or sustained 60 FPS.
+
+First earned scout exploration checkpoint (2026-09-16):
+
+The fresh seed-115501 scout now receives its first direct Sol-to-Proxima order
+through native outliner selection, Locate, map zoom/drag, right-click preview and
+Confirm. Core starts departure on the next step; acceptance alone is not motion.
+The replay observes departure, partial warp, local arrival and automatic two-work-
+day reconnaissance. The only order raises mission revision 0 to 1; resuming
+never reissues it. Day 6568.5 reaches partial warp at 6569.34375 (54 exact 1/64-day
+steps), then reconnaissance completes at 6572.359375 (193 further steps), with
+survey knowledge advancing from detected/0 to partial/0.35.
+
+Owned scout feedback now shows local work, Hold status, completion and the next
+science-survey decision. Review found that a consumed fleet-button release left
+the map gesture captured: releasing the UI gesture now restores immediate wheel
+zoom after Locate. The replay asserts real zoom and exact scout selection.
+Validation: final MSVC build; 8 affected CTests; Python 532 checks (515 pass,
+17 optional executable skips). The relocated four-process Vulkan journey passes
+at 720p/1080p, preserving the complete Player17 payload across both paused reloads
+except SavedAtUtc. Six exact-dimension captures and four distinct saves are
+retained; departure, arrival and completed scout feedback were inspected. Existing
+navigation, fleet, local-system travel and fresh first-ships graphical regressions
+pass. Missing load, wrong seed and conflicting modes exit nonzero in the terminal.
+Evidence: work/native-first-exploration-{build-final,ctest-final,python,runtime,
+regressions,cli}.log and work/native-first-exploration-{runtime,regressions}.json.
+The shared base and Devin head remain ac45d958 / b023e384.
+
+No Core, C#, Player17 schema or approved-art changes. Contract:
+`NATIVE_FIRST_EXPLORATION_UI.md`. PR332 remains unmerged, and the local
+package remains UNSEALED. Next: extend this earned campaign through the science
+vessel's full survey, including actionable discoveries and save/recovery.
+
+First-ships graphical checkpoint (2026-09-16): the no-grant seed-115501 native
+replay passes the MSVC build, 13 affected CTests and Python 516 (499 pass / 17
+optional executable skips). Normal input reaches day 6568.5 after 26,274
+quarter-day steps, completing 13 research, 3 construction and 2 ship orders;
+scout 0 and science vessel 1 are preserved through the paused reload. Fresh
+720p and paused 1080p captures were inspected, with full Player17 equality
+except `SavedAtUtc`; the earlier day than headless 6574 follows .25-day graphical
+order boundaries rather than a rule change. Existing navigation, research,
+shipyard and construction Vulkan suites pass. Stale queue and invalidated
+cancellation notices are fixed; final build, CTests and fresh/reload/shipyard
+runtime checks pass. The corrected capture was inspected. The next gap is
+normal UI ordering for the earned scout through local departure, warp,
+arrival/exploration and save/reload. See `NATIVE_FIRST_SHIPS_UI.md` and
+`../CPP_MIGRATION_HANDOFF.md`.
+
+Owned-colony roster checkpoint (2026-09-16): the compact navigation icon opens
+owned colonies/outposts with grouped identity/location/population and direct View
+entry. Survey privacy, live ownership and matched-input gates remain required;
+refresh preserves scroll and the inspector no longer overlaps the list. MSVC,
+14 CTests, Python492 (475 pass / 17 optional skips), 720p/1080p Vulkan roster and
+paused reload plus freight/surface/settlement/navigation regressions pass.
+See `NATIVE_COLONY_ROSTER.md` and `../CPP_MIGRATION_HANDOFF.md`. No Core/C#/schema
+or approved-art changes. UNSEALED local package; PR332 unmerged. Next: graphical
+fresh-campaign-to-first-ship proof using the existing no-grant progression recipe.
+
+Outpost freight checkpoint (2026-09-16): owned outposts expose a paused Collect
+materials review and exact-ship dispatch through existing Core. Copied-state
+preflight skips unreachable ships and catches invalid orders before live mutation;
+single-use confirmation protects observer, target, generation and mission state.
+MSVC, 8 CTests, Python485 (468 pass / 17 optional skips), 720p/1080p freight dispatch
+and full paused reload pass. Six freight captures; existing colony, surface and
+settlement runtime suites pass. See `NATIVE_OUTPOST_FREIGHT.md` and the current
+`../CPP_MIGRATION_HANDOFF.md`. No Core/C#/schema changes; UNSEALED local package,
+PR332 unmerged. Devin inventoried to b023e384; colony-sites board remains pending.
+
+Surface relief checkpoint (2026-09-16): native surface smoke runs now validate a neutral fixed world-space relief layer prepared asynchronously and cached across pan/zoom. Core remains untouched; saves and UI contracts are unchanged. The bounded top-down refinement is not full 3D/final graphics, sustained 60 FPS proof, or a sealed release. See `NATIVE_SURFACE_RELIEF.md`; MSVC, focused CTests, Python export and five surface cases pass. Next bounded review covers Land/Collect `d9d23f57` and colony sites `e49f4df0` against settlement/recovery/observer contracts; latest Devin `88de7e38`, shared `ac45d958`, PR #332 unmerged.
+
+Celestial detail checkpoint (2026-09-16): approved source planet discs are 512px,
+procedural discs 256px within the original 16 MiB cache and asynchronous queue.
+Capture evidence now binds each screenshot to its exact readback dimensions.
+Reviewed generated-art replacements remain excluded; see `NATIVE_CELESTIAL_ART_REVIEW.md`
+and the latest checkpoint in `../CPP_MIGRATION_HANDOFF.md` for validation and limits.
+
+Current Codex candidate (2026-09-16): PR #332 integrates native diplomacy,
+observer-safe territory, approved artwork, audio/settings/scientist cues,
+strategic fleet orders/Locate, the sovereign economy/industry workspace, top-down colony construction and reviewed building management, grouped survey-gated planet inspection and focus, transactional video settings, observer-safe system inspection, home-system supply,
+recent events, bounded diagnostic exports and
+corrected native tactical controls/persistence. See `../CPP_MIGRATION_HANDOFF.md`
+for current tests and checkpoint history. Tactical `357872e8` is selectively
+adapted with the corrections in `NATIVE_TACTICAL_WORKSPACE.md`; the native-only
+zero-fleet tactical identity repair is an explicit C# parity exception. Surface
+sprites `58aaf475` remain unimported; see `NATIVE_SURFACE_SPRITE_REVIEW.md`.
+PR #332 remains unmerged and unsealed. Detailed ships fighting inside the system,
+full 3D colonies, production HUD styling and sustained 60 FPS remain unfinished.
+
+Engine 0.1.58 adds the native observer-safe diplomacy presentation on `cpp/devin-swe2-native-conversion` (pending merge into this branch). `native_diplomacy_controller` ports `DiplomacyRelationsPresenter`: a `DiplomaticStateView`-filtered projection of contacts, channels, relationships, access, agreements, proposals and three-event history with selection clamping, latest-tick access and the 2050 epoch calendar. Commands route through `ObserverDiplomacyCommandService` only after generation, revision and signature revalidation; relationship drift and identification changes bump the revision so stale quotes are rejected. `native_diplomacy_workspace` adds the RELATIONS top-bar workspace: contact directory with nine filters, transmission stage (species communications portrait or signal waveform), five relationship meters, negotiation/declaration modals and agreements/proposals/history/intelligence/overview tabs. Unidentified contacts expose no civilization id, name, species or metrics. Maintained validation passed 150/150 graphical CTest including two new diplomacy suites; full interactive playthrough evidence remains pending.
+
+Engine 0.1.57 adds bounded native ship artwork and authorized fleet route effects (`ac45d958`). `native_ship_art_assets` resolves design_id-then-role artwork from six reviewed 1254px sources through a single-decode 6-entry/4MiB cache of 224px thumbnails; fleet workspace rows/details and shipyard design rows/details render them, and `NativeOwnFleet` carries `design_id`. `native_fleet_route_effects` matches the Godot map for active owned fleets: faint under-stroke, dashed legs, chevron arrowheads and three bounded trail strokes. Own route geometry draws through unsurveyed systems because it is player-authorized; foreign contacts remain unplaced and unknown labels stay redacted. The ship-art validator authors a shipyard-capable save and demands six decoded sources, exact 1,204,224-byte cache, fleet/shipyard art rows and route/trail/marker evidence plus paused reload equality. Maintained validation passed 148/148 graphical CTest, 144/144 headless CTest and all Python export checks including 19 ship-art runtime tests.
+
+Engine 0.1.56 integrates the approved galaxy artwork with actual-game regression proof (`10d3ec3d`). CPU-side WIC decode split into `stellar_native_image`, repairing the headless LNK1181 regression without disabling tests. Deep-field and Milky Way layers fit the overview, regional nebula plus 356 deterministic star points appear at wheel zoom, and antialiased class-coloured markers replace placeholder points; the hidden galactic core fog is preserved. `--galaxy-art-smoke` proves wheel zoom, system entry, pause and day-invariance on real Vulkan at 1280x720 and 1920x1080, with `decoded_sources=3`, bounded uploads and zero revealed unknown labels. Sealed export `StellarContinuum-windows-native-preview-10d3ec3d-...` passed 147/147 CTest, all validators, relocated launch and restricted-PATH Player17 reload: 106 files, 33.15 MB ZIP, sourceDirty=false.
+
 Engine 0.1.55 restores the four approved menu/loading artworks in the native C++23 client: application boot, main menu and race setup, new-galaxy generation, and saved-campaign restoration. The application-loading screen lasts at least seven seconds; its displayed progress is bounded by both loaded assets and the minimum presentation time. New/save operations retain real operation progress without an artificial delay. The right artwork survives immediate worker completion because the request origin is recorded explicitly. Responsive translucent controls, complete species portraits and one gameplay tip per operation remain legible at 720p and 1080p.
 
 System stars now use cached 1024px class-coloured photospheres, seeded sunspots and intermittent prominence animation. Saturn renders a textured globe between continuous back/front ring layers. Review caught and removed a diagonal ring-opacity seam. Generated celestial resources are bounded to 18 entries / 32 MiB; camera movement does not regenerate textures. These are improved 2D visuals, not full reference shader or 3D parity.

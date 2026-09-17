@@ -37,6 +37,41 @@ explicit cancellation gap.
 
 ## Player workspace and persistence validation
 
+### Inspector readability checkpoint (2026-09-15)
+
+Cost, known capability, requirement, disabled-action reason and result-notice
+sections use the native renderer's wrapped text measurements. The inspector
+scrolls independently of the graph; its action and concise result remain
+pinned. Long final lines are reachable. Routine progress, lab and funding
+refreshes preserve the reading position, with clamping when content shrinks.
+Selection, campaign, viewport and newly issued notices reset the position.
+This repairs fixed-height clipping without changing research rules or adding
+unrevealed capabilities or invented effect descriptions.
+
+The workspace regression covers long wrapped sections, final-line reachability,
+overscroll reversal, live refresh/shrinking content, selection/campaign/viewport
+resets, graph isolation and the pinned action hit target. The final native build
+and focused `native_research_workspace` CTest passed. The Python export tests
+pass 62 checks, including malformed, missing, wrong-size and truncated capture
+rejection and exact inspector diagnostic validation.
+
+Two actual Vulkan runs use fresh 1280x720 and paused reload 1920x1080. Both keep
+the base capture and an inspector-end sidecar after normal wheel routing;
+actual font measurements check that the last displayed section reaches its
+final line without covering the action. All four captures were visually
+inspected. The fresh canonical program's content fits without overflow after
+the spacing correction; the deliberately oversized text cases are covered by
+the workspace regression, not claimed as a live campaign scenario. Funded
+research advances and the entire paused Player17 recapture matches except
+`SavedAtUtc`. Evidence: `work/native-research-inspector-runtime.json`,
+`work/native-research-inspector-build.log`,
+`work/native-research-inspector-tests.log`, and
+`work/native-audio-validation/package-research-{started,loaded}*.bmp`.
+
+These are local preview checks, not a sealed release or finished research art.
+The remaining purpose/bonus prose gap requires authored catalog content; the
+presentation must continue to display only the observer-approved data it has.
+
 The native client workspace consumes this owned projection. It exposes known
 research by domain, local text search, mouse selection and pan/scroll navigation.
 The inspector displays the canonical funding quote and current action. The

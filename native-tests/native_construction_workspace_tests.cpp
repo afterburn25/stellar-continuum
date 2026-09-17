@@ -1,4 +1,5 @@
 #include "native_construction_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -85,7 +86,10 @@ void responsive_layout_contains_full_actions() {
     const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.projects, layout.details, layout.orders,
                               layout.costs, layout.feedback,
                               layout.primary_action,
@@ -125,11 +129,13 @@ void mouse_routes_start_queue_and_stable_cancel_confirmation() {
   refreshed.projects.front().formatted_cancellation_refund = "$650M UED";
   workspace.set_view(std::move(refreshed));
   REQUIRE(workspace.arm_cancel_confirmation(command.project_id));
+  REQUIRE(workspace.confirmation_open());
 
   auto changed = view(1, 6);
   changed.projects.front().active = true;
   changed.projects.front().formatted_cancellation_refund = "$600M UED";
   workspace.set_view(std::move(changed));
+  REQUIRE(!workspace.confirmation_open());
   command = workspace.handle(
       {InputEventType::LeftPressed, center(layout.secondary_action)}, 1280, 720);
   REQUIRE(command.kind == ConstructionWorkspaceCommandKind::PrepareCancel);

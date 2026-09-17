@@ -50,6 +50,9 @@ public:
   void open() noexcept;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
+  [[nodiscard]] bool confirmation_open() const noexcept {
+    return cancel_confirmation_id_.has_value();
+  }
   void set_view(stellar::native_construction::NativeConstructionView view);
   void discard_campaign();
   void set_notice(std::string message, bool accepted);
@@ -60,6 +63,8 @@ public:
   view() const noexcept;
   [[nodiscard]] const std::optional<std::string> &
   selected_project_id() const noexcept;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  project_bounds(std::string_view project_id, int width, int height) const;
   [[nodiscard]] ConstructionWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
   void render(stellar::native_map::DrawList &out, int width, int height) const;

@@ -43,6 +43,9 @@ public:
   void open() noexcept;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
+  [[nodiscard]] bool confirmation_open() const noexcept {
+    return cancel_confirmation_id_.has_value();
+  }
 
   void set_view(stellar::native_shipyard::NativeShipyardView view);
   void discard_campaign();
@@ -52,6 +55,8 @@ public:
   view() const noexcept;
   [[nodiscard]] const std::optional<std::string> &selected_design_id() const noexcept;
   [[nodiscard]] const std::optional<std::string> &selected_order_id() const noexcept;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  design_bounds(std::string_view design_id, int width, int height) const;
 
   [[nodiscard]] ShipyardWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);

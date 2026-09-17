@@ -2,3 +2,26 @@
 data/astronomy/hyg-nearby-500-v1.json text eol=lf
 # Keep the reviewed upstream header byte-identical on Windows checkouts.
 third_party/nlohmann/json.hpp text eol=lf
+# Native exports verify these credits byte-for-byte. Pin each reviewed format
+# so fresh checkouts do not depend on the developer's core.autocrlf setting.
+docs/SOL_VISUAL_SOURCES.md text eol=crlf
+docs/engine/NATIVE_GALAXY_ART_SOURCES.md text eol=crlf
+docs/engine/NATIVE_SPECIES_ART_SOURCES.md text eol=crlf
+docs/engine/NATIVE_STARTUP_ART_SOURCES.md text eol=crlf
+docs/engine/NATIVE_SHIP_ART_SOURCES.md text eol=lf
+docs/engine/NATIVE_AUDIO_SOURCES.md text eol=crlf
+docs/engine/NATIVE_SCIENTIST_VOICE.md text eol=lf
+docs/engine/NATIVE_SURFACE_ART_SOURCES.md text eol=lf
+docs/engine/NATIVE_NAVIGATION_ART_SOURCES.md text eol=lf
+export/native-research-assets.json text eol=lf
+assets/visual/catalog/catalog.json text eol=lf
+assets/visual/catalog/production/provenance.json text eol=lf
+assets/visual/ui/navigation/nav_research.svg text eol=lf
+assets/visual/ui/navigation/nav_shipyard.svg text eol=lf
+assets/visual/ui/navigation/nav_construction.svg text eol=lf
+assets/visual/ui/navigation/nav_relations.svg text eol=lf
+assets/audio/voice/scientist-cues.json text eol=lf
+assets/audio/voice/Kokoro-Apache-2.0.txt text eol=lf
+assets/visual/fonts/OFL-Rajdhani.txt text eol=crlf
+
+assets/visual/planetary/ARTWORK.md text eol=lf

@@ -1,4 +1,5 @@
 #include "native_new_campaign_setup.hpp"
+#include <stellar/core/colony_biology.hpp>
 
 #include <algorithm>
 #include <array>
@@ -81,6 +82,7 @@ std::string solvent_label(const stellar::core::SpeciesSolvent value) {
 
 NativeSpeciesSetupOption copy_species(
     const stellar::core::SpeciesEnvironmentProfile &source) {
+  const auto& biology=stellar::core::species_biology_profile(source.id);
   return {source.id,
           source.display_name,
           source.biochemistry,
@@ -96,7 +98,7 @@ NativeSpeciesSetupOption copy_species(
           source.compatible_solvents,
           biochemistry_label(source.biochemistry),
           atmosphere_label(source.preferred_atmosphere),
-          solvent_label(source.biological_solvent)};
+          solvent_label(source.biological_solvent),biology.typical_adult_mass_kg,biology.baseline_lifespan_years,biology.reproductive_maturity_years,biology.baseline_metabolic_demand};
 }
 } // namespace
 
@@ -109,8 +111,16 @@ NativeNewCampaignSetupView NativeNewCampaignSetupController::build() const {
         {sizes[index], std::string{size_labels[index]}, sizes[index] == 500});
   result.default_species_id = terran;
   result.default_system_count = 500;
-  result.fixed_pre_warp_civilization_count = 6;
-  result.fixed_ancient_civilization_count = 1;
+  // These mirror the established Sandbox choices.  Counts include the player
+  // in the pre-warp roster because that is the canonical seeder's contract.
+  result.pre_warp_civilization_presets = {
+      {1, "None", false}, {4, "Sparse · 3", false},
+      {6, "Standard · 5", true}, {9, "Crowded · 8", false},
+      {13, "Packed · 12", false}};
+  result.ancient_civilization_presets = {
+      {0, "None", false}, {1, "Rare", true}, {2, "Standard", false}};
+  result.default_pre_warp_civilization_count = 6;
+  result.default_ancient_civilization_count = 1;
   return result;
 }
 
@@ -129,11 +139,19 @@ NativeNewCampaignSetupAssessment NativeNewCampaignSetupController::prepare(
                         &stellar::core::SpeciesEnvironmentProfile::id) ==
       profiles.end())
     return {false, "Choose an available species.", {}};
+  constexpr std::array pre_warp_counts{1, 4, 6, 9, 13};
+  constexpr std::array ancient_counts{0, 1, 2};
+  if (std::ranges::find(pre_warp_counts, input.pre_warp_civilization_count) ==
+          pre_warp_counts.end() ||
+      std::ranges::find(ancient_counts, input.ancient_civilization_count) ==
+          ancient_counts.end())
+    return {false, "Choose supported rival and ancient civilization counts.", {}};
   if (!present(input.created_at_utc))
     return {false, "Campaign creation time is unavailable.", {}};
 
   stellar::core::PersistableFreshCampaignOptions options{
-      input.created_at_utc, input.system_count, 6, 1,
+      input.created_at_utc, input.system_count,
+      input.pre_warp_civilization_count, input.ancient_civilization_count,
       input.player_species_id};
   return {true, "Campaign setup is ready.",
           NativePreparedNewCampaign{*seed, std::move(options)}};

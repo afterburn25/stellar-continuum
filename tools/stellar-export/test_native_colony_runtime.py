@@ -50,6 +50,12 @@ def state(mode):
                                       "paused", "day_unchanged")}}
 
 
+def roster():
+    return {"player_id": 0, "colony_id": 4, "rows": 1,
+            "opened": True, "selected": True, "readonly": True,
+            "exclusive": True, "scrolled": True}
+
+
 class NativeColonyRuntimeTests(unittest.TestCase):
     def exercise(self, fault=None):
         with tempfile.TemporaryDirectory() as temporary:
@@ -69,6 +75,7 @@ class NativeColonyRuntimeTests(unittest.TestCase):
                 current = json.loads(save.read_text()) if reload else payload()
                 current["SavedAtUtc"] = f"saved-{len(calls)}"
                 report = state(mode)
+                proof = roster()
                 if fault in report:
                     report[fault] = False if isinstance(report[fault], bool) else -1
                 if fault == "nonfinite": report["support_ratio"] = float("nan")
@@ -91,10 +98,33 @@ class NativeColonyRuntimeTests(unittest.TestCase):
                         struct.pack_into("<I", image, 2, len(image))
                         image = bytes(image)
                     capture.write_bytes(image)
+                roster_capture = capture.with_name(f"{capture.stem}-colony-roster.bmp")
+                if fault != "roster_missing_sidecar":
+                    roster_capture.write_bytes(bmp(
+                        1279 if fault == "roster_geometry" else int(args[args.index("--width") + 1]),
+                        int(args[args.index("--height") + 1])))
+                if fault == "roster_false": proof["selected"] = False
+                if fault == "roster_count": proof["rows"] = 2
+                if fault == "roster_identity": proof["colony_id"] = 99
+                if fault == "roster_missing":
+                    roster_line = ""
+                else:
+                    roster_line = "colony_roster=" + json.dumps(proof, separators=(",", ":"))
+                if fault == "roster_duplicate":
+                    roster_line = roster_line + "\n" + roster_line
                 uploads = 0 if fault == "uploads" else 4
                 driver = "software" if fault == "renderer" else "vulkan"
+                dimensions = {"path": str(capture),
+                              "width": int(args[args.index("--width") + 1]),
+                              "height": int(args[args.index("--height") + 1])}
+                roster_dimensions = {"path": str(roster_capture),
+                                     "width": int(args[args.index("--width") + 1]),
+                                     "height": int(args[args.index("--height") + 1])}
                 stdout = (f"gpu_driver={driver} systems=500 image_uploads={uploads} "
-                          f"save=ok colony={json.dumps(report, separators=(',', ':'))}")
+                          f"save=ok colony={json.dumps(report, separators=(',', ':'))}\n"
+                          f"native_capture={json.dumps(dimensions, separators=(',', ':'))}\n"
+                          f"native_capture={json.dumps(roster_dimensions, separators=(',', ':'))}\n"
+                          f"{roster_line}")
                 calls.append(args)
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
@@ -105,7 +135,9 @@ class NativeColonyRuntimeTests(unittest.TestCase):
             self.assertIn("--load", calls[1])
             self.assertTrue(result["nativeColonyPlayerInput"])
             self.assertTrue(result["nativeColonyPausedReload"])
+            self.assertTrue(result["nativeColonyRoster"])
             self.assertEqual(len(result["colonyCaptures"]), 2)
+            self.assertEqual(len(result["colonyRosterCaptures"]), 2)
             self.assertEqual(len(result["colonyDiagnostics"]), 2)
 
     def test_two_launch_player_input_and_paused_reload(self): self.exercise()
@@ -153,6 +185,20 @@ class NativeColonyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("renderer")
     def test_missing_image_uploads_are_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("uploads")
+    def test_missing_roster_proof_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_missing")
+    def test_duplicate_roster_proof_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_duplicate")
+    def test_false_roster_proof_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_false")
+    def test_forged_roster_count_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_count")
+    def test_forged_roster_identity_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_identity")
+    def test_missing_roster_sidecar_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_missing_sidecar")
+    def test_roster_sidecar_geometry_is_rejected(self):
+        with self.assertRaises(RuntimeError): self.exercise("roster_geometry")
     def test_failed_launch_reports_stdout_and_stderr(self):
         with self.assertRaisesRegex(RuntimeError, "(?s)caught-output.*terminal-error"):
             self.exercise("launch")

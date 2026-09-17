@@ -1,4 +1,5 @@
 #include "native_colony_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -59,6 +60,15 @@ NativeSurfaceSite site(int id, bool complete = false) {
   return result;
 }
 
+NativeSurfaceBuildOption build_option(std::string type_id, std::string name,
+                                      double power_supply = 0.,
+                                      double power_demand = 0.) {
+  return {.type_id = std::move(type_id), .name = std::move(name),
+          .industry_cost = 40., .authorization_budget_units = 50.,
+          .formatted_authorization = "$500M UED", .power_supply = power_supply,
+          .power_demand = power_demand, .workforce_required_millions = .02};
+}
+
 NativeColonyView view(std::uint64_t generation = 1) {
   NativeColonyView result;
   result.campaign_generation = generation;
@@ -100,6 +110,8 @@ NativeColonyView view(std::uint64_t generation = 1) {
   result.upkeep_credits_per_day = .08;
   result.industry_per_day = 3.5;
   result.science_per_day = 2.0;
+  result.active_research_facilities = 2;
+  result.active_research_lab_units = 3.5;
   result.required_habitat_systems = 1;
   result.specialization_name = "Balanced settlement";
   result.specialization_description = "No dominant surface specialization";
@@ -110,11 +122,14 @@ NativeColonyView view(std::uint64_t generation = 1) {
 void responsive_layout_is_contained_and_nonoverlapping() {
   for (const auto [width, height] :
        {std::pair{1280, 720}, std::pair{1920, 1080},
-        std::pair{3840, 2160}}) {
+        std::pair{2560, 1440}, std::pair{3840, 2160}}) {
     const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.research.x + navigation.research.width);
     for (const auto bounds : {layout.details, layout.summary,
                               layout.sustenance, layout.sites,
                               layout.site_rows, layout.close})
@@ -156,7 +171,16 @@ void rendering_uses_canonical_sections_and_clipped_progress() {
         progress = true;
     }
   }
-  REQUIRE(support && projected && local_currency && power && modules && progress);
+  bool research_capacity{};
+  for (const auto &command : draw.overlay)
+    if (const auto *label = std::get_if<Text>(&command))
+      research_capacity |= label->value.find("Active research facilities 2 (3.5 effective labs)") !=
+                           std::string::npos;
+  REQUIRE(support && projected && local_currency && power && modules && progress && research_capacity);
+  REQUIRE(std::ranges::none_of(draw.overlay, [](const auto &command) {
+    const auto *label = std::get_if<Text>(&command);
+    return label && label->value.find("Research 2.00/day") != std::string::npos;
+  }));
 }
 
 void detail_scroll_reaches_outpost_rows_and_keeps_text_clipped() {
@@ -239,11 +263,121 @@ void wheel_reaches_last_site_and_escape_closes() {
           closed.captured && !workspace.visible());
 }
 
+void freight_review_input_and_layout() {
+  for (const auto size : {Point{1280,720},Point{1920,1080},Point{3840,2160}}) {
+    const auto width=static_cast<int>(size.x),height=static_cast<int>(size.y);
+    const auto layout=ColonyWorkspaceLayout::for_viewport(width,height,true);
+    REQUIRE(contains(layout.surface,layout.collect_freight));
+    REQUIRE(!overlaps(layout.collect_freight,layout.open_surface));
+    REQUIRE(!overlaps(layout.title,layout.collect_freight));
+    REQUIRE(contains(layout.surface,layout.freight_review));
+    REQUIRE(contains(layout.freight_review,layout.freight_text));
+    REQUIRE(contains(layout.freight_review,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_text,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_cancel,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_notice,layout.site_rows));
+    NativeColonyWorkspace workspace;auto owned=view();owned.resource_outpost=true;
+    workspace.open(owned);
+    const auto click=[&](UiRect bounds){const auto point=center(bounds);(void)workspace.handle({InputEventType::LeftPressed,point},width,height);return workspace.handle({InputEventType::LeftReleased,point},width,height);};
+    REQUIRE(workspace.handle({InputEventType::LeftReleased,center(layout.collect_freight)},width,height).kind==ColonyWorkspaceCommandKind::None);
+    REQUIRE(click(layout.collect_freight).kind==ColonyWorkspaceCommandKind::ReviewFreight);
+    NativeOutpostFreightPreview quote;quote.campaign_generation=owned.campaign_generation;quote.revision=19;
+    quote.player_civilization_id=owned.player_civilization_id;quote.colony_id=owned.colony_id;
+    quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
+    quote.fleet_name="Mercury Freight";quote.home_name="Earth";quote.outpost_name="Mining Depot";
+    quote.cargo_capacity=1000;quote.stored_materials=100;quote.extraction_per_day=2;
+    workspace.set_freight_preview(quote);REQUIRE(workspace.freight_preview().has_value());
+    // A drag across different buttons must not dispatch.
+    (void)workspace.handle({InputEventType::LeftPressed,center(layout.freight_cancel)},width,height);
+    REQUIRE(workspace.handle({InputEventType::LeftReleased,center(layout.freight_confirm)},width,height).kind==ColonyWorkspaceCommandKind::None);
+    const auto confirmed=click(layout.freight_confirm);
+    REQUIRE(confirmed.kind==ColonyWorkspaceCommandKind::ConfirmFreight&&confirmed.quote_revision==19);
+    REQUIRE(click(layout.freight_cancel).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(!workspace.freight_preview()&&workspace.visible());
+    quote.accepted=false;quote.message="No idle freighter available.";workspace.set_freight_preview(quote);
+    REQUIRE(click(layout.freight_confirm).kind==ColonyWorkspaceCommandKind::None);
+    DrawList denied;workspace.render(denied,width,height);
+    REQUIRE(std::ranges::none_of(denied.overlay,[](const auto& item){const auto* t=std::get_if<Text>(&item);return t&&t->value=="DISPATCH FREIGHTER";}));
+    REQUIRE(workspace.handle({InputEventType::EscapePressed},width,height).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(workspace.visible()&&!workspace.freight_preview());
+    quote.accepted=true;workspace.set_freight_preview(quote);
+    (void)workspace.handle({InputEventType::PointerCancelled},width,height);REQUIRE(!workspace.freight_preview());
+    workspace.set_freight_preview(quote);auto changed=owned;changed.player_civilization_id++;
+    workspace.set_view(changed);REQUIRE(!workspace.freight_preview());
+    workspace.open(owned);workspace.set_freight_preview(quote);workspace.close();REQUIRE(!workspace.freight_preview());
+  }
+}
+
 void campaign_replacement_clears_owned_snapshot() {
   NativeColonyWorkspace workspace;
   workspace.open(view(7));
   workspace.discard_campaign();
   REQUIRE(!workspace.visible() && !workspace.view());
+}
+
+void empty_colony_guidance_uses_live_options_and_resolves_after_construction() {
+  auto empty = view();
+  empty.construction_sites.clear();
+  empty.power_supply = 1.;
+  empty.power_demand = 3.;
+  empty.available_buildings = {build_option("fabricator", "Fabricator", 0., 2.),
+                               build_option("power_generator", "Power Generator", 4.)};
+  NativeColonyWorkspace workspace;
+  workspace.open(empty);
+  DrawList draw;
+  workspace.render(draw, 1280, 720);
+  const auto has = [&draw](std::string_view value) {
+    return std::ranges::any_of(draw.overlay, [value](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value.find(value) != std::string::npos;
+    });
+  };
+  REQUIRE(has("DEVELOP THIS COLONY"));
+  REQUIRE(has("Available next: Power Generator"));
+  REQUIRE(has("$500M UED authorization"));
+  REQUIRE(has("incoming materials over time"));
+  empty.construction_sites = {site(1)};
+  workspace.set_view(empty);
+  DrawList resolved;
+  workspace.render(resolved, 1280, 720);
+  REQUIRE(std::ranges::none_of(resolved.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "DEVELOP THIS COLONY";
+  }));
+
+  empty.construction_sites.clear();
+  empty.available_buildings.clear();
+  workspace.set_view(empty);
+  DrawList unavailable;
+  workspace.render(unavailable, 1280, 720);
+  REQUIRE(std::ranges::any_of(unavailable.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.find("No eligible surface modules") != std::string::npos;
+  }));
+
+  // Authorization is credit-based: a newly founded colony can begin a
+  // fabricator while its construction materials accumulate over time.
+  empty.available_buildings = {build_option("fabricator", "Fabricator", 0., 2.)};
+  empty.power_supply = 6.;
+  empty.power_demand = 3.;
+  empty.stored_industry = 1.;
+  empty.treasury_budget_units = 120.;
+  workspace.set_view(empty);
+  DrawList low_stockpile;
+  workspace.render(low_stockpile, 1280, 720);
+  REQUIRE(std::ranges::any_of(low_stockpile.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "Available next: Fabricator";
+  }));
+
+  empty.treasury_budget_units = 10.;
+  workspace.set_view(empty);
+  DrawList no_funds;
+  workspace.render(no_funds, 1280, 720);
+  REQUIRE(std::ranges::any_of(no_funds.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.find("More treasury is needed") != std::string::npos;
+  }));
 }
 } // namespace
 
@@ -254,6 +388,8 @@ int main() {
     detail_scroll_reaches_outpost_rows_and_keeps_text_clipped();
     wheel_reaches_last_site_and_escape_closes();
     campaign_replacement_clears_owned_snapshot();
+    empty_colony_guidance_uses_live_options_and_resolves_after_construction();
+    freight_review_input_and_layout();
     std::cout << "native colony workspace tests passed\n";
     return 0;
   } catch (const std::exception &error) {

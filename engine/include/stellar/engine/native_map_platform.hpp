@@ -20,6 +20,14 @@ struct Text { Point at; std::string value; Color color; int font_pixel_size{15};
 struct TextExtent { int width{},height{}; };
 struct FilledRectangle { UiRect bounds; Color color; };
 struct StrokedRectangle { UiRect bounds; Color color; };
+// Ordered, untextured geometry in drawable pixels. Each three indices form one
+// triangle; callers batch compatible materials to keep submission work bounded.
+struct TriangleMesh {
+  std::vector<Point> vertices;
+  std::vector<int> indices;
+  Color color;
+  std::optional<UiRect> clip;
+};
 inline constexpr int maximum_rgba_image_dimension=8192;
 inline constexpr std::size_t maximum_rgba_image_bytes=64u*1024u*1024u;
 inline constexpr std::size_t maximum_image_cache_entries=128;
@@ -47,9 +55,12 @@ struct Image {
   std::optional<UiRect> source;
   Color tint{255,255,255,255};
   std::optional<UiRect> clip;
+  // Clockwise rotation about the destination center, in drawable space.
+  // Appended with a neutral default to preserve existing image callers.
+  float rotation_degrees{};
 };
 using WorldCommand=std::variant<Line,Circle,Text,Image>;
-using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image>;
+using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
 // pixels, already projected relative to the camera by the application.
 struct DrawList {
@@ -61,9 +72,19 @@ struct DrawList {
   // UI overlay remains last, preserving every existing aggregate caller.
   std::vector<WorldCommand> world;
 };
+// Optional CPU wall-clock breakdown for a single draw. Submission and present
+// may include driver or GPU waits; these are not GPU execution measurements.
+struct FrameTiming { double submission_ms{},readback_ms{},throttle_ms{},present_ms{}; };
+struct DisplayMode { int width{},height{}; float refresh_hz{}; };
+enum class WindowDisplayMode { Windowed, Borderless, ExclusiveFullscreen };
+struct FolderDialogResult {
+  std::uint64_t request_id{};
+  std::optional<std::filesystem::path> directory;
+  std::string error;
+};
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
-                            EscapePressed, BackspacePressed, TextEntered,
+                            EscapePressed, BackspacePressed, KeyPressed, TextEntered,
                             PointerCancelled };
 struct InputEvent {
   InputEventType type{};
@@ -71,6 +92,8 @@ struct InputEvent {
   float wheel_y{};
   std::string text;
   std::uint8_t click_count{};
+  // SDL_Keycode for non-repeating KeyPressed events.
+  std::uint32_t key{};
 };
 struct InputSnapshot {
   std::vector<InputEvent> events;
@@ -93,9 +116,39 @@ class Window final {
   Window &operator=(const Window &) = delete;
   [[nodiscard]] InputSnapshot poll();
   void set_text_input(bool enabled);
+  [[nodiscard]] std::vector<DisplayMode> display_modes() const;
+  [[nodiscard]] std::vector<DisplayMode> windowed_display_modes() const;
+  [[nodiscard]] DisplayMode desktop_display_mode() const;
+  [[nodiscard]] float display_refresh_hz() const;
+  // Owner-thread operations. Driver rejection is reported to the host's
+  // transactional preview controller; no requested setting is reported saved.
+  void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);
+  void set_fullscreen_mode(bool exclusive,int width=0,int height=0,float refresh_hz=0);
+  void set_vsync(int mode);
+  void set_scene_quality(int resolution_percent, int samples);
+  [[nodiscard]] std::string graphics_adapter() const;
+  [[nodiscard]] bool has_nvidia_control_panel() const;
+  void open_nvidia_control_panel();
+  void set_clipboard_text(const std::string& text);
+  void set_frame_cap(double hz);
+  void set_auto_frame_cap();
+  // Queues at most one player capture. F12/PrintScreen call this internally;
+  // tests may use it with an isolated directory.
+  [[nodiscard]] bool request_screenshot(std::filesystem::path path);
+  // Empty restores the standard Pictures destination. Environment override is
+  // intentionally resolved above this application preference.
+  void set_screenshot_directory(std::filesystem::path path);
+  [[nodiscard]] static std::filesystem::path default_screenshot_directory();
+  // SDL's asynchronous native picker. Invoke/consume on the window thread;
+  // the callback owns independent state and never touches the Window or UI.
+  [[nodiscard]] bool request_folder_dialog(std::uint64_t request_id,
+                                         std::filesystem::path initial_directory);
+  [[nodiscard]] std::optional<FolderDialogResult> take_folder_dialog_result();
+  [[nodiscard]] std::optional<std::string> take_screenshot_status();
   [[nodiscard]] TextExtent measure_text(const Text &);
   void draw(const DrawList &draw_list,
-            const std::optional<std::filesystem::path> &screenshot = std::nullopt);
+            const std::optional<std::filesystem::path> &screenshot = std::nullopt,
+            FrameTiming *timing = nullptr);
   [[nodiscard]] int drawable_width() const noexcept;
   [[nodiscard]] int drawable_height() const noexcept;
   [[nodiscard]] std::string gpu_driver() const;

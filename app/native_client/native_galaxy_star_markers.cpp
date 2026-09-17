@@ -57,21 +57,22 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
       const float py = (2.f * (y + .5f) / size - 1.f);
       const float radius = std::hypot(px, py);
       const float edge = 1.f - std::clamp((radius - .78f) / .20f, 0.f, 1.f);
-      const float glow = std::exp(-radius * 4.6f) * .48f;
+      // A resolved, bright core with a short limb transition. A broad Gaussian
+      // core reads as a blurred blotch once the map magnifies its sprite.
+      const float core_width = style.compact ? .105f : .145f;
+      const float core = std::exp(-std::pow(radius / core_width, 4.f));
+      const float glow = std::exp(-radius * radius / .095f) * .15f;
       const float ray_x = antialiased_line(std::abs(py), .012f) *
                           std::pow(std::max(0.f, 1.f - std::abs(px)), 1.45f) *
-                          .68f;
+                          .90f;
       const float ray_y = antialiased_line(std::abs(px), .010f) *
                           std::pow(std::max(0.f, 1.f - std::abs(py)), 1.6f) *
-                          (style.compact ? .48f : .28f);
+                          (style.compact ? .70f : .62f);
       const float diagonal = style.beam
                                  ? antialiased_line(std::abs(px + py * .55f),
                                                     .010f) *
                                        std::max(0.f, 1.f - radius) * .62f
                                  : 0.f;
-      const float core_width = style.compact ? .105f : .145f;
-      const float core = std::exp(-(radius * radius) /
-                                  (2.f * core_width * core_width));
       const float lens = style.dark_center
                              ? std::max(0.f, 1.f - std::abs(radius - .25f) / .065f)
                              : 0.f;
@@ -82,23 +83,20 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
           std::max({glow, ray_x, ray_y, diagonal,
                     style.dark_center ? std::max(lens, horizon) : core}),
           0.f, 1.f);
-      const float contrast = edge * .30f *
-          std::exp(-std::pow((radius - .37f) / .13f, 2.f));
-      const float alpha = std::max(light_alpha, contrast);
+      const float alpha = light_alpha;
       if (alpha < .002f) continue;
-      const float white = style.dark_center ? lens * .20f : core * .52f;
-      const float light_mix = light_alpha / (light_alpha + contrast + .0001f);
+      const float white = style.dark_center ? lens * .20f :
+          core * (.96f - .52f * std::clamp(radius / core_width, 0.f, 1.f));
       const auto offset = static_cast<std::size_t>((y * size + x) * 4);
       if (horizon > .5f) {
         pixels[offset] = pixels[offset + 1] = 3;
         pixels[offset + 2] = 7;
       } else {
-        const float red = std::min(1.f, (style.color.r / 255.f) * .92f + white);
-        const float green = std::min(1.f, (style.color.g / 255.f) * .92f + white);
-        const float blue = std::min(1.f, (style.color.b / 255.f) * .92f + white);
-        pixels[offset] = channel(red * light_mix + .012f * (1.f - light_mix));
-        pixels[offset + 1] = channel(green * light_mix + .020f * (1.f - light_mix));
-        pixels[offset + 2] = channel(blue * light_mix + .035f * (1.f - light_mix));
+        // Straight alpha: keep the spectral rim and rays luminous rather than
+        // mixing a dark contrast annulus into the star's own emitted light.
+        pixels[offset] = channel((style.color.r / 255.f) * (1.f - white) + white);
+        pixels[offset + 1] = channel((style.color.g / 255.f) * (1.f - white) + white);
+        pixels[offset + 2] = channel((style.color.b / 255.f) * (1.f - white) + white);
       }
       pixels[offset + 3] = channel(alpha);
     }
@@ -106,6 +104,16 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
   return RgbaImage::create(size, size, std::move(pixels));
 }
 } // namespace
+
+float galaxy_star_core_radius(double relative_zoom, int viewport_height,
+                              GalaxyStarVisualClass visual) {
+  const float display_scale=std::clamp(viewport_height/1080.f,.8f,2.f);
+  const float growth=static_cast<float>(std::pow(std::clamp(relative_zoom,1.,10000.),.55));
+  const float type_scale=visual==GalaxyStarVisualClass::giant?1.65f:
+      visual==GalaxyStarVisualClass::hot_blue_star?1.15f:
+      visual==GalaxyStarVisualClass::white_dwarf||visual==GalaxyStarVisualClass::neutron_star?.8f:1.f;
+  return std::min(36.f,5.f*growth)*display_scale*type_scale;
+}
 
 struct NativeGalaxyStarMarkerRenderer::Storage {
   struct Entry {
@@ -142,26 +150,34 @@ void NativeGalaxyStarMarkerRenderer::append(DrawList &out, Point center,
                                               float core_radius,
                                               const NativeGalaxyStarAppearance &appearance,
                                               bool selected,
-                                              std::optional<UiRect> clip) {
+                                              std::optional<UiRect> clip,
+                                              float alpha) {
   if (!std::isfinite(center.x) || !std::isfinite(center.y) ||
-      !std::isfinite(core_radius) || core_radius <= 0.f) {
+      !std::isfinite(core_radius) || core_radius <= 0.f ||
+      !std::isfinite(alpha) || alpha < 0.f) {
     throw std::invalid_argument("Galaxy star marker geometry must be finite and positive.");
   }
+  alpha = std::min(alpha, 1.f);
+  const auto scaled = [&](std::uint8_t value) {
+    return static_cast<std::uint8_t>(
+        std::clamp(std::lround(value * alpha), 0l, 255l));
+  };
   const auto place = [&](GalaxyStarVisualClass visual, Point offset, float scale) {
     const float extent = core_radius * 3.5f * scale;
     out.world.emplace_back(Image{storage_->obtain(visual),
                                  {center.x + offset.x - extent,
                                   center.y + offset.y - extent,
                                   extent * 2.f, extent * 2.f},
-                                 std::nullopt, {255, 255, 255, 255}, clip});
+                                 std::nullopt, {255, 255, 255, scaled(255)},
+                                 clip});
   };
   if (selected) {
     out.world.emplace_back(Circle{center, core_radius * 1.9f,
-                                  {111, 225, 255, 52}});
+                                  {111, 225, 255, scaled(52)}});
   }
   out.world.emplace_back(
       Circle{center, std::clamp(core_radius * 1.85f, 3.5f, 6.f),
-             {1, 4, 9, 155}});
+             {1, 4, 9, scaled(155)}});
   place(appearance.primary, {}, 1.f);
   if (appearance.secondary) {
     place(*appearance.secondary,
