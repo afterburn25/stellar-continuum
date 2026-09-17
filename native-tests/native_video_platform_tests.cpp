@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -34,8 +35,23 @@ int main(int argc,char**argv){
     TempDirectory temp;
     Window window("Stellar display validation",1280,720,true,std::filesystem::path(argv[1]));
     auto* native=find_test_window();require(native!=nullptr,"Could not identify the bounded SDL test window.");
+    require(SDL_GetWindowFullscreenMode(native)==nullptr,"Fullscreen startup selected an exclusive desktop mode.");
+    // A hidden test-owned window catches desktop rearrangement without touching
+    // or enumerating any of the user's application windows.
+    const std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> neighbor(
+      SDL_CreateWindow("Stellar desktop preservation sentinel",360,240,SDL_WINDOW_HIDDEN),SDL_DestroyWindow);
+    require(neighbor!=nullptr,"Could not create desktop preservation sentinel.");
+    int neighbor_x{},neighbor_y{},neighbor_w{},neighbor_h{};
+    require(SDL_GetWindowPosition(neighbor.get(),&neighbor_x,&neighbor_y)&&SDL_GetWindowSize(neighbor.get(),&neighbor_w,&neighbor_h),"Could not snapshot sentinel geometry.");
     auto modes=window.display_modes();require(!modes.empty()&&modes.size()<=256,"Detected display choices were empty or unbounded.");
     int display_count{};auto* displays=SDL_GetDisplays(&display_count);require(displays&&display_count>0,"SDL did not report an active display.");
+    struct DesktopSnapshot {SDL_DisplayID id;SDL_Rect bounds;int width,height;float hz;};
+    std::vector<DesktopSnapshot> desktops;
+    for(int i=0;i<display_count;++i){SDL_Rect rect{};const auto* mode=SDL_GetCurrentDisplayMode(displays[i]);require(mode&&SDL_GetDisplayBounds(displays[i],&rect),"Could not snapshot desktop.");desktops.push_back({displays[i],rect,mode->w,mode->h,mode->refresh_rate});}
+    const auto verify_desktop=[&]{
+      for(const auto& before:desktops){SDL_Rect rect{};const auto* mode=SDL_GetCurrentDisplayMode(before.id);require(mode&&SDL_GetDisplayBounds(before.id,&rect),"Desktop disappeared after mode transition.");require(rect.x==before.bounds.x&&rect.y==before.bounds.y&&rect.w==before.bounds.w&&rect.h==before.bounds.h&&mode->w==before.width&&mode->h==before.height&&std::abs(mode->refresh_rate-before.hz)<.2f,"Display transition rearranged the desktop.");}
+      int nx{},ny{},nw{},nh{};require(SDL_GetWindowPosition(neighbor.get(),&nx,&ny)&&SDL_GetWindowSize(neighbor.get(),&nw,&nh)&&nx==neighbor_x&&ny==neighbor_y&&nw==neighbor_w&&nh==neighbor_h,"Display transition moved or resized another window.");
+    };
     const auto original_display=SDL_GetDisplayForWindow(native);require(original_display!=0,"Current display could not be queried.");
     const float scale=SDL_GetDisplayContentScale(original_display);require(std::isfinite(scale)&&scale>0.f,"Display DPI scale was invalid.");
     SDL_Rect bounds{},usable{};require(SDL_GetDisplayBounds(original_display,&bounds)&&SDL_GetDisplayUsableBounds(original_display,&usable),"Display coordinate bounds could not be queried.");
@@ -59,6 +75,7 @@ int main(int argc,char**argv){
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_RESIZABLE)!=0,"Windowed mode was not resizable.");
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_BORDERLESS)==0,"Windowed mode was not decorated.");
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_MAXIMIZED)==0,"Windowed restoration retained maximized state");
+    verify_desktop();
     int client_w{},client_h{},x{},y{},top{},left{},bottom{},right{};
     require(SDL_GetWindowSize(native,&client_w,&client_h)&&client_w==960&&client_h==540,"Windowed client resolution was not preserved.");
     require(SDL_GetWindowPosition(native,&x,&y)&&SDL_GetWindowBordersSize(native,&top,&left,&bottom,&right),"Windowed coordinate or frame query failed.");
@@ -102,7 +119,9 @@ int main(int argc,char**argv){
     push_key(SDLK_F12);(void)window.poll();window.draw(pattern);int screenshot_count{};for(const auto& entry:std::filesystem::directory_iterator(hotkey_dir))if(entry.path().extension()==L".png")++screenshot_count;require(screenshot_count==1,"F12 did not route to one automatic PNG screenshot.");
     push_key(SDLK_PRINTSCREEN);(void)window.poll();window.draw(pattern);screenshot_count=0;for(const auto& entry:std::filesystem::directory_iterator(hotkey_dir))if(entry.path().extension()==L".png")++screenshot_count;require(screenshot_count==2,"PrintScreen did not route to a second unique PNG screenshot.");require(_wputenv_s(L"STELLAR_SCREENSHOT_DIR",saved_env.c_str())==0,"Could not restore screenshot directory environment.");
 
-    const auto chosen=modes.back();window.set_display_mode(WindowDisplayMode::ExclusiveFullscreen,chosen.width,chosen.height,chosen.refresh_hz);window.draw(pattern);require((SDL_GetWindowFlags(native)&SDL_WINDOW_FULLSCREEN)!=0,"Exclusive mode did not enter fullscreen.");require(window.drawable_width()==chosen.width&&window.drawable_height()==chosen.height,"Exclusive mode drawable did not match its selected resolution.");require(std::abs(window.display_refresh_hz()-chosen.refresh_hz)<.2f,"Exclusive mode did not retain its selected refresh tuple.");window.set_display_mode(WindowDisplayMode::Borderless);window.set_display_mode(WindowDisplayMode::Windowed,960,540);
+    // Exercise exclusive mode at the existing desktop tuple; shrinking a live
+    // monitor to the smallest supported resolution moves unrelated windows.
+    const auto chosen=window.desktop_display_mode();window.set_display_mode(WindowDisplayMode::ExclusiveFullscreen,chosen.width,chosen.height,chosen.refresh_hz);window.draw(pattern);require((SDL_GetWindowFlags(native)&SDL_WINDOW_FULLSCREEN)!=0,"Exclusive mode did not enter fullscreen.");require(window.drawable_width()==chosen.width&&window.drawable_height()==chosen.height,"Exclusive mode drawable did not match its selected resolution.");require(std::abs(window.display_refresh_hz()-chosen.refresh_hz)<.2f,"Exclusive mode did not retain its selected refresh tuple.");verify_desktop();window.set_display_mode(WindowDisplayMode::Borderless);window.set_display_mode(WindowDisplayMode::Windowed,960,540);verify_desktop();
     window.set_vsync(0);window.set_frame_cap(60.);window.draw(DrawList{});
     const auto start=std::chrono::steady_clock::now();double throttle{};for(int frame=0;frame<12;++frame){FrameTiming timing;window.draw(DrawList{}, {},&timing);throttle+=timing.throttle_ms;}
     const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();require(elapsed>=150.&&throttle>0.,"Explicit frame cap did not pace presentation.");window.set_frame_cap(0.);require(window.presentation_mode()=="unbounded","Unlimited retained an invisible frame cap.");window.set_vsync(1);require(window.presentation_mode()=="vsync","VSync did not restore.");

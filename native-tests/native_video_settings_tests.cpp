@@ -43,13 +43,10 @@ void responsive_layout() {
              rect.y + rect.height <= viewport.y + viewport.height;
     };
     require(inside(layout.panel), "panel escaped");
-    require(layout.choice_labels.size() == 6 && layout.choice_buttons.size() == 6 &&
-                layout.choice_previous.size() == 6 && layout.choice_next.size() == 6,
+    require(layout.choice_labels.size() == 6 && layout.choice_buttons.size() == 6,
             "choice rows incomplete");
     for (int index = 0; index < 4; ++index) {
       require(inside(layout.choice_buttons[index]), "choice escaped");
-      require(inside(layout.choice_previous[index]) && inside(layout.choice_next[index]),
-              "choice chevrons escaped");
       require(layout.panel.contains({layout.choice_buttons[index].x + 1.f,
                                      layout.choice_buttons[index].y + 1.f}),
               "choice outside panel");
@@ -184,142 +181,57 @@ void persistence_round_trip() {
   std::filesystem::remove_all(directory, error);
 }
 
-void choice_cycles() {
-  constexpr int width = 1280, height = 720;
-  const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  NativeVideoSettingsView view;
-  view.open(NativeVideoSettings{});
-  view.set_display_choices({{1920, 1080, 60.f}, {2560, 1440, 144.f}}, "1920 x 1080 @ 60 Hz");
-  require(view.visible(), "view not visible after open");
-
-  // Display: Borderless → Exclusive → Windowed → Borderless.
-  auto result = view.handle(press(InputEventType::LeftPressed,
-                                  center(layout.choice_buttons[0])), width, height);
-  require(result.command == VideoSettingsCommand::None && result.captured &&
-              result.values.display == VideoDisplayMode::Exclusive,
-          "display did not cycle to exclusive");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[0])), width, height);
-  require(result.values.display == VideoDisplayMode::Windowed,
-          "display did not cycle to windowed");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[0])), width, height);
-  require(result.values.display == VideoDisplayMode::Borderless,
-          "display did not wrap");
-
-  // Borderless follows the desktop and cannot select an exclusive resolution.
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[1])), width, height);
-  require(result.values.width == 0 && result.values.height == 0,
-          "borderless mode allowed a resolution choice");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[0])), width, height);
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[1])), width, height);
-  require(result.values.width == 1920 && result.values.height == 1080 &&
-              result.values.refresh_hz == 60.f,
-          "exclusive mode did not select a detected resolution");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[1])), width, height);
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_buttons[1])), width, height);
-  require(result.values.width == 0 && result.values.height == 0 &&
-              result.values.refresh_hz == 0.f,
-          "resolution cycle did not include the desktop default");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_previous[1])), width, height);
-  require(result.values.width == 2560 && result.values.height == 1440,
-          "resolution previous control did not wrap from desktop to the last mode");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_previous[1])), width, height);
-  require(result.values.width == 1920 && result.values.height == 1080,
-          "resolution previous control did not step backward through detected modes");
-
-  // V-Sync: On → Adaptive → Off → On.
-  for (const VideoVsync expected : {VideoVsync::Adaptive, VideoVsync::Off,
-                                    VideoVsync::On}) {
-    result = view.handle(press(InputEventType::LeftPressed,
-                               center(layout.choice_buttons[2])), width, height);
-    require(result.values.vsync == expected, "vsync did not cycle");
-  }
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_previous[2])), width, height);
-  require(result.values.vsync == VideoVsync::Off,
-          "V-Sync previous control did not wrap backward");
-
-  // Frame cap: Automatic → 60 → 120 → 144 → Unlimited → Automatic.
-  for (const VideoFrameCap expected :
-       {VideoFrameCap::Fps60, VideoFrameCap::Fps120, VideoFrameCap::Fps144,
-        VideoFrameCap::Unlimited, VideoFrameCap::Automatic}) {
-    result = view.handle(press(InputEventType::LeftPressed,
-                               center(layout.choice_buttons[3])), width, height);
-    require(result.values.frame_cap == expected, "frame cap did not cycle");
-  }
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_previous[3])), width, height);
-  require(result.values.frame_cap == VideoFrameCap::Unlimited,
-          "frame-cap previous control did not wrap backward");
+void startup_preserves_desktop() {
+  NativeVideoSettings saved{.display=VideoDisplayMode::Exclusive,.width=2560,.height=1440,.refresh_hz=144.f,.vsync=VideoVsync::Adaptive,.frame_cap=VideoFrameCap::Fps144,.scene_resolution_percent=75,.scene_samples=4};
+  auto expected=saved;expected.display=VideoDisplayMode::Borderless;
+  require(saved.for_startup()==expected&&saved.display==VideoDisplayMode::Exclusive,"Startup lost display preferences or retained exclusive mode");
+  saved.display=VideoDisplayMode::Windowed;saved.refresh_hz=0;
+  require(saved.for_startup()==saved,"Startup did not preserve Windowed mode");
 }
 
-void same_resolution_refresh_choices_and_windowed_sizes() {
-  constexpr int width = 1280, height = 720;
-  const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  NativeVideoSettingsView view;
-  view.open(NativeVideoSettings{});
-  view.set_display_choices({{1280, 720, 60.f}, {1280, 720, 144.f},
-                            {1920, 1080, 60.f}},
-                           "test display");
-  // A window-size list is intentionally independent from exclusive refresh
-  // tuples and may be deduped to one choice for each logical size.
-  view.set_windowed_choices({{1280, 720, 0.f}, {1280, 720, 0.f},
-                             {1920, 1080, 0.f}});
-  auto result = view.handle(press(InputEventType::LeftPressed,
-                                  center(layout.choice_next[0])), width, height);
-  require(result.values.display == VideoDisplayMode::Exclusive,
-          "display did not enter Exclusive mode");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 1280 && result.values.height == 720 &&
-              result.values.refresh_hz == 60.f,
-          "exclusive choices did not begin at the first refresh tuple");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 1280 && result.values.height == 720 &&
-              result.values.refresh_hz == 144.f,
-          "same-size exclusive refresh choice was lost or stuck");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 1920 && result.values.height == 1080 &&
-              result.values.refresh_hz == 60.f,
-          "exclusive size did not advance after same-size refresh choices");
+void dropdown_choices() {
+  constexpr int width=1280,height=720;
+  const auto layout=VideoSettingsLayout::for_viewport(width,height);
+  NativeVideoSettingsView view;view.open({});
+  view.set_display_choices({{1280,720,60.f},{1280,720,144.f},{1920,1080,60.f}},"test display");
+  view.set_windowed_choices({{1280,720,0.f},{1280,720,0.f},{1920,1080,0.f}});
+  auto select=[&](int row,int count,int option){
+    const auto before=view.values();
+    (void)view.handle(press(InputEventType::LeftPressed,center(layout.choice_buttons[row])),width,height);
+    require(view.values()==before,"Opening dropdown changed the value");
+    stellar::native_ui::Dropdown popup;popup.open(row,std::vector<std::string>(count,"item"),0);
+    const auto choices=popup.layout(layout.choice_buttons[row],width,height);
+    return view.handle(press(InputEventType::LeftPressed,center(choices.rows[option])),width,height);
+  };
+  select(0,3,1);require(view.values().display==VideoDisplayMode::Exclusive,"Exclusive selection failed");
+  select(1,4,2);require(view.values().width==1280&&view.values().refresh_hz==144.f,"Same-resolution refresh tuples were not distinct");
+  select(1,4,3);require(view.values().width==1920,"Resolution direct selection failed");
+  select(0,3,2);require(view.values().display==VideoDisplayMode::Windowed&&view.values().refresh_hz==0,"Windowed selection retained refresh");
+  select(1,3,1);require(view.values().width==1280,"Windowed resolution was not deduplicated");
+  select(1,3,0);require(view.values().width==0,"Default window size missing");
+  select(2,3,0);select(3,5,4);select(4,3,2);select(5,3,0);
+  require(view.values().vsync==VideoVsync::Off&&view.values().frame_cap==VideoFrameCap::Unlimited&&view.values().scene_samples==4&&view.values().scene_resolution_percent==50,"Quality dropdown values failed");
+  (void)view.handle(press(InputEventType::LeftPressed,center(layout.choice_buttons[0])),width,height);
+  require(view.handle(press(InputEventType::EscapePressed,{}),width,height).command==VideoSettingsCommand::None&&view.visible(),"Escape closed settings instead of just the dropdown");
+  (void)view.handle(press(InputEventType::LeftPressed,center(layout.choice_buttons[0])),width,height);
+  require(view.handle(press(InputEventType::LeftPressed,center(layout.apply)),width,height).command==VideoSettingsCommand::None,"Outside click fell through dropdown to Apply");
+  select(0,3,0);const auto before=view.values();
+  (void)view.handle(press(InputEventType::LeftPressed,center(layout.choice_buttons[1])),width,height);
+  require(view.values()==before,"Borderless resolution changed");
+}
 
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[0])), width, height);
-  require(result.values.display == VideoDisplayMode::Windowed &&
-              result.values.width == 1920 && result.values.height == 1080 &&
-              result.values.refresh_hz == 0.f,
-          "Windowed mode did not retain its size and clear refresh rate");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 0 && result.values.height == 0 &&
-              result.values.refresh_hz == 0.f,
-          "Windowed size cycle did not expose its default-size choice");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 1280 && result.values.height == 720 &&
-              result.values.refresh_hz == 0.f,
-          "Windowed size choices did not advance independently of exclusive modes");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[1])), width, height);
-  require(result.values.width == 1920 && result.values.height == 1080 &&
-              result.values.refresh_hz == 0.f,
-          "Windowed choices did not retain both deduped logical sizes");
-  result = view.handle(press(InputEventType::LeftPressed,
-                             center(layout.choice_next[0])), width, height);
-  require(result.values.display == VideoDisplayMode::Borderless &&
-              result.values.width == 0 && result.values.height == 0 &&
-              result.values.refresh_hz == 0.f,
-          "legacy Borderless display state changed after Windowed cycling");
+void long_dropdown_navigation() {
+  using stellar::native_ui::Dropdown;
+  for(const auto [width,height]:{std::pair{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160}}){
+    Dropdown menu;std::vector<std::string> options(100,"resolution");menu.open(1,options,0);
+    const UiRect anchor{static_cast<float>(width-400),static_cast<float>(height-48),360,36};
+    auto l=menu.layout(anchor,width,height);
+    require(l.panel.y>=0&&l.panel.y+l.panel.height<=height&&l.rows.size()==8,"Dropdown list overflowed viewport");
+    InputEvent wheel{InputEventType::Wheel,center(l.panel)};wheel.wheel_y=-1000;menu.handle(wheel,anchor,width,height);
+    require(menu.handle(press(InputEventType::LeftPressed,center(l.rows.back())),anchor,width,height)==99,"Scrolling did not expose last detected resolution");
+    menu.open(1,options,0);InputEvent key{InputEventType::KeyPressed};key.key=0x4000004du;menu.handle(key,anchor,width,height);key.key=13;
+    require(menu.handle(key,anchor,width,height)==99,"Keyboard selection did not reach last entry");
+  }
 }
 
 void apply_confirm_revert_flow() {
@@ -386,8 +298,9 @@ int main() {
   try {
     responsive_layout();
     persistence_round_trip();
-    choice_cycles();
-    same_resolution_refresh_choices_and_windowed_sizes();
+    startup_preserves_desktop();
+    dropdown_choices();
+    long_dropdown_navigation();
     apply_confirm_revert_flow();
   } catch (const std::exception &error) {
     std::cerr << "native video settings tests failed: " << error.what() << '\n';

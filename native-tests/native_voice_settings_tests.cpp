@@ -87,7 +87,9 @@ void input_preview_callbacks_and_rollback(const fs::path& path) {
   click(settings, layout.speaker_labels);
   click(settings, layout.no_interruptions);
   click(settings, layout.subtitle_size);
+  {stellar::native_ui::Dropdown menu;menu.open(0,{"14","18","22","26","32"},0);click(settings,menu.layout(layout.subtitle_size,1280,720).rows[2]);}
   click(settings, layout.frequency);
+  {stellar::native_ui::Dropdown menu;menu.open(1,{"Minimal","Normal","Frequent"},0);click(settings,menu.layout(layout.frequency,1280,720).rows[2]);}
   require(!settings.values().enabled && !settings.values().subtitles && !settings.values().speaker_labels &&
           !settings.values().no_interruptions && settings.values().subtitle_size == 22 &&
           settings.values().frequency == VoiceFrequency::Frequent,
@@ -131,7 +133,9 @@ void persistence_and_failed_save(const fs::path& scratch) {
   const auto layout = VoiceSettingsLayout::for_viewport(1280, 720);
   click(settings, layout.enable_voices);
   click(settings, layout.subtitle_size);
+  {stellar::native_ui::Dropdown menu;menu.open(0,{"14","18","22","26","32"},0);click(settings,menu.layout(layout.subtitle_size,1280,720).rows[2]);}
   click(settings, layout.frequency);
+  {stellar::native_ui::Dropdown menu;menu.open(1,{"Minimal","Normal","Frequent"},0);click(settings,menu.layout(layout.frequency,1280,720).rows[2]);}
   click(settings, layout.no_interruptions);
   (void)settings.handle({InputEventType::LeftPressed,
                          {layout.volume_track.x + layout.volume_track.width * .4f, center(layout.volume_track).y}},

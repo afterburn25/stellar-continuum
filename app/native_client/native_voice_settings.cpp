@@ -38,11 +38,6 @@ bool valid_size(int value) noexcept {
   constexpr std::array sizes{14, 18, 22, 26, 32};
   return std::ranges::find(sizes, value) != sizes.end();
 }
-int next_size(int value) noexcept {
-  constexpr std::array sizes{14, 18, 22, 26, 32};
-  const auto found = std::ranges::find(sizes, value);
-  return found == sizes.end() || std::next(found) == sizes.end() ? sizes.front() : *std::next(found);
-}
 const char* frequency_name(VoiceFrequency value) noexcept {
   switch (value) {
     case VoiceFrequency::Minimal: return "Minimal";
@@ -202,7 +197,7 @@ void NativeVoiceSettings::load() {
 
 void NativeVoiceSettings::preview() { if (apply_) apply_(values_); }
 void NativeVoiceSettings::open() {
-  require_owner(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None;
+  require_owner(); dropdown_.close(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None;
   viewport_width_ = viewport_height_ = 0; preview();
 }
 bool NativeVoiceSettings::visible() const { require_owner(); return visible_; }
@@ -227,6 +222,16 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
       (viewport_width_ != width || viewport_height_ != height)) dragging_ = Dragged::None;
   viewport_width_ = width; viewport_height_ = height;
   const auto layout = VoiceSettingsLayout::for_viewport(width, height);
+  if(dropdown_.visible()){
+    const int id=dropdown_.id();const auto anchor=id==0?layout.subtitle_size:layout.frequency;
+    hover_feedback_.update(event,dropdown_.hover_target(event.position,anchor,width,height));
+    if(const auto selected=dropdown_.handle(event,anchor,width,height)){
+      if(id==0){constexpr std::array sizes{14,18,22,26,32};values_.subtitle_size=sizes[*selected];}
+      else values_.frequency=static_cast<VoiceFrequency>(*selected);
+      preview();
+    }
+    return true;
+  }
   hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.enable_voices,layout.volume_track,layout.subtitles,layout.subtitle_size,layout.background_track,layout.speaker_labels,layout.filter_track,layout.frequency,layout.no_interruptions,layout.replay,layout.stop,layout.defaults,layout.cancel,layout.save}):0);
   if (event.type == InputEventType::PointerCancelled) { dragging_ = Dragged::None; return true; }
   if (event.type == InputEventType::EscapePressed) { cancel(); return true; }
@@ -247,10 +252,12 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
   dragging_ = Dragged::None;
   if (layout.enable_voices.contains(event.position)) values_.enabled = !values_.enabled;
   else if (layout.subtitles.contains(event.position)) values_.subtitles = !values_.subtitles;
-  else if (layout.subtitle_size.contains(event.position)) values_.subtitle_size = next_size(values_.subtitle_size);
+  else if (layout.subtitle_size.contains(event.position)) {
+    constexpr std::array sizes{14,18,22,26,32};const auto found=std::ranges::find(sizes,values_.subtitle_size);
+    dropdown_.open(0,{"14 px","18 px","22 px","26 px","32 px"},static_cast<int>(found-sizes.begin()));return true;
+  }
   else if (layout.speaker_labels.contains(event.position)) values_.speaker_labels = !values_.speaker_labels;
-  else if (layout.frequency.contains(event.position))
-    values_.frequency = static_cast<VoiceFrequency>((static_cast<int>(values_.frequency) + 1) % 3);
+  else if (layout.frequency.contains(event.position)) {dropdown_.open(1,{"Minimal","Normal","Frequent"},static_cast<int>(values_.frequency));return true;}
   else if (layout.no_interruptions.contains(event.position)) values_.no_interruptions = !values_.no_interruptions;
   else if (layout.replay.contains(event.position)) { if (replay_) replay_(); return true; }
   else if (layout.stop.contains(event.position)) { if (stop_) stop_(); return true; }
@@ -285,7 +292,7 @@ void NativeVoiceSettings::save() {
 }
 
 void NativeVoiceSettings::cancel() {
-  require_owner(); dragging_ = Dragged::None; values_ = saved_; preview(); visible_ = false;
+  require_owner(); dropdown_.close(); dragging_ = Dragged::None; values_ = saved_; preview(); visible_ = false;
 }
 
 void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
@@ -324,6 +331,7 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
   label(draw, layout.status, status_.empty() ? "Changes preview immediately. Save keeps them; Cancel restores the saved settings."
                                              : status_,
         std::max(11, layout.body_font_pixels - 2), native_menu_style::muted);
+  if(dropdown_.visible())dropdown_.render(draw,dropdown_.id()==0?layout.subtitle_size:layout.frequency,width,height,layout.body_font_pixels);
 }
 
 } // namespace stellar::native_audio

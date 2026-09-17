@@ -45,9 +45,10 @@ void check_video_settings(NativeVideoController& controller,
     open_settings();
     require(controller.visible(), "The menu did not open video settings.");
   };
-  const auto cycle_to = [&](std::size_t row, int count, int from, int target) {
-    const auto presses = (target - from + count) % count;
-    for (int index = 0; index < presses; ++index) click(layout.choice_buttons[row]);
+  const auto cycle_to = [&](std::size_t row,int count,int,int target) {
+    click(layout.choice_buttons[row]);
+    stellar::native_ui::Dropdown menu;menu.open(static_cast<int>(row),std::vector<std::string>(count,"item"),0);
+    click(menu.layout(layout.choice_buttons[row],width,height).rows[target]);
   };
   const auto choose_preview = [&](const NativeVideoSettings& from) {
     // No display or resolution click occurs here: platform coverage owns mode

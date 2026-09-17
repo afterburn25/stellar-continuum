@@ -1,5 +1,6 @@
 #pragma once
 #include "native_menu_hover.hpp"
+#include "native_dropdown.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -60,6 +61,7 @@ class NativeVoiceSettings final {
 
  private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
+  stellar::native_ui::Dropdown dropdown_;
   enum class Dragged { None, Volume, Background, Filter };
   void require_owner() const;
   void load();

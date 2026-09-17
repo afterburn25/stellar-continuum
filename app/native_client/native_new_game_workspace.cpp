@@ -198,6 +198,7 @@ void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
 }
 void NativeNewGameWorkspace::clear() noexcept { *this = {}; }
 void NativeNewGameWorkspace::reset_interaction() noexcept {
+  dropdown_.close();
   hover_feedback_.reset();
   seed_focused_ = false;
   pressed_ = false;
@@ -380,6 +381,19 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   if (!view_) return {};
   const auto measured = measure_layout(width, height, measure);
   const auto &layout = measured.base;
+  const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
+  if(dropdown_.visible()){
+    const int id=dropdown_.id();const auto anchor=choice_bounds[id];
+    hover_feedback_.update(event,dropdown_.hover_target(event.position,anchor,width,height));
+    if(const auto chosen_option=dropdown_.handle(event,anchor,width,height)){
+      message_.clear();pressed_=false;
+      if(id==0){selected_pre_warp_civilization_count_=view_->pre_warp_civilization_presets[*chosen_option].count;return {NativeNewGameIntentKind::SelectRivals,true,{},{},0,selected_pre_warp_civilization_count_,selected_ancient_civilization_count_};}
+      if(id==1){selected_ancient_civilization_count_=view_->ancient_civilization_presets[*chosen_option].count;return {NativeNewGameIntentKind::SelectAncients,true,{},{},0,selected_pre_warp_civilization_count_,selected_ancient_civilization_count_};}
+      if(id==2){population_.morphology=static_cast<stellar::core::GalaxyMorphology>(*chosen_option);population_.state=stellar::core::stellar_default_population_state(population_.morphology);}
+      if(id==3)population_.state=static_cast<stellar::core::PopulationState>(*chosen_option);
+    }
+    return {NativeNewGameIntentKind::None,true};
+  }
   auto target=stellar::native_menu_audio::hit(event.position,{layout.cancel,layout.seed_input,layout.randomize_seed,layout.restore_defaults,layout.copy_setup,layout.create,layout.mode_story,layout.mode_sandbox});
   if(const auto index=species_hit(event.position,measured))target=100+*index;
   if(const auto index=size_hit(event.position,layout))target=200+*index;
@@ -450,35 +464,13 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
     return {NativeNewGameIntentKind::SelectSize, true, {}, {},
             selected_system_count_};
   }
-  const auto cycle_count = [](const auto &choices, int current) {
-    if (choices.empty()) return current;
-    const auto found = std::ranges::find(choices, current,
-                                         &NativeCivilizationCountOption::count);
-    return (found == choices.end() || std::next(found) == choices.end())
-               ? choices.front().count : std::next(found)->count;
-  };
-  if (layout.mode_story.contains(event.position)) {
-    selected_pre_warp_civilization_count_ = cycle_count(
-        view_->pre_warp_civilization_presets, selected_pre_warp_civilization_count_);
-    message_.clear();
-    return {NativeNewGameIntentKind::SelectRivals, true, {}, {}, 0,
-            selected_pre_warp_civilization_count_, selected_ancient_civilization_count_};
-  }
-  if (layout.mode_sandbox.contains(event.position)) {
-    selected_ancient_civilization_count_ = cycle_count(
-        view_->ancient_civilization_presets, selected_ancient_civilization_count_);
-    message_.clear();
-    return {NativeNewGameIntentKind::SelectAncients, true, {}, {}, 0,
-            selected_pre_warp_civilization_count_, selected_ancient_civilization_count_};
-  }
-  if(layout.morphology.contains(event.position)) {
-    population_.morphology=static_cast<stellar::core::GalaxyMorphology>((static_cast<int>(population_.morphology)+1)%6);
-    population_.state=stellar::core::stellar_default_population_state(population_.morphology);
-    message_.clear();return {NativeNewGameIntentKind::None,true};
-  }
-  if(layout.population.contains(event.position)) {
-    population_.state=static_cast<stellar::core::PopulationState>((static_cast<int>(population_.state)+1)%5);
-    message_.clear();return {NativeNewGameIntentKind::None,true};
+  for(int id=0;id<4;++id)if(choice_bounds[id].contains(event.position)){
+    std::vector<std::string> options;int chosen_option{};
+    if(id<2){const auto& choices=id==0?view_->pre_warp_civilization_presets:view_->ancient_civilization_presets;const int current=id==0?selected_pre_warp_civilization_count_:selected_ancient_civilization_count_;
+      for(const auto& choice:choices){if(choice.count==current)chosen_option=static_cast<int>(options.size());options.push_back(choice.label);}}
+    else if(id==2){for(int i=0;i<6;++i)options.emplace_back(stellar::core::morphology_name(static_cast<stellar::core::GalaxyMorphology>(i)));chosen_option=static_cast<int>(population_.morphology);}
+    else {for(int i=0;i<5;++i)options.emplace_back(stellar::core::population_state_name(static_cast<stellar::core::PopulationState>(i)));chosen_option=static_cast<int>(population_.state);}
+    dropdown_.open(id,std::move(options),chosen_option);pressed_=false;return {NativeNewGameIntentKind::None,true};
   }
   if (layout.randomize_seed.contains(event.position)) {
     randomize_seed();
@@ -566,8 +558,8 @@ void NativeNewGameWorkspace::render(
        TextAlign::Center);
 
   for(const auto& [rect,label]:std::array<std::pair<UiRect,std::string>,2>{
-      std::pair{layout.morphology,"SHAPE: "+(population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology)))+"  >"},
-      std::pair{layout.population,"POPULATION: "+std::string(stellar::core::population_state_name(population_.state))+"  >"}}){
+      std::pair{layout.morphology,"SHAPE: "+(population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology)))},
+      std::pair{layout.population,"POPULATION: "+std::string(stellar::core::population_state_name(population_.state))}}){
     fill(out,rect,rect.contains(pointer_)?hover:raised_tint);stroke(out,rect,border);text(out,rect,label,bright,layout.small_font,TextAlign::Center);
   }
   const auto count_label = [](const auto &choices, const int count) {
@@ -782,6 +774,9 @@ void NativeNewGameWorkspace::render(
   stroke(out, layout.create, accent);
   text(out, layout.create, "CREATE CAMPAIGN", bright, layout.body_font,
        TextAlign::Center);
+  const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
+  for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
+  if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
 }
 
 } // namespace stellar::native_setup_ui

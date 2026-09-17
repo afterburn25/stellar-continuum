@@ -62,6 +62,13 @@ void presentations(){
   require(species_presentation("pelagic_high_pressure").has_value()&&species_presentation("compact_high_gravity").has_value()&&species_presentation("cryogenic_hydrocarbon").has_value(),"preserved species presentation absent");
   require(!species_presentation("future_unknown"),"future species received invented presentation");
 }
+NativeNewGameIntent choose_count(NativeNewGameWorkspace& w,UiRect anchor,bool ancient){
+  (void)w.handle({InputEventType::LeftPressed,center(anchor)},1280,720,measure);
+  const auto choices=ancient?setup().ancient_civilization_presets:setup().pre_warp_civilization_presets;
+  int index{};for(int i=0;i<static_cast<int>(choices.size());++i)if(choices[i].count==(ancient?2:9))index=i;
+  stellar::native_ui::Dropdown menu;menu.open(0,std::vector<std::string>(choices.size(),"count"),0);
+  return w.handle({InputEventType::LeftPressed,center(menu.layout(anchor,1280,720).rows[index])},1280,720,measure);
+}
 void mouse_and_text(){
   NativeNewGameWorkspace w;w.set_view(setup());require(w.selected_species_id()=="terran_baseline"&&w.selected_system_count()==500,"detached defaults not selected");
   const auto measured=w.measure_layout(1280,720,measure);const auto&l=measured.base;
@@ -69,8 +76,8 @@ void mouse_and_text(){
   require(!w.seed_text().empty(),"fresh sandbox setup did not receive a numeric seed");
   auto intent=w.handle({InputEventType::LeftPressed,center(l.randomize_seed)},1280,720,measure);
   require(intent.kind==NativeNewGameIntentKind::RandomizeSeed&&intent.seed_text==w.seed_text()&&!w.seed_text().empty(),"Randomize did not provide a seed");
-  require(w.handle({InputEventType::LeftPressed,center(l.mode_story)},1280,720,measure).kind==NativeNewGameIntentKind::SelectRivals&&w.selected_pre_warp_civilization_count()==9,"rival selection did not advance through supported counts");
-  require(w.handle({InputEventType::LeftPressed,center(l.mode_sandbox)},1280,720,measure).kind==NativeNewGameIntentKind::SelectAncients&&w.selected_ancient_civilization_count()==2,"ancient selection did not advance through supported counts");
+  require(choose_count(w,l.mode_story,false).kind==NativeNewGameIntentKind::SelectRivals&&w.selected_pre_warp_civilization_count()==9,"rival selection did not advance through supported counts");
+  require(choose_count(w,l.mode_sandbox,true).kind==NativeNewGameIntentKind::SelectAncients&&w.selected_ancient_civilization_count()==2,"ancient selection did not advance through supported counts");
   const Point gap{measured.species_rows[0].x+10,measured.species_rows[0].y+measured.species_rows[0].height+2};
   require(w.handle({InputEventType::LeftPressed,gap},1280,720,measure).kind==NativeNewGameIntentKind::None&&w.selected_species_id()=="terran_baseline","species row gap selected a species");
   intent=w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
@@ -81,8 +88,8 @@ void mouse_and_text(){
   require(intent.kind==NativeNewGameIntentKind::RestoreDefaults&&intent.system_count==500&&intent.pre_warp_civilization_count==6&&intent.ancient_civilization_count==1&&intent.species_id.empty(),"Restore defaults did not return canonical selections");
   (void)w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
   (void)w.handle({InputEventType::LeftPressed,center(l.size_buttons[3])},1280,720,measure);
-  (void)w.handle({InputEventType::LeftPressed,center(l.mode_story)},1280,720,measure);
-  (void)w.handle({InputEventType::LeftPressed,center(l.mode_sandbox)},1280,720,measure);
+  (void)choose_count(w,l.mode_story,false);
+  (void)choose_count(w,l.mode_sandbox,true);
   (void)w.handle({InputEventType::LeftPressed,center(l.seed_input)},1280,720,measure);
   require(w.seed_focused(),"seed field did not focus");
   (void)w.handle({InputEventType::TextEntered,{}, {},0,"-9223372036854775808"},1280,720,measure);

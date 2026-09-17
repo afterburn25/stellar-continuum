@@ -1,10 +1,11 @@
 #pragma once
 #include "native_menu_hover.hpp"
+#include "native_dropdown.hpp"
 
 // Modal video settings view ported from the reference MainMenuLayer.cs VIDEO
 // panel (VideoSettingsService): DISPLAY (borderless / exclusive fullscreen),
 // RESOLUTION (exclusive fullscreen only), V-SYNC (Off / On / Adaptive) and FRAME CAP (Automatic / 60 / 120 / 144 /
-// Unlimited) cycle rows with the reference Apply → 15s CONFIRM DISPLAY →
+// Unlimited) dropdown rows with the reference Apply → 15s CONFIRM DISPLAY →
 // Keep/Revert rollback flow, persisted as video-settings.json next to the
 // campaign save directory. The view owns no window
 // state; the host applies each emitted payload through the Window setters
@@ -31,6 +32,13 @@ struct NativeVideoSettings {
   VideoFrameCap frame_cap{VideoFrameCap::Automatic};
   int scene_resolution_percent{100}, scene_samples{1};
   [[nodiscard]] NativeVideoSettings sanitized() const noexcept;
+  // Startup never changes desktop geometry. Saved exclusive resolution/refresh
+  // choices remain available when explicitly selecting Exclusive in Settings.
+  [[nodiscard]] NativeVideoSettings for_startup() const noexcept {
+    auto value=sanitized();
+    if(value.display==VideoDisplayMode::Exclusive)value.display=VideoDisplayMode::Borderless;
+    return value;
+  }
   [[nodiscard]] bool operator==(const NativeVideoSettings &) const = default;
   [[nodiscard]] static NativeVideoSettings load(const std::filesystem::path &);
   void save(const std::filesystem::path &) const;
@@ -52,11 +60,9 @@ struct VideoSettingsLayout {
   stellar::native_map::UiRect title;
   stellar::native_map::UiRect hint;
   stellar::native_map::UiRect adapter;
-  // 4 cycle rows: display, resolution, vsync, frame cap.
+  // Display, resolution, V-Sync, frame cap, smoothing and scene resolution.
   std::vector<stellar::native_map::UiRect> choice_labels;
   std::vector<stellar::native_map::UiRect> choice_buttons;
-  std::vector<stellar::native_map::UiRect> choice_previous;
-  std::vector<stellar::native_map::UiRect> choice_next;
   stellar::native_map::UiRect error, quality_hint, nvidia;
   stellar::native_map::UiRect apply;
   stellar::native_map::UiRect cancel;
@@ -94,7 +100,7 @@ public:
   // Whether the CONFIRM DISPLAY overlay is up; the host raises it after
   // applying an Apply payload and lowers it on Keep/Revert.
   [[nodiscard]] bool confirming() const noexcept { return confirming_; }
-  void set_confirming(bool confirming) noexcept { confirming_ = confirming; }
+  void set_confirming(bool confirming) noexcept { confirming_ = confirming; dropdown_.close(); }
   void set_error(std::string message);
 
   [[nodiscard]] VideoSettingsResult
@@ -104,10 +110,12 @@ public:
 
 private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
-  void cycle_choice(int index, int direction) noexcept;
+  void open_choice(int index);
+  void select_choice(int index, int option) noexcept;
   void reconcile_resolution() noexcept;
 
   bool visible_{};
+  stellar::native_ui::Dropdown dropdown_;
   bool confirming_{};
   stellar::native_map::Point pointer_{};
   NativeVideoSettings values_{};

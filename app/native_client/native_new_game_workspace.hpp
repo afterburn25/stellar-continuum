@@ -1,5 +1,6 @@
 #pragma once
 #include "native_menu_hover.hpp"
+#include "native_dropdown.hpp"
 
 #include "native_new_campaign_setup.hpp"
 
@@ -114,6 +115,7 @@ public:
 
 private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
+  stellar::native_ui::Dropdown dropdown_;
   [[nodiscard]] std::optional<std::size_t> species_hit(
       stellar::native_map::Point,
       const NativeNewGameMeasuredLayout &) const noexcept;

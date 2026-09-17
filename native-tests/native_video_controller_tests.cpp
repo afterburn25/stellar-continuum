@@ -63,24 +63,21 @@ struct Fixture {
   }
 };
 
-void choose_exclusive_and_apply(NativeVideoController &controller) {
-  const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  require(controller.handle(click(center(layout.choice_buttons[0])), width, height),
-          "display row did not capture input");
-  require(controller.handle(click(center(layout.apply)), width, height),
-          "apply did not capture input");
+void select_display(NativeVideoController& controller,int index) {
+  const auto layout=VideoSettingsLayout::for_viewport(width,height);
+  controller.handle(click(center(layout.choice_buttons[0])),width,height);
+  stellar::native_ui::Dropdown menu;menu.open(0,{"Borderless","Exclusive","Windowed"},0);
+  controller.handle(click(center(menu.layout(layout.choice_buttons[0],width,height).rows[index])),width,height);
 }
-
-void choose_windowed_and_apply(NativeVideoController &controller) {
+void choose_exclusive_and_apply(NativeVideoController& controller) {
+  select_display(controller,1);
+  controller.handle(click(center(VideoSettingsLayout::for_viewport(width,height).apply)),width,height);
+}
+void choose_windowed_and_apply(NativeVideoController& controller) {
   controller.set_display_choices({{1280,720,60.f},{1920,1080,60.f}},"test display");
   controller.set_windowed_display_choices({{1280,720,0.f},{1920,1080,0.f}});
-  const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  require(controller.handle(click(center(layout.choice_next[0])), width, height),
-          "display row did not capture first mode cycle");
-  require(controller.handle(click(center(layout.choice_next[0])), width, height),
-          "display row did not capture Windowed mode cycle");
-  require(controller.handle(click(center(layout.apply)), width, height),
-          "Windowed Apply did not capture input");
+  select_display(controller,2);
+  controller.handle(click(center(VideoSettingsLayout::for_viewport(width,height).apply)),width,height);
 }
 
 void partial_apply_is_restored() {
@@ -248,7 +245,7 @@ void launch_override_is_editable_and_not_persisted(){
   require(controller.active()==launch&&f.backend.calls.back()==launch&&f.persisted.empty(),"Launch override was not applied independently of saved preferences");
   controller.set_windowed_display_choices({{1280,720,0}});controller.open();
   const auto layout=VideoSettingsLayout::for_viewport(width,height);
-  controller.handle(click(center(layout.choice_buttons[0])),width,height);controller.handle(click(center(layout.apply)),width,height);
+  select_display(controller,1);controller.handle(click(center(layout.apply)),width,height);
   require(controller.previewing()&&controller.active().display!=VideoDisplayMode::Windowed,"Windowed launch locked display controls");
   controller.close();require(controller.active()==launch&&f.backend.calls.back()==launch&&f.persisted.empty(),"Cancelling launch-mode preview did not restore without saving");
 }

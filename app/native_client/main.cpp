@@ -3086,9 +3086,7 @@ class NativeCampaign final {
           "First exploration scout was absent from the outliner.");
     const auto scout_index = static_cast<std::size_t>(
         scout_row - fleet_workspace_.view()->own_fleets.begin());
-    click({layout.list.x + 12.f * layout.scale,
-           layout.list.y +
-               (static_cast<float>(scout_index) * 45.f + 20.f) * layout.scale});
+    click(scroll_fleet_row_into_view(scout_index,width,height));
     first_exploration_selected_ =
         fleet_controller_.selection() == first_exploration_fleet_id_;
     first_exploration_selection_read_only_ =
@@ -3317,9 +3315,7 @@ class NativeCampaign final {
                             height));
       // Map hits can cycle overlapping own vessels. Keep the exact earned
       // scout selected for the final mission-status capture.
-      click({layout.list.x + 12.f * layout.scale,
-             layout.list.y +
-                 (static_cast<float>(scout_index) * 45.f + 20.f) * layout.scale});
+      click(scroll_fleet_row_into_view(scout_index,width,height));
       pause();
       if (captured(before_capture) != before_selection)
         throw std::runtime_error("First exploration paused browsing changed "
@@ -3588,10 +3584,8 @@ class NativeCampaign final {
       const auto &fleets = fleet_workspace_.view()->own_fleets;
       const auto fleet = std::ranges::find(fleets, fleet_id, &NativeOwnFleet::id);
       if (fleet == fleets.end()) throw std::runtime_error("Expedition missing from outliner.");
-      const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
-      const auto index = static_cast<float>(fleet - fleets.begin());
-      click({layout.list.x + 12.f * layout.scale,
-             layout.list.y + (index * 45.f + 20.f) * layout.scale});
+      const auto index = static_cast<std::size_t>(fleet - fleets.begin());
+      click(scroll_fleet_row_into_view(index,width,height));
       if (fleet_controller_.selection() != fleet_id)
         throw std::runtime_error("Expedition outliner selection failed.");
     }
@@ -4731,9 +4725,7 @@ class NativeCampaign final {
     const auto science_index = static_cast<std::size_t>(
         science_row - fleet_workspace_.view()->own_fleets.begin());
     const auto select_science = [&] {
-      click({layout.list.x + 12.f * layout.scale,
-             layout.list.y + (static_cast<float>(science_index) * 45.f + 20.f) *
-                                 layout.scale});
+      click(scroll_fleet_row_into_view(science_index,width,height));
     };
     select_science();
     first_survey_selected_ =
@@ -7707,7 +7699,7 @@ int main(int argc,char **argv){
     const auto video_settings_path=settings_path.parent_path()/"video-settings.json";
     const auto general_settings_path=settings_path.parent_path()/"general-settings.json";
     const auto initial_video=stellar::native_video_settings::NativeVideoSettings::load(video_settings_path);
-    auto launch_video=initial_video;
+    auto launch_video=initial_video.for_startup();
     // Capture dimensions belong to the test viewport, not the player's saved
     // preferences. Normal --windowed launches still expose their actual mode.
     if(options.windowed&&!options.smoke_screenshot){launch_video.display=stellar::native_video_settings::VideoDisplayMode::Windowed;
