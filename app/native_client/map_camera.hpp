@@ -27,6 +27,6 @@ struct Camera {
     center.x=std::clamp(center.x,overview.center.x-x,overview.center.x+x);
     center.y=std::clamp(center.y,overview.center.y-y,overview.center.y+y);
   }
-  void zoom_at(float wheel,Point pointer,int width,int height){if(width<=0||height<=0||!std::isfinite(wheel))return;const auto before=unproject(pointer,width,height);pixels_per_world=std::clamp(pixels_per_world*std::pow(1.16,static_cast<double>(wheel)),.01,100.);const auto after=unproject(pointer,width,height);center.x+=before.x-after.x;center.y+=before.y-after.y;}
+  void zoom_at(float wheel,Point pointer,int width,int height){if(width<=0||height<=0||!std::isfinite(wheel))return;const auto before=unproject(pointer,width,height);pixels_per_world=std::clamp(pixels_per_world*std::pow(1.16,static_cast<double>(wheel)),.01,16000.);const auto after=unproject(pointer,width,height);center.x+=before.x-after.x;center.y+=before.y-after.y;}
 };
 } // namespace stellar::native_map

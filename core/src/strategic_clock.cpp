@@ -29,7 +29,12 @@ void validate_positive_finite(double value, const char *message) {
 }
 
 double StrategicClock::requested_multiplier() const {
+  if(speed_==StrategicSpeed::Maximum)return maximum_multiplier_;
   return multipliers_.at(static_cast<int>(speed_));
+}
+void StrategicClock::set_maximum_multiplier(double multiplier) {
+  validate_positive_finite(multiplier,"Maximum clock multiplier must be positive and finite.");
+  maximum_multiplier_=multiplier;
 }
 void StrategicClock::set_speed(StrategicSpeed speed) noexcept {
   if (speed != StrategicSpeed::Paused) last_running_speed_ = speed;

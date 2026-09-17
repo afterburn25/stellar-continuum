@@ -48,7 +48,9 @@ double NativeVideoController::remaining_seconds()const{
   return previous_?std::max(0.,std::chrono::duration<double>(deadline_-now_()).count()):0.;
 }
 void NativeVideoController::service(bool focused,bool renderable){
-  if(previous_&&(!focused||!renderable||now_()>=deadline_))
+  // Windows can briefly lose focus / drawable size while changing display mode.
+  // Allow that transition to settle without undoing a valid preview immediately.
+  if(previous_&&(now_()>=deadline_||((!focused||!renderable)&&now_()>=transition_settles_)))
     restore(!focused||!renderable?"Display preview reverted while the game was inactive.":"Display preview expired; previous settings restored.");
 }
 bool NativeVideoController::handle(const stellar::native_map::InputEvent& event,int width,int height){
@@ -62,6 +64,7 @@ bool NativeVideoController::handle(const stellar::native_map::InputEvent& event,
       try{
         apply_(result.values);active_=result.values.sanitized();
         deadline_=now_()+std::chrono::seconds(15);
+        transition_settles_=now_()+std::chrono::seconds(2);
         notice_.clear();view_.set_error({});view_.set_confirming(true);
       }catch(const std::exception& error){restore(std::string("Display change rejected: ")+error.what());}
       break;

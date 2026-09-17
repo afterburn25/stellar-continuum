@@ -52,9 +52,13 @@ int main(int argc,char**argv){
     require(window.drawable_width()==desktop_w&&window.drawable_height()==desktop_h,"Borderless mode lost the desktop drawable dimensions.");
     require(std::abs(window.display_refresh_hz()-desktop_refresh)<.1f,"Borderless mode changed the desktop refresh rate.");
     window.set_display_mode(WindowDisplayMode::Windowed,960,540);
+    require(SDL_MaximizeWindow(native)&&SDL_SyncWindow(native),"Could not stage maximized window restoration");
+    window.set_display_mode(WindowDisplayMode::Borderless);
+    window.set_display_mode(WindowDisplayMode::Windowed,960,540);
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_FULLSCREEN)==0,"Windowed mode retained fullscreen state.");
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_RESIZABLE)!=0,"Windowed mode was not resizable.");
     require((SDL_GetWindowFlags(native)&SDL_WINDOW_BORDERLESS)==0,"Windowed mode was not decorated.");
+    require((SDL_GetWindowFlags(native)&SDL_WINDOW_MAXIMIZED)==0,"Windowed restoration retained maximized state");
     int client_w{},client_h{},x{},y{},top{},left{},bottom{},right{};
     require(SDL_GetWindowSize(native,&client_w,&client_h)&&client_w==960&&client_h==540,"Windowed client resolution was not preserved.");
     require(SDL_GetWindowPosition(native,&x,&y)&&SDL_GetWindowBordersSize(native,&top,&left,&bottom,&right),"Windowed coordinate or frame query failed.");

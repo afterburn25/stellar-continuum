@@ -406,6 +406,13 @@ void Window::set_display_mode(WindowDisplayMode requested,int width,int height,f
   if (requested == WindowDisplayMode::Windowed) {
     require(SDL_SetWindowFullscreen(storage_->window,false),"Windowed mode was rejected");
     require(SDL_SyncWindow(storage_->window),"Windowed mode change did not complete");
+    // Fullscreen may have inherited a maximized restore state from Windows.
+    // Explicitly restore the decorated client before measuring or resizing it.
+    require(SDL_SetWindowFullscreenMode(storage_->window,nullptr),"Exclusive display selection could not be cleared");
+    require(SDL_RestoreWindow(storage_->window),"Window could not be restored");
+    require(SDL_SetWindowBordered(storage_->window,true),"Window borders could not be restored");
+    require(SDL_SetWindowResizable(storage_->window,true),"Window resizing could not be restored");
+    require(SDL_SyncWindow(storage_->window),"Window restoration did not complete");
     const auto windowed_display=SDL_GetDisplayForWindow(storage_->window);
     if(!windowed_display)throw sdl_error("Windowed display query failed");
     SDL_Rect usable{};

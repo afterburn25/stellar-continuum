@@ -35,6 +35,11 @@
       "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
       "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
       "sha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9"
+    },
+    "empire-emblem": {
+      "source": "assets/visual/branding/stellar-continuum-icon-v1.png",
+      "runtimePath": "assets/visual/branding/stellar-continuum-icon-v1.png",
+      "sha256": "5942d3e6a0e82947bf4d9553409585ebf79572cbfede16348482ac2ce38c6065"
     }
   }
 }

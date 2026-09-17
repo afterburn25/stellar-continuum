@@ -83,7 +83,7 @@ struct NativeUiLayout {
                                                     int height) noexcept {
     const auto screen_width = static_cast<float>(width);
     const auto screen_height = static_cast<float>(height);
-    const auto requested_scale = std::max(1.f, screen_height / 900.f);
+    const auto requested_scale = std::max(1.f, screen_height / 1080.f);
     const auto width_scale = std::max(.5f, (screen_width - 36.f) / 300.f);
     const auto height_scale = std::max(.5f, (screen_height - 36.f) / 430.f);
     const auto scale = std::min({requested_scale, width_scale, height_scale});
@@ -106,7 +106,7 @@ struct NativeUiLayout {
         std::max(12.f, (screen_height - 2.f * inset - 60.f * scale - 13.f * rail_gap) / 14.f));
     const auto rail_y = inset + 60.f * scale;
 
-    return {
+    auto result = NativeUiLayout{
         scale,
         static_cast<int>(std::lround(17.f * scale)),
         static_cast<int>(std::lround(15.f * scale)),
@@ -148,6 +148,15 @@ struct NativeUiLayout {
         {inset, rail_y + (rail_size + rail_gap) * 9.f, rail_size, rail_size},
         {inset, rail_y + (rail_size + rail_gap) * 13.f, rail_size, rail_size},
         {inset + 242.f * scale, 52.f * scale, 210.f * scale, 20.f * scale}};
+    // A thin strategic strip leaves the viewport to the world. All controls
+    // share these bounds for drawing and mouse interaction.
+    result.pause={screen_width-146.f*scale,3.f*scale,40.f*scale,30.f*scale};
+    result.speed={screen_width-102.f*scale,3.f*scale,90.f*scale,30.f*scale};
+    result.notifications={screen_width-216.f*scale,3.f*scale,64.f*scale,30.f*scale};
+    result.day_text={screen_width-340.f*scale,9.f*scale,116.f*scale,20.f*scale};
+    result.status_text={80.f*scale,screen_height-30.f*scale,std::max(0.f,screen_width*.5f-310.f*scale),20.f*scale};
+    result.zoom_text={80.f*scale,43.f*scale,210.f*scale,20.f*scale};
+    return result;
   }
 
   [[nodiscard]] UiAction hit(Point point, bool menu_open) const noexcept {
@@ -179,6 +188,28 @@ struct NativeUiLayout {
     if (explore.contains(point)) return UiAction::Explore;
     if (menu.contains(point)) return UiAction::Menu;
     return UiAction::None;
+  }
+};
+
+// Shared by presentation and hit testing, in drawable pixels (never desktop DPI).
+struct CommandHudLayout {
+  float scale{};
+  UiRect resource_strip, context, crest, switch_view, planets, planet_list;
+  float row_height{};
+  static CommandHudLayout make(int width, int height) {
+    const float s = NativeUiLayout::for_viewport(width,height).scale;
+    const float w = static_cast<float>(width), h = static_cast<float>(height);
+    const float plate = std::min(430.f*s,w*.48f), side = 254.f*s;
+    const UiRect context{(w-plate)*.5f,h-66.f*s,plate,58.f*s};
+    const UiRect planets{w-side-12.f*s,52.f*s,side,196.f*s};
+    return {s,{0,0,w,36.f*s},context,
+        {context.x+8.f*s,context.y+9.f*s,40.f*s,40.f*s},
+        {context.x+context.width-52.f*s,context.y+7.f*s,44.f*s,44.f*s},
+        planets,{planets.x+8.f*s,planets.y+32.f*s,planets.width-16.f*s,planets.height-40.f*s},48.f*s};
+  }
+  UiRect row(std::size_t index,float scroll) const {
+    return {planet_list.x,planet_list.y+static_cast<float>(index)*row_height-scroll,
+            planet_list.width,row_height};
   }
 };
 

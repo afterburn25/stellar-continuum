@@ -170,10 +170,14 @@ void inactive_window_reverts() {
   controller.open();
   choose_exclusive_and_apply(controller);
   controller.service(false, true);
+  require(controller.previewing(),"Transient display-switch focus loss reverted the preview");
+  fixture.now += std::chrono::seconds(2);
+  controller.service(false, true);
   require(!controller.previewing() && controller.active() == NativeVideoSettings{},
           "focus loss did not revert the preview");
   controller.open();
   choose_exclusive_and_apply(controller);
+  fixture.now += std::chrono::seconds(2);
   controller.service(true, false);
   require(!controller.previewing() && controller.active() == NativeVideoSettings{},
           "non-renderable window did not revert the preview");

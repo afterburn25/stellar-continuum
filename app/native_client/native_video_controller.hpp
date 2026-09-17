@@ -44,6 +44,7 @@ private:
   NativeVideoSettingsView view_;
   std::optional<NativeVideoSettings> previous_;
   Clock::time_point deadline_;
+  Clock::time_point transition_settles_;
   std::string notice_;
   bool faulted_{};
 };

@@ -112,7 +112,7 @@ float galaxy_star_core_radius(double relative_zoom, int viewport_height,
   const float type_scale=visual==GalaxyStarVisualClass::giant?1.65f:
       visual==GalaxyStarVisualClass::hot_blue_star?1.15f:
       visual==GalaxyStarVisualClass::white_dwarf||visual==GalaxyStarVisualClass::neutron_star?.8f:1.f;
-  return std::min(96.f,5.f*growth)*display_scale*type_scale;
+  return std::min(180.f,1.25f*growth)*display_scale*type_scale;
 }
 
 struct NativeGalaxyStarMarkerRenderer::Storage {

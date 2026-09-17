@@ -95,12 +95,12 @@ public:
   void render(stellar::native_map::DrawList&,int width,int height);
   void reset_fit(int width,int height);
   [[nodiscard]] bool select_body(int body_id);
+  void focus_selected_body(int width,int height);
   [[nodiscard]] float inspection_scroll() const noexcept { return body_inspection_.scroll_offset(); }
 private:
   enum class InspectorFocus { automatic, body, fleet };
   void resize(int width,int height);
   void sync_body_inspection();
-  void focus_selected_body(int width,int height);
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
@@ -120,6 +120,7 @@ private:
   std::optional<stellar::native_system_travel::NativeSystemTravelSnapshot> travel_;
   std::vector<stellar::native_system_travel::NativeLaneLabelMetrics> lane_metrics_;
   std::optional<int> selected_fleet_id_,hovered_fleet_id_,hovered_lane_id_;
+  std::optional<int> pressed_lane_id_;
   std::string notice_;
   stellar::native_map::Point pointer_{};
   InspectorFocus inspector_focus_{InspectorFocus::automatic};

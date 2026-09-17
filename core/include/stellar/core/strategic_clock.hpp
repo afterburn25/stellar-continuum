@@ -18,6 +18,7 @@ class StrategicClock {
   double backlog_days() const noexcept { return backlog_days_; }
 
   void set_speed(StrategicSpeed speed) noexcept;
+  void set_maximum_multiplier(double multiplier);
   void resume() noexcept;
   void select_resume_speed(StrategicSpeed speed);
   void restore(double simulation_days) noexcept;
@@ -32,6 +33,7 @@ class StrategicClock {
   double simulation_days_ = 0.;
   double effective_multiplier_ = 1.;
   double backlog_days_ = 0.;
+  double maximum_multiplier_ = 8.; // Legacy replay default; native player profile uses 4x.
 };
 
 class CampaignAutosavePolicy {

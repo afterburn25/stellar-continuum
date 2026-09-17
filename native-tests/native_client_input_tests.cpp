@@ -19,8 +19,8 @@ int main(){
   camera.zoom_at(std::numeric_limits<float>::quiet_NaN(),pointer,640,360);
   check(camera.pixels_per_world==prior,"non-finite zoom changed scale");
   camera.zoom_at(100,pointer,640,360);
-  check(camera.pixels_per_world==100.f,"maximum zoom clamp failed");
-  camera.zoom_at(-100,pointer,640,360);
+  check(camera.pixels_per_world==16000.,"close-up star-map zoom clamp failed");
+  camera.zoom_at(-1000,pointer,640,360);
   check(camera.pixels_per_world==.01,"minimum zoom clamp failed");
   for(const int height:{720,1080,1440,2160}){
     const int width=height*16/9;

@@ -1,4 +1,5 @@
 #include "native_fleet_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -100,20 +101,18 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                                                          int height) noexcept {
   const auto w = static_cast<float>(width);
   const auto h = static_cast<float>(height);
-  const auto scale = std::min(std::max(1.f, h / 900.f),
-                              std::max(1.f, w / 900.f));
-  const auto inset = 18.f * scale;
-  const auto top = 64.f * scale;
-  const auto panel_width = std::clamp(w * .255f, 270.f * scale,
-                                      360.f * scale);
+  const auto scale = NativeUiLayout::for_viewport(width,height).scale;
+  const auto inset = 12.f * scale;
+  const auto top = std::min(260.f * scale, std::max(52.f * scale,h-440.f*scale));
+  const auto panel_width = 254.f * scale;
   const UiRect panel{w - inset - panel_width, top, panel_width,
-                     std::max(260.f * scale, h - top - inset)};
+                     std::max(0.f, std::min(620.f*scale,h - top - inset))};
   const auto inner_x = panel.x + 12.f * scale;
   const auto inner_width = panel.width - 24.f * scale;
   const UiRect heading{inner_x, panel.y + 12.f * scale, inner_width,
-                       28.f * scale};
-  const auto list_height = std::clamp(panel.height * .31f, 82.f * scale,
-                                      190.f * scale);
+                       22.f * scale};
+  const auto list_height = std::clamp(panel.height * .20f, 68.f * scale,
+                                      134.f * scale);
   const UiRect list{inner_x, heading.y + heading.height + 8.f * scale,
                     inner_width, list_height};
   const UiRect confirm{inner_x, panel.y + panel.height - 48.f * scale,
@@ -147,7 +146,7 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const UiRect locate{confirm};
   const UiRect civilian_locate{details.x, details_action_y,details.width,details_action_height};
   return {scale,
-          static_cast<int>(std::lround(20.f * scale)),
+          static_cast<int>(std::lround(15.f * scale)),
           static_cast<int>(std::lround(14.f * scale)),
           static_cast<int>(std::lround(11.f * scale)),
           panel,
@@ -290,7 +289,8 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     std::span<const FleetScreenMarker> markers,
     std::optional<int> target_system_id) {
   pointer_ = event.position;
-  const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  if(!view_||view_->own_fleets.empty())layout.panel.height=142.f*layout.scale;
   if (event.type == InputEventType::PointerCancelled) {
     clear_pressed_action();
     cancel_recovery();
@@ -423,7 +423,11 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
                                   std::span<const FleetScreenMarker> markers,
                                   stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
   last_ship_art_rows_ = 0;
-  const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  if(!view_||view_->own_fleets.empty()){
+    layout.panel.height=142.f*layout.scale;
+    layout.list.height=80.f*layout.scale;
+  }
   const auto artwork = [&](const stellar::native_fleet::NativeOwnFleet &fleet) {
     if (!ship_art) return std::shared_ptr<const RgbaImage>{};
     return ship_art->image_for(
@@ -506,6 +510,7 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
   }
 
   const auto *fleet = selected_fleet();
+  if(!view_||view_->own_fleets.empty())return;
   const auto action_button = [&](UiRect bounds,const char *label) {
     fill(out,bounds,bounds.contains(pointer_)?hover_color:row_color);
     stroke(out,bounds,bounds.contains(pointer_)?bright:border_color);
@@ -545,7 +550,7 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       const auto image = artwork(*fleet);
       const float side = std::min(details_bounds.height - 8.f * layout.scale,
                                   96.f * layout.scale);
-      if (image && side >= 8.f * layout.scale) {
+      if (image && side >= 8.f * layout.scale && details_bounds.width>300.f*layout.scale) {
         out.overlay.emplace_back(Image{
             image,
             {details_bounds.x + details_bounds.width - side -

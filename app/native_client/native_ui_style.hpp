@@ -26,9 +26,10 @@ inline void panel(DrawList &out, UiRect bounds, bool hover, bool active) {
       Color{7, 13, 25, 180}});
 }
 inline void menu_panel(DrawList &out, UiRect bounds) {
+  out.overlay.emplace_back(FilledRectangle{{bounds.x+4.f,bounds.y+5.f,bounds.width,bounds.height},{0,4,9,95}});
   out.overlay.emplace_back(FilledRectangle{bounds, {5, 16, 31, 247}});
   out.overlay.emplace_back(FilledRectangle{{bounds.x + 2.f, bounds.y + 2.f,
       bounds.width - 4.f, 3.f}, {77, 193, 207, 150}});
-  out.overlay.emplace_back(StrokedRectangle{bounds, {99, 190, 211, 250}});
+  out.overlay.emplace_back(StrokedRectangle{bounds, {59, 109, 134, 240}});
 }
 } // namespace stellar::native_ui_style

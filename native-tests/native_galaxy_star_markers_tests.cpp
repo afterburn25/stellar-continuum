@@ -202,7 +202,7 @@ int main() try {
     const auto start=galaxy_star_core_radius(1.,height);
     const auto near=galaxy_star_core_radius(5.,height);
     const auto close=galaxy_star_core_radius(30.,height);
-    require(start>=4.f&&near>start*2.f&&close>near*2.f,"star markers stayed tiny or failed to grow with zoom");
+    require(start>=1.f&&start<=2.5f&&near>start*2.f&&close>near*2.f,"star markers stayed tiny or failed to grow with zoom");
     require(galaxy_star_core_radius(5.,height,GalaxyStarVisualClass::giant)>near*1.5f,"giant marker lost its larger silhouette");
     NativeGalaxyStarMarkerRenderer renderer;DrawList a,b;
     renderer.append(a,{100,100},start,{},false);renderer.append(b,{100,100},close,{},false);
