@@ -10,6 +10,8 @@ NATIVE_STARTUP_ART_SOURCES = {
     for key in ('stellar-continuum-splash', 'stellar-loading-splash', 'stellar-galaxy-generation', 'stellar-save-loading')
 }
 for key, path in {"empire-emblem": "assets/visual/branding/stellar-continuum-icon-v1.png",
+                  "galaxy-view": "assets/visual/hud/galaxy-view.png",
+                  "system-view": "assets/visual/hud/system-view.png",
                   "title-logo": "assets/visual/branding/stellar-continuum-title-v1.png",
                   "galaxy-card": "assets/visual/space/campaign-galaxy-four-arm-v1.png"}.items():
     NATIVE_STARTUP_ART_SOURCES[key] = (path, path)

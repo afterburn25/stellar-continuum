@@ -7352,12 +7352,14 @@ class NativeCampaign final {
     }
     if(!map_hud_visible())return;
     if(!hud_crest_)hud_crest_=decode_rgba_image(asset_root_/"assets/visual/branding/stellar-continuum-icon-v1.png");
+    if(!hud_galaxy_icon_)hud_galaxy_icon_=decode_rgba_image(asset_root_/"assets/visual/hud/galaxy-view.png");
+    if(!hud_system_icon_)hud_system_icon_=decode_rgba_image(asset_root_/"assets/visual/hud/system-view.png");
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     const bool in_system=system_workspace_.visible();
     std::string title=in_system?system_workspace_.snapshot()->catalog_name:player!=world.civilizations.end()?player->name:"Empire";
     std::string subtitle=in_system?"SYSTEM VIEW":player!=world.civilizations.end()?species_environment_profile(player->species_id).display_name:"";
     const bool paused=session_->frame().clock().speed()==StrategicSpeed::Paused;
-    render_context_plate(out,l,title,subtitle,paused,pointer_,hud_crest_,in_system?galaxy_assets_.request_galaxy_layer():nullptr,in_system||selected_id_.has_value());
+    render_context_plate(out,l,title,subtitle,paused,pointer_,hud_crest_,in_system?hud_galaxy_icon_:hud_system_icon_,in_system||selected_id_.has_value());
     const auto& view=colony_roster_.view();
     planet_outliner_scroll_=std::clamp(planet_outliner_scroll_,0.f,std::max(0.f,view.rows.size()*l.row_height-l.planet_list.height));
     render_planet_outliner(out,l,view,planet_outliner_scroll_,pointer_,[&](int body_id){
@@ -7482,6 +7484,7 @@ class NativeCampaign final {
   stellar::native_logistics::SupplyWorkspace supply_workspace_;
   stellar::native_colony_roster::RosterWorkspace colony_roster_;
   std::shared_ptr<const RgbaImage> hud_crest_;
+  std::shared_ptr<const RgbaImage> hud_galaxy_icon_,hud_system_icon_;
   std::unordered_map<int,SystemBodyAppearance> hud_planet_appearances_;
   float planet_outliner_scroll_{};
   std::optional<int> hud_pressed_colony_;
