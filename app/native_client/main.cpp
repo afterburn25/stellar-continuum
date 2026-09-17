@@ -1002,7 +1002,7 @@ class NativeCampaign final {
   [[nodiscard]] bool paused_menu_visible()const{return menu_&&session_->frame().clock().speed()==StrategicSpeed::Paused;}
   void prepare_galaxy_art_smoke(int width,int height,bool reload){
     smoke_galaxy_mode_=true;smoke_galaxy_reload_=reload;
-    if(!selected_id_||camera_.pixels_per_world<fitted_pixels_per_world_*4.99)
+    if(camera_.pixels_per_world<fitted_pixels_per_world_*4.99)
       throw std::runtime_error("Campaign did not start in the home-system neighborhood.");
     smoke_galaxy_day_=session_->frame().clock().simulation_days();
     const auto click_pause=[&]{const auto layout=NativeUiLayout::for_viewport(width,height);const auto point=center(layout.pause);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke pause input closed the campaign.");};
@@ -5407,7 +5407,7 @@ class NativeCampaign final {
       }
       if(action==UiAction::Home){
         close_navigation_workspaces();
-        focus_home_map(width,height);refresh_inspection();return;
+        focus_home_map(width,height,true);refresh_inspection();return;
       }
       if(action==UiAction::Inspect){
         if(system_workspace_.visible()){
@@ -7136,7 +7136,7 @@ class NativeCampaign final {
   void zoom_galaxy_camera(float wheel,Point pointer,int width,int height){
     camera_.zoom_at(wheel,pointer,width,height);constrain_galaxy_camera(width,height);
   }
-  void focus_home_map(int width,int height){
+  void focus_home_map(int width,int height,bool inspect=false){
     const auto& world=session_->frame().runtime().world().campaign();
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     if(player==world.civilizations.end())return;
@@ -7150,7 +7150,7 @@ class NativeCampaign final {
     camera_.center={home->position.x,home->position.y};
     camera_.pixels_per_world=std::clamp(std::min(width,height)*.34/radius,
         fitted_pixels_per_world_*5.,std::max(100.,fitted_pixels_per_world_*5.));
-    selected_id_=home->id;
+    selected_id_=inspect?std::optional<int>{home->id}:std::nullopt;
     constrain_galaxy_camera(width,height);
   }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
