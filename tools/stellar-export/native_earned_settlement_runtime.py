@@ -51,7 +51,7 @@ def _checker_evidence(stdout: str) -> tuple[dict, list[dict]]:
         raise RuntimeError("Earned settlement checker final evidence has the wrong schema")
     for key in ("before_day", "after_day", "step_days"):
         _number(final.get(key), key)
-    if (not math.isclose(final["before_day"], 6587.15625, abs_tol=1e-8) or
+    if (final["before_day"] <= 0 or
             final["after_day"] <= final["before_day"] or
             final["after_day"] > final["before_day"] + 5000 or
             not math.isclose(final["step_days"], 1 / 64, abs_tol=1e-15)):
@@ -68,6 +68,7 @@ def _checker_evidence(stdout: str) -> tuple[dict, list[dict]]:
         raise RuntimeError("Earned settlement checker reported invalid target evidence")
     if (len(final["visited_systems"]) > 24 or len(set(final["visited_systems"])) != len(final["visited_systems"]) or
             [row["system_id"] for row in visits] != final["visited_systems"] or
+            any(not final["before_day"] < visit["day"] < final["after_day"] for visit in visits) or
             any(visits[index]["day"] >= visits[index + 1]["day"] for index in range(len(visits) - 1)) or
             target["system_id"] != final["visited_systems"][-1]):
         raise RuntimeError("Earned settlement checker visit evidence is not chronological and bound to its target")
@@ -125,7 +126,7 @@ def _validate_checkpoint_chain(source_payload, checkpoint_payloads, final):
         galaxy, checkpoint_player = _galaxy(checkpoint_payloads[name], f"Earned {name} checkpoint")
         if checkpoint_player != player: raise RuntimeError("Earned checkpoints changed player identity")
         galaxies[name] = galaxy; days.append(_number(checkpoint_payloads[name].get("SimulationDays"), f"{name} days"))
-    if (not math.isclose(days[0], final["before_day"], abs_tol=1e-8) or not math.isclose(days[-1], final["after_day"], abs_tol=1e-8) or any(days[i] >= days[i + 1] for i in range(len(days) - 1))):
+    if (not math.isclose(days[0], final["before_day"], rel_tol=0, abs_tol=1e-8) or not math.isclose(days[-1], final["after_day"], rel_tol=0, abs_tol=1e-8) or any(days[i] >= days[i + 1] for i in range(len(days) - 1))):
         raise RuntimeError("Earned checkpoints are not strictly monotonic from source through founding")
     _surveyed_target(galaxies["eligible-site"], player, target, "Eligible-site checkpoint")
     fleet = _fleet(galaxies["populated-vessel"], fleet_id, "Populated-vessel checkpoint")

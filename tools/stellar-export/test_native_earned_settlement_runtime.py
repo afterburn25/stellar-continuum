@@ -28,6 +28,19 @@ class EarnedSettlementTests(unittest.TestCase):
         _, player, fleet=runtime._validate_checkpoint_chain(source,checkpoints,final)
         self.assertEqual(player,0); self.assertEqual(fleet["MissionOrderRevision"],0)
 
+    def test_checkpoint_chain_binds_actual_source_date_after_route_changes(self):
+        source, checkpoints, final = self.chain()
+        offset = -3.65625
+        source["SimulationDays"] += offset
+        for checkpoint in checkpoints.values():
+            checkpoint["SimulationDays"] += offset
+        final["before_day"] += offset
+        final["after_day"] += offset
+        runtime._validate_checkpoint_chain(source, checkpoints, final)
+        final["before_day"] += 1 / 64
+        with self.assertRaisesRegex(RuntimeError, "monotonic"):
+            runtime._validate_checkpoint_chain(source, checkpoints, final)
+
     def test_checkpoint_chain_rejects_wrong_partial_revision_or_final_outcome(self):
         source, checkpoints, final=self.chain(); checkpoints["partial-establishment"]["Galaxy"]["Fleets"][0]["CurrentSystemId"]=7
         with self.assertRaises(RuntimeError): runtime._validate_checkpoint_chain(source,checkpoints,final)
@@ -57,6 +70,22 @@ class EarnedSettlementTests(unittest.TestCase):
                "target":{"system_id":8,"body_id":8004,"kind":"colony"},"fleet_id":2,"colony_id":9}
         evidence, parsed=runtime._checker_evidence("\n".join(json.dumps(x,separators=(",",":")) for x in visits+[final]))
         self.assertEqual(evidence["colony_id"],9); self.assertEqual([x["system_id"] for x in parsed],[2,8])
+
+        # A different earned route can finish its first survey on another day.
+        for value in visits:
+            value["day"] += 1000
+        final["before_day"] += 1000
+        final["after_day"] += 1000
+        encode = lambda: "\n".join(json.dumps(x) for x in visits + [final])
+        evidence, _ = runtime._checker_evidence(encode())
+        self.assertEqual(evidence["before_day"], 7587.15625)
+        final["after_day"] = final["before_day"] + 5000 + 1 / 64
+        with self.assertRaisesRegex(RuntimeError, "time evidence"):
+            runtime._checker_evidence(encode())
+        final["after_day"] = 7762.421875
+        visits[0]["day"] = final["before_day"]
+        with self.assertRaisesRegex(RuntimeError, "chronological"):
+            runtime._checker_evidence(encode())
 
     def test_parser_rejects_wrong_visit_target_order_or_bound(self):
         visit={"kind":"earned_settlement_visit","system_id":2,"day":6600.0,"stage":"reconnaissance"}

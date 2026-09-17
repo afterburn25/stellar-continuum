@@ -35,8 +35,13 @@ namespace {
 constexpr std::uint64_t generation = 1;
 constexpr int maximum_systems = 24;
 constexpr double maximum_days = 5000.;
-constexpr double maximum_end_day = 6587.15625 + maximum_days;
 constexpr auto maximum_wall_time = std::chrono::seconds(300);
+
+struct ReplayBounds {
+  double before_day{};
+  double end_day{};
+  std::chrono::steady_clock::time_point deadline;
+};
 
 void require(const bool value, const std::string_view message) {
   if (!value) throw std::runtime_error(std::string(message));
@@ -66,8 +71,29 @@ CampaignFrame load_earned_frame(const fs::path &research, const fs::path &save) 
           "earned source is not seed 115501");
   require(loaded.campaign.galaxy().player_civilization_id == 0,
           "earned source is not player 0");
-  require(std::abs(loaded.campaign.simulation_days() - 6587.15625) < .000001,
-          "earned source is not the full-survey day-6587.15625 checkpoint");
+  require(std::isfinite(loaded.campaign.simulation_days()) &&
+              loaded.campaign.simulation_days() > 0.,
+          "earned source has no valid elapsed campaign time");
+  // Route safety and generation versions can change the completion date. Bind
+  // the replay to the earned full-survey state, not an obsolete absolute day.
+  const auto &world = loaded.campaign.galaxy();
+  const auto science = std::ranges::find_if(world.fleets, [&](const auto &fleet) {
+    return fleet.civilization_id == world.player_civilization_id && fleet.is_active &&
+        fleet.role == FleetRole::Science && fleet.current_system_id &&
+        !fleet.destination_system_id && fleet.transit_phase == FleetTransitPhase::None &&
+        world.knowledge.system_survey_level(world.player_civilization_id,
+            *fleet.current_system_id) == SystemSurveyLevel::fully_surveyed &&
+        std::ranges::none_of(world.colonies, [&](const auto &colony) {
+          return colony.civilization_id == world.player_civilization_id &&
+              colony.system_id == *fleet.current_system_id;
+        });
+  });
+  require(science != world.fleets.end() &&
+      std::ranges::any_of(world.fleets, [&](const auto &fleet) {
+        return fleet.civilization_id == world.player_civilization_id && fleet.is_active &&
+            fleet.role == FleetRole::Scout && fleet.current_system_id == science->current_system_id &&
+            !fleet.destination_system_id && fleet.transit_phase == FleetTransitPhase::None;
+      }), "earned source lacks the scout/science completed non-colony survey checkpoint");
   StrategicClock clock;
   clock.restore(loaded.campaign.simulation_days());
   clock.set_speed(StrategicSpeed::Normal);
@@ -122,16 +148,16 @@ std::optional<NativeFleetRoutePreview> visible_route(
 bool wait_for_survey(CampaignFrame &frame, NativeFleetController &controller,
                      const int fleet_id, const int system_id,
                      const SystemSurveyLevel required, std::string &terminal,
-                     const std::chrono::steady_clock::time_point deadline) {
+                     const ReplayBounds &bounds) {
   const auto player_id = frame.runtime().world().campaign().player_civilization_id;
-  while (frame.clock().simulation_days() < maximum_end_day &&
-         std::chrono::steady_clock::now() < deadline) {
+  while (frame.clock().simulation_days() < bounds.end_day &&
+         std::chrono::steady_clock::now() < bounds.deadline) {
     if (frame.runtime().world().campaign().knowledge.system_survey_level(player_id, system_id) >= required)
       return true;
     advance(frame);
     (void)controller.build(frame, generation);
   }
-  terminal = "survey " + std::string(std::chrono::steady_clock::now() >= deadline ? "wall-time" : "day") + " bound reached for fleet " + std::to_string(fleet_id) +
+  terminal = "survey " + std::string(std::chrono::steady_clock::now() >= bounds.deadline ? "wall-time" : "day") + " bound reached for fleet " + std::to_string(fleet_id) +
              " at system " + std::to_string(system_id);
   return false;
 }
@@ -164,7 +190,7 @@ std::optional<int> build_settlement_ship(CampaignFrame &frame,
                                          NativeShipyardController &shipyard,
                                          const NativeSettlementMissionKind kind,
                                          std::string &terminal,
-                                         const std::chrono::steady_clock::time_point deadline) {
+                                         const ReplayBounds &bounds) {
   const auto design_id = kind == NativeSettlementMissionKind::Colony
                              ? "colony_ship" : "resource_outpost_ship";
   const auto before = frame.runtime().world().campaign().fleets.size();
@@ -190,8 +216,8 @@ std::optional<int> build_settlement_ship(CampaignFrame &frame,
               order->reserved_population_millions == design->population_cost_millions &&
               after_start.treasury_credits == view.treasury_credits - design->credit_cost,
           "paid shipyard start did not charge and reserve canonical vessel terms");
-  while (frame.clock().simulation_days() < maximum_end_day &&
-         std::chrono::steady_clock::now() < deadline) {
+  while (frame.clock().simulation_days() < bounds.end_day &&
+         std::chrono::steady_clock::now() < bounds.deadline) {
     advance(frame);
     const auto &fleets = frame.runtime().world().campaign().fleets;
     if (fleets.size() > before) {
@@ -208,7 +234,7 @@ std::optional<int> build_settlement_ship(CampaignFrame &frame,
     }
   }
   terminal = "paid " + std::string(design_id) + " build exceeded " +
-             (std::chrono::steady_clock::now() >= deadline ? "wall-time" : "5000-day") + " bound";
+             (std::chrono::steady_clock::now() >= bounds.deadline ? "wall-time" : "5000-day") + " bound";
   return std::nullopt;
 }
 
@@ -237,13 +263,13 @@ void checkpoint(CampaignFrame &frame, const fs::path &directory,
       PreparedPlayerCampaignSave::capture(frame.runtime(), options), false);
 }
 
-void emit(const std::string_view terminal, CampaignFrame &frame,
+void emit(const std::string_view terminal, CampaignFrame &frame, const ReplayBounds &bounds,
           const std::vector<int> &visited, const std::vector<std::string> &steps,
           const std::optional<Target> &target = std::nullopt,
           const std::optional<int> fleet_id = std::nullopt,
           const std::optional<int> colony_id = std::nullopt) {
   nlohmann::json evidence{{"kind", "earned_settlement"}, {"terminal", terminal},
-                          {"before_day", 6587.15625},
+                          {"before_day", bounds.before_day},
                           {"after_day", frame.clock().simulation_days()},
                           {"step_days", 1.0 / 64.0}, {"visited_systems", visited},
                           {"ordered_steps", steps}};
@@ -296,10 +322,12 @@ bool earned_progression(const fs::path &research, const fs::path &save,
   std::optional<Target> target;
   std::vector<int> visited;
   std::vector<std::string> steps;
-  const auto deadline = std::chrono::steady_clock::now() + maximum_wall_time;
+  const ReplayBounds bounds{frame.clock().simulation_days(),
+      frame.clock().simulation_days() + maximum_days,
+      std::chrono::steady_clock::now() + maximum_wall_time};
 
-  for (int explored{}; explored < maximum_systems && frame.clock().simulation_days() < maximum_end_day &&
-       std::chrono::steady_clock::now() < deadline; ++explored) {
+  for (int explored{}; explored < maximum_systems && frame.clock().simulation_days() < bounds.end_day &&
+       std::chrono::steady_clock::now() < bounds.deadline; ++explored) {
     const auto scout_view = fleets.build(frame, generation);
     const auto scout = find_idle_fleet(scout_view, FleetRole::Scout);
     if (!scout) { terminal = "no idle earned scout is available"; break; }
@@ -308,7 +336,7 @@ bool earned_progression(const fs::path &research, const fs::path &save,
     const auto scout_order = fleets.issue_selected_route(frame, *route);
     if (!scout_order.accepted) { terminal = "scout route rejected: " + scout_order.message; break; }
     if (!wait_for_survey(frame, fleets, scout->id, route->target_system_id,
-                         SystemSurveyLevel::partially_surveyed, terminal, deadline)) break;
+                         SystemSurveyLevel::partially_surveyed, terminal, bounds)) break;
     visited.push_back(route->target_system_id);
     steps.push_back("scout reconnaissance " + std::to_string(route->target_system_id));
     std::cout << nlohmann::json{{"kind", "earned_settlement_visit"},
@@ -335,21 +363,21 @@ bool earned_progression(const fs::path &research, const fs::path &save,
     const auto science_order = fleets.issue_selected_route(frame, science_route);
     if (!science_order.accepted) { terminal = "science route rejected: " + science_order.message; break; }
     if (!wait_for_survey(frame, fleets, science->id, route->target_system_id,
-                         SystemSurveyLevel::fully_surveyed, terminal, deadline)) break;
+                         SystemSurveyLevel::fully_surveyed, terminal, bounds)) break;
     steps.push_back("science full survey " + std::to_string(route->target_system_id));
     if ((target = surveyed_target(frame, route->target_system_id))) break;
   }
 
   if (!target) {
-    if (terminal.empty()) terminal = std::chrono::steady_clock::now() >= deadline
+    if (terminal.empty()) terminal = std::chrono::steady_clock::now() >= bounds.deadline
         ? "300-second wall-time bound reached" : "24-system or 5000-day exploration bound reached";
-    emit("blocked: " + terminal, frame, visited, steps);
+    emit("blocked: " + terminal, frame, bounds, visited, steps);
     return false;
   }
   checkpoint(frame, output_directory, "eligible-site");
-  const auto colony_fleet = build_settlement_ship(frame, shipyard, target->kind, terminal, deadline);
+  const auto colony_fleet = build_settlement_ship(frame, shipyard, target->kind, terminal, bounds);
   if (!colony_fleet) {
-    emit("blocked: " + terminal, frame, visited, steps, target);
+    emit("blocked: " + terminal, frame, bounds, visited, steps, target);
     return false;
   }
   checkpoint(frame, output_directory, "populated-vessel");
@@ -357,7 +385,7 @@ bool earned_progression(const fs::path &research, const fs::path &save,
   const auto quote = settlements.preview_exact(frame, generation, *colony_fleet,
                                                 target->system_id, target->body_id);
   if (!quote.accepted) {
-    emit("blocked: exact quote rejected: " + quote.message, frame, visited, steps, target, colony_fleet);
+    emit("blocked: exact quote rejected: " + quote.message, frame, bounds, visited, steps, target, colony_fleet);
     return false;
   }
   const auto known = frame.runtime().world().campaign().knowledge.known_systems(
@@ -375,7 +403,7 @@ bool earned_progression(const fs::path &research, const fs::path &save,
   const auto treasury_before_expedition = quote.treasury_budget_units;
   const auto issued = settlements.issue_exact(frame, generation, quote.revision);
   if (!issued.accepted) {
-    emit("blocked: exact order rejected: " + issued.message, frame, visited, steps, target, colony_fleet);
+    emit("blocked: exact order rejected: " + issued.message, frame, bounds, visited, steps, target, colony_fleet);
     return false;
   }
   const auto economy = std::ranges::find(frame.runtime().world().campaign().economies,
@@ -388,8 +416,8 @@ bool earned_progression(const fs::path &research, const fs::path &save,
   bool saved_partial{};
   steps.push_back("exact settlement order " + std::to_string(*colony_fleet));
   const auto order_day = frame.clock().simulation_days();
-  while (frame.clock().simulation_days() < maximum_end_day &&
-         std::chrono::steady_clock::now() < deadline) {
+  while (frame.clock().simulation_days() < bounds.end_day &&
+         std::chrono::steady_clock::now() < bounds.deadline) {
     advance(frame);
     if (!saved_partial) {
       const auto status = settlements.live_status(frame, generation, *colony_fleet);
@@ -411,14 +439,14 @@ bool earned_progression(const fs::path &research, const fs::path &save,
               "settlement founding skipped populated timed establishment");
       roundtrip(frame, research);
       checkpoint(frame, output_directory, "founded");
-      emit("established", frame, visited, steps, target, colony_fleet, colony->id);
+      emit("established", frame, bounds, visited, steps, target, colony_fleet, colony->id);
       return true;
     }
   }
-  emit(std::chrono::steady_clock::now() >= deadline
+  emit(std::chrono::steady_clock::now() >= bounds.deadline
            ? "blocked: establishment wall-time bound exceeded"
            : "blocked: establishment exceeded 5000-day bound",
-       frame, visited, steps, target, colony_fleet);
+       frame, bounds, visited, steps, target, colony_fleet);
   return false;
 }
 }  // namespace

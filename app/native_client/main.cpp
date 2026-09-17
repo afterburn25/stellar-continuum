@@ -1541,8 +1541,6 @@ class NativeCampaign final {
         if(world.knowledge.system_survey_level(world.player_civilization_id,body.system_id)!=SystemSurveyLevel::fully_surveyed)continue;
         const auto system=session_->cache().systems_by_id.find(body.system_id);
         if(system==session_->cache().systems_by_id.end())continue;
-        const auto point=camera_.project({system->second->position.x,system->second->position.y},width,height);
-        if(point.x<0||point.y<0||point.x>=width||point.y>=height||fleet_layout.panel.contains(point))continue;
         auto candidate=settlement_controller_.preview_exact(session_->frame(),session_->cache().generation,chosen->fleet_id,body.system_id,body.id);
         if(candidate.accepted&&candidate.candidate){smoke_settlement_system_id_=body.system_id;smoke_settlement_body_id_=body.id;found=true;break;}
       }
@@ -1550,6 +1548,12 @@ class NativeCampaign final {
     }
     const auto system=session_->cache().systems_by_id.find(*smoke_settlement_system_id_);
     if(system==session_->cache().systems_by_id.end())throw std::runtime_error("Settlement target system is absent from the campaign cache.");
+    // A legitimately earned viable world can be outside the initial home view.
+    // Center its chart marker before exercising the normal double-click path;
+    // never alter survey knowledge, vessel state or the settlement quote.
+    const auto target_point=camera_.project({system->second->position.x,system->second->position.y},width,height);
+    if(target_point.x<0||target_point.y<0||target_point.x>=width||target_point.y>=height||fleet_layout.panel.contains(target_point))
+      camera_.center={system->second->position.x-static_cast<double>(width)*.12/camera_.pixels_per_world,system->second->position.y};
     click(camera_.project({system->second->position.x,system->second->position.y},width,height),InputEventType::LeftPressed,2);
     if(!system_workspace_.snapshot()||!system_workspace_.viewport())throw std::runtime_error("Settlement smoke could not open the target system.");
     const auto spatial=project_system(*system_workspace_.snapshot());
