@@ -217,6 +217,18 @@ class NativeClientDependencyTests(unittest.TestCase):
         self.assertEqual(set(native_research_asset_files(self.root)),
                          {record["path"] for record in research_records})
 
+        self.stellar_declaration=self.root/"assets/visual/stellar/manifest.json"
+        stellar=json.loads((exporter.ROOT/"assets/visual/stellar/manifest.json").read_text(encoding="utf-8"))
+        for record in stellar["files"]:
+            asset=fixture_asset("assets/visual/stellar/"+record["filename"],"stellar art")
+            record["sha256"]=hashlib.sha256(asset.read_bytes()).hexdigest()
+        self.stellar_declaration.write_text(json.dumps(stellar))
+        for path in ("data/stellar/population-v1.json","data/stellar/population-profiles-v1.json"):
+            asset=self.root/path;asset.parent.mkdir(parents=True,exist_ok=True)
+            asset.write_bytes((exporter.ROOT/path).read_bytes())
+        for path in ("docs/stellar-asset-validation.md","docs/stellar-generation-validation.md","docs/stellar-population-profiles.md"):
+            fixture_asset(path,"stellar documentation")
+
 
 
     def inspect(self, binary, runtime=(), windows=()):
@@ -242,6 +254,33 @@ class NativeClientDependencyTests(unittest.TestCase):
     def test_missing_research_art_blocks_package(self):
         (self.root / "assets/visual/catalog/portraits/research-energy.png").unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing or duplicate research artwork"):
+            self.copy()
+
+    def test_missing_stellar_art_blocks_package(self):
+        (self.root/"assets/visual/stellar/G-Class Yellow.png").unlink()
+        with self.assertRaisesRegex(RuntimeError,"Missing native client dependency"):
+            self.copy()
+
+    def test_tampered_stellar_art_blocks_package(self):
+        (self.root/"assets/visual/stellar/G-Class Yellow.png").write_bytes(b"changed")
+        with self.assertRaisesRegex(RuntimeError,"differs from reviewed"):
+            self.copy()
+
+    def test_incomplete_stellar_mappings_block_package(self):
+        value=json.loads(self.stellar_declaration.read_text());value["objects"].pop()
+        self.stellar_declaration.write_text(json.dumps(value))
+        with self.assertRaisesRegex(RuntimeError,"Missing or duplicate stellar artwork"):
+            self.copy()
+
+    def test_stellar_paths_cannot_expand_package_scope(self):
+        value=json.loads(self.stellar_declaration.read_text())
+        original=value["files"][0]["filename"];invalid="../"+original
+        value["files"][0]["filename"]=invalid
+        for item in value["objects"]:
+            for key in ("closeAsset","distanceAsset"):
+                if item[key]==original:item[key]=invalid
+        self.stellar_declaration.write_text(json.dumps(value))
+        with self.assertRaisesRegex(RuntimeError,"Unsafe stellar artwork filename"):
             self.copy()
 
     def test_tampered_research_art_blocks_package(self):

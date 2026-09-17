@@ -63,6 +63,17 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_research_asset_files(root))
     stellar_manifest=root / "assets/visual/stellar/manifest.json"
     stellar_art=json.loads(stellar_manifest.read_text(encoding="utf-8"))
+    if stellar_art.get("version") != 1:
+        raise RuntimeError("Unsupported stellar artwork manifest version")
+    declarations=stellar_art["files"]
+    names=[item["filename"] for item in declarations]
+    used={name for item in stellar_art["objects"] for name in
+          (item["closeAsset"],item["distanceAsset"]) if name}
+    types=[item["objectType"] for item in stellar_art["objects"]]
+    definitions=json.loads((root/"data/stellar/population-v1.json").read_text(encoding="utf-8"))
+    expected_types={item["id"] for item in definitions["objects"]}|{"m-red-dwarf-quiet","central-supermassive-black-hole"}
+    if len(names)!=len(set(names)) or set(names)!=used or len(types)!=len(set(types)) or set(types)!=expected_types:
+        raise RuntimeError("Missing or duplicate stellar artwork mapping")
     for item in stellar_art["files"]:
         name=item["filename"]
         if Path(name).name!=name: raise RuntimeError("Unsafe stellar artwork filename")
