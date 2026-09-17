@@ -72,6 +72,10 @@ void normal_lifecycle(const fs::path& root) {
   director.menu_ready();
   director.service();
   require(director.stats().music_start_count == 1, "repeated menu admission restarted music");
+  director.hover();
+  require(director.stats().hover_count == 1,"hover did not queue the existing effect");
+  for(int i=0;i<20;++i)director.hover();
+  require(director.stats().hover_count == 1,"hover effect was not rate limited");
   director.confirm();
   require(director.stats().confirm_count == 1, "confirm did not play an effect");
   for (int index = 0; index < 20; ++index) director.play_event(stellar::native_audio::Cue::Alert);

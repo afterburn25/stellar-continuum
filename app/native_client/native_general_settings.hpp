@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 #include <filesystem>
@@ -31,6 +32,7 @@ class NativeGeneralSettings final {
   [[nodiscard]] std::string error() const { return error_; }
   // Persistence failure leaves the previous preference and destination intact.
   [[nodiscard]] bool save(GeneralPreferences);
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_apply(Apply apply) { apply_=std::move(apply); }
   void set_browse(Browse browse) { browse_=std::move(browse); }
   void set_default_directory(std::filesystem::path value) { default_directory_=std::move(value); }
@@ -45,6 +47,7 @@ class NativeGeneralSettings final {
   // Owner thread only. Results from a dismissed/reopened view are discarded.
   void accept_browse_result(stellar::native_map::FolderDialogResult);
  private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   [[nodiscard]] stellar::native_map::Text path_text(const GeneralSettingsLayout&) const;
   std::filesystem::path path_,default_directory_;
   GeneralPreferences saved_,draft_;

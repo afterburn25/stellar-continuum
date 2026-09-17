@@ -306,6 +306,7 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
 }
 
 void NativeVideoSettingsView::open(const NativeVideoSettings current) noexcept {
+  hover_feedback_.reset();
   values_ = current.sanitized();
   reconcile_resolution();
   visible_ = true;
@@ -414,6 +415,12 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
   result.values = values_;
   pointer_ = event.position;
   const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  auto target=confirming_?stellar::native_menu_audio::hit(event.position,{layout.keep,layout.revert}):stellar::native_menu_audio::hit(event.position,{layout.apply,layout.cancel,open_panel_?layout.nvidia:stellar::native_map::UiRect{}});
+  if(!confirming_)for(std::size_t i=0;i<layout.choice_buttons.size();++i){
+    if(i==1&&values_.display==VideoDisplayMode::Borderless)continue;
+    if(layout.choice_buttons[i].contains(event.position))target=10+i;
+  }
+  hover_feedback_.update(event,target);
 
   if (confirming_) {
     if (event.type == InputEventType::EscapePressed ||

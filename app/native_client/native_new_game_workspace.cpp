@@ -195,6 +195,7 @@ void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
 }
 void NativeNewGameWorkspace::clear() noexcept { *this = {}; }
 void NativeNewGameWorkspace::reset_interaction() noexcept {
+  hover_feedback_.reset();
   seed_focused_ = false;
   pressed_ = false;
   pointer_ = {};
@@ -375,6 +376,10 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   if (!view_) return {};
   const auto measured = measure_layout(width, height, measure);
   const auto &layout = measured.base;
+  auto target=stellar::native_menu_audio::hit(event.position,{layout.cancel,layout.seed_input,layout.randomize_seed,layout.restore_defaults,layout.copy_setup,layout.create,layout.mode_story,layout.mode_sandbox});
+  if(const auto index=species_hit(event.position,measured))target=100+*index;
+  if(const auto index=size_hit(event.position,layout))target=200+*index;
+  hover_feedback_.update(event,pressed_?0:target);
   if (event.type == InputEventType::PointerMove) pointer_ = event.position;
   if (event.type == InputEventType::EscapePressed) {
     reset_interaction();

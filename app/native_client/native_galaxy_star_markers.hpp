@@ -32,6 +32,11 @@ struct NativeGalaxyStarAppearance {
   std::optional<GalaxyStarVisualClass> tertiary;
 };
 
+// Screen-space light profile grows with magnification, independently of the
+// simulation's physical stellar radius and without allocating per-star assets.
+[[nodiscard]] float galaxy_star_core_radius(double relative_zoom, int viewport_height,
+    GalaxyStarVisualClass visual = GalaxyStarVisualClass::unknown);
+
 struct NativeGalaxyStarMarkerStats {
   std::size_t cached_resources{};
   std::size_t cached_bytes{};

@@ -304,7 +304,7 @@ void NativeAudioDirector::hover() {
   if (now - last_hover_ < debounce_interval) return;
   last_hover_ = now;
   if (!may_play_effect()) return;
-  try { output_->play_effect(clips_->hover); }
+  try { output_->play_effect(clips_->hover); ++stats_.hover_count; }
   catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what()); }
 }
 

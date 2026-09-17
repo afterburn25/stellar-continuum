@@ -129,7 +129,7 @@ void NativeAudioSettings::load() {
 }
 
 void NativeAudioSettings::preview() { if (apply_) apply_(values_); }
-void NativeAudioSettings::open() { require_owner(); visible_ = true; dragging_ = Dragged::None; viewport_width_ = viewport_height_ = 0; preview(); }
+void NativeAudioSettings::open() { require_owner(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None; viewport_width_ = viewport_height_ = 0; preview(); }
 bool NativeAudioSettings::visible() const { require_owner(); return visible_; }
 AudioPreferences NativeAudioSettings::values() const { require_owner(); return values_; }
 AudioPreferences NativeAudioSettings::saved_values() const { require_owner(); return saved_; }
@@ -152,6 +152,7 @@ bool NativeAudioSettings::handle(const InputEvent& event, int width, int height)
       (viewport_width_ != width || viewport_height_ != height)) dragging_ = Dragged::None;
   viewport_width_ = width; viewport_height_ = height;
   const auto layout = AudioSettingsLayout::for_viewport(width, height);
+  hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.master_track,layout.music_track,layout.effects_track,layout.mute,layout.defaults,layout.cancel,layout.save,video_navigation_?layout.video:UiRect{},general_navigation_?layout.general:UiRect{}}):0);
   if (event.type == InputEventType::PointerCancelled) { dragging_ = Dragged::None; return true; }
   if (event.type == InputEventType::EscapePressed) { cancel(); return true; }
   if (event.type == InputEventType::PointerMove && dragging_ != Dragged::None) { set_from_track(dragging_, event.position, layout); return true; }

@@ -107,6 +107,16 @@ std::shared_ptr<const RgbaImage> make_marker(GalaxyStarVisualClass visual) {
 }
 } // namespace
 
+float galaxy_star_core_radius(double relative_zoom, int viewport_height,
+                              GalaxyStarVisualClass visual) {
+  const float display_scale=std::clamp(viewport_height/1080.f,.8f,2.f);
+  const float growth=static_cast<float>(std::pow(std::clamp(relative_zoom,1.,10000.),.55));
+  const float type_scale=visual==GalaxyStarVisualClass::giant?1.65f:
+      visual==GalaxyStarVisualClass::hot_blue_star?1.15f:
+      visual==GalaxyStarVisualClass::white_dwarf||visual==GalaxyStarVisualClass::neutron_star?.8f:1.f;
+  return std::min(36.f,5.f*growth)*display_scale*type_scale;
+}
+
 struct NativeGalaxyStarMarkerRenderer::Storage {
   struct Entry {
     GalaxyStarVisualClass visual{};

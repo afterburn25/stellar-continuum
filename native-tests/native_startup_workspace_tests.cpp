@@ -1,4 +1,5 @@
 #include "native_startup_workspace.hpp"
+#include "native_settings_hub.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -82,4 +83,39 @@ void continue_and_development(){
   (void)ui.handle({InputEventType::EscapePressed},1280,720,measure);require(ui.screen()==StartupScreen::Entry,"Development did not return to main menu");
 }
 }
-int main()try{responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+namespace {
+void menu_hover_feedback(){
+  for(const auto [w,h]:{std::pair{1280,720},std::pair{1920,1080}}){
+    NativeStartupWorkspace ui;ui.set_setup(setup());int cues=0;
+    ui.set_hover_callback([&]{++cues;});const auto l=StartupLayout::for_viewport(w,h);
+    const auto move=[&](Point point){(void)ui.handle({InputEventType::PointerMove,point},w,h,measure);};
+    move(center(l.return_to_campaign));require(cues==0,"disabled Continue played hover audio");
+    move(center(l.new_campaign));move(center(l.new_campaign));
+    move({l.new_campaign.x+4,l.new_campaign.y+4});require(cues==1,"one control repeated its hover audio");
+    move({1,1});move(center(l.new_campaign));require(cues==2,"re-entered menu item was silent");
+    (void)ui.handle({InputEventType::PointerCancelled},w,h,measure);
+    move(center(l.new_campaign));require(cues==3,"focus loss did not reset hover");
+    (void)ui.handle({InputEventType::LeftPressed,center(l.new_campaign)},w,h,measure);
+    move(center(l.story_campaign));require(cues==3,"Coming Soon played enabled-item audio");
+    move(center(l.sandbox_campaign));require(cues==4,"Sandbox card lacked hover audio");
+    (void)ui.handle({InputEventType::LeftPressed,center(l.sandbox_campaign)},w,h,measure);
+    const auto n=stellar::native_setup_ui::NativeNewGameLayout::for_viewport(w,h);
+    move(center(n.randomize_seed));move(center(n.randomize_seed));require(cues==5,"setup hover failed or repeated");
+    move(center(n.size_buttons[0]));require(cues==6,"galaxy size hover was silent");
+    DrawList draw;ui.render(draw,w,h,measure);ui.render(draw,w,h,measure);require(cues==6,"rendering played audio");
+    stellar::native_settings::NativeSettingsHub hub;bool child=false;
+    hub.set_callbacks([&](auto){child=true;},[&]{return child;});hub.set_hover_callback([&]{++cues;});hub.open();
+    const auto hub_layout=stellar::native_settings::HubLayout::for_viewport(w,h);
+    const auto hp=center(hub_layout.categories[1]);
+    (void)hub.handle({InputEventType::PointerMove,hp},w,h);(void)hub.handle({InputEventType::PointerMove,hp},w,h);
+    require(cues==7,"settings category audio failed or repeated");
+    (void)hub.handle({InputEventType::LeftPressed,hp},w,h);
+    (void)hub.handle({InputEventType::PointerMove,center(hub_layout.categories[2])},w,h);
+    require(cues==7,"covered settings categories played through a modal");
+    child=false;hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
+    (void)hub.handle({InputEventType::PointerMove,hp},w,h);require(cues==7,"Controls help text played hover audio");
+  }
+}
+}
+int main()try{menu_hover_feedback();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}

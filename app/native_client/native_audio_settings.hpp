@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -38,6 +39,7 @@ class NativeAudioSettings final {
   NativeAudioSettings(NativeAudioSettings&&) = delete;
   NativeAudioSettings& operator=(NativeAudioSettings&&) = delete;
 
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_video_navigation(Confirm callback) { require_owner(); video_navigation_ = std::move(callback); }
   void set_general_navigation(Confirm callback) { require_owner(); general_navigation_ = std::move(callback); }
   void open();
@@ -52,6 +54,7 @@ class NativeAudioSettings final {
   [[nodiscard]] std::string status() const;
 
  private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   enum class Dragged { None, Master, Music, Effects };
   void require_owner() const;
   void preview();

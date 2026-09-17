@@ -51,6 +51,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     throw std::invalid_argument("Startup artwork minimum duration cannot be negative.");
   NativeStartupHost host(config.host);
   NativeStartupWorkspace workspace;
+  workspace.set_hover_callback(config.audio.hover);
   workspace.set_build_label("Stellar Continuum " + config.host.game_version);
   const std::string system_info="Stellar Continuum "+config.host.game_version+"\n"+window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height());
   workspace.set_diagnostics(window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height()));
@@ -204,6 +205,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
     const int width = window.drawable_width(), height = window.drawable_height();
     evidence.entry_opened = workspace.screen() == StartupScreen::Entry;
     const auto entry_layout = StartupLayout::for_viewport(width, height);
+    if(workspace.screen()==StartupScreen::Entry){
+      (void)workspace.handle({InputEventType::PointerMove,center(entry_layout.new_campaign)},width,height,measure);
+      (void)workspace.handle({InputEventType::PointerMove,center(entry_layout.new_campaign)},width,height,measure);
+    }
     if (!automation->audio_settings_screenshot.empty()) {
       if (!config.audio_settings) throw std::runtime_error("Audio settings validation requires the real overlay.");
       stellar::native_audio::check_audio_settings(*config.audio_settings,

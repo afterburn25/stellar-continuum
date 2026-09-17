@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 #include "native_menu_style.hpp"
 #include <array>
 #include <functional>
@@ -23,8 +24,9 @@ struct HubLayout {
 class NativeSettingsHub {
 public:
   using Open=std::function<void(Category)>;
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_callbacks(Open open,std::function<bool()> child_visible){open_=std::move(open);child_visible_=std::move(child_visible);}
-  void open(){visible_=true;controls_=false;pointer_={};}
+  void open(){hover_feedback_.reset();visible_=true;controls_=false;pointer_={};}
   void close(){visible_=false;controls_=false;}
   bool visible()const{return visible_;}
   bool showing_categories()const{return visible_&&(!child_visible_||!child_visible_());}
@@ -33,6 +35,9 @@ public:
     if(e.type==InputEventType::PointerMove)pointer_=e.position;
     if(e.type==InputEventType::PointerCancelled){pointer_={};return true;}
     const auto l=HubLayout::for_viewport(width,height);
+    auto target=stellar::native_menu_audio::hit(e.position,{l.back});
+    if(!controls_)for(std::size_t i=0;i<l.categories.size();++i)if(l.categories[i].contains(e.position))target=10+i;
+    hover_feedback_.update(e,target);
     if(e.type==InputEventType::EscapePressed){if(controls_)controls_=false;else close();return true;}
     if(e.type==InputEventType::LeftPressed){
       if(l.back.contains(e.position)){if(controls_)controls_=false;else close();}
@@ -57,6 +62,7 @@ public:
     button(out,l.back,"< Back",static_cast<int>(17*s),l.back.contains(pointer_),true,s);
   }
 private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   bool visible_{},controls_{};Point pointer_{};Open open_;std::function<bool()> child_visible_;
 };
 }

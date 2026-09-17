@@ -21,6 +21,7 @@ namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
   std::function<void()> service, menu_ready, confirm;
   std::function<bool()> assets_ready;
+  std::function<void()> hover;
 };
 struct StartupEntryConfig {
   StartupHostConfig host;

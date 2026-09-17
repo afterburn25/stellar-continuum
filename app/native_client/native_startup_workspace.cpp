@@ -70,7 +70,7 @@ StartupLayout StartupLayout::for_viewport(int width,int height) noexcept{
 void NativeStartupWorkspace::set_setup(stellar::native_setup::NativeNewCampaignSetupView view){setup_.set_view(std::move(view));}
 void NativeStartupWorkspace::set_return_to_campaign_available(bool available)noexcept{return_to_campaign_available_=available;}
 void NativeStartupWorkspace::show_setup()noexcept{screen_=StartupScreen::Setup;setup_.randomize_seed();selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
-void NativeStartupWorkspace::reset_pointer() noexcept{pointer_={};}
+void NativeStartupWorkspace::reset_pointer() noexcept{pointer_={};hover_feedback_.reset();}
 void NativeStartupWorkspace::show_entry() noexcept{screen_=StartupScreen::Entry;selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
 void NativeStartupWorkspace::set_slots(stellar::native_startup::NativeStartupSaveSlots slots){slots_=std::move(slots);selected_slot_=slots_.slots.empty()?std::nullopt:std::optional<std::size_t>{0};load_scroll_=0;screen_=StartupScreen::LoadSlots;reset_pointer();}
 void NativeStartupWorkspace::set_setup_message(std::string message,bool accepted){setup_.set_assessment_message(std::move(message),accepted);}
@@ -84,6 +84,22 @@ StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int he
   if(e.type==InputEventType::PointerCancelled){reset_pointer();if(screen_==StartupScreen::Setup)(void)setup_.handle(e,width,height,measure);return {StartupIntentKind::None,true};}
   const auto l=StartupLayout::for_viewport(width,height);
   if(screen_==StartupScreen::Setup){const auto child=setup_.handle(e,width,height,measure);switch(child.kind){case stellar::native_setup_ui::NativeNewGameIntentKind::Cancel:screen_=StartupScreen::ModeSelection;reset_pointer();return {StartupIntentKind::Back,true};case stellar::native_setup_ui::NativeNewGameIntentKind::CopySetup:return {StartupIntentKind::CopySetup,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count};case stellar::native_setup_ui::NativeNewGameIntentKind::Create:return {StartupIntentKind::Create,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count};default:return {StartupIntentKind::None,child.captured};}}
+  std::uint64_t hover_target{};
+  using stellar::native_menu_audio::hit;
+  if(screen_==StartupScreen::Entry)hover_target=hit(e.position,{l.new_campaign,l.load_campaign,l.settings,l.development,l.exit,(return_to_campaign_available_||!continue_save_.empty())?l.return_to_campaign:UiRect{}});
+  else if(screen_==StartupScreen::ModeSelection)hover_target=hit(e.position,{l.back,l.sandbox_campaign});
+  else if(screen_==StartupScreen::Development)hover_target=hit(e.position,{l.back,l.primary});
+  else if(screen_==StartupScreen::Failure)hover_target=hit(e.position,{l.back});
+  else if(screen_==StartupScreen::Busy)hover_target=hit(e.position,{busy_cancel(width,height,l.scale)});
+  else if(screen_==StartupScreen::LoadSlots){
+    hover_target=hit(e.position,{l.back,selected_slot_?l.primary:UiRect{}});
+    if(l.list.contains(e.position))for(std::size_t i=0;i<slots_.slots.size();++i){
+      const float pitch=46.f*l.scale;
+      const auto row=intersect({l.list.x,l.list.y+i*pitch-load_scroll_,l.list.width,pitch-4*l.scale},l.list);
+      if(row.width>0&&row.height>0&&row.contains(e.position)){hover_target=100+i;break;}
+    }
+  }
+  hover_feedback_.update(e,hover_target);
   if(e.type==InputEventType::EscapePressed){if(screen_==StartupScreen::Busy)return {StartupIntentKind::CancelOperation,true};if(screen_==StartupScreen::Entry&&return_to_campaign_available_)return {StartupIntentKind::ReturnToCampaign,true};show_entry();return {StartupIntentKind::Back,true};}
   if(screen_==StartupScreen::LoadSlots&&e.type==InputEventType::Wheel&&l.list.contains(e.position)){
     const float pitch=46.f*l.scale;

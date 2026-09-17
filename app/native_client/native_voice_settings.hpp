@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -47,6 +48,7 @@ class NativeVoiceSettings final {
   NativeVoiceSettings(NativeVoiceSettings&&) = delete;
   NativeVoiceSettings& operator=(NativeVoiceSettings&&) = delete;
 
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void open();
   [[nodiscard]] bool visible() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
@@ -57,6 +59,7 @@ class NativeVoiceSettings final {
   [[nodiscard]] std::string status() const;
 
  private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   enum class Dragged { None, Volume, Background, Filter };
   void require_owner() const;
   void load();

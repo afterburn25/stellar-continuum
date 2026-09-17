@@ -202,7 +202,7 @@ void NativeVoiceSettings::load() {
 
 void NativeVoiceSettings::preview() { if (apply_) apply_(values_); }
 void NativeVoiceSettings::open() {
-  require_owner(); visible_ = true; dragging_ = Dragged::None;
+  require_owner(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None;
   viewport_width_ = viewport_height_ = 0; preview();
 }
 bool NativeVoiceSettings::visible() const { require_owner(); return visible_; }
@@ -227,6 +227,7 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
       (viewport_width_ != width || viewport_height_ != height)) dragging_ = Dragged::None;
   viewport_width_ = width; viewport_height_ = height;
   const auto layout = VoiceSettingsLayout::for_viewport(width, height);
+  hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.enable_voices,layout.volume_track,layout.subtitles,layout.subtitle_size,layout.background_track,layout.speaker_labels,layout.filter_track,layout.frequency,layout.no_interruptions,layout.replay,layout.stop,layout.defaults,layout.cancel,layout.save}):0);
   if (event.type == InputEventType::PointerCancelled) { dragging_ = Dragged::None; return true; }
   if (event.type == InputEventType::EscapePressed) { cancel(); return true; }
   if (event.type == InputEventType::PointerMove && dragging_ != Dragged::None) {

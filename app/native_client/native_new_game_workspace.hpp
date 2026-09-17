@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include "native_new_campaign_setup.hpp"
 
@@ -69,6 +70,7 @@ public:
   using PortraitProvider = std::function<std::shared_ptr<
       const stellar::native_map::RgbaImage>(std::string_view asset_path)>;
 
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_view(stellar::native_setup::NativeNewCampaignSetupView);
   void clear() noexcept;
   void set_assessment_message(std::string message, bool accepted);
@@ -109,6 +111,7 @@ public:
                   {}) const;
 
 private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   [[nodiscard]] std::optional<std::size_t> species_hit(
       stellar::native_map::Point,
       const NativeNewGameMeasuredLayout &) const noexcept;

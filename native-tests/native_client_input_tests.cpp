@@ -22,6 +22,23 @@ int main(){
   check(camera.pixels_per_world==100.f,"maximum zoom clamp failed");
   camera.zoom_at(-100,pointer,640,360);
   check(camera.pixels_per_world==.01,"minimum zoom clamp failed");
+  for(const int height:{720,1080,1440,2160}){
+    const int width=height*16/9;
+    const Camera overview{{145.,-71.},height/1000.};
+    auto view=overview;
+    view.pan_pixels(900,-600);view.constrain_to_overview(overview,width,height);
+    check(view.center.x==overview.center.x&&view.center.y==overview.center.y,"overview can be dragged off center");
+    view.zoom_at(-20,{300,200},width,height);view.constrain_to_overview(overview,width,height);
+    check(view.pixels_per_world==overview.pixels_per_world&&view.center.x==overview.center.x,"overview shrank below fitted galaxy");
+    view.zoom_at(10,{width*.5f,height*.5f},width,height);view.constrain_to_overview(overview,width,height);
+    const WorldPoint star{150.,-40.};const auto before=view.project(star,width,height);
+    view.pan_pixels(90,-50);view.constrain_to_overview(overview,width,height);
+    const auto after=view.project(star,width,height);
+    check(std::abs(after.x-before.x-90)<.001&&std::abs(after.y-before.y+50)<.001,"zoomed drag did not pan through world coordinates");
+    view.pan_pixels(100000,100000);view.constrain_to_overview(overview,width,height);
+    const auto corner=view.unproject({0,0},width,height),bound=overview.unproject({0,0},width,height);
+    check(corner.x>=bound.x-.0001&&corner.y>=bound.y-.0001,"pan escaped map navigation bounds");
+  }
   PointerGesture gesture;
   gesture.begin(false);gesture.move({1,1});
   check(gesture.release_as_world_click(),"small pointer jitter was not a click");

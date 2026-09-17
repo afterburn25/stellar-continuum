@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 #include "native_new_game_workspace.hpp"
 #include "native_startup_artwork.hpp"
@@ -43,6 +44,7 @@ public:
   using PortraitProvider =
       stellar::native_setup_ui::NativeNewGameWorkspace::PortraitProvider;
 
+  void set_hover_callback(std::function<void()> callback){setup_.set_hover_callback(callback);hover_feedback_.set_callback(std::move(callback));}
   void set_setup(stellar::native_setup::NativeNewCampaignSetupView);
   // The executable owns the generated build identity; the workspace only
   // presents the value it is given.
@@ -70,6 +72,7 @@ public:
               const StartupArtworkProvider *, bool backdrop_only = false) const;
 
 private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   void reset_pointer() noexcept;
   StartupScreen screen_{StartupScreen::Entry};
   stellar::native_setup_ui::NativeNewGameWorkspace setup_;

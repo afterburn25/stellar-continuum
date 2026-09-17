@@ -628,12 +628,14 @@ class NativeCampaign final {
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
+    focus_home_map(width,height);
     refresh_fleets(true);
     audio_confirm_=std::move(audio_confirm);
     audio_settings_=audio_settings;
     video_settings_=video_settings;
     general_settings_=general_settings;settings_hub_=settings_hub;voice_settings_=voice_settings;
     presentation_audio_=presentation_audio;
+    menu_hover_feedback_.set_callback([this]{if(presentation_audio_)presentation_audio_->hover();});
   }
 
   [[nodiscard]] bool new_game_ready()const{return session_->new_campaign_transition()==NewCampaignTransition::Ready;}
@@ -1000,12 +1002,25 @@ class NativeCampaign final {
   [[nodiscard]] bool paused_menu_visible()const{return menu_&&session_->frame().clock().speed()==StrategicSpeed::Paused;}
   void prepare_galaxy_art_smoke(int width,int height,bool reload){
     smoke_galaxy_mode_=true;smoke_galaxy_reload_=reload;
+    if(!selected_id_||camera_.pixels_per_world<fitted_pixels_per_world_*4.99)
+      throw std::runtime_error("Campaign did not start in the home-system neighborhood.");
     smoke_galaxy_day_=session_->frame().clock().simulation_days();
     const auto click_pause=[&]{const auto layout=NativeUiLayout::for_viewport(width,height);const auto point=center(layout.pause);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke pause input closed the campaign.");};
     if(session_->frame().clock().speed()==StrategicSpeed::Paused)click_pause();
     click_pause();
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke did not pause through player input.");
     smoke_galaxy_paused_=true;fit_camera(width,height);smoke_galaxy_fitted_scale_=camera_.pixels_per_world;
+    const auto overview=camera_;
+    InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+    const Point middle{width*.5f,height*.5f};
+    input.events={{InputEventType::LeftPressed,middle},
+        {InputEventType::PointerMove,{middle.x+64,middle.y+32},{64,32}},
+        {InputEventType::LeftReleased,{middle.x+64,middle.y+32}},
+        {InputEventType::Wheel,middle,{},-12.f}};
+    (void)update(input,width,height,0.,false);
+    if(camera_.center.x!=overview.center.x||camera_.center.y!=overview.center.y||
+        camera_.pixels_per_world!=overview.pixels_per_world)
+      throw std::runtime_error("Overview drag/zoom moved or shrank the complete galaxy.");
   }
   [[nodiscard]] GalaxyArtSceneEvidence galaxy_scene_evidence(int width,int height){
     GalaxyArtSceneEvidence evidence;
@@ -1036,6 +1051,20 @@ class NativeCampaign final {
     const auto after=camera_.unproject(sol_anchor,width,height);
     if(std::hypot(after.x-before.x,after.y-before.y)>1e-9)throw std::runtime_error("Galaxy artwork smoke wheel zoom moved the world anchor beneath the pointer.");
     if(camera_.pixels_per_world<smoke_galaxy_fitted_scale_*5.)throw std::runtime_error("Galaxy artwork smoke did not reach regional magnification.");
+    const auto overview_radius=galaxy_star_core_radius(1.,height);
+    const auto regional_radius=galaxy_star_core_radius(camera_.pixels_per_world/smoke_galaxy_fitted_scale_,height);
+    if(regional_radius<overview_radius*2.)throw std::runtime_error("Regional zoom did not grow its star markers.");
+    const auto before_pan=camera_;
+    InputSnapshot drag;drag.drawable_width=width;drag.drawable_height=height;
+    const Point middle{width*.5f,height*.5f};
+    drag.events={{InputEventType::LeftPressed,middle},
+        {InputEventType::PointerMove,{middle.x+24,middle.y+16},{24,16}},
+        {InputEventType::LeftReleased,{middle.x+24,middle.y+16}}};
+    (void)update(drag,width,height,0.,false);
+    const auto expected=before_pan.unproject({width*.5f-24,height*.5f-16},width,height);
+    if(std::hypot(camera_.center.x-expected.x,camera_.center.y-expected.y)>1e-6)
+      throw std::runtime_error("Regional map drag did not pan the camera through space.");
+    camera_=before_pan;
     smoke_galaxy_regional_scale_=camera_.pixels_per_world;smoke_galaxy_wheel_input_=true;
   }
   void capture_galaxy_regional(int width,int height){smoke_galaxy_regional_=galaxy_scene_evidence(width,height);}
@@ -5294,6 +5323,7 @@ class NativeCampaign final {
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     if(video_settings_)video_settings_->service(input.focused,input.renderable());
+    resize_galaxy_camera(width,height);
     support_notice_seconds_=std::max(0.,support_notice_seconds_-std::max(0.,elapsed));
     if(support_.poll())support_notice_seconds_=20.;
     feedback_.advance(elapsed);
@@ -5319,6 +5349,7 @@ class NativeCampaign final {
       fit_camera(width,height);
       galaxy_backdrop_.discard_campaign();
       bind_galaxy_backdrop(width,height);
+      focus_home_map(width,height);
       refresh_knowledge();
       research_workspace_.discard_campaign();
       projected_research_stamp_.reset();
@@ -5376,7 +5407,7 @@ class NativeCampaign final {
       }
       if(action==UiAction::Home){
         close_navigation_workspaces();
-        const auto &world=session_->frame().runtime().world().campaign();const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);if(player!=world.civilizations.end()){const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);if(home!=world.systems.end()){camera_.center={home->position.x,home->position.y};camera_.pixels_per_world=std::max(fitted_pixels_per_world_,camera_.pixels_per_world);selected_id_=home->id;refresh_inspection();}}return;
+        focus_home_map(width,height);refresh_inspection();return;
       }
       if(action==UiAction::Inspect){
         if(system_workspace_.visible()){
@@ -5396,7 +5427,7 @@ class NativeCampaign final {
         if(system_workspace_.visible()){
           (void)system_workspace_.handle({InputEventType::Wheel,{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},{},direction},width,height);
         }else if(!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!surface_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()){
-          camera_.zoom_at(direction,{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},width,height);
+          zoom_galaxy_camera(direction,{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},width,height);
         }
         return;
       }
@@ -5439,7 +5470,11 @@ class NativeCampaign final {
         else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);}
       }
     };
+    if(!input.focused||!input.renderable())menu_hover_feedback_.reset();
     for(const auto &event:input.events){
+      const bool hover_blocked=settings_visible()||(!menu_&&(battle_workspace_.visible()||settlement_workspace_.visible()||surface_workspace_.modal_open()||colony_workspace_.planetary_modal()||diplomacy_workspace_.modal_open()||shipyard_workspace_.confirmation_open()||construction_workspace_.confirmation_open()||fleet_workspace_.preview()));
+      const auto hover_action=(!hover_blocked&&input.focused&&input.renderable())?layout.hit(event.position,menu_):UiAction::None;
+      menu_hover_feedback_.update(event,static_cast<std::uint64_t>(hover_action));
       if(session_->new_campaign_pending()) break;
       if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
       if(voice_settings_&&voice_settings_->visible()){(void)voice_settings_->handle(event,width,height);gesture_.capture_for_ui();continue;}
@@ -5730,8 +5765,8 @@ class NativeCampaign final {
         if(colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible()||surface_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())camera_.pan_pixels(event.delta.x,event.delta.y);gesture_.move(event.delta);continue;}
-      if(event.type==InputEventType::Wheel){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())camera_.zoom_at(event.wheel_y,event.position,width,height);continue;}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())pan_galaxy_camera(event.delta,width,height);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::Wheel){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())zoom_galaxy_camera(event.wheel_y,event.position,width,height);continue;}
       if(event.type==InputEventType::LeftReleased){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||surface_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
     if(const auto request=surface_workspace_.take_preview_request())execute_surface(*request);
@@ -6053,12 +6088,8 @@ class NativeCampaign final {
     for (const auto &system : world.systems) {
       const auto point = camera_.project(
           {system.position.x, system.position.y}, width, height);
-      if (point.x < -14.f || point.y < -14.f || point.x > width + 14.f ||
-          point.y > height + 14.f)
-        continue;
       const bool known = known_.contains(system.id);
       const bool selected_system = selected_id_ && *selected_id_ == system.id;
-      const float core_radius = selected_system ? 4.2f : 2.f;
       NativeGalaxyStarAppearance appearance;
       const auto survey = world.knowledge.system_survey_level(
           world.player_civilization_id, system.id);
@@ -6070,17 +6101,23 @@ class NativeCampaign final {
         if (system.tertiary)
           appearance.tertiary = galaxy_star_visual(*system.tertiary);
       }
+      const float core_radius = galaxy_star_core_radius(
+          camera_.pixels_per_world/fitted_pixels_per_world_,height,appearance.primary);
+      const float extent=core_radius*4.5f;
+      if(point.x < -extent || point.y < -extent || point.x > width+extent || point.y > height+extent)continue;
       galaxy_star_markers_.append(
           out, point, core_radius, appearance, selected_system,
           UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)},
           known ? 1.f : .28f);
 
-      float marker_left = -core_radius * 3.5f;
-      float marker_right = core_radius * 3.5f;
+      // Names may cross the faint corona, but never the bright stellar core.
+      // Reserving the full transparent sprite hid every nearby label at zoom.
+      float marker_left = -core_radius * 1.1f;
+      float marker_right = core_radius * 1.1f;
       float marker_top = marker_left;
       float marker_bottom = marker_right;
       const auto include_component = [&](Point offset, float scale) {
-        const float extent = core_radius * 3.5f * scale;
+        const float extent = core_radius * 1.1f * scale;
         marker_left = std::min(marker_left, offset.x - extent);
         marker_right = std::max(marker_right, offset.x + extent);
         marker_top = std::min(marker_top, offset.y - extent);
@@ -6097,7 +6134,7 @@ class NativeCampaign final {
           {{point.x + marker_left, point.y + marker_top,
             marker_right - marker_left, marker_bottom - marker_top},
            NativeGalaxyLabelObstacleKind::star});
-      if (selected_system || (known && camera_.pixels_per_world > 7.)) {
+      if (selected_system || (known && camera_.pixels_per_world/fitted_pixels_per_world_ > 2.)) {
         const double dx = point.x - static_cast<float>(width) * .5f;
         const double dy = point.y - static_cast<float>(height) * .5f;
         label_candidates.push_back(
@@ -6942,7 +6979,7 @@ class NativeCampaign final {
 
   [[nodiscard]] std::optional<int> system_hit(Point pointer,int width,
                                                int height)const{
-    float best=10.f;
+    float best=std::max(10.f,galaxy_star_core_radius(camera_.pixels_per_world/fitted_pixels_per_world_,height)*1.8f);
     std::optional<int> result;
     for(const auto &system:session_->frame().runtime().world().campaign().systems){
       const auto point=camera_.project({system.position.x,system.position.y},width,height);
@@ -7078,6 +7115,44 @@ class NativeCampaign final {
     }
   }
 
+  void constrain_galaxy_camera(int width,int height){
+    if(!galaxy_backdrop_.artwork_frame())return;
+    const auto overview=galaxy_backdrop_.fit_camera(width,height);
+    fitted_pixels_per_world_=overview.pixels_per_world;
+    camera_.constrain_to_overview(overview,width,height);
+  }
+  void resize_galaxy_camera(int width,int height){
+    if(width<=0||height<=0||!galaxy_backdrop_.artwork_frame())return;
+    if(galaxy_view_width_==width&&galaxy_view_height_==height)return;
+    const auto fit=galaxy_backdrop_.fit_camera(width,height);
+    camera_.pixels_per_world*=fit.pixels_per_world/fitted_pixels_per_world_;
+    fitted_pixels_per_world_=fit.pixels_per_world;
+    galaxy_view_width_=width;galaxy_view_height_=height;
+    constrain_galaxy_camera(width,height);
+  }
+  void pan_galaxy_camera(Point delta,int width,int height){
+    camera_.pan_pixels(delta.x,delta.y);constrain_galaxy_camera(width,height);
+  }
+  void zoom_galaxy_camera(float wheel,Point pointer,int width,int height){
+    camera_.zoom_at(wheel,pointer,width,height);constrain_galaxy_camera(width,height);
+  }
+  void focus_home_map(int width,int height){
+    const auto& world=session_->frame().runtime().world().campaign();
+    const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
+    if(player==world.civilizations.end())return;
+    const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
+    if(home==world.systems.end())return;
+    std::vector<double> nearby;
+    for(const auto& star:world.systems)if(star.id!=home->id)
+      nearby.push_back(std::hypot(star.position.x-home->position.x,star.position.y-home->position.y));
+    std::ranges::sort(nearby);
+    const double radius=nearby.empty()?1.:std::max(1.,nearby[std::min<std::size_t>(7,nearby.size()-1)]);
+    camera_.center={home->position.x,home->position.y};
+    camera_.pixels_per_world=std::clamp(std::min(width,height)*.34/radius,
+        fitted_pixels_per_world_*5.,std::max(100.,fitted_pixels_per_world_*5.));
+    selected_id_=home->id;
+    constrain_galaxy_camera(width,height);
+  }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
@@ -7160,9 +7235,10 @@ class NativeCampaign final {
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
-  void select(Point pointer,int width,int height){float best=10.f;std::optional<int> id;for(const auto &system:session_->frame().runtime().world().campaign().systems){const auto p=camera_.project({system.position.x,system.position.y},width,height);const auto d=std::hypot(p.x-pointer.x,p.y-pointer.y);if(d<best){best=d;id=system.id;}}selected_id_=id;refresh_inspection();}
+  void select(Point pointer,int width,int height){selected_id_=system_hit(pointer,width,height);refresh_inspection();}
   std::unique_ptr<NativeCampaignSession> session_;
   Camera camera_;
+  int galaxy_view_width_{},galaxy_view_height_{};
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   stellar::native_navigation::NativeNavigationArt navigation_art_;
   NativeResearchArt research_art_;
@@ -7359,6 +7435,7 @@ class NativeCampaign final {
   stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
   double notification_refresh_elapsed_{};
   stellar::native_audio::NativeAudioDirector* presentation_audio_{};
+  stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;
   std::chrono::steady_clock::time_point last_event_sound_{};
   bool settings_visible() const { return (settings_hub_&&settings_hub_->visible()) || (voice_settings_&&voice_settings_->visible()) || (general_settings_&&general_settings_->visible()) || (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
   stellar::native_general::NativeGeneralSettings* general_settings_{};
@@ -7453,11 +7530,15 @@ int main(int argc,char **argv){
     audio_settings.set_video_navigation(open_video);
     audio_settings.set_general_navigation([&]{general_settings.open();});
     general_settings.set_navigation([&]{audio.confirm();audio_settings.open();},[&]{audio.confirm();open_video();});
+    const auto menu_hover=[&]{audio.hover();};
+    audio_settings.set_hover_callback(menu_hover);video_settings.set_hover_callback(menu_hover);
+    general_settings.set_hover_callback(menu_hover);voice_settings.set_hover_callback(menu_hover);
+    settings_hub.set_hover_callback(menu_hover);
     bool audio_menu_ready{};std::size_t audio_boot_services{};
     const StartupAudioHooks audio_hooks{
       [&]{audio.service();service_general();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
       [&]{audio_menu_ready=true;audio.menu_ready();},
-      [&]{audio.confirm();},[&]{return audio.assets_ready();}};
+      [&]{audio.confirm();},[&]{return audio.assets_ready();},[&]{audio.hover();}};
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.caption=[&](DrawList& draw,int w,int h){stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);});};return config;
@@ -7918,7 +7999,7 @@ int main(int argc,char **argv){
         }
         if(options.audio_check){
           const auto state=audio.stats();
-          if(!state.assets_loaded||state.failed||!state.music_started||state.music_start_count!=1||state.queued_music_bytes==0||(options.new_game_smoke&&(audio_boot_services==0||state.confirm_count==0)))
+          if(!state.assets_loaded||state.failed||!state.music_started||state.music_start_count!=1||state.queued_music_bytes==0||(options.new_game_smoke&&(audio_boot_services==0||state.confirm_count==0||state.hover_count==0)))
             throw std::runtime_error("Native audio startup/playback proof failed: "+audio.failure_message());
           audio.stop();const auto stopped=audio.stats();
           if(!stopped.stopped||stopped.music_started||stopped.queued_music_bytes!=0)throw std::runtime_error("Native audio did not stop before window teardown.");
@@ -7927,6 +8008,7 @@ int main(int argc,char **argv){
               throw std::runtime_error("Scientist guidance did not coalesce, bound its queue, or stop cleanly.");
             std::cout<<"voice_check={\"available\":true,\"played\":"<<state.voice_play_count<<",\"unknown_denied\":true,\"overlap_prevented\":true,\"queue_bounded\":true,\"stopped\":true}\n";
           }
+          std::cout<<"audio_hover_check={\"played\":"<<state.hover_count<<"}\n";
           std::cout<<"audio_check={\"assets_loaded\":true,\"music_starts\":"<<state.music_start_count<<",\"confirm_count\":"<<state.confirm_count<<",\"queued_music_bytes\":"<<state.queued_music_bytes<<",\"boot_services\":"<<audio_boot_services<<",\"stopped\":true}\n";
         }
         if(options.campaign_profile&&(!campaign_started||!campaign_mid_requested||!campaign_mid_saved||!campaign_advanced_after_mid||!campaign_final_requested||campaign.campaign_profile_notice()!=SessionNoticeKind::Saved||campaign.campaign_profile_speed()!=StrategicSpeed::Paused))throw std::runtime_error("Campaign profile did not complete active simulation, saves, and final UI pause.");

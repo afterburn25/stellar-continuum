@@ -191,6 +191,17 @@ void unexplored_alpha_preserves_resources_and_dims_every_component() {
 } // namespace
 
 int main() try {
+  for(const int height:{720,1080,1440,2160}){
+    const auto start=galaxy_star_core_radius(1.,height);
+    const auto near=galaxy_star_core_radius(5.,height);
+    const auto close=galaxy_star_core_radius(30.,height);
+    require(start>=4.f&&near>start*2.f&&close>near*2.f,"star markers stayed tiny or failed to grow with zoom");
+    require(galaxy_star_core_radius(5.,height,GalaxyStarVisualClass::giant)>near*1.5f,"giant marker lost its larger silhouette");
+    NativeGalaxyStarMarkerRenderer renderer;DrawList a,b;
+    renderer.append(a,{100,100},start,{},false);renderer.append(b,{100,100},close,{},false);
+    require(image_at(b,1).destination.width>image_at(a,1).destination.width*4.f,"zoom did not enlarge drawn stars");
+    require(image_at(a,1).resource==image_at(b,1).resource,"zoom allocated a new star texture");
+  }
   shared_discrete_resources();
   compact_and_multiplicity_cues();
   hard_budget_and_validation();

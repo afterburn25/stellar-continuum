@@ -470,7 +470,7 @@ def export(preset_name):
                 "An installed Vulkan graphics driver and Windows Media Foundation components are required. No Godot or .NET runtime is used.\n"
                 "Native music begins at the main menu and continues into the campaign; startup loading stays silent.\n"
                 "Known systems open orbital maps; owned planets show grouped colony information.\n"
-                "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
+                "Choose Manage Planet on an owned solid world to inspect stats, select a building slot, review costs, and confirm construction.\n"
                 "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
                 "New Game opens large Campaign/Sandbox cards, then species portraits, biology, galaxy sizes, rival/ancient empires, and an automatic random seed. Copy setup and Restore defaults are available.\n"
                 "Settings in the main and pause menus provide General, Audio, Video, Voice & Subtitles and Controls.\n"

@@ -19,6 +19,7 @@ public:
   ~NativeVideoController();
   NativeVideoController(const NativeVideoController&) = delete;
   NativeVideoController& operator=(const NativeVideoController&) = delete;
+  void set_hover_callback(std::function<void()> callback){view_.set_hover_callback(std::move(callback));}
   void open();
   void set_adapter(std::string value,std::function<void()> open_panel) {view_.set_adapter(std::move(value),std::move(open_panel));}
   void close();

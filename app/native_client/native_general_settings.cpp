@@ -80,7 +80,7 @@ bool NativeGeneralSettings::save(GeneralPreferences value) {
   }
   saved_=std::move(value);error_.clear();if(apply_)apply_(saved_);return true;
 }
-void NativeGeneralSettings::open(){draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
+void NativeGeneralSettings::open(){hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
 void NativeGeneralSettings::cancel(){draft_=saved_;pending_request_.reset();visible_=false;}
 Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
   const UiRect clip{l.folder.x+12*l.scale,l.folder.y+12*l.scale,l.folder.width-24*l.scale,l.folder.height-24*l.scale};
@@ -126,6 +126,7 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   if(!visible_)return false;
   if(event.type==InputEventType::EscapePressed){cancel();return true;}
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
+  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.browse,layout.defaults,layout.cancel,layout.save}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
     const auto max_scroll=std::max(0.f,static_cast<float>(measure_(text).height)-text.clip->height);

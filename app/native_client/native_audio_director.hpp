@@ -27,6 +27,7 @@ struct NativeAudioStats final {
   bool assets_loaded{};
   std::uint64_t music_start_count{};
   std::uint64_t confirm_count{};
+  std::uint64_t hover_count{};
   std::uint64_t event_count{};
   bool music_started{};
   std::size_t queued_music_bytes{};

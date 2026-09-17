@@ -52,3 +52,28 @@ verify modal isolation, and reload the reserved building at 720p and 1080p.
 Geometry/input checks additionally cover 1440p and 4K. Earlier terrain-rendering
 smokes remain explicitly compatibility probes; a separate planetary smoke tests
 the screen used by players.
+
+## Menu hover audio
+
+The original `ui-hover.wav` plays when the pointer enters a different enabled
+menu item, game-mode card, setup control, settings control, pause-menu item or
+navigation icon. Staying within one item, rendering, help text and disabled
+Story/Continue controls stay silent. Modal pages block underlying hover targets.
+Hover uses the existing master/effects gain and mute controls, remains rate
+limited, and does not restart music. New-game audio checks require a real queued
+hover effect; pointer transition tests cover 720p and 1080p.
+
+## Galaxy navigation and star scale
+
+Campaigns open centered on the player's home neighborhood (nearest eight systems),
+not the fitted overview. Home returns to this useful scale. The overview is the
+minimum zoom and remains centered when dragged; closer views pan the camera
+within the fitted world bounds. Stars, lanes and territory share one transform.
+Resizing preserves relative zoom. Star light profiles start larger, grow with
+magnification, preserve spectral colors/multiplicity and use shared textures.
+Giant markers have a larger silhouette. Picking grows with the visible core;
+labels avoid bright cores rather than the entire faint corona. Solar-system
+star rendering is unchanged. Camera regression checks cover 720p through 4K;
+the real galaxy smoke verifies home framing, overview limits, pointer-anchored
+zoom, regional panning, and star growth before entering a system.
+

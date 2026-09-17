@@ -1,4 +1,5 @@
 #pragma once
+#include "native_menu_hover.hpp"
 
 // Modal video settings view ported from the reference MainMenuLayer.cs VIDEO
 // panel (VideoSettingsService): DISPLAY (borderless / exclusive fullscreen),
@@ -79,6 +80,7 @@ struct VideoSettingsResult {
 
 class NativeVideoSettingsView final {
 public:
+  void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void open(NativeVideoSettings current) noexcept;
   void set_adapter(std::string value, std::function<void()> open_panel) {adapter_label_=std::move(value);open_panel_=std::move(open_panel);}
   void close() noexcept;
@@ -101,6 +103,7 @@ public:
               double rollback_remaining_seconds = 0.) const;
 
 private:
+  stellar::native_menu_audio::HoverFeedback hover_feedback_;
   void cycle_choice(int index, int direction) noexcept;
   void reconcile_resolution() noexcept;
 
