@@ -1,4 +1,5 @@
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/core/fleet_transit.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -9,7 +10,8 @@ FreshCampaignState seed_fresh_campaign(std::int64_t seed,
                                        std::span<const CatalogStar> catalog,
                                        int system_count, int pre_warp_count,
                                        int ancient_count,
-                                       const std::string &player_species_id) {
+                                       const std::string &player_species_id,
+                                       std::optional<StellarPopulationOptions> population) {
   if (system_count != 250 && system_count != 500 && system_count != 1000 &&
       system_count != 2500)
     throw std::out_of_range(
@@ -29,6 +31,7 @@ FreshCampaignState seed_fresh_campaign(std::int64_t seed,
   }
 
   auto physical = generate_stellar_catalog(seed, system_count, catalog);
+  if (population) apply_stellar_population(seed, physical, *population);
   auto founding = create_founding_catalog(seed, physical, pre_warp_count,
                                           ancient_count, player_species_id);
 
@@ -40,9 +43,21 @@ FreshCampaignState seed_fresh_campaign(std::int64_t seed,
   result.used_constrained_home_fallback =
       founding.used_constrained_home_fallback;
 
+  if (population) {
+    const auto removed=apply_stellar_planetary_physics(result.systems,result.bodies);
+    for (auto& system:result.systems) {
+      if(auto found=removed.find(system.id);found!=removed.end())system.engulfed_planets+=found->second;
+      system.has_habitable_world=std::any_of(result.bodies.begin(),result.bodies.end(),[&](const auto& body){return body.system_id==system.id&&body.legacy_colonization_candidate;});
+    }
+  }
+
   result.colonies = seed_colonies(result.civilizations, result.bodies);
   result.fleets =
       seed_fleets(result.systems, result.civilizations, result.colonies);
+  if(population)for(auto& fleet:result.fleets)if(fleet.current_system_id){
+    const auto& p=result.systems.at(static_cast<std::size_t>(*fleet.current_system_id)).stellar_object;
+    if(p)begin_fleet_local_transit(fleet,FleetTransitPhase::None,{}, {},&*p);
+  }
   result.economies = seed_economies(result.civilizations);
   result.technologies = seed_legacy_technologies(result.civilizations);
   result.construction = seed_construction(result.civilizations);

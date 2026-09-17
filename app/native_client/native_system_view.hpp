@@ -25,6 +25,7 @@ struct NativeSystemBodyDetails {
   stellar::core::PlanetarySolventRegime available_solvent{};
   double radiation_hazard{};
   bool is_immersed_environment{}, has_solid_surface{};
+  std::optional<stellar::core::StellarPlanetProperties> stellar_exposure;
 };
 
 struct NativeSystemBody {
@@ -52,6 +53,7 @@ struct NativeSystemSnapshot {
   std::optional<stellar::core::StellarClass> primary_stellar_class,
       secondary_stellar_class, tertiary_stellar_class;
   std::vector<NativeSystemBody> bodies;
+  std::optional<stellar::core::StellarPhysicalProperties> stellar_object;
 };
 
 struct NativeSystemViewResult {

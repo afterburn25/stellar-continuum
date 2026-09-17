@@ -320,7 +320,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
                       [&](const auto &colony) {
                         return colony.system_id == *fleet.current_system_id;
                       });
-      if (body &&
+      if (body && !(body->stellar_exposure && body->stellar_exposure->baked) &&
           world.knowledge.system_survey_level(fleet.civilization_id,
                                               body->system_id) ==
               SystemSurveyLevel::fully_surveyed &&

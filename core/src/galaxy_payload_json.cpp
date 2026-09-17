@@ -1,6 +1,7 @@
 #include <stellar/core/galaxy_payload_json.hpp>
 
 #include "json_ordered_value.hpp"
+#include "stellar_object_json.hpp"
 #include "galaxy_payload_json_internal.hpp"
 
 #include <nlohmann/json.hpp>
@@ -358,6 +359,19 @@ Enum enumeration(const Value &value, const std::string &path) {
   return static_cast<Enum>(integer<int>(value, path));
 }
 
+Json extension_json(const Value& v) {
+  if (auto n=std::get_if<Value::Number>(&v.data)) return Json::parse(n->text);
+  if (auto a=std::get_if<Array>(&v.data)) { Json j=Json::array();for(const auto& x:*a)j.push_back(extension_json(x));return j; }
+  if (auto o=std::get_if<Object>(&v.data)) { Json j=Json::object();for(const auto& [k,x]:*o)j[k]=extension_json(x);return j; }
+  if (auto b=std::get_if<bool>(&v.data))return *b;
+  if (auto t=std::get_if<std::string>(&v.data))return *t;
+  return nullptr;
+}
+template<class T> T decode_stellar_extension(const Value& v,const std::string& path) {
+  try { return extension_json(v).template get<T>(); }
+  catch(const std::exception& e) { json_error(GalaxyPayloadJsonErrorPhase::Parse,v,path,std::string("Invalid stellar extension: ")+e.what()); }
+}
+
 GalacticCoreMetadata decode_core_value(const Value &value,
                                        const std::string &path) {
   GalacticCoreMetadata result;
@@ -371,6 +385,7 @@ GalacticCoreMetadata decode_core_value(const Value &value,
     else if (name == "X") result.x = single(member, member_path);
     else if (name == "Y") result.y = single(member, member_path);
     else if (name == "ExclusionRadius") result.exclusion_radius = single(member, member_path);
+    else if (name == "BlackHole") result.black_hole = decode_stellar_extension<CentralBlackHoleProperties>(member,member_path);
   }
   if (!landmark_key)
     json_error(GalaxyPayloadJsonErrorPhase::Representability, value,
@@ -401,6 +416,8 @@ GalaxyGenerationMetadata decode_metadata_value(const Value &value,
     else if (name == "CreatedAtUtc") result.created_at_utc = canonical_datetime_offset(member, p);
     else if (name == "SystemCount") result.system_count = integer<int>(member, p);
     else if (name == "GalaxyShape") { result.galaxy_shape = string(member, p); galaxy_shape = true; }
+    else if (name == "StellarPopulation") result.stellar_population=decode_stellar_extension<StellarPopulationOptions>(member,p);
+    else if (name == "StellarProfileVersion") result.stellar_profile_version=string(member,p);
     else if (name == "StellarVariety") { result.stellar_variety = string(member, p); stellar_variety = true; }
     else if (name == "PlanetBearingSystems") { result.planet_bearing_systems = string(member, p); planet_bearing = true; }
     else if (name == "HabitableWorlds") { result.habitable_worlds = string(member, p); habitable_worlds = true; }
@@ -450,6 +467,9 @@ StellarSystemPersistenceDto decode_system(const Value &value,
     else if (name == "X") result.x = single(member, p);
     else if (name == "Y") result.y = single(member, p);
     else if (name == "GalacticDepthLightYears") result.galactic_depth_light_years = optional_value<double>(member, p, number);
+    else if (name == "StellarObject") result.stellar_object=decode_stellar_extension<StellarPhysicalProperties>(member,p);
+    else if (name == "EngulfedPlanets") result.engulfed_planets=integer<int>(member,p);
+    else if (name == "StellarRegion") result.stellar_region=decode_stellar_extension<StellarRegion>(member,p);
     else if (name == "StellarCatalogId") result.stellar_catalog_id = optional_value<std::string>(member, p, string);
     else if (name == "Archetype") result.archetype = enumeration<StarArchetype>(member, p);
     else if (name == "HasHabitableWorld") result.has_habitable_world = boolean(member, p);
@@ -504,6 +524,7 @@ PlanetaryBodyPersistenceDto decode_body(const Value &value,
     else if (name == "HasRareResource") { result.has_rare_resource = boolean(member, p); rare = true; }
     else if (name == "HasAnomaly") { result.has_anomaly = boolean(member, p); anomaly = true; }
     else if (name == "HasPreWarpCivilization") { result.has_pre_warp_civilization = boolean(member, p); prewarp = true; }
+    else if (name == "StellarExposure") result.stellar_exposure=decode_stellar_extension<StellarPlanetProperties>(member,p);
     else if (name == "OrbitalEccentricity") result.orbital_eccentricity = number(member, p);
     else if (name == "OrbitalInclinationDegrees") result.orbital_inclination_degrees = number(member, p);
   }
@@ -935,6 +956,7 @@ FleetSaveDto decode_fleet(const Value &value, const std::string &path) {
     else if (name == "LocalTransitStartY") result.local_transit_start_y = single(member, p);
     else if (name == "LocalTransitPositionX") result.local_transit_position_x = single(member, p);
     else if (name == "LocalTransitPositionY") result.local_transit_position_y = single(member, p);
+    else if (name == "StellarTransitPath") result.stellar_transit_path = decode_stellar_extension<std::vector<std::array<float,2>>>(member,p);
     else if (name == "LocalTransitTargetX") result.local_transit_target_x = single(member, p);
     else if (name == "LocalTransitTargetY") result.local_transit_target_y = single(member, p);
     else if (name == "PlannedRouteSystemIds") result.planned_route_system_ids = optional_value<std::vector<int>>(member, p, int_list);
@@ -1361,10 +1383,12 @@ Json encode_optional_list(const std::optional<std::vector<T>> &values,
 }
 
 Json encode_core(const GalacticCoreMetadata &value) {
-  return {{"LandmarkKey", value.landmark_key},
+  Json result{{"LandmarkKey", value.landmark_key},
           {"X", value.x},
           {"Y", value.y},
           {"ExclusionRadius", value.exclusion_radius}};
+  if(value.black_hole) result["BlackHole"]=*value.black_hole;
+  return result;
 }
 
 std::string ascii_lower(std::string value) {
@@ -1399,6 +1423,8 @@ Json encode_metadata(const GalaxyGenerationMetadata &value) {
               {"GalacticCore", value.galactic_core
                                     ? encode_core(*value.galactic_core)
                                     : Json(nullptr)}};
+  if(value.stellar_population)result["StellarPopulation"]=*value.stellar_population;
+  if(value.stellar_profile_version)result["StellarProfileVersion"]=*value.stellar_profile_version;
   result["SpoilerFreeSummary"] =
       std::to_string(value.system_count) + " systems · " +
       ascii_lower(value.stellar_variety) + " stellar variety · " +
@@ -1416,6 +1442,8 @@ Json encode_system(const StellarSystemPersistenceDto &value) {
     result["GalacticDepthLightYears"] = *value.galactic_depth_light_years;
   if (value.stellar_catalog_id)
     result["StellarCatalogId"] = *value.stellar_catalog_id;
+  if(value.stellar_object) {result["StellarObject"]=*value.stellar_object;result["EngulfedPlanets"]=value.engulfed_planets;}
+  if(value.stellar_region)result["StellarRegion"]=*value.stellar_region;
   result["Archetype"] = static_cast<int>(value.archetype);
   result["HasHabitableWorld"] = value.has_habitable_world;
   result["HasAnomaly"] = value.has_anomaly;
@@ -1462,6 +1490,7 @@ Json encode_body(const PlanetaryBodyPersistenceDto &value) {
               {"HasRareResource", value.has_rare_resource},
               {"HasAnomaly", value.has_anomaly},
               {"HasPreWarpCivilization", value.has_pre_warp_civilization}};
+  if(value.stellar_exposure)result["StellarExposure"]=*value.stellar_exposure;
   if (value.orbital_eccentricity != 0)
     result["OrbitalEccentricity"] = value.orbital_eccentricity;
   if (value.orbital_inclination_degrees != 0)
@@ -1802,6 +1831,7 @@ Json encode_fleet(const FleetSaveDto &value) {
                optional_json(value.embarked_population_species_id)},
               {"Combat", value.combat ? encode_fleet_combat(*value.combat)
                                        : Json(nullptr)}};
+  if(!value.stellar_transit_path.empty())result["StellarTransitPath"]=value.stellar_transit_path;
   if (value.tactical_loadout)
     result["TacticalLoadout"] = encode_loadout(*value.tactical_loadout);
   if (value.tactical_vessel)

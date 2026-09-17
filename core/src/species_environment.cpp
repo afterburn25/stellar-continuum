@@ -195,7 +195,7 @@ PlanetSpeciesAssessment assess_species_planet(const SpeciesEnvironmentProfile& s
     validate_species(species);
     validate_planetary_body(body);
     const SpeciesEnvironmentAssessment environment = evaluate_species_environment(species, to_species_habitat(body.environment), adaptation);
-    const bool site = species.requires_immersion ? body.environment.is_immersed_environment : body.environment.has_solid_surface;
+    const bool site = !(body.stellar_exposure && body.stellar_exposure->baked) && (species.requires_immersion ? body.environment.is_immersed_environment : body.environment.has_solid_surface);
     const bool colonizable = site && environment.natural_habitability >= .20;
     const SettlementSuitability suitability = !site || environment.natural_habitability <= 0.0 ? SettlementSuitability::Incompatible :
         environment.natural_habitability < .20 ? SettlementSuitability::Marginal : environment.natural_habitability < .95 ?

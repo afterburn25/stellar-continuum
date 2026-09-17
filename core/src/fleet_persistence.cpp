@@ -114,7 +114,10 @@ std::vector<FleetState> restore_fleet_dtos(
                                    save_format_version,
                                    "fleet " + std::to_string(dto.id)))
                              : std::nullopt;
+    if(dto.stellar_transit_path.size()>132)throw std::runtime_error("Stellar transit path exceeds route limit.");
+    for(const auto& p:dto.stellar_transit_path)if(!std::isfinite(p[0])||!std::isfinite(p[1]))throw std::runtime_error("Invalid stellar transit waypoint.");
     FleetState fleet;
+    fleet.stellar_transit_path=dto.stellar_transit_path;
     fleet.id = dto.id;
     fleet.civilization_id = dto.civilization_id;
     fleet.name = dto.name;
@@ -214,6 +217,7 @@ std::vector<FleetSaveDto> capture_fleet_dtos(std::span<FleetState> fleets) {
     dto.local_transit_start_y = fleet.local_transit_start.y;
     dto.local_transit_position_x = fleet.local_transit_position.x;
     dto.local_transit_position_y = fleet.local_transit_position.y;
+    dto.stellar_transit_path=fleet.stellar_transit_path;
     dto.local_transit_target_x = fleet.local_transit_target.x;
     dto.local_transit_target_y = fleet.local_transit_target.y;
     dto.planned_route_system_ids = fleet.planned_route_system_ids;

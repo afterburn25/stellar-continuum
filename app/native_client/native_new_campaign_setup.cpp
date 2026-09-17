@@ -126,6 +126,7 @@ NativeNewCampaignSetupView NativeNewCampaignSetupController::build() const {
 
 NativeNewCampaignSetupAssessment NativeNewCampaignSetupController::prepare(
     const NativeNewCampaignSetupInput &input) const {
+  try{(void)stellar::core::stellar_population_weights(input.stellar_population);}catch(const std::exception&){return {false,"Choose a supported morphology and population state.",{}};}
   const auto seed = numeric_seed(input.seed_text);
   if (!seed)
     return {false,
@@ -152,7 +153,7 @@ NativeNewCampaignSetupAssessment NativeNewCampaignSetupController::prepare(
   stellar::core::PersistableFreshCampaignOptions options{
       input.created_at_utc, input.system_count,
       input.pre_warp_civilization_count, input.ancient_civilization_count,
-      input.player_species_id};
+      input.player_species_id, input.stellar_population};
   return {true, "Campaign setup is ready.",
           NativePreparedNewCampaign{*seed, std::move(options)}};
 }

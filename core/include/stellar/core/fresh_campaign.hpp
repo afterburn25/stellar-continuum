@@ -47,6 +47,7 @@ FreshCampaignState
 seed_fresh_campaign(std::int64_t seed, std::span<const CatalogStar> catalog,
                     int system_count = 500, int pre_warp_count = 6,
                     int ancient_count = 1,
-                    const std::string &player_species_id = "terran_baseline");
+                    const std::string &player_species_id = "terran_baseline",
+                    std::optional<StellarPopulationOptions> population = std::nullopt);
 
 } // namespace stellar::core

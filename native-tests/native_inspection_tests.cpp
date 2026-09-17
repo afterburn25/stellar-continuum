@@ -158,6 +158,23 @@ void all_enum_labels() {
   }
 }
 
+void stellar_physics_requires_completed_observation() {
+  for(const auto level:{SystemSurveyLevel::unknown,SystemSurveyLevel::detected,SystemSurveyLevel::partially_surveyed}) {
+    auto ordinary=world();set_survey(ordinary,level);
+    ordinary.systems[1].stellar_object=generate_stellar_physics(41,StellarObjectType::GYellowStar);
+    auto secret=ordinary;
+    secret.systems[1].stellar_object=generate_stellar_physics(91,StellarObjectType::JetBlackHole);
+    require(build_system_inspection(ordinary,2)==build_system_inspection(secret,2),
+            "undiscovered stellar physics, rarity or jets leaked into inspection");
+  }
+  auto observed=world();set_survey(observed,SystemSurveyLevel::fully_surveyed);
+  observed.systems[1].stellar_object=generate_stellar_physics(91,StellarObjectType::JetBlackHole);
+  const auto inspection=build_system_inspection(observed,2);
+  require(!fact(inspection,"STELLAR RADIUS").value.empty()&&
+          fact(inspection,"STELLAR HAZARD").value=="Directional high-energy jets",
+          "completed observation did not reveal physical measurements and hazards");
+}
+
 void own_colonies_are_complete_sorted_and_body_safe() {
   auto value = world();
   set_survey(value, SystemSurveyLevel::fully_surveyed);
@@ -346,6 +363,7 @@ int main() try {
   foreign_state_never_leaks();
   survey_redaction_and_public_distance();
   all_enum_labels();
+  stellar_physics_requires_completed_observation();
   own_colonies_are_complete_sorted_and_body_safe();
   invalid_observer_and_missing_target_are_independent();
   card_layout_scroll_and_refresh();

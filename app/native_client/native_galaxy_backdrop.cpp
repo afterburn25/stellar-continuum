@@ -340,6 +340,28 @@ void NativeGalaxyBackdrop::bind(GalaxyBackdropCatalog catalog) {
       x-=std::floor(x); y-=std::floor(y); add(x,y,true);
     }
   }
+  density_layer_.reset();
+  if(!catalog.use_spiral_artwork){
+    // Non-spiral morphologies use the generated stellar density itself, so a
+    // ring/ellipsoid/clumped population never sits on unrelated spiral arms.
+    constexpr int w=512,h=384;
+    std::vector<float> density(w*h);
+    for(const auto& point:catalog.system_positions){
+      const auto x=static_cast<float>((point.x-frame.left)/frame.width*w);
+      const auto y=static_cast<float>((point.y-frame.top)/frame.height*h);
+      for(int py=std::max(0,static_cast<int>(y)-24);py<std::min(h,static_cast<int>(y)+25);++py)
+        for(int px=std::max(0,static_cast<int>(x)-24);px<std::min(w,static_cast<int>(x)+25);++px){
+          const float dx=px-x,dy=py-y;
+          density[py*w+px]+=std::exp(-(dx*dx+dy*dy)/150.f);
+        }
+    }
+    const auto peak=*std::max_element(density.begin(),density.end());
+    std::vector<std::uint8_t> pixels(w*h*4);
+    for(int i=0;i<w*h;++i){const float value=peak>0?std::pow(density[i]/peak,.65f):0.f;
+      pixels[i*4]=145;pixels[i*4+1]=174;pixels[i*4+2]=198;pixels[i*4+3]=static_cast<std::uint8_t>(std::clamp(value*165.f,0.f,165.f));
+    }
+    density_layer_=RgbaImage::create(w,h,std::move(pixels));
+  }
   catalog_ = std::move(catalog); artwork_frame_ = frame;
 }
 
@@ -375,7 +397,7 @@ void NativeGalaxyBackdrop::append(DrawList &out, const GalaxyBackdropView &view)
     const auto top_left=view.camera.project({frame.left,frame.top},view.viewport_width,view.viewport_height);
     const auto destination=UiRect{top_left.x,top_left.y,static_cast<float>(frame.width*view.camera.pixels_per_world),static_cast<float>(frame.height*view.camera.pixels_per_world)};
     if (intersects(destination,viewport)) {
-      if (auto galaxy=assets_->request_galaxy_layer()) {
+      if (auto galaxy=density_layer_?density_layer_:assets_->request_galaxy_layer()) {
         out.world.emplace_back(Image{galaxy,destination,std::nullopt,{255,255,255,static_cast<std::uint8_t>(std::lround(255.*blend))},viewport});
         last_stats_.galaxy_layer_images=1;
       } else artwork_ready_=false;

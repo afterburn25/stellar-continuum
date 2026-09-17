@@ -21,6 +21,8 @@ NativeSystemBodyVisualClass visual_class(const PlanetaryBody &body,
     return body.kind == PlanetaryBodyKind::Moon
                ? NativeSystemBodyVisualClass::unknown_moon
                : NativeSystemBodyVisualClass::unknown_planet;
+  if(body.stellar_exposure&&body.stellar_exposure->baked&&body.environment.has_solid_surface)
+    return NativeSystemBodyVisualClass::hot_rocky;
   if (body.kind == PlanetaryBodyKind::Moon)
     return NativeSystemBodyVisualClass::moon;
   if (canonical_sol) {
@@ -108,6 +110,7 @@ NativeSystemViewResult NativeSystemViewController::build(
       .catalog_name = system->name, .survey_level = level,
       .survey_progress = world.knowledge.system_survey_progress(observer, system->id)};
   if (detailed) {
+    result.stellar_object=system->stellar_object;
     result.archetype = system->archetype;
     result.primary_stellar_class = system->primary;
     result.secondary_stellar_class = system->secondary;
@@ -132,7 +135,7 @@ NativeSystemViewResult NativeSystemViewController::build(
           body.environment.pressure_kpa, body.environment.atmosphere,
           body.environment.available_solvent, body.environment.radiation_hazard,
           body.environment.is_immersed_environment,
-          body.environment.has_solid_surface};
+          body.environment.has_solid_surface,body.stellar_exposure};
     item.visual_class = visual_class(body, detailed, canonical_sol);
     item.sol_texture_key = sol_texture(body, canonical_sol);
     result.bodies.push_back(std::move(item));

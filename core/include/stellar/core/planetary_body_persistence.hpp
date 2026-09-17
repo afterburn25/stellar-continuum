@@ -54,6 +54,7 @@ struct PlanetaryBodyPersistenceDto {
   bool has_pre_warp_civilization{};
   double orbital_eccentricity{};
   double orbital_inclination_degrees{};
+  std::optional<StellarPlanetProperties> stellar_exposure;
 };
 
 // Preserves the nullable list and nullable element distinctions accepted by the

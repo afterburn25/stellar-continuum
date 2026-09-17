@@ -59,6 +59,7 @@ PlanetaryBody materialize(const PlanetaryBodyPersistenceDto &body) {
       body.has_pre_warp_civilization,
       body.orbital_eccentricity,
       body.orbital_inclination_degrees,
+      body.stellar_exposure,
   };
 }
 
@@ -102,6 +103,7 @@ PlanetaryBodyPersistenceDto project(const PlanetaryBody &body) {
       body.has_pre_warp_civilization,
       body.orbital_eccentricity,
       body.orbital_inclination_degrees,
+      body.stellar_exposure,
   };
 }
 

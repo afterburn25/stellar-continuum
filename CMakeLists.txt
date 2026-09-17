@@ -47,7 +47,15 @@ file(SHA256 "${CMAKE_SOURCE_DIR}/third_party/nlohmann/json.hpp" STELLAR_JSON_SHA
 if(NOT STELLAR_JSON_SHA256 STREQUAL "aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63")
   message(FATAL_ERROR "Vendored nlohmann JSON differs from the reviewed 3.12.0 header; review and pin dependency changes explicitly")
 endif()
-add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/legacy_random.cpp
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/stellar/population-v1.json")
+file(READ "${CMAKE_SOURCE_DIR}/data/stellar/population-v1.json" STELLAR_POPULATION_CONFIG)
+string(REPLACE "\n" ")stellarconfig\"\nR\"stellarconfig(" STELLAR_POPULATION_CONFIG "${STELLAR_POPULATION_CONFIG}")
+configure_file(core/src/stellar_population_config.hpp.in generated/stellar_population_config.hpp @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/stellar/population-profiles-v1.json")
+file(READ "${CMAKE_SOURCE_DIR}/data/stellar/population-profiles-v1.json" STELLAR_PROFILES_CONFIG)
+string(REPLACE "\n" ")stellarprofiles\"\nR\"stellarprofiles(" STELLAR_PROFILES_CONFIG "${STELLAR_PROFILES_CONFIG}")
+configure_file(core/src/stellar_profiles_config.hpp.in generated/stellar_profiles_config.hpp @ONLY)
+add_library(stellar_core STATIC core/src/stellar_object.cpp core/src/stellar_population_profiles.cpp core/src/interstellar_distance.cpp core/src/legacy_random.cpp
   core/src/galaxy_catalog.cpp core/src/stellar_population.cpp core/src/stellar_traits.cpp core/src/planetary_catalog.cpp
   core/src/planetary_generation.cpp core/src/planetary_diversity.cpp
   core/src/species_environment.cpp core/src/species_homeworlds.cpp core/src/nearby_habitable.cpp
@@ -116,7 +124,15 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/player_campaign_save.cpp
   core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
+target_include_directories(stellar_core PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
+add_executable(stellar_object_tests native-tests/stellar_object_tests.cpp)
+add_executable(stellar_population_profiles_tests native-tests/stellar_population_profiles_tests.cpp)
+target_link_libraries(stellar_population_profiles_tests PRIVATE stellar_core)
+add_test(NAME stellar_population_profiles COMMAND stellar_population_profiles_tests)
+target_link_libraries(stellar_object_tests PRIVATE stellar_core stellar_json)
+add_test(NAME stellar_objects COMMAND stellar_object_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "${CMAKE_BINARY_DIR}/stellar-population-diagnostics.txt")
+set_tests_properties(stellar_objects PROPERTIES TIMEOUT 180)
 add_executable(stellar-continuum app/headless_main.cpp app/galaxy_main.cpp
   app/fresh_campaign_output.cpp app/adaptive_campaign_host.cpp)
 target_include_directories(stellar-continuum PRIVATE "${CMAKE_BINARY_DIR}/generated")

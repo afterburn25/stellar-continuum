@@ -1,4 +1,5 @@
 #include <stellar/core/galaxy_generation_metadata.hpp>
+#include <stellar/core/stellar_population_profiles.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -41,7 +42,7 @@ bool dotnet_float_equal(float left, float right) {
 bool GalacticCoreMetadata::operator==(const GalacticCoreMetadata &other) const {
   return landmark_key == other.landmark_key && dotnet_float_equal(x, other.x) &&
          dotnet_float_equal(y, other.y) &&
-         dotnet_float_equal(exclusion_radius, other.exclusion_radius);
+         dotnet_float_equal(exclusion_radius, other.exclusion_radius) && black_hole == other.black_hole;
 }
 
 std::optional<GalacticCoreMetadata>
@@ -55,6 +56,7 @@ validate_galactic_core_metadata(
       !std::isfinite(core->exclusion_radius) || core->exclusion_radius <= 0.0F)
     throw std::runtime_error("Campaign galactic-core metadata is invalid.");
 
+  if(core->black_hole) validate_central_black_hole(*core->black_hole);
   const auto radius_squared = core->exclusion_radius * core->exclusion_radius;
   for (const auto &system : systems) {
     const auto dx = system.position.x - core->x;
@@ -79,6 +81,9 @@ validate_galaxy_generation_metadata(
       metadata->guaranteed_nearby_habitable_worlds < 0)
     throw std::runtime_error(
         "Campaign generation metadata is invalid or does not match the saved galaxy.");
+  if(metadata->stellar_population) (void)stellar_population_weights(*metadata->stellar_population);
+  if(metadata->stellar_profile_version&&(!metadata->stellar_population||*metadata->stellar_profile_version!=stellar_population_profile_version()))
+    throw std::runtime_error("Unsupported saved stellar population profile version.");
   (void)validate_galactic_core_metadata(metadata->galactic_core, systems);
   return metadata;
 }

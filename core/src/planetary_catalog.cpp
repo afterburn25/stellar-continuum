@@ -86,6 +86,7 @@ bool is_sol(const StellarSystem& system) {
 } // namespace
 
 void validate_planetary_body(const PlanetaryBody& body) {
+    if(body.stellar_exposure) validate_stellar_planet(*body.stellar_exposure);
     if (body.id < 0) invalid("Planetary body IDs must be non-negative.");
     if (body.system_id < 0) invalid("Planetary body system IDs must be non-negative.");
     if (body.orbit_index < 0) invalid("Planetary body orbit indices must be non-negative.");

@@ -30,6 +30,7 @@ struct NativeGalaxyStarAppearance {
   GalaxyStarVisualClass primary{GalaxyStarVisualClass::unknown};
   std::optional<GalaxyStarVisualClass> secondary;
   std::optional<GalaxyStarVisualClass> tertiary;
+  std::optional<stellar::native_map::Color> observed_color;
 };
 
 // Screen-space light profile grows with magnification, independently of the

@@ -1,0 +1,490 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "objectType": "a-white",
+      "closeAsset": "A-Class blue-white.png",
+      "distanceAsset": "A-Class blue-white Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        213,
+        231,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "accreting-black-hole",
+      "closeAsset": "Accreting Black Hole.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "accretion-disk",
+      "colorProfile": [
+        255,
+        185,
+        107
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "m-red-dwarf",
+      "closeAsset": "Active M-Class Red Dwarf.png",
+      "distanceAsset": "Active M-Class Red Dwarf Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        95,
+        58
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "b-blue-white",
+      "closeAsset": "B-Class star.png",
+      "distanceAsset": "B-Class star Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        136,
+        188,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "jet-black-hole",
+      "closeAsset": "Black Hole With Relativistic Jets.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "bipolar-accretion",
+      "colorProfile": [
+        155,
+        212,
+        255
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "blue-giant",
+      "closeAsset": "Blue Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        129,
+        193,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1.8
+    },
+    {
+      "objectType": "blue-supergiant",
+      "closeAsset": "Blue Super Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        126,
+        190,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 2.8
+    },
+    {
+      "objectType": "brown-dwarf",
+      "closeAsset": "Brown Dwarf.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "dim-point",
+      "colorProfile": [
+        146,
+        55,
+        36
+      ],
+      "luminosityProfile": 0.15,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "f-yellow-white",
+      "closeAsset": "F-Class White  Yellow-White Star.png",
+      "distanceAsset": "F-Class White  Yellow-White Star Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        246,
+        209
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "g-yellow",
+      "closeAsset": "G-Class Yellow.png",
+      "distanceAsset": "G-Class Yellow Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        230,
+        147
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "hypergiant",
+      "closeAsset": "Hyper Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        189,
+        117
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 2.8
+    },
+    {
+      "objectType": "k-orange",
+      "closeAsset": "K-Class Orange Star.png",
+      "distanceAsset": "K-Class Orange Star Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        175,
+        82
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "magnetar",
+      "closeAsset": "Magnetar.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "magnetic-halo",
+      "colorProfile": [
+        125,
+        218,
+        255
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "quiet-neutron",
+      "closeAsset": "Neutron Star.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        176,
+        219,
+        255
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "o-hot-blue",
+      "closeAsset": "O-Class Hot Blue.png",
+      "distanceAsset": "O-Class Hot Blue Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        119,
+        175,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "pulsar",
+      "closeAsset": "Pulsar.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "polar-pulse",
+      "colorProfile": [
+        118,
+        204,
+        255
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "quiescent-black-hole",
+      "closeAsset": "Quiescent Black Hole.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "gravitational-sensor",
+      "colorProfile": [
+        90,
+        120,
+        151
+      ],
+      "luminosityProfile": 0.15,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "m-red-dwarf-quiet",
+      "closeAsset": "Quiet M-Class Red Dwarf.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        95,
+        58
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "red-giant",
+      "closeAsset": "Red Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        94,
+        42
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1.8
+    },
+    {
+      "objectType": "red-supergiant",
+      "closeAsset": "Red Super Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        79,
+        36
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 2.8
+    },
+    {
+      "objectType": "central-supermassive-black-hole",
+      "closeAsset": "Super Massive Blackhole.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "gravitational-sensor",
+      "colorProfile": [
+        90,
+        120,
+        151
+      ],
+      "luminosityProfile": 0.15,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "white-dwarf",
+      "closeAsset": "White Dwarf.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        198,
+        222,
+        255
+      ],
+      "luminosityProfile": 1,
+      "visualScaleProfile": 0.6
+    },
+    {
+      "objectType": "wolf-rayet",
+      "closeAsset": "Wolf-Rayet Star.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "wind-halo",
+      "colorProfile": [
+        166,
+        211,
+        255
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1
+    },
+    {
+      "objectType": "yellow-giant",
+      "closeAsset": "Yellow Giant.png",
+      "distanceAsset": "Yellow Giant Distance.png",
+      "automaticPair": true,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        213,
+        87
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 1.8
+    },
+    {
+      "objectType": "yellow-supergiant",
+      "closeAsset": "Yellow Super Giant.png",
+      "distanceAsset": null,
+      "automaticPair": false,
+      "fallbackDistanceMode": "stellar-point",
+      "colorProfile": [
+        255,
+        213,
+        93
+      ],
+      "luminosityProfile": 1.6,
+      "visualScaleProfile": 2.8
+    }
+  ],
+  "files": [
+    {
+      "filename": "A-Class blue-white Distance.png",
+      "sha256": "c13cb92476f4f2abf13430317e955c9971f65ce34feba0aaceb3eb7783d52db4"
+    },
+    {
+      "filename": "A-Class blue-white.png",
+      "sha256": "4119950830916d25d2aede5a13e224d53c3c3c5187f6f24347fd9228202352a7"
+    },
+    {
+      "filename": "Accreting Black Hole.png",
+      "sha256": "24f29dcfb40ca35932ffc23bbb440e551f8ed5b4450a0510f6c6712960131bf7"
+    },
+    {
+      "filename": "Active M-Class Red Dwarf Distance.png",
+      "sha256": "2f4a11bc126ebed698a8c50268e418ca3e5923f6bd0cd2868fa4ce247d1d2b2c"
+    },
+    {
+      "filename": "Active M-Class Red Dwarf.png",
+      "sha256": "50386778108ac4e27cdaef4947e6babec7a4d79485cde48cfb14d4c73bd45335"
+    },
+    {
+      "filename": "B-Class star Distance.png",
+      "sha256": "473352ca274dc7a8ce3525c4064345cd7e9b9ed48723f846f2adffa1f4de737f"
+    },
+    {
+      "filename": "B-Class star.png",
+      "sha256": "865ead670df53f494dd3d7af10636d4108eea1aa5fae3055b41c23b81b0f2bd8"
+    },
+    {
+      "filename": "Black Hole With Relativistic Jets.png",
+      "sha256": "7ae05f5dd292cd180d76065d828c347ea5ef88ab00a02950c8a0fc9f5d7442f3"
+    },
+    {
+      "filename": "Blue Giant.png",
+      "sha256": "571b1b6c42827c9627338d89d1122471e0918953849d3a929f3af691d7592647"
+    },
+    {
+      "filename": "Blue Super Giant.png",
+      "sha256": "00ea13e745a1aec18ab77f697acf669e01bf70f06c847b5680085ff4907457fc"
+    },
+    {
+      "filename": "Brown Dwarf.png",
+      "sha256": "796f378c03d35185d52d2b5685e448fc1d083a7596cfc240881787126de56b07"
+    },
+    {
+      "filename": "F-Class White  Yellow-White Star Distance.png",
+      "sha256": "37447446d93f5efecbfe2b740b90f7835ad3cd434061681e23ac6472357bca83"
+    },
+    {
+      "filename": "F-Class White  Yellow-White Star.png",
+      "sha256": "2fb1ba3b2cca820dca4a3287d8aeba82c95143ec2221b4b717777abfceaf129b"
+    },
+    {
+      "filename": "G-Class Yellow Distance.png",
+      "sha256": "8b212f55fbad41ee27cb1bb78bdbd940a8b15d2bbcf1bd20a9de10a68410367a"
+    },
+    {
+      "filename": "G-Class Yellow.png",
+      "sha256": "7549d0d83a17170851aaec7e5af75d49d919f77ee947fd8b23c6a95db1757c45"
+    },
+    {
+      "filename": "Hyper Giant.png",
+      "sha256": "404ec37c2876603b174b06f6c582de5944d48a4e7c9ec9617c760f8ecf9dd905"
+    },
+    {
+      "filename": "K-Class Orange Star Distance.png",
+      "sha256": "c05d2417838ace600c5d62937c62556b0ca484c223b47648d30bbcbaf0dc03a5"
+    },
+    {
+      "filename": "K-Class Orange Star.png",
+      "sha256": "5b05af258bb4d195c040492ffdb0e2dae10ecc547b3b54c832f99b3429da456a"
+    },
+    {
+      "filename": "Magnetar.png",
+      "sha256": "07c2abc321d4cca7b0cc6e4aefee5b9378e6c12225cd874192ca745ba84ff74d"
+    },
+    {
+      "filename": "Neutron Star.png",
+      "sha256": "c908ae50f0997cdf8242e268202e8acf98e52b7c6898c3b4a9b380d50f5adbd3"
+    },
+    {
+      "filename": "O-Class Hot Blue Distance.png",
+      "sha256": "2b2a488fb6fe82454beb3e924a8dede9427c7444d75b63f10aa08432c0deb3ee"
+    },
+    {
+      "filename": "O-Class Hot Blue.png",
+      "sha256": "cac982e40ebdcac450e9313606a59201aee7f7978e82e1f2f6ce40e96e85ebdf"
+    },
+    {
+      "filename": "Pulsar.png",
+      "sha256": "c5a1fedbbf74baa20a741074d0f7adf1914a297384336049bb3b02a1072646ce"
+    },
+    {
+      "filename": "Quiescent Black Hole.png",
+      "sha256": "1986528acabaf1e30dfd5dec5215b1a57b6a44a9144e061d5a11d282379e0bf0"
+    },
+    {
+      "filename": "Quiet M-Class Red Dwarf.png",
+      "sha256": "5e808d22d5bf3adb061308063ce468c486476182ed20a9dde9bf0768358c3642"
+    },
+    {
+      "filename": "Red Giant.png",
+      "sha256": "71e8123c25bc0ad8cf7fbd3a0415ab292254f68035df2fb519b6396697b43c0f"
+    },
+    {
+      "filename": "Red Super Giant.png",
+      "sha256": "f1945482badfe50a269dbbccbd92cadc1f85cbfa4cebb49ab51ee4d8e8eca13f"
+    },
+    {
+      "filename": "Super Massive Blackhole.png",
+      "sha256": "a45ba08a2398f66e38792afd7c424fd53e36bda24fd04c79689e9a3d9bb23c9a"
+    },
+    {
+      "filename": "White Dwarf.png",
+      "sha256": "1b57131802c8407921003b50e9483b3feba376719941fdd2a2a1f4b4c91cdeb4"
+    },
+    {
+      "filename": "Wolf-Rayet Star.png",
+      "sha256": "d51d51520c53c76d66bb6edea6da2004c7d0b3b384add2bd15006a6cc2053b50"
+    },
+    {
+      "filename": "Yellow Giant Distance.png",
+      "sha256": "569a496352a6d92921930a06c9aaa63b8a3b432a29e41e52060fa90d7b8975f2"
+    },
+    {
+      "filename": "Yellow Giant.png",
+      "sha256": "905de4d8f865c5d1e84ee8bb3b97021db1a03f0315a9d7e4ff76c683683217c4"
+    },
+    {
+      "filename": "Yellow Super Giant.png",
+      "sha256": "122639a951e44b362094acd5fc66d4ad54ae14b1183a699eeb454e0bf7d80da6"
+    }
+  ],
+  "unmatched": []
+}

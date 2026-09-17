@@ -84,6 +84,13 @@ void ring_layers_occlude(){NativeCelestialAppearanceRenderer renderer;DrawList d
 int main(int argc,char**argv)try{
   if(argc!=1&&(argc!=3||std::string_view(argv[1])!="--capture"))throw std::runtime_error("Usage: native_celestial_appearance_tests [--capture <directory>]");
   star_cache_and_transience();black_hole_and_limits();ring_layers_occlude();async_preparation_contract();saturated_preparation_matches_sync();
+  NativeCelestialAppearanceRenderer activity;bool quiet=false,flare=false;
+  for(int frame=0;frame<900;++frame){
+    DrawList draw;activity.append_stellar_activity(draw,{120,120},60,{{255,211,98,255},false,17},10000000.+frame/30.);
+    quiet|=draw.world.empty();flare|=!draw.world.empty();
+    require(draw.world.size()<=36,"supplied artwork activity exceeded its geometry budget");
+  }
+  require(quiet&&flare&&activity.stats().generated_resources==0,"supplied art lost intermittent flares or generated a replacement surface");
   if(argc==3)capture_cold_resources(fs::absolute(argv[2]));
   std::cout<<"native celestial appearance tests passed\n";return 0;
 }catch(const std::exception&error){std::cerr<<error.what()<<'\n';return 1;}

@@ -17,6 +17,7 @@ struct GalacticCoreMetadata {
   float x{};
   float y{};
   float exclusion_radius{};
+  std::optional<CentralBlackHoleProperties> black_hole;
 
   bool operator==(const GalacticCoreMetadata &) const;
 };
@@ -43,6 +44,8 @@ struct GalaxyGenerationMetadata {
   std::optional<std::string> player_species_id;
   std::string anomaly_frequency{"Standard"};
   std::optional<GalacticCoreMetadata> galactic_core;
+  std::optional<StellarPopulationOptions> stellar_population;
+  std::optional<std::string> stellar_profile_version;
 
   bool operator==(const GalaxyGenerationMetadata &) const = default;
 };

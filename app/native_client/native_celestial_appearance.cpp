@@ -213,11 +213,16 @@ void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point c
   const auto image=storage_->obtain({a.spectral_color,a.deterministic_seed,a.black_hole,false,false});const float extent=radius*2.20f;
   if(!image){out.world.emplace_back(Circle{center,radius,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,110}});return;}
   out.world.emplace_back(Image{image,{center.x-extent,center.y-extent,extent*2,extent*2},std::nullopt,{255,255,255,255},clip});
+  append_stellar_activity(out,center,radius,a,seconds,clip);
+}
+void NativeCelestialAppearanceRenderer::append_stellar_activity(DrawList&out,Point center,float radius,const NativeStellarDiscAppearance&a,double seconds,std::optional<UiRect>clip){
+  if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0||!std::isfinite(seconds))throw std::invalid_argument("Stellar activity geometry must be finite and positive.");
   if(a.black_hole)return;
   const float seed=static_cast<float>(a.deterministic_seed&65535u);
   const float slot_length=9.5f+hash(seed,4.7f)*3.5f;
-  const float shifted=static_cast<float>(seconds)+hash(seed,17.1f)*slot_length;
-  const float epoch=std::floor(shifted/slot_length),phase=fract(shifted/slot_length);
+  const double cycles=(seconds+hash(seed,17.1f)*slot_length)/slot_length;
+  const float epoch=static_cast<float>(std::fmod(std::floor(cycles),65536.));
+  const float phase=static_cast<float>(cycles-std::floor(cycles));
   const float roll=hash(seed*2.31f+epoch,31.7f),previous=hash(seed*2.31f+epoch-1.f,31.7f);
   const bool enabled=roll>=.48f||previous<.48f;
   const float start=.08f+hash(seed+epoch*1.17f,8.3f)*.12f;

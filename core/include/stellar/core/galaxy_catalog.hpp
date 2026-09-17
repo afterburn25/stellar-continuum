@@ -1,6 +1,7 @@
 #pragma once
 #include <stellar/core/interstellar_distance.hpp>
 #include <stellar/core/legacy_random.hpp>
+#include <stellar/core/stellar_object.hpp>
 #include <array>
 #include <filesystem>
 #include <optional>
@@ -26,6 +27,9 @@ struct StellarSystem {
     std::optional<std::string> catalog_preset_id,stellar_catalog_id;
     StarArchetype archetype{StarArchetype::Standard};
     bool has_habitable_world{},has_anomaly{},has_rare_resource{},has_pre_warp_civilization{};
+    std::optional<StellarPhysicalProperties> stellar_object;
+    int engulfed_planets{};
+    std::optional<StellarRegion> stellar_region;
 };
 std::optional<StellarClass> classify_spectral_type(const std::string& spectral_type);
 std::vector<CatalogStar> load_nearby_catalog(const std::filesystem::path& path);

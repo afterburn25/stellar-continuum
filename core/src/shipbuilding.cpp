@@ -2,6 +2,7 @@
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
 #include <stellar/core/species_environment.hpp>
+#include <stellar/core/fleet_transit.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -473,6 +474,7 @@ FleetState create_fleet(ShipbuildingReadView world,
           ? std::optional<std::string_view>(*design.combat_profile_id)
           : std::nullopt,
       design.role);
+  if(home.stellar_object)begin_fleet_local_transit(fleet,FleetTransitPhase::None,{}, {},&*home.stellar_object);
   return fleet;
 }
 std::vector<ShipbuildingEvent>

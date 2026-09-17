@@ -141,6 +141,13 @@ build_body_inspection(const native_system::NativeSystemSnapshot &snapshot,
       {"Pressure", confirmed ? confirmed_pressure(found->details->pressure_kpa) : hidden()},
       {"Atmosphere", confirmed ? atmosphere(found->details->atmosphere) : hidden()}}};
 
+  if(confirmed&&found->details->stellar_exposure) {
+    const auto& e=*found->details->stellar_exposure;
+    physical.facts.push_back({"Stellar distance",scientific(e.orbit_au*stellar::core::astronomical_unit_km)+" km"});
+    environment.facts.push_back({"Stellar flux",fixed(e.incident_flux,3)+" Earth flux"});
+    environment.facts.push_back({"Thermal zone",e.in_habitable_zone?"Temperate flux (other hazards apply)":"Outside temperate zone"});
+    if(e.baked)environment.facts.push_back({"EXTREME IRRADIATION","Approach, settlement, surface work and mining prohibited"});
+  }
   BodySection satellites{"Satellites & signals", {}};
   bool has_valid_parent = false;
   if (found->parent_body_id && *found->parent_body_id != found->id) {

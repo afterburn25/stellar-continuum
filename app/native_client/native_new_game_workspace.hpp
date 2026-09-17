@@ -31,6 +31,7 @@ struct NativeNewGameLayout {
       seed_input, randomize_seed, restore_defaults, create, portrait;
   std::array<stellar::native_map::UiRect, 4> size_buttons{};
   stellar::native_map::UiRect copy_setup;
+  stellar::native_map::UiRect morphology, population;
   [[nodiscard]] static NativeNewGameLayout for_viewport(int width,
                                                          int height) noexcept;
 };
@@ -61,6 +62,7 @@ struct NativeNewGameIntent {
   bool captured{};
   std::string species_id, seed_text;
   int system_count{}, pre_warp_civilization_count{}, ancient_civilization_count{};
+  stellar::core::StellarPopulationOptions stellar_population;
 };
 
 class NativeNewGameWorkspace final {
@@ -123,6 +125,7 @@ private:
 
   std::optional<stellar::native_setup::NativeNewCampaignSetupView> view_;
   std::string selected_species_id_, seed_text_, message_;
+  stellar::core::StellarPopulationOptions population_;
   int selected_system_count_{}, selected_pre_warp_civilization_count_{},
       selected_ancient_civilization_count_{};
   float species_scroll_{}, detail_scroll_{};

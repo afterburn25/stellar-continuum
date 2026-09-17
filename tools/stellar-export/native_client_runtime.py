@@ -61,6 +61,18 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_surface_art_asset_files(root))
     files.update(native_navigation_asset_files(root))
     files.update(native_research_asset_files(root))
+    stellar_manifest=root / "assets/visual/stellar/manifest.json"
+    stellar_art=json.loads(stellar_manifest.read_text(encoding="utf-8"))
+    for item in stellar_art["files"]:
+        name=item["filename"]
+        if Path(name).name!=name: raise RuntimeError("Unsafe stellar artwork filename")
+        files["assets/visual/stellar/"+name]=_verified_file(stellar_manifest.parent/name,item["sha256"])
+    files["assets/visual/stellar/manifest.json"]=stellar_manifest
+    files["Data/stellar/population-v1.json"]=root/"data/stellar/population-v1.json"
+    files["Data/stellar/population-profiles-v1.json"]=root/"data/stellar/population-profiles-v1.json"
+    files["Licenses/Stellar-artwork.md"]=root/"docs/stellar-asset-validation.md"
+    files["Documentation/Stellar-generation.md"]=root/"docs/stellar-generation-validation.md"
+    files["Documentation/Stellar-population-profiles.md"]=root/"docs/stellar-population-profiles.md"
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)

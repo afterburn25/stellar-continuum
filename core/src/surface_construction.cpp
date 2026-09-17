@@ -221,6 +221,8 @@ SurfaceBuildingPlacementAssessment assess_surface_building_placement(
   if (!c)
     return deny("You can build only in a colony you own.");
   const auto *b = body_for(w, *c);
+  if (b && b->stellar_exposure && b->stellar_exposure->baked)
+    return deny("Extreme stellar irradiation prohibits all surface construction.");
   if (!b || !b->environment.has_solid_surface)
     return deny("A surveyed colony on a solid planetary surface is required.");
   const auto economy = std::find_if(
@@ -453,6 +455,8 @@ ConstructionOrderResult upgrade_surface_building(ConstructionWorld w, int civ,
   auto *c = colony_for(w, civ, id);
   if (!c)
     return {false, "You can upgrade buildings only in a colony you own."};
+  if(const auto* body=body_for(w.read(),*c);body&&body->stellar_exposure&&body->stellar_exposure->baked)
+    return {false,"Extreme stellar irradiation prevents surface operations."};
   auto p =
       std::find_if(c->surface_buildings.begin(), c->surface_buildings.end(),
                    [=](auto &b) { return b.id == bid; });
@@ -496,6 +500,8 @@ ConstructionOrderResult upgrade_surface_hub(ConstructionWorld w, int civ,
   auto *c = colony_for(w, civ, id);
   if (!c)
     return {false, "You can upgrade only a colony you own."};
+  if(const auto* body=body_for(w.read(),*c);body&&body->stellar_exposure&&body->stellar_exposure->baked)
+    return {false,"Extreme stellar irradiation prevents surface operations."};
   if (const auto* body=body_for(w.read(),*c); !body || !body->environment.has_solid_surface)
     return {false,"A Command Center requires an owned settlement on a solid surface."};
   if (c->surface_hub_upgrade_days_remaining > 0)
@@ -538,6 +544,8 @@ ConstructionOrderResult repair_surface_building(ConstructionWorld w, int civ,
   auto *c = colony_for(w, civ, id);
   if (!c)
     return {false, "You can repair buildings only in a colony you own."};
+  if(const auto* body=body_for(w.read(),*c);body&&body->stellar_exposure&&body->stellar_exposure->baked)
+    return {false,"Extreme stellar irradiation prevents surface operations."};
   auto p =
       std::find_if(c->surface_buildings.begin(), c->surface_buildings.end(),
                    [=](auto &b) { return b.id == bid; });

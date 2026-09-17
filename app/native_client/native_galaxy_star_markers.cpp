@@ -32,7 +32,7 @@ Palette palette(GalaxyStarVisualClass value) {
   case GalaxyStarVisualClass::black_hole: return {{155, 135, 217, 255}, true, true};
   case GalaxyStarVisualClass::protostar: return {{255, 176, 101, 255}};
   case GalaxyStarVisualClass::pulsar: return {{103, 220, 255, 255}, false, true, true};
-  default: return {{185, 200, 225, 255}};
+  default: return {{255, 255, 255, 255}};
   }
 }
 
@@ -112,7 +112,7 @@ float galaxy_star_core_radius(double relative_zoom, int viewport_height,
   const float type_scale=visual==GalaxyStarVisualClass::giant?1.65f:
       visual==GalaxyStarVisualClass::hot_blue_star?1.15f:
       visual==GalaxyStarVisualClass::white_dwarf||visual==GalaxyStarVisualClass::neutron_star?.8f:1.f;
-  return std::min(36.f,5.f*growth)*display_scale*type_scale;
+  return std::min(96.f,5.f*growth)*display_scale*type_scale;
 }
 
 struct NativeGalaxyStarMarkerRenderer::Storage {
@@ -163,12 +163,13 @@ void NativeGalaxyStarMarkerRenderer::append(DrawList &out, Point center,
         std::clamp(std::lround(value * alpha), 0l, 255l));
   };
   const auto place = [&](GalaxyStarVisualClass visual, Point offset, float scale) {
+    auto tint=appearance.observed_color.value_or(Color{255,255,255,255});tint.a=scaled(255);
     const float extent = core_radius * 3.5f * scale;
     out.world.emplace_back(Image{storage_->obtain(visual),
                                  {center.x + offset.x - extent,
                                   center.y + offset.y - extent,
                                   extent * 2.f, extent * 2.f},
-                                 std::nullopt, {255, 255, 255, scaled(255)},
+                                 std::nullopt, tint,
                                  clip});
   };
   if (selected) {

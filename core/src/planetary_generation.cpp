@@ -226,7 +226,7 @@ int checked_body_id(int system_id, int local_id) {
 }
 } // namespace
 
-std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed, std::span<const StellarSystem> systems) {
+std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed, std::span<const StellarSystem> systems, std::map<int,int>* engulfed) {
     std::vector<PlanetaryBody> result;
     result.reserve(systems.size() * 8);
     const auto counts = balanced_counts(seed, systems);
@@ -255,8 +255,10 @@ std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed, std::sp
             }
         }
     }
-    const auto conditioned = apply_environmental_diversity(seed, systems, result);
+    auto conditioned = apply_environmental_diversity(seed, systems, result);
     validate_catalog(conditioned, systems);
+    const auto removed=apply_stellar_planetary_physics(systems,conditioned);
+    if(engulfed)*engulfed=removed;
     return conditioned;
 }
 } // namespace stellar::core

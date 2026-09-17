@@ -154,8 +154,32 @@ add_dependencies(stellar-continuum-native stellar_native_galaxy_art_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_galaxy_backdrop.cpp
   app/native_client/native_galaxy_star_markers.cpp
+  app/native_client/native_stellar_art.cpp
   app/native_client/native_territory_projection.cpp
   app/native_client/native_territory_overlay.cpp)
+
+# The supplied stellar artwork has its own content-addressed inventory and LOD manifest.
+file(READ "${CMAKE_SOURCE_DIR}/assets/visual/stellar/manifest.json" STELLAR_ART_MANIFEST)
+string(JSON STELLAR_ART_COUNT LENGTH "${STELLAR_ART_MANIFEST}" files)
+math(EXPR STELLAR_ART_LAST "${STELLAR_ART_COUNT}-1")
+foreach(INDEX RANGE 0 ${STELLAR_ART_LAST})
+  string(JSON NAME GET "${STELLAR_ART_MANIFEST}" files ${INDEX} filename)
+  string(JSON EXPECTED GET "${STELLAR_ART_MANIFEST}" files ${INDEX} sha256)
+  file(SHA256 "${CMAKE_SOURCE_DIR}/assets/visual/stellar/${NAME}" ACTUAL)
+  if(NOT ACTUAL STREQUAL EXPECTED)
+    message(FATAL_ERROR "Supplied stellar artwork digest mismatch: ${NAME}")
+  endif()
+endforeach()
+if(BUILD_TESTING)
+  add_executable(stellar_native_stellar_art_tests native-tests/native_stellar_art_tests.cpp app/native_client/native_stellar_art.cpp)
+  target_include_directories(stellar_native_stellar_art_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_stellar_art_tests PRIVATE stellar_native_platform stellar_json)
+  add_test(NAME native_stellar_art COMMAND stellar_native_stellar_art_tests "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(native_stellar_art PROPERTIES TIMEOUT 90)
+endif()
+add_custom_target(stellar_native_stellar_art
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets/visual/stellar" "${CMAKE_BINARY_DIR}/assets/visual/stellar")
+add_dependencies(stellar-continuum-native stellar_native_stellar_art)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeShipArtAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_ship_art_assets)

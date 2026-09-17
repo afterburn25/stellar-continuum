@@ -25,6 +25,7 @@ struct StartupIntent {
   bool captured{};
   std::string seed_text, species_id;
   int system_count{}, pre_warp_civilization_count{6}, ancient_civilization_count{1};
+  stellar::core::StellarPopulationOptions stellar_population;
   std::filesystem::path save_path;
 };
 struct StartupLayout {

@@ -97,7 +97,7 @@ ColonizationOpportunityCandidate colony_candidate(
   const bool reserved = ri != reservations.end(),
              surface = b.environment.has_solid_surface,
              native = b.has_pre_warp_civilization,
-             bio = surface && !native &&
+             bio = surface && !(b.stellar_exposure && b.stellar_exposure->baked) && !native &&
                    v.colonization_viability !=
                        SpeciesColonizationViability::Unsuitable;
   const bool affordable =
@@ -105,7 +105,9 @@ ColonizationOpportunityCandidate colony_candidate(
       economy(w, f.civilization_id).credits + .0001 >= colony_cost;
   const bool can = bio && !occ && !reserved && r.is_supported && affordable;
   std::string reason;
-  if (!surface)
+  if(b.stellar_exposure && b.stellar_exposure->baked)
+    reason="Extreme stellar irradiation prohibits approach, habitation and surface operations.";
+  else if (!surface)
     reason = b.name +
              " has no solid settlement surface in the current colony model.";
   else if (native)
@@ -392,12 +394,14 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
                aff = f->destination_system_id ||
                      economy(w, f->civilization_id).credits + .0001 >=
                          outpost_cost,
-               can = body.environment.has_solid_surface &&
+               can = !(body.stellar_exposure && body.stellar_exposure->baked) && body.environment.has_solid_surface &&
                      body.has_rare_resource &&
                      !body.has_pre_warp_civilization && harsh && !occ &&
                      !reserved && it->second.is_supported && aff;
     std::string reason;
-    if (!body.environment.has_solid_surface)
+    if(body.stellar_exposure && body.stellar_exposure->baked)
+      reason="Extreme stellar irradiation prohibits close approach and resource extraction.";
+    else if (!body.environment.has_solid_surface)
       reason =
           body.name + " has no solid surface for the current outpost model.";
     else if (!body.has_rare_resource)

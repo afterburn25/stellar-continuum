@@ -273,7 +273,8 @@ void assign_fleet_route(OperationalReachWorldView world, FleetState &fleet,
     begin_fleet_local_transit(
         fleet, FleetTransitPhase::LocalDeparture, fleet.local_transit_position,
         fleet_gate_towards(Vec2{next->position.x, next->position.y},
-                           Vec2{current->position.x, current->position.y}));
+                           Vec2{current->position.x, current->position.y}),
+        current->stellar_object?&*current->stellar_object:nullptr);
   }
 }
 
@@ -288,7 +289,7 @@ void clear_fleet_route(FleetState &fleet) {
   if (fleet.current_system_id &&
       fleet.transit_phase != FleetTransitPhase::None) {
     begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival,
-                              fleet.local_transit_position, Vec2{});
+                              fleet.local_transit_position, fleet.stellar_transit_path.empty()?Vec2{}:fleet.local_transit_position);
     fleet.transit_target_system_id.reset();
   } else if (fleet.transit_phase != FleetTransitPhase::InterstellarWarp) {
     fleet.transit_phase = FleetTransitPhase::None;

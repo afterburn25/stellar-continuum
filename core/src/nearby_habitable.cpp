@@ -13,6 +13,13 @@ namespace stellar::core {
 namespace {
 constexpr double maximum_opening_distance = 340.0;
 
+void align_guaranteed_environment(PlanetaryBody& body,const StellarSystem& system) {
+    if(!system.stellar_object)return;
+    const auto& p=*system.stellar_object;
+    const auto temperature=std::max(3.,body.environment.temperature_kelvin);
+    const double orbit=std::sqrt(p.luminosity_solar)*std::pow(278.5/temperature,2);
+    if(orbit>p.safe_approach_au)body.stellar_exposure=stellar_planet_exposure(p,orbit);
+}
 bool stable_star(const std::optional<StellarClass>& primary) {
     return primary != StellarClass::BlackHole && primary != StellarClass::NeutronStar && primary != StellarClass::Pulsar &&
         primary != StellarClass::HotBlueStar && primary != StellarClass::Giant && primary != StellarClass::Protostar;
@@ -132,6 +139,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
                 changed.mass_earth = std::max(.0005,
                     home.environment.gravity_g * changed.radius_earth * changed.radius_earth);
                 changed.environment = home.environment;
+                align_guaranteed_environment(changed,*candidate.system);
                 result[changed.id] = changed;
                 const auto system = std::find_if(systems.begin(), systems.end(),
                     [&](const auto& value) { return value.id == candidate.system->id; });
@@ -208,6 +216,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
         changed.mass_earth = std::max(.0005,
             requirement->home->environment.gravity_g * changed.radius_earth * changed.radius_earth);
         changed.environment = requirement->home->environment;
+        align_guaranteed_environment(changed,*candidate->system);
         result[changed.id] = changed;
         const auto system = std::find_if(systems.begin(), systems.end(),
             [&](const auto& value) { return value.id == system_id; });

@@ -41,6 +41,12 @@ public:
       float photosphere_radius, const NativeStellarDiscAppearance &,
       double presentation_seconds,
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
+  // Reuse the same intermittent prominence animation with supplied stellar art.
+  void append_stellar_activity(
+      stellar::native_map::DrawList &, stellar::native_map::Point center,
+      float photosphere_radius, const NativeStellarDiscAppearance &,
+      double presentation_seconds,
+      std::optional<stellar::native_map::UiRect> clip = std::nullopt);
   void append_ring_back(
       stellar::native_map::DrawList &, stellar::native_map::Point center,
       float planet_radius,

@@ -13,6 +13,7 @@
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
 #include "native_galaxy_star_markers.hpp"
+#include "native_stellar_art.hpp"
 #include "native_navigation_art.hpp"
 #include "native_galaxy_labels.hpp"
 #include "native_campaign_session.hpp"
@@ -556,7 +557,7 @@ void control_label(DrawList &out, UiRect bounds, std::string value, Color color,
       load_adaptive_research_strategic_runtime(research_root),
       seed_persistable_fresh_campaign(options.seed,
         load_nearby_catalog(asset_root/"Data/astronomy/hyg-nearby-500-v1.json"),
-        {utc_timestamp(),500,6,1,"terran_baseline"})),
+        {utc_timestamp(),500,6,1,"terran_baseline",StellarPopulationOptions{}})),
     research_root,options.save_path,STELLAR_GAME_VERSION);
 }
 
@@ -594,6 +595,7 @@ class NativeCampaign final {
       : session_(std::move(session)),
         navigation_art_(std::filesystem::absolute(asset_root)),
         research_art_(std::filesystem::absolute(asset_root)),
+        stellar_art_(std::filesystem::absolute(asset_root)),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
         planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
@@ -603,6 +605,13 @@ class NativeCampaign final {
         asset_root_(std::filesystem::absolute(asset_root)),
         text_measurer_(text_measurer),
         system_workspace_([this](const SystemBodyAppearance &appearance){return planet_discs_.request_image(appearance);},text_measurer) {
+    stellar_art_.use_queue(image_preparation_);
+    system_workspace_.set_stellar_art([this](DrawList& out,Point p,float radius,const StellarPhysicalProperties& physics,double seconds,UiRect clip){
+      auto id=stellar_object_definition(physics.type).id;
+      if(physics.type==StellarObjectType::MRedDwarf&&!physics.active)id="m-red-dwarf-quiet";
+      const float scale=static_cast<float>(stellar_object_definition(physics.type).visual_scale);
+      stellar_art_.append(out,p,radius*scale,id,seconds,clip);
+    });
     research_workspace_.set_text_measurer(text_measurer_);
     research_workspace_.set_artwork_resolver([this](std::string_view id, bool portrait) {
       return research_art_.image(id, portrait);
@@ -6055,7 +6064,7 @@ class NativeCampaign final {
       const auto relief=surface_workspace_.relief_stats();
       return surface_art_.cache_bytes()>0&&surface_buildings_.ready()&&(relief.ready||relief.failed);
     }
-    return system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending();
+    return stellar_art_.pending_count()==0&&(system_workspace_.visible()?system_workspace_.artwork_ready():galaxy_backdrop_.artwork_ready()&&territory_overlay_.valid()&&!territory_overlay_.pending());
   }
 
   [[nodiscard]] DrawList scene(int width,int height){
@@ -6076,9 +6085,15 @@ class NativeCampaign final {
     }
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
+    stellar_art_.begin_frame();
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
+    if(world.core&&world.galactic_core&&world.galactic_core->black_hole&&world.knowledge.is_galactic_core_discovered(world.player_civilization_id)) {
+      const auto point=camera_.project({world.core->position.x,world.core->position.y},width,height);
+      const auto radius=static_cast<float>(std::clamp(world.core->exclusion_radius*camera_.pixels_per_world*.3,9.,300.));
+      stellar_art_.append(out,point,radius,"central-supermassive-black-hole",std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});
+    }
     last_territory_draw_=territory_overlay_.append(out,camera_,width,height,
         static_cast<float>(fitted_pixels_per_world_), {false});
     for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
@@ -6101,19 +6116,41 @@ class NativeCampaign final {
         if (system.tertiary)
           appearance.tertiary = galaxy_star_visual(*system.tertiary);
       }
+      if(survey!=SystemSurveyLevel::fully_surveyed&&colored_frontier_.contains(system.id)) {
+        if(system.stellar_object){const auto rgb=stellar_object_definition(system.stellar_object->type).color;appearance.observed_color=Color{static_cast<std::uint8_t>(rgb[0]),static_cast<std::uint8_t>(rgb[1]),static_cast<std::uint8_t>(rgb[2]),255};}
+        else if(system.primary)appearance.observed_color=spectral_color(system.primary);
+      }
       const float core_radius = galaxy_star_core_radius(
           camera_.pixels_per_world/fitted_pixels_per_world_,height,appearance.primary);
-      const float extent=core_radius*4.5f;
+      const bool observed_physics=survey==SystemSurveyLevel::fully_surveyed&&system.stellar_object.has_value();
+      const float primary_scale=observed_physics?static_cast<float>(stellar_object_definition(system.stellar_object->type).visual_scale):1.f;
+      const float separation=observed_physics?std::max(1.f,primary_scale):1.f;
+      const Point secondary_offset=observed_physics?Point{core_radius*2.4f*separation,-core_radius*.85f}:Point{core_radius*.88f,-core_radius*.48f};
+      const Point tertiary_offset=observed_physics?Point{-core_radius*2.2f*separation,core_radius*.95f}:Point{-core_radius*.82f,core_radius*.54f};
+      const float extent=core_radius*4.5f*separation;
       if(point.x < -extent || point.y < -extent || point.x > width+extent || point.y > height+extent)continue;
-      galaxy_star_markers_.append(
+      if(survey==SystemSurveyLevel::fully_surveyed&&system.stellar_object) {
+        const auto& physics=*system.stellar_object;auto id=stellar_object_definition(physics.type).id;
+        if(physics.type==StellarObjectType::MRedDwarf&&!physics.active)id="m-red-dwarf-quiet";
+        stellar_art_.append(out,point,core_radius*static_cast<float>(stellar_object_definition(physics.type).visual_scale),id,
+            std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});
+        const auto companion=[&](std::optional<GalaxyStarVisualClass> visual,Point offset,float scale){
+          if(!visual)return;
+          NativeGalaxyStarAppearance component;component.primary=*visual;
+          galaxy_star_markers_.append(out,{point.x+offset.x,point.y+offset.y},core_radius*scale,component,false,UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});
+        };
+        companion(appearance.secondary,secondary_offset,.70f);
+        companion(appearance.tertiary,tertiary_offset,.58f);
+        if(selected_system)out.world.emplace_back(Circle{point,core_radius*primary_scale*1.9f,{111,225,255,40}});
+      } else galaxy_star_markers_.append(
           out, point, core_radius, appearance, selected_system,
           UiRect{0, 0, static_cast<float>(width), static_cast<float>(height)},
           known ? 1.f : .86f);
 
       // Names may cross the faint corona, but never the bright stellar core.
       // Reserving the full transparent sprite hid every nearby label at zoom.
-      float marker_left = -core_radius * 1.1f;
-      float marker_right = core_radius * 1.1f;
+      float marker_left = -core_radius * primary_scale * 1.1f;
+      float marker_right = core_radius * primary_scale * 1.1f;
       float marker_top = marker_left;
       float marker_bottom = marker_right;
       const auto include_component = [&](Point offset, float scale) {
@@ -6124,9 +6161,9 @@ class NativeCampaign final {
         marker_bottom = std::max(marker_bottom, offset.y + extent);
       };
       if (appearance.secondary)
-        include_component({core_radius * .88f, -core_radius * .48f}, .70f);
+        include_component(secondary_offset, .70f);
       if (appearance.tertiary)
-        include_component({-core_radius * .82f, core_radius * .54f}, .58f);
+        include_component(tertiary_offset, .58f);
       const float marker_radius = std::max(
           {std::abs(marker_left), std::abs(marker_right),
            std::abs(marker_top), std::abs(marker_bottom)});
@@ -7168,7 +7205,24 @@ class NativeCampaign final {
   }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
-  void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));}
+  void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
+    if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
+    std::unordered_set<int> owned;
+    for(const auto& colony:world.colonies)if(colony.civilization_id==world.player_civilization_id)owned.insert(colony.system_id);
+    std::vector<int> origins;
+    for(const auto& system:world.systems)if(owned.contains(system.id)||world.knowledge.system_survey_level(world.player_civilization_id,system.id)>=SystemSurveyLevel::partially_surveyed)origins.push_back(system.id);
+    const auto generation=session_->cache().generation;
+    if(frontier_generation_==generation&&frontier_origins_==origins)return;
+    frontier_generation_=generation;frontier_origins_=origins;colored_frontier_.clear();
+    for(int id:origins){
+      const auto& origin=*session_->cache().systems_by_id.at(id);
+      colored_frontier_.insert(id);
+      std::vector<std::pair<double,int>> nearest;nearest.reserve(world.systems.size());
+      for(const auto& candidate:world.systems)if(candidate.id!=id)nearest.emplace_back(squared_distance_light_years(origin.position,candidate.position),candidate.id);
+      const auto count=std::min<std::size_t>(3,nearest.size());std::partial_sort(nearest.begin(),nearest.begin()+count,nearest.end());
+      for(std::size_t i=0;i<count;++i)colored_frontier_.insert(nearest[i].second);
+    }
+  }
   [[nodiscard]] bool inspection_visible()const noexcept {
     return inspection_card_.visible()&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_&&!system_workspace_.visible()&&
         !surface_workspace_.visible()&&!colony_workspace_.visible()&&
@@ -7245,7 +7299,7 @@ class NativeCampaign final {
     inspection_card_.set_inspection(stellar::native_inspection::build_system_inspection(
         session_->frame().runtime().world().campaign(),*selected_id_));
   }
-  void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
+  void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;if(world.generation_metadata&&world.generation_metadata->stellar_population){const auto m=world.generation_metadata->stellar_population->morphology;view.use_spiral_artwork=m==GalaxyMorphology::Spiral||m==GalaxyMorphology::BarredSpiral;}view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));camera_=galaxy_backdrop_.fit_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){selected_id_=system_hit(pointer,width,height);refresh_inspection();}
@@ -7253,6 +7307,10 @@ class NativeCampaign final {
   Camera camera_;
   int galaxy_view_width_{},galaxy_view_height_{};
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
+  stellar::native_stellar::Artwork stellar_art_;
+  std::unordered_set<int> colored_frontier_;
+  std::vector<int> frontier_origins_;
+  std::optional<std::uint64_t> frontier_generation_;
   stellar::native_navigation::NativeNavigationArt navigation_art_;
   NativeResearchArt research_art_;
   NativeTerritoryOverlay territory_overlay_;

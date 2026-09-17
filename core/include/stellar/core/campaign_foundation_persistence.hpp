@@ -28,6 +28,9 @@ struct StellarSystemPersistenceDto {
   std::optional<StellarClass> tertiary_stellar_class;
   std::optional<double> galactic_depth_light_years;
   std::optional<std::string> stellar_catalog_id;
+  std::optional<StellarPhysicalProperties> stellar_object;
+  int engulfed_planets{};
+  std::optional<StellarRegion> stellar_region;
 };
 
 struct CivilizationPersistenceDto {

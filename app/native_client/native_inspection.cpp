@@ -156,7 +156,15 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   }
   result.name = system->name;
   result.guidance = "Survey complete. Review stellar findings and owned settlements below.";
-  result.facts.push_back({"PRIMARY STAR", star_label(system->primary), true});
+  result.facts.push_back({"PRIMARY STAR", system->stellar_object?stellar_object_definition(system->stellar_object->type).name:star_label(system->primary), true});
+  if(system->stellar_object){
+    const auto& p=*system->stellar_object;
+    result.facts.push_back({"STELLAR RADIUS",number(p.radius_solar*695700.,0)+" km",true});
+    result.facts.push_back({"LUMINOSITY",number(p.luminosity_solar,4)+" x Sol",true});
+    result.facts.push_back({"SAFE APPROACH",number(p.safe_approach_au*astronomical_unit_km,0)+" km",false});
+    if(p.hooks.is_rare_discovery)result.facts.push_back({"DISCOVERY",p.hooks.rarity_tier,true});
+    if(p.jet_half_angle_radians>0)result.facts.push_back({"STELLAR HAZARD","Directional high-energy jets",false});
+  }
   result.facts.push_back({"SYSTEM TRAITS", archetype_label(system->archetype), true});
   result.facts.push_back({"HABITABLE WORLD", system->has_habitable_world ? "Yes" : "No", system->has_habitable_world});
   result.facts.push_back({"ANOMALY", system->has_anomaly ? "Yes" : "No", system->has_anomaly});

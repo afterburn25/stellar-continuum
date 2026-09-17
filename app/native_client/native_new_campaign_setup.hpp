@@ -58,6 +58,7 @@ struct NativeNewCampaignSetupInput {
   std::string created_at_utc;
   int pre_warp_civilization_count{6};
   int ancient_civilization_count{1};
+  stellar::core::StellarPopulationOptions stellar_population;
 };
 
 class NativePreparedNewCampaign final {

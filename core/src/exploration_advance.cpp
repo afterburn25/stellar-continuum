@@ -459,7 +459,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
         fleet.transit_origin_system_id.reset();
         fleet.transit_target_system_id.reset();
         fleet.transit_progress = 0;
-        fleet.local_transit_position = {};
+        if(fleet.stellar_transit_path.empty())fleet.local_transit_position = {};
       }
       continue;
     }
@@ -495,7 +495,8 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
             finite_fleet_chart_position(fleet.local_transit_position)
                 ? fleet.local_transit_position
                 : Vec2{},
-            fleet_gate_towards(chart_position(target), chart_position(origin)));
+            fleet_gate_towards(chart_position(target), chart_position(origin)),
+            origin.stellar_object?&*origin.stellar_object:nullptr);
       }
 
       if (fleet.transit_phase == FleetTransitPhase::LocalDeparture ||
@@ -609,7 +610,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
             chart_position(target));
       }
       begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival, inbound,
-                                final_target);
+                                final_target,target.stellar_object?&*target.stellar_object:nullptr);
       if (handle_inbound(world, fleet, target, events))
         break;
       if (fleet.hold_requested)

@@ -25,6 +25,7 @@ struct SystemBodyAppearance {
   float lighting_longitude{};
 };
 using SystemImageProvider=std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(const SystemBodyAppearance&)>;
+using StellarArtProvider=std::function<void(stellar::native_map::DrawList&,stellar::native_map::Point,float,const stellar::core::StellarPhysicalProperties&,double,stellar::native_map::UiRect)>;
 using SystemTextMeasurer=std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>;
 enum class SystemWorkspaceCommandKind {
   none,
@@ -62,6 +63,7 @@ struct SystemWorkspaceLayout {
 class NativeSystemWorkspace final {
 public:
   explicit NativeSystemWorkspace(SystemImageProvider provider={},SystemTextMeasurer measurer={});
+  void set_stellar_art(StellarArtProvider value){stellar_art_=std::move(value);}
   void use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
   [[nodiscard]] bool artwork_ready() const noexcept{return artwork_ready_;}
   void open(stellar::native_system::NativeSystemSnapshot,int width,int height);
@@ -102,6 +104,7 @@ private:
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
+  StellarArtProvider stellar_art_;
   SystemImageProvider image_provider_;
   SystemTextMeasurer text_measurer_;
   BodyInspectionPanel body_inspection_;

@@ -1,5 +1,6 @@
 #include "native_new_game_workspace.hpp"
 #include "native_menu_style.hpp"
+#include <stellar/core/stellar_population_profiles.hpp>
 
 #include <algorithm>
 #include <array>
@@ -124,7 +125,7 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
   // Keep the player species as the first substantial decision on the page.
   // The galaxy population controls live beside the other generation settings
   // in the footer, where their selected values remain visible before Create.
-  const float footer_h = 196.f * scale;
+  const float footer_h = 294.f * scale;
   UiRect heading{x, panel_rect.y + pad, right - x - 112.f * scale, header_h};
   UiRect cancel{right - 100.f * scale, panel_rect.y + pad, 100.f * scale,
                 34.f * scale};
@@ -145,7 +146,7 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                         details.width - 24.f * scale,
                         details.height - 24.f * scale};
   const float seed_w = std::max(220.f * scale, (right - x) * .42f);
-  const float generation_y = footer_y + mode_h + 12.f * scale;
+  const float generation_y = footer_y + mode_h + 52.f * scale;
   UiRect seed_label{x, generation_y, seed_w, 22.f * scale};
   UiRect seed_input{x, generation_y + 24.f * scale, seed_w - 112.f * scale,
                     36.f * scale};
@@ -153,7 +154,7 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                         seed_input.y, 106.f * scale, 36.f * scale};
   UiRect restore_defaults{seed_input.x, seed_input.y + 44.f * scale,
                           156.f * scale, 32.f * scale};
-  UiRect create{right - 190.f * scale, footer_y + 148.f * scale,
+  UiRect create{right - 190.f * scale, footer_y + 246.f * scale,
                 190.f * scale, 38.f * scale};
   UiRect sizes{randomize_seed.x + randomize_seed.width + gap, generation_y,
                right - create.width - gap -
@@ -175,7 +176,9 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
   return {scale, static_cast<int>(24 * scale), std::max(14,static_cast<int>(17 * scale)),
           std::max(12,static_cast<int>(14 * scale)), panel_rect, heading, cancel, story,
           sandbox, species, rows, details, detail_content, sizes, seed_label,
-          seed_input, randomize_seed, restore_defaults, create, portrait, size_buttons,{restore_defaults.x+restore_defaults.width+8*scale,restore_defaults.y,138*scale,restore_defaults.height}};
+          seed_input, randomize_seed, restore_defaults, create, portrait, size_buttons,{restore_defaults.x+restore_defaults.width+8*scale,restore_defaults.y,138*scale,restore_defaults.height},
+          {story.x,story.y+mode_h+4*scale,story.width,32*scale},
+          {sandbox.x,sandbox.y+mode_h+4*scale,sandbox.width,32*scale}};
 }
 
 void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
@@ -216,6 +219,7 @@ void NativeNewGameWorkspace::randomize_seed() {
   message_.clear();
 }
 void NativeNewGameWorkspace::restore_defaults() {
+  population_={};
   if (!view_) return;
   selected_species_id_ = view_->default_species_id;
   selected_system_count_ = view_->default_system_count;
@@ -467,6 +471,15 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
     return {NativeNewGameIntentKind::SelectAncients, true, {}, {}, 0,
             selected_pre_warp_civilization_count_, selected_ancient_civilization_count_};
   }
+  if(layout.morphology.contains(event.position)) {
+    population_.morphology=static_cast<stellar::core::GalaxyMorphology>((static_cast<int>(population_.morphology)+1)%6);
+    population_.state=stellar::core::stellar_default_population_state(population_.morphology);
+    message_.clear();return {NativeNewGameIntentKind::None,true};
+  }
+  if(layout.population.contains(event.position)) {
+    population_.state=static_cast<stellar::core::PopulationState>((static_cast<int>(population_.state)+1)%5);
+    message_.clear();return {NativeNewGameIntentKind::None,true};
+  }
   if (layout.randomize_seed.contains(event.position)) {
     randomize_seed();
     return {NativeNewGameIntentKind::RandomizeSeed, true, {}, seed_text_};
@@ -478,11 +491,11 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
             selected_ancient_civilization_count_};
   }
   if(layout.copy_setup.contains(event.position))
-    return {NativeNewGameIntentKind::CopySetup,true,selected_species_id_,seed_text_,selected_system_count_,selected_pre_warp_civilization_count_,selected_ancient_civilization_count_};
+    return {NativeNewGameIntentKind::CopySetup,true,selected_species_id_,seed_text_,selected_system_count_,selected_pre_warp_civilization_count_,selected_ancient_civilization_count_,population_};
   if (layout.create.contains(event.position))
     return {NativeNewGameIntentKind::Create, true, selected_species_id_,
             seed_text_, selected_system_count_, selected_pre_warp_civilization_count_,
-            selected_ancient_civilization_count_};
+            selected_ancient_civilization_count_,population_};
   return {NativeNewGameIntentKind::None, layout.panel.contains(event.position)};
 }
 
@@ -552,6 +565,11 @@ void NativeNewGameWorkspace::render(
   text(out, layout.cancel, "CANCEL", bright, layout.body_font,
        TextAlign::Center);
 
+  for(const auto& [rect,label]:std::array<std::pair<UiRect,std::string>,2>{
+      std::pair{layout.morphology,"SHAPE: "+(population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology)))+"  >"},
+      std::pair{layout.population,"POPULATION: "+std::string(stellar::core::population_state_name(population_.state))+"  >"}}){
+    fill(out,rect,rect.contains(pointer_)?hover:raised_tint);stroke(out,rect,border);text(out,rect,label,bright,layout.small_font,TextAlign::Center);
+  }
   const auto count_label = [](const auto &choices, const int count) {
     const auto found = std::ranges::find(choices, count,
                                          &NativeCivilizationCountOption::count);
@@ -745,6 +763,10 @@ void NativeNewGameWorkspace::render(
          "GALAXY SIZE · SYSTEMS", gold, layout.small_font);
   }
   native_menu_style::button(out,layout.copy_setup,"COPY SETUP",layout.small_font,layout.copy_setup.contains(pointer_),true,s);
+  text(out,{layout.seed_label.x,layout.create.y-32*s,layout.panel.width-28*s,26*s},
+       std::string(stellar::core::stellar_population_character(population_)),muted,layout.small_font);
+  text(out,{layout.seed_label.x,layout.create.y+5*s,layout.create.x-layout.seed_label.x-10*s,25*s},
+       "STAR FORMATION: "+std::string(stellar::core::stellar_star_formation_label(population_.state)),gold,layout.small_font);
   const UiRect notice{layout.seed_label.x,layout.create.y+layout.create.height+5*s,layout.create.x-layout.seed_label.x-10*s,18*s};
   text(out, notice,
        message_.empty()

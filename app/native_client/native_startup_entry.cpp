@@ -161,7 +161,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       catch(const std::exception&){workspace.set_diagnostics(system_info+"\nClipboard unavailable. Try again.");}
       break;
     case StartupIntentKind::CopySetup:
-      try{window.set_clipboard_text("Stellar Continuum sandbox\nSpecies: "+intent.species_id+"\nSeed: "+intent.seed_text+"\nSystems: "+std::to_string(intent.system_count)+"\nRival empires: "+std::to_string(std::max(0,intent.pre_warp_civilization_count-1))+"\nAncient empires: "+std::to_string(intent.ancient_civilization_count));workspace.set_setup_message("Setup copied to clipboard.",true);}
+      try{window.set_clipboard_text("Stellar Continuum sandbox\nSpecies: "+intent.species_id+"\nSeed: "+intent.seed_text+"\nSystems: "+std::to_string(intent.system_count)+"\nRival empires: "+std::to_string(std::max(0,intent.pre_warp_civilization_count-1))+"\nAncient empires: "+std::to_string(intent.ancient_civilization_count)+"\nMorphology: "+std::string(stellar::core::morphology_name(intent.stellar_population.morphology))+"\nPopulation: "+std::string(stellar::core::population_state_name(intent.stellar_population.state))+"\nGeneration: stellar-population-v1");workspace.set_setup_message("Setup copied to clipboard.",true);}
       catch(const std::exception&){workspace.set_setup_message("Could not copy setup. Try again.",false);}break;
     case StartupIntentKind::OpenSettings:
       if(config.settings_hub)config.settings_hub->open();
@@ -174,7 +174,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       const auto started = host.start_new(
           {intent.seed_text, intent.system_count, intent.species_id,
            config.utc_timestamp(), intent.pre_warp_civilization_count,
-           intent.ancient_civilization_count});
+           intent.ancient_civilization_count,intent.stellar_population});
       if (started.accepted)
         workspace.begin_operation(host.poll(),
                                   StartupOperationOrigin::NewCampaign);

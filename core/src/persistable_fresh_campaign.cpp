@@ -1,4 +1,5 @@
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/stellar_population_profiles.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -29,7 +30,7 @@ FreshCampaignState seed_persistable_fresh_campaign(
   auto state = seed_fresh_campaign(
       seed, catalog, options.system_count,
       options.pre_warp_civilization_count,
-      options.ancient_civilization_count, options.player_species_id);
+      options.ancient_civilization_count, options.player_species_id, options.stellar_population);
 
   if (!state.core)
     throw std::logic_error(
@@ -60,6 +61,15 @@ FreshCampaignState seed_persistable_fresh_campaign(
       core,
   };
 
+  if (options.stellar_population) {
+    core.black_hole=generate_central_black_hole(static_cast<std::uint64_t>(seed));
+    metadata.galactic_core=core;
+    metadata.stellar_population=options.stellar_population;
+    metadata.stellar_profile_version=std::string(stellar_population_profile_version());
+    metadata.generator_version="stellar-population-v1";
+    metadata.galaxy_shape=std::string(morphology_name(options.stellar_population->morphology));
+    metadata.stellar_variety=std::string(population_state_name(options.stellar_population->state));
+  }
   state.galactic_core = core;
   state.generation_metadata = std::move(metadata);
   validate_galactic_core_agreement(state.generation_metadata->galactic_core,

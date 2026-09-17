@@ -103,6 +103,10 @@ bool done(const ConstructionState &s, std::string_view id) {
 }
 std::string lock(ConstructionReadView w, int id,
                  const ConstructionProjectDefinition &p) {
+  const auto* civilization=civ_for(w.civilizations,id);
+  for(const auto& colony:w.colonies)if(civilization&&colony.civilization_id==id&&colony.system_id==civilization->home_system_id)
+    for(const auto& body:w.bodies)if(colony.planetary_body_id==body.id&&body.stellar_exposure&&body.stellar_exposure->baked)
+      return "Extreme stellar irradiation prevents construction at the home settlement.";
   std::vector<std::string> m;
   for (auto &x : p.required_technologies)
     if (!construction_has_capability(w, id, x))

@@ -23,6 +23,7 @@ struct GalaxyBackdropCatalog {
   std::optional<stellar::native_map::WorldPoint> galactic_core;
   double galactic_core_exclusion_radius{};
   bool galactic_core_discovered{};
+  bool use_spiral_artwork{true};
 };
 
 struct GalaxyBackdropFrame {
@@ -136,6 +137,7 @@ class NativeGalaxyBackdrop final {
   NativeGalaxyBackdropAssets *assets_{};
   std::optional<GalaxyBackdropCatalog> catalog_;
   std::optional<GalaxyBackdropFrame> artwork_frame_;
+  std::shared_ptr<const stellar::native_map::RgbaImage> density_layer_;
   std::vector<RegionalPoint> regional_points_;
   GalaxyBackdropRenderStats last_stats_{};
   bool artwork_ready_{true};
