@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.00023651123046875,
+    "disc": [
+      1022.0522400798849,
+      1025.2878346086986,
+      889.3026476387644
+    ],
+    "id": "giant-cream-band-01",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.30320939362009536,
+      0.11627946664155309,
+      0.28662358007989164
+    ],
+    "seamError": 0.004156357356939383,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_gas_giant_planet_Cream__1fcae89b-3e3a-49f7-b4d0-3ad0afc17d33_0.png",
+  "folder": "Gas Giants/Gas Giant A - Cream Band Giant",
+  "height": 2048,
+  "id": "giant-cream-band-01",
+  "index": 1,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": -20
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "gas-giant",
+  "reason": "",
+  "sha256": "dcb6e971a965179fdb1d22f7efa4876c91e9882ce47df62b7b8e6d978a9a49ce",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Gas Giants/Gas Giant A - Cream Band Giant/afterburn25._fictional_photorealistic_gas_giant_planet_Cream__1fcae89b-3e3a-49f7-b4d0-3ad0afc17d33_0.png",
+  "status": "candidate",
+  "subclass": "cream-band",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "layered-haze-and-bands",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-01.png",
+    "sourceBandRollDegrees": -20,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

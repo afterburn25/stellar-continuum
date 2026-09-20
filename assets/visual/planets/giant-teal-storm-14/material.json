@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.00177001953125,
+    "clippedFraction": 0.0,
+    "disc": [
+      1026.2508989076912,
+      1022.1094037257357,
+      872.6430345998422
+    ],
+    "id": "giant-teal-storm-14",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.7,
+      0.42046227428830163
+    ],
+    "seamError": 0.009204574780911101,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_ice_giant_planet_Teal_S_9ba66976-3188-4fcb-b9a2-791a3ebddae5_1.png",
+  "folder": "Ice Giants/Ice Giant D - Teal Storm Ice Giant",
+  "height": 2048,
+  "id": "giant-teal-storm-14",
+  "index": 226,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": -25
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "ice-giant",
+  "reason": "",
+  "sha256": "bc3806dba7fd371027a24ef3d65ca2f570667fcd044a2e4fcd6d5ac9488bd24a",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Ice Giants/Ice Giant D - Teal Storm Ice Giant/afterburn25._fictional_photorealistic_ice_giant_planet_Teal_S_9ba66976-3188-4fcb-b9a2-791a3ebddae5_1.png",
+  "status": "candidate",
+  "subclass": "teal-storm",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "detailed-clouds",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-15.png",
+    "sourceBandRollDegrees": -25,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

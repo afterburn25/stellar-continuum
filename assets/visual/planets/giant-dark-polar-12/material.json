@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 3.814697265625e-06,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5000000000003,
+      1023.4999999999999,
+      939.5999999999997
+    ],
+    "id": "giant-dark-polar-12",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.7,
+      -0.7
+    ],
+    "seamError": 0.012531233907373545,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_ice_giant_planet_Dark_P_a5b9be88-f296-4c4e-ad1f-f5e8c212f31c_1.png",
+  "folder": "Ice Giants/Ice Giant E - Dark Polar Ice Giant",
+  "height": 2048,
+  "id": "giant-dark-polar-12",
+  "index": 252,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 0
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "ice-giant",
+  "reason": "",
+  "sha256": "39c3013037f43d598dbc5a130268353fa8ef5678c6d769241b15cf161316950d",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Ice Giants/Ice Giant E - Dark Polar Ice Giant/afterburn25._fictional_photorealistic_ice_giant_planet_Dark_P_a5b9be88-f296-4c4e-ad1f-f5e8c212f31c_1.png",
+  "status": "candidate",
+  "subclass": "dark-polar",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "detailed-clouds",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-16.png",
+    "sourceBandRollDegrees": 0,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

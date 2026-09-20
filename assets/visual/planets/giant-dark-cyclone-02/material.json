@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.00399017333984375,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5000000000001,
+      1023.5000000000001,
+      923.6000000000001
+    ],
+    "id": "giant-dark-cyclone-02",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.7,
+      -0.7
+    ],
+    "seamError": 0.008810232217423474,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_gas_giant_planet_Dark_C_749a3622-0b82-4341-b97a-9801801e7601_1.png",
+  "folder": "Gas Giants/Gas Giant E — Dark Cyclone Giant",
+  "height": 2048,
+  "id": "giant-dark-cyclone-02",
+  "index": 114,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 0
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "gas-giant",
+  "reason": "",
+  "sha256": "cf3d4864d5755d3f077145ad0244433c317ce05ebec48e135f188c18589d813c",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Gas Giants/Gas Giant E — Dark Cyclone Giant/afterburn25._fictional_photorealistic_gas_giant_planet_Dark_C_749a3622-0b82-4341-b97a-9801801e7601_1.png",
+  "status": "candidate",
+  "subclass": "dark-cyclone",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "detailed-clouds",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-08.png",
+    "sourceBandRollDegrees": 0,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

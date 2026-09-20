@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.004891872406005859,
+    "clippedFraction": 1.9073486328125e-06,
+    "disc": [
+      1025.3249411237618,
+      1039.8023833077598,
+      911.788457258439
+    ],
+    "id": "sol-oberon",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.15512967894029472,
+      -0.3155440854993526
+    ],
+    "seamError": 0.03367984580004153,
+    "usable": true
+  },
+  "id": "sol-oberon",
+  "name": "Oberon",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "19f2492578625eeec6f779265217fe100f90680afdb1225555328b2f84c62a30",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Oberon.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

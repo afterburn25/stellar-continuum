@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0010991096496582031,
+    "disc": [
+      1024.4571639445,
+      1025.9934973249362,
+      955.4404885822802
+    ],
+    "id": "sol-tethys",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.24379987316894094,
+      0.7
+    ],
+    "seamError": 0.010295373809880609,
+    "usable": true
+  },
+  "id": "sol-tethys",
+  "name": "Tethys",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "29bddabc94f7cf429f5eba84f3bcddc2e8c4c746cfaf63fe882ba52820bf7cd3",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Tethys.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 1.8596649169921875e-05,
+    "disc": [
+      1023.5,
+      1023.5000000000001,
+      949.6
+    ],
+    "id": "sol-titania",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.5674861831470162,
+      -0.05441103080908936,
+      0.1485745607942066
+    ],
+    "seamError": 0.02804052799936573,
+    "usable": true
+  },
+  "id": "sol-titania",
+  "name": "Titania",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "2629ecd381dd72aa6efa3cfbb00b9ee797345e0f29b09e25589610916ce7d3fe",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Titania.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

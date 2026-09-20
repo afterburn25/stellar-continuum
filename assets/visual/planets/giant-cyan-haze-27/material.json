@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.025753021240234375,
+    "disc": [
+      1023.1672086747568,
+      1030.8048924366742,
+      914.4795788656884
+    ],
+    "id": "giant-cyan-haze-27",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      0.19251441103778685,
+      0.29359479940884947,
+      0.14730889193551208
+    ],
+    "seamError": 0.0053831621811232895,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_ice_giant_planet_Cyan_H_a48ef378-25e7-4704-b2c1-41b8ddf60768_2.png",
+  "folder": "Ice Giants/Ice Giant A - Cyan Haze Giant",
+  "height": 2048,
+  "id": "giant-cyan-haze-27",
+  "index": 159,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 20
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "ice-giant",
+  "reason": "",
+  "sha256": "11215ac8486895ffa393e1fce05f035cf8b69a8eb78dcfcfd348dfed311fedd4",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Ice Giants/Ice Giant A - Cyan Haze Giant/afterburn25._fictional_photorealistic_ice_giant_planet_Cyan_H_a48ef378-25e7-4704-b2c1-41b8ddf60768_2.png",
+  "status": "candidate",
+  "subclass": "cyan-haze",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "layered-haze-and-bands",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-10.png",
+    "sourceBandRollDegrees": 20,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

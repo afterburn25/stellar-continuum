@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5,
+      1023.5,
+      897.6
+    ],
+    "id": "giant-blue-mist-11",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.41234216233103593,
+      0.525088092099641
+    ],
+    "seamError": 0.005665076494026417,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_gas_giant_planet_Blue_M_84f172ac-8d94-4ee7-a34c-eb078ba23832_2.png",
+  "folder": "Gas Giants/Gas Giant C - Blue Mist Giant",
+  "height": 2048,
+  "id": "giant-blue-mist-11",
+  "index": 67,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 25
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "gas-giant",
+  "reason": "",
+  "sha256": "1ef7fb9bde8a57674a9622708b2f3d2b4c63785d2c2884564fcb5dd8755bebd6",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Gas Giants/Gas Giant C - Blue Mist Giant/afterburn25._fictional_photorealistic_gas_giant_planet_Blue_M_84f172ac-8d94-4ee7-a34c-eb078ba23832_2.png",
+  "status": "candidate",
+  "subclass": "blue-mist",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "layered-haze-and-bands",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-05.png",
+    "sourceBandRollDegrees": 25,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.00012874603271484375,
+    "clippedFraction": 7.05718994140625e-05,
+    "disc": [
+      1012.8987090115677,
+      1028.6372404584038,
+      917.7484326519127
+    ],
+    "id": "sol-callisto",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.48156966489741876,
+      -0.18351294825063094
+    ],
+    "seamError": 0.028859885306029648,
+    "usable": true
+  },
+  "id": "sol-callisto",
+  "name": "Callisto",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "550580768f5b6c45599f19ceadc3869fb9b22af1bfc9f270814f7a6c3b4eae7a",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Callisto.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

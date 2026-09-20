@@ -12,6 +12,7 @@ docs/engine/NATIVE_SHIP_ART_SOURCES.md text eol=lf
 docs/engine/NATIVE_AUDIO_SOURCES.md text eol=crlf
 docs/engine/NATIVE_SCIENTIST_VOICE.md text eol=lf
 docs/engine/NATIVE_SURFACE_ART_SOURCES.md text eol=lf
+docs/IMMERSIVE_TEXTURE_PROVENANCE.md text eol=crlf
 docs/engine/NATIVE_NAVIGATION_ART_SOURCES.md text eol=lf
 export/native-research-assets.json text eol=lf
 assets/visual/catalog/catalog.json text eol=lf
@@ -25,3 +26,19 @@ assets/audio/voice/Kokoro-Apache-2.0.txt text eol=lf
 assets/visual/fonts/OFL-Rajdhani.txt text eol=crlf
 
 assets/visual/planetary/ARTWORK.md text eol=lf
+# Source/embedded shader pairing is verified offline during native configuration.
+engine/shaders/* text eol=lf
+engine/src/generated/scene3d_shaders.hpp text eol=lf
+docs/AUTHORED_PLANET_TEXTURE_PROVENANCE.md text eol=lf
+
+# Reviewed native runtime artwork uses LFS; do not rewrite historical commits.
+assets/visual/galaxies/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/moons/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/phenomena/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/planets/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/rings/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/small-bodies/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/sol/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/space/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/starfields/*.png filter=lfs diff=lfs merge=lfs -text
+assets/visual/stellar-eruptions/**/*.png filter=lfs diff=lfs merge=lfs -text

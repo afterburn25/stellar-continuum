@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1024.4188624562587,
+      1023.9531328174551,
+      892.5860962385875
+    ],
+    "id": "giant-frost-veil-13",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.5163057927833584,
+      0.6507766692339662
+    ],
+    "seamError": 0.00992684118696814,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_ice_giant_planet_Frost__b2de1beb-2c81-46ab-af68-40e86bbb8ce8_3.png",
+  "folder": "Ice Giants/Ice Giant C - Frost Veil Giant",
+  "height": 2048,
+  "id": "giant-frost-veil-13",
+  "index": 201,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 30
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "ice-giant",
+  "reason": "",
+  "sha256": "0874fa9d04a42849eb90406f03bc85a1cc4e3481fbc5bbc2155d40789c875f4b",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Ice Giants/Ice Giant C - Frost Veil Giant/afterburn25._fictional_photorealistic_ice_giant_planet_Frost__b2de1beb-2c81-46ab-af68-40e86bbb8ce8_3.png",
+  "status": "candidate",
+  "subclass": "frost-veil",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "layered-haze-and-bands",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-13.png",
+    "sourceBandRollDegrees": 30,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

@@ -1,0 +1,40 @@
+{
+  "conversion": {
+    "blackFraction": 0.09255218505859375,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.4999999999999,
+      1023.4999999999999,
+      903.6000000000001
+    ],
+    "id": "sol-iapetus",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.15,
+      0.15,
+      -0.15
+    ],
+    "seamError": 0.022331143979295098,
+    "usable": true
+  },
+  "id": "sol-iapetus",
+  "name": "Iapetus",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumDarkFraction": 0.12,
+    "maximumLightGradient": 0.15,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "8c784af14df44966f8d8868626e2498960ca9da2193b99e87e5f96e1f9270e66",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Iapetus.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}
