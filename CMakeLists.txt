@@ -1020,6 +1020,10 @@ if(BUILD_TESTING)
   set_tests_properties(legacy_galaxy_payload_persistence_parity PROPERTIES TIMEOUT 300)
   add_executable(stellar_player_campaign_persistence_tests native-tests/player_campaign_persistence_tests.cpp)
   target_link_libraries(stellar_player_campaign_persistence_tests PRIVATE stellar_core stellar_json)
+  if(MSVC)
+    # Embedded debug sections exceed COFF's default limit in this large fixture test.
+    target_compile_options(stellar_player_campaign_persistence_tests PRIVATE /bigobj)
+  endif()
   add_test(NAME player_campaign_persistence_parity COMMAND stellar_player_campaign_persistence_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-persistence.json"
     "${CMAKE_SOURCE_DIR}/src/Game"
