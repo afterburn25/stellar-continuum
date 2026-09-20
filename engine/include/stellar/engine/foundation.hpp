@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <condition_variable>
@@ -11,8 +13,10 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -94,6 +98,58 @@ private:
     std::vector<T> events_;
 };
 
+enum class JobPriority : std::size_t { High = 0, Normal = 1, Low = 2, Count = 3 };
+
+class JobCancelledError : public std::runtime_error {
+public:
+    JobCancelledError() : std::runtime_error("job cancelled before execution") {}
+};
+
+class JobDependencyError : public std::runtime_error {
+public:
+    JobDependencyError() : std::runtime_error("job dependency did not complete successfully") {}
+};
+
+class JobCancelToken {
+public:
+    JobCancelToken() = default;
+    explicit JobCancelToken(std::shared_ptr<std::atomic_bool> state) : state_(std::move(state)) {}
+    [[nodiscard]] bool cancelled() const noexcept { return state_ && state_->load(std::memory_order_relaxed); }
+    void throw_if_cancelled() const { if (cancelled()) throw JobCancelledError{}; }
+private:
+    std::shared_ptr<std::atomic_bool> state_;
+};
+
+class JobCancelSource {
+public:
+    JobCancelSource() : state_(std::make_shared<std::atomic_bool>(false)) {}
+    [[nodiscard]] JobCancelToken token() const { return JobCancelToken{state_}; }
+    void cancel() noexcept { state_->store(true, std::memory_order_relaxed); }
+    [[nodiscard]] bool cancelled() const noexcept { return state_->load(std::memory_order_relaxed); }
+private:
+    std::shared_ptr<std::atomic_bool> state_;
+};
+
+struct JobTagStats {
+    std::uint64_t submitted{};
+    std::uint64_t completed{};
+    std::uint64_t failed{};
+    std::uint64_t cancelled{};
+    std::uint64_t wait_nanoseconds{};
+    std::uint64_t run_nanoseconds{};
+};
+
+struct JobStats {
+    std::uint64_t submitted{};
+    std::uint64_t completed{};
+    std::uint64_t failed{};
+    std::uint64_t cancelled{};
+    std::uint64_t queued{};
+    std::uint64_t queue_high_water{};
+    std::size_t workers{};
+    std::unordered_map<std::string, JobTagStats> tags;
+};
+
 class JobSystem {
 public:
     explicit JobSystem(std::size_t workers = 0);
@@ -102,17 +158,42 @@ public:
     JobSystem& operator=(const JobSystem&) = delete;
 
     [[nodiscard]] std::future<void> submit(std::function<void()> task);
+    [[nodiscard]] std::future<void> submit(JobPriority priority, std::function<void()> task);
+    [[nodiscard]] std::future<void> submit(std::string_view tag, JobPriority priority,
+                                           JobCancelToken cancel, std::function<void()> task);
+
+    struct Node {
+        std::string tag;
+        JobPriority priority{JobPriority::Normal};
+        JobCancelToken cancel;
+        std::function<void()> run;
+        std::vector<std::size_t> depends_on;
+    };
+    // Submits a dependency graph. A node queues once every dependency finished
+    // successfully; a failed or cancelled dependency fails the dependent's future
+    // with JobDependencyError without running it. Cycles and out-of-range
+    // dependencies throw std::invalid_argument before anything is queued.
+    [[nodiscard]] std::vector<std::shared_future<void>> submit_graph(std::vector<Node> nodes);
+
     void wait_idle();
     [[nodiscard]] std::size_t worker_count() const noexcept;
+    [[nodiscard]] JobStats stats() const;
+    void reset_stats();
 
 private:
-    void worker_loop();
+    struct QueuedJob;
+    void enqueue_locked(std::shared_ptr<QueuedJob> job);
+    void finish_dependents(const QueuedJob& job, bool success);
+    void worker_loop(std::size_t worker_index);
     std::vector<std::thread> workers_;
-    std::deque<std::function<void()>> jobs_;
+    std::array<std::deque<std::shared_ptr<QueuedJob>>, static_cast<std::size_t>(JobPriority::Count)> jobs_;
     mutable std::mutex mutex_;
     std::condition_variable work_ready_;
     std::condition_variable idle_;
     std::size_t active_{};
+    std::uint64_t queue_high_water_{};
+    std::unordered_map<std::string, JobTagStats> tag_stats_;
+    JobStats totals_;
     bool accepting_{true};
     bool stopping_{};
 };
