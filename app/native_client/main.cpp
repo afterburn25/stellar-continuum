@@ -59,6 +59,7 @@
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/engine/runtime_paths.hpp>
+#include <stellar/engine/crash_reporter.hpp>
 
 #include <SDL3/SDL.h>
 
@@ -4076,6 +4077,22 @@ int main(int argc,char **argv){
 #endif
   try{
     const auto options=parse_options(argc,argv);
+    // Local crash bundles beside the save file; nothing is uploaded.
+    stellar::engine::CrashReporter::Options crash_options;
+    crash_options.crash_directory =
+        ((options.save_path.has_parent_path()
+              ? options.save_path.parent_path()
+              : std::filesystem::current_path()) /
+         "crash_dumps")
+            .string();
+    crash_options.game_version = STELLAR_GAME_VERSION;
+    crash_options.engine_version = "foundation-expansion";
+    crash_options.build_id = STELLAR_GAME_VERSION;
+    stellar::engine::CrashReporter crash_reporter(crash_options);
+    crash_reporter.install();
+    crash_reporter.set_context("exe_dir",
+                               stellar::engine::executable_directory()
+                                   .string());
     const auto asset_root=std::filesystem::absolute(options.asset_root);
     const auto startup_begin=std::chrono::steady_clock::now();
     Window window("Stellar Continuum - Native Galaxy",options.window_width,

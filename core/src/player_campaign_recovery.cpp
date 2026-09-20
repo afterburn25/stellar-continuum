@@ -1,5 +1,7 @@
 #include <stellar/core/player_campaign_recovery.hpp>
 
+#include <stellar/engine/save_integrity.hpp>
+
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -104,6 +106,12 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
     }
     try {
       report(.04, "Reading saved campaign");
+      // A present-but-mismatched integrity sidecar marks corruption; absent
+      // sidecars (older saves) load unchecked.
+      if (stellar::engine::verify_integrity(path) ==
+          stellar::engine::IntegrityStatus::Mismatch)
+        throw std::runtime_error(
+            "Campaign save failed its integrity check.");
       auto json = read_utf8_file(path);
       const auto staged = [&](PlayerCampaignJsonStage stage) {
         switch (stage) {

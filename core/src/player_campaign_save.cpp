@@ -2,6 +2,7 @@
 #include <stellar/core/developer_campaign_json.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
+#include <stellar/engine/save_integrity.hpp>
 
 #include <chrono>
 #include <algorithm>
@@ -52,8 +53,16 @@ void write_prepared_player_campaign(const std::filesystem::path &path,
     throw std::invalid_argument(
         "A Developer-envelope capture requires the Developer writer.");
   const auto json = encode_player_campaign_v17_json(prepared.payload());
-  stellar::engine::write_file_atomically(path,
-      std::as_bytes(std::span(json.data(), json.size())), {preserve_existing_backup});
+  const auto bytes = std::as_bytes(std::span(json.data(), json.size()));
+  stellar::engine::write_file_atomically(path, bytes, {preserve_existing_backup});
+  // Integrity sidecars are best-effort: a missing sidecar is tolerated on
+  // load, while a present-but-mismatched one detects corruption.
+  stellar::engine::write_integrity_sidecar(path, bytes);
+  auto backup = path;
+  backup += ".bak";
+  std::error_code ec;
+  if (std::filesystem::is_regular_file(backup, ec))
+    stellar::engine::write_integrity_sidecar_for_file(backup);
 }
 
 PlayerCampaignSaveController::PlayerCampaignSaveController(
