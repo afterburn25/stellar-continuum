@@ -57,24 +57,31 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/core/save_preview.hpp>
 #include <stellar/engine/runtime_paths.hpp>
+#include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/crash_reporter.hpp>
 #include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/profiler.hpp>
+#include <stellar/engine/replay.hpp>
 #include <stellar/engine/save_history.hpp>
 #include <stellar/engine/save_integrity.hpp>
 
 #include <SDL3/SDL.h>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -170,6 +177,11 @@ struct Options {
   bool economy_smoke{};
   bool developer_smoke{};
   bool save_path_overridden{};
+  // Deterministic replay: --record captures the GALAXY command stream and a
+  // canonical-state hash at every save capture; --replay re-feeds the commands
+  // under a fixed 60 Hz step and verifies the checkpoint hashes in order.
+  std::filesystem::path record_path;
+  std::filesystem::path replay_path;
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -215,6 +227,8 @@ struct Options {
     else if(arg==L"--logistics-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.logistics_smoke=true;result.windowed=true;}
     else if(arg==L"--economy-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.economy_smoke=true;result.windowed=true;}
     else if(arg==L"--developer-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.developer_smoke=true;result.windowed=true;}
+    else if(arg==L"--record"&&i+1<argc) result.record_path=argv[++i];
+    else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -249,6 +263,8 @@ struct Options {
     else if(arg=="--logistics-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.logistics_smoke=true;result.windowed=true;}
     else if(arg=="--economy-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.economy_smoke=true;result.windowed=true;}
     else if(arg=="--developer-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.developer_smoke=true;result.windowed=true;}
+    else if(arg=="--record"&&i+1<argc) result.record_path=argv[++i];
+    else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -269,6 +285,7 @@ struct Options {
   if((result.settlement_smoke||result.settlement_reload_smoke)&&!result.load)throw std::invalid_argument("Settlement smoke requires --load with a test-authored funded populated settlement vessel.");
   if((result.surface_smoke||result.surface_reload_smoke)&&!result.load)throw std::invalid_argument("Surface smoke requires --load with the isolated native campaign save.");
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
+  if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
   return result;
 }
 
@@ -500,6 +517,34 @@ struct DeveloperSmokeEvidence {
   bool mode{}, demo{}, tools{}, command{}, save{}, fresh{}, backup{};
 };
 
+// Deterministic replay state, owned by main() so one stream spans the
+// per-session NativeCampaign rebuilds that mode switches and new games cause.
+struct ReplayState {
+  std::optional<stellar::engine::ReplayRecorder> recorder;
+  std::optional<stellar::engine::ReplayRecorder> recording;
+  std::size_t command_cursor{};
+  std::size_t checkpoint_cursor{};
+  std::uint64_t verified_checkpoints{};
+  std::string divergence;
+};
+
+// Writes the recording on scope exit, including early returns and failures.
+struct ReplayFileFlush {
+  const ReplayState *state{};
+  std::filesystem::path path;
+  ~ReplayFileFlush() {
+    if (!state || !state->recorder || path.empty()) return;
+    try {
+      const auto bytes = state->recorder->serialize();
+      stellar::engine::write_file_atomically(
+          path, std::as_bytes(std::span<const char>(bytes.data(), bytes.size())));
+    } catch (const std::exception &error) {
+      std::cerr << "Stellar Continuum native client: replay recording write "
+                   "failed: " << error.what() << '\n';
+    }
+  }
+};
+
 class NativeCampaign final {
  public:
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,Window &window,int width,int height,
@@ -558,6 +603,98 @@ class NativeCampaign final {
     if(input_mapper_.load_contexts(kGalaxyContext,&error))
       input_mapper_.push_context("GALAXY");
     else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
+  }
+
+  // Deterministic replay (engine ReplayRecorder adoption): --record stores
+  // each dispatched GALAXY keypress and a canonical-state hash at every save
+  // capture; --replay re-feeds the keypresses under the fixed step that main()
+  // applies and verifies the recorded hashes in order. Verification failures
+  // surface as a thrown divergence after advance(), never inside the writer.
+  void attach_replay(ReplayState *state){
+    replay_=state;
+    install_replay_observer();
+  }
+
+  [[nodiscard]] std::uint64_t replay_tick()const{
+    return static_cast<std::uint64_t>(std::llround(
+        session_->frame().clock().simulation_days()*1000.));
+  }
+
+  void install_replay_observer(){
+    if(!replay_||!session_||(!replay_->recorder&&!replay_->recording))return;
+    session_->set_save_capture_observer(
+        [this](double day,const PlayerCampaignPayloadV17Dto &payload){
+          if(!replay_||!replay_->divergence.empty())return;
+          const auto tick=static_cast<std::uint64_t>(std::llround(day*1000.));
+          // The canonical payload carries two wall-clock provenance fields —
+          // SavedAtUtc and the campaign's CreatedAtUtc generation stamp. Strip
+          // both so checkpoint hashes compare simulation state only.
+          auto document=nlohmann::ordered_json::parse(
+              encode_player_campaign_v17_json(payload));
+          document.erase("SavedAtUtc");
+          if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
+            if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+              meta->erase("CreatedAtUtc");
+          const auto hash=stellar::engine::fnv1a64(document.dump());
+          if(replay_->recorder){
+            replay_->recorder->checkpoint(tick,hash,"save");
+            return;
+          }
+          const auto &expected=replay_->recording->checkpoints();
+          if(replay_->checkpoint_cursor>=expected.size()){
+            replay_->divergence=
+                "replay produced an unrecorded save checkpoint at tick "+
+                std::to_string(tick);
+            return;
+          }
+          const auto &want=expected[replay_->checkpoint_cursor];
+          if(want.tick!=tick){
+            replay_->divergence=
+                "replay checkpoint tick diverged: expected "+
+                std::to_string(want.tick)+", captured "+std::to_string(tick);
+            return;
+          }
+          if(want.hash!=hash){
+            replay_->divergence=
+                "replay state hash diverged at tick "+std::to_string(tick);
+            return;
+          }
+          ++replay_->checkpoint_cursor;
+          ++replay_->verified_checkpoints;
+        });
+  }
+
+  [[nodiscard]] std::string_view first_galaxy_action_pressed()const{
+    static constexpr std::string_view actions[]={
+        "toggle_pause","speed_normal","speed_fast","speed_very_fast",
+        "speed_maximum","speed_demo","cycle_research","start_research",
+        "cycle_construction","start_construction","new_campaign","quicksave",
+        "support_bundle"};
+    for(const auto name:actions)
+      if(input_mapper_.just_pressed(name))return name;
+    return {};
+  }
+
+  void dispatch_galaxy_action(std::string_view action){
+    auto &clock=session_->frame().clock();
+    if(action=="toggle_pause"){
+      if(clock.speed()==StrategicSpeed::Paused)clock.resume();
+      else clock.set_speed(StrategicSpeed::Paused);
+    }
+    else if(action=="speed_normal")clock.set_speed(StrategicSpeed::Normal);
+    else if(action=="speed_fast")clock.set_speed(StrategicSpeed::Fast);
+    else if(action=="speed_very_fast")clock.set_speed(StrategicSpeed::VeryFast);
+    else if(action=="speed_maximum")clock.set_speed(StrategicSpeed::Maximum);
+    // Reference UiResumeAtSpeed: the Demo rate is Developer-only; Player mode
+    // coerces the request to Normal.
+    else if(action=="speed_demo")clock.set_speed(session_->developer_mode()?StrategicSpeed::Demo:StrategicSpeed::Normal);
+    else if(action=="cycle_research")cycle_research_candidate();
+    else if(action=="start_research")start_research_candidate();
+    else if(action=="cycle_construction")cycle_construction_candidate();
+    else if(action=="start_construction")start_construction_candidate();
+    else if(action=="new_campaign")request_new_game();
+    else if(action=="quicksave")session_->request_save();
+    else if(action=="support_bundle")export_support_bundle();
   }
 
   // Loads the reviewed voice catalogue from Data/voice_profiles, binds the
@@ -637,7 +774,7 @@ class NativeCampaign final {
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke did not pause through player input.");
     // Keyboard parity: Space routes through the GALAXY input context and
     // resumes the paused clock, then pauses it again for the scene capture.
-    const auto press_space=[&]{InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.events={{InputEventType::KeyPressed,{},{},0.f,{},0,' '}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke key input closed the campaign.");};
+    const auto press_space=[&]{InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.events={{InputEventType::KeyPressed,{},{},0.f,{},0,' '},{InputEventType::KeyReleased,{},{},0.f,{},0,' '}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke key input closed the campaign.");};
     press_space();
     if(session_->frame().clock().speed()==StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke Space action did not resume the clock.");
     press_space();
@@ -988,6 +1125,8 @@ class NativeCampaign final {
     InputEvent event{};
     event.type=InputEventType::KeyPressed;
     event.key=key;
+    input.events.push_back(event);
+    event.type=InputEventType::KeyReleased;
     input.events.push_back(event);
     return update(input,width,height,0.,false);
   }
@@ -2436,6 +2575,7 @@ class NativeCampaign final {
       if(research_workspace_.visible())refresh_research(true);
       if(shipyard_workspace_.visible())refresh_shipyard(true);
       if(construction_workspace_.visible())refresh_construction(true);
+      install_replay_observer();
     }
     if(new_game_requested_&&session_->notice().kind==SessionNoticeKind::Failure)
       new_game_requested_=false;
@@ -2454,6 +2594,34 @@ class NativeCampaign final {
     input_mapper_.begin_frame();
     {
     const auto input_span_scope=stellar::engine::Profiler::instance().span("update.events","client");
+    // Replay: feed recorded keypresses whose ticks have arrived through the
+    // same GALAXY context and dispatch path as live input. The same input
+    // gates apply — a suppressed tick replays when the gate opens.
+    if(replay_&&replay_->recording&&session_&&!menu_&&
+       !surface_workspace_.visible()&&!diplomacy_workspace_.visible()&&
+       !wants_text_input()){
+      const auto tick=replay_tick();
+      const auto &commands=replay_->recording->commands();
+      while(replay_->command_cursor<commands.size()&&
+            commands[replay_->command_cursor].tick<=tick){
+        const auto &command=commands[replay_->command_cursor++];
+        if(command.name!="key_press")continue;
+        int code=0;
+        const auto parsed=std::from_chars(command.payload.data(),
+            command.payload.data()+command.payload.size(),code);
+        if(parsed.ec!=std::errc{})continue;
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        raw.code=code;
+        (void)input_mapper_.feed(raw);
+        const auto action=first_galaxy_action_pressed();
+        if(!action.empty())dispatch_galaxy_action(action);
+        // Replayed presses are edge-triggered: release immediately so the next
+        // recorded press of the same key fires like real input does.
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        (void)input_mapper_.feed(raw);
+      }
+    }
     for(const auto &event:input.events){
       if(battle_workspace_.visible()&&!menu_){
         const auto command=battle_workspace_.handle(event,width,height);
@@ -2684,39 +2852,34 @@ class NativeCampaign final {
         else toggle_menu();
         continue;
       }
+      // Key releases always reach the input mapper so held state clears even
+      // when a menu or workspace suppressed the matching press.
+      if(event.type==InputEventType::KeyReleased){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        raw.code=event.key;
+        (void)input_mapper_.feed(raw);
+        continue;
+      }
       // Reference keyboard shortcuts (Main.cs): resolved through the GALAXY
       // input context. Suppressed while the menu, surface view, or diplomacy
       // blocks gameplay input, or a text field owns the keyboard.
       if(event.type==InputEventType::KeyPressed&&!menu_&&
          !surface_workspace_.visible()&&!diplomacy_workspace_.visible()&&
          !wants_text_input()){
-        auto &clock=session_->frame().clock();
         stellar::engine::RawInputEvent raw;
         raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
         raw.code=event.key;
-        const auto fired=[this](std::string_view name){
-          return input_mapper_.just_pressed(name);};
         bool handled=input_mapper_.feed(raw);
         if(handled){
-          if(fired("toggle_pause")){
-            if(clock.speed()==StrategicSpeed::Paused)clock.resume();
-            else clock.set_speed(StrategicSpeed::Paused);
+          const auto action=first_galaxy_action_pressed();
+          if(action.empty())handled=false;
+          else{
+            if(replay_&&replay_->recorder)
+              replay_->recorder->record(replay_tick(),"key_press",
+                                        std::to_string(event.key));
+            dispatch_galaxy_action(action);
           }
-          else if(fired("speed_normal"))clock.set_speed(StrategicSpeed::Normal);
-          else if(fired("speed_fast"))clock.set_speed(StrategicSpeed::Fast);
-          else if(fired("speed_very_fast"))clock.set_speed(StrategicSpeed::VeryFast);
-          else if(fired("speed_maximum"))clock.set_speed(StrategicSpeed::Maximum);
-          // Reference UiResumeAtSpeed: the Demo rate is Developer-only;
-          // Player mode coerces the request to Normal.
-          else if(fired("speed_demo"))clock.set_speed(session_->developer_mode()?StrategicSpeed::Demo:StrategicSpeed::Normal);
-          else if(fired("cycle_research"))cycle_research_candidate();
-          else if(fired("start_research"))start_research_candidate();
-          else if(fired("cycle_construction"))cycle_construction_candidate();
-          else if(fired("start_construction"))start_construction_candidate();
-          else if(fired("new_campaign"))request_new_game();
-          else if(fired("quicksave"))session_->request_save();
-          else if(fired("support_bundle"))export_support_bundle();
-          else handled=false;
         }
         if(handled)continue;
       }
@@ -2883,6 +3046,8 @@ class NativeCampaign final {
       refresh_diplomacy(false);
       colony_refresh_elapsed_+=elapsed;
       refresh_colony(false);
+      if(replay_&&!replay_->divergence.empty())
+        throw std::runtime_error("Replay divergence: "+replay_->divergence);
       system_refresh_elapsed_+=elapsed;
       refresh_system(false);
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
@@ -4195,6 +4360,7 @@ class NativeCampaign final {
   native_development::NativeDevelopmentMenu development_menu_;
   native_developer::NativeDeveloperToolsPanel developer_tools_;
   stellar::engine::InputMapper input_mapper_;
+  ReplayState *replay_{};
   std::string developer_result_{};bool developer_result_accepted_{};
   std::filesystem::path player_save_path_{};
   UiAction hovered_action_{UiAction::None};
@@ -4239,6 +4405,25 @@ int main(int argc,char **argv){
     bool new_game_restart{};
     bool developer_switched{},developer_fresh{};
     DeveloperSmokeEvidence developer_evidence;
+    ReplayState replay;
+    if(!options.record_path.empty())
+      replay.recorder.emplace(stellar::engine::ReplayHeader{
+          static_cast<std::uint64_t>(options.seed),STELLAR_GAME_VERSION,
+          STELLAR_GAME_VERSION});
+    if(!options.replay_path.empty()){
+      std::ifstream replay_file(options.replay_path,std::ios::binary);
+      if(!replay_file)throw std::invalid_argument("Replay file cannot be opened.");
+      std::ostringstream contents;contents<<replay_file.rdbuf();
+      std::string parse_error;
+      auto parsed=stellar::engine::ReplayRecorder::parse(contents.str(),&parse_error);
+      if(!parsed)throw std::invalid_argument("Replay file is not a valid recording: "+parse_error);
+      replay.recording=std::move(parsed);
+    }
+    // Fixed-step: record/replay share one deterministic advance quantum so
+    // command ticks and checkpoint days reproduce exactly.
+    constexpr double kReplayStepSeconds=1./60.;
+    const bool fixed_step=!options.record_path.empty()||!options.replay_path.empty();
+    const ReplayFileFlush replay_flush{&replay,options.record_path};
     if(options.new_game_restart_smoke&&!std::filesystem::is_regular_file(options.save_path))
       throw std::invalid_argument("--new-game-restart-smoke requires a preexisting save-path anchor.");
     if(options.new_game_smoke){
@@ -4263,6 +4448,7 @@ int main(int argc,char **argv){
                              [&window](const Text &label){return window.measure_text(label);},
                              options.save_path);
     campaign.adopt_developer_smoke_evidence(developer_evidence);
+    campaign.attach_replay(&replay);
     campaign.enable_support_log({STELLAR_GAME_VERSION,SDL_GetPlatform(),
                                  window.gpu_driver(),
                                  SDL_GetNumLogicalCPUCores(),
@@ -4354,7 +4540,7 @@ int main(int argc,char **argv){
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         continue;
       }
-      const auto elapsed=discard_elapsed?0.:measured_elapsed;
+      const auto elapsed=discard_elapsed?0.:(fixed_step?kReplayStepSeconds:measured_elapsed);
       if(frames>0&&!discard_elapsed)frame_ms.push_back(elapsed*1000.);
       discard_elapsed=false;
       const auto cpu_begin=std::chrono::steady_clock::now();
@@ -4455,6 +4641,16 @@ int main(int argc,char **argv){
                  <<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
                  <<utf8_path(*options.smoke_screenshot)
                  <<" territory="<<campaign.territory_smoke_status();
+        if(replay.recorder)
+          std::cout<<" replay={\"commands\":"<<replay.recorder->commands().size()
+                   <<",\"checkpoints\":"<<replay.recorder->checkpoints().size()
+                   <<",\"file\":"<<json_string(utf8_path(options.record_path))<<"}";
+        if(replay.recording)
+          std::cout<<" replay={\"verified_checkpoints\":"
+                   <<replay.verified_checkpoints<<",\"of\":"
+                   <<replay.recording->checkpoints().size()
+                   <<",\"commands_consumed\":"<<replay.command_cursor
+                   <<",\"diverged\":false}";
         if(options.research_smoke)
           std::cout<<" research="<<campaign.research_smoke_status()
                    <<" shortcut="<<(campaign.shortcut_smoke_succeeded()?1:0);

@@ -343,6 +343,12 @@ bool NativeCampaignSession::checkpoint_now(const std::string &saved_at_utc) {
   }
 }
 
+void NativeCampaignSession::set_save_capture_observer(
+    stellar::core::PlayerCampaignCaptureObserver observer) {
+  require_owner();
+  if (live_) live_->saves.set_capture_observer(std::move(observer));
+}
+
 PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {
   return [root = research_root_] {
     return load_adaptive_research_strategic_runtime(root);

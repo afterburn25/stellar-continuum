@@ -64,7 +64,7 @@ struct DrawList {
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, KeyPressed,
-                            TextEntered, PointerCancelled };
+                            KeyReleased, TextEntered, PointerCancelled };
 struct InputEvent {
   InputEventType type{};
   Point position{}, delta{};

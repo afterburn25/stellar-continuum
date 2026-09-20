@@ -123,6 +123,11 @@ public:
   void request_load();
   void request_exit();
 
+  // Installs a capture observer on the save controller (autosave + manual).
+  // Re-install after service() activates a replacement campaign live state.
+  void set_save_capture_observer(
+      stellar::core::PlayerCampaignCaptureObserver observer);
+
   // Runs deferred main-thread capture and activation work. Returns true only
   // when a fully validated load candidate replaced the live session.
   [[nodiscard]] bool service(const std::string &saved_at_utc,

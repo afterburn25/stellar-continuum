@@ -55,6 +55,12 @@ struct PlayerCampaignSaveResult {
 using PlayerCampaignPreparedWriter = std::function<void(
     const std::filesystem::path &, const PreparedPlayerCampaignSave &, bool)>;
 
+// Invoked synchronously on the simulation thread with each captured payload
+// (autosave and manual saves). Used by replay recording/verification to hash
+// the canonical state at deterministic points.
+using PlayerCampaignCaptureObserver = std::function<void(
+    double simulation_days, const PlayerCampaignPayloadV17Dto &)>;
+
 // A single simulation-thread owner controls one immutable background write.
 // Configure/replace requires draining first. It neither owns nor advances the
 // simulation. Call after_frame only with that frame's actual returned result.
@@ -81,6 +87,9 @@ public:
   // The host must consume/report any pending completion before this call.
   [[nodiscard]] PlayerCampaignSaveResult save_manual(
       IntegratedAdaptiveCampaignRuntime &, const PlayerCampaignCaptureOptions &);
+  // The observer runs before the write job is submitted; it must be cheap
+  // relative to a full payload capture and must not throw into the writer.
+  void set_capture_observer(PlayerCampaignCaptureObserver observer);
   [[nodiscard]] bool pending() const noexcept;
   [[nodiscard]] bool preserves_recovered_backup() const noexcept;
   [[nodiscard]] double next_due_day() const noexcept;
@@ -106,6 +115,7 @@ private:
   PlayerCampaignPreparedWriter writer_;
   stellar::engine::JobSystem jobs_{1};
   std::filesystem::path path_;
+  PlayerCampaignCaptureObserver capture_observer_;
   std::uint64_t revision_{};
   bool configured_{};
   bool developer_mode_{};

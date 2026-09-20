@@ -143,6 +143,7 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::after_fram
   const bool preserve = preserve_backup_;
   try {
     auto prepared = capture_prepared(frame.runtime(), {day, game_version, saved_at_utc});
+    if (capture_observer_) capture_observer_(day, prepared.payload());
     const auto destination = path_; const auto writer = writer_;
     // Allocate all pending metadata before submitting. No operation after
     // submit can throw and lose tracking of an already running write.
@@ -166,6 +167,7 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
   const bool preserve = preserve_backup_;
   try {
     const auto prepared = capture_prepared(runtime, options);
+    if (capture_observer_) capture_observer_(options.simulation_days, prepared.payload());
     writer_(path_, prepared, preserve);
     scheduler_.mark_success(options.simulation_days); preserve_backup_ = false;
     return {true, path_, options.simulation_days, preserve, {}, {}};
@@ -173,6 +175,11 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
     auto result = failure(std::current_exception(), options.simulation_days, path_, preserve);
     scheduler_.mark_failure(options.simulation_days); return result;
   }
+}
+void PlayerCampaignSaveController::set_capture_observer(
+    PlayerCampaignCaptureObserver observer) {
+  require_owner();
+  capture_observer_ = std::move(observer);
 }
 bool PlayerCampaignSaveController::pending() const noexcept { return pending_.has_value(); }
 bool PlayerCampaignSaveController::preserves_recovered_backup() const noexcept { return preserve_backup_; }
