@@ -1,6 +1,6 @@
 add_library(stellar_native_audio STATIC engine/src/native_audio.cpp)
 target_include_directories(stellar_native_audio PUBLIC engine/include)
-target_link_libraries(stellar_native_audio PUBLIC SDL3::SDL3 PRIVATE mfplat mfreadwrite mfuuid ole32)
+target_link_libraries(stellar_native_audio PUBLIC SDL3::SDL3 PRIVATE stellar_engine mfplat mfreadwrite mfuuid ole32)
 
 if(MSVC)
   target_compile_options(stellar_native_audio PRIVATE /WX)
