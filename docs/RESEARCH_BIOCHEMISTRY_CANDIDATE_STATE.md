@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Adaptive Research Milestone #9 — Candidate State
 
 This branch-local record preserves the current Alternative Biochemistry / Exotic Biospheres expansion until it is validated and merged. Once accepted, canonical project state/history should absorb this information.

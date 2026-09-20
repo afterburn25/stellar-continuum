@@ -1,6 +1,27 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Release version policy
 
-The next published release is **0.1.0 Alpha**.
+The current locally validated native alpha is **0.1.13 Alpha** (engine 0.1.62).
+See [its validation report](releases/0.1.13-alpha-validation.md) for the package,
+checksums, tested flows and remaining limits.
+Native versions come from `export/runtime-config.json`, which CMake embeds in the
+executables and the exporter records in package names and manifests. Each native
+alpha increments manually and adds `docs/releases/<version>.md`. A local package
+may truthfully record `sourceDirty: true`; it is not an exact clean-commit build.
+Full parity release presets remain blocked until their separate gates pass.
+
+The preserved Godot reference uses `VERSION` and `GameVersion`; those values are
+independent and are not changed when packaging a native alpha.
+
+## Historical Godot policy
+
+The initial published release target was **0.1.0 Alpha**.
 
 - `VERSION` and `GameVersion.Current` use technical SemVer (`0.1.0-alpha`). This value is written
   to save metadata, manifests and Windows package filenames.

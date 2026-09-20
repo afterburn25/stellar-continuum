@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Adaptive Research and integrated campaign migration boundary
 
 Status: foundations, calculated authority, standalone schema-2 research recovery, pressure support and visible research agendas are implemented through gate 056. Foreign intake and outcomes are being migrated in gates 057/058. The native legacy campaign step (038) does not establish integrated Adaptive Research parity. Preserve the C# authority and `data/research/v1` unchanged while building the native implementation.

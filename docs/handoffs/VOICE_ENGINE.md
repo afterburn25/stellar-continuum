@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Voice engine handoff
 
 Branch: `work/voice-engine-tts`; PR target: `integration`. Built independently from integration 5763a1e while premium-art PR #305 is separate. Integrate through PR review and resolve shared Main/Menu/capture changes without dropping either workstream.

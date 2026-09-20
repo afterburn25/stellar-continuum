@@ -1,8 +1,13 @@
 # Required engine capability workflow
 
+Current architecture: **custom Stellar Engine / C++23 engine / C++23 game**.
+Start with [the current handoff](docs/AGENT_HANDOFF.md) and its verification
+receipt. Godot/C# is historical fixture provenance, not the current runtime.
+Do not migrate back to Godot or introduce Unity/Unreal.
+
 The user's Engine Capability Gap Rule applies to Stellar Continuum work in this
 repository. See [the capability registry](docs/ENGINE_CAPABILITIES.md) and
-[engine architecture](docs/engine/ARCHITECTURE.md) before extending a subsystem.
+[engine architecture](docs/ENGINE_ARCHITECTURE.md) before extending a subsystem.
 
 - Requested functionality must use real authoritative game state and commands.
   Do not substitute static mockups, permanently disabled controls, hidden
