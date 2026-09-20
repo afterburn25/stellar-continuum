@@ -41,7 +41,8 @@
     "allTargets": "passed",
     "fixes": [
       "target-specific /bigobj for persistence tests",
-      "native audio private link to stellar_engine"
+      "native audio private link to stellar_engine",
+      "canonical LF shader manifest hash and seven existing LFS pointers for clean checkout"
     ],
     "remainingWarnings": [
       "CMake CMP0175 / NativePlanetAssets add_custom_command missing explicit phase",
@@ -3499,7 +3500,6 @@
     "auditLooseBytes": 3759528000,
     "newPublishedFiles": 6010,
     "newPublishedBytes": 3561621863,
-    "lfsUniqueUploadedObjects": 4107,
     "localOmittedFiles": 736,
     "localOmittedBytes": 44172594,
     "localOmittedPaths": [
@@ -4448,7 +4448,9 @@
         },
         "large": []
       }
-    }
+    },
+    "initialLfsUniqueUploadedObjects": 4107,
+    "previouslyTrackedPngsConvertedToLfs": 7
   },
   "refsObservedBeforePublication": [
     {
@@ -5649,5 +5651,612 @@
     "docs/releases/0.1.13-alpha-validation.md",
     "docs/releases/0.1.13-alpha.md"
   ],
-  "publicationNote": "This receipt describes the source commit above; the containing documentation commit and remote branch establish its publication. No release tag or GitHub Release is created."
+  "publicationNote": "This receipt describes the source commit above; the containing documentation commit and remote branch establish its publication. No release tag or GitHub Release is created.",
+  "checkoutVerification": {
+    "commit": "a3f98a2ba51bc63a4974bf85825f4e6c37a75c9e",
+    "isolatedTrackedFilesOnly": true,
+    "configurePreset": "windows-native-preview",
+    "result": "passed",
+    "allTargetsRebuiltInCheckout": false,
+    "fix": "Normalize the scene3d.frag checksum to committed LF bytes; shader tokens and embedded SPIR-V are unchanged. Convert seven previously tracked PNGs to LFS pointers to match attributes.",
+    "changedDocumentLinksChecked": 424,
+    "brokenChangedDocumentLinks": 0,
+    "roadmapItems": 30,
+    "originalRemainingUntrackedFiles": 736,
+    "unexpectedUntrackedFiles": 0
+  },
+  "documentationChanges": [
+    {
+      "status": "A",
+      "path": "AGENTS.md"
+    },
+    {
+      "status": "M",
+      "path": "README.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ADAPTIVE_RESEARCH_RUNTIME_STATUS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ADAPTIVE_RESEARCH_SYSTEM.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/AGENT_HANDOFF.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ARCHITECTURE.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ASSET_COOKER.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ASSET_COOKER_REPORT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ASSET_MANIFEST.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ASSET_PIPELINE_STATUS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/AUTHORED_PLANET_TEXTURE_PROVENANCE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/BRANCH_INVENTORY_2026-09-08.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CELESTIAL_CONTENT_STATUS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/CHAT_HANDOFF.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/CINEMATIC_MAP_AND_SURFACE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/COMBAT_PERFORMANCE_BENCHMARKS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/CPP_MIGRATION_HANDOFF.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/CPP_MIGRATION_STATUS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/DECISION_LOG.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/DEVELOPER_QA.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/DEVELOPMENT_HISTORY.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/DEVELOPMENT_PROGRESS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/DIPLOMACY_UI.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ENGINEERING_GUARDRAILS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ENGINE_ARCHITECTURE.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ENGINE_CAPABILITIES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/FLARE_SHARPNESS_AND_TIMING.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/FUN_VISUAL_VERTICAL_SLICE.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/GALAXY_ASSET_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/GALAXY_CREATION_IMPLEMENTATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/GALAXY_WIDESCREEN_ART.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/GIANT_RING_IMPLEMENTATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/KNOWN_ISSUES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/LARGE_GALAXY_ENGINE_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/LIGHTING_ORBITS_HOURLY_CLOCK.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/MOON_IMPLEMENTATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_3D_ENGINE_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_3D_SCALE_INTEGRATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_AUTHORED_PLANET_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_CAMPAIGN_CAPTURE_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_CAMPAIGN_LOADING_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_DEVELOPER_EXPLORATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_DEVELOPER_INSPECTION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_ICE_OPTICS_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_SMALL_BODY_3D_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_SMALL_BODY_FIELDS_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_SOL_ARTWORK_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/NATIVE_STELLAR_CLOSEUP_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/ORBIT_ART_TUMBLE_FIXES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PERFORMANCE_AUDIT_20260920.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PHENOMENON_ART_IMPLEMENTATION.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_ART_IMPLEMENTATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_ORIENTATION_FIX.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_PORTRAITS_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_RING_SHADOWS_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_STATIC_ART_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_TEXTURE_FILTERING_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PLANET_TYPE_REGISTRY.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/PREMIUM_ART_VISUAL_IDENTITY.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/PROCEDURAL_PHENOMENA_IMPLEMENTATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/PROJECT_STATE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RELEASE_VERSION_POLICY.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RESEARCH_BENCHMARK_MODEL.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RESEARCH_BIOCHEMISTRY_CANDIDATE_STATE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RESEARCH_CI_KNOWN_ISSUES.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RESEARCH_RUNTIME_IMPLEMENTATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/RESEARCH_RUNTIME_STATUS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/RING_SHARPNESS_REPORT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/ROADMAP.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/SCREENSHOT_VISUAL_QA_2026-09-08.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/SOLAR_VISUAL_CORRECTIONS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/SOL_ARTWORK_GENERATION.json"
+    },
+    {
+      "status": "M",
+      "path": "docs/SOL_STARTING_CATALOG.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/SPATIAL_PRESENTATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/SPECIES_SYSTEM.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STARFIELD_ASSET_AUDIT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STARFIELD_IMPLEMENTATION_REPORT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STAR_MAP_ZOOM_CRASH_FIX.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STAR_MAP_ZOOM_CRASH_FIX_20260920.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STELLAR_ERUPTIONS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/STELLAR_VISUAL_MOTION_UPDATE.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/TECHNICAL_DEBT.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/TERRITORY_AND_SAVE_SCALING_REPORT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/VALIDATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/VISUAL_STYLE_GUIDE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/VOICE_ENGINE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/VOICE_EVENT_INTEGRATION.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/WINDOWS_INSTALLER.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/WORKSTREAMS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/decisions/0001-custom-stellar-engine-cpp.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/ADAPTIVE_RESEARCH_MIGRATION_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/ARCHITECTURE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/CAMPAIGN_FRAME_VALIDATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/DIPLOMACY_CAMPAIGN_INTEGRATION_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/FLEET_STATE_MIGRATION_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/HANDOFF.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/INTEGRATED_ADAPTIVE_CAMPAIGN_VALIDATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/KNOWLEDGE_MIGRATION_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/MIGRATION_INVENTORY.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/MIGRATION_STATUS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/NATIVE_AUDIO.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/NATIVE_CLIENT_VALIDATION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/NATIVE_FLEETS.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/NATIVE_GALAXY_ART_SOURCES.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/NATIVE_UI_RESTORATION_ALPHA_0110.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/PERSISTABLE_FRESH_CAMPAIGN.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/PLAYER_CAMPAIGN_SAVE_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/SHIPBUILDING_MIGRATION_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/SHIPYARD_COMMAND_CONTRACT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/engine/WINDOWS_EXPORT.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/ALPHA_PLAYTHROUGH.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/IMMERSIVE_SYSTEM_MAP.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/PLAYER_EXPEDITION.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/SHIPYARD_RECOVERY.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/VISUAL_AUDIO_POLISH.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/VISUAL_FINISH.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/VOICE_ENGINE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/celestial-gpu-materials.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/cinematic-spatial-navigation.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/core-game-integration.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/developer-session-persistence.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/exploration-colonization.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/free-placement-surface.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/galaxy-star-system-visuals.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/galaxy-view-0.1.6.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/nearby-catalog-0.1.5.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/regional-map-0.1.3.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/solar-economy-logistics.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/species-races.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/system-scale-0.1.2.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/testing-release.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/handoffs/visual-style-assets.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/history/PROJECT_STATE.pre-native-sync-20260920.txt"
+    },
+    {
+      "status": "A",
+      "path": "docs/history/README.pre-native-sync-20260920.txt"
+    },
+    {
+      "status": "A",
+      "path": "docs/history/ROADMAP.pre-native-sync-20260920.txt"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/classification-corrections.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/full-audit.csv"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/full-audit.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/generation-rules.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/rejected-art.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/planet-art/type-registry.json"
+    },
+    {
+      "status": "M",
+      "path": "docs/releases/0.1.12-alpha.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/releases/0.1.13-alpha-validation.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/releases/0.1.13-alpha.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/releases/NATIVE_ALPHA_README.txt"
+    },
+    {
+      "status": "A",
+      "path": "docs/validation/2026-09-20-development-sync.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/validation/2026-09-20-development-sync.md"
+    }
+  ]
 }

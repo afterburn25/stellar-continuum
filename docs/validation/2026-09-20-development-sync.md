@@ -1,4 +1,4 @@
-# Development synchronization verification — 2026-09-20
+# Development synchronization verification â€” 2026-09-20
 
 **Build succeeds; the full test gate fails. This is a development-state handoff,
 not a release certification.** Current architecture: custom Stellar Engine,
@@ -16,10 +16,10 @@ or work on other branches declared integrated.
 
 Source/art/build synchronization commits:
 
-- `bd7f9621` — assets: publish reviewed native runtime artwork with Git LFS
-- `544ccce0` — feat: synchronize native engine, celestial content, diagnostics and maintenance
-- `84159ebe` — build: enable large COFF objects for campaign persistence tests
-- `7552d3f0` — build: link native audio resources and fetch LFS inputs in native CI
+- `bd7f9621` â€” assets: publish reviewed native runtime artwork with Git LFS
+- `544ccce0` â€” feat: synchronize native engine, celestial content, diagnostics and maintenance
+- `84159ebe` â€” build: enable large COFF objects for campaign persistence tests
+- `7552d3f0` â€” build: link native audio resources and fetch LFS inputs in native CI
 
 Verified code baseline: `7552d3f0d5ac7b8b4a4d80dbb5222df3d9e11e92`. Documentation is committed
 after that baseline. The branch contains the previous nine commits too. Exact
@@ -54,8 +54,8 @@ not a claimed clean-room rebuild of every unchanged translation unit.
 Warnings remain: CMake CMP0175 at `NativePlanetAssets.cmake:15` (missing explicit
 custom-command phase); MSVC C4996 (`filesystem::u8path`) in import/cook tools,
 C4456 local shadowing in construction tests, C4244 double/float in giant visual
-tests, and C4127 at `installer/src/main.cpp:59`. The first four compiler categories
-refer to the whole build-attempt sequence; the final attempt logged C4127.
+tests, and C4127 at `installer/src/main.cpp:59`. The compiler warning list
+covers the whole build-attempt sequence; the final attempt logged C4127.
 No warnings were suppressed to obtain this result.
 
 ## Final automated results
@@ -133,3 +133,29 @@ credential or user save is included. Existing source/fixture/history files are
 preserved. Hash-pinned provenance documents keep their reviewed bytes; current
 architecture warnings live in entry documents and notices on historical docs.
 Final publication and independent-checkout checks are recorded below when done.
+
+## Independent checkout and final documentation checks
+
+A detached checkout containing committed files and resolved LFS assets was
+created locally. This shares Git's local object/LFS storage; it is **not** a
+claimed fresh network download. Its first configuration exposed a pre-existing
+line-ending mismatch: the fragment-shader manifest hashed local CRLF bytes,
+whereas `.gitattributes` restores canonical LF bytes. Commit `a3f98a2b` corrects
+only that hash and converts seven already-tracked PNGs to actual LFS pointers.
+Normalized shader text and embedded SPIR-V are byte-identical to the prior
+tested implementation; no graphics behavior was changed.
+
+After checkout completed and that correction was applied, configuring
+`windows-native-preview` succeeded in the isolated checkout at `a3f98a2b`.
+The complete suite was not repeated for documentation/LF-hash-only changes.
+All **424 local links in changed Markdown files resolve**; the roadmap contains
+items **1 through 30**, and the architecture warning is present in the handoff.
+No new credential-pattern matches or unwanted executable/archive files were
+found in the synchronized changes. Existing curation reports retain some old
+trailing whitespace; their review content was not reformatted during this audit.
+
+The original working tree has exactly the **736 documented asset exclusions**
+and no other untracked files. They are deliberately preserved, not deleted to
+make status look clean. Final Git push and remote-ref comparison occur after
+this receipt is committed; the assistant's completion report gives the published
+tip. Source and handoff are on the same existing native development branch.
