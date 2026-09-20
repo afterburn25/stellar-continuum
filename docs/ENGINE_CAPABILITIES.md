@@ -2,44 +2,44 @@
 
 Baseline: `fbb3165b` (merged Developer-mode + design-system line, 172/172 CTest,
 425 Python, sealed export `6ad1650b` green). Work branch:
-`engine/foundation-expansion-1-30`.
+`engine/foundation-expansion-1-30` — latest `1c2df367`, 188/188 CTest green.
 
 Status vocabulary: **MISSING** (greenfield), **PARTIAL** (exists but does not
 meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 (engine side complete, outside dependency pending).
 
-| # | Capability | Prior state | Files (before) | Work this expansion |
-|---|---|---|---|---|
-| 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` exist but game uses int IDs in vectors; no components/hierarchy/queries | `engine/…/foundation.hpp`, `core/fresh_campaign.hpp` | engine world store + hierarchy + queries + ID mapping |
-| 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock` speeds {0,1,2,3,8,24}, `CampaignFrame` routing, per-civ AI review throttle; no LOD tiers | `core/strategic_clock.hpp`, `core/campaign_frame.hpp` | LOD tier policy + scheduler in engine |
-| 3 | Job/threading system | PARTIAL — `JobSystem` FIFO+futures; no priorities/deps/cancel/naming/profiling; used only by save writer | `engine/…/foundation.hpp` | priorities, named workers, stats, adoption |
-| 4 | Render graph | MISSING — one immediate-mode `scene()` + `DrawList` buckets | `app/native_client/main.cpp`, `native_map_platform.hpp` | pass scheduler over DrawList layers |
-| 5 | GPU-driven rendering | MISSING — SDL_Renderer 2D batches only; CPU culling | `native_map_platform.cpp` | instance-batch DrawList primitive; raw SDL_GPU pipeline is follow-on |
-| 6 | Texture streaming | PARTIAL — bounded LRU caches (128/192MiB GPU, per-producer CPU caps); synchronous decode | `native_map_platform.hpp`, `native_*_assets.*` | streaming requests, priorities, async decode, promotion |
-| 7 | Shader library + cache | MISSING — SDL built-in shaders only | — | registry/variants/cache manifest; consumption pending SDL_GPU pipeline |
-| 8 | Particle/VFX framework | MISSING — procedural flare polylines + battle VisualEvents | `native_celestial_appearance.cpp` | engine VFX definitions (emitters, curves, attachment, LOD); migrate flares |
-| 9 | Physics layer | MISSING — combat-only grid; abstract damage | `core/massive_combat_engine.cpp` | engine collision primitives, broadphase, raycast, overlap |
-| 10 | Spatial query framework | PARTIAL — private combat `SpatialIndex`, lane graph, linear scans elsewhere | `core/massive_combat_engine.cpp`, `core/lane_network.*` | shared engine spatial index + queries |
-| 11 | Route engine | PRESENT-PARTIAL — lane Dijkstra, leg-range, whitelist, fuel post-walk, caches; no hostile penalty, no fuel-optimized search | `core/lane_network.*`, `fleet_reach.*` | cost hooks, blocked sets, refuel-aware search |
-| 12 | Knowledge/FoW | PRESENT-PARTIAL — `CivilizationKnowledgeState` (unknown/detected/partial/full), observer filtering per-callsite | `core/knowledge.*`, `settlement_knowledge.*` | unified filtered-view helper; per-body granularity documented |
-| 13 | Generic economy/resources | MISSING — per-resource scalar fields/ledgers | `core/*economy*`, `freight.*`, `logistics.*` | `ResourceDefinition`/`Inventory`/`Recipe`/`Reservation`/`TransportOrder` framework |
-| 14 | Event bus | PARTIAL — `EventQueue<T>` single-type owner-affine; domain events flow via step-result vectors | `engine/…/foundation.hpp`, `campaign_coordinator.hpp` | typed subscription bus, lifecycle-safe |
-| 15 | Mission/event framework | MISSING — implicit fleet-role missions; UI board only | `core/exploration_*`, `native_missions.*` | data-driven definitions: triggers/stages/choices/timers |
-| 16 | Advanced saves | MOSTLY PRESENT — v17 schema, legacy migration, autosave scheduler, atomic+`.bak`, async writer; no rolling slots/checksum/metadata preview | `core/player_campaign_*`, `engine/atomic_file_write.*` | rolling slots, checksum sidecar, preview reader |
-| 17 | Deterministic replay | MISSING — repeat-run hash comparison only | `app/galaxy_main.cpp` | session journal + replay harness |
-| 18 | Crash reporter | PARTIAL — user-triggered support bundle + top-level exception boundary; no crash handler | `native_support.*`, `headless_main.cpp` | unhandled-exception/minidump capture → bundle |
-| 19 | Profiler | MISSING — ad-hoc chrono + smoke metrics | `main.cpp` smoke block | scoped spans, counters, JSON export, overlay |
-| 20 | Memory tracking | MISSING — cache byte counters only | `native_map_platform.hpp` | subsystem registry, high-water marks |
-| 21 | Input actions | PARTIAL — normalized `InputEvent`; literal key switch; no rebind/gamepad/contexts | `native_map_platform.hpp`, `main.cpp` key switch | action map, contexts, bindings file, gamepad |
-| 22 | Audio engine | PARTIAL — 48kHz CPU mixer, 1 music bed (fully decoded), 8 sfx voices, ducking, SAPI voice | `native_audio*`, `native_voice*` | buses, per-category gains, positional pan/attenuation, streaming music |
-| 23 | Animation | MISSING — stateless procedural time functions | `native_celestial_appearance.cpp` | clip/track/easing/state-machine module |
-| 24 | Advanced UI | PARTIAL — theme helpers + per-view widgets; responsive scale; no shared list/table/tree/drag-drop | `native_ui_theme.hpp`, `native_ui_layout.hpp` | shared widget module (scroll list, table, tabs, tree) |
-| 25 | Localization | MISSING — hardcoded English literals | — | `TextCatalog` + locale JSON + formatting/plurals; migrate a slice |
-| 26 | Accessibility | PARTIAL — subtitle size, auto layout scale | `native_voice_settings.*`, `native_ui_layout.hpp` | ui/text scale, high-contrast, reduced motion, colorblind accents |
-| 27 | Platform layer | PARTIAL — window/paths/atomic-write/image; Win32+SDL+GDI+WIC | `engine/*` | `IPlatformServices` seam, documented non-Windows path |
-| 28 | Steam layer | MISSING — `windows-steam` preset blocked | `export/stellar-presets.json` | service interface + null backend + hooks |
-| 29 | Mod architecture | MISSING — data catalogs with manifests; no packages/overrides | `data/research/v1`, `adaptive_research_catalog.cpp` | package manifest, load order, dependency/version checks, data overrides |
-| 30 | Stellar Tools | PARTIAL — DEVELOPMENT submenu + 6-command tools panel | `native_development_menu.*`, `native_developer_tools.*` | tabbed tools host: entity/asset/profiler/event/job/save views |
+| # | Capability | Prior state | Current state | Files | Tests |
+|---|---|---|---|---|---|
+| 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` only | **ENGINE-COMPLETE** — `World` store: components, hierarchy, queries, binary snapshot/restore, legacy ID map. Game-side adoption pending. | `engine/…/world.hpp`, `engine/src/world.cpp` | `engine_world` |
+| 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE** — `SimulationScheduler`: tier policies (ACTIVE/NEARBY/NORMAL/BACKGROUND/DORMANT), cadence, deterministic ordering, dormant analytic skip. Integration into campaign frame pending. | `engine/…/simulation_scheduler.hpp` | `simulation_scheduler` |
+| 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. Wider adoption pending. | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
+| 4 | Render graph | MISSING | **ENGINE-COMPLETE (policy layer)** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. Backend adoption pending (DrawList layer today; SDL_GPU follow-on). | `engine/…/render_graph.hpp` | `render_pipeline` |
+| 5 | GPU-driven rendering | MISSING | **PARTIAL** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. True indirect draw requires the SDL_GPU pipeline follow-on. | `engine/…/draw_batcher.hpp` | `batcher_ui` |
+| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE (policy layer)** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. Backend consumption pending. | `engine/…/texture_streaming.hpp` | `render_pipeline` |
+| 7 | Shader library + cache | MISSING — SDL built-ins only | **ENGINE-COMPLETE (management layer)** — `ShaderLibrary`: families, canonical variant keys, artifact hashes, version invalidation, diagnostics. Consumption pending SDL_GPU pipeline. | `engine/…/shader_library.hpp` | `render_pipeline` |
+| 8 | Particle/VFX framework | MISSING — procedural flares | **ENGINE-COMPLETE** — `VfxSystem`: data-driven emitters, deterministic per-instance RNG pools, gravity/integration, LOD rate scaling, curve-driven scale/opacity/tint. Flare migration pending. | `engine/…/vfx.hpp`, `vfx.cpp` | `render_pipeline` |
+| 9 | Physics layer | MISSING — combat-only grid | **ENGINE-COMPLETE** — `PhysicsWorld`: circle/AABB/segment primitives, broadphase over SpatialGrid, overlap/raycast/sweep, trigger enter/stay/exit events. | `engine/…/physics.hpp`, `physics.cpp` | `spatial_physics` |
+| 10 | Spatial query framework | PARTIAL — private combat index | **ENGINE-COMPLETE** — `SpatialGrid`: deterministic cell order, insert/remove/update, radius/AABB/ray queries, broadphase candidates. Combat-index adoption pending parity review. | `engine/…/spatial_index.hpp` | `spatial_physics` |
+| 11 | Route engine | PRESENT-PARTIAL | **EXTENDED** — `RoutePolicy` (blocked sets, per-system traversal cost = hostile-territory penalties) + `find_fuel_feasible_route` waypoint insertion with refuel callbacks. | `core/lane_network.*` | `route_policy` |
+| 12 | Knowledge/FoW | PRESENT-PARTIAL | **UNCHANGED** — `CivilizationKnowledgeState` covers observer filtering; per-callsite discipline retained. | `core/knowledge.*` | `settlement_knowledge_parity` |
+| 13 | Generic economy/resources | MISSING — per-resource fields | **ENGINE-COMPLETE** — `ResourceDefinition`/`Inventory`/`Recipe`/`Producer`/`TransferOrder`/`ResourceNetwork` with shortage reporting and bounded transfers. | `engine/…/resource_economy.hpp` | `economy_animation` |
+| 14 | Event bus | PARTIAL — `EventQueue<T>` | **ENGINE-COMPLETE** — `EventBus`: typed subscribe, RAII `Subscription`, deferred tick-ordered queue, owner-thread enforcement. Core event-flow adoption pending. | `engine/…/event_bus.hpp` | `event_bus` |
+| 15 | Mission/event framework | MISSING | **ENGINE-COMPLETE** — `MissionGraph`: JSON-defined triggers/conditions/stages/choices/timers, persistent instances, serialize/restore, effects emitted via EventBus. | `engine/…/mission_graph.hpp` | `mission_graph` |
+| 16 | Advanced saves | MOSTLY PRESENT | **EXTENDED** — fnv1a64 integrity sidecars (atomic, incl. `.bak`), mismatch → backup fallback on load. Existing: v17 schema, migrations, autosave scheduler, async writer, `.bak`. Still missing: rolling multi-slots, metadata preview reader. | `engine/…/save_integrity.hpp`, `core/player_campaign_save.cpp`, `player_campaign_recovery.cpp` | `save_integrity` |
+| 17 | Deterministic replay | MISSING | **ENGINE-COMPLETE** — `ReplayRecorder`/`ReplayPlayer`: ordered command stream, FNV checkpoints, JSON round-trip. Session-journal integration pending. | `engine/…/replay.hpp` | `economy_animation` |
+| 18 | Crash reporter | PARTIAL — support bundle only | **INTEGRATED** — `CrashReporter`: unhandled-exception filter, minidump + context/event-log bundle, installed at client startup beside save dir. | `engine/…/crash_reporter.hpp`, `app/native_client/main.cpp` | `crash_reporter` |
+| 19 | Profiler | MISSING | **ENGINE-COMPLETE** — `Profiler`: scoped spans, per-frame counters, thread-buffer drain, JSON export. Overlay + app instrumentation pending. | `engine/…/profiler.hpp` | `engine_diagnostics` |
+| 20 | Memory tracking | MISSING | **ENGINE-COMPLETE** — `MemoryTracker`: subsystem registry, high-water marks, `TrackedAllocator` adapter, JSON export. Adoption pending. | `engine/…/memory_tracker.hpp` | `engine_diagnostics` |
+| 21 | Input actions | PARTIAL — raw events | **ENGINE-COMPLETE** — `InputMapper`: JSON contexts (stacked, exclusive), Button/Axis1D/Axis2D actions, chords, rebinding, gamepad kinds. SDL adapter wiring pending. | `engine/…/input_actions.hpp` | `input_actions` |
+| 22 | Audio engine | PARTIAL — CPU mixer | **UNCHANGED** — existing 48kHz mixer + SAPI voice retained; bus abstraction deferred. | `native_audio*`, `native_voice*` | `native_audio` |
+| 23 | Animation | MISSING | **ENGINE-COMPLETE** — `FloatCurve` (5 easings), `Timeline` tracks + loop modes (Once/Loop/PingPong) + crossed events. Skeletal blending out of scope. | `engine/…/animation.hpp` | `economy_animation` |
+| 24 | Advanced UI | PARTIAL — theme helpers | **PARTIAL** — `VirtualizedList`, `TableModel` (sort/filter), `TreeModel` (expand/flatten) added; screen adoption pending. | `engine/…/ui_viewmodels.hpp` | `batcher_ui` |
+| 25 | Localization | MISSING | **ENGINE-COMPLETE** — `LocalizationTable`/`LocalizationService`: JSON locales, fallback chain, positional+named formatting, plurals, runtime reload. UI string migration pending. | `engine/…/localization.hpp` | `localization` |
+| 26 | Accessibility | PARTIAL — subtitle size | **ENGINE-COMPLETE (settings layer)** — `AccessibilitySettings`: ui/text scale, high contrast, color-blind modes, reduced motion/flashing, subtitles; sanitize + JSON round-trip. Presentation adoption pending. | `engine/…/accessibility.hpp` | `economy_animation` |
+| 27 | Platform layer | PARTIAL — Win32+SDL+GDI | **UNCHANGED-PARTIAL** — existing paths/atomic-write/image layer retained; `PlatformServices` (Req 28) adds the services seam. Full OS abstraction documented as follow-on. | `engine/*` | — |
+| 28 | Steam layer | MISSING | **ENGINE-COMPLETE — EXTERNAL** — `PlatformServices` facade + `NullPlatformBackend`; feature gating, user identity, achievement/presence/cloud calls. Live Steamworks SDK backend pending credentials. | `engine/…/platform_services.hpp` | `package_platform` |
+| 29 | Mod architecture | MISSING | **ENGINE-COMPLETE** — `PackageManifest` (semver, deps, provides), `PackageRegistry` (protected namespaces, deterministic topo load order, conflict reporting), `scan_packages` directory discovery. | `engine/…/package.hpp` | `package_platform` |
+| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **UNCHANGED** — existing DEVELOPMENT submenu + tools panel retained; tabbed inspector host is the documented follow-on. | `native_development_menu.*`, `native_developer_tools.*` | `native_developer_session` |
 
 ## Notes
 
@@ -49,8 +49,10 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
   theme of this expansion is adopting/extending rather than duplicating them.
 - Renderer constraint: the GPU path is SDL3's 2D `SDL_GPURenderer` over a
   Vulkan device — no custom pipelines/shaders. Requirements 4–7 are therefore
-  implemented at the DrawList/pass layer with real batching, streaming and
-  shader-asset management; a raw `SDL_GPU` pipeline migration is the
+  implemented at the DrawList/pass layer with real batching, streaming policy
+  and shader-asset management; a raw `SDL_GPU` pipeline migration is the
   documented follow-on for true indirect draw / custom shader execution.
 - Save compatibility is frozen by the Player17 contract; save upgrades are
-  additive (sidecars/envelopes), never reinterpretation.
+  additive (sidecars/envelopes), never reinterpretation. The integrity
+  sidecar (`<save>.integrity`, `fnv1a64:<hex>`) verifies on load when present
+  and is silently absent for pre-expansion saves.
