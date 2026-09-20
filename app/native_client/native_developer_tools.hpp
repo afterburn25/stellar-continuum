@@ -7,10 +7,12 @@
 // engine diagnostics (profiler/memory) and the save-slot chain.
 
 #include <stellar/core/developer_commands.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <array>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_developer {
@@ -67,6 +69,17 @@ struct DeveloperToolsCommand {
 // caller dispatches them through NativeCampaignSession::run_developer_command.
 class NativeDeveloperToolsPanel final {
  public:
+  NativeDeveloperToolsPanel();
+
+  // Loads an additional locale JSON document or file into the panel's
+  // LocalizationService; later tables override the embedded English
+  // catalog, so mods/locale packs can re-skin the panel text.
+  bool load_locale_document(std::string_view json, std::string *error = nullptr);
+  bool load_locale_file(const std::string &path, std::string *error = nullptr);
+  void set_locale(std::string locale) {
+    localization_.set_locale(std::move(locale));
+  }
+
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] DeveloperToolsTab active_tab() const noexcept {
     return active_tab_;
@@ -82,6 +95,11 @@ class NativeDeveloperToolsPanel final {
               const native_map::Point *pointer = nullptr) const;
 
  private:
+  [[nodiscard]] std::string tr(std::string_view key) const {
+    return localization_.translate(key);
+  }
+
+  engine::LocalizationService localization_;
   bool visible_{};
   DeveloperToolsTab active_tab_{DeveloperToolsTab::Commands};
 };

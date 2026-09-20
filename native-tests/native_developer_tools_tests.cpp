@@ -1,7 +1,11 @@
 #include "native_developer_tools.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 using namespace stellar::native_developer;
 using namespace stellar::native_map;
@@ -115,6 +119,47 @@ void verify_render_all_tabs() {
   }
 }
 
+void verify_localization_override() {
+  constexpr int width = 1280, height = 720;
+  NativeDeveloperToolsPanel panel;
+  panel.open();
+
+  const auto rendered_texts = [&] {
+    DrawList out;
+    NativeDeveloperToolsView view;
+    view.developer = true;
+    panel.render(out, view, width, height, nullptr);
+    std::vector<std::string> texts;
+    for (const auto &primitive : out.overlay)
+      if (const auto *text = std::get_if<Text>(&primitive))
+        texts.push_back(text->value);
+    return texts;
+  };
+
+  const auto has = [](const std::vector<std::string> &texts,
+                      std::string_view needle) {
+    return std::ranges::find(texts, needle) != texts.end();
+  };
+
+  require(has(rendered_texts(), "DEVELOPER TOOLS"),
+          "The embedded English catalog did not render the panel title.");
+
+  std::string error;
+  require(panel.load_locale_document(
+              R"json({"locale":"en","fallback":"en","strings":{"DEVTOOLS_TITLE":"OUTILS DE DEVELOPPEMENT"}})json",
+              &error),
+          "A locale override document was rejected.");
+  require(has(rendered_texts(), "OUTILS DE DEVELOPPEMENT") &&
+              !has(rendered_texts(), "DEVELOPER TOOLS"),
+          "The locale override did not replace the panel title.");
+
+  // Malformed documents are rejected without corrupting loaded strings.
+  require(!panel.load_locale_document("not json", &error),
+          "A malformed locale document was accepted.");
+  require(has(rendered_texts(), "OUTILS DE DEVELOPPEMENT"),
+          "A rejected locale document corrupted the loaded strings.");
+}
+
 }  // namespace
 
 int main() {
@@ -122,6 +167,7 @@ int main() {
     verify_geometry();
     verify_tab_switching();
     verify_render_all_tabs();
+    verify_localization_override();
     std::cout << "Developer tools panel tabs passed\n";
     return 0;
   } catch (const std::exception &error) {

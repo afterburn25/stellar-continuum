@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string_view>
 #include <utility>
 
 namespace stellar::native_developer {
@@ -31,8 +32,29 @@ constexpr Color button_color = native_ui::color::surface_secondary;
 constexpr Color hover_color = native_ui::color::surface_hover;
 constexpr Color tab_active_color = native_ui::color::selected;
 
-constexpr std::array<const char *, developer_tools_tab_count> tab_names = {
-    "COMMANDS", "DIAGNOSTICS", "SAVES"};
+// Panel chrome strings live in a localization table (req 25): the embedded
+// English catalog is the default; load_locale_* can layer other locales on
+// top. Command row titles/descriptions come from the parity-locked
+// developer_command_catalog and stay untouched.
+constexpr std::string_view kEnglishCatalog = R"json({
+  "locale": "en",
+  "fallback": "en",
+  "strings": {
+    "DEVTOOLS_TITLE": "DEVELOPER TOOLS",
+    "DEVTOOLS_SUBTITLE": "Authorized test operations in a separate world",
+    "DEVTOOLS_CLOSE": "X",
+    "DEVTOOLS_MODE_USED": "DEVELOPER MODE  \u00b7  TOOLS USED \u00b7 DEVELOPER CAMPAIGN",
+    "DEVTOOLS_MODE_UNUSED": "DEVELOPER MODE  \u00b7  TOOLS UNUSED",
+    "DEVTOOLS_TAB_COMMANDS": "COMMANDS",
+    "DEVTOOLS_TAB_DIAGNOSTICS": "DIAGNOSTICS",
+    "DEVTOOLS_TAB_SAVES": "SAVES",
+    "DEVTOOLS_EMPTY_DIAGNOSTICS": "No diagnostics recorded yet.",
+    "DEVTOOLS_EMPTY_SAVES": "No save file has been written for this campaign yet."
+  }
+})json";
+
+constexpr std::array<const char *, developer_tools_tab_count> tab_keys = {
+    "DEVTOOLS_TAB_COMMANDS", "DEVTOOLS_TAB_DIAGNOSTICS", "DEVTOOLS_TAB_SAVES"};
 
 void fill(DrawList &out, UiRect rect, Color color) {
   out.overlay.emplace_back(FilledRectangle{rect, color});
@@ -57,6 +79,26 @@ Color save_status_color(int status) {
 }
 
 }  // namespace
+
+NativeDeveloperToolsPanel::NativeDeveloperToolsPanel() {
+  engine::LocalizationTable table{"en", "en"};
+  (void)table.load_json(kEnglishCatalog);
+  localization_.add_table(std::move(table));
+}
+
+bool NativeDeveloperToolsPanel::load_locale_document(std::string_view json,
+                                                     std::string *error) {
+  engine::LocalizationTable table{localization_.locale(),
+                                  localization_.fallback_locale()};
+  if (!table.load_json(json, error)) return false;
+  localization_.add_table(std::move(table));
+  return true;
+}
+
+bool NativeDeveloperToolsPanel::load_locale_file(const std::string &path,
+                                                 std::string *error) {
+  return localization_.load_file(path, error);
+}
 
 DeveloperToolsLayout developer_tools_layout_for(const int width,
                                                 const int height) {
@@ -168,20 +210,18 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
   fill(out, layout.panel, panel_color);
   stroke(out, layout.panel, border_color);
 
-  text(out, {layout.header.x, layout.header.y}, "DEVELOPER TOOLS", gold_color,
-       layout.heading_font_pixels);
+  text(out, {layout.header.x, layout.header.y}, tr("DEVTOOLS_TITLE"),
+       gold_color, layout.heading_font_pixels);
   text(out, {layout.header.x, layout.header.y + 26.f * scale},
-       "Authorized test operations in a separate world", muted_color,
-       layout.small_font_pixels);
+       tr("DEVTOOLS_SUBTITLE"), muted_color, layout.small_font_pixels);
   fill(out, layout.close_button, button_color);
   text(out, {layout.close_button.x + 8.f * scale,
              layout.close_button.y + 4.f * scale},
-       "X", muted_color, layout.body_font_pixels + 1);
+       tr("DEVTOOLS_CLOSE"), muted_color, layout.body_font_pixels + 1);
 
   // Reference Refresh: "DEVELOPER MODE · TOOLS USED · DEVELOPER CAMPAIGN".
   text(out, {layout.mode_text.x, layout.mode_text.y},
-       view.tools_used ? "DEVELOPER MODE  ·  TOOLS USED · DEVELOPER CAMPAIGN"
-                       : "DEVELOPER MODE  ·  TOOLS UNUSED",
+       tr(view.tools_used ? "DEVTOOLS_MODE_USED" : "DEVTOOLS_MODE_UNUSED"),
        view.tools_used ? gold_color : accent_color, layout.body_font_pixels);
 
   // Tab strip.
@@ -197,7 +237,7 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
     text(out,
          {rect.x + 8.f * scale,
           rect.y + (rect.height - static_cast<float>(label_pixels)) * .5f},
-         tab_names[i],
+         tr(tab_keys[i]),
          active ? title_color : (hovered ? title_color : muted_color),
          label_pixels);
   }
@@ -232,7 +272,7 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
       cursor += section ? row_height + 4.f * scale : row_height;
     }
     if (view.diagnostics.empty())
-      text(out, {layout.content.x, cursor}, "No diagnostics recorded yet.",
+      text(out, {layout.content.x, cursor}, tr("DEVTOOLS_EMPTY_DIAGNOSTICS"),
            muted_color, layout.small_font_pixels);
   } else {
     const auto row_height = 34.f * scale;
@@ -254,8 +294,7 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
       cursor += row_height;
     }
     if (view.save_slots.empty())
-      text(out, {layout.content.x, cursor},
-           "No save file has been written for this campaign yet.",
+      text(out, {layout.content.x, cursor}, tr("DEVTOOLS_EMPTY_SAVES"),
            muted_color, layout.small_font_pixels);
   }
 
