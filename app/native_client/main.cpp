@@ -2452,6 +2452,8 @@ class NativeCampaign final {
     }
     const auto layout=NativeUiLayout::for_viewport(width,height,session_->developer_mode());
     input_mapper_.begin_frame();
+    {
+    const auto input_span_scope=stellar::engine::Profiler::instance().span("update.events","client");
     for(const auto &event:input.events){
       if(battle_workspace_.visible()&&!menu_){
         const auto command=battle_workspace_.handle(event,width,height);
@@ -2852,7 +2854,9 @@ class NativeCampaign final {
     }
     if(const auto request=surface_workspace_.take_preview_request())execute_surface(*request);
     if(research_workspace_.take_refresh_request())refresh_research(true);
+    }
     if(advance_simulation){
+      const auto advance_span_scope=stellar::engine::Profiler::instance().span("update.advance","client");
       const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp);
       {
         const auto player=session_->frame()
@@ -2863,6 +2867,10 @@ class NativeCampaign final {
             if(allocation.civilization_id==player)
               last_industry_allocation_=allocation;
       }
+      stellar::engine::Profiler::instance().set_gauge(
+          "campaign.systems",
+          static_cast<double>(session_->frame()
+                                  .runtime().world().campaign().systems.size()));
       research_refresh_elapsed_+=elapsed;
       refresh_research(false);
       fleet_refresh_elapsed_+=elapsed;
@@ -2906,6 +2914,7 @@ class NativeCampaign final {
   }
 
   [[nodiscard]] DrawList scene(int width,int height){
+    const auto scene_span_scope=stellar::engine::Profiler::instance().span("scene.build","client");
     const auto screen_height=static_cast<float>(height);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible())system_workspace_.render(out,width,height);else{
