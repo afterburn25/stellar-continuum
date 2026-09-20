@@ -68,11 +68,18 @@ add_executable(stellar_native_development_menu_tests
 target_include_directories(stellar_native_development_menu_tests PRIVATE app/native_client engine/include)
 add_test(NAME native_development_menu COMMAND stellar_native_development_menu_tests)
 
+add_executable(stellar_native_developer_tools_tests
+  native-tests/native_developer_tools_tests.cpp app/native_client/native_developer_tools.cpp)
+target_include_directories(stellar_native_developer_tools_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_developer_tools_tests PRIVATE stellar_core)
+add_test(NAME native_developer_tools COMMAND stellar_native_developer_tools_tests)
+
 if(MSVC)
   target_compile_options(stellar_native_research_controller_tests PRIVATE /WX)
   target_compile_options(stellar_native_research_workspace_tests PRIVATE /WX)
   target_compile_options(stellar_native_ui_layout_tests PRIVATE /WX)
   target_compile_options(stellar_native_development_menu_tests PRIVATE /WX)
+  target_compile_options(stellar_native_developer_tools_tests PRIVATE /WX)
   target_compile_options(stellar_native_client_input_tests PRIVATE /WX)
 endif()
 

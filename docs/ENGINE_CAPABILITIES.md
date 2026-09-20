@@ -39,7 +39,7 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 | 27 | Platform layer | PARTIAL — Win32+SDL+GDI | **UNCHANGED-PARTIAL** — existing paths/atomic-write/image layer retained; `PlatformServices` (Req 28) adds the services seam. Full OS abstraction documented as follow-on. | `engine/*` | — |
 | 28 | Steam layer | MISSING | **ENGINE-COMPLETE — EXTERNAL** — `PlatformServices` facade + `NullPlatformBackend`; feature gating, user identity, achievement/presence/cloud calls. Live Steamworks SDK backend pending credentials. | `engine/…/platform_services.hpp` | `package_platform` |
 | 29 | Mod architecture | MISSING | **ENGINE-COMPLETE** — `PackageManifest` (semver, deps, provides), `PackageRegistry` (protected namespaces, deterministic topo load order, conflict reporting), `scan_packages` directory discovery. | `engine/…/package.hpp` | `package_platform` |
-| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **UNCHANGED** — existing DEVELOPMENT submenu + tools panel retained; tabbed inspector host is the documented follow-on. | `native_development_menu.*`, `native_developer_tools.*` | `native_developer_session` |
+| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **EXTENDED** — tabbed tools host: Commands / Diagnostics (live Profiler + MemoryTracker overlays, session stats) / Saves (rolling-chain slots with integrity + preview fields). Profiler `begin/end_frame` wired into the client frame loop. Entity/asset/event-log inspectors remain follow-on. | `native_developer_tools.*`, `main.cpp` | `native_developer_tools` |
 
 ## Notes
 

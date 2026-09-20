@@ -3,15 +3,29 @@
 // Native port of the reference DeveloperToolsLayer: a floating DEVELOPER
 // TOOLS panel that lists the six authorized Developer commands and runs them
 // through the campaign session boundary. The panel only opens for a
-// Developer-mode campaign.
+// Developer-mode campaign. A tab strip adds the Stellar Tools inspectors:
+// engine diagnostics (profiler/memory) and the save-slot chain.
 
 #include <stellar/core/developer_commands.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <array>
 #include <string>
+#include <vector>
 
 namespace stellar::native_developer {
+
+enum class DeveloperToolsTab { Commands = 0, Diagnostics = 1, Saves = 2 };
+inline constexpr int developer_tools_tab_count = 3;
+
+// One row on the Saves tab — a slot in the primary/.bak/.bak.N chain.
+struct DeveloperSaveSlotRow {
+  std::string label;
+  std::string detail;
+  // 0 = verified/current, 1 = loaded-generations history, 2 = no sidecar,
+  // 3 = integrity mismatch / unreadable, 4 = missing.
+  int status{};
+};
 
 struct NativeDeveloperToolsView {
   bool developer{};
@@ -19,6 +33,11 @@ struct NativeDeveloperToolsView {
   // The most recent command outcome; styled like the reference result text.
   std::string result;
   bool result_accepted{};
+  // Diagnostics tab: preformatted rows (profiler, memory, jobs). Rows with a
+  // leading "--" are rendered as section headers.
+  std::vector<std::string> diagnostics;
+  // Saves tab: the rolling save chain for the session's slot.
+  std::vector<DeveloperSaveSlotRow> save_slots;
 };
 
 // Panel geometry, exposed for tests and graphical smoke drivers.
@@ -26,6 +45,9 @@ struct DeveloperToolsLayout {
   float scale{};
   int heading_font_pixels{}, body_font_pixels{}, small_font_pixels{};
   native_map::UiRect panel, header, close_button, mode_text, result_text;
+  std::array<native_map::UiRect, developer_tools_tab_count> tabs;
+  // Scrollable content region under the tab strip.
+  native_map::UiRect content;
   // One clickable row per catalog command; its description renders inside.
   std::array<native_map::UiRect, 6> command_rows;
 };
@@ -46,6 +68,9 @@ struct DeveloperToolsCommand {
 class NativeDeveloperToolsPanel final {
  public:
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] DeveloperToolsTab active_tab() const noexcept {
+    return active_tab_;
+  }
   void open() noexcept { visible_ = true; }
   void close() noexcept { visible_ = false; }
   void toggle() noexcept { visible_ = !visible_; }
@@ -58,6 +83,7 @@ class NativeDeveloperToolsPanel final {
 
  private:
   bool visible_{};
+  DeveloperToolsTab active_tab_{DeveloperToolsTab::Commands};
 };
 
 }  // namespace stellar::native_developer

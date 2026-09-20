@@ -58,8 +58,13 @@
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
+#include <stellar/core/save_preview.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/crash_reporter.hpp>
+#include <stellar/engine/memory_tracker.hpp>
+#include <stellar/engine/profiler.hpp>
+#include <stellar/engine/save_history.hpp>
+#include <stellar/engine/save_integrity.hpp>
 
 #include <SDL3/SDL.h>
 
@@ -87,6 +92,13 @@
 namespace {
 using namespace stellar::core;
 using namespace stellar::native_map;
+
+// Ends the profiler frame opened at the top of ClientApp::update.
+struct ProfileFrameGuard {
+  ~ProfileFrameGuard() {
+    (void)stellar::engine::Profiler::instance().end_frame();
+  }
+};
 
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
@@ -1984,6 +1996,64 @@ class NativeCampaign final {
   [[nodiscard]] std::filesystem::path developer_save_path()const{
     return developer_save_path_beside(player_save_path());
   }
+  // Stellar Tools host: the panel's Diagnostics and Saves tabs read live
+  // engine instrumentation and the session slot's rolling save chain.
+  [[nodiscard]] native_developer::NativeDeveloperToolsView
+  developer_tools_view()const{
+    native_developer::NativeDeveloperToolsView view;
+    view.developer=true;
+    view.tools_used=session_->developer_tools_used();
+    view.result=developer_result_;
+    view.result_accepted=developer_result_accepted_;
+
+    view.diagnostics.emplace_back("-- Profiler");
+    for(auto &line:stellar::engine::Profiler::instance().overlay_lines(6))
+      view.diagnostics.push_back(std::move(line));
+    view.diagnostics.emplace_back("-- Memory");
+    for(auto &line:stellar::engine::MemoryTracker::instance().overlay_lines(6))
+      view.diagnostics.push_back(std::move(line));
+    view.diagnostics.emplace_back("-- Campaign");
+    char day_buffer[48];
+    std::snprintf(day_buffer,sizeof day_buffer,"simulation day %.1f",
+                  session_->frame().clock().simulation_days());
+    view.diagnostics.emplace_back(day_buffer);
+    view.diagnostics.emplace_back(session_->developer_mode()
+                                      ?"developer session"
+                                      :"player session");
+
+    const auto &slot_root=session_->save_path();
+    for(std::size_t slot=0;
+        slot<=stellar::engine::k_default_save_history_depth;++slot){
+      const auto path=slot==0?slot_root
+                             :stellar::engine::history_slot_path(slot_root,slot);
+      native_developer::DeveloperSaveSlotRow row;
+      row.label=slot==0?"current":slot==1?".bak"
+                                         :".bak."+std::to_string(slot);
+      std::error_code exists_error;
+      if(!std::filesystem::is_regular_file(path,exists_error)){
+        if(slot>1)continue;  // absent deep slots are not listed
+        row.detail="not written";row.status=4;
+      }else if(const auto preview=read_player_campaign_preview(path)){
+        std::ostringstream detail;
+        detail<<preview->saved_at_utc<<"  day "<<preview->simulation_days;
+        if(preview->developer)detail<<"  developer";
+        switch(preview->integrity){
+        case stellar::engine::IntegrityStatus::Verified:
+          row.status=slot==0?0:1;detail<<"  verified";break;
+        case stellar::engine::IntegrityStatus::SidecarAbsent:
+          row.status=2;detail<<"  unverified";break;
+        case stellar::engine::IntegrityStatus::Mismatch:
+          row.status=3;detail<<"  CORRUPT";break;
+        default:row.status=4;break;
+        }
+        row.detail=detail.str();
+      }else{
+        row.detail="unreadable";row.status=3;
+      }
+      view.save_slots.push_back(std::move(row));
+    }
+    return view;
+  }
   [[nodiscard]] static bool save_slot_exists(const std::filesystem::path &path){
     std::error_code error{};
     if(std::filesystem::is_regular_file(path,error))return true;
@@ -2290,6 +2360,8 @@ class NativeCampaign final {
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
+    stellar::engine::Profiler::instance().begin_frame();
+    const ProfileFrameGuard profile_frame_guard;
     pointer_=input.pointer;
     // VideoSettingsService preview rollback: an unconfirmed display preview
     // restores the previous settings once the 15s window lapses.
@@ -3019,10 +3091,8 @@ class NativeCampaign final {
     if(!menu_&&developer_tools_.visible()){
       if(!session_->developer_mode())developer_tools_.close();
       else
-        developer_tools_.render(
-            out,{true,session_->developer_tools_used(),developer_result_,
-                 developer_result_accepted_},
-            width,height,&pointer_);
+        developer_tools_.render(out,developer_tools_view(),width,height,
+                                &pointer_);
     }
     if(!menu_&&missions_view_.visible()){
       const auto &campaign=session_->frame().runtime().world().campaign();
