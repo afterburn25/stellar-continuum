@@ -320,9 +320,11 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   return {};
 }
 
-void NativeFleetWorkspace::render(DrawList &out, int width, int height,
-                                  std::span<const FleetScreenMarker> markers,
-                                  stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
+void NativeFleetWorkspace::render(
+    DrawList &out, int width, int height,
+    std::span<const FleetScreenMarker> markers,
+    stellar::native_ship_ui::NativeShipArtAssets *ship_art,
+    const stellar::native_overview::OverviewImageProvider *portraits) const {
   last_ship_art_rows_ = 0;
   const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
   const auto artwork = [&](const stellar::native_fleet::NativeOwnFleet &fleet) {
@@ -419,7 +421,7 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       native_overview::render_empire_overview(
           out, *overview_,
           native_overview::overview_layout_for(*overview_, content),
-          pointer_);
+          pointer_, portraits);
     } else {
       text(out, layout.details,
            "Select an owned fleet on the map or in the outliner.", muted,

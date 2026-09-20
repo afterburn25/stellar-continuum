@@ -14,6 +14,7 @@ from native_celestial_runtime import native_celestial_asset_files
 from native_species_runtime import native_species_asset_files
 from native_startup_art_runtime import native_startup_art_asset_files
 from native_galaxy_art_runtime import native_galaxy_art_asset_files
+from native_leader_art_runtime import native_leader_art_asset_files
 from native_ship_art_runtime import native_ship_art_asset_files
 from native_planet_art_runtime import native_planet_art_asset_files
 from native_star_art_runtime import native_star_art_asset_files
@@ -54,6 +55,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_species_asset_files(root))
     files.update(native_startup_art_asset_files(root))
     files.update(native_galaxy_art_asset_files(root))
+    files.update(native_leader_art_asset_files(root))
     files.update(native_ship_art_asset_files(root))
     files.update(native_planet_art_asset_files(root))
     files.update(native_star_art_asset_files(root))

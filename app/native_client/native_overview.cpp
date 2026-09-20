@@ -1,6 +1,7 @@
 #include "native_overview.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <ranges>
 #include <utility>
@@ -15,6 +16,7 @@ namespace {
 using native_map::Color;
 using native_map::DrawList;
 using native_map::FilledRectangle;
+using native_map::Image;
 using native_map::Point;
 using native_map::StrokedRectangle;
 using native_map::Text;
@@ -55,7 +57,23 @@ std::string population_label(const double millions) {
                    "B people"
              : core::detail::legacy_custom_fixed(millions, 1, 1) + "M people";
 }
+constexpr std::array<NativeLeaderCard, 3> council{{
+    {"Civil Administration",
+     "Planetary development and public services",
+     "assets/visual/leaders/planetary-governor.jpg"},
+    {"Science Directorate",
+     "Research institutions and discovery",
+     "assets/visual/leaders/chief-scientist.jpg"},
+    {"Fleet Command",
+     "Exploration, defense and fleet operations",
+     "assets/visual/leaders/fleet-commander.jpg"},
+}};
+
 }  // namespace
+
+std::span<const NativeLeaderCard> leadership_council() noexcept {
+  return council;
+}
 
 NativeEmpireOverview build_empire_overview(
     const core::FreshCampaignState &campaign,
@@ -136,12 +154,36 @@ OverviewLayout overview_layout_for(const NativeEmpireOverview &overview,
         {content.x, y, content.width, 48.f * scale});
     y += 52.f * scale;
   }
+
+  // Reference BuildLeadershipCouncil (PlayerControls.cs sidebar): the three
+  // fixed office portraits sit under the empire summary. The render's own
+  // flow: colony end + 10·s, separator, +10·s, combined-power line (~30·s
+  // block), separator, +10·s, heading, then 46·s card rows.
+  const float bottom = content.y + content.height;
+  float cursor = overview.colonies.empty()
+                     ? content.y + 102.f * scale
+                     : layout.colony_rows.back().y +
+                           layout.colony_rows.back().height + 10.f * scale;
+  cursor += 40.f * scale;  // separator + combined-power line
+  if (cursor + 60.f * scale <= bottom) {
+    cursor += 10.f * scale;  // council separator
+    layout.council_heading = {content.x, cursor, content.width,
+                              14.f * scale};
+    cursor += 18.f * scale;
+    for (std::size_t index = 0; index < council.size(); ++index) {
+      if (cursor + 42.f * scale > bottom) break;
+      layout.leader_rows.push_back(
+          {content.x, cursor, content.width, 42.f * scale});
+      cursor += 46.f * scale;
+    }
+  }
   return layout;
 }
 
 void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
                             const OverviewLayout &layout,
-                            const Point pointer) {
+                            const Point pointer,
+                            const OverviewImageProvider *portraits) {
   const auto scale = layout.scale;
   const auto inner_x = layout.bounds.x;
   const auto inner_w = layout.bounds.width;
@@ -191,6 +233,44 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
          "Combined power  " +
              core::detail::legacy_custom_fixed(overview.combined_power, 0, 0),
          title_color, layout.small_font_pixels, inner_w);
+  }
+
+  // LEADERSHIP COUNCIL (reference PlayerControls.cs sidebar section).
+  if (layout.council_heading.height > 0.f) {
+    const float council_sep = layout.council_heading.y - 10.f * scale;
+    stroke(out, {inner_x, council_sep, inner_w, 1.f}, {64, 96, 128, 255});
+    text(out, {inner_x, layout.council_heading.y}, "LEADERSHIP COUNCIL",
+         title_color, layout.label_font_pixels, inner_w);
+    for (std::size_t index = 0; index < layout.leader_rows.size(); ++index) {
+      const auto row = layout.leader_rows[index];
+      const auto &card = council[index];
+      fill(out, row, row.contains(pointer) ? button_hover : button_color);
+      stroke(out, row, border_color);
+      const UiRect portrait_frame{row.x + 4.f * scale, row.y + 4.f * scale,
+                                  34.f * scale, row.height - 8.f * scale};
+      if (portraits)
+        if (const auto image = (*portraits)(card.asset_path)) {
+          const float ratio =
+              std::min(portrait_frame.width /
+                           static_cast<float>(image->width()),
+                       portrait_frame.height /
+                           static_cast<float>(image->height()));
+          const UiRect destination{
+              portrait_frame.x +
+                  (portrait_frame.width - image->width() * ratio) * .5f,
+              portrait_frame.y +
+                  (portrait_frame.height - image->height() * ratio) * .5f,
+              image->width() * ratio, image->height() * ratio};
+          out.overlay.emplace_back(Image{image, destination, std::nullopt,
+                                         {255, 255, 255, 255}, row});
+        }
+      text(out, {row.x + 46.f * scale, row.y + 4.f * scale},
+           std::string{card.role}, message_color, layout.body_font_pixels,
+           inner_w - 50.f * scale);
+      text(out, {row.x + 46.f * scale, row.y + 21.f * scale},
+           std::string{card.responsibility}, muted_color,
+           layout.small_font_pixels, inner_w - 50.f * scale);
+    }
   }
 }
 

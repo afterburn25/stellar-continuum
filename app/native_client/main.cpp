@@ -3108,7 +3108,7 @@ class NativeCampaign final {
       }
     }
     if(!menu_&&!system_workspace_.visible()&&!surface_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
-      fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
+      fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_,&overview_portrait_provider_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
     research_workspace_.render(out, width, height);
@@ -4066,6 +4066,16 @@ class NativeCampaign final {
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
       [this](std::string_view relative){
         auto [entry,inserted]=diplomacy_portraits_.try_emplace(std::string(relative));
+        if(inserted){
+          try{entry->second=decode_rgba_image(asset_root_/entry->first);}
+          catch(...){entry->second.reset();}
+        }
+        return entry->second;
+      };
+  std::unordered_map<std::string,std::shared_ptr<const RgbaImage>> overview_portraits_;
+  stellar::native_overview::OverviewImageProvider overview_portrait_provider_ =
+      [this](std::string_view relative){
+        auto [entry,inserted]=overview_portraits_.try_emplace(std::string(relative));
         if(inserted){
           try{entry->second=decode_rgba_image(asset_root_/entry->first);}
           catch(...){entry->second.reset();}

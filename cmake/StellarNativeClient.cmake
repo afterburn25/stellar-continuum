@@ -220,6 +220,8 @@ target_sources(stellar-continuum-native PRIVATE
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeShipArtAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_ship_art_assets)
+include("${CMAKE_CURRENT_LIST_DIR}/NativeLeaderArtAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_leader_art_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_ship_art_assets.cpp
   app/native_client/native_fleet_route_effects.cpp)

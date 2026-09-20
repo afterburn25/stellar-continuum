@@ -16,6 +16,7 @@ from native_audio_runtime import NATIVE_AUDIO_SOURCES
 from native_voice_runtime import NATIVE_VOICE_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
+from native_leader_art_runtime import NATIVE_LEADER_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_planet_art_runtime import NATIVE_PLANET_ART_SOURCES
 from native_star_art_runtime import NATIVE_STAR_ART_SOURCES
@@ -103,6 +104,15 @@ class NativeClientDependencyTests(unittest.TestCase):
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.galaxy_art_declaration = self.root / "export/native-galaxy-art-assets.json"
         self.galaxy_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":galaxy_art_records}))
+        leader_art_records = {}
+        for key, (source, destination) in NATIVE_LEADER_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only leader art " + key).encode())
+            leader_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.leader_art_declaration = self.root / "export/native-leader-art-assets.json"
+        self.leader_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":leader_art_records}))
         ship_art_records = {}
         for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
             asset = self.root / source

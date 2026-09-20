@@ -103,11 +103,11 @@ void rendered_facts(){
 void portrait_provider(){
   NativeNewGameWorkspace w;w.set_view(setup());
   auto resource=RgbaImage::create(2,1,std::vector<std::uint8_t>(8,255));int calls=0;
-  const std::unordered_set<std::string_view> approved{"assets/visual/species/terran-baseline.jpg","assets/visual/species/pelagic-high-pressure.jpg","assets/visual/species/compact-high-gravity.jpg","assets/visual/species/cryogenic-hydrocarbon.jpg"};
+  const std::unordered_set<std::string_view> approved{"assets/visual/species/terran-baseline.jpg","assets/visual/species/pelagic-high-pressure.jpg","assets/visual/species/compact-high-gravity.jpg","assets/visual/species/cryogenic-hydrocarbon.jpg","assets/visual/loading/stellar-continuum-splash.png","assets/visual/space/campaign-galaxy-four-arm-v1.png"};
   NativeNewGameWorkspace::PortraitProvider provider=[&](std::string_view path){++calls;require(approved.contains(path),"provider received an unapproved portrait path");return resource;};
   DrawList draw;w.render(draw,1280,720,measure,&provider);const auto l=NativeNewGameLayout::for_viewport(1280,720);
   bool found_large=false;int images=0;for(const auto&command:draw.overlay)if(const auto*image=std::get_if<Image>(&command)){++images;require(image->resource==resource,"overlay did not retain immutable portrait ownership");require(image->destination.width/image->destination.height==2.f,"portrait was cropped or distorted");if(image->destination.width>80){found_large=true;require(contains(l.portrait,image->destination),"contained selected portrait escaped its frame");}}
-  require(found_large&&images==5&&calls==5,"list thumbnails and selected portrait were not all requested");
+  require(found_large&&images==7&&calls==7,"mode card art, list thumbnails and selected portrait were not all requested");
 }
 void physical_range_presentation(){
   NativeNewGameWorkspace w;w.set_view(setup());auto layout=w.measure_layout(1280,720,measure);

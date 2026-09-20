@@ -6,6 +6,7 @@ The C++ client reuses these existing Stellar Continuum images unchanged:
 - `assets/visual/space/milky-way-layer-v2.png`: original project transparent barred-spiral artwork generated on the same date. It is decorative; authoritative system positions, distances, routes, ownership and discovery never come from its pixels.
 
 - `assets/visual/space/regional-nebula-b.png`: existing approved project regional star/nebula backdrop, reused unchanged at closer galaxy-map zoom. Source role is recorded in `docs/CINEMATIC_MAP_AND_SURFACE.md`.
+- `assets/visual/space/campaign-galaxy-four-arm-v1.png`: original project four-arm galaxy artwork generated for the campaign flow. The native client shows it as the SANDBOX card art on the new-game screen, matching the reference `GameTypeCard` usage in `MainMenuLayer.cs`.
 
 Exact prompts and original generation filenames are retained in `docs/CINEMATIC_ASSET_PROVENANCE.md`. The user's Stellaris screenshots are visual references and are not shipped. These illustrations do not assert that generated systems exactly follow painted spiral arms. The bounded native integration does not establish the full Godot dust-shader or graphical parity.
 

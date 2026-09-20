@@ -459,21 +459,35 @@ void NativeNewGameWorkspace::render(
   text(out, layout.cancel, "CANCEL", bright, layout.body_font,
        TextAlign::Center);
 
+  // Reference GameTypeCard: each campaign mode shows its approved artwork
+  // beside the title (Story = continuum splash, Sandbox = four-arm galaxy).
+  const auto mode_thumbnail = [&](UiRect card) {
+    return UiRect{card.x + 5.f * s, card.y + 5.f * s, 64.f * s,
+                  card.height - 10.f * s};
+  };
+  const auto mode_text_x = [&](UiRect card) { return card.x + 76.f * s; };
+  const auto mode_text_width = [&](UiRect card) {
+    return card.width - 86.f * s;
+  };
   fill(out, layout.mode_story, raised_tint);
   stroke(out, layout.mode_story, muted);
-  text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 7 * s,
-             layout.mode_story.width - 20 * s, 22 * s},
+  portrait_image(mode_thumbnail(layout.mode_story), layout.mode_story,
+                 "assets/visual/loading/stellar-continuum-splash.png");
+  text(out, {mode_text_x(layout.mode_story), layout.mode_story.y + 7 * s,
+             mode_text_width(layout.mode_story), 22 * s},
        "STORY CAMPAIGN", muted, layout.body_font);
-  text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 30 * s,
-             layout.mode_story.width - 20 * s, 18 * s},
+  text(out, {mode_text_x(layout.mode_story), layout.mode_story.y + 30 * s,
+             mode_text_width(layout.mode_story), 18 * s},
        "COMING SOON", gold, layout.small_font);
   fill(out, layout.mode_sandbox, selected_tint);
   stroke(out, layout.mode_sandbox, accent);
-  text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 7 * s,
-             layout.mode_sandbox.width - 20 * s, 22 * s},
+  portrait_image(mode_thumbnail(layout.mode_sandbox), layout.mode_sandbox,
+                 "assets/visual/space/campaign-galaxy-four-arm-v1.png");
+  text(out, {mode_text_x(layout.mode_sandbox), layout.mode_sandbox.y + 7 * s,
+             mode_text_width(layout.mode_sandbox), 22 * s},
        "SANDBOX", bright, layout.body_font);
-  text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 30 * s,
-             layout.mode_sandbox.width - 20 * s, 18 * s},
+  text(out, {mode_text_x(layout.mode_sandbox), layout.mode_sandbox.y + 30 * s,
+             mode_text_width(layout.mode_sandbox), 18 * s},
        "Configure a reproducible galaxy", accent, layout.small_font);
 
   fill(out, layout.species, raised_tint);

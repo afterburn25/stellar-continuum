@@ -1,6 +1,11 @@
 {
   "schemaVersion": 1,
   "assets": {
+    "campaign-galaxy-four-arm-v1": {
+      "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "sha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9"
+    },
     "deep-field-v2": {
       "source": "assets/visual/space/deep-field-v2.png",
       "runtimePath": "assets/visual/space/deep-field-v2.png",
@@ -14,7 +19,7 @@
     "credits": {
       "source": "docs/engine/NATIVE_GALAXY_ART_SOURCES.md",
       "runtimePath": "Licenses/Galaxy-art-sources.md",
-      "sha256": "d722ba1c797a5c991b7000c72936df5886e37956889d23ac978c9ed15ce104dc"
+      "sha256": "df74627167a148a01303ba30e089c81ba548a0dccb5f04b4067967180453b43c"
     },
     "regional-nebula-b": {
       "source": "assets/visual/space/regional-nebula-b.png",

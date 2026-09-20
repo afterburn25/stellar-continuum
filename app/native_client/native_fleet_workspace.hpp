@@ -103,7 +103,9 @@ public:
       std::optional<int> target_system_id);
   void render(stellar::native_map::DrawList &out, int width, int height,
               std::span<const FleetScreenMarker> markers,
-              stellar::native_ship_ui::NativeShipArtAssets *ship_art = nullptr) const;
+              stellar::native_ship_ui::NativeShipArtAssets *ship_art = nullptr,
+              const stellar::native_overview::OverviewImageProvider
+                  *portraits = nullptr) const;
   [[nodiscard]] int last_ship_art_rows() const noexcept {
     return last_ship_art_rows_;
   }
