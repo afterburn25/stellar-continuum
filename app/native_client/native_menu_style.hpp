@@ -1,5 +1,6 @@
 #pragma once
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_ui_skin.hpp>
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -23,18 +24,14 @@ inline void rounded(DrawList& out, UiRect r, Color color, float radius=5.f, bool
   out.overlay.emplace_back(std::move(mesh));
 }
 inline void panel(DrawList& out,UiRect r,float scale=1.f){
-  rounded(out,{r.x+5*scale,r.y+7*scale,r.width,r.height},{0,4,12,115},7*scale);
-  rounded(out,r,{17,42,64,232},6*scale);
-  rounded(out,r,{93,159,189,235},6*scale,true);
-  out.overlay.emplace_back(Line{{r.x+8*scale,r.y+scale},{r.x+r.width-8*scale,r.y+scale},{160,220,240,65}});
+  stellar::engine::ui_skin::surface(out,r,scale);
 }
 inline void text(DrawList& out,UiRect r,std::string value,int size,Color color=ink,TextAlign align=TextAlign::Left){
   const float x=align==TextAlign::Center?r.x+r.width*.5f:align==TextAlign::Right?r.x+r.width:r.x;
   out.overlay.emplace_back(Text{{x,r.y},std::move(value),color,size,r.width,r,align,FontFace::Interface});
 }
 inline void button(DrawList& out,UiRect r,std::string title,int font,bool hover=false,bool enabled=true,float scale=1.f){
-  rounded(out,r,enabled?(hover?Color{33,92,132,245}:Color{28,68,98,215}):Color{30,42,52,190},4*scale);
-  rounded(out,r,enabled?(hover?cyan:Color{85,148,177,240}):Color{84,109,129,175},4*scale,true);
+  stellar::engine::ui_skin::control(out,r,hover,false,enabled,scale);
   text(out,{r.x+12*scale,r.y+(r.height-font)*.5f,r.width-24*scale,r.height},std::move(title),font,enabled?ink:muted);
 }
 }

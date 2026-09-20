@@ -44,6 +44,10 @@ bool NativeSupportService::request(SupportBundleRequest request){
   record("support",error_);
   return false;
 }
+void NativeSupportService::report_capture_failure(std::string_view message){
+  if(busy())return;
+  result_.clear();error_=bounded_line(message,1024);state_=SupportExportState::Failed;record("support",error_);
+}
 bool NativeSupportService::poll(){
   if(!busy()||worker_.wait_for(std::chrono::seconds(0))!=std::future_status::ready)return false;
   try {

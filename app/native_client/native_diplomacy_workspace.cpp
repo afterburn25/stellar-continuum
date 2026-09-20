@@ -1,3 +1,4 @@
+#include <stellar/engine/native_ui_skin.hpp>
 #include "native_diplomacy_workspace.hpp"
 #include "native_ui_layout.hpp"
 
@@ -199,7 +200,7 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const auto scale = std::min(requested, fit);
   const auto margin = 14.f * scale;
   const auto left_margin = native_navigation_content_left * scale;
-  const auto top = 60.f * scale;
+  const auto top = native_workspace_top(width,height);
   const UiRect surface{left_margin, top,
                        std::max(1.f, w - left_margin - margin),
                        std::max(1.f, h - top - margin)};
@@ -662,19 +663,16 @@ void NativeDiplomacyWorkspace::render(
   if (!visible_ || !view_) return;
   const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
   const auto s = layout.scale;
-  fill(out, layout.surface, panel);
-  stroke(out, layout.surface, border);
+  stellar::engine::ui_skin::surface(out,layout.surface,layout.scale);
   text(out, layout.title, "RELATIONS", bright, layout.title_font_pixels);
   text(out, layout.date, view_->date, muted, layout.body_font_pixels,
        TextAlign::Right);
-  fill(out, layout.close, layout.close.contains(pointer_) ? hover : row);
-  stroke(out, layout.close, border);
+  stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
   text(out, layout.close, "RETURN", bright, layout.small_font_pixels,
        TextAlign::Center);
 
   // Contact directory
-  fill(out, layout.contact_panel, inset);
-  stroke(out, layout.contact_panel, border);
+  stellar::engine::ui_skin::surface(out,layout.contact_panel,s);
   text(out,
        {layout.contact_panel.x + 8.f * s, layout.contact_panel.y + 8.f * s,
         layout.contact_panel.width - 16.f * s, 22.f * s},
@@ -682,14 +680,11 @@ void NativeDiplomacyWorkspace::render(
   for (std::size_t index = 0; index < std::size(filter_labels); ++index) {
     const auto bounds = filter_button(layout, index);
     const bool active = filter_ == filter_labels[index].first;
-    fill(out, bounds, active ? selected
-                             : bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, border);
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),active,true,s);
     text(out, bounds, filter_labels[index].second,
          active ? bright : muted, layout.small_font_pixels, TextAlign::Center);
   }
-  fill(out, layout.contact_rows, inset);
-  stroke(out, layout.contact_rows, border);
+  stellar::engine::ui_skin::surface(out,layout.contact_rows,s);
   const auto rows = filtered_contacts();
   if (rows.empty()) {
     text(out, layout.contact_rows,
@@ -708,9 +703,7 @@ void NativeDiplomacyWorkspace::render(
     const bool chosen = contact.source_index == selected_contact_index_;
     const auto clip = intersection(bounds, layout.contact_rows);
     if (!clip) continue;
-    fill(out, *clip, chosen ? selected
-                            : bounds.contains(pointer_) ? hover : row);
-    stroke(out, *clip, chosen ? accent : border);
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),chosen,true,s,layout.contact_rows);
     const auto clipped_text = [&](float y, std::string value, Color color,
                                   int pixels) {
       out.overlay.emplace_back(Text{{bounds.x + 8.f * s, y}, std::move(value),
@@ -732,8 +725,7 @@ void NativeDiplomacyWorkspace::render(
 
   const auto &sel = view_->selected;
   // Transmission stage: portrait for identified contacts, signal arcs otherwise.
-  fill(out, layout.stage, inset);
-  stroke(out, layout.stage, border);
+  stellar::engine::ui_skin::surface(out,layout.stage,s);
   text(out,
        {layout.stage.x + 10.f * s, layout.stage.y + 6.f * s,
         layout.stage.width - 20.f * s, 20.f * s},
@@ -814,8 +806,7 @@ void NativeDiplomacyWorkspace::render(
        muted, layout.body_font_pixels);
 
   // Relationship meters and actions.
-  fill(out, layout.meter_panel, inset);
-  stroke(out, layout.meter_panel, border);
+  stellar::engine::ui_skin::surface(out,layout.meter_panel,s);
   text(out,
        {layout.meter_panel.x + 8.f * s, layout.meter_panel.y + 8.f * s,
         layout.meter_panel.width - 16.f * s, 20.f * s},
@@ -853,8 +844,8 @@ void NativeDiplomacyWorkspace::render(
   std::size_t action_index = 0;
   const auto draw_action = [&](const char *label, bool danger_button) {
     const auto bounds = action_button(layout, action_index++);
-    fill(out, bounds, bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, danger_button ? danger : border);
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,true,s);
+    if(danger_button)stellar::engine::ui_skin::rim(out,bounds,danger,{96,38,32,240},1.f,4*s);
     text(out, bounds, label, danger_button ? danger : bright,
          layout.body_font_pixels, TextAlign::Center);
   };
@@ -882,16 +873,13 @@ void NativeDiplomacyWorkspace::render(
   for (std::size_t index = 0; index < std::size(tab_labels); ++index) {
     const auto bounds = tab_button(layout, index);
     const bool active = tab_ == tab_labels[index].first;
-    fill(out, bounds, active ? selected
-                             : bounds.contains(pointer_) ? hover : row);
-    stroke(out, bounds, border);
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),active,true,s);
     text(out, bounds, tab_labels[index].second, active ? accent : bright,
          layout.small_font_pixels, TextAlign::Center);
   }
 
   // Detail region.
-  fill(out, layout.detail_rows, inset);
-  stroke(out, layout.detail_rows, border);
+  stellar::engine::ui_skin::surface(out,layout.detail_rows,s);
   const auto card = [&](std::size_t index, float card_h) {
     const auto top = layout.detail_rows.y + 8.f * s +
                      static_cast<float>(index) * (card_h + 8.f * s) -

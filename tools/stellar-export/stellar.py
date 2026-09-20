@@ -36,10 +36,7 @@ from native_first_exploration_runtime import validate_native_first_exploration_e
 from native_first_survey_runtime import validate_native_first_survey_export
 from native_settlement_preparation_runtime import validate_native_settlement_preparation_export
 from native_earned_settlement_runtime import validate_native_earned_settlement_export
-from native_earned_surface_runtime import validate_native_earned_surface_export
-from native_earned_surface_expansion_runtime import validate_native_earned_surface_expansion_export
 from native_settlement_runtime import validate_native_settlement_export
-from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
@@ -95,7 +92,9 @@ def native_build(preset, env):
     # 30-minute allowance specific to compilation; runtime smoke
     # checks retain their short deadlines so a hung game still fails promptly.
     run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
-    run(["ctest", "--preset", preset], env=env)
+    # The expanded suite includes 25k/50k persistence roundtrips. Individual
+    # tests retain their own deadlines; allow time for the complete serial suite.
+    run(["ctest", "--preset", preset], env=env, timeout=900)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
@@ -111,8 +110,6 @@ def native_build(preset, env):
     run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_freight_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_art_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
@@ -421,7 +418,7 @@ def export(preset_name):
     commit = run(["git", "rev-parse", "HEAD"], capture=True).strip()
     dirty = bool(run(["git", "status", "--porcelain", "--untracked-files=normal"], capture=True).strip())
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    output = ROOT / "Builds/Windows" / f"StellarContinuum-{preset_name}-{commit[:8]}-{stamp}"
+    output = ROOT / "Builds/Windows" / f"StellarContinuum-{version['gameVersion']}-{preset_name}-{commit[:8]}-{stamp}"
     output.mkdir(parents=True, exist_ok=False)
     try:
         shutil.copy2(exe, output / exe.name)
@@ -445,7 +442,7 @@ def export(preset_name):
             "Fresh initialization: stellar-continuum.exe --headless --seed-campaign --systems 500 --catalog-output fresh.json\n"
             "Campaign simulation diagnostics: stellar-continuum.exe --headless --simulate-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output simulated.json\n"
             "Adaptive campaign diagnostics: stellar-continuum.exe --headless --simulate-adaptive-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output adaptive.json\n"
-            "Supported sizes: 250, 500, 1000, 2500. Use --help for seed, species and civilization options.\n"
+            "Supported sizes: 250, 500, 1000, 2500, 5000, 10000, 25000, 50000. Use --help for seed, species and civilization options.\n"
             "Fresh and simulated outputs are diagnostics, not player saves. The Adaptive command uses the packaged research data and integrated research, diplomacy and intelligence runtime; it does not claim complete gameplay or rendering parity. Existing output files are preserved.\n"
             "Windows 10/11 x64 required. No Godot, .NET, compiler, CMake, Ninja, Vulkan SDK or Python required at runtime.\n",
             encoding="utf-8")
@@ -456,30 +453,12 @@ def export(preset_name):
             native_client = copy_native_client_runtime(ROOT, directory, output,
                 lambda binary, runtime, windows: executable_dependencies(binary, env, runtime, windows))
             dependencies = sorted(set(dependencies + native_client["windowsImports"]))
-            readme = output / "README.txt"
-            readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
-                "Launch stellar-continuum-native.exe. Borderless Fullscreen is the recommended default.\n"
-                "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
-                "Use the left icon rail for Research, Shipyard, Construction and Relations; hover an icon for its name.\n"
-                "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
-                "Select a green fleet or its outliner entry, then right-click a destination to preview and confirm travel.\n"
-                "Shipyard shows available designs, authorization costs, population requirements and timed build orders.\n"
-                "Cancel pauses the campaign to review the current refund; confirm explicitly, then resume when ready.\n"
-                "The native campaign saves separately under LocalAppData/Stellar Continuum/NativePreview.\n"
-                "Use --save-path <path> for another slot, and --load to restore it; restored games start paused.\n"
-                "An installed Vulkan graphics driver and Windows Media Foundation components are required. No Godot or .NET runtime is used.\n"
-                "Native music begins at the main menu and continues into the campaign; startup loading stays silent.\n"
-                "Known systems open orbital maps; owned planets show grouped colony information.\n"
-                "Choose Manage Planet on an owned solid world to inspect stats, select a building slot, review costs, and confirm construction.\n"
-                "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Game opens large Campaign/Sandbox cards, then species portraits, biology, galaxy sizes, rival/ancient empires, and an automatic random seed. Copy setup and Restore defaults are available.\n"
-                "Settings in the main and pause menus provide General, Audio, Video, Voice & Subtitles and Controls.\n"
-                "Video offers Windowed, Borderless Fullscreen and Exclusive Fullscreen, with resolution and refresh options where supported.\n"
-                "Press F12 to save a PNG screenshot. The default folder is Pictures/Stellar Continuum/Screenshots.\n"
-                "Choose General > Browse, select a screenshot folder, then Save to remember it across restarts.\n"
-                "Voice & Subtitles provides volume, subtitle size/background/speaker labels, announcement frequency, replay/stop and an optional dry radio filter. Three scientist cues are integrated. The original title logo and Windows emblem are restored. Development offers diagnostics; the separate Godot Developer world and editing tools are not yet ported. Broader casting and full gameplay controls remain in migration.\n"
-                "Manage Planet replaces terrain placement with organized planet statistics, illustrated building slots, construction reviews and a timed queue. Native Player17 saves retain buildings and add optional slot indices; use this build for the new slots. Godot version-19 planetary saves are not imported.\n\n"
-                + readme.read_text(encoding="utf-8"), encoding="utf-8")
+            (output / "README.txt").write_text(
+                f"Stellar Continuum {version['gameVersion']} / Engine {version['engineVersion']}\n\n"
+                + (ROOT / "docs/releases/NATIVE_ALPHA_README.txt").read_text(encoding="utf-8"), encoding="utf-8")
+            notes = output / "Documentation/ReleaseNotes.md"
+            notes.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / f"docs/releases/{version['gameVersion']}.md", notes)
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
                     "configuration": preset["configurePreset"], "architecture": "x86_64", "mode": preset["mode"],
@@ -526,12 +505,7 @@ def export(preset_name):
                 output, env, Path(smoke["firstSurveySaveCaptures"][-1]),
                 directory / "stellar_native_earned_settlement_tests.exe",
                 output / "Data/astronomy/hyg-nearby-500-v1.json"))
-            smoke.update(validate_native_earned_surface_export(
-                output, env, Path(smoke["settlementCompletionSaveCaptures"][-1])))
-            smoke.update(validate_native_earned_surface_expansion_export(
-                output, env, Path(smoke["earnedSurfaceSaveCaptures"][-1])))
             smoke.update(validate_native_settlement_export(output, env))
-            smoke.update(validate_native_surface_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_travel_export(output, env,
@@ -550,7 +524,10 @@ def export(preset_name):
             smoke["campaignSimulationBenchmarks"]=[json.loads(run([output/"stellar-continuum.exe","--headless","--simulate-campaign","--systems",count,"--ticks",40,"--step-days",0.25],env=env,capture=True)) for count in (250,500,1000,2500)]
         (output.parent / (output.name+"-validation.json")).write_text(json.dumps(smoke, indent=2)+"\n", encoding="utf-8")
         archive = shutil.make_archive(str(output), "zip", output)
-        print(json.dumps({"export": str(output), "archive": archive, "validation": smoke}, indent=2))
+        with open(archive, "rb") as stream:
+            archive_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+        Path(archive + ".sha256").write_text(archive_hash + "  " + Path(archive).name + "\n", encoding="ascii")
+        print(json.dumps({"export": str(output), "archive": archive, "sha256": archive_hash, "validation": smoke}, indent=2))
     except Exception:
         # Retain failed output for diagnosis, but never label/package it as validated.
         (output / "EXPORT_FAILED.txt").write_text("Export failed validation; do not distribute. See terminal diagnostics.\n", encoding="utf-8")

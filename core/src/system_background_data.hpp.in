@@ -1,0 +1,2 @@
+#pragma once
+inline constexpr const char* system_background_manifest=R"starfields(@SYSTEM_BACKGROUND_JSON@)starfields";

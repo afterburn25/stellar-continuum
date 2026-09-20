@@ -71,9 +71,16 @@ struct NativeCampaignSession::Live final {
   Live(IntegratedAdaptiveCampaignRuntime runtime, StrategicClock clock,
        const std::filesystem::path &path, std::uint64_t revision,
        bool recovered, PlayerCampaignPreparedWriter writer,
-       std::uint64_t cache_generation)
-      : frame(std::move(runtime), std::move(clock), CampaignFramePolicy::Player),
-        saves({}, std::move(writer)) {
+       std::uint64_t cache_generation,bool developer)
+      : frame(std::move(runtime), std::move(clock), developer?CampaignFramePolicy::Developer:CampaignFramePolicy::Player),
+        saves({}, std::move(writer),developer?CampaignSaveKind::Developer:CampaignSaveKind::Player) {
+    if(frame.runtime().world().campaign().developer_provenance.has_value()!=developer)
+      throw std::invalid_argument("Campaign provenance does not match the requested session mode.");
+    frame.clock().set_days_per_second(1./24.);
+    if(developer)frame.set_developer_speed(frame.runtime().world().campaign().developer_provenance->simulation.speed);
+    auto& campaign=frame.runtime().world().campaign();
+    initialize_small_body_fields(campaign.seed,campaign.systems,campaign.bodies);
+    initialize_stellar_orbits(campaign.seed,campaign.systems,campaign.bodies);
     cache = NativeCampaignSession::build_cache(frame, cache_generation);
     saves.configure(path, revision, frame.clock().simulation_days(), recovered);
   }
@@ -146,7 +153,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_fresh(
   validate_dependencies(dependencies);
   auto live = std::make_unique<Live>(
       std::move(runtime), StrategicClock{}, save_path, 1, false,
-      dependencies.save_writer, 1);
+      dependencies.save_writer, 1,dependencies.developer_session);
   return std::unique_ptr<NativeCampaignSession>(new NativeCampaignSession(
       std::move(live), std::move(research_root), std::move(save_path),
       std::move(game_version), std::move(dependencies)));
@@ -164,7 +171,8 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::load_startup(
   const auto make_runtime = [root = research_root] {
     return load_adaptive_research_strategic_runtime(root);
   };
-  auto loaded = dependencies.loader(save_path, make_runtime, progress);
+  auto loaded = dependencies.developer_session?load_existing_developer_campaign(save_path,make_runtime,progress)
+      :dependencies.loader(save_path, make_runtime, progress);
   return create_loaded(std::move(loaded), std::move(research_root),
                        std::move(save_path), std::move(game_version),
                        std::move(dependencies));
@@ -189,7 +197,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
   clock.set_speed(StrategicSpeed::Paused);
   auto live = std::make_unique<Live>(
       std::move(loaded.campaign).activate(), std::move(clock), save_path, 1,
-      recovered, dependencies.save_writer, 1);
+      recovered, dependencies.save_writer, 1,dependencies.developer_session);
   if (live->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");
   }
@@ -340,12 +348,12 @@ bool NativeCampaignSession::drain_live_save() {
 }
 
 CampaignFrameResult NativeCampaignSession::advance(
-    double real_delta_seconds, const std::string &saved_at_utc) {
+    double real_delta_seconds, const std::string &saved_at_utc, bool developer_single_step) {
   require_owner();
   // Freeze even tactical reconciliation and preserve the completed capture boundary.
   if (new_campaign_pending()) return {};
   manual_capture_ready_ = false;
-  auto result = live_->frame.advance(real_delta_seconds);
+  auto result = developer_single_step ? live_->frame.step_developer() : live_->frame.advance(real_delta_seconds);
   // A returned tactical frame has finished its owned advance/reconciliation.
   // Player17 already captures its pending time, orders and encounter state.
   // Exceptions leave this false, and autosaves remain strategic-day driven.
@@ -380,7 +388,7 @@ void NativeCampaignSession::request_save() {
 
 void NativeCampaignSession::begin_load() {
   auto progress = std::make_shared<LoadProgress>();
-  auto loader = dependencies_.loader;
+  auto loader = dependencies_.developer_session?NativeCampaignLoader{load_existing_developer_campaign}:dependencies_.loader;
   auto path = save_path_;
   auto make_runtime = runtime_factory();
   auto task = std::async(
@@ -443,7 +451,7 @@ std::unique_ptr<NativeCampaignSession::Live> NativeCampaignSession::activate(
   auto candidate = std::make_unique<Live>(
       std::move(loaded.campaign).activate(), std::move(clock), save_path_, revision,
       loaded.origin == PlayerCampaignLoadOrigin::Backup,
-      dependencies_.save_writer, cache_generation);
+      dependencies_.save_writer, cache_generation,dependencies_.developer_session);
   if (candidate->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");
   }

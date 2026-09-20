@@ -1,4 +1,6 @@
 #include "native_fleet_controller.hpp"
+#include <stellar/core/campaign_observation.hpp>
+#include <unordered_set>
 
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/exploration_advance.hpp>
@@ -50,6 +52,15 @@ struct PlayerContext {
                  found->civilization_id == player.player_id
              ? &*found
              : nullptr;
+}
+
+// Inspection is deliberately separate from find_owned, which remains the
+// authority check for every command that changes a fleet.
+[[nodiscard]] const FleetState *find_inspectable(PlayerContext &player, int id) {
+  if (!developer_observation(player.world, player.player_id)) return find_owned(player, id);
+  if (std::ranges::count(player.world.fleets, id, &FleetState::id) != 1) return nullptr;
+  const auto found = std::ranges::find(player.world.fleets, id, &FleetState::id);
+  return found != player.world.fleets.end() && found->is_active ? &*found : nullptr;
 }
 
 [[nodiscard]] InterstellarMissionKind mission_kind(FleetRole role) {
@@ -108,7 +119,7 @@ scout_reconnaissance(const PlayerContext &player, const FleetState &fleet) {
 
   const auto system_id = *fleet.current_system_id;
   const auto level = player.world.knowledge.system_survey_level(
-      player.player_id, system_id);
+      fleet.civilization_id, system_id);
   const bool recorded_here = fleet.reconnaissance_system_id == system_id;
   if (level < SystemSurveyLevel::partially_surveyed) {
     return NativeScoutReconnaissanceStatus{
@@ -133,10 +144,10 @@ science_survey(const PlayerContext &player, const FleetState &fleet) {
     return std::nullopt;
   const auto system_id = *fleet.current_system_id;
   const auto level = player.world.knowledge.system_survey_level(
-      player.player_id, system_id);
+      fleet.civilization_id, system_id);
   return NativeScienceSurveyStatus{
       std::clamp(player.world.knowledge.system_survey_progress(
-                     player.player_id, system_id),
+                     fleet.civilization_id, system_id),
                  0., 1.),
       fleet.hold_requested, level >= SystemSurveyLevel::fully_surveyed};
 }
@@ -164,8 +175,14 @@ NativeFleetMapView NativeFleetController::build(
   require_owner();
   bind_generation(campaign_generation);
   auto player = context(frame);
-  const auto statuses = player.runtime.core().get_own_combat_fleet_status(
+  auto statuses = player.runtime.core().get_own_combat_fleet_status(
       &player.simulation, player.player_id);
+  const bool developer = developer_observation(player.world, player.player_id);
+  if (developer) for (const auto& civilization : player.world.civilizations) {
+    if (civilization.id == player.player_id) continue;
+    auto foreign = player.runtime.core().get_own_combat_fleet_status(&player.simulation, civilization.id);
+    statuses.fleets.insert(statuses.fleets.end(), foreign.fleets.begin(), foreign.fleets.end());
+  }
   std::unordered_map<int, OwnCombatFleetStatus> status_by_id;
   status_by_id.reserve(statuses.fleets.size());
   for (const auto &status : statuses.fleets)
@@ -174,9 +191,11 @@ NativeFleetMapView NativeFleetController::build(
   NativeFleetMapView result;
   result.campaign_generation = campaign_generation;
   result.player_civilization_id = player.player_id;
+  result.developer_inspection = developer;
+  std::unordered_map<int, unsigned> counts;
+  for (const auto& fleet : player.world.fleets) ++counts[fleet.id];
   for (const auto &fleet : player.world.fleets) {
-    if (!fleet.is_active || fleet.civilization_id != player.player_id ||
-        std::ranges::count(player.world.fleets, fleet.id, &FleetState::id) != 1) continue;
+    if (!fleet.is_active || (!developer && fleet.civilization_id != player.player_id) || counts[fleet.id] != 1) continue;
     NativeOwnFleet item{
         .id = fleet.id,
         .name = fleet.name,
@@ -198,6 +217,11 @@ NativeFleetMapView NativeFleetController::build(
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
+    item.owner_civilization_id = fleet.civilization_id;
+    item.foreign_inspection = fleet.civilization_id != player.player_id;
+    const auto owner = std::ranges::find(player.world.civilizations, fleet.civilization_id, &Civilization::id);
+    if (owner != player.world.civilizations.end()) item.owner_name = owner->name;
+    if (item.foreign_inspection) item.recovery_message = "Developer inspection · " + item.owner_name + " · Live fleet statistics";
     item.reconnaissance = scout_reconnaissance(player, fleet);
     item.science_survey = science_survey(player, fleet);
     result.own_fleets.push_back(std::move(item));
@@ -221,14 +245,14 @@ NativeFleetMapView NativeFleetController::build(
   std::ranges::sort(result.foreign_contacts, {},
                     &NativeForeignFleetContact::fleet_id);
 
-  if (selected_fleet_id_ && find_owned(player, *selected_fleet_id_))
+  if (selected_fleet_id_ && find_inspectable(player, *selected_fleet_id_))
     result.selected_fleet_id = selected_fleet_id_;
   else
     selected_fleet_id_.reset(), military_order_quote_.reset();
   if (result.selected_fleet_id) {
     auto selected = std::ranges::find(result.own_fleets, *result.selected_fleet_id,
                                      &NativeOwnFleet::id);
-    if (selected != result.own_fleets.end() && is_civilian_role(selected->role)) {
+    if (selected != result.own_fleets.end() && !selected->foreign_inspection && is_civilian_role(selected->role)) {
       const auto *live = find_owned(player, selected->id);
       selected->recovery = recovery_quote(*live, campaign_generation, player.player_id);
       if (live->return_to_base_failure_reason)
@@ -271,7 +295,7 @@ NativeFleetSelectionOutcome NativeFleetController::select(
   if (!generation_ || *generation_ != campaign_generation)
     return {false, "The campaign changed; refresh fleets before selecting."};
   auto player = context(frame);
-  const auto *fleet = find_owned(player, fleet_id);
+  const auto *fleet = find_inspectable(player, fleet_id);
   if (!fleet)
     return {false, "That owned fleet is no longer available."};
   selected_fleet_id_ = fleet->id;
@@ -289,7 +313,7 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
   std::vector<int> owned_hits;
   owned_hits.reserve(hit_fleet_ids.size());
   for (const auto id : hit_fleet_ids)
-    if (find_owned(player, id)) owned_hits.push_back(id);
+    if (find_inspectable(player, id)) owned_hits.push_back(id);
   std::ranges::sort(owned_hits);
   owned_hits.erase(std::unique(owned_hits.begin(), owned_hits.end()),
                    owned_hits.end());
@@ -302,7 +326,7 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
   const auto next = current == owned_hits.end() || ++current == owned_hits.end()
                         ? owned_hits.begin()
                         : current;
-  const auto *fleet = find_owned(player, *next);
+  const auto *fleet = find_inspectable(player, *next);
   selected_fleet_id_ = *next;
   military_order_quote_.reset();
   return {true, fleet->name + " selected."};
@@ -484,7 +508,7 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
   auto *fleet = find_owned(player, quote.fleet_id);
   if (!fleet)
     return {false, "Select an active owned armed military fleet."};
-  const auto statuses = player.runtime.core().get_own_combat_fleet_status(
+  auto statuses = player.runtime.core().get_own_combat_fleet_status(
       &player.simulation, player.player_id);
   const auto status = std::ranges::find(statuses.fleets, fleet->id,
                                         &OwnCombatFleetStatus::fleet_id);
@@ -513,7 +537,7 @@ NativeFleetLocateOutcome NativeFleetController::locate_selected(
   auto player = context(frame);
   if (player.player_id != quote.observer_id)
     return {false, "The fleet observer changed; refresh fleet details first."};
-  const auto *fleet = find_owned(player, quote.fleet_id);
+  const auto *fleet = find_inspectable(player, quote.fleet_id);
   if (!fleet || fleet->mission_order_revision != quote.mission_order_revision)
     return {false, "That owned fleet is no longer at its displayed position."};
   return {true, fleet->name + " located.", fleet->id, fleet->current_system_id,

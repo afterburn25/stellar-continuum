@@ -89,7 +89,7 @@ void responsive_layout_contains_full_actions() {
     const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
     REQUIRE(layout.surface.x >=
-            navigation.research.x + navigation.research.width);
+            navigation.inspect.x + navigation.inspect.width);
     for (const auto bounds : {layout.projects, layout.details, layout.orders,
                               layout.costs, layout.feedback,
                               layout.primary_action,

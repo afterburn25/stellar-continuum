@@ -43,6 +43,85 @@ int main(int argc,char**argv)try{
   NativeSystemViewController controller;auto built=controller.build(campaign,1,sol_system_id);
   require(built.snapshot.has_value(),"fresh Sol view unavailable");
   const auto reference=*built.snapshot;auto display=reference;
+  {
+    NativeSystemWorkspace camera_test;camera_test.open(reference,1920,1080);
+    const auto uranus=std::ranges::find_if(reference.bodies,[](const auto& b){return b.sol_texture_key==std::optional<std::string>{"uranus"};});
+    require(uranus!=reference.bodies.end()&&camera_test.select_body(uranus->id),"Outer-planet camera fixture missing");
+    camera_test.focus_selected_body(1920,1080);const auto area=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;
+    const Point focus{area.x+area.width*.5f,area.y+area.height*.5f};
+    (void)camera_test.handle({.type=InputEventType::Wheel,.position=focus,.wheel_y=2},1920,1080);
+    const auto projected=project_system(reference);
+    require(camera_test.viewport()->hit_body(projected,focus.x,focus.y)==uranus->id,"Expanded orbit camera clamped away from its anchor");
+    (void)camera_test.handle({.type=InputEventType::Wheel,.position=focus,.wheel_y=100},1920,1080);
+    require(camera_test.viewport()->scale==55.f&&camera_test.viewport()->hit_body(projected,focus.x,focus.y)==uranus->id,"High planet zoom lost its selected anchor");
+    DrawList magnified;camera_test.render(magnified,1920,1080);require(has_overlay_text(magnified,"Zoom ")&&camera_test.magnification()>55.f,"Magnification indicator did not follow planet zoom");
+    require(camera_test.tracked_body_id()==uranus->id,"Close planet zoom did not acquire tracking");
+    const auto assert_tracked=[&]{const auto geometry=project_system(*camera_test.snapshot());const auto body=std::ranges::find(geometry.bodies,uranus->id,&SystemSpatialBodyMarker::body_id);const auto point=camera_test.viewport()->world_to_screen(body->offset_x,body->offset_y);
+      require(std::hypot(point.x-focus.x,point.y-focus.y)<.1f,"Orbiting planet drifted out of the close camera");};
+    camera_test.set_simulation_days(reference.simulation_days+400);assert_tracked();
+    auto refreshed=reference;refreshed.simulation_days+=800;camera_test.refresh(refreshed);assert_tracked();
+    const auto paused_camera=*camera_test.viewport();camera_test.set_simulation_days(refreshed.simulation_days);require(same_camera(paused_camera,*camera_test.viewport()),"Paused clock moved the tracking camera");
+    camera_test.reset_fit(1920,1080);DrawList fitted;camera_test.render(fitted,1920,1080);
+    require(!camera_test.tracked_body_id(),"Fit System did not release planet tracking");
+    require(has_overlay_text(fitted,"Zoom 1.00x"),"Magnification indicator did not follow Fit System");
+    camera_test.inspect_small_body(1);camera_test.focus_small_body(1920,1080);DrawList draw;camera_test.render(draw,1920,1080);
+    require(camera_test.small_body_statistics().visible>0&&camera_test.viewport()->scale>5,"Small ice-body focus failed to magnify the actual body");
+  }
+  {
+    NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);
+    const auto earth=std::ranges::find_if(reference.bodies,[](const auto& b){return b.sol_texture_key==std::optional<std::string>{"earth"};});require(earth!=reference.bodies.end(),"Earth missing for hourly motion test");
+    require(tracked.select_body(earth->id),"Could not select Earth");
+    require(tracked.tracked_body_id()==earth->id,"Selecting an overview planet did not acquire tracking");tracked.focus_selected_body(1920,1080);
+    const auto field=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;const Point target=center(field);
+    (void)tracked.handle({.type=InputEventType::Wheel,.position=target,.wheel_y=30},1920,1080);
+    require(tracked.tracked_body_id()==earth->id,"Wheel zoom did not track Earth");
+    StrategicClock hourly;hourly.restore(reference.simulation_days);hourly.set_days_per_second(1./24.);hourly.set_speed(StrategicSpeed::Normal);
+    (void)hourly.advance(1);require(std::abs(hourly.simulation_days()-reference.simulation_days-1./24.)<1e-9,"1x advanced more than an in-game hour");
+    tracked.set_simulation_days(hourly.simulation_days());const auto after=project_system(*tracked.snapshot());const auto before=project_system(reference);
+    const auto b0=std::ranges::find(before.bodies,earth->id,&SystemSpatialBodyMarker::body_id),b1=std::ranges::find(after.bodies,earth->id,&SystemSpatialBodyMarker::body_id);
+    const double angle=std::abs(std::atan2(b0->offset_x*b1->offset_y-b0->offset_y*b1->offset_x,b0->offset_x*b1->offset_x+b0->offset_y*b1->offset_y));
+    require(angle>.00068&&angle<.00076,"Earth does not advance roughly 0.041 degrees per game hour");
+    const auto p=tracked.viewport()->world_to_screen(b1->offset_x,b1->offset_y);require(std::hypot(p.x-target.x,p.y-target.y)<.1f,"Hourly motion displaced tracked Earth");
+    tracked.reset_fit(1920,1080);require(tracked.select_body(earth->id),"Earth selection lost");tracked.focus_selected_body(1920,1080);
+    const Point empty{field.x+2,field.y+2};(void)tracked.handle({.type=InputEventType::LeftPressed,.position=empty},1920,1080);
+    (void)tracked.handle({.type=InputEventType::PointerMove,.position={empty.x+20,empty.y+10},.delta={20,10}},1920,1080);
+    (void)tracked.handle({.type=InputEventType::LeftReleased,.position=empty},1920,1080);require(!tracked.tracked_body_id(),"Manual panning did not release tracking");
+    const auto free_camera=*tracked.viewport();tracked.set_simulation_days(hourly.simulation_days()+10);require(same_camera(free_camera,*tracked.viewport()),"Released tracking snapped camera back to planet");
+  }
+  // Both legacy spectral-only Sol and modern physical records select supplied
+  // artwork through the same observer boundary used by the galaxy map.
+  NativeSystemWorkspace artwork_ui;std::string observed_art;float observed_radius{};
+  const auto sentinel=RgbaImage::create(1,1,{255,200,80,255});
+  artwork_ui.set_stellar_art([&](DrawList& draw,Point p,float radius,const stellar::native_stellar::ObservedStellarArtwork& art,double,UiRect clip){
+    observed_art=art.id;observed_radius=radius;draw.world.emplace_back(Image{sentinel,{p.x-radius,p.y-radius,radius*2,radius*2},{},{255,255,255,255},clip});
+  });
+  auto legacy=reference;legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::GYellowDwarf;
+  artwork_ui.open(legacy,1280,720);DrawList legacy_draw;artwork_ui.render(legacy_draw,1280,720);
+  require(observed_art=="g-yellow","Spectral-only Sol still uses the obsolete procedural star");
+  for(const auto& command:legacy_draw.world)if(const auto* image=std::get_if<Image>(&command)){
+    const auto* vp=artwork_ui.viewport();
+    if(std::abs(image->destination.x+image->destination.width*.5f-vp->center_x)<1&&std::abs(image->destination.y+image->destination.height*.5f-vp->center_y)<1)
+      require(image->resource==sentinel,"Procedural star was painted over supplied artwork");
+  }
+  const auto* star_viewport=artwork_ui.viewport();const Point star_position{star_viewport->center_x,star_viewport->center_y};
+  (void)artwork_ui.handle({InputEventType::Wheel,star_position,{},1000},1280,720);
+  legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+  require(artwork_ui.viewport()->scale==55.f&&observed_radius<=350.f&&observed_radius>=300.f,"Maximum system zoom invalid: scale="+std::to_string(artwork_ui.viewport()->scale)+" star radius="+std::to_string(observed_radius));
+  legacy.stellar_object=generate_stellar_physics(1,StellarObjectType::OHotBlueStar);
+  artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+  require(observed_art=="o-hot-blue","Physical stellar identity must take precedence over legacy class");
+  for(const auto survey:{SystemSurveyLevel::unknown,SystemSurveyLevel::detected,SystemSurveyLevel::partially_surveyed}){
+    require(!stellar::native_stellar::observed_stellar_artwork(survey,legacy.stellar_object,legacy.primary_stellar_class),"Incomplete survey leaked supplied stellar identity");
+    if(survey==SystemSurveyLevel::partially_surveyed){
+      legacy.survey_level=survey;artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+      require(observed_art.empty(),"Reconnaissance view leaked supplied stellar identity");
+    }
+  }
+  for(int spectral=0;spectral<=static_cast<int>(StellarClass::Pulsar);++spectral){
+    const auto value=static_cast<StellarClass>(spectral);
+    const auto art=stellar::native_stellar::observed_stellar_artwork(SystemSurveyLevel::fully_surveyed,std::nullopt,value);
+    require(art.has_value()==(value!=StellarClass::Protostar),"Legacy stellar class lost its supplied artwork mapping");
+  }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;
   preparation_ui.open(reference,1280,720);
@@ -128,13 +207,28 @@ int main(int argc,char**argv)try{
   display_earth->positive_signatures={NativePositiveSignature::rare_resource,NativePositiveSignature::anomaly,NativePositiveSignature::activity};
   const auto projected=project_system(display);
   int image_requests{},texture_requests{};auto body_image=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,255));
+  {
+    NativeSystemWorkspace zoom_limit;zoom_limit.open(reference,1280,720);const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;
+    (void)zoom_limit.handle({InputEventType::Wheel,center(field),{},-100},1280,720);
+    require(std::abs(zoom_limit.magnification()-.05f)<1e-6f,"System zoom-out did not stop at 0.05x");
+    DrawList far_view;zoom_limit.render(far_view,1280,720);require(has_overlay_text(far_view,"Zoom 0.05x"),"Minimum magnification was not displayed");
+    zoom_limit.advance_tumble(1./60,true);const auto normal=zoom_limit.visual_seconds();
+    zoom_limit.advance_tumble(1./60,false);require(zoom_limit.visual_seconds()==normal,"Paused planet display rotation advanced");
+  }
   int measurements{};NativeSystemWorkspace workspace([&](const SystemBodyAppearance&appearance){++image_requests;if(appearance.texture_key)++texture_requests;return body_image;},[&](const Text&label){++measurements;return TextExtent{static_cast<int>(label.value.size()*7u),14};});
   workspace.open(std::move(display),1280,720);
   require(workspace.visible()&&workspace.system_id()==sol_system_id,"workspace did not open fresh Sol");
   DrawList draw;workspace.render(draw,1280,720);
   require(!draw.world.empty()&&image_requests>0&&texture_requests>0,"workspace did not request eligible Sol appearances");
   require(has_central_stellar_image(draw,*workspace.viewport()),"full-survey Sol did not use a cached native stellar image");
-  const auto saturn=std::ranges::find_if(projected.bodies,[](const auto&body){return body.sol_texture_key==std::optional<std::string>{"saturn"};});require(saturn!=projected.bodies.end(),"Sol projection lacks observer-filtered Saturn");const auto saturn_screen=workspace.viewport()->world_to_screen(saturn->offset_x,saturn->offset_y);std::vector<std::size_t> saturn_layers;for(std::size_t i=0;i<draw.world.size();++i)if(const auto*image=std::get_if<Image>(&draw.world[i]);image&&std::abs(image->destination.x+image->destination.width*.5f-saturn_screen.x)<.01f&&std::abs(image->destination.y+image->destination.height*.5f-saturn_screen.y)<.01f)saturn_layers.push_back(i);require(saturn_layers.size()==3&&std::get<Image>(draw.world[saturn_layers[0]]).resource->width()==NativeCelestialAppearanceRenderer::ring_texture_size&&std::get<Image>(draw.world[saturn_layers[1]]).resource==body_image&&std::get<Image>(draw.world[saturn_layers[2]]).resource->width()==NativeCelestialAppearanceRenderer::ring_texture_size,"Saturn back/globe/front ordering was not preserved");
+  for(const auto key:{"saturn","uranus"}){
+    const auto body=std::ranges::find_if(projected.bodies,[&](const auto& b){return b.sol_texture_key==std::optional<std::string>{key};});
+    require(body!=projected.bodies.end(),"Ringed world missing from Sol");const auto p=workspace.viewport()->world_to_screen(body->offset_x,body->offset_y);
+    bool found=false;for(std::size_t i=1;i+1<draw.world.size();++i)if(const auto* image=std::get_if<Image>(&draw.world[i]);image&&image->resource==body_image&&std::abs(image->destination.x+image->destination.width*.5f-p.x)<.01f&&std::abs(image->destination.y+image->destination.height*.5f-p.y)<.01f){
+      const auto* back=std::get_if<TriangleMesh>(&draw.world[i-1]);const auto* front=std::get_if<TriangleMesh>(&draw.world[i+1]);
+      require(back&&front&&!back->indices.empty()&&!front->indices.empty()&&back->indices!=front->indices,"Ring back/body/front ordering or depth split is wrong");found=true;
+    }require(found,"Ringed world never submitted its body disc");
+  }
   const auto earth=std::ranges::find(projected.bodies,earth_body_id,&SystemSpatialBodyMarker::body_id);
   require(earth!=projected.bodies.end(),"Sol projection lacks Earth");
   auto earth_screen=workspace.viewport()->world_to_screen(earth->offset_x,earth->offset_y);
@@ -144,7 +238,7 @@ int main(int argc,char**argv)try{
   const auto earth_body=std::ranges::find(reference.bodies,earth_body_id,&NativeSystemBody::id);require(earth_body!=reference.bodies.end(),"Sol snapshot lacks Earth label metadata");
   require(workspace.viewport()->scale>=.01f&&workspace.viewport()->scale<=1.15f,"measured system fit escaped the supported range");
   for(const auto [viewport_width,viewport_height]:std::array<std::pair<int,int>,4>{{{1280,720},{1920,1080},{2560,1440},{3840,2160}}}){
-    workspace.reset_fit(viewport_width,viewport_height);const auto responsive_layout=SystemWorkspaceLayout::for_viewport(viewport_width,viewport_height);const auto navigation=NativeUiLayout::for_viewport(viewport_width,viewport_height);const auto responsive_earth=workspace.viewport()->world_to_screen(earth->offset_x,earth->offset_y);require(responsive_layout.world_field.x>=navigation.research.x+navigation.research.width,"system content overlaps navigation rail");require(responsive_layout.world_field.contains({responsive_earth.x,responsive_earth.y}),"responsive fit placed Earth outside the drawable field");
+    workspace.reset_fit(viewport_width,viewport_height);const auto responsive_layout=SystemWorkspaceLayout::for_viewport(viewport_width,viewport_height);const auto navigation=NativeUiLayout::for_viewport(viewport_width,viewport_height);const auto responsive_earth=workspace.viewport()->world_to_screen(earth->offset_x,earth->offset_y);require(responsive_layout.world_field.x>=navigation.inspect.x+navigation.inspect.width,"system content overlaps navigation rail");require(responsive_layout.world_field.contains({responsive_earth.x,responsive_earth.y}),"responsive fit placed Earth outside the drawable field");
     command=workspace.handle({InputEventType::LeftPressed,{responsive_earth.x,responsive_earth.y}},viewport_width,viewport_height);require(command.captured&&workspace.selected_body_id()==earth_body_id,"responsive viewport lost exact body selection");(void)workspace.handle({InputEventType::LeftReleased,{responsive_earth.x,responsive_earth.y}},viewport_width,viewport_height);
     draw={};workspace.render(draw,viewport_width,viewport_height);require(has_body_label(draw,earth_body->name),"selected body label was hidden by collision resolution");const auto labels=visible_body_label_bounds(draw,*workspace.snapshot());for(std::size_t left=0;left<labels.size();++left)for(std::size_t right=left+1;right<labels.size();++right)require(!overlaps(labels[left],labels[right]),"visible body labels overlapped");
   }
@@ -244,5 +338,23 @@ int main(int argc,char**argv)try{
   command=workspace.handle({InputEventType::LeftPressed,unknown_geometry->center},1280,720);require(command.kind==SystemWorkspaceCommandKind::none,"Lane activated before mouse release");command=workspace.handle({InputEventType::LeftReleased,unknown_geometry->center},1280,720);require(command.kind==SystemWorkspaceCommandKind::reconnaissance_required&&command.target_id==-1&&command.captured&&workspace.notice().find("Telemetry unavailable")!=std::string::npos,"unknown lane click did not give observer-safe scout guidance");require(workspace.notice().find(std::to_string(unknown_destination))==std::string::npos,"unknown lane notice disclosed its opaque destination identity");command=workspace.handle({InputEventType::LeftPressed,known_geometry->center},1280,720);require(command.kind==SystemWorkspaceCommandKind::none,"Lane activated before mouse release");command=workspace.handle({InputEventType::LeftReleased,known_geometry->center},1280,720);require(command.kind==SystemWorkspaceCommandKind::open_destination&&command.target_id==known_destination&&command.captured,"known lane click did not request observer-gated navigation");const auto destination_view=controller.build(campaign,3,command.target_id);require(destination_view.snapshot.has_value(),"known lane navigation failed the observer gate");for(const auto id:{99001,99002}){const auto current=std::ranges::find(world.fleets,id,&FleetState::id);require(current!=world.fleets.end()&&current->mission_order_revision==original_revision&&current->planned_route_system_ids==original_route,"lane navigation issued or changed a fleet order");}
   for(const auto [viewport_width,viewport_height]:std::array<std::pair<int,int>,4>{{{1280,720},{1920,1080},{2560,1440},{3840,2160}}}){workspace.reset_fit(viewport_width,viewport_height);const auto responsive_layout=SystemWorkspaceLayout::for_viewport(viewport_width,viewport_height);const auto responsive_geometry=workspace.lane_geometry();const auto boundary=local_orbital_boundary_radius(local_spatial,*workspace.viewport());require(!responsive_geometry.empty(),"responsive reset fit discarded local lanes");for(const auto&lane:responsive_geometry)require(local_lane_visible(lane,responsive_layout.world_field)&&responsive_layout.world_field.contains(lane.center)&&std::hypot(lane.center.x-workspace.viewport()->center_x,lane.center.y-workspace.viewport()->center_y)>boundary,"responsive fit did not keep a local travel arrow and label in the world field");const auto responsive_known=std::ranges::find(responsive_geometry,known_destination,&NativeLocalLaneGeometry::destination_system_id);require(responsive_known!=responsive_geometry.end(),"known lane disappeared after responsive fit");command=workspace.handle({InputEventType::LeftPressed,responsive_known->center},viewport_width,viewport_height);require(command.kind==SystemWorkspaceCommandKind::none,"Lane activated before mouse release");command=workspace.handle({InputEventType::LeftReleased,responsive_known->center},viewport_width,viewport_height);require(command.kind==SystemWorkspaceCommandKind::open_destination&&command.target_id==known_destination&&command.captured,"responsive known lane lost observer-gated navigation");}
   draw={};workspace.render(draw,1920,1080);require(!workspace.lane_geometry().empty(),"1080p resize discarded local lanes");workspace.discard_campaign();require(!workspace.travel_snapshot()&&!workspace.selected_fleet_id()&&workspace.notice().empty(),"generation discard retained local travel presentation");
+  auto triple=reference;triple.secondary_stellar_class=StellarClass::MRedDwarf;triple.tertiary_stellar_class=StellarClass::KOrangeDwarf;
+  triple.stellar_object=generate_stellar_physics(17,StellarObjectType::GYellowStar);
+  StellarOrbitArchitecture architecture;
+  architecture.companions={generate_stellar_physics(18,StellarObjectType::MRedDwarf),generate_stellar_physics(19,StellarObjectType::KOrangeStar)};
+  const double inner_mass=triple.stellar_object->mass_solar+architecture.companions[0].mass_solar;
+  architecture.relative_orbits={{100,.1,.02,0,.3,1,kepler_rate(100,inner_mass)},{3000,.1,.06,0,.15,.7,kepler_rate(3000,inner_mass+architecture.companions[1].mass_solar)}};
+  triple.stellar_orbits=architecture;workspace.open(triple,1280,720);
+  for(const auto days:{0.,10000.,100000.}){
+    workspace.set_simulation_days(days);workspace.reset_fit(1280,720);draw={};workspace.render(draw,1280,720);
+    const auto chart=project_system(*workspace.snapshot());const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;
+    for(int component=0;component<3;++component){const auto p=workspace.viewport()->world_to_screen(chart.stellar_hosts[component].x,chart.stellar_hosts[component].y);
+      require(field.contains({p.x,p.y}),"Fit System cropped a moving stellar component");
+      require(std::ranges::any_of(draw.world,[&](const auto& command){const auto* text=std::get_if<Text>(&command);return text&&text->value.find(stellar_host_name(component))!=std::string::npos&&text->align==TextAlign::Center&&text->at.y>p.y;}),"Triple omitted its below-object component label");
+    }
+  }
+  const auto fitted_scale=workspace.viewport()->scale;const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;
+  (void)workspace.handle({.type=InputEventType::Wheel,.position=center(field),.wheel_y=.1f},1280,720);
+  require(workspace.viewport()->scale>fitted_scale&&workspace.viewport()->scale<fitted_scale*1.1f,"Wide-system zoom jumped to the old minimum scale");
   std::cout<<"native system workspace cases passed\n";return 0;
 }catch(const std::exception&e){std::cerr<<"native system workspace failed: "<<e.what()<<'\n';return 1;}

@@ -50,6 +50,91 @@
       "source": "docs/SOL_VISUAL_SOURCES.md",
       "runtimePath": "Licenses/Sol-visual-sources.md",
       "sha256": "fe113adfa917418ce0de626ea5911065529203bd03596979b44411674b298c5a"
+    },
+    "earth-map": {
+      "source": "assets/visual/sol/earth-map.jpg",
+      "runtimePath": "assets/visual/sol/earth-map.jpg",
+      "sha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d"
+    },
+    "earth-night-map": {
+      "source": "assets/visual/sol/earth-night-map.jpg",
+      "runtimePath": "assets/visual/sol/earth-night-map.jpg",
+      "sha256": "d87de751a264e4f8ff69c68de5dab9606daee87a6f15ae743c93200743bd7ec1"
+    },
+    "earth-clouds": {
+      "source": "assets/visual/sol/earth-clouds.jpg",
+      "runtimePath": "assets/visual/sol/earth-clouds.jpg",
+      "sha256": "daddaad84d7a33bbbc86cdda3f591099f57cee8607b7bcf3b67eb7e4f7a1c793"
+    },
+    "building-portraits-v1": {
+      "source": "assets/visual/planetary/building-portraits-v1.png",
+      "runtimePath": "assets/visual/planetary/building-portraits-v1.png",
+      "sha256": "647d318ce7a1a0a456a43f5f71adb8a8cba5abdcc679c55f081a4060c8da9921"
+    },
+    "colony-panorama-v1": {
+      "source": "assets/visual/planetary/colony-panorama-v1.png",
+      "runtimePath": "assets/visual/planetary/colony-panorama-v1.png",
+      "sha256": "bedc18fefa35796e6106a68e8625c90cb562f59642a4e16579f75b8ca7913d29"
+    },
+    "globe-credits": {
+      "source": "docs/IMMERSIVE_TEXTURE_PROVENANCE.md",
+      "runtimePath": "Licenses/Globe-texture-provenance.md",
+      "sha256": "982b3589b190b5f65d18f94065dd62509d44e244006e2af98b87599d4ecbfbb4"
+    },
+    "planetary-credits": {
+      "source": "assets/visual/planetary/ARTWORK.md",
+      "runtimePath": "Licenses/Planetary-artwork.md",
+      "sha256": "969f1970a099870398f3e7484a4da186bed9252e883e828cb6d1caf00cade01f"
+    },
+    "mars-map": {
+      "source": "assets/visual/sol/mars-map.png",
+      "runtimePath": "assets/visual/sol/mars-map.png",
+      "sha256": "0c4ccde0e7e1ab3069b25e6ffe55ceec153d3b0452e3096b68dfba053cc476e4"
+    },
+    "jupiter-map": {
+      "source": "assets/visual/sol/jupiter-map.png",
+      "runtimePath": "assets/visual/sol/jupiter-map.png",
+      "sha256": "757339d459eee3170ccabd32a9d81131b98649778dc21dd7637fe55171fc498c"
+    },
+    "authored-planet-credits": {
+      "source": "docs/AUTHORED_PLANET_TEXTURE_PROVENANCE.md",
+      "runtimePath": "Licenses/Authored-planet-texture-provenance.md",
+      "sha256": "6bf677e6827632e21bd864ff253acfddf66a9f98fa894928c9d2151faccae7c4"
+    },
+    "mercury-map": {
+      "source": "assets/visual/sol/mercury-map.png",
+      "runtimePath": "assets/visual/sol/mercury-map.png",
+      "sha256": "717eb5515618e6d92aaf2d576b41a7a45b372e5443c3a28d65f7c1fcac02e19a"
+    },
+    "venus-map": {
+      "source": "assets/visual/sol/venus-map.png",
+      "runtimePath": "assets/visual/sol/venus-map.png",
+      "sha256": "324be25ed4bf89b6c9dc9ea783ec769ba63eced277122cd4578cc568390914a5"
+    },
+    "earth-authored-map": {
+      "source": "assets/visual/sol/earth-map.png",
+      "runtimePath": "assets/visual/sol/earth-map.png",
+      "sha256": "09b9dce69c6966433179ae75a40636c9a3b48315bc6349d3d7afc0f0434bbdd5"
+    },
+    "moon-map": {
+      "source": "assets/visual/sol/moon-map.png",
+      "runtimePath": "assets/visual/sol/moon-map.png",
+      "sha256": "f7ef8b5199b3a2983d00ab4fb2e1836eae2db85f10dcf17b14e21bac57b3c2cd"
+    },
+    "saturn-map": {
+      "source": "assets/visual/sol/saturn-map.png",
+      "runtimePath": "assets/visual/sol/saturn-map.png",
+      "sha256": "17885ebd2a0dea30dd7b0da80fdf1255f012993e3856bda5d74bb0e4e9c8476d"
+    },
+    "uranus-map": {
+      "source": "assets/visual/sol/uranus-map.png",
+      "runtimePath": "assets/visual/sol/uranus-map.png",
+      "sha256": "2ae65973542897b24690ae468f2fd627f624f06d17c8ca12f5ac0f2e434ed50f"
+    },
+    "neptune-map": {
+      "source": "assets/visual/sol/neptune-map.png",
+      "runtimePath": "assets/visual/sol/neptune-map.png",
+      "sha256": "9b290d76f5434221f6edf470a1e8281c5b0f8b5e5efc358a7cc2912fbfee379d"
     }
   }
 }

@@ -1,4 +1,5 @@
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -86,6 +87,8 @@ bool is_sol(const StellarSystem& system) {
 } // namespace
 
 void validate_planetary_body(const PlanetaryBody& body) {
+    if(body.appearance){validate_planet_appearance(*body.appearance);if(body.system_id!=sol_system_id&&body.appearance->source_asset_id.starts_with("sol:"))invalid("Alien worlds cannot use Sol geography.");
+        if(body.appearance->source_asset_id.starts_with("sol:"))for(const auto& m:sol_moon_definitions())if(body.appearance->source_asset_id.substr(4)==m.key&&(body.id!=m.id||body.parent_body_id!=m.parent||body.name!=m.name))invalid("Canonical moon artwork requires its reserved identity and parent.");}
     if(body.stellar_exposure) validate_stellar_planet(*body.stellar_exposure);
     if (body.id < 0) invalid("Planetary body IDs must be non-negative.");
     if (body.system_id < 0) invalid("Planetary body system IDs must be non-negative.");
@@ -124,6 +127,7 @@ std::vector<PlanetaryBody> create_sol_catalog(const StellarSystem& system) {
             false, false, false, false, 0.0, 0.0},
         pluto(),
     };
+    for(auto& moon:create_sol_major_moons())result.push_back(std::move(moon));
     for (const auto& body : result) validate_planetary_body(body);
     return result;
 }
@@ -144,7 +148,6 @@ std::vector<PlanetaryBody> upgrade_saved_sol_catalog(std::span<const PlanetaryBo
     if (existing_pluto != bodies.end()) {
         if (existing_pluto->system_id != sol_system_id || existing_pluto->name != "Pluto" || existing_pluto->kind != PlanetaryBodyKind::DwarfPlanet)
             throw std::invalid_argument{"Reserved Pluto body ID 10 is occupied by a different body."};
-        return {bodies.begin(), bodies.end()};
     }
 
     struct Identity { int id; const char* name; PlanetaryBodyKind kind; };
@@ -159,7 +162,23 @@ std::vector<PlanetaryBody> upgrade_saved_sol_catalog(std::span<const PlanetaryBo
         if (!found) throw std::invalid_argument{"The saved Sol v1 catalog is missing a legacy canonical body identity."};
     }
     std::vector<PlanetaryBody> result{bodies.begin(), bodies.end()};
-    result.push_back(pluto());
+    if(existing_pluto==bodies.end()){
+        auto added=pluto();
+        added.appearance=planet_appearance_for_existing(0,added,sol->stellar_object?&*sol->stellar_object:nullptr);
+        result.push_back(std::move(added));
+    }
+    for(auto& moon:create_sol_major_moons()){
+        const auto existing=std::ranges::find(result,moon.id,&PlanetaryBody::id);
+        if(existing!=result.end()){
+            if(existing->system_id!=sol_system_id||existing->name!=moon.name||existing->kind!=PlanetaryBodyKind::Moon||existing->parent_body_id!=moon.parent_body_id)
+                throw std::invalid_argument{"Reserved Sol moon ID is occupied by a different body."};
+            continue;
+        }
+        const auto parent=std::ranges::find(result,*moon.parent_body_id,&PlanetaryBody::id);
+        moon.stellar_exposure=parent->stellar_exposure;
+        moon.appearance=planet_appearance_for_existing(0,moon,sol->stellar_object?&*sol->stellar_object:nullptr);
+        result.push_back(std::move(moon));
+    }
     return result;
 }
 

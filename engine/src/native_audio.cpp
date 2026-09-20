@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/native_audio.hpp>
 
 #include <SDL3/SDL.h>
@@ -128,12 +129,7 @@ std::size_t AudioClip::byte_size() const noexcept { return samples_.size() * siz
 std::uint64_t AudioClip::sample_frames() const noexcept { return samples_.size() / audio_channels; }
 
 std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& path) {
-  std::error_code file_error;
-  const auto file_bytes = std::filesystem::file_size(path, file_error);
-  if (file_error) throw std::runtime_error("Could not inspect audio source " + utf8_path(path) + ": " + file_error.message());
-  if (file_bytes == 0 || file_bytes > maximum_source_audio_bytes) {
-    throw std::length_error("Audio source must be non-empty and no larger than 16 MiB: " + utf8_path(path));
-  }
+  const auto encoded=read_resource(path,maximum_source_audio_bytes);if(encoded.empty())throw std::runtime_error("Empty audio asset");
   ComApartment apartment(path);
   using Microsoft::WRL::ComPtr;
   ComPtr<IMFAttributes> reader_attributes;
@@ -142,8 +138,12 @@ std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& 
   require_hresult(reader_attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE),
                   "Configure audio reader transforms", path);
   ComPtr<IMFSourceReader> reader;
-  require_hresult(MFCreateSourceReaderFromURL(path.c_str(), reader_attributes.Get(), reader.GetAddressOf()),
-                  "MFCreateSourceReaderFromURL", path);
+  ComPtr<IStream> source_stream;require_hresult(CreateStreamOnHGlobal(nullptr,TRUE,source_stream.GetAddressOf()),"Create audio memory stream",path);
+  ULONG written{};require_hresult(source_stream->Write(encoded.data(),static_cast<ULONG>(encoded.size()),&written),"Write audio memory stream",path);
+  if(written!=encoded.size())throw std::runtime_error("Incomplete audio memory stream");
+  LARGE_INTEGER zero{};require_hresult(source_stream->Seek(zero,STREAM_SEEK_SET,nullptr),"Seek audio stream",path);
+  ComPtr<IMFByteStream> byte_stream;require_hresult(MFCreateMFByteStreamOnStream(source_stream.Get(),byte_stream.GetAddressOf()),"Create audio byte stream",path);
+  require_hresult(MFCreateSourceReaderFromByteStream(byte_stream.Get(),reader_attributes.Get(),reader.GetAddressOf()),"Decode cooked audio",path);
   constexpr DWORD audio_stream = static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM);
   ComPtr<IMFMediaType> output_type;
   require_hresult(MFCreateMediaType(output_type.GetAddressOf()), "MFCreateMediaType", path);
@@ -447,3 +447,5 @@ AudioDiagnostics AudioOutput::diagnostics() const {
 }
 
 } // namespace stellar::engine::audio
+
+

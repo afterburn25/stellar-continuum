@@ -24,15 +24,22 @@ struct NativeSpeciesPresentation {
 [[nodiscard]] std::optional<NativeSpeciesPresentation>
 species_presentation(std::string_view species_id) noexcept;
 
+enum class SandboxPage { GalaxyType, Population, Configuration };
+struct GalaxyChoiceLayout {
+  float scale{};stellar::native_map::UiRect panel,heading,back,next,preview,population,description,summary;
+  std::array<stellar::native_map::UiRect,6> cards;
+  static GalaxyChoiceLayout for_viewport(int width,int height) noexcept;
+};
 struct NativeNewGameLayout {
   float scale{};
   int heading_font{}, body_font{}, small_font{};
   stellar::native_map::UiRect panel, heading, cancel, mode_story, mode_sandbox,
       species, species_rows, details, details_content, size_group, seed_label,
       seed_input, randomize_seed, restore_defaults, create, portrait;
-  std::array<stellar::native_map::UiRect, 4> size_buttons{};
+  std::array<stellar::native_map::UiRect, 8> size_buttons{};
   stellar::native_map::UiRect copy_setup;
   stellar::native_map::UiRect morphology, population;
+  stellar::native_map::UiRect developer_normal_research,developer_special_research,developer_coverage,developer_exploration;
   [[nodiscard]] static NativeNewGameLayout for_viewport(int width,
                                                          int height) noexcept;
 };
@@ -64,6 +71,10 @@ struct NativeNewGameIntent {
   std::string species_id, seed_text;
   int system_count{}, pre_warp_civilization_count{}, ancient_civilization_count{};
   stellar::core::StellarPopulationOptions stellar_population;
+  stellar::core::DeveloperResearchOptions developer_research;
+  bool developer_full_coverage{};
+  stellar::core::PopulationSelection requested_population{stellar::core::PopulationSelection::Random};
+  bool developer_full_exploration{};
 };
 
 class NativeNewGameWorkspace final {
@@ -78,6 +89,12 @@ public:
   void clear() noexcept;
   void set_assessment_message(std::string message, bool accepted);
   void randomize_seed();
+  void begin_sandbox();
+  [[nodiscard]] SandboxPage page()const noexcept{return page_;}
+  [[nodiscard]] std::optional<stellar::core::GalaxyMorphology> selected_morphology()const noexcept{return morphology_selected_?std::optional{population_.morphology}:std::nullopt;}
+  [[nodiscard]] stellar::core::PopulationSelection requested_population()const noexcept{return requested_population_;}
+  [[nodiscard]] std::optional<stellar::core::GalaxyGenerationConfig> generation_configuration()const;
+
 
   [[nodiscard]] const std::optional<
       stellar::native_setup::NativeNewCampaignSetupView> &
@@ -114,6 +131,11 @@ public:
                   {}) const;
 
 private:
+  NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int);
+  void render_galaxy_page(stellar::native_map::DrawList&,int,int,const PortraitProvider*,std::shared_ptr<const stellar::native_map::RgbaImage>)const;
+  SandboxPage page_{SandboxPage::Configuration};
+  bool morphology_selected_{};
+  stellar::core::PopulationSelection requested_population_{stellar::core::PopulationSelection::Random};
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   stellar::native_ui::Dropdown dropdown_;
   [[nodiscard]] std::optional<std::size_t> species_hit(
@@ -128,6 +150,9 @@ private:
   std::optional<stellar::native_setup::NativeNewCampaignSetupView> view_;
   std::string selected_species_id_, seed_text_, message_;
   stellar::core::StellarPopulationOptions population_;
+  stellar::core::DeveloperResearchOptions developer_research_;
+  bool developer_coverage_{};
+  bool developer_exploration_{};
   int selected_system_count_{}, selected_pre_warp_civilization_count_{},
       selected_ancient_civilization_count_{};
   float species_scroll_{}, detail_scroll_{};

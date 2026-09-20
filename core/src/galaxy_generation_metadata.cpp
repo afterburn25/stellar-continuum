@@ -81,6 +81,15 @@ validate_galaxy_generation_metadata(
       metadata->guaranteed_nearby_habitable_worlds < 0)
     throw std::runtime_error(
         "Campaign generation metadata is invalid or does not match the saved galaxy.");
+  if(metadata->configuration){
+    const auto& c=*metadata->configuration;validate_galaxy_configuration(c);
+    if(c.base_seed!=seed||c.system_count!=static_cast<int>(systems.size())||c.generator_version!=metadata->generator_version||!metadata->stellar_population||c.morphology!=metadata->stellar_population->morphology||c.resolved_population!=metadata->stellar_population->state)
+      throw std::runtime_error("Saved canonical generation configuration disagrees with galaxy metadata");
+    if(galaxy_has_central_black_hole(c)!=metadata->galactic_core.has_value())throw std::runtime_error("Saved central occupancy disagrees with generation configuration");
+    if(c.generator_version!="galaxy-configuration-v2"&&!metadata->phenomena)throw std::runtime_error("Saved galaxy is missing its generated phenomena");
+    if(metadata->phenomena)validate_galaxy_phenomena(*metadata->phenomena,c,systems);
+  }
+  else if(metadata->phenomena)throw std::runtime_error("Phenomena require canonical generation metadata");
   if(metadata->stellar_population) (void)stellar_population_weights(*metadata->stellar_population);
   if(metadata->stellar_profile_version&&(!metadata->stellar_population||*metadata->stellar_profile_version!=stellar_population_profile_version()))
     throw std::runtime_error("Unsupported saved stellar population profile version.");

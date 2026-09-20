@@ -1,6 +1,7 @@
 #include <stellar/core/adaptive_research_campaign.hpp>
 
 #include <stellar/core/detail/adaptive_research_campaign_state_access.hpp>
+#include <stellar/core/detail/adaptive_research_state_writer.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -165,6 +166,7 @@ struct AdaptiveResearchCampaignState::Storage {
     AdaptiveResearchCivilizationState state;
     AdaptiveResearchCivilizationStart start;
     FundingCollection funding;
+    AdaptiveResearchPlan plan;
   };
 
   const AdaptiveResearchStrategicRuntime *runtime{};
@@ -259,6 +261,50 @@ AdaptiveResearchCampaignState::project_funding(int id) const {
   return entry->funding.values();
 }
 
+const AdaptiveResearchPlan &AdaptiveResearchCampaignState::plan(int id) const {
+  (void)get_civilization(id);
+  return storage_->find(id)->plan;
+}
+
+AdaptiveResearchCommandResult AdaptiveResearchCampaignState::edit_plan(
+    int id, ResearchPlanCommand command, std::string_view node_id) {
+  auto *entry=storage_->find(id);
+  if(!entry)return AdaptiveResearchCommandResult::rejected("Research civilization is unavailable.");
+  auto next=entry->plan;
+  if(command==ResearchPlanCommand::SuggestionsOn||command==ResearchPlanCommand::SuggestionsOff)
+    next.suggestions=command==ResearchPlanCommand::SuggestionsOn;
+  else {
+    const auto *node=entry->state.try_get_node_state(node_id);
+    if(!node||node->maturity<ResearchMaturity::investigable)
+      return AdaptiveResearchCommandResult::rejected("That technology has not been discovered.");
+    const bool favorite=command==ResearchPlanCommand::AddFavorite||command==ResearchPlanCommand::RemoveFavorite;
+    auto &list=favorite?next.favorites:next.queue;
+    auto found=std::find(list.begin(),list.end(),node_id);
+    if(command==ResearchPlanCommand::AddFavorite||command==ResearchPlanCommand::Enqueue){
+      if(command==ResearchPlanCommand::Enqueue&&(node->maturity>=ResearchMaturity::mature||
+          std::any_of(entry->state.active_projects().begin(),entry->state.active_projects().end(),
+            [&](const auto &p){return p.node_id==node_id;})))
+        return AdaptiveResearchCommandResult::rejected("This program is already active or concluded.");
+      if(found==list.end()){
+        if(list.size()>=128)return AdaptiveResearchCommandResult::rejected("Research plan is full (128 entries).");
+        list.emplace_back(node_id);
+      }
+    }else if(command==ResearchPlanCommand::RemoveFavorite||command==ResearchPlanCommand::RemoveQueued){
+      if(found!=list.end())list.erase(found);
+    }else if(command==ResearchPlanCommand::MoveUp||command==ResearchPlanCommand::MoveDown){
+      if(found==list.end()||(command==ResearchPlanCommand::MoveUp&&found==list.begin())||
+         (command==ResearchPlanCommand::MoveDown&&found+1==list.end()))
+        return AdaptiveResearchCommandResult::rejected("The queued program cannot move in that direction.");
+      std::iter_swap(found,command==ResearchPlanCommand::MoveUp?found-1:found+1);
+    }else return AdaptiveResearchCommandResult::rejected("Unknown research plan command.");
+  }
+  if(next!=entry->plan){
+    detail::AdaptiveResearchStateWriter::mark_state_changed(entry->state);
+    entry->plan=std::move(next);
+  }
+  return {true,"Research plan updated. Queued programs start in order when time is running and their requirements are met.",{}, {}};
+}
+
 AdaptiveResearchCampaignFactory::AdaptiveResearchCampaignFactory(
     const AdaptiveResearchStrategicRuntime &runtime) noexcept
     : runtime_(&runtime) {}
@@ -349,7 +395,7 @@ AdaptiveResearchCampaignSnapshotCodec::capture(
         "Adaptive Research campaign belongs to a different runtime catalog "
         "instance.");
   AdaptiveResearchCampaignSnapshot result{
-      current_schema_version,
+      2,
       storage_->runtime->authority().catalog().metadata().catalog_id,
       {}};
   std::vector<int> ordered(campaign.civilization_ids().begin(),
@@ -371,7 +417,8 @@ AdaptiveResearchCampaignSnapshotCodec::capture(
         {id, start.species_id, start.reference_profile_id,
          start.applicability_context_id,
          storage_->civilization_codec.capture(campaign.get_civilization(id)),
-         std::move(funding)});
+         std::move(funding), campaign.plan(id)});
+    if(campaign.plan(id)!=AdaptiveResearchPlan{})result.schema_version=current_schema_version;
   }
   return result;
 }
@@ -379,8 +426,8 @@ AdaptiveResearchCampaignSnapshotCodec::capture(
 AdaptiveResearchCampaignState AdaptiveResearchCampaignSnapshotCodec::restore(
     std::span<const Civilization> civilizations,
     const AdaptiveResearchCampaignSnapshot &snapshot) const {
-  if (snapshot.schema_version != 1 &&
-      snapshot.schema_version != current_schema_version)
+  if (snapshot.schema_version < 1 ||
+      snapshot.schema_version > current_schema_version)
     throw AdaptiveResearchCampaignDataError(
         "Unsupported Adaptive Research campaign schema " +
         std::to_string(snapshot.schema_version) + ".");
@@ -445,6 +492,11 @@ AdaptiveResearchCampaignState AdaptiveResearchCampaignSnapshotCodec::restore(
     for (const auto &entry : snapshot.civilizations)
       detail::AdaptiveResearchCampaignStateAccess::restore_project_funding(
           campaign, entry.civilization_id, entry.project_funding);
+  for(const auto &entry:snapshot.civilizations){
+    if(snapshot.schema_version<3&&entry.plan!=AdaptiveResearchPlan{})
+      throw AdaptiveResearchCampaignDataError("Research planning requires campaign research schema 3.");
+    detail::AdaptiveResearchCampaignStateAccess::restore_plan(campaign,entry.civilization_id,entry.plan);
+  }
   return campaign;
 }
 
@@ -455,6 +507,25 @@ AdaptiveResearchCampaignState AdaptiveResearchCampaignSnapshotCodec::restore(
 }
 
 namespace detail {
+
+void AdaptiveResearchCampaignStateAccess::restore_plan(
+    AdaptiveResearchCampaignState &campaign,int id,const AdaptiveResearchPlan &plan){
+  const auto owned=plan;
+  const auto &state=campaign.get_civilization(id);
+  for(const auto *list:{&owned.favorites,&owned.queue}){
+    if(list->size()>128)throw AdaptiveResearchCampaignDataError("Research plan exceeds 128 entries.");
+    std::vector<std::string> seen;
+    for(const auto &node_id:*list){
+      const auto *node=state.try_get_node_state(node_id);
+      if(node_id.size()>128||!campaign.runtime().authority().catalog().find_node(node_id)||
+         !node||node->maturity<ResearchMaturity::investigable||
+         std::find(seen.begin(),seen.end(),node_id)!=seen.end())
+        throw AdaptiveResearchCampaignDataError("Research plan contains an unknown, undiscovered or duplicate technology.");
+      seen.push_back(node_id);
+    }
+  }
+  campaign.storage_->find(id)->plan=owned;
+}
 
 AdaptiveResearchCivilizationState &
 AdaptiveResearchCampaignStateAccess::get_civilization(
@@ -517,6 +588,13 @@ AdaptiveResearchCampaignStateAccess::consume_project_milestone(
     entry->funding.replace(owned_node, std::move(replacement));
   }
   return {true, consumed, remaining};
+}
+
+void AdaptiveResearchCampaignStateAccess::release_project_funding(
+    AdaptiveResearchCampaignState &campaign, int civilization_id, std::string_view node_id) {
+  auto *entry = campaign.storage_->find(civilization_id);
+  if (!entry) throw AdaptiveResearchCampaignMissingState("Missing research civilization.");
+  entry->funding.erase(node_id);
 }
 
 void AdaptiveResearchCampaignStateAccess::restore_project_funding(

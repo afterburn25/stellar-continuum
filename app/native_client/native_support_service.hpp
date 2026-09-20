@@ -19,6 +19,7 @@ class NativeSupportService final {
   void record(std::string_view category,std::string_view message);
   [[nodiscard]] bool request(SupportBundleRequest request);
   [[nodiscard]] bool poll();
+  void report_capture_failure(std::string_view);
   [[nodiscard]] SupportExportState state() const noexcept { return state_; }
   [[nodiscard]] bool busy() const noexcept { return state_==SupportExportState::Working; }
   [[nodiscard]] const std::filesystem::path& result() const noexcept { return result_; }

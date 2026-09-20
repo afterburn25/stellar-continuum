@@ -1,4 +1,5 @@
 #pragma once
+#include <stellar/engine/atomic_file_write.hpp>
 
 #include <stellar/core/player_campaign_persistence.hpp>
 
@@ -61,5 +62,10 @@ encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload);
     AdaptiveResearchStrategicRuntime research_runtime,
     std::string_view utf8_json,
     const PlayerCampaignJsonRestoreHooks &hooks = {});
+
+// Streaming counterparts preserve byte order/format without building a whole save DOM.
+struct DeveloperCampaignPayload;
+void stream_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto&,const stellar::engine::AtomicTextSink&);
+void stream_developer_campaign_json(const DeveloperCampaignPayload&,const stellar::engine::AtomicTextSink&);
 
 } // namespace stellar::core

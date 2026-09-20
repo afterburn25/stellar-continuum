@@ -54,8 +54,7 @@ void label(DrawList& draw, UiRect bounds, std::string value, int size,
   native_menu_style::text(draw, bounds, std::move(value), size, color, alignment);
 }
 void toggle(DrawList& draw, UiRect bounds, std::string value, bool selected, int font, float scale) {
-  native_menu_style::rounded(draw, bounds, selected ? selected_fill : row_fill, 4.f * scale);
-  native_menu_style::rounded(draw, bounds, selected ? active : border, 4.f * scale, true);
+  stellar::engine::ui_skin::control(draw,bounds,false,selected,true,scale);
   label(draw, {bounds.x + 12.f * scale, bounds.y + (bounds.height - font * 1.4f) * .5f,
                bounds.width - 54.f * scale, font * 1.5f}, std::move(value), font);
   const UiRect switch_track{bounds.x + bounds.width - 38.f * scale, bounds.y + bounds.height * .5f - 7.f * scale,
@@ -66,8 +65,7 @@ void toggle(DrawList& draw, UiRect bounds, std::string value, bool selected, int
                              native_menu_style::ink, 5.f * scale);
 }
 void choice(DrawList& draw, UiRect bounds, std::string name, std::string value, int font, float scale) {
-  native_menu_style::rounded(draw, bounds, row_fill, 4.f * scale);
-  native_menu_style::rounded(draw, bounds, border, 4.f * scale, true);
+  stellar::engine::ui_skin::control(draw,bounds,false,false,true,scale);
   const float text_y = bounds.y + (bounds.height - font * 1.4f) * .5f;
   label(draw, {bounds.x + 12.f * scale, text_y,
                bounds.width * .48f, font * 1.5f}, std::move(name), font, native_menu_style::muted);

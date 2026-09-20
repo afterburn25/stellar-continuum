@@ -157,12 +157,14 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
   validate_surface_economies(world);
 
   std::unordered_map<int, const PlanetaryBody *> bodies;
+  bodies.reserve(world.bodies.size());
   for (const auto &body : world.bodies)
     if (!bodies.emplace(body.id, &body).second)
       throw GalaxyReferenceValidationArgumentError(
           "An item with the same key has already been added. Key: " +
           std::to_string(body.id));
   std::unordered_set<int> system_ids;
+  system_ids.reserve(world.systems.size());
   for (const auto &system : world.systems) system_ids.insert(system.id);
 
   for (const auto &colony : world.colonies) {

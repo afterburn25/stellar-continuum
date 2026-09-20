@@ -75,6 +75,12 @@ struct DiplomacyCampaignRuntimeStepResult {
   [[nodiscard]] int processed_diplomacy_events() const noexcept;
 };
 
+struct DiplomacyRuntimeSchedule {
+  std::int64_t last_processed_tick{-1};
+  DiplomacyMaintenanceSnapshot maintenance;
+  void validate() const;
+};
+
 class DiplomacyCampaignRuntimeCoordinator final {
 public:
   explicit DiplomacyCampaignRuntimeCoordinator(
@@ -101,6 +107,8 @@ public:
   [[nodiscard]] CombatSimulation create_combat_simulation() const;
   [[nodiscard]] DiplomaticStateView build_view(int observer) const;
   void reset(double simulation_days, bool review_immediately = true);
+  [[nodiscard]] DiplomacyRuntimeSchedule schedule() const;
+  void restore_schedule(const DiplomacyRuntimeSchedule &);
   [[nodiscard]] DiplomacyCampaignRuntimeStepResult
   process(std::span<const ExplorationEvent> exploration_events,
           std::span<const CombatEvent> combat_events, double simulation_days);

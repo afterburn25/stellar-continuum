@@ -18,8 +18,8 @@ constexpr double kPi = 3.1415926535897932384626433832795028841971694;
 constexpr double kTau = 6.2831853071795864769252867665590057683943388;
 
 void validate_count(int count) {
-    if (count != 250 && count != 500 && count != 1000 && count != 2500)
-        throw std::invalid_argument("Full-galaxy system count must be 250, 500, 1000, or 2500");
+    if (!supported_full_galaxy_system_count(count))
+        throw std::invalid_argument("Unsupported full-galaxy system count");
 }
 
 float length(Vec2 value) {

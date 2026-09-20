@@ -132,6 +132,7 @@ build_body_inspection(const native_system::NativeSystemSnapshot &snapshot,
                          found->details.has_value();
   const auto hidden = [] { return std::string{"Unconfirmed"}; };
   BodySection physical{"Physical", {{"Type", physical_kind(found->kind)},
+      {"World class", confirmed&&found->appearance&&!found->appearance->source_asset_id.starts_with("sol:")?stellar::core::planet_appearance_display_name(*found->appearance):confirmed && found->world_class ? std::string(stellar::core::planetary_world_class_name(*found->world_class)) : hidden()},
       {"Radius", confirmed ? confirmed_radius(found->radius_earth) : hidden()},
       {"Mass", confirmed ? confirmed_mass(found->details->mass_earth) : hidden()},
       {"Gravity", confirmed ? confirmed_gravity(found->details->gravity_g) : hidden()},

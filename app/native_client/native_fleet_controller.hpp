@@ -109,6 +109,9 @@ struct NativeOwnFleet {
   std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
   std::optional<NativeScienceSurveyStatus> science_survey;
   std::string recovery_message;
+  bool foreign_inspection{};
+  int owner_civilization_id{};
+  std::string owner_name;
 };
 
 // A historic intelligence record owns no current position. The strategic
@@ -126,6 +129,7 @@ struct NativeFleetMapView {
   std::vector<NativeOwnFleet> own_fleets;
   std::vector<NativeForeignFleetContact> foreign_contacts;
   std::optional<int> selected_fleet_id;
+  bool developer_inspection{};
 };
 
 struct NativeFleetSelectionOutcome {

@@ -24,6 +24,7 @@ struct NativeLocalFleetMarker {
   stellar::core::FleetTransitPhase phase{};
   bool moving{},held{};
   int mission_order_revision{};
+  bool foreign_inspection{};
 };
 
 struct NativeLocalLaneMarker {

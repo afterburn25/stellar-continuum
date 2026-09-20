@@ -49,7 +49,12 @@ StartupEntryResult run_native_startup_entry(Window &window,
     throw std::invalid_argument("Startup requires a UTC timestamp provider.");
   if (config.minimum_boot_artwork < std::chrono::milliseconds::zero())
     throw std::invalid_argument("Startup artwork minimum duration cannot be negative.");
+  if(automation&&automation->developer_mode){
+    if(!config.developer_access||!config.developer_access->set_active(true))
+      throw std::runtime_error("Developer smoke requires explicit launch eligibility.");
+  }
   NativeStartupHost host(config.host);
+  if(config.developer_access&&config.developer_access->active())host.set_developer_mode(true);
   NativeStartupWorkspace workspace;
   workspace.set_hover_callback(config.audio.hover);
   workspace.set_build_label("Stellar Continuum " + config.host.game_version);
@@ -75,7 +80,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       [&](std::string_view relative) {
         auto [entry, inserted] = portraits.try_emplace(std::string(relative));
         if (inserted)
-          entry->second = decode_rgba_image(config.asset_root / entry->first);
+          entry->second = decode_rgba_image(config.asset_root / entry->first,0,stellar::native_map::ImageDecodeUsage::PixelsOnly);
         return entry->second;
       };
   NativeStartupArtworkAssets artwork_assets(config.asset_root);
@@ -161,8 +166,18 @@ StartupEntryResult run_native_startup_entry(Window &window,
       catch(const std::exception&){workspace.set_diagnostics(system_info+"\nClipboard unavailable. Try again.");}
       break;
     case StartupIntentKind::CopySetup:
-      try{window.set_clipboard_text("Stellar Continuum sandbox\nSpecies: "+intent.species_id+"\nSeed: "+intent.seed_text+"\nSystems: "+std::to_string(intent.system_count)+"\nRival empires: "+std::to_string(std::max(0,intent.pre_warp_civilization_count-1))+"\nAncient empires: "+std::to_string(intent.ancient_civilization_count)+"\nMorphology: "+std::string(stellar::core::morphology_name(intent.stellar_population.morphology))+"\nPopulation: "+std::string(stellar::core::population_state_name(intent.stellar_population.state))+"\nGeneration: stellar-population-v1");workspace.set_setup_message("Setup copied to clipboard.",true);}
-      catch(const std::exception&){workspace.set_setup_message("Could not copy setup. Try again.",false);}break;
+      try {
+        NativeNewCampaignSetupController controller;
+        const auto prepared=controller.prepare({intent.seed_text,intent.system_count,intent.species_id,
+          config.utc_timestamp(),intent.pre_warp_civilization_count,intent.ancient_civilization_count,
+          intent.stellar_population,intent.developer_research,intent.developer_full_coverage,intent.requested_population,intent.developer_full_exploration},
+          config.developer_access&&config.developer_access->active());
+        if(!prepared.accepted)throw std::invalid_argument(prepared.message);
+        std::string details=stellar::core::galaxy_configuration_description(*prepared.prepared->options().configuration);
+        if(config.developer_access&&config.developer_access->active())details+="\nDeveloper session: yes\nAll normal research: "+std::string(intent.developer_research.complete_normal_research?"yes":"no")+"\nInclude special research: "+std::string(intent.developer_research.complete_special_research?"yes":"no")+"\nFull celestial coverage: "+std::string(intent.developer_full_coverage?"yes":"no")+"\nEntire galaxy explored and surveyed: "+std::string(intent.developer_full_exploration?"yes":"no");
+        window.set_clipboard_text(details);
+        workspace.set_setup_message("Setup and generation fingerprint copied.",true);
+      }catch(const std::exception& error){workspace.set_setup_message(error.what(),false);}break;
     case StartupIntentKind::OpenSettings:
       if(config.settings_hub)config.settings_hub->open();
       else if (config.audio_settings) config.audio_settings->open();
@@ -174,7 +189,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       const auto started = host.start_new(
           {intent.seed_text, intent.system_count, intent.species_id,
            config.utc_timestamp(), intent.pre_warp_civilization_count,
-           intent.ancient_civilization_count,intent.stellar_population});
+           intent.ancient_civilization_count,intent.stellar_population,intent.developer_research,intent.developer_full_coverage,intent.requested_population,intent.developer_full_exploration});
       if (started.accepted)
         workspace.begin_operation(host.poll(),
                                   StartupOperationOrigin::NewCampaign);
@@ -313,6 +328,20 @@ StartupEntryResult run_native_startup_entry(Window &window,
       evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
       intent = {StartupIntentKind::OpenSetup, evidence.setup_opened};
     }
+    const auto galaxy_layout=stellar::native_setup_ui::GalaxyChoiceLayout::for_viewport(width,height);
+    DrawList types_draw;workspace.render(types_draw,width,height,measure,&portrait_provider,&artwork_provider);
+    window.draw(types_draw,startup_capture_path(automation->setup_screenshot,"-galaxy-types"));
+    (void)workspace.handle({InputEventType::LeftPressed,center(galaxy_layout.cards.at(automation->galaxy_card))},width,height,measure);
+    DrawList selected_draw;workspace.render(selected_draw,width,height,measure,&portrait_provider,&artwork_provider);
+    window.draw(selected_draw,startup_capture_path(automation->setup_screenshot,"-galaxy-selected"));
+    (void)workspace.handle({InputEventType::LeftPressed,center(galaxy_layout.next)},width,height,measure);
+    DrawList population_draw;workspace.render(population_draw,width,height,measure,&portrait_provider,&artwork_provider);
+    window.draw(population_draw,startup_capture_path(automation->setup_screenshot,"-population"));
+    (void)workspace.handle({InputEventType::LeftPressed,center(galaxy_layout.population)},width,height,measure);
+    DrawList population_menu;workspace.render(population_menu,width,height,measure,&portrait_provider,&artwork_provider);
+    window.draw(population_menu,startup_capture_path(automation->setup_screenshot,"-population-dropdown"));
+    (void)workspace.handle({InputEventType::EscapePressed},width,height,measure);
+    (void)workspace.handle({InputEventType::LeftPressed,center(galaxy_layout.next)},width,height,measure);
     const auto option = std::ranges::find(setup_view.species,
                                           automation->species_id,
                                           &NativeSpeciesSetupOption::id);
@@ -343,6 +372,12 @@ StartupEntryResult run_native_startup_entry(Window &window,
         {InputEventType::TextEntered, {}, {}, 0, automation->seed_text}, width,
         height, measure);
     evidence.seed_entered = true;
+    if(automation->developer_mode&&automation->complete_normal_research)
+      (void)workspace.handle({InputEventType::LeftPressed,center(measured.base.developer_normal_research)},width,height,measure);
+    if(automation->developer_mode&&automation->full_celestial_coverage)
+      (void)workspace.handle({InputEventType::LeftPressed,center(measured.base.developer_coverage)},width,height,measure);
+    if(automation->full_exploration)
+      (void)workspace.handle({InputEventType::LeftPressed,center(measured.base.developer_exploration)},width,height,measure);
     DrawList setup_draw;
     workspace.render(setup_draw, width, height, measure, &portrait_provider,
                      &artwork_provider);
@@ -351,6 +386,12 @@ StartupEntryResult run_native_startup_entry(Window &window,
         {InputEventType::LeftPressed, center(measured.base.create)}, width,
         height, measure);
     evidence.create_requested = intent.kind == StartupIntentKind::Create;
+    if(automation->developer_mode&&intent.developer_research.complete_normal_research!=automation->complete_normal_research)
+      throw std::runtime_error("Developer research checkbox did not reach campaign setup.");
+    if(automation->developer_mode&&intent.developer_full_coverage!=automation->full_celestial_coverage)
+      throw std::runtime_error("Developer coverage checkbox did not reach campaign setup.");
+    if(intent.developer_full_exploration!=automation->full_exploration)
+      throw std::runtime_error("Full exploration checkbox did not reach campaign setup.");
     evidence.species_selected = evidence.species_selected &&
                                 intent.species_id == automation->species_id;
     evidence.size_selected = evidence.size_selected &&
@@ -388,6 +429,19 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     bool exit{};
     for (const auto &event : input.events) {
+      if(is_developer_shortcut(event)){
+        if(config.developer_access&&config.developer_access->eligible()&&workspace.screen()!=StartupScreen::Busy){
+          const bool enabled=!config.developer_access->active();
+          host.set_developer_mode(enabled);
+          (void)config.developer_access->set_active(enabled);
+          workspace.set_setup(host.setup());
+          const auto slots=host.slots();
+          workspace.set_continue_save(slots.slots.empty()?std::filesystem::path{}:slots.slots.front().path);
+          workspace.set_slots(slots);workspace.show_entry();
+          if(config.audio.confirm)config.audio.confirm();
+        }
+        continue;
+      }
       if(route_settings(event,input.drawable_width,input.drawable_height))continue;
       if (config.general_settings && config.general_settings->visible()) {
         (void)config.general_settings->handle(event, input.drawable_width, input.drawable_height);
@@ -435,6 +489,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
         return {std::move(session), false, std::move(evidence)};
       }
       if (state.phase == NativeStartupPhase::Failed) {
+        if (automation) throw std::runtime_error(state.status);
         std::cerr << state.status << '\n';
         workspace.show_failure(state.status);
       } else if (state.phase == NativeStartupPhase::Cancelled)

@@ -1,4 +1,5 @@
 #include "native_galaxy_star_markers.hpp"
+#include <stellar/engine/native_triangle_mesh.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -136,8 +137,9 @@ void hard_budget_and_validation() {
     renderer.append(draw, {0, 0}, 1.f, {visual}, false);
     require_transparent_border(*image_at(draw, draw.world.size() - 1).resource);
   }
+  renderer.append_neutral_batch(draw,{0,0},1.f,false,std::nullopt,1.f);
   const auto stats = renderer.stats();
-  require(stats.cached_resources == std::size(visuals) &&
+  require(stats.cached_resources == std::size(visuals)+1 &&
               stats.cached_resources ==
                   NativeGalaxyStarMarkerRenderer::maximum_cached_resources &&
               stats.cached_bytes ==
@@ -195,6 +197,58 @@ void unexplored_alpha_preserves_resources_and_dims_every_component() {
   }
 }
 
+void dense_neutral_batch_preserves_geometry_and_order() {
+  NativeGalaxyStarMarkerRenderer renderer;
+  const UiRect clip{0,0,1920,1080};
+  DrawList reference,batch;
+  renderer.append(reference,{100,80},2.f,{},true,clip,.4f);
+  renderer.append_neutral_batch(batch,{100,80},2.f,true,clip,.4f);
+  const auto& mesh=std::get<TriangleMesh>(batch.world.front());
+  validate_triangle_mesh(mesh);
+  require(mesh.vertices.size()==48&&mesh.indices.size()==126,"Batched selection/contrast/star primitives changed");
+  for(int part=0;part<2;++part){
+    const auto& circle=circle_at(reference,part);const auto offset=static_cast<std::size_t>(part*22);
+    require(mesh.vertices[offset].x==circle.center.x&&mesh.vertices[offset].y==circle.center.y&&
+            mesh.vertex_colors[offset].a==circle.color.a&&mesh.vertex_colors[offset+1].a==0,
+            "Batched circle changed center, opacity or soft edge");
+    require(mesh.vertices[offset+1].x==circle.center.x+circle.radius,"Batched circle changed radius");
+  }
+  const auto& sprite=image_at(reference,2);
+  require(mesh.vertices[44].x==sprite.destination.x&&mesh.vertices[44].y==sprite.destination.y&&
+          mesh.vertex_colors[44].a==sprite.tint.a,"Batched marker changed placement or opacity");
+  // The complete original star texture must survive packing byte-for-byte.
+  for(int y=0;y<sprite.resource->height();++y)
+    require(std::equal(sprite.resource->pixels().begin()+y*256*4,sprite.resource->pixels().begin()+(y+1)*256*4,
+                       mesh.texture->pixels().begin()+y*mesh.texture->width()*4),"Atlas packing altered the light profile");
+  DrawList dense;
+  for(int i=0;i<10000;++i)renderer.append_neutral_batch(dense,{float(i%100)*10,float(i/100)*10},1.25f,false,clip,.86f);
+  require(dense.world.size()<=4,"Ten thousand neutral markers did not batch into bounded submissions");
+  std::size_t vertices=0,indices=0;
+  for(const auto& command:dense.world){const auto& m=std::get<TriangleMesh>(command);validate_triangle_mesh(m);vertices+=m.vertices.size();indices+=m.indices.size();}
+  require(vertices==260000&&indices==660000,"Dense batching dropped or duplicated stars");
+  const auto before=dense.world.size();
+  dense.world.emplace_back(Line{{0,0},{1,1},{255,255,255,255}});
+  renderer.append_neutral_batch(dense,{1,1},1.f,false,clip,1.f);
+  renderer.append_neutral_batch(dense,{1,1},1.f,false,UiRect{0,0,800,600},1.f);
+  require(dense.world.size()==before+3&&std::holds_alternative<Line>(dense.world[before]),"Batch crossed a layer or clipping boundary");
+}
+
+void compact_large_catalog_keeps_every_system(){
+  NativeGalaxyStarMarkerRenderer renderer;DrawList draw;const UiRect clip{0,0,1920,1080};
+  for(int i=0;i<50000;++i)renderer.append_neutral_batch(draw,{float(i%250)*7,float(i/250)*5},.6f,false,clip,.55f,std::nullopt,true);
+  std::size_t vertices=0,indices=0;
+  for(const auto& command:draw.world){const auto& mesh=std::get<TriangleMesh>(command);validate_triangle_mesh(mesh);vertices+=mesh.vertices.size();indices+=mesh.indices.size();}
+  require(draw.world.size()==4&&vertices==200000&&indices==300000,
+      "Compact 50,000-system map dropped markers or exceeded batch budgets.");
+  const auto& first=std::get<TriangleMesh>(draw.world.front());
+  require(first.vertex_colors.front().a==140&&first.texture_coordinates.front().x>0&&
+      first.texture_coordinates.front().y==.25f,"Compact markers lost dimming or their cropped core.");
+  const auto last_count=std::get<TriangleMesh>(draw.world.back()).vertices.size();
+  renderer.append_neutral_batch(draw,{50,50},2.f,true,clip,1.f,std::nullopt,true);
+  require(std::get<TriangleMesh>(draw.world.back()).vertices.size()==last_count+48,
+      "Selected star lost its full marker and selection halo at low detail.");
+}
+
 } // namespace
 
 int main() try {
@@ -202,6 +256,8 @@ int main() try {
     const auto start=galaxy_star_core_radius(1.,height);
     const auto near=galaxy_star_core_radius(5.,height);
     const auto close=galaxy_star_core_radius(30.,height);
+    const auto detail=galaxy_star_core_radius(10000.,height);
+    require(detail>=height*.25f&&detail<=height*.45f,"Deep map zoom must expose enough surface detail without a screen-filling unbounded sprite");
     require(start>=1.f&&start<=2.5f&&near>start*2.f&&close>near*2.f,"star markers stayed tiny or failed to grow with zoom");
     require(galaxy_star_core_radius(5.,height,GalaxyStarVisualClass::giant)>near*1.5f,"giant marker lost its larger silhouette");
     NativeGalaxyStarMarkerRenderer renderer;DrawList a,b;
@@ -213,6 +269,8 @@ int main() try {
   compact_and_multiplicity_cues();
   hard_budget_and_validation();
   unexplored_alpha_preserves_resources_and_dims_every_component();
+  dense_neutral_batch_preserves_geometry_and_order();
+  compact_large_catalog_keeps_every_system();
   std::cout << "native galaxy star marker tests passed\n";
   return 0;
 } catch (const std::exception &error) {

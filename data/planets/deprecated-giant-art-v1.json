@@ -1,0 +1,1244 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "asset": "P03-02",
+      "material": "p03-02",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P03-03",
+      "material": "p03-03",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P03-18",
+      "material": "p03-18",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P03-20",
+      "material": "p03-20",
+      "baseClass": "gas-giant",
+      "oldSubclass": "cream-cloud-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P03-27",
+      "material": "p03-27",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P09-12",
+      "material": "p09-12",
+      "baseClass": "gas-giant",
+      "oldSubclass": "cream-cloud-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P09-22",
+      "material": "p09-22",
+      "baseClass": "gas-giant",
+      "oldSubclass": "cream-cloud-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P10-02",
+      "material": "p10-02",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-03",
+      "material": "p10-03",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-04",
+      "material": "p10-04",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-05",
+      "material": "p10-05",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-06",
+      "material": "p10-06",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-07",
+      "material": "p10-07",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-09",
+      "material": "p10-09",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-10",
+      "material": "p10-10",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-11",
+      "material": "p10-11",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-12",
+      "material": "p10-12",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-15",
+      "material": "p10-15",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-16",
+      "material": "p10-16",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-19",
+      "material": "p10-19",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-21",
+      "material": "p10-21",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-22",
+      "material": "p10-22",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-23",
+      "material": "p10-23",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-24",
+      "material": "p10-24",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-25",
+      "material": "p10-25",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P10-26",
+      "material": "p10-26",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P11-01",
+      "material": "p11-01",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-02",
+      "material": "p11-02",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-03",
+      "material": "p11-03",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-04",
+      "material": "p11-04",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-05",
+      "material": "p11-05",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-06",
+      "material": "p11-06",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-07",
+      "material": "p11-07",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-08",
+      "material": "p11-08",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-09",
+      "material": "p11-09",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-10",
+      "material": "p11-10",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-11",
+      "material": "p11-11",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-13",
+      "material": "p11-13",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-14",
+      "material": "p11-14",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-15",
+      "material": "p11-15",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-16",
+      "material": "p11-16",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-17",
+      "material": "p11-17",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-18",
+      "material": "p11-18",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-19",
+      "material": "p11-19",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-20",
+      "material": "p11-20",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-21",
+      "material": "p11-21",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-22",
+      "material": "p11-22",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-23",
+      "material": "p11-23",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-24",
+      "material": "p11-24",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-25",
+      "material": "p11-25",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P21-04",
+      "material": "p21-04",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P21-18",
+      "material": "p21-18",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P31-05",
+      "material": "p31-05",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P31-09",
+      "material": "p31-09",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P31-18",
+      "material": "p31-18",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P32-01",
+      "material": "p32-01",
+      "baseClass": "gas-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P33-01",
+      "material": "p33-01",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-02",
+      "material": "p33-02",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-03",
+      "material": "p33-03",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-04",
+      "material": "p33-04",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-05",
+      "material": "p33-05",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-06",
+      "material": "p33-06",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-08",
+      "material": "p33-08",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-10",
+      "material": "p33-10",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-11",
+      "material": "p33-11",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-13",
+      "material": "p33-13",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-16",
+      "material": "p33-16",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-17",
+      "material": "p33-17",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-18",
+      "material": "p33-18",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-19",
+      "material": "p33-19",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P34-01",
+      "material": "p34-01",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-06",
+      "material": "p34-06",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-07",
+      "material": "p34-07",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-11",
+      "material": "p34-11",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-14",
+      "material": "p34-14",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-15",
+      "material": "p34-15",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-16",
+      "material": "p34-16",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-21",
+      "material": "p34-21",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P35-01",
+      "material": "p35-01",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-04",
+      "material": "p35-04",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-05",
+      "material": "p35-05",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-06",
+      "material": "p35-06",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-07",
+      "material": "p35-07",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-08",
+      "material": "p35-08",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-10",
+      "material": "p35-10",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-12",
+      "material": "p35-12",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-13",
+      "material": "p35-13",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-14",
+      "material": "p35-14",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-15",
+      "material": "p35-15",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-16",
+      "material": "p35-16",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-17",
+      "material": "p35-17",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-19",
+      "material": "p35-19",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-20",
+      "material": "p35-20",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-21",
+      "material": "p35-21",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-22",
+      "material": "p35-22",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-23",
+      "material": "p35-23",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-24",
+      "material": "p35-24",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P39-05",
+      "material": "p39-05",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P39-13",
+      "material": "p39-13",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P39-21",
+      "material": "p39-21",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P39-23",
+      "material": "p39-23",
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P40-11",
+      "material": "p40-11",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P40-12",
+      "material": "p40-12",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P40-16",
+      "material": "p40-16",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P40-21",
+      "material": "p40-21",
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P11-12",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P11-26",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "asset": "P21-12",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "asset": "P33-07",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-09",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-12",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-14",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P33-15",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "asset": "P34-02",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-03",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-04",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-05",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-08",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-09",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-10",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-12",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-13",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-17",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-18",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-19",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P34-20",
+      "material": "",
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "asset": "P35-02",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-03",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-09",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-11",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    },
+    {
+      "asset": "P35-18",
+      "material": "",
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    }
+  ],
+  "subclasses": [
+    {
+      "id": "amber-cloud",
+      "name": "Amber Cloud",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-cloud-giant",
+      "name": "Blue Cloud Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "chemical-cloud",
+      "name": "Chemical Cloud",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "copper-ring-giant",
+      "name": "Copper Ring Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": true,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cream-cloud-giant",
+      "name": "Cream Cloud Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "lavender-cloud-giant",
+      "name": "Lavender Cloud Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "pale-ring-giant",
+      "name": "Pale Ring Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": true,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-cloud-giant",
+      "name": "Blue Cloud Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        230
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-ring-giant",
+      "name": "Blue Ring Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        230
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": true,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    }
+  ],
+  "migration": [
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "amber-cloud",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "chemical-cloud",
+      "newSubclass": "cream-band"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "copper-ring-giant",
+      "newSubclass": "amber-storm"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "cream-cloud-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "lavender-cloud-giant",
+      "newSubclass": "blue-mist"
+    },
+    {
+      "baseClass": "gas-giant",
+      "oldSubclass": "pale-ring-giant",
+      "newSubclass": "cream-band"
+    },
+    {
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-cloud-giant",
+      "newSubclass": "deep-azure"
+    },
+    {
+      "baseClass": "ice-giant",
+      "oldSubclass": "blue-ring-giant",
+      "newSubclass": "cyan-haze"
+    }
+  ]
+}

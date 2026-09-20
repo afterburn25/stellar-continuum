@@ -17,7 +17,6 @@ from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
-from native_surface_art_assets import NATIVE_SURFACE_ART_SOURCES
 from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
 from native_research_assets import native_research_asset_files
 from native_research_runtime import validate_native_research_export
@@ -135,6 +134,11 @@ class NativeClientDependencyTests(unittest.TestCase):
             celestial_records[key] = {"source": source, "runtimePath": runtime_path,
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.celestial_declaration = self.root / "export/native-celestial-assets.json"
+        small_body_manifest=json.loads((exporter.ROOT/"export/native-small-body-assets.json").read_text())
+        for record in small_body_manifest['assets']:
+            asset=fixture_asset(record['source'],'small body')
+            record['sha256']=hashlib.sha256(asset.read_bytes()).hexdigest()
+        (self.root/'export/native-small-body-assets.json').write_text(json.dumps(small_body_manifest))
         self.celestial_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": celestial_records}))
 
         species_records = {}
@@ -158,6 +162,18 @@ class NativeClientDependencyTests(unittest.TestCase):
                                         "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.galaxy_art_declaration = self.root / "export/native-galaxy-art-assets.json"
         self.galaxy_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":galaxy_art_records}))
+        # Tiny deterministic PNG-header fixtures exercise the same manifest
+        # validation without duplicating the 48 full-resolution originals.
+        phenomenon_manifest = json.loads((Path(__file__).resolve().parents[2] / "data/stellar/phenomenon-art-v1.json").read_text())
+        for asset in phenomenon_manifest["assets"]:
+            path = self.root / asset["path"]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8 + struct.pack(">II", *asset["dimensions"]) + asset["filename"].encode()
+            path.write_bytes(payload)
+            asset["sha256"] = hashlib.sha256(payload).hexdigest()
+        manifest_path = self.root / "data/stellar/phenomenon-art-v1.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(phenomenon_manifest))
         ship_art_records = {}
         for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
             asset = fixture_asset(source, "ship art " + key)
@@ -173,14 +189,6 @@ class NativeClientDependencyTests(unittest.TestCase):
                                   "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.audio_declaration = self.root / "export/native-audio-assets.json"
         self.audio_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": audio_records}))
-        surface_art_records = {}
-        for key, (source, destination) in NATIVE_SURFACE_ART_SOURCES.items():
-            asset = fixture_asset(source, "surface art " + key)
-            surface_art_records[key] = {"source": source, "runtimePath": destination,
-                                        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
-        self.surface_art_declaration = self.root / "export/native-surface-art-assets.json"
-        self.surface_art_declaration.write_text(json.dumps({"schemaVersion": 1, "assets": surface_art_records}))
-
         navigation_records = {}
         for key, (source, destination) in NATIVE_NAVIGATION_SOURCES.items():
             record = {"source": source, "runtimePath": destination}
@@ -254,6 +262,22 @@ class NativeClientDependencyTests(unittest.TestCase):
     def test_missing_research_art_blocks_package(self):
         (self.root / "assets/visual/catalog/portraits/research-energy.png").unlink()
         with self.assertRaisesRegex(RuntimeError, "Missing or duplicate research artwork"):
+            self.copy()
+
+    def test_planetary_workspace_images_are_packaged(self):
+        metadata = self.copy()
+        for path in ("assets/visual/sol/earth-map.jpg",
+                     "assets/visual/sol/earth-night-map.jpg",
+                     "assets/visual/sol/earth-clouds.jpg",
+                     "assets/visual/planetary/building-portraits-v1.png",
+                     "assets/visual/planetary/colony-panorama-v1.png"):
+            with self.subTest(path=path):
+                self.assertIn(path, metadata["requiredFiles"])
+                self.assertEqual((self.output / path).read_bytes(), (self.root / path).read_bytes())
+
+    def test_missing_planetary_image_blocks_package(self):
+        (self.root / "assets/visual/planetary/building-portraits-v1.png").unlink()
+        with self.assertRaisesRegex(RuntimeError, "Missing native celestial"):
             self.copy()
 
     def test_missing_stellar_art_blocks_package(self):
@@ -413,7 +437,7 @@ class NativeClientDependencyTests(unittest.TestCase):
         for field in ("source", "runtimePath"):
             with self.subTest(field=field):
                 declaration = json.loads(original)
-                declaration["assets"]["deep-field-v2"][field] = "../outside.png"
+                declaration["assets"]["deep-field-v3"][field] = "../outside.png"
                 self.galaxy_art_declaration.write_text(json.dumps(declaration))
                 with self.assertRaisesRegex(RuntimeError, "Unreviewed native galaxy art"):
                     self.copy()
@@ -427,7 +451,7 @@ class NativeClientDependencyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Unsupported native galaxy art"):
             self.copy()
         declaration = json.loads(original)
-        declaration["assets"]["extra"] = declaration["assets"]["deep-field-v2"]
+        declaration["assets"]["extra"] = declaration["assets"]["deep-field-v3"]
         self.galaxy_art_declaration.write_text(json.dumps(declaration))
         with self.assertRaisesRegex(RuntimeError, "set differs from reviewed content"):
             self.copy()

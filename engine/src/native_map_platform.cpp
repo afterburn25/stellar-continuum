@@ -1,5 +1,7 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
+#include "native_scene3d_gpu.hpp"
 #include <stellar/engine/windows_resource_ids.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
@@ -177,12 +179,13 @@ struct Window::Storage {
   static constexpr std::size_t text_cache_capacity=640,text_cache_byte_capacity=32u*1024u*1024u;
   struct CachedImage {std::shared_ptr<const RgbaImage> owner;SDL_Texture *texture{};std::size_t resident_bytes{};std::uint64_t last_use{};};
   SDL_Window *window{};SDL_GPUDevice *device{};SDL_Renderer *renderer{};HDC text_dc{};
-  std::filesystem::path private_font_path;bool private_font_added{};
+  std::vector<std::uint8_t> private_font_bytes;HANDLE private_font_handle{};
   std::vector<SDL_Vertex> triangle_vertices;
   std::unordered_map<int,HFONT> fonts;std::unordered_map<TextKey,CachedText,TextKeyHash> text_cache;std::size_t text_cache_bytes{};std::uint64_t text_use{};
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::filesystem::path screenshot_directory;std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   SDL_Texture* scene_target{};
+  std::unique_ptr<Scene3DRenderer> scene3d;
   int scene_width{},scene_height{},scene_percent{100},scene_samples{1};
   void prepare_scene_target(int percent,int samples) {
     if(percent==100&&samples==1){if(scene_target)SDL_DestroyTexture(scene_target);scene_target=nullptr;scene_width=scene_height=0;return;}
@@ -198,11 +201,12 @@ struct Window::Storage {
     if(scene_target)SDL_DestroyTexture(scene_target);scene_target=next;scene_width=w;scene_height=h;
   }
   ~Storage(){
+    scene3d.reset();
     if(scene_target)SDL_DestroyTexture(scene_target);
     for(auto &[key,cached]:image_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(const auto &[size,font_value]:fonts){(void)size;if(font_value)DeleteObject(font_value);}
-    if(text_dc)DeleteDC(text_dc);if(private_font_added)RemoveFontResourceExW(private_font_path.c_str(),FR_PRIVATE,nullptr);
+    if(text_dc)DeleteDC(text_dc);if(private_font_handle)RemoveFontMemResourceEx(private_font_handle);
     if(renderer)SDL_DestroyRenderer(renderer);if(device)SDL_DestroyGPUDevice(device);if(window)SDL_DestroyWindow(window);if(initialized)SDL_Quit();
   }
   [[nodiscard]] HFONT font(int pixel_size,FontFace role){
@@ -247,19 +251,21 @@ struct Window::Storage {
   [[nodiscard]] CachedImage &image(const std::shared_ptr<const RgbaImage> &resource){
     if(!resource)throw std::invalid_argument("An image command requires an RGBA resource.");
     if(const auto found=image_cache.find(resource.get());found!=image_cache.end()){found->second.last_use=++image_use;return found->second;}
-    const auto bytes=resource->byte_size();if(bytes>maximum_image_cache_resident_bytes-bytes)throw std::length_error("An image exceeds the texture-cache resident limit.");const auto resident=bytes*2u;evict_images(resident);
+    const auto bytes=resource->byte_size(),gpu_bytes=resource->pixels().size();
+    if(bytes>maximum_image_cache_resident_bytes||gpu_bytes>maximum_image_cache_resident_bytes-bytes)throw std::length_error("An image exceeds the texture-cache resident limit.");
+    const auto resident=bytes+gpu_bytes;evict_images(resident);
     auto *texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,resource->width(),resource->height());if(!texture)throw sdl_error("SDL image texture creation failed");
     try{require(SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND),"SDL image blend setup failed");require(SDL_SetTextureScaleMode(texture,SDL_SCALEMODE_LINEAR),"SDL image scale setup failed");require(SDL_UpdateTexture(texture,nullptr,resource->pixels().data(),resource->width()*4),"SDL image texture upload failed");}catch(...){SDL_DestroyTexture(texture);throw;}
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> owner(texture,SDL_DestroyTexture);auto [inserted,ok]=image_cache.emplace(resource.get(),CachedImage{resource,texture,resident,++image_use});if(!ok)throw std::logic_error("Duplicate image cache key.");(void)owner.release();image_cache_resident_bytes+=resident;++image_uploads;return inserted->second;
   }
   void draw_text(const Text &label){
-    if(label.value.empty())return;if(!std::isfinite(label.at.x)||!std::isfinite(label.at.y)||(label.clip&&!valid_clip(*label.clip)))throw std::invalid_argument("UI text bounds must be finite and within the drawable range.");auto &cached=text(label);require(SDL_SetTextureColorMod(cached.texture,label.color.r,label.color.g,label.color.b),"SDL text color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,label.color.a),"SDL text alpha modulation failed");float x=label.at.x;if(label.align==TextAlign::Center)x-=static_cast<float>(cached.width)*.5f;else if(label.align==TextAlign::Right)x-=static_cast<float>(cached.width);const SDL_FRect destination{x,label.at.y,static_cast<float>(cached.width),static_cast<float>(cached.height)};
+    if(label.value.empty())return;if(!std::isfinite(label.rotation_degrees))throw std::invalid_argument("Text rotation must be finite.");if(!std::isfinite(label.at.x)||!std::isfinite(label.at.y)||(label.clip&&!valid_clip(*label.clip)))throw std::invalid_argument("UI text bounds must be finite and within the drawable range.");auto &cached=text(label);require(SDL_SetTextureColorMod(cached.texture,label.color.r,label.color.g,label.color.b),"SDL text color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,label.color.a),"SDL text alpha modulation failed");float x=label.at.x;if(label.align==TextAlign::Center)x-=static_cast<float>(cached.width)*.5f;else if(label.align==TextAlign::Right)x-=static_cast<float>(cached.width);const SDL_FRect destination{x,label.at.y,static_cast<float>(cached.width),static_cast<float>(cached.height)};
     if(label.clip){const SDL_Rect clip{static_cast<int>(std::floor(label.clip->x)),static_cast<int>(std::floor(label.clip->y)),static_cast<int>(std::ceil(label.clip->width)),static_cast<int>(std::ceil(label.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL text clip setup failed");}
-    const auto rendered=SDL_RenderTexture(renderer,cached.texture,nullptr,&destination);if(label.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL text clip reset failed");require(rendered,"SDL cached text draw failed");
+    const auto rendered=label.rotation_degrees==0.f?SDL_RenderTexture(renderer,cached.texture,nullptr,&destination):SDL_RenderTextureRotated(renderer,cached.texture,nullptr,&destination,std::fmod(static_cast<double>(label.rotation_degrees),360.),nullptr,SDL_FLIP_NONE);if(label.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL text clip reset failed");require(rendered,"SDL cached text draw failed");
   }
   void draw_image(const Image &command){
     if(!std::isfinite(command.rotation_degrees))throw std::invalid_argument("Image rotation must be finite.");
-    if(!valid_positive_rect(command.destination)||(command.clip&&!valid_clip(*command.clip)))throw std::invalid_argument("Image destination and clip bounds must be finite and within the drawable range.");
+    if(!valid_positive_rect(command.destination)||(command.clip&&!valid_clip(*command.clip)))throw std::invalid_argument("Image destination and clip bounds must be finite and within the drawable range. Destination: "+std::to_string(command.destination.x)+", "+std::to_string(command.destination.y)+", "+std::to_string(command.destination.width)+", "+std::to_string(command.destination.height));
     if(!command.resource)throw std::invalid_argument("An image command requires an RGBA resource.");std::optional<SDL_FRect> source;
     if(command.source){const auto value=*command.source;if(!valid_positive_rect(value)||value.x<0.f||value.y<0.f||value.x+value.width>static_cast<float>(command.resource->width())||value.y+value.height>static_cast<float>(command.resource->height()))throw std::invalid_argument("Image source bounds must be finite and inside the resource.");source=sdl_rect(value);}
     auto &cached=image(command.resource);
@@ -279,8 +285,12 @@ struct Window::Storage {
     triangle_vertices.resize(mesh.vertices.size());
     const SDL_FColor color{mesh.color.r / 255.f, mesh.color.g / 255.f,
                            mesh.color.b / 255.f, mesh.color.a / 255.f};
-    for (std::size_t i = 0; i < mesh.vertices.size(); ++i)
-      triangle_vertices[i] = {{mesh.vertices[i].x, mesh.vertices[i].y}, color, {0.f, 0.f}};
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i){
+      auto tint=color;
+      if(!mesh.vertex_colors.empty()){const auto c=mesh.vertex_colors[i];tint={c.r/255.f,c.g/255.f,c.b/255.f,c.a/255.f};}
+      const auto uv=mesh.texture_coordinates.empty()?Point{}:mesh.texture_coordinates[i];
+      triangle_vertices[i] = {{mesh.vertices[i].x, mesh.vertices[i].y}, tint, {uv.x, uv.y}};
+    }
     if (mesh.clip) {
       const auto left = static_cast<int>(std::floor(mesh.clip->x));
       const auto top = static_cast<int>(std::floor(mesh.clip->y));
@@ -289,7 +299,8 @@ struct Window::Storage {
           static_cast<int>(std::ceil(mesh.clip->y + mesh.clip->height)) - top};
       require(SDL_SetRenderClipRect(renderer, &clip), "SDL triangle clip setup failed");
     }
-    const auto rendered = SDL_RenderGeometry(renderer, nullptr,
+    SDL_Texture* texture=mesh.texture?image(mesh.texture).texture:nullptr;
+    const auto rendered = SDL_RenderGeometry(renderer, texture,
         triangle_vertices.data(), static_cast<int>(triangle_vertices.size()),
         mesh.indices.data(), static_cast<int>(mesh.indices.size()));
     // Restore clip before propagating a submission failure to the entry point.
@@ -308,7 +319,7 @@ Window::Window(std::string title,int width,int height,bool fullscreen,std::files
     SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL,icon_id.c_str(),SDL_HINT_OVERRIDE);
   }
   auto candidate=std::make_unique<Storage>();require(SDL_Init(SDL_INIT_VIDEO),"SDL video initialization failed");candidate->initialized=true;const auto flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY|(fullscreen?SDL_WINDOW_FULLSCREEN:0);candidate->window=SDL_CreateWindow(title.c_str(),width,height,flags);if(!candidate->window)throw sdl_error("SDL window creation failed");candidate->device=SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,false,"vulkan");if(!candidate->device)throw sdl_error("Vulkan SDL GPU device creation failed");const char *driver=SDL_GetGPUDeviceDriver(candidate->device);if(!driver||std::string(driver)!="vulkan")throw std::runtime_error("Vulkan SDL GPU device creation returned an unexpected backend");candidate->renderer=SDL_CreateGPURenderer(candidate->device,candidate->window);if(!candidate->renderer)throw sdl_error("Vulkan SDL GPU renderer creation failed");require(SDL_SetRenderDrawBlendMode(candidate->renderer,SDL_BLENDMODE_BLEND),"SDL renderer blend setup failed");
-  candidate->text_dc=CreateCompatibleDC(nullptr);if(!candidate->text_dc)throw std::runtime_error("Windows text device creation failed.");if(font_path.empty())throw std::invalid_argument("A bundled native UI font path is required.");candidate->private_font_path=std::filesystem::absolute(std::move(font_path));candidate->private_font_added=AddFontResourceExW(candidate->private_font_path.c_str(),FR_PRIVATE,nullptr)>0;if(!candidate->private_font_added)throw std::runtime_error("Bundled Rajdhani font could not be loaded.");
+  candidate->text_dc=CreateCompatibleDC(nullptr);if(!candidate->text_dc)throw std::runtime_error("Windows text device creation failed.");if(font_path.empty())throw std::invalid_argument("A bundled native UI font path is required.");candidate->private_font_bytes=stellar::engine::read_resource(font_path,16u*1024u*1024u);DWORD added_fonts=0;candidate->private_font_handle=AddFontMemResourceEx(candidate->private_font_bytes.data(),static_cast<DWORD>(candidate->private_font_bytes.size()),nullptr,&added_fonts);if(!candidate->private_font_handle)throw std::runtime_error("Bundled Rajdhani font could not be loaded.");
   candidate->vsync=SDL_SetRenderVSync(candidate->renderer,1);if(!candidate->vsync){const std::string reason=SDL_GetError();float refresh=60.f;const auto display=SDL_GetDisplayForWindow(candidate->window);if(display){if(const auto *mode=SDL_GetDesktopDisplayMode(display);mode&&mode->refresh_rate>1.f)refresh=mode->refresh_rate;}candidate->fallback_interval_ns=static_cast<Uint64>(1000000000./static_cast<double>(refresh));SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,"Renderer VSync unavailable (%s); pacing presents at %.2f Hz",reason.c_str(),static_cast<double>(refresh));}
   require(SDL_GetCurrentRenderOutputSize(candidate->renderer,&candidate->width,&candidate->height),"SDL drawable pixel query failed");const auto window_flags=SDL_GetWindowFlags(candidate->window);candidate->focused=(window_flags&SDL_WINDOW_INPUT_FOCUS)!=0;candidate->minimized=(window_flags&SDL_WINDOW_MINIMIZED)!=0;storage_=candidate.release();
 }
@@ -318,9 +329,11 @@ InputSnapshot Window::poll(){
   while(SDL_PollEvent(&event)){switch(event.type){
     case SDL_EVENT_QUIT:input.quit_requested=true;break;
     case SDL_EVENT_KEY_DOWN:if(!event.key.repeat){
-      if(event.key.key==SDLK_F12||event.key.key==SDLK_PRINTSCREEN){
+      if(event.key.key==SDLK_F12&&(event.key.mod&SDL_KMOD_CTRL)&&(event.key.mod&SDL_KMOD_SHIFT)){
+        input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key),true,true,(event.key.mod&SDL_KMOD_ALT)!=0});
+      }else if(event.key.key==SDLK_F12||event.key.key==SDLK_PRINTSCREEN){
         if(!storage_->player_screenshot)try{storage_->player_screenshot=player_screenshot_path(++storage_->screenshot_serial,storage_->screenshot_directory);storage_->screenshot_status="Saving screenshot...";storage_->screenshot_status_until_ns=SDL_GetTicksNS()+4000000000ull;}catch(const std::exception& error){storage_->screenshot_status=std::string("Screenshot failed: ")+error.what();storage_->screenshot_status_until_ns=SDL_GetTicksNS()+5000000000ull;}
-      }else if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key)});
+      }else if(event.key.key==SDLK_ESCAPE)input.events.push_back({InputEventType::EscapePressed,storage_->pointer,{}});else if(event.key.key==SDLK_BACKSPACE)input.events.push_back({InputEventType::BackspacePressed,storage_->pointer,{}});else input.events.push_back({InputEventType::KeyPressed,storage_->pointer,{},0.f,{},0,static_cast<std::uint32_t>(event.key.key),(event.key.mod&SDL_KMOD_CTRL)!=0,(event.key.mod&SDL_KMOD_SHIFT)!=0,(event.key.mod&SDL_KMOD_ALT)!=0});
     }break;
     case SDL_EVENT_TEXT_INPUT:if(storage_->text_input_requested&&event.text.text)input.events.push_back({InputEventType::TextEntered,storage_->pointer,{},0.f,event.text.text});break;
     case SDL_EVENT_MOUSE_MOTION:{const auto prior=storage_->pointer;storage_->pointer=convert(event.motion.x,event.motion.y);input.events.push_back({InputEventType::PointerMove,storage_->pointer,{storage_->pointer.x-prior.x,storage_->pointer.y-prior.y}});break;}
@@ -540,6 +553,9 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   if(timing)*timing={};
   const auto elapsed_ms=[](const auto started){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();};
   const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
+  const auto has_3d=[](const auto& commands){return std::any_of(commands.begin(),commands.end(),[](const auto& c){return std::holds_alternative<Scene3DView>(c);});};
+  if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay)))storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
+  if(storage_->scene3d)storage_->scene3d->prepare(draw_list);
   const auto draw_line=[&](const Line &line){
     if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");
     const float dx=line.to.x-line.from.x,dy=line.to.y-line.from.y,length=std::hypot(dx,dy);
@@ -567,7 +583,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   }
   if(storage_->scene_target){require(SDL_SetRenderTarget(storage_->renderer,storage_->scene_target),"Scene target failed");require(SDL_SetRenderScale(storage_->renderer,static_cast<float>(storage_->scene_width)/storage_->width,static_cast<float>(storage_->scene_height)/storage_->height),"Scene scaling failed");}
   require(SDL_SetRenderDrawColor(storage_->renderer,5,9,19,255),"SDL clear color failed");require(SDL_RenderClear(storage_->renderer),"SDL render clear failed");for(const auto &line:draw_list.lines)draw_line(line);for(const auto &circle:draw_list.circles)draw_circle(circle);for(const auto &label:draw_list.text)storage_->draw_text(label);
-  for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else storage_->draw_image(value);},command);}
+  for(const auto &command:draw_list.world){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Circle>)draw_circle(value);else if constexpr(std::is_same_v<Value,Text>)storage_->draw_text(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,Scene3DView>)storage_->scene3d->composite(value);else storage_->draw_triangle_mesh(value);},command);}
   if(storage_->scene_target){
     require(SDL_SetRenderTarget(storage_->renderer,nullptr),"Scene resolve target failed");
     require(SDL_SetRenderScale(storage_->renderer,1.f,1.f),"Native UI scale reset failed");
@@ -575,7 +591,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
     const SDL_FRect full{0,0,static_cast<float>(storage_->width),static_cast<float>(storage_->height)};
     require(SDL_RenderTexture(storage_->renderer,storage_->scene_target,nullptr,&full),"Scene quality resolve failed");
   }
-  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else storage_->draw_text(value);},command);}
+  for(const auto &command:draw_list.overlay){std::visit([&](const auto &value){using Value=std::decay_t<decltype(value)>;if constexpr(std::is_same_v<Value,FilledRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel fill bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel fill color failed");require(SDL_RenderFillRect(storage_->renderer,&bounds),"SDL panel fill failed");}else if constexpr(std::is_same_v<Value,StrokedRectangle>){if(!valid_clip(value.bounds))throw std::invalid_argument("Panel stroke bounds must be finite.");const auto bounds=sdl_rect(value.bounds);require(SDL_SetRenderDrawColor(storage_->renderer,value.color.r,value.color.g,value.color.b,value.color.a),"SDL panel stroke color failed");require(SDL_RenderRect(storage_->renderer,&bounds),"SDL panel stroke failed");}else if constexpr(std::is_same_v<Value,Line>)draw_line(value);else if constexpr(std::is_same_v<Value,Image>)storage_->draw_image(value);else if constexpr(std::is_same_v<Value,TriangleMesh>)storage_->draw_triangle_mesh(value);else if constexpr(std::is_same_v<Value,Scene3DView>)storage_->scene3d->composite(value);else storage_->draw_text(value);},command);}
   if(timing)timing->submission_ms=elapsed_ms(*submission_started);
   const bool player_capture=!screenshot&&storage_->player_screenshot.has_value();
   const auto capture=screenshot?screenshot:storage_->player_screenshot;
@@ -615,4 +631,6 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
 int Window::drawable_width()const noexcept{return storage_->width;}int Window::drawable_height()const noexcept{return storage_->height;}std::string Window::gpu_driver()const{const char *driver=SDL_GetGPUDeviceDriver(storage_->device);if(!driver)throw sdl_error("SDL GPU driver query failed");return driver;}std::string Window::presentation_mode()const{return storage_->vsync?"vsync":storage_->fallback_interval_ns?"display-refresh-fallback":storage_->frame_cap_interval_ns?"frame-cap":"unbounded";}
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
 std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
+Scene3DStatistics Window::scene3d_statistics()const noexcept{return storage_->scene3d?storage_->scene3d->statistics():Scene3DStatistics{};}
 } // namespace stellar::native_map
+

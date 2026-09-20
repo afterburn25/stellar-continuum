@@ -29,7 +29,7 @@ constexpr float degrees_to_radians = .01745329251994329577f;
 [[nodiscard]] bool valid_world_point(MassivePoint value) noexcept {
   return std::isfinite(value.x) && std::isfinite(value.y) &&
          std::abs(value.x) <= maximum_world_coordinate &&
-         std::abs(value.y) <= maximum_world_coordinate;
+         std::abs(value.y) <= maximum_world_coordinate && std::isfinite(value.z) && std::abs(value.z)<=maximum_world_coordinate;
 }
 
 // Reference palette (VisualPalette).
@@ -502,7 +502,7 @@ Point NativeBattleWorkspace::to_screen(const MassivePoint value, int width,
   const auto cx=camera_initialized_?next_center.x+camera_center_.x-previous_center.x:next_center.x;
   const auto cy=camera_initialized_?next_center.y+camera_center_.y-previous_center.y:next_center.y;
   return {cx + (value.x - world_center_.x) * zoom_,
-          cy + (value.y - world_center_.y) * zoom_};
+          cy + (value.y - world_center_.y - .35f * value.z) * zoom_};
 }
 MassivePoint
 NativeBattleWorkspace::to_world(const Point value, int width,
@@ -588,8 +588,8 @@ void NativeBattleWorkspace::fit(int width, int height) noexcept {
     found=true;
     min_x = std::min(min_x, formation.position.x);
     max_x = std::max(max_x, formation.position.x);
-    min_y = std::min(min_y, formation.position.y);
-    max_y = std::max(max_y, formation.position.y);
+    min_y = std::min(min_y, formation.position.y-.35f*formation.position.z);
+    max_y = std::max(max_y, formation.position.y-.35f*formation.position.z);
   }
   if(!found){world_center_={};zoom_=1.f;camera_center_=battlefield_center(width,height);camera_viewport_width_=width;camera_viewport_height_=height;camera_initialized_=true;return;}
   world_center_ = {(min_x + max_x) * .5f, (min_y + max_y) * .5f};
@@ -628,7 +628,7 @@ void NativeBattleWorkspace::issue_context(const Point point, int width,
   const auto hit = hit_formation(point, width, height);
   for (const auto source : selected) { MassiveCombatOrder order; order.formation_id=source;
     if (hit && *hit != source) { order.type=MassiveCombatOrderType::Engage; order.target_formation_id=*hit; }
-    else { const auto objective=to_world(point,width,height);if(!valid_world_point(objective))continue;order.type=MassiveCombatOrderType::Advance; order.objective=objective; }
+    else { auto objective=to_world(point,width,height);const auto current=std::ranges::find(snapshot_->formations,source,&MassiveObservedFormation::formation_id);if(current!=snapshot_->formations.end()){objective.z=current->position.z;objective.y+=.35f*objective.z;}if(!valid_world_point(objective))continue;order.type=MassiveCombatOrderType::Advance; order.objective=objective; }
     command.orders.push_back(std::move(order)); }
   if(!command.orders.empty())command.kind=BattleWorkspaceCommandKind::IssueOrder;
 }
@@ -673,6 +673,16 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
   if (event.type == InputEventType::Wheel) {
     if(!std::isfinite(event.wheel_y)||event.wheel_y==0.f||
        on_chrome(event.position,layout))return command;
+    if(event.alt){
+      for(const auto id:selected_owned()){
+        const auto formation=std::ranges::find(snapshot_->formations,id,&MassiveObservedFormation::formation_id);
+        if(formation==snapshot_->formations.end())continue;
+        auto objective=formation->position;objective.z=std::clamp(objective.z+(event.wheel_y>0?100.f:-100.f),-10000.f,10000.f);
+        command.orders.push_back({id,MassiveCombatOrderType::Advance,std::nullopt,objective,std::nullopt});
+      }
+      if(!command.orders.empty()){command.kind=BattleWorkspaceCommandKind::IssueOrder;set_status("Changing formation depth.");}
+      return command;
+    }
     const auto factor = event.wheel_y > 0.f ? 1.25f : 1.f / 1.25f;
     const auto before = to_world(event.position, width, height);
     zoom_ = std::clamp(zoom_ * factor, minimum_zoom, maximum_zoom);
@@ -783,7 +793,9 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
       if (hit && *hit != source)
         order.target_formation_id = *hit;
       else {
-        const auto objective=to_world(event.position,width,height);
+        auto objective=to_world(event.position,width,height);
+        const auto current=std::ranges::find(snapshot_->formations,source,&MassiveObservedFormation::formation_id);
+        if(current!=snapshot_->formations.end()){objective.z=current->position.z;objective.y+=.35f*objective.z;}
         if(!valid_world_point(objective))return command;
         order.objective=objective;
       }
@@ -1208,6 +1220,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
         }
       summary += " · " + grouped(low) +
                  (exact ? " ships" : "-" + grouped(high) + " estimated ships");
+      summary += " · Alt + wheel to change depth";
     }
     text(out, {layout.selection_summary.x, layout.selection_summary.y},
          summary, text_secondary, layout.body_font_pixels);

@@ -1,4 +1,5 @@
 #include "native_planet_disc_assets.hpp"
+#include "native_planet_surface_assets.hpp"
 
 #include <stellar/engine/native_image_preparation.hpp>
 
@@ -21,16 +22,6 @@ using stellar::native_map::RgbaImage;
 using stellar::native_system::NativeSystemBodyVisualClass;
 struct FloatColor {float r{},g{},b{},a{1.f};};
 struct Vector3 {float x{},y{},z{};};
-struct SourceDisc {float center_x{},center_y{},radius_x{},radius_y{};};
-
-[[nodiscard]] std::optional<SourceDisc> source_disc(std::string_view key){
-  if(key=="earth")return SourceDisc{.5280f,.5836f,.1851f,.1968f};
-  if(key=="mercury")return SourceDisc{.5f,.5f,.454f,.454f};
-  if(key=="uranus")return SourceDisc{.25f,.501f,.176f,.352f};
-  if(key=="moon")return SourceDisc{.529f,.503f,.398f,.398f};
-  if(key=="venus")return SourceDisc{.5f,.5f,.414f,.426f};
-  return std::nullopt;
-}
 [[nodiscard]] bool canonical_key(std::string_view key){
   static constexpr std::array keys{"mercury","venus","earth","mars","jupiter","saturn","uranus","neptune","moon"};
   return std::ranges::find(keys,key)!=keys.end();
@@ -62,12 +53,19 @@ struct SourceDisc {float center_x{},center_y{},radius_x{},radius_y{};};
   return lerp(lerp(pixel(x0,y0),pixel(x1,y0),tx),lerp(pixel(x0,y1),pixel(x1,y1),tx),ty);
 }
 [[nodiscard]] std::uint8_t channel(float value){return static_cast<std::uint8_t>(std::lround(std::clamp(value,0.f,1.f)*255.f));}
-[[nodiscard]] std::shared_ptr<const RgbaImage> generate_disc(const SystemBodyAppearance &appearance,const RgbaImage *source,std::optional<SourceDisc> crop,int lighting_step){
+[[nodiscard]] std::shared_ptr<const RgbaImage> generate_disc(const SystemBodyAppearance &appearance,const RgbaImage *source,int lighting_step){
   const auto resolution=source?source_planet_disc_resolution:procedural_planet_disc_resolution;std::vector<std::uint8_t> pixels(static_cast<std::size_t>(resolution)*resolution*4u);const auto angle=static_cast<float>(lighting_step)/4096.f;float light_x=std::cos(angle)*.85f,light_y=std::sin(angle)*.85f,light_z=.53f;const auto light_length=std::sqrt(light_x*light_x+light_y*light_y+light_z*light_z);light_x/=light_length;light_y/=light_length;light_z/=light_length;const auto base=class_color(appearance.visual_class);const auto surface_seed=(appearance.deterministic_seed&255u)*.137f;const auto edge=2.16f/static_cast<float>(resolution);
   for(int y=0;y<resolution;++y)for(int x=0;x<resolution;++x){const auto px=((x+.5f)/resolution-.5f)*2.f*1.08f,py=((y+.5f)/resolution-.5f)*2.f*1.08f;const auto radius=std::hypot(px,py);auto coverage=1.f-smoothstep(1.f-edge,1.f+edge,radius);if(coverage<=0.f)continue;const auto divisor=std::max(1.f,radius),nx=px/divisor,ny=py/divisor,nz=std::sqrt(std::max(0.f,1.f-nx*nx-ny*ny));auto color=base;
-    if(source){float u{},v{};if(crop){const auto safe_x=std::max(.001f,crop->radius_x-.5f/source->width()),safe_y=std::max(.001f,crop->radius_y-.5f/source->height());u=crop->center_x+nx*safe_x;v=crop->center_y+ny*safe_y;}else{u=.5f+std::atan2(nx,nz)/(2.f*std::numbers::pi_v<float>);v=.5f+std::asin(std::clamp(ny,-1.f,1.f))/std::numbers::pi_v<float>;}color=sample(*source,u,v,!crop);coverage*=color.a;
+    if(source){
+      const auto pose=planet_presentation_pose(appearance.texture_key.value_or(""));
+      const float rx=nx*std::cos(pose.roll)-ny*std::sin(pose.roll),ry=-nx*std::sin(pose.roll)-ny*std::cos(pose.roll);
+      const float ly=ry*std::cos(pose.pitch)+nz*std::sin(pose.pitch),lz=nz*std::cos(pose.pitch)-ry*std::sin(pose.pitch);
+      const float lx=rx*std::cos(pose.yaw)+lz*std::sin(pose.yaw),zz=lz*std::cos(pose.yaw)-rx*std::sin(pose.yaw);
+      const float u=.5f+std::atan2(lx,zz)/(2.f*std::numbers::pi_v<float>),v=.5f-std::asin(std::clamp(ly,-1.f,1.f))/std::numbers::pi_v<float>;
+      color=sample(*source,u,v,true);coverage*=color.a;
+
     }else{const Vector3 normal{nx,ny,nz};float variation{};if(appearance.visual_class==NativeSystemBodyVisualClass::gas_giant||appearance.visual_class==NativeSystemBodyVisualClass::ice_giant){const auto drift=value_noise({normal.x*5.f+surface_seed,normal.y*5.f+surface_seed,normal.z*5.f+surface_seed},surface_seed)*7.f;variation=.72f+.28f*std::sin(normal.y*65.f+drift);}else{variation=terrain_variation(normal,surface_seed);if(appearance.visual_class==NativeSystemBodyVisualClass::oceanic)variation=std::lerp(.82f,variation,.42f);}color.r*=variation;color.g*=variation;color.b*=variation;}
-    if(!crop){const auto incidence=nx*light_x+ny*light_y+nz*light_z,daylight=smoothstep(-.10f,.16f,incidence),illumination=.025f+daylight*(.17f+std::max(incidence,0.f)*.91f);color.r*=illumination;color.g*=illumination;color.b*=illumination;}
+    {const auto incidence=nx*light_x+ny*light_y+nz*light_z,daylight=smoothstep(-.10f,.16f,incidence),illumination=.025f+daylight*(.17f+std::max(incidence,0.f)*.91f);color.r*=illumination;color.g*=illumination;color.b*=illumination;}
     const auto index=(static_cast<std::size_t>(y)*resolution+static_cast<std::size_t>(x))*4u;pixels[index]=channel(color.r);pixels[index+1]=channel(color.g);pixels[index+2]=channel(color.b);pixels[index+3]=channel(coverage);
   }
   return RgbaImage::create(resolution,resolution,std::move(pixels));
@@ -96,8 +94,15 @@ void validate(const SystemBodyAppearance &appearance){
 }
 int lighting_step_for(const SystemBodyAppearance &appearance){return static_cast<int>(std::lround(std::remainder(appearance.lighting_longitude,2.f*std::numbers::pi_v<float>)*4096.f));}
 std::shared_ptr<const RgbaImage> prepare_disc(SystemBodyAppearance appearance,std::filesystem::path root,int lighting_step){
-  std::shared_ptr<const RgbaImage> source;if(appearance.texture_key){const auto path=root/(*appearance.texture_key+".jpg");try{source=stellar::native_map::decode_rgba_image(path);}catch(const std::exception &error){const auto value=path.u8string();throw std::runtime_error("Planet appearance asset failed to decode: "+std::string(reinterpret_cast<const char*>(value.data()),value.size())+": "+error.what());}}
-  return generate_disc(appearance,source.get(),appearance.texture_key?source_disc(*appearance.texture_key):std::nullopt,lighting_step);
+  std::shared_ptr<const RgbaImage> source;
+  if(appearance.texture_key){
+    const auto index=planet_surface_asset_index(*appearance.texture_key,0);
+    if(!index)throw std::invalid_argument("Missing approved planet surface map");
+    const auto path=root/planet_surface_assets[*index].filename;
+    try{source=stellar::native_map::decode_rgba_image(path,0,stellar::native_map::ImageDecodeUsage::PixelsOnly);
+    }catch(const std::exception &error){throw std::runtime_error("Planet appearance asset failed to decode: "+path.string()+": "+error.what());}
+  }
+  return generate_disc(appearance,source.get(),lighting_step);
 }
 }
 std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::image(const SystemBodyAppearance &appearance){

@@ -1,3 +1,5 @@
+#include <stellar/engine/text_fit.hpp>
+#include "native_campaign_calendar.hpp"
 #include "native_research_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include "native_research_presentation.hpp"
@@ -21,11 +23,10 @@ using namespace stellar::native_map;
 using namespace stellar::native_research;
 
 constexpr Color background{4, 10, 21, 255};
-constexpr Color surface{8, 20, 36, 252};
-constexpr Color raised{12, 31, 54, 250};
+constexpr Color raised{5, 24, 36, 244};
 constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{23, 67, 102, 255};
-constexpr Color border{91, 151, 205, 235};
+constexpr Color selected{9, 40, 55, 255};
+constexpr Color border{65, 126, 156, 225};
 constexpr Color bright{235, 244, 255, 255};
 constexpr Color muted{154, 181, 211, 240};
 constexpr Color positive{154, 225, 188, 255};
@@ -51,6 +52,13 @@ constexpr Color failure{255, 133, 123, 255};
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
+}
+
+UiRect research_art_source(const RgbaImage &image,UiRect destination){
+  const float w=static_cast<float>(image.width()),h=static_cast<float>(image.height());
+  const float aspect=destination.width/std::max(1.f,destination.height);
+  if(w/h>aspect){const float crop=h*aspect;return {(w-crop)*.5f,0,crop,h};}
+  const float crop=w/aspect;return {0,(h-crop)*.5f,w,crop};
 }
 
 void stroke(DrawList &out, UiRect bounds, Color color) {
@@ -173,6 +181,7 @@ void centered(DrawList &out, UiRect bounds, std::string value, Color color,
 }
 
 [[nodiscard]] std::string node_state(const NativeResearchNode &node) {
+  if (node.cancelled) return "CANCELLED · WORK RETAINED";
   if (node.active)
     return node.paused ? "PAUSED PROGRAM" : "ACTIVE PROGRAM";
   return maturity(node.maturity);
@@ -229,68 +238,26 @@ void erase_last_utf8(std::string &value) {
 ResearchWorkspaceLayout
 ResearchWorkspaceLayout::for_viewport(int width, int height,
                                       std::size_t tab_count) {
-  const auto screen_width = static_cast<float>(width);
-  const auto screen_height = static_cast<float>(height);
-  const auto scale = std::min(std::max(1.f, screen_height / 900.f),
-                              std::max(1.f, screen_width / 900.f));
-  const auto inset = 18.f * scale;
-  const auto content_left = native_navigation_content_left * scale;
-  const auto top = 64.f * scale;
-  const auto search_width =
-      std::clamp(screen_width * .28f, 180.f * scale, 330.f * scale);
-  const auto close_width = 88.f * scale;
-  const auto gap = 8.f * scale;
-  const auto tabs_y = top + 62.f * scale;
-  const auto tab_gap = 5.f * scale;
-  const auto available = screen_width - content_left - inset;
-  const auto columns = std::max<std::size_t>(
-      1, static_cast<std::size_t>(available / (172.f * scale)));
-  const auto rows =
-      std::max<std::size_t>(1, (tab_count + columns - 1) / columns);
-  const auto tab_width =
-      (available - tab_gap * static_cast<float>(columns - 1)) /
-      static_cast<float>(columns);
-  const auto tab_height = 34.f * scale;
-  std::vector<ResearchTabLayout> tabs;
-  tabs.reserve(tab_count);
-  for (std::size_t index = 0; index < tab_count; ++index) {
-    const auto column = index % columns;
-    const auto row = index / columns;
-    tabs.push_back({index,
-                    {content_left + static_cast<float>(column) *
-                                        (tab_width + tab_gap),
-                     tabs_y + static_cast<float>(row) * (tab_height + tab_gap),
-                     tab_width, tab_height}});
-  }
-  const auto body_y =
-      tabs_y + static_cast<float>(rows) * (tab_height + tab_gap) + 7.f * scale;
-  const auto body_height =
-      std::max(80.f * scale, screen_height - body_y - inset);
-  const auto inspector_width =
-      std::clamp(screen_width * .29f, 285.f * scale, 390.f * scale);
-  const auto graph_width =
-      std::max(180.f * scale, available - inspector_width - gap);
-  const UiRect inspector{content_left + graph_width + gap, body_y, inspector_width,
-                         body_height};
-  const UiRect action{inspector.x + 12.f * scale,
-                      inspector.y + inspector.height - 50.f * scale,
-                      inspector.width - 24.f * scale, 38.f * scale};
-  return {scale,
-          static_cast<int>(std::lround(22.f * scale)),
-          static_cast<int>(std::lround(14.f * scale)),
-          static_cast<int>(std::lround(11.f * scale)),
-          {0, top, screen_width, screen_height - top},
-      {content_left, top + 12.f * scale, 280.f * scale, 30.f * scale},
-      {content_left, top + 39.f * scale, 340.f * scale, 20.f * scale},
-          {screen_width - inset - close_width - gap - search_width,
-           top + 10.f * scale, search_width, 38.f * scale},
-          {screen_width - inset - close_width, top + 10.f * scale, close_width,
-           38.f * scale},
-          std::move(tabs),
-      {content_left, body_y, graph_width, body_height},
-          inspector,
-          {action.x, action.y - 44.f * scale, action.width, 38.f * scale},
-          action};
+  ResearchWorkspaceLayout l;const float s=std::clamp(height/1080.f,.8f,2.f),g=10*s;
+  l.scale=s;l.title_font_pixels=static_cast<int>(24*s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
+  const auto chrome=NativeUiLayout::for_viewport(width,height);const float x=native_navigation_content_left*chrome.scale,top=native_workspace_top(width,height),right=width-12*s;
+  l.surface={x,top,right-x,height-top-10*s};l.title={x,top,350*s,32*s};l.labs={x,top+36*s,right-x-115*s,25*s};
+  l.close={right-80*s,top,80*s,34*s};
+  const float body=top+124*s,sidebar_width=195*s,inspector_width=350*s;
+  l.sidebar={x,top+78*s,sidebar_width,height-top-88*s};
+  const float gx=x+sidebar_width+g,iw=right-inspector_width,gwidth=iw-g-gx;
+  l.view_tabs={gx,top+74*s,gwidth*.55f,38*s};
+  l.search={gx+gwidth*.55f+g,top+74*s,gwidth*.45f-g,38*s};
+  l.inspector={iw,body,inspector_width,height-body-10*s};
+  l.active={gx,height-138*s,gwidth,128*s};
+  l.graph={gx,body,gwidth,l.active.y-body-g};
+  l.toolbar={gx,body,gwidth,38*s};l.filter={gx+gwidth-150*s,body+6*s,144*s,30*s};l.sort={gx+gwidth-300*s,body+6*s,144*s,30*s};
+  const float tab_h=std::min(50*s,(l.sidebar.height-94*s)/std::max<std::size_t>(1,tab_count));
+  for(std::size_t i=0;i<tab_count;++i)l.tabs.push_back({i,{x+6*s,l.sidebar.y+6*s+i*tab_h,sidebar_width-12*s,tab_h-4*s}});
+  l.completed={x+6*s,l.sidebar.y+l.sidebar.height-84*s,sidebar_width-12*s,36*s};l.queue={x+6*s,l.sidebar.y+l.sidebar.height-42*s,sidebar_width-12*s,36*s};
+  l.action={iw+12*s,height-106*s,inspector_width-24*s,38*s};
+  l.bookmark={iw+12*s,height-58*s,(inspector_width-32*s)*.5f,36*s};l.enqueue={l.bookmark.x+l.bookmark.width+8*s,l.bookmark.y,l.bookmark.width,36*s};
+  l.feedback={iw+12*s,l.action.y-36*s,inspector_width-24*s,30*s};l.tree_focus={iw+12*s,body+34*s,inspector_width-24*s,20*s};return l;
 }
 
 void NativeResearchWorkspace::open() {
@@ -305,6 +272,7 @@ void NativeResearchWorkspace::close() {
   visible_ = false;
   search_focused_ = false;
   dragging_ = false;
+  dropdown_.close();
   inspector_scroll_ = 0.f;
   inspector_scroll_limit_ = 0.f;
 }
@@ -326,6 +294,7 @@ bool NativeResearchWorkspace::wants_text_input() const noexcept {
 }
 
 void NativeResearchWorkspace::set_window(NativeResearchWindow window) {
+  plan_=window.plan;
   const auto prior_selection = selected_node_id_;
   const auto generation_changed =
       window_ && window_->campaign_generation != window.campaign_generation;
@@ -376,6 +345,7 @@ void NativeResearchWorkspace::set_window(NativeResearchWindow window) {
 }
 
 void NativeResearchWorkspace::discard_campaign() {
+  plan_={};dropdown_.close();why_open_=false;
   window_.reset();
   selected_node_id_.reset();
   placements_.clear();
@@ -525,6 +495,7 @@ NativeResearchWorkspace::card_bounds(std::string_view node_id, int width,
     return std::nullopt;
   const auto layout = ResearchWorkspaceLayout::for_viewport(
       width, height, window_->domain_tabs.size());
+  if(mode_!=ResearchViewMode::Tree){for(const auto& card:guided_cards(layout))if(card.id==node_id)return card.bounds;return {};}
   const auto found =
       std::ranges::find(placements_, node_id, &NodePlacement::id);
   if (found == placements_.end())
@@ -538,6 +509,7 @@ NativeResearchWorkspace::first_actionable_card(int width, int height) const {
     return std::nullopt;
   const auto layout = ResearchWorkspaceLayout::for_viewport(
       width, height, window_->domain_tabs.size());
+  if(mode_!=ResearchViewMode::Tree){for(const auto& card:guided_cards(layout)){const auto n=std::ranges::find(window_->nodes,card.id,&NativeResearchNode::id);if(n!=window_->nodes.end()&&n->primary_action.enabled&&intersection(card.bounds,layout.graph))return card.bounds;}return {};}
   for (const auto &placement : placements_) {
     const auto node = std::ranges::find(window_->nodes, placement.id,
                                         &NativeResearchNode::id);
@@ -558,6 +530,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
   const auto tab_count = window_ ? window_->domain_tabs.size() : 0;
   const auto layout =
       ResearchWorkspaceLayout::for_viewport(width, height, tab_count);
+  if(auto extra=handle_controls(event,layout,width,height))return *extra;
   WorkspaceCommand result;
   result.captured = layout.surface.contains(event.position) || dragging_ ||
                     event.type == InputEventType::TextEntered ||
@@ -570,13 +543,13 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
   if (event.type == InputEventType::TextEntered && search_focused_) {
     if (query_.search.size() + event.text.size() <= 256) {
       query_.search += event.text;
-      rebuild_topology();
+      rebuild_topology();guided_scroll_=0;
     }
     return result;
   }
   if (event.type == InputEventType::BackspacePressed && search_focused_) {
     erase_last_utf8(query_.search);
-    rebuild_topology();
+    rebuild_topology();guided_scroll_=0;
     return result;
   }
   if (event.type == InputEventType::PointerMove && dragging_) {
@@ -590,6 +563,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
   }
   if (event.type == InputEventType::Wheel &&
       layout.graph.contains(event.position)) {
+    if(mode_!=ResearchViewMode::Tree){const auto cards=guided_cards(layout);float limit=0;for(const auto& card:cards)limit=std::max(limit,card.bounds.y+card.bounds.height+guided_scroll_-layout.graph.y-layout.graph.height+12*layout.scale);guided_scroll_=std::clamp(guided_scroll_-event.wheel_y*58*layout.scale,0.f,limit);return result;}
     const auto next = std::clamp(zoom_ * std::pow(1.12f, event.wheel_y), .58f, 1.55f);
     const auto x = (event.position.x - layout.graph.x) / layout.scale;
     const auto y = (event.position.y - layout.graph.y) / layout.scale;
@@ -623,7 +597,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
       const auto &domain = window_->domain_tabs.at(tab.index).id;
       query_.domain_id =
           domain.empty() ? std::nullopt : std::optional<std::string>(domain);
-      selected_node_id_.reset();
+      selected_node_id_.reset();guided_scroll_=0;
       pan_ = {24.f, 30.f};
       zoom_ = 1.f;
       rebuild_topology();
@@ -642,6 +616,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
       }
       return result;
     }
+    if(mode_!=ResearchViewMode::Tree){for(const auto& card:guided_cards(layout)){const auto clip=intersection(card.bounds,{layout.graph.x,layout.graph.y+80*layout.scale,layout.graph.width,layout.graph.height-80*layout.scale});if(clip&&clip->contains(event.position)){select(card.id);return {WorkspaceCommandKind::Select,true,card.id};}}return result;}
     for (const auto &placement : placements_) {
       const auto bounds = transformed_card(placement, layout);
       const auto clipped = intersection(layout.graph, bounds);
@@ -651,7 +626,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
       return {WorkspaceCommandKind::Select, true, placement.id};
     }
   }
-  if (layout.graph.contains(event.position))
+  if (mode_==ResearchViewMode::Tree&&layout.graph.contains(event.position))
     dragging_ = true;
   return result;
 }
@@ -691,28 +666,29 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     }
     center_selection_ = false;
   }
+  interface_hits_.clear();
   fill(out, layout.surface, background);
-  text(out, layout.title, "RESEARCH NETWORK", bright, layout.title_font_pixels,
+  fill(out,{layout.title.x,layout.title.y+2*layout.scale,3*layout.scale,50*layout.scale},{66,207,255,255});
+  auto research_title=layout.title;research_title.x+=16*layout.scale;
+  text(out, research_title, "RESEARCH", {151,222,255,255}, layout.title_font_pixels,
        TextAlign::Left, FontFace::Heading);
   if (window_) {
     auto summary = fixed(window_->free_effective_labs) + " / " +
                    fixed(window_->total_effective_labs) +
-                   " effective labs free";
+                   " effective labs free  ·  " + std::to_string(window_->active_program_count) + (window_->lab_capacity_only?" active programs · lab capacity limited":" / "+std::to_string(window_->maximum_programs.value_or(0))+" research slots");
     if (window_->formatted_treasury)
       summary = *window_->formatted_treasury + " treasury  |  " + summary;
     text(out, layout.labs, std::move(summary), muted, layout.small_font_pixels);
   }
-  fill(out, layout.search, raised);
-  stroke(out, layout.search, search_focused_ ? positive : border);
+  stellar::engine::ui_skin::control(out,layout.search,false,search_focused_,true,layout.scale);
   text(out,
        {layout.search.x + 10.f * layout.scale,
         layout.search.y + 9.f * layout.scale,
         layout.search.width - 20.f * layout.scale,
         layout.search.height - 10.f * layout.scale},
-       query_.search.empty() ? "Search known research" : query_.search,
+       query_.search.empty() ? "Search technology, effects, unlocks…" : query_.search,
        query_.search.empty() ? muted : bright, layout.body_font_pixels);
-  fill(out, layout.close, layout.close.contains(pointer_) ? hover : raised);
-  stroke(out, layout.close, border);
+  stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
   centered(out, layout.close, "CLOSE", bright, layout.body_font_pixels,
            layout.scale);
 
@@ -721,26 +697,28 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
       const auto &domain = window_->domain_tabs.at(tab.index);
       const auto active =
           domain.id.empty() ? !query_.domain_id : query_.domain_id == domain.id;
-      fill(out, tab.bounds,
-           active                          ? selected
-           : tab.bounds.contains(pointer_) ? hover
-                                           : raised);
-      stroke(out, tab.bounds, active ? positive : border);
-      const UiRect tab_label{tab.bounds.x + 6.f * layout.scale,
-                             tab.bounds.y + 4.f * layout.scale,
-                             tab.bounds.width - 12.f * layout.scale,
+      stellar::engine::ui_skin::control(out,tab.bounds,tab.bounds.contains(pointer_),active,true,layout.scale);
+      const float icon=std::min(34.f*layout.scale,tab.bounds.height-8.f*layout.scale);
+      if(artwork_resolver_){
+        const auto node=std::ranges::find_if(window_->nodes,[&](const auto &n){return domain.id.empty()||research_category_matches(domain.id,n.domain_id);});
+        if(node!=window_->nodes.end())if(const auto image=artwork_resolver_(node->id,false)){
+          const UiRect r{tab.bounds.x+5*layout.scale,tab.bounds.y+5*layout.scale,icon,icon};
+          out.overlay.emplace_back(Image{image,r,research_art_source(*image,r),{210,235,255,255},tab.bounds});
+        }
+      }
+      const UiRect tab_label{tab.bounds.x + icon+12.f * layout.scale,
+                             tab.bounds.y + 5.f * layout.scale,
+                             tab.bounds.width - icon-18.f * layout.scale,
                              tab.bounds.height - 8.f * layout.scale};
       clipped_text(out, tab_label, tab.bounds,
-                   domain.label + " " + std::to_string(domain.known_node_count),
+                   domain.label,
                    active ? bright : muted, layout.small_font_pixels,
-                   TextAlign::Center);
+                   TextAlign::Left);
     }
   }
 
-  fill(out, layout.graph, surface);
-  stroke(out, layout.graph, border);
-  fill(out, layout.inspector, surface);
-  stroke(out, layout.inspector, border);
+  stellar::engine::ui_skin::surface(out,layout.graph,layout.scale);
+  stellar::engine::ui_skin::surface(out,layout.inspector,layout.scale);
 
   if (!window_) {
     text(out,
@@ -750,7 +728,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          "Building the known research view...", muted, layout.body_font_pixels);
     return;
   }
-  if (placements_.empty()) {
+  if (mode_==ResearchViewMode::Tree&&placements_.empty()) {
     text(out,
          {layout.graph.x + 24.f * layout.scale,
           layout.graph.y + 24.f * layout.scale,
@@ -759,6 +737,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          layout.body_font_pixels);
   }
 
+  if(mode_==ResearchViewMode::Tree){
   struct VisibleCard {
     UiRect bounds;
     UiRect clipping;
@@ -839,30 +818,32 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
       fill(out, *progress_clip, positive);
   }
 
+  }else render_dashboard(out,layout);
+  render_controls(out,layout);
+
   const auto inspector_x = layout.inspector.x + 14.f * layout.scale;
   const auto inspector_width = layout.inspector.width - 28.f * layout.scale;
   auto inspector_y = layout.inspector.y + 14.f * layout.scale;
   text(out, {inspector_x, inspector_y, inspector_width, 18.f * layout.scale},
-       "PROGRAM INSPECTOR", muted, layout.small_font_pixels);
-  inspector_y += 24.f * layout.scale;
+       "SELECTED TECHNOLOGY", muted, layout.small_font_pixels);
+  inspector_y += 42.f * layout.scale;
   const auto *node = selected_node();
   if (!node) {
     text(out, {inspector_x, inspector_y, inspector_width, 60.f * layout.scale},
          "Select a known program to inspect its current details.", muted,
          layout.body_font_pixels);
+    dropdown_.render(out,dropdown_.id()==1?layout.filter:dropdown_.id()==2?layout.sort:layout.toolbar,width,height,layout.small_font_pixels);
     return;
   }
-  const auto portrait_side = std::clamp(68.f * layout.scale, 68.f, 96.f * layout.scale);
-  if (artwork_resolver_) {
-    if (const auto image = artwork_resolver_(node->id, true))
-      out.overlay.emplace_back(Image{image, {inspector_x, inspector_y, portrait_side,
-                                               portrait_side}, std::nullopt,
-                                     {255, 255, 255, 255}, layout.inspector});
+  const float art_height=150.f*layout.scale;
+  if(artwork_resolver_)if(const auto image=artwork_resolver_(node->id,true)){
+    const UiRect hero{inspector_x,inspector_y,inspector_width,art_height};
+    out.overlay.emplace_back(Image{image,hero,research_art_source(*image,hero),{255,255,255,255},layout.inspector});
   }
-  text(out, {inspector_x + portrait_side + 10.f * layout.scale, inspector_y,
-             inspector_width - portrait_side - 10.f * layout.scale, 56.f * layout.scale},
-       node->display_name, bright, layout.title_font_pixels);
-  inspector_y += std::max(57.f * layout.scale, portrait_side + 6.f * layout.scale);
+  inspector_y+=art_height+9*layout.scale;
+  const Text name_probe{{},node->display_name,bright,layout.title_font_pixels,inspector_width};
+  const float name_height=text_measurer_?static_cast<float>(text_measurer_(name_probe).height):56*layout.scale;
+  text(out,{inspector_x,inspector_y,inspector_width,std::max(56*layout.scale,name_height)},node->display_name,bright,layout.title_font_pixels);inspector_y+=std::max(56*layout.scale,name_height)+6*layout.scale;
   text(out, {inspector_x, inspector_y, inspector_width, 22.f * layout.scale},
        node->domain_label + "  |  " + node_state(*node),
        node->active ? positive : muted, layout.small_font_pixels);
@@ -891,10 +872,15 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     std::string value;
     Color color;
     float height{};
+    std::string node_id;
   };
   std::vector<InspectorBlock> details;
+  if (node->cancelled) details.push_back({"RESTARTING THIS PROGRAM\nRetained progress resumes in its original context. New authorization and milestone funding are required.", muted});
   if (!node->purpose.empty()) details.push_back({"WHAT IT DOES\n" + node->purpose, bright});
-  if (!node->benefits.empty()) details.push_back({"BENEFITS\n" + node->benefits, bright});
+  if (!node->benefits.empty()) details.push_back({"WHAT THIS CHANGES\n" + node->benefits, bright});
+  if (node->active) details.push_back({"CANCELLATION\n" + node->cancel_action.reason, muted});
+  if(!node->recommendation_reasons.empty()){std::string why="RECOMMENDED BECAUSE";for(const auto& reason:node->recommendation_reasons)why+="\n• "+reason;details.push_back({std::move(why),warning});}
+  for(const auto& edge:window_->edges)if(edge.to_id==node->id||edge.from_id==node->id){const bool prerequisite=edge.to_id==node->id;const auto id=prerequisite?edge.from_id:edge.to_id;const auto other=std::ranges::find(window_->nodes,id,&NativeResearchNode::id);if(other!=window_->nodes.end())details.push_back({(prerequisite?"REQUIRES\n":"LEADS TO\n")+std::string(other->maturity>=stellar::core::ResearchMaturity::mature?"✓ ":"› ")+other->display_name,prerequisite&&other->maturity<stellar::core::ResearchMaturity::mature?warning:positive,0,id});}
   if (node->research_points > 0.)
     details.push_back({"RESEARCH WORK\n" + fixed(node->research_points, 0) + " RP", muted});
   if (!node->active && node->maturity >= stellar::core::ResearchMaturity::mature)
@@ -909,7 +895,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
                  cost.formatted_credits_needed_to_start + "\n";
     value += std::isfinite(cost.estimated_years_at_full_funding)
                  ? "At full funding " +
-                       fixed(cost.estimated_years_at_full_funding, 2) + " years"
+                       stellar::native_campaign::format_campaign_duration(cost.estimated_years_at_full_funding * 365.25)
                  : "Staffed duration unavailable";
     details.push_back({std::move(value), bright});
   }
@@ -981,6 +967,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
       std::clamp(inspector_scroll_, 0.f, inspector_scroll_limit_);
   auto block_y = details_clip.y - inspector_scroll_;
   for (auto &block : details) {
+    if(!block.node_id.empty())if(const auto visible=intersection({details_clip.x,block_y,details_clip.width,block.height},details_clip))interface_hits_.push_back({*visible,10,block.node_id});
     clipped_text(out,
                  {details_clip.x, block_y, details_clip.width, block.height},
                  details_clip, std::move(block.value), block.color,
@@ -1000,12 +987,10 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
           2.f * layout.scale, thumb},
          muted);
   }
-  const auto action_text = action_label(node->primary_action.intent);
+  const auto action_text = node->cancelled && node->primary_action.intent == NativeResearchIntent::Start ? std::string("Restart research") : action_label(node->primary_action.intent);
   if (!action_text.empty()) {
     const auto enabled = node->primary_action.enabled;
-    fill(out, layout.action,
-         enabled && layout.action.contains(pointer_) ? hover : raised);
-    stroke(out, layout.action, enabled ? positive : border);
+    stellar::engine::ui_skin::control(out,layout.action,layout.action.contains(pointer_),enabled,enabled,layout.scale);
     centered(out, layout.action, action_text, enabled ? bright : muted,
              layout.body_font_pixels, layout.scale);
   }
@@ -1019,6 +1004,9 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   if (!feedback_text.empty())
     text(out, layout.feedback, feedback_text,
          notice_accepted_ ? positive : warning, layout.small_font_pixels);
+  dropdown_.render(out,dropdown_.id()==1?layout.filter:dropdown_.id()==2?layout.sort:layout.toolbar,width,height,layout.small_font_pixels);
 }
+
+#include "native_research_dashboard.inl"
 
 } // namespace stellar::native_research_ui

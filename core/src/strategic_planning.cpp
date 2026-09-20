@@ -1,6 +1,7 @@
 #include <stellar/core/strategic_planning.hpp>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <format>
@@ -114,4 +115,27 @@ CivilizationStrategicPlan CivilizationStrategicPlanner::get_plan(
   CivilizationStrategicPlan plan{id,now,now+review_interval_ticks_,std::move(p)};cached_plans_[id]=plan;return plan;
 }
 void CivilizationStrategicPlanner::invalidate(int id) noexcept{cached_plans_.erase(id);}void CivilizationStrategicPlanner::remove_civilization(int id) noexcept{cached_plans_.erase(id);}void CivilizationStrategicPlanner::clear() noexcept{cached_plans_.clear();}std::size_t CivilizationStrategicPlanner::cached_plan_count()const noexcept{return cached_plans_.size();}
+std::vector<CivilizationStrategicPlan> CivilizationStrategicPlanner::snapshot() const {
+  std::vector<CivilizationStrategicPlan> plans;
+  for(const auto &[id,plan]:cached_plans_)plans.push_back(plan);
+  std::ranges::sort(plans,{},&CivilizationStrategicPlan::civilization_id);
+  return plans;
+}
+void CivilizationStrategicPlanner::restore(std::span<const CivilizationStrategicPlan> plans){
+  if(plans.size()>4096)throw std::invalid_argument("Too many strategic plans.");
+  decltype(cached_plans_) staged;
+  for(const auto &plan:plans){
+    if(plan.civilization_id<0||plan.generated_at_tick<0||plan.review_after_tick<=plan.generated_at_tick||
+        plan.priorities.empty()||plan.priorities.size()>8||!staged.emplace(plan.civilization_id,plan).second)
+      throw std::invalid_argument("Invalid or duplicate strategic plan.");
+    std::array<bool,8> seen{};
+    for(const auto &priority:plan.priorities){
+      const auto type=static_cast<int>(priority.type);
+      if(type<0||type>=8||seen[type]||!std::isfinite(priority.score)||priority.reason.size()>4096)
+        throw std::invalid_argument("Invalid strategic priority.");
+      seen[type]=true;
+    }
+  }
+  cached_plans_=std::move(staged);
+}
 } // namespace stellar::core

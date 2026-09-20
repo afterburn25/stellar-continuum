@@ -163,7 +163,7 @@ void validate_formation(MassiveFormationState &formation) {
 } // namespace
 
 bool MassivePoint::is_finite() const noexcept {
-  return std::isfinite(x) && std::isfinite(y);
+  return std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
 }
 
 bool MassiveMissileSalvoState::is_valid() const noexcept {

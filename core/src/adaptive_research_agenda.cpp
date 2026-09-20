@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_agenda.hpp>
 #include <stellar/core/detail/adaptive_research_agenda_support_access.hpp>
 
@@ -26,7 +27,7 @@ using Json = nlohmann::json;
 }
 
 std::string bytes(const std::filesystem::path &path) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input) catalog_fail("Could not find file '" + path.string() + "'.");
   return {std::istreambuf_iterator<char>(input), {}};
 }
@@ -934,3 +935,4 @@ AdaptiveResearchAgendaState &detail::AdaptiveResearchAgendaSupportAccess::state(
 }
 
 } // namespace stellar::core
+

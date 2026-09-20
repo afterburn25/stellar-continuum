@@ -1,4 +1,5 @@
 #include "native_colony_roster.hpp"
+#include <stellar/core/campaign_observation.hpp>
 
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
@@ -115,13 +116,19 @@ View build(const stellar::core::FreshCampaignState &campaign,
 
     View result{
         generation, player, {}, "No owned colonies are available.", true};
+    result.developer_inspection = stellar::core::developer_observation(campaign, player);
     for (const auto &colony : campaign.colonies) {
-      if (colony.civilization_id != player)
+      if (!stellar::core::can_inspect_settlement(campaign, player, colony))
         continue;
       Row row;
       row.colony_id = colony.id;
       row.name = colony.name;
       row.kind_label = kind(colony.kind);
+      if (stellar::core::developer_observation(campaign, player)) {
+        const auto owner = std::ranges::find(campaign.civilizations, colony.civilization_id,
+                                            &stellar::core::Civilization::id);
+        if (owner != campaign.civilizations.end()) row.kind_label += " · " + owner->name;
+      }
       row.population = population(colony.population_millions);
       if (!colony.planetary_body_id) {
         row.body_name = row.system_name = "Unconfirmed";
@@ -146,9 +153,8 @@ View build(const stellar::core::FreshCampaignState &campaign,
       if (system == campaign.systems.end()) {
         row.body_name = row.system_name = "Unconfirmed";
         row.reason = "This owned colony's system reference is unavailable.";
-      } else if (!campaign.knowledge.is_system_known(player, body->system_id) ||
-                 !campaign.knowledge.is_system_fully_surveyed(
-                     player, body->system_id)) {
+      } else if (stellar::core::observation_survey_level(campaign, player, body->system_id) <
+                 stellar::core::SystemSurveyLevel::fully_surveyed) {
         row.body_name = row.system_name = "Unconfirmed";
         row.reason =
             "A full survey is required before this world can be opened.";
@@ -162,7 +168,9 @@ View build(const stellar::core::FreshCampaignState &campaign,
     std::ranges::sort(result.rows, {}, &Row::colony_id);
     result.message = result.rows.empty()
                          ? "No colonies belong to the active player."
-                         : "Select an owned colony to inspect its world.";
+                         : stellar::core::developer_observation(campaign, player)
+                             ? "Developer inspection · All empires · Select a colony for live statistics."
+                             : "Select an owned colony to inspect its world.";
     return result;
   } catch (const std::exception &) {
     return unavailable(generation, campaign.player_civilization_id,
@@ -349,7 +357,7 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
   text(out,
        {p.x + 16.f * layout.scale, p.y + 12.f * layout.scale,
         p.width - 190.f * layout.scale, 29.f * layout.scale},
-       "OWNED COLONIES", std::max(15, static_cast<int>(23.f * layout.scale)),
+       view_.developer_inspection ? "ALL COLONIES" : "OWNED COLONIES", std::max(15, static_cast<int>(23.f * layout.scale)),
        ink, p);
   stellar::native_ui_style::panel(out, layout.refresh,
                                   layout.refresh.contains(pointer_), false);

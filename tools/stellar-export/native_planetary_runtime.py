@@ -13,7 +13,7 @@ def validate_native_planetary_export(folder: Path, env: dict[str,str]):
     captures, diagnostics, payloads = [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-planetary-") as temporary:
         work=Path(temporary);save=work/"planetary.player17.json"
-        for width,height,load in ((1280,720,False),(1920,1080,True)):
+        for width,height,load in ((1280,720,False),(1920,1080,True),(2560,1440,True)):
             label="reload" if load else "fresh"
             capture=work/f"planetary-{width}x{height}.bmp"
             args=[str(folder/"stellar-continuum-native.exe"),"--asset-root",str(folder),
@@ -42,7 +42,7 @@ def validate_native_planetary_export(folder: Path, env: dict[str,str]):
                 validate_bmp(source,width,height,"planetary",stdout=result.stdout)
                 target=folder.parent/f"{folder.name}-{source.name}";shutil.copy2(source,target);captures.append(str(target))
             diagnostics.append(result.stdout.strip());payloads.append(payload)
-        if _normalized(payloads[0])!=_normalized(payloads[1]):
+        if any(_normalized(payloads[0])!=_normalized(p) for p in payloads[1:]):
             raise RuntimeError("Paused planetary save/reload changed campaign state")
     return {"nativePlanetaryInput":True,"nativePlanetaryPausedReload":True,
             "planetaryCaptures":captures,"planetaryDiagnostics":diagnostics}

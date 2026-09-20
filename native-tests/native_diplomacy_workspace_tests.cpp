@@ -149,7 +149,7 @@ int main() try {
             "Diplomacy workspace escaped its viewport.");
     if(height>=720)
       require(layout.surface.x >=
-                  navigation.research.x + navigation.research.width,
+                  navigation.inspect.x + navigation.inspect.width,
               "Diplomacy content overlaps the navigation rail.");
   }
 

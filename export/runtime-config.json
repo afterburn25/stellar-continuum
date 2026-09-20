@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "application": "Stellar Continuum",
-  "engineVersion": "0.1.61",
-  "gameVersion": "0.1.12-alpha",
+  "engineVersion": "0.1.64",
+  "gameVersion": "0.1.14.2-dev",
   "mode": "headless-foundation",
   "graphicalParity": false,
-  "description": "C++23 campaign runtime and SDL3/Vulkan client with native race/size/seed setup, asynchronous generation/loading, independent Player17 save slots, research, fleets, shipyard, construction, orbital, colony, settlement, surface and diplomacy workspaces. Existing loading/menu, galaxy/regional, species and planet artwork is packaged. Detailed system stars, observer-safe map star markers and six approved ship artworks use bounded native image caches, with fleet route dashes, arrowheads and motion trails for active owned fleets. The relations workspace presents observer-filtered contacts, channels, agreements, proposals and history with revision-guarded commands and species transmission portraits. Detailed graphics, orbital structures and audio remain in migration. No Godot or .NET runtime is required. Diagnostic timings are not an FPS guarantee."
+  "description": "C++23 campaign runtime and SDL3/Vulkan client with native race/size/seed setup through 50,000 systems, asynchronous generation/loading, streaming Player17 saves, research, fleets, shipyard, construction, orbital, planetary, settlement and diplomacy workspaces. The planetary screen is the sole native colony interface. Existing loading/menu, galaxy/regional, species and planet artwork is packaged. Detailed system stars, observer-safe map star markers and six approved ship artworks use bounded native image caches, with fleet route dashes, arrowheads and motion trails for active owned fleets. Tactical corvettes and procedural planetary terrain use native 3D meshes; combat supports saved depth and 3D movement. The relations workspace presents observer-filtered contacts, channels, agreements, proposals and history with revision-guarded commands and species transmission portraits. Detailed graphics, orbital structures and audio remain in migration. No Godot or .NET runtime is required. Diagnostic timings are not an FPS guarantee."
 }

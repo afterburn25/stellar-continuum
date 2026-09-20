@@ -23,6 +23,7 @@ struct NativeTerritoryDrawStats final {
 
 struct NativeTerritoryRenderStyle final {
   bool draw_labels{true};
+  bool emphasize_overview{};
 };
 
 // Presentation cache mirroring Main.StrategicTerritory.cs: the projection and
@@ -42,7 +43,7 @@ public:
   static constexpr std::size_t maximum_cached_image_bytes = 16u * 1024u * 1024u;
 
   // Rebuilds when the fingerprint of the observer-visible inputs changes.
-  // observer_claims must come from an observer-filtered DiplomaticStateView.
+  // observer_claims must come from Core's observer/developer visibility policy.
   void update(const core::FreshCampaignState &world,
               int observer_civilization_id,
               std::span<const core::TerritorialClaimSnapshot> observer_claims);

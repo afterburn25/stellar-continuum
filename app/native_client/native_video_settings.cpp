@@ -37,8 +37,8 @@ constexpr Color text_error{239, 172, 146, 255};
 constexpr Color gold{230, 190, 105, 255};
 
 constexpr std::size_t maximum_settings_bytes = 64u * 1024u;
-constexpr std::array<std::string_view, 6> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
-                                                        "FRAME CAP", "EDGE SMOOTHING", "SCENE RESOLUTION"};
+constexpr std::array<std::string_view, 8> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
+                                                        "FRAME CAP", "EDGE SMOOTHING", "SCENE RESOLUTION", "STARFIELD QUALITY", "STARFIELD DENSITY"};
 constexpr std::array<std::string_view, 3> display_names = {"Borderless fullscreen",
                                                          "Exclusive fullscreen", "Windowed"};
 constexpr std::array<std::string_view, 3> vsync_names = {"Off", "On",
@@ -174,6 +174,8 @@ NativeVideoSettings NativeVideoSettings::sanitized() const noexcept {
   if(copy.display == VideoDisplayMode::Windowed)copy.refresh_hz=0.f;
   if(copy.scene_resolution_percent!=50&&copy.scene_resolution_percent!=75&&copy.scene_resolution_percent!=100)copy.scene_resolution_percent=100;
   if(copy.scene_samples!=1&&copy.scene_samples!=2&&copy.scene_samples!=4)copy.scene_samples=1;
+  if(copy.starfield_quality<0||copy.starfield_quality>3)copy.starfield_quality=2;
+  if(copy.starfield_density<0||copy.starfield_density>2)copy.starfield_density=1;
   return copy;
 }
 
@@ -209,6 +211,8 @@ NativeVideoSettings::load(const std::filesystem::path &path) {
     settings.refresh_hz = read_refresh(document);
     settings.scene_resolution_percent=read_dimension(document,"sceneResolutionPercent");
     settings.scene_samples=read_dimension(document,"sceneSamples");
+    if(document.contains("starfieldQuality")&&document["starfieldQuality"].is_number_integer())settings.starfield_quality=document["starfieldQuality"].get<int>();
+    if(document.contains("starfieldDensity")&&document["starfieldDensity"].is_number_integer())settings.starfield_density=document["starfieldDensity"].get<int>();
     return settings.sanitized();
   } catch (const std::exception &) {
     return {};
@@ -226,6 +230,8 @@ void NativeVideoSettings::save(const std::filesystem::path &path) const {
   document["refreshHz"] = settings.refresh_hz;
   document["sceneResolutionPercent"]=settings.scene_resolution_percent;
   document["sceneSamples"]=settings.scene_samples;
+  document["starfieldQuality"]=settings.starfield_quality;
+  document["starfieldDensity"]=settings.starfield_density;
   const auto payload = document.dump(2);
   if (payload.size() > maximum_settings_bytes)
     throw std::runtime_error("video settings payload exceeds 64 KiB");
@@ -238,14 +244,14 @@ VideoSettingsLayout
 VideoSettingsLayout::for_viewport(const int width, const int height) {
   const auto w = static_cast<float>(width), h = static_cast<float>(height);
   const auto scale = std::max(.01f, std::min({std::clamp(h / 1080.f, .8f, 2.5f),
-                                            (w - 24.f) / 760.f, (h - 24.f) / 660.f}));
+                                            (w - 24.f) / 760.f, (h - 24.f) / 730.f}));
   VideoSettingsLayout layout;
   layout.scale = scale;
   layout.title_font_pixels = static_cast<int>(std::lround(28.f * scale));
   layout.body_font_pixels = static_cast<int>(std::lround(18.f * scale));
   layout.small_font_pixels = static_cast<int>(std::lround(15.f * scale));
   const auto panel_width = std::min(760.f * scale, w - 24.f * scale);
-  const auto panel_height = std::min(660.f * scale, h - 24.f * scale);
+  const auto panel_height = std::min(730.f * scale, h - 24.f * scale);
   layout.panel = {(w - panel_width) * .5f, (h - panel_height) * .5f,
                   panel_width, panel_height};
   const auto inset = 26.f * scale;
@@ -258,10 +264,10 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
   layout.adapter = {inner, layout.hint.y + layout.hint.height, inner_width,
                     20.f * scale};
   auto row_y = layout.adapter.y + layout.adapter.height + 12.f * scale;
-  const auto choice_height = 53.f * scale;
+  const auto choice_height = 49.f * scale;
   const auto label_width = std::min(200.f * scale, inner_width * .30f);
   const auto choice_width = std::min(460.f * scale, inner_width * .68f);
-  for (int index = 0; index < 6; ++index) {
+  for (int index = 0; index < 8; ++index) {
     layout.choice_labels.push_back(
         {inner, row_y + 5.f * scale, label_width, 26.f * scale});
     const UiRect choice_rect{inner + inner_width - choice_width, row_y,
@@ -379,6 +385,8 @@ void NativeVideoSettingsView::open_choice(int index) {
   else if(index==3){for(const auto name:frame_cap_names)options.emplace_back(name);selected=static_cast<int>(values_.frame_cap);}
   else if(index==4){options={"Off","2x supersampling","4x supersampling"};selected=values_.scene_samples==1?0:values_.scene_samples==2?1:2;}
   else if(index==5){options={"50% · Reduced","75% · Reduced","100% · Native"};selected=(values_.scene_resolution_percent-50)/25;}
+  else if(index==6){options={"Low","Medium","High","Ultra"};selected=values_.starfield_quality;}
+  else if(index==7){options={"Low","Normal","High"};selected=values_.starfield_density;}
   dropdown_.open(index,std::move(options),selected);
 }
 
@@ -392,6 +400,8 @@ void NativeVideoSettingsView::select_choice(int index,int option) noexcept {
   else if(index==3)values_.frame_cap=static_cast<VideoFrameCap>(option);
   else if(index==4)values_.scene_samples=option==0?1:option==1?2:4;
   else if(index==5)values_.scene_resolution_percent=50+option*25;
+  else if(index==6)values_.starfield_quality=option;
+  else if(index==7)values_.starfield_density=option;
 }
 
 VideoSettingsResult
@@ -445,7 +455,7 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
       result.command = VideoSettingsCommand::Cancel;
       return result;
     }
-    for (int index = 0; index < 6; ++index) {
+    for (int index = 0; index < 8; ++index) {
       if (!layout.choice_buttons[index].contains(event.position)) continue;
       open_choice(index);
       return result;
@@ -470,20 +480,21 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
        text_muted, layout.small_font_pixels);
   text(out,layout.adapter,adapter_label_,{112,223,238,255},layout.small_font_pixels);
   const auto draw_button = [&](UiRect bounds, std::string caption, bool enabled = true, float inset = 0.f) {
-    fill(out, bounds, enabled && bounds.contains(pointer_) ? hover : button);
-    stroke(out, bounds, enabled ? border : text_muted);
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,enabled,layout.scale);
     text(out, {bounds.x + inset, bounds.y + bounds.height * .5f - layout.body_font_pixels * .55f,
                bounds.width - inset * 2.f, static_cast<float>(layout.body_font_pixels) * 1.2f},
          std::move(caption), enabled ? text_primary : text_muted, layout.body_font_pixels,
          TextAlign::Center);
   };
-  const std::array<std::string, 6> choice_values = {
+  const std::array<std::string, 8> choice_values = {
       std::string(display_name(values_.display)),
       resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
       std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
       values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
-      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced")};
-  for (int index = 0; index < 6; ++index) {
+      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
+      std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
+      std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
+  for (int index = 0; index < 8; ++index) {
     text(out, layout.choice_labels[index],
          std::string(choice_names[static_cast<std::size_t>(index)]), gold,
          layout.small_font_pixels);
@@ -513,8 +524,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
     fill(out,
          {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
          {0, 0, 0, 184});
-    fill(out, layout.confirm_panel, panel);
-    stroke(out, layout.confirm_panel, border);
+    stellar::engine::ui_skin::surface(out,layout.confirm_panel,layout.scale);
     text(out, layout.confirm_title,
          "CONFIRM DISPLAY", text_primary, layout.title_font_pixels,
          TextAlign::Left, FontFace::Heading);

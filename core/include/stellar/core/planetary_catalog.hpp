@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/planet_appearance.hpp>
 
 namespace stellar::core {
 
@@ -42,6 +43,8 @@ struct PlanetaryBody {
     double orbital_eccentricity{};
     double orbital_inclination_degrees{};
     std::optional<StellarPlanetProperties> stellar_exposure;
+    bool cracked_world{};
+    std::optional<PlanetAppearance> appearance;
 };
 
 inline constexpr std::string_view sol_catalog_preset_id = "sol-v1";

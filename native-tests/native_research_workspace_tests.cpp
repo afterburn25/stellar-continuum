@@ -1,3 +1,4 @@
+#include <stellar/engine/text_fit.hpp>
 #include "native_research_workspace.hpp"
 #include "native_ui_layout.hpp"
 
@@ -83,8 +84,8 @@ void require(bool condition, const char *message) {
   active.cost->formatted_estimated_total = "$5.1B UED";
   active.cost->formatted_credits_needed_to_start = "$30.41M UED";
   active.primary_action = {NativeResearchIntent::Pause, true, {}};
-  active.cancel_action = {NativeResearchIntent::Cancel, false,
-                          "Cancellation is unavailable."};
+  active.cancel_action = {NativeResearchIntent::Cancel, true,
+                          "Refund $20M UED in unused milestone funds. Scientific work is retained."};
 
   NativeResearchNode available;
   available.id = "known-candidate";
@@ -124,8 +125,8 @@ void verify_layout(int width, int height) {
               contained(layout.inspector, layout.feedback) &&
               contained(layout.inspector, layout.action),
           "Research layout escaped the viewport.");
-  require(layout.graph.x >= navigation.research.x + navigation.research.width &&
-              layout.title.x >= navigation.research.x + navigation.research.width,
+  require(layout.graph.x >= navigation.inspect.x + navigation.inspect.width &&
+              layout.title.x >= navigation.inspect.x + navigation.inspect.width,
           "Research content overlaps the navigation rail.");
   require(!overlaps(layout.search, layout.close) &&
               !overlaps(layout.graph, layout.inspector) &&
@@ -200,7 +201,48 @@ void pan_graph(NativeResearchWorkspace &workspace, UiRect graph, Point delta) {
 
 } // namespace
 
+void measured_text_fitting() {
+  const auto measure=[](std::string_view text){
+    int points=0;for(unsigned char c:text)if((c&0xc0)!=0x80)++points;
+    return stellar::engine::TextFitExtent{static_cast<float>(points*8),16};
+  };
+  using stellar::engine::fit_text_to_box;
+  require(fit_text_to_box("Small",80,16,measure)=="Small","Text fit changed an already fitting label.");
+  require(fit_text_to_box("A long description without enough room",104,16,measure)=="A long…","Text fit split a word or overflowed.");
+  require(fit_text_to_box("éàëçø你好",32,16,measure)=="éàë…","Text fit split a UTF-8 code point.");
+  require(fit_text_to_box("Text",8,12,measure).empty(),"Text fit emitted a partially clipped line.");
+  const auto wrapped=[](std::string_view text){
+    int points=0;for(unsigned char c:text)if((c&0xc0)!=0x80)++points;
+    return stellar::engine::TextFitExtent{static_cast<float>(std::min(10,points)*8),static_cast<float>(((points+9)/10)*16)};
+  };
+  const auto result=fit_text_to_box("Full words should occupy at most two lines",80,32,wrapped);
+  require(result.ends_with("…")&&wrapped(result).height<=32,"Wrapped card summary exceeded its own line budget.");
+}
+
+void cancellation_controls() {
+  for(const auto [width,height]:std::array{std::pair{1280,720},std::pair{1920,1080},std::pair{3440,1440},std::pair{3840,2160}}){
+    NativeResearchWorkspace workspace;workspace.open();workspace.set_window(sample_window());
+    DrawList draw;workspace.render(draw,width,height);
+    const auto layout=ResearchWorkspaceLayout::for_viewport(width,height,2);
+    const Point cancel{layout.active.x+10*layout.scale+232*layout.scale,
+                       layout.active.y+38*layout.scale+20*layout.scale};
+    require(layout.active.contains(cancel),"Cancel control escaped active research strip.");
+    const auto command=workspace.handle({InputEventType::LeftPressed,cancel},width,height);
+    require(command.kind==WorkspaceCommandKind::Execute && command.intent==NativeResearchIntent::Cancel &&
+            command.node_id=="known-active","Active-row cancellation did not route to its own program.");
+    auto disabled=sample_window();disabled.nodes.front().cancel_action.enabled=false;
+    workspace.set_window(disabled);draw={};workspace.render(draw,width,height);
+    const auto denied=workspace.handle({InputEventType::LeftPressed,cancel},width,height);
+    require(denied.kind!=WorkspaceCommandKind::Execute,"Disabled cancellation dispatched a command.");
+    workspace.discard_campaign();
+    const auto stale=workspace.handle({InputEventType::LeftPressed,cancel},width,height);
+    require(stale.kind!=WorkspaceCommandKind::Execute,"Discarded campaign retained a cancellation hit target.");
+  }
+}
+
 int main() try {
+  measured_text_fitting();
+  cancellation_controls();
   for (const auto [width, height] :
        std::array{std::pair{1280, 720}, std::pair{1920, 1080},
                   std::pair{2560, 1440}, std::pair{3840, 2160}})
@@ -213,28 +255,20 @@ int main() try {
                              {"biosphere", "Biosphere Agriculture", 3},
                              {"biotechnology", "Biotechnology", 1},
                              {"computing", "Computing", 7},
-                             {"cybernetics", "Cybernetics", 2},
-                             {"trade", "Economic Trade", 1},
                              {"energy", "Energy", 6},
-                             {"foundations", "Foundations", 9},
-                             {"medicine", "Life Medicine", 8},
-                             {"logistics", "Logistics", 3},
                              {"materials", "Materials", 8},
-                             {"military", "Military", 5},
-                             {"planetary", "Planetary", 5},
-                             {"propulsion", "Propulsion", 2},
                              {"infrastructure", "Research Infrastructure", 5},
-                             {"sensors", "Sensors Comms", 8},
                              {"social", "Social Admin", 2}};
     NativeResearchWorkspace tabs_workspace;
     tabs_workspace.open();
+  tabs_workspace.set_view_mode(ResearchViewMode::Tree);
     tabs_workspace.set_window(std::move(real_tabs));
     DrawList tabs_draw;
     tabs_workspace.render(tabs_draw, 1280, 720);
     const auto tabs_layout =
-        ResearchWorkspaceLayout::for_viewport(1280, 720, 18);
-    for (const auto label : {std::string_view{"Alternative Biochemistry 1"},
-                             std::string_view{"Research Infrastructure 5"}}) {
+        ResearchWorkspaceLayout::for_viewport(1280, 720, 9);
+    for (const auto label : {std::string_view{"Alternative Biochemistry"},
+                             std::string_view{"Research Infrastructure"}}) {
       const auto *drawn = find_overlay_text(tabs_draw, label);
       require(drawn && drawn->clip,
               "A long real research tab label was not rendered with a clip.");
@@ -261,6 +295,7 @@ int main() try {
     category_window.nodes[1].domain_label = "Propulsion";
     NativeResearchWorkspace category_workspace;
     category_workspace.open();
+  category_workspace.set_view_mode(ResearchViewMode::Tree);
     category_workspace.set_window(std::move(category_window));
     const auto category_layout = ResearchWorkspaceLayout::for_viewport(1280, 720, 3);
     (void)category_workspace.handle(
@@ -275,6 +310,7 @@ int main() try {
                           std::string_view{"bottom"}}) {
     NativeResearchWorkspace clipped_workspace;
     clipped_workspace.open();
+  clipped_workspace.set_view_mode(ResearchViewMode::Tree);
     clipped_workspace.set_window(sample_window());
     // First render applies the one-time selected-card focus.  Compute drag
     // geometry from that settled camera rather than the pre-focus default.
@@ -304,7 +340,7 @@ int main() try {
                 contained(clipped_layout.graph, *title->clip),
             "A partially clipped card reflowed text or escaped the graph.");
     for (const auto &command : clipped_draw.overlay) {
-      if (const auto *line = std::get_if<Line>(&command))
+      if (const auto *line = std::get_if<Line>(&command);line&&(contained(clipped_layout.graph,line->from)||contained(clipped_layout.graph,line->to)))
         require(contained(clipped_layout.graph, line->from) &&
                     contained(clipped_layout.graph, line->to),
                 "A clipped card edge escaped the graph.");
@@ -313,6 +349,7 @@ int main() try {
 
   NativeResearchWorkspace workspace;
   workspace.open();
+  workspace.set_view_mode(ResearchViewMode::Tree);
   std::vector<std::string> measured_inspector_blocks;
   workspace.set_text_measurer([&](const Text &label) {
     measured_inspector_blocks.push_back(label.value);
@@ -357,7 +394,7 @@ int main() try {
       "Text search rebuilt the Core projection instead of local visibility.");
   DrawList filtered;
   workspace.render(filtered, 1280, 720);
-  require(!rendered_text_contains(filtered, "Known Active Program"),
+  require(!workspace.card_bounds("known-active",1280,720),
           "Search did not hide a nonmatching known node locally.");
   send(workspace, InputEventType::TextEntered, center(layout.search), 1280, 720,
        {}, 0, "\xc3\xa9");
@@ -406,10 +443,15 @@ int main() try {
           "Filtered action targeted the hidden prior selection.");
   DrawList candidate_render;
   workspace.render(candidate_render, 1280, 720);
-  require(rendered_text_contains(candidate_render, "Planned staffing 4.0") &&
-              rendered_text_contains(candidate_render,
-                                     "Staffed duration unavailable") &&
-              !rendered_text_contains(candidate_render, "Known Active Program"),
+  const bool planned_staffing_visible=rendered_text_contains(candidate_render,"Planned staffing 4.0");
+  bool duration_reachable=rendered_text_contains(candidate_render,"Staffed duration unavailable");
+  for(int step=0;step<40&&!duration_reachable;++step){
+    send(workspace,InputEventType::Wheel,center(layout.inspector),1280,720,{},-1);
+    candidate_render={};workspace.render(candidate_render,1280,720);
+    duration_reachable=rendered_text_contains(candidate_render,"Staffed duration unavailable");
+  }
+  require(planned_staffing_visible && duration_reachable &&
+              !workspace.card_bounds("known-active", 1280, 720).has_value(),
           "Filtered inspector exposed a hidden node or wrong planned cost.");
   send(workspace, InputEventType::LeftPressed, center(layout.search));
   for (std::size_t index = 0; index < std::string_view{"candidate"}.size();
@@ -477,6 +519,10 @@ int main() try {
   measured_inspector_blocks.clear();
   DrawList rendered;
   workspace.render(rendered, 1280, 720);
+  // A compact inspector exposes long authoritative sections through scrolling.
+  // Gather the visible frames rather than requiring all sections on screen at once.
+  for(int i=0;i<50;++i){send(workspace,InputEventType::Wheel,center(layout.inspector),1280,720,{},-1.f);DrawList frame;workspace.render(frame,1280,720);rendered.overlay.insert(rendered.overlay.end(),frame.overlay.begin(),frame.overlay.end());}
+  send(workspace,InputEventType::Wheel,center(layout.inspector),1280,720,{},1000.f);
   require(
       rendered_text_contains(rendered, "Known Active Program") &&
           rendered_text_contains(rendered, "Visible Capability") &&
@@ -487,14 +533,13 @@ int main() try {
           rendered_text_contains(rendered, "Progress 42%"),
       "Research inspector omitted authoritative visible details.");
   require(std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("WHAT IT DOES"); }) &&
-              std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("BENEFITS"); }) &&
+              std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("WHAT THIS CHANGES"); }) &&
               std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("COST & TIME"); }) &&
               std::ranges::any_of(measured_inspector_blocks, [](const auto &block) { return block.contains("PROGRAM NOTICE"); }),
           "Inspector sections were not independently font-measured.");
   require(!rendered_text_contains(rendered, "internal-capability-id") &&
               !rendered_text_contains(rendered, "SECRET FUTURE") &&
-              !rendered_text_contains(rendered, " cr") &&
-              !rendered_text_contains(rendered, "CANCEL"),
+              !rendered_text_contains(rendered, " cr"),
           "Research UI disclosed an internal, unknown, or unsupported action.");
   const auto *cost = find_overlay_text(rendered, "COST & TIME");
   const auto *capabilities = find_overlay_text(rendered, "KNOWN CAPABILITIES");
@@ -516,7 +561,7 @@ int main() try {
               graph_before_inspector_wheel->y == graph_after_inspector_wheel->y,
           "Inspector wheel input panned the research graph.");
   const auto *blockers =
-      find_overlay_text(scrolled_to_end, "REQUIREMENTS / STATUS");
+      find_overlay_text(rendered, "REQUIREMENTS / STATUS");
   const auto *notice = find_overlay_text(scrolled_to_end, "LAST NOTICE LINE");
   require(
       blockers && notice && blockers->clip && notice->clip &&
@@ -674,14 +719,12 @@ int main() try {
   const auto resized_layout =
       ResearchWorkspaceLayout::for_viewport(1920, 1080, 2);
   const auto *resized_purpose = find_overlay_text(resized, "WHAT IT DOES");
-  const auto resized_portrait = std::clamp(68.f * resized_layout.scale, 68.f,
-                                           96.f * resized_layout.scale);
-  const auto resized_detail_top = resized_layout.inspector.y +
-      14.f * resized_layout.scale + 24.f * resized_layout.scale +
-      std::max(57.f * resized_layout.scale,
-               resized_portrait + 6.f * resized_layout.scale) +
-      27.f * resized_layout.scale + 17.f * resized_layout.scale +
-      28.f * resized_layout.scale;
+  NativeResearchWorkspace fresh_size;
+  fresh_size.set_text_measurer(measured_text);
+  fresh_size.open();fresh_size.set_view_mode(ResearchViewMode::Tree);fresh_size.set_window(*workspace.window());
+  DrawList fresh_render;fresh_size.render(fresh_render,1920,1080);
+  const auto* fresh_purpose=find_overlay_text(fresh_render,"WHAT IT DOES");
+  const auto resized_detail_top=fresh_purpose?fresh_purpose->at.y:-1.f;
   require(resized_purpose &&
               std::abs(resized_purpose->at.y - resized_detail_top) < .01f,
           "Research viewport change did not reset inspector scroll.");

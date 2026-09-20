@@ -66,6 +66,33 @@ void write(const fs::path &path, std::string_view value) {
                        CampaignFramePolicy::Player);
 }
 
+void developer_fleet_inspection(CampaignFrame& frame) {
+  auto& world=frame.runtime().world().campaign();
+  require(!world.fleets.empty(), "No fleet fixture");
+  auto& fleet=world.fleets.front();
+  const auto alien=std::ranges::find_if(world.civilizations,[&](const auto& c){return c.id!=world.player_civilization_id;});
+  require(alien!=world.civilizations.end(), "No alien fixture");
+  fleet.civilization_id=alien->id;fleet.is_active=true;const auto id=fleet.id;
+  world.developer_provenance.emplace();
+  NativeFleetController controller;(void)controller.build(frame,99);
+  require(controller.select(frame,99,id).accepted,"Developer could not inspect foreign fleet");
+  const auto view=controller.build(frame,99);
+  const auto row=std::ranges::find(view.own_fleets,id,&NativeOwnFleet::id);
+  require(row!=view.own_fleets.end()&&row->foreign_inspection&&row->owner_civilization_id==alien->id&&
+      row->fuel_remaining_light_years==fleet.fuel_remaining_light_years&&row->combat_power==own_fleet_combat_power(fleet),
+      "Developer fleet statistics do not match actual owner/fuel/power");
+  require(!row->recovery&&!row->military_order_quote&&row->locate&&controller.locate_selected(frame,*row->locate).accepted,
+      "Inspection granted command authority or denied read-only locate");
+  const auto revision=fleet.mission_order_revision;
+  require(!controller.preview_selected_route(frame,99,world.systems.front().id).command_available&&fleet.mission_order_revision==revision,
+      "Foreign fleet inspection permitted travel orders");
+  world.developer_provenance.reset();
+  require(!controller.select(frame,99,id).accepted, "Revoked developer access still selected foreign fleet");
+  const auto ordinary=controller.build(frame,99);
+  require(!ordinary.selected_fleet_id&&std::ranges::find(ordinary.own_fleets,id,&NativeOwnFleet::id)==ordinary.own_fleets.end(),
+      "Ordinary view retained foreign fleet statistics");
+}
+
 void reconnaissance_projection(CampaignFrame &frame) {
   NativeFleetController controller;
   constexpr std::uint64_t generation = 73;
@@ -630,6 +657,8 @@ int main(int argc, char **argv) try {
                                     fs::absolute(argv[4]));
   science_survey_projection(science_frame);
   observer_and_commands(frame);
+  auto developer_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]), fs::absolute(argv[4]));
+  developer_fleet_inspection(developer_frame);
   auto recovery_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                                     fs::absolute(argv[4]));
   civilian_recovery(recovery_frame);

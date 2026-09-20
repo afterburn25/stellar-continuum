@@ -93,6 +93,11 @@ inline AdaptiveResearchCampaignSnapshot decode_research(const Json &value) {
              funding.at("AuthorizationCredits").get<double>()});
       }
     }
+    if(const auto plan=item.find("Planning");plan!=item.end()){
+      civilization.plan.favorites=plan->at("Favorites").get<std::vector<std::string>>();
+      civilization.plan.queue=plan->at("Queue").get<std::vector<std::string>>();
+      civilization.plan.suggestions=plan->at("Suggestions").get<bool>();
+    }
     result.civilizations.push_back(std::move(civilization));
   }
   return result;
@@ -166,6 +171,9 @@ inline Json encode_research(const AdaptiveResearchCampaignSnapshot &snapshot) {
          {"ApplicabilityContextId", value.applicability_context_id},
          {"Research", std::move(research)},
          {"ProjectFunding", funding}});
+    if(snapshot.schema_version>=3)
+      civilizations.back()["Planning"]={{"Favorites",value.plan.favorites},
+        {"Queue",value.plan.queue},{"Suggestions",value.plan.suggestions}};
   }
   return {{"SchemaVersion", snapshot.schema_version},
           {"CatalogId", snapshot.catalog_id},

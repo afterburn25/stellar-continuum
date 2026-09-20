@@ -168,7 +168,7 @@ int planet_count(StarArchetype archetype, StableRandom& random) {
 
 std::optional<std::unordered_map<int, int>> balanced_counts(std::int64_t seed, std::span<const StellarSystem> systems) {
     const int count = static_cast<int>(systems.size());
-    const int scale = count % 100 == 0 && count >= 500 && count <= 2500 &&
+    const int scale = count % 100 == 0 && count >= 500 && count <= maximum_full_galaxy_system_count &&
         (std::all_of(systems.begin(), systems.end(), [](const auto& s) { return s.stellar_catalog_id.has_value(); }) ||
          std::all_of(systems.begin(), systems.end(), [](const auto& s) { return s.primary.has_value(); })) ? count / 100 : 1;
     if (count != 100 * scale || (scale == 1 && std::any_of(systems.begin(), systems.end(), [](const auto& s) { return !s.primary; }))) return std::nullopt;
@@ -202,9 +202,10 @@ std::optional<std::unordered_map<int, int>> balanced_counts(std::int64_t seed, s
 }
 
 void validate_catalog(std::span<const PlanetaryBody> bodies, std::span<const StellarSystem> systems) {
-    std::unordered_set<int> ids, system_ids;
+    std::unordered_set<int> ids, system_ids, habitable_systems;
     for (const auto& system : systems) system_ids.insert(system.id);
     for (const auto& body : bodies) {
+        if (body.legacy_colonization_candidate) habitable_systems.insert(body.system_id);
         if (!ids.insert(body.id).second) throw std::invalid_argument{"Duplicate planetary body ID."};
         if (!system_ids.contains(body.system_id)) throw std::invalid_argument{"Planetary body references unknown system."};
     }
@@ -213,11 +214,10 @@ void validate_catalog(std::span<const PlanetaryBody> bodies, std::span<const Ste
     for (const auto& moon : bodies) if (moon.kind == PlanetaryBodyKind::Moon) {
         if (!moon.parent_body_id || !by_id.contains(*moon.parent_body_id)) throw std::invalid_argument{"Moon has no valid parent body."};
         const auto& parent = *by_id.at(*moon.parent_body_id);
-        if (parent.kind != PlanetaryBodyKind::Planet || parent.system_id != moon.system_id) throw std::invalid_argument{"Moon parent is not a planet in the same system."};
+        if (parent.kind == PlanetaryBodyKind::Moon || parent.system_id != moon.system_id) throw std::invalid_argument{"Moon parent is not a primary body in the same system."};
     }
-    for (const auto& system : systems) if (system.has_habitable_world && !std::any_of(bodies.begin(), bodies.end(), [&](const auto& body) {
-        return body.system_id == system.id && body.legacy_colonization_candidate;
-    })) throw std::invalid_argument{"Legacy habitable system has no compatibility colony candidate."};
+    for (const auto& system : systems) if (system.has_habitable_world && !habitable_systems.contains(system.id))
+        throw std::invalid_argument{"Legacy habitable system has no compatibility colony candidate."};
 }
 int checked_body_id(int system_id, int local_id) {
     const auto value = static_cast<std::int64_t>(system_id) * body_id_stride + local_id;
@@ -258,6 +258,7 @@ std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed, std::sp
     auto conditioned = apply_environmental_diversity(seed, systems, result);
     validate_catalog(conditioned, systems);
     const auto removed=apply_stellar_planetary_physics(systems,conditioned);
+    generate_planet_appearances(seed,systems,conditioned);
     if(engulfed)*engulfed=removed;
     return conditioned;
 }

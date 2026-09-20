@@ -14,8 +14,8 @@ def diagnostic(mode="fresh"):
     return {
         "mode": mode, "fitted_scale": 1.0, "regional_scale": 5.1,
         "wheel_input": True, "system_entry": True, "paused": True,
-        "day_unchanged": True, "decoded_sources": 3,
-        "overview": {"deep_field": 1, "galaxy_layer": 1,
+        "day_unchanged": True, "decoded_sources": 4,
+        "overview": {"deep_field": 1, "galaxy_layer": 1, "star_background": 0,
                      "regional_nebula": 0, "regional_points": 0,
                      "catalog_markers": 500, "known_markers": 2,
                      "unknown_markers": 498, "revealed_unknown_labels": 0,
@@ -24,8 +24,8 @@ def diagnostic(mode="fresh"):
                                 "label_overlaps": 0, "obstacle_overlaps": 0,
                                 "hud_overlaps": 0, "star_overlaps": 0,
                                 "outside_viewport": 0}},
-        "regional": {"deep_field": 0, "galaxy_layer": 0,
-                     "regional_nebula": 1, "regional_points": 356,
+        "regional": {"deep_field": 0, "galaxy_layer": 0, "star_background": 1,
+                     "regional_nebula": 1, "regional_points": 0,
                      "catalog_markers": 4, "known_markers": 1,
                      "unknown_markers": 3, "revealed_unknown_labels": 0,
                      "labels": {"candidates": 2, "measured": 2, "placed": 2,
@@ -63,7 +63,10 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
                 calls.append(args)
                 state = diagnostic("paused_reload" if reload else "fresh")
                 if fault == "overview": state["overview"]["galaxy_layer"] = 0
-                if fault == "regional": state["regional"]["regional_nebula"] = 0
+                if fault == "regional": state["regional"]["star_background"] = 0
+                if fault == "overview_replaced": state["overview"]["star_background"] = 1
+                if fault == "legacy_points": state["regional"]["regional_points"] = 356
+                if fault == "legacy_nebula": state["regional"]["regional_nebula"] = 0
                 if fault == "system": state["system"]["background_images"] = 1
                 if fault == "labels": state["overview"]["revealed_unknown_labels"] = 1
                 if fault == "wheel": state["wheel_input"] = False
@@ -134,8 +137,11 @@ class NativeGalaxyRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("cold_profile", profile_frames=120)
     def test_missing_overview_art_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("overview")
-    def test_missing_regional_nebula_rejected(self):
+    def test_missing_regional_background_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("regional")
+    def test_incorrect_background_layers_rejected(self):
+        for fault in ("overview_replaced", "legacy_points", "legacy_nebula"):
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError): self.exercise(fault)
     def test_system_art_leak_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("system")
     def test_unknown_label_leak_rejected(self):

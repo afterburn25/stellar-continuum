@@ -63,6 +63,12 @@ bool same_placements(const NativeGalaxyLabelLayout &left,
 
 int main() try {
   const UiRect viewport{0, 0, 640, 360};
+  auto central=system(0,{320,180},"Supermassive black hole");
+  central.kind=NativeGalaxyLabelKind::central_object;
+  const auto central_layout=layout_native_galaxy_labels({central},viewport,
+      {{{235,135,170,90},NativeGalaxyLabelObstacleKind::star}},variable_measure);
+  require(central_layout.placements.size()==1&&central_layout.stats.obstacle_overlaps==0,
+      "Central label could not find a clear position around crowded core artwork.");
   const std::vector<NativeGalaxyLabelObstacle> basic_obstacles{
       {{0, 0, 640, 48}, NativeGalaxyLabelObstacleKind::hud},
       {{313, 173, 14, 14}, NativeGalaxyLabelObstacleKind::star}};
@@ -86,6 +92,8 @@ int main() try {
           }),
           "empire label did not share collision resolution with system labels");
 
+  for(const auto& p:basic.placements)if(p.kind==NativeGalaxyLabelKind::system){const float x=p.stable_id==1?320.f:350.f;
+    require(p.bounds.y>=191.f&&std::abs(p.bounds.x+p.bounds.width*.5f-x)<.001f,"System name did not stay centered below its object");}
   std::vector<NativeGalaxyLabelCandidate> crowded_home{
       system(100, {500, 180}, "Home", true, 10'000.),
       empire(7, {320, 180}, "HUMAN COMMONWEALTH", 5.)};
@@ -261,6 +269,44 @@ int main() try {
     rejected_obstacle = true;
   }
   require(rejected_obstacle, "non-positive obstacle was accepted");
+
+  // At close star-map zoom the discovered galactic core can project millions
+  // of pixels offscreen. Its valid bounds must not abort the live scene.
+  const std::vector<NativeGalaxyLabelCandidate> zoom_candidates{
+      system(40, {100, 180}, "Near edge"),
+      system(41, {400, 180}, "Visible star", true)};
+  const auto without_offscreen = layout_native_galaxy_labels(
+      zoom_candidates, viewport, {}, variable_measure);
+  const auto with_offscreen = layout_native_galaxy_labels(
+      zoom_candidates, viewport,
+      {{{3'000'000, -2'000'000, 256, 256}, NativeGalaxyLabelObstacleKind::star},
+       {{std::numeric_limits<float>::max(), 0, std::numeric_limits<float>::max(), 200},
+        NativeGalaxyLabelObstacleKind::star}}, variable_measure);
+  require(same_placements(without_offscreen, with_offscreen),
+          "offscreen projected bodies changed labels or aborted close zoom");
+
+  const auto clipped = layout_native_galaxy_labels(
+      zoom_candidates, viewport,
+      {{{0, 0, 150, 360}, NativeGalaxyLabelObstacleKind::star}}, variable_measure);
+  const auto oversized = layout_native_galaxy_labels(
+      zoom_candidates, viewport,
+      {{{-2'000'000, -2'000'000, 2'000'150, 4'000'000},
+        NativeGalaxyLabelObstacleKind::star}}, variable_measure);
+  require(same_placements(clipped, oversized) && oversized.stats.obstacle_overlaps == 0,
+          "oversized star footprint lost its visible collision boundary");
+  const auto enveloping = layout_native_galaxy_labels(
+      zoom_candidates, viewport,
+      {{{-1e30f, -1e30f, 2e30f, 2e30f}, NativeGalaxyLabelObstacleKind::star}},
+      variable_measure);
+  require(enveloping.placements.empty(), "viewport-covering star allowed labels through it");
+
+  bool rejected_nonfinite_obstacle = false;
+  try {
+    (void)layout_native_galaxy_labels({}, viewport,
+        {{{0, 0, std::numeric_limits<float>::infinity(), 10},
+          NativeGalaxyLabelObstacleKind::star}}, variable_measure);
+  } catch (const std::invalid_argument &) { rejected_nonfinite_obstacle = true; }
+  require(rejected_nonfinite_obstacle, "non-finite obstacle was accepted");
 
   int filtered_measurements = 0;
   const auto filtered = layout_native_galaxy_labels(

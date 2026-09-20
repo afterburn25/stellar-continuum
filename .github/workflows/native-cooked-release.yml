@@ -1,0 +1,44 @@
+name: Native cooked release validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cooked-release:
+    # The real game launch is mandatory, so use a Windows runner with a working
+    # Vulkan/D3D12 device, rather than silently skip it on a headless worker.
+    runs-on: [self-hosted, Windows, X64, stellar-gpu]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure, build, cook, validate and boot isolated content
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          $devcmd = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          @"
+          @echo off
+          call "$devcmd" -arch=x64 -host_arch=x64
+          cmake --preset windows-native-preview
+          if errorlevel 1 exit /b 1
+          cmake --build build-native/preview --target stellar_asset_cooker_tests --parallel 4
+          if errorlevel 1 exit /b 1
+          ctest --test-dir build-native/preview -R "^engine_asset_cooker$" --output-on-failure
+          if errorlevel 1 exit /b 1
+          pwsh -NoProfile -File tools/build-cooked-game.ps1 -VerifyLaunch
+          "@ | Set-Content -LiteralPath "$env:RUNNER_TEMP/native-cook.cmd"
+          & "$env:RUNNER_TEMP/native-cook.cmd"
+          if ($LASTEXITCODE) {throw 'Native cooked release validation failed.'}
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cooked-release-evidence
+          path: |
+            work/cooker/*report.json
+            work/cooker/*validation.json
+            work/cooker/launch-*/
+          retention-days: 7

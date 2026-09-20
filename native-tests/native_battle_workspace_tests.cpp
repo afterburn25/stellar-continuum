@@ -741,6 +741,43 @@ void targeted_chrome_gesture_does_not_order() {
           "Fresh field click did not issue the intended targeted order.");
 }
 
+void spatial_orders_preserve_depth() {
+  constexpr int width=1280,height=720;
+  auto view=snapshot();view.formations[0].position.z=120.f;
+  NativeBattleWorkspace workspace;workspace.open(view,1,width,height);
+  const auto own=workspace.project(view.formations[0].position,width,height);
+  const auto select=[&]{
+    (void)workspace.handle(press(InputEventType::LeftPressed,own),width,height);
+    (void)workspace.handle(press(InputEventType::LeftReleased,own),width,height);
+  };
+  select();
+  auto wheel=press(InputEventType::Wheel,own);wheel.alt=true;wheel.wheel_y=1.f;
+  auto command=workspace.handle(wheel,width,height);
+  require(command.kind==BattleWorkspaceCommandKind::IssueOrder&&command.orders.size()==1&&
+      command.orders.front().formation_id==11&&command.orders.front().objective&&
+      command.orders.front().objective->z==220.f&&
+      command.orders.front().objective->x==-60.f&&command.orders.front().objective->y==0.f,
+      "Depth control must issue an authoritative 3D movement order.");
+  require(workspace.project(view.formations[0].position,width,height).x==own.x&&
+      workspace.project(view.formations[0].position,width,height).y==own.y,
+      "Depth order must not zoom the camera or mutate the observed snapshot.");
+  wheel.wheel_y=-1.f;command=workspace.handle(wheel,width,height);
+  require(command.orders.size()==1&&command.orders.front().objective->z==20.f,
+      "Depth control did not support descending.");
+  const MassivePoint destination{20.f,-30.f,120.f};
+  const auto at=workspace.project(destination,width,height);
+  (void)workspace.handle(press(InputEventType::RightPressed,at),width,height);
+  command=workspace.handle(press(InputEventType::RightReleased,at),width,height);
+  require(command.orders.size()==1&&command.orders.front().objective&&
+      std::abs(command.orders.front().objective->x-destination.x)<.01f&&
+      std::abs(command.orders.front().objective->y-destination.y)<.01f&&
+      command.orders.front().objective->z==destination.z,
+      "A field movement order must preserve formation depth and unproject correctly.");
+  wheel.position=center(BattleWorkspaceLayout::for_viewport(width,height).orders);
+  require(workspace.handle(wheel,width,height).orders.empty(),
+      "Depth control leaked through the orders panel.");
+}
+
 void fit_keeps_formations_clear_of_controls() {
   for(const auto [width,height]:{std::pair{1280,720},{1920,1080},{3840,2160}}){
     auto view=snapshot();
@@ -775,6 +812,7 @@ int main() {
     snapshot_drops_departed_selection();
     observer_secrecy_rendering();
     targeted_chrome_gesture_does_not_order();
+    spatial_orders_preserve_depth();
     fit_keeps_formations_clear_of_controls();
   } catch (const std::exception &error) {
     std::cerr << "native battle workspace tests failed: " << error.what()

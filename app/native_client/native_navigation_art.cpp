@@ -26,7 +26,7 @@ std::shared_ptr<const RgbaImage> thumbnail(const RgbaImage &source) {
 } // namespace
 NativeNavigationArt::NativeNavigationArt(std::filesystem::path root) {
   const auto load = [&](const char *name) {
-    auto image = stellar::native_map::decode_rgba_image(root / name);
+    auto image = stellar::native_map::decode_rgba_image(root / name,0,stellar::native_map::ImageDecodeUsage::PixelsOnly);
     if (!image) throw std::runtime_error(std::string("Native navigation photo could not be decoded: ") + name);
     return thumbnail(*image);
   };

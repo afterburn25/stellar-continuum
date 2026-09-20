@@ -43,7 +43,7 @@ void responsive_layout() {
              rect.y + rect.height <= viewport.y + viewport.height;
     };
     require(inside(layout.panel), "panel escaped");
-    require(layout.choice_labels.size() == 6 && layout.choice_buttons.size() == 6,
+    require(layout.choice_labels.size() == 8 && layout.choice_buttons.size() == 8,
             "choice rows incomplete");
     for (int index = 0; index < 4; ++index) {
       require(inside(layout.choice_buttons[index]), "choice escaped");
@@ -99,6 +99,8 @@ void persistence_round_trip() {
   saved.refresh_hz = 144.f;
   saved.vsync = VideoVsync::Adaptive;
   saved.frame_cap = VideoFrameCap::Fps144;
+  saved.starfield_quality = 3;
+  saved.starfield_density = 0;
   saved.save(path);
   const auto loaded = NativeVideoSettings::load(path);
   require(loaded == saved, "video settings did not round-trip");
@@ -182,7 +184,7 @@ void persistence_round_trip() {
 }
 
 void startup_preserves_desktop() {
-  NativeVideoSettings saved{.display=VideoDisplayMode::Exclusive,.width=2560,.height=1440,.refresh_hz=144.f,.vsync=VideoVsync::Adaptive,.frame_cap=VideoFrameCap::Fps144,.scene_resolution_percent=75,.scene_samples=4};
+  NativeVideoSettings saved{.display=VideoDisplayMode::Exclusive,.width=2560,.height=1440,.refresh_hz=144.f,.vsync=VideoVsync::Adaptive,.frame_cap=VideoFrameCap::Fps144,.scene_resolution_percent=75,.scene_samples=4,.starfield_quality=3,.starfield_density=2};
   auto expected=saved;expected.display=VideoDisplayMode::Borderless;
   require(saved.for_startup()==expected&&saved.display==VideoDisplayMode::Exclusive,"Startup lost display preferences or retained exclusive mode");
   saved.display=VideoDisplayMode::Windowed;saved.refresh_hz=0;
@@ -209,7 +211,8 @@ void dropdown_choices() {
   select(0,3,2);require(view.values().display==VideoDisplayMode::Windowed&&view.values().refresh_hz==0,"Windowed selection retained refresh");
   select(1,3,1);require(view.values().width==1280,"Windowed resolution was not deduplicated");
   select(1,3,0);require(view.values().width==0,"Default window size missing");
-  select(2,3,0);select(3,5,4);select(4,3,2);select(5,3,0);
+  select(2,3,0);select(3,5,4);select(4,3,2);select(5,3,0);select(6,4,3);select(7,3,0);
+  require(view.values().starfield_quality==3&&view.values().starfield_density==0,"Starfield dropdown values failed");
   require(view.values().vsync==VideoVsync::Off&&view.values().frame_cap==VideoFrameCap::Unlimited&&view.values().scene_samples==4&&view.values().scene_resolution_percent==50,"Quality dropdown values failed");
   (void)view.handle(press(InputEventType::LeftPressed,center(layout.choice_buttons[0])),width,height);
   require(view.handle(press(InputEventType::EscapePressed,{}),width,height).command==VideoSettingsCommand::None&&view.visible(),"Escape closed settings instead of just the dropdown");

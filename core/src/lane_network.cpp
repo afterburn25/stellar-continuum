@@ -1,6 +1,9 @@
 #include <stellar/core/lane_network.hpp>
 
 #include <stellar/core/interstellar_distance.hpp>
+#include <stellar/engine/spatial_index3d.hpp>
+#include <queue>
+#include <set>
 
 #include <algorithm>
 #include <bit>
@@ -142,9 +145,10 @@ measure_remaining_fleet_route(const std::vector<StellarSystem> *systems,
 }
 
 struct InterstellarLaneNetwork::Impl {
-  std::vector<StellarSystem> systems;
+  struct LaneSystem { int id{}; StarPosition position; };
+  std::vector<LaneSystem> systems;
   std::vector<InterstellarLane> lanes;
-  std::unordered_map<int, const StellarSystem *> by_id;
+  std::unordered_map<int, const LaneSystem *> by_id;
   std::unordered_map<int, std::vector<InterstellarLane>> adjacency;
   std::unordered_map<RouteKey, RouteTree, RouteKeyHash> routes;
   bool built{};
@@ -152,7 +156,7 @@ struct InterstellarLaneNetwork::Impl {
   std::thread::id owner{std::this_thread::get_id()};
 
   explicit Impl(std::span<const StellarSystem> values)
-      : systems(values.begin(), values.end()) {}
+      { systems.reserve(values.size());for(const auto& value:values)systems.push_back({value.id,value.position}); }
 
   void require_owner() const {
     if (std::this_thread::get_id() != owner)
@@ -166,11 +170,11 @@ struct InterstellarLaneNetwork::Impl {
     if (source_is_null)
       throw std::invalid_argument("Value cannot be null. (Parameter 'systems')");
     std::vector<InterstellarLane> next_lanes;
-    std::unordered_map<int, const StellarSystem *> next_by_id;
+    std::unordered_map<int, const LaneSystem *> next_by_id;
     std::unordered_map<int, std::vector<InterstellarLane>> next_adjacency;
 
     if (systems.size() >= 2) {
-      std::vector<const StellarSystem *> ordered;
+      std::vector<const LaneSystem *> ordered;
       ordered.reserve(systems.size());
       for (const auto &system : systems)
         ordered.push_back(&system);
@@ -181,6 +185,16 @@ struct InterstellarLaneNetwork::Impl {
       for (const auto *system : ordered)
         if (!next_by_id.emplace(system->id, system).second)
           throw std::invalid_argument(duplicate_message(system->id));
+      std::vector<std::pair<int, int>> edges;
+      std::set<std::pair<int, int>> unique_edges;
+      const auto add_edge = [&](int first, int second) {
+        const auto edge = canonical(first, second);
+        if (unique_edges.insert(edge).second)
+          edges.push_back(edge);
+      };
+      // Existing <=10k worlds retain their exact legacy near-tie backbone.
+      // Larger worlds use a deterministic Boruvka backbone over the 3D index.
+      if(ordered.size()<=10000){
       for (std::size_t first = 0; first < ordered.size(); ++first)
         for (std::size_t second = first + 1; second < ordered.size(); ++second)
           if (!std::isfinite(distance_light_years(ordered[first]->position,
@@ -188,12 +202,6 @@ struct InterstellarLaneNetwork::Impl {
             throw std::invalid_argument(
                 "Interstellar lane geometry produced a nonfinite distance");
 
-      std::vector<std::pair<int, int>> edges;
-      const auto add_edge = [&](int first, int second) {
-        const auto edge = canonical(first, second);
-        if (std::find(edges.begin(), edges.end(), edge) == edges.end())
-          edges.push_back(edge);
-      };
       std::unordered_set<int> connected{ordered.front()->id};
       struct Nearest {
         int first{};
@@ -202,18 +210,24 @@ struct InterstellarLaneNetwork::Impl {
       // The source Dictionary was populated from the ascending-ID array and only
       // deletes entries. Preserve that iteration order because the 1e-9 near-tie
       // relation is intentionally approximate and therefore nontransitive.
-      std::map<int, Nearest> nearest;
+      // A compact ascending-ID array preserves the legacy near-tie scan order
+      // while avoiding map traversal and ID hash lookups in the quadratic MST.
+      std::vector<Nearest> nearest(ordered.size());
+      std::vector<bool> remaining_backbone(ordered.size(),true);
+      remaining_backbone.front()=false;
       for (std::size_t index = 1; index < ordered.size(); ++index)
-        nearest.emplace(ordered[index]->id,
-                        Nearest{ordered.front()->id,
+        nearest[index]=Nearest{ordered.front()->id,
                                 distance_light_years(ordered.front()->position,
-                                                     ordered[index]->position)});
+                                                     ordered[index]->position)};
 
       while (connected.size() < ordered.size()) {
         int best_id = -1;
         Nearest best{-1, std::numeric_limits<double>::infinity()};
         bool found_best = false;
-        for (const auto &[candidate_id, candidate] : nearest) {
+        std::size_t best_index{};
+        for (std::size_t i=1;i<ordered.size();++i) {
+          if(!remaining_backbone[i])continue;
+          const int candidate_id=ordered[i]->id;const auto& candidate=nearest[i];
           if (!found_best || candidate.distance < best.distance - tie_tolerance ||
               (std::abs(candidate.distance - best.distance) <= tie_tolerance &&
                (candidate.first < best.first ||
@@ -221,16 +235,18 @@ struct InterstellarLaneNetwork::Impl {
             best_id = candidate_id;
             best = candidate;
             found_best = true;
+            best_index = i;
           }
         }
         if (!found_best)
           throw std::logic_error("Interstellar lane backbone made no progress.");
         add_edge(best.first, best_id);
         connected.insert(best_id);
-        nearest.erase(best_id);
-        const auto *added = next_by_id.at(best_id);
-        for (auto &[candidate_id, current] : nearest) {
-          const auto *candidate = next_by_id.at(candidate_id);
+        remaining_backbone[best_index]=false;
+        const auto *added = ordered[best_index];
+        for (std::size_t i=1;i<ordered.size();++i) {
+          if(!remaining_backbone[i])continue;
+          auto& current=nearest[i];const auto *candidate = ordered[i];
           const auto distance =
               distance_light_years(added->position, candidate->position);
           if (distance < current.distance - tie_tolerance ||
@@ -241,11 +257,12 @@ struct InterstellarLaneNetwork::Impl {
       }
 
       for (const auto *system : ordered) {
-        std::vector<const StellarSystem *> neighbours;
+        std::vector<const LaneSystem *> neighbours;
         for (const auto *candidate : ordered)
           if (candidate->id != system->id)
             neighbours.push_back(candidate);
-        std::stable_sort(neighbours.begin(), neighbours.end(),
+        const auto count = std::min<std::size_t>(3, neighbours.size());
+        std::partial_sort(neighbours.begin(), neighbours.begin()+count, neighbours.end(),
                          [&](const auto *first, const auto *second) {
           const auto first_distance =
               squared_distance_light_years(system->position, first->position);
@@ -255,9 +272,37 @@ struct InterstellarLaneNetwork::Impl {
             return first_distance < second_distance;
           return first->id < second->id;
         });
-        const auto count = std::min<std::size_t>(3, neighbours.size());
         for (std::size_t index = 0; index < count; ++index)
           add_edge(system->id, neighbours[index]->id);
+      }
+      }else{
+        using Index=stellar::engine::SpatialIndex3D;
+        std::vector<Index::Point> points;points.reserve(ordered.size());
+        for(const auto* system:ordered)points.push_back({system->position.x,system->position.y,system->position.depth_light_years.value_or(0.)});
+        Index index(std::move(points));
+        const auto metric=[&](std::size_t a,std::size_t b){return squared_distance_light_years(ordered[a]->position,ordered[b]->position);};
+        std::vector<std::size_t> parent(ordered.size());std::iota(parent.begin(),parent.end(),std::size_t{});
+        const auto root=[&](std::size_t a){while(parent[a]!=a){parent[a]=parent[parent[a]];a=parent[a];}return a;};
+        auto components=ordered.size();
+        while(components>1){
+          for(std::size_t i=0;i<parent.size();++i)parent[i]=root(i);
+          index.partitions(parent);
+          using Edge=std::tuple<double,std::size_t,std::size_t>;
+          std::vector<std::optional<Edge>> best(parent.size());
+          for(std::size_t i=0;i<ordered.size();++i){
+            const auto match=index.nearest(i,1,true,metric);if(match.empty())throw std::logic_error("Spatial backbone disconnected");
+            const auto j=match.front().index;const Edge edge{match.front().distance,std::min(i,j),std::max(i,j)};
+            auto& candidate=best[parent[i]];if(!candidate||edge<*candidate)candidate=edge;
+          }
+          const auto before=components;
+          for(const auto& edge:best)if(edge){const auto [distance,a,b]=*edge;(void)distance;
+            const auto ra=root(a),rb=root(b);if(ra==rb)continue;
+            parent[std::max(ra,rb)]=std::min(ra,rb);--components;add_edge(ordered[a]->id,ordered[b]->id);
+          }
+          if(components==before)throw std::logic_error("Spatial backbone made no progress");
+        }
+        for(std::size_t i=0;i<ordered.size();++i)
+          for(const auto& match:index.nearest(i,3,false,metric))add_edge(ordered[i]->id,ordered[match.index]->id);
       }
       std::sort(edges.begin(), edges.end());
       next_lanes.reserve(edges.size());
@@ -298,21 +343,12 @@ struct InterstellarLaneNetwork::Impl {
       }
     }
     tree.distance.at(origin) = 0;
-    while (!remaining.empty()) {
-      int current = 0;
-      double current_distance = std::numeric_limits<double>::infinity();
-      bool found_current = false;
-      for (const int candidate : remaining) {
-        const auto distance = tree.distance.at(candidate);
-        if (!found_current || distance < current_distance ||
-            (distance == current_distance && candidate < current)) {
-          current = candidate;
-          current_distance = distance;
-          found_current = true;
-        }
-      }
-      if (!std::isfinite(current_distance))
-        break;
+    using Pending=std::pair<double,int>;
+    std::priority_queue<Pending,std::vector<Pending>,std::greater<Pending>> pending;
+    pending.emplace(0.,origin);
+    while (!pending.empty()) {
+      const auto [current_distance,current]=pending.top();pending.pop();
+      if(!remaining.contains(current)||current_distance!=tree.distance.at(current))continue;
       remaining.erase(current);
       for (const auto &lane : adjacency.at(current)) {
         if (lane.length_light_years > range + tie_tolerance)
@@ -324,6 +360,7 @@ struct InterstellarLaneNetwork::Impl {
         if (candidate < tree.distance.at(next) - tie_tolerance) {
           tree.distance[next] = candidate;
           tree.prior[next] = current;
+          pending.emplace(candidate,next);
         }
       }
     }
@@ -386,7 +423,7 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
       auto built = impl_->build_route_tree(origin_system_id,
                                            maximum_leg_range_light_years,
                                            nullptr);
-      if (impl_->routes.size() >= 64)
+      if (impl_->routes.size() >= std::clamp<std::size_t>(262144 / std::max<std::size_t>(1,impl_->systems.size()),1,64))
         impl_->routes.clear();
       found = impl_->routes.emplace(key, std::move(built)).first;
     }

@@ -700,6 +700,45 @@ void tactical_save_reload_and_continuation(const fs::path &research_root,
   session->request_save();(void)session->service("2044-05-06T07:08:20Z",true);wait_for_save(*session);
   require(read(path)==completed,"Completion-frame tactical save was not durable.");
 }
+
+void developer_save_isolation(const fs::path &research_root,const std::string &source,const fs::path &directory){
+  auto restored=restore_player_campaign_v17_json(load_adaptive_research_strategic_runtime(research_root),source);
+  const auto restored_day=restored.simulation_days();
+  auto runtime=std::move(restored).activate();
+  runtime.world().campaign().developer_provenance=CampaignDeveloperProvenance{true,true,false};
+  NativeCampaignSessionDependencies dev;dev.developer_session=true;
+  const auto path=directory/"isolated.dev17.json";
+  // This fixture is an existing campaign, not a new day-zero world. Preserve
+  // its clock while changing the test envelope; never rewind its AI schedule.
+  write_prepared_campaign(path,PreparedPlayerCampaignSave::capture_developer(
+      runtime,{restored_day,"test","2050-03-21T00:00:00Z"}),false);
+  auto session=NativeCampaignSession::load_startup(research_root,path,"test",{},dev);
+  (void)session->advance(0.,"2050-03-21T00:00:00Z");
+  session->request_save();(void)session->service("2050-03-21T00:00:00Z",false);wait_for_save(*session);
+  require(session->notice().kind==SessionNoticeKind::Saved,"Developer session background save failed.");
+  const auto first=read(path);
+  require(Json::parse(first).at("DeveloperSession")==true,"Developer writer omitted provenance.");
+  bool rejected=false;
+  try{(void)NativeCampaignSession::load_startup(research_root,path,"test");}catch(const std::exception&){rejected=true;}
+  require(rejected,"Player session loaded a developer campaign.");
+  session->request_load();require(wait_for_load(*session),"Developer session could not reload its own save.");
+  require(session->frame().runtime().world().campaign().developer_provenance->normal_research_completed,
+      "Developer provenance was lost on reload.");
+  (void)session->advance(0.,"2050-03-21T00:00:01Z");
+  session->request_save();(void)session->service("2050-03-21T00:00:01Z",false);wait_for_save(*session);
+  require(read(fs::path(path.string()+".bak"))==first,"Developer atomic save did not preserve its previous version.");
+  write(path,"broken");
+  auto recovered=NativeCampaignSession::load_startup(research_root,path,"test",{},dev);
+  require(recovered->notice().kind==SessionNoticeKind::Recovered,"Developer save backup recovery failed.");
+  require(recovered->frame().runtime().world().campaign().developer_provenance.has_value(),"Recovery cleared developer marker.");
+  const auto prepared=PreparedPlayerCampaignSave::capture_developer(recovered->frame().runtime(),{recovered->frame().clock().simulation_days(),"test","now"});
+  rejected=false;try{write_prepared_player_campaign(directory/"forbidden-player.json",prepared,false);}catch(const std::exception&){rejected=true;}
+  require(rejected&&!fs::exists(directory/"forbidden-player.json"),"Player writer silently converted a developer capture.");
+  rejected=false;try{write_prepared_campaign(directory/"forbidden-player.json",prepared,false);}catch(const std::exception&){rejected=true;}
+  require(rejected,"Generic writer allowed a developer capture at a player path.");
+  rejected=false;try{PlayerCampaignSaveController invalid({},write_prepared_campaign,CampaignSaveKind::Developer);invalid.configure(directory/"player.json",1,0,false);}catch(const std::exception&){rejected=true;}
+  require(rejected,"Developer save controller accepted a player destination.");
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -720,6 +759,7 @@ int main(int argc, char **argv) try {
       ("native-session-" + std::to_string(
           std::chrono::steady_clock::now().time_since_epoch().count()));
   require(fs::create_directory(directory), "Cannot claim session test directory.");
+  developer_save_isolation(research_root,source,directory);
   save_load_and_transactional_failure(research_root, source, directory);
   new_campaign_save_fence(research_root, source, directory);
   new_campaign_filesystem_failure(research_root, source, directory);

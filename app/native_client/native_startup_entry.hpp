@@ -2,6 +2,7 @@
 
 #include "native_startup_host.hpp"
 #include "native_startup_workspace.hpp"
+#include "native_developer_access.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -36,6 +37,7 @@ struct StartupEntryConfig {
   stellar::native_settings::NativeSettingsHub* settings_hub{};
   stellar::native_audio::NativeVoiceSettings* voice_settings{};
   std::function<void(stellar::native_map::DrawList&,int,int)> caption;
+  stellar::engine::DeveloperAccess *developer_access{};
 };
 enum class StartupEntryAutomationAction { Create, ReturnToCampaign, Exit };
 struct StartupEntryAutomation {
@@ -45,6 +47,9 @@ struct StartupEntryAutomation {
   std::filesystem::path audio_settings_path, audio_settings_screenshot;
   StartupEntryAutomationAction action{StartupEntryAutomationAction::Create};
   std::filesystem::path video_settings_path, video_settings_screenshot, video_confirm_screenshot;
+  bool developer_mode{},complete_normal_research{},full_celestial_coverage{};
+  int galaxy_card{};
+  bool full_exploration{};
 };
 struct StartupEntryEvidence {
   bool entry_opened{}, setup_opened{}, species_selected{}, size_selected{},

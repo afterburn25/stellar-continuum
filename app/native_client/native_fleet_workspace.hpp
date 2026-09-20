@@ -17,6 +17,8 @@ struct FleetScreenMarker {
   stellar::native_map::Point position{};
 };
 
+enum class FleetWorkspacePresentation { Outliner, SelectedCommands };
+
 struct FleetWorkspaceLayout {
   float scale{};
   int title_font_pixels{};
@@ -40,7 +42,8 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect engage;
 
   [[nodiscard]] static FleetWorkspaceLayout for_viewport(int width,
-                                                          int height) noexcept;
+      int height, FleetWorkspacePresentation presentation =
+          FleetWorkspacePresentation::Outliner) noexcept;
 };
 
 enum class FleetWorkspaceCommandKind {
@@ -71,6 +74,11 @@ struct FleetWorkspaceCommand {
 
 class NativeFleetWorkspace final {
 public:
+  explicit NativeFleetWorkspace(FleetWorkspacePresentation presentation =
+      FleetWorkspacePresentation::Outliner) : presentation_(presentation) {}
+  [[nodiscard]] FleetWorkspaceLayout layout(int width, int height) const noexcept;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect> panel_bounds(
+      int width, int height) const noexcept;
   void set_view(stellar::native_fleet::NativeFleetMapView view);
   void discard_campaign();
   void set_preview(stellar::native_fleet::NativeFleetRoutePreview preview,
@@ -102,6 +110,7 @@ public:
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
 
 private:
+  FleetWorkspacePresentation presentation_;
   enum class PressTarget { None, Hold, Defend, Retreat, Locate };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
   selected_fleet() const noexcept;

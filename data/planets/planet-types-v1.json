@@ -1,0 +1,2514 @@
+{
+  "version": "planet-types-v1",
+  "classes": [
+    {
+      "id": "barren",
+      "name": "Barren / Airless Rocky",
+      "weight": 20,
+      "mass": [
+        0.0001,
+        12
+      ],
+      "radius": [
+        0.03,
+        2.2
+      ],
+      "temperature": [
+        3,
+        1900
+      ],
+      "pressure": [
+        0,
+        0.05
+      ],
+      "albedo": 0.18,
+      "greenhouseCoefficient": 0,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "desert",
+      "name": "Desert",
+      "weight": 10,
+      "mass": [
+        0.03,
+        10
+      ],
+      "radius": [
+        0.2,
+        2.2
+      ],
+      "temperature": [
+        160,
+        720
+      ],
+      "pressure": [
+        0,
+        200
+      ],
+      "albedo": 0.3,
+      "greenhouseCoefficient": 0.25,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "frozen",
+      "name": "Frozen / Ice",
+      "weight": 12,
+      "mass": [
+        0.0001,
+        12
+      ],
+      "radius": [
+        0.03,
+        2.2
+      ],
+      "temperature": [
+        3,
+        260
+      ],
+      "pressure": [
+        0,
+        180
+      ],
+      "albedo": 0.55,
+      "greenhouseCoefficient": 0.18,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "ocean",
+      "name": "Ocean / Water",
+      "weight": 5,
+      "mass": [
+        0.35,
+        12
+      ],
+      "radius": [
+        0.65,
+        2.3
+      ],
+      "temperature": [
+        273.16,
+        345
+      ],
+      "pressure": [
+        40,
+        450
+      ],
+      "albedo": 0.3,
+      "greenhouseCoefficient": 0.65,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "temperate",
+      "name": "Temperate / Terran-like",
+      "weight": 4,
+      "mass": [
+        0.4,
+        4
+      ],
+      "radius": [
+        0.7,
+        1.7
+      ],
+      "temperature": [
+        273.16,
+        325
+      ],
+      "pressure": [
+        55,
+        180
+      ],
+      "albedo": 0.3,
+      "greenhouseCoefficient": 0.65,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "tundra",
+      "name": "Cold Terrestrial / Tundra",
+      "weight": 5,
+      "mass": [
+        0.25,
+        8
+      ],
+      "radius": [
+        0.6,
+        2
+      ],
+      "temperature": [
+        240,
+        285
+      ],
+      "pressure": [
+        30,
+        180
+      ],
+      "albedo": 0.4,
+      "greenhouseCoefficient": 0.65,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "volcanic",
+      "name": "Volcanic / Magma / Inferno",
+      "weight": 7,
+      "mass": [
+        0.001,
+        15
+      ],
+      "radius": [
+        0.08,
+        2.4
+      ],
+      "temperature": [
+        3,
+        2700
+      ],
+      "pressure": [
+        0,
+        400
+      ],
+      "albedo": 0.16,
+      "greenhouseCoefficient": 0.5,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse / Toxic",
+      "weight": 5,
+      "mass": [
+        0.3,
+        15
+      ],
+      "radius": [
+        0.65,
+        2.4
+      ],
+      "temperature": [
+        350,
+        1200
+      ],
+      "pressure": [
+        1000,
+        10000
+      ],
+      "albedo": 0.65,
+      "greenhouseCoefficient": 2.8,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 44,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "carbon-dioxide-rich"
+      }
+    },
+    {
+      "id": "carbon",
+      "name": "Carbon World",
+      "weight": 2,
+      "mass": [
+        0.03,
+        15
+      ],
+      "radius": [
+        0.2,
+        2.4
+      ],
+      "temperature": [
+        3,
+        1600
+      ],
+      "pressure": [
+        0,
+        50
+      ],
+      "albedo": 0.1,
+      "greenhouseCoefficient": 0.3,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "super-earth",
+      "name": "Super-Earth",
+      "weight": 8,
+      "mass": [
+        1.5,
+        15
+      ],
+      "radius": [
+        1,
+        2.4
+      ],
+      "temperature": [
+        3,
+        1400
+      ],
+      "pressure": [
+        0,
+        700
+      ],
+      "albedo": 0.3,
+      "greenhouseCoefficient": 0.65,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "mini-neptune",
+      "name": "Mini-Neptune",
+      "weight": 7,
+      "mass": [
+        2,
+        25
+      ],
+      "radius": [
+        1.7,
+        4
+      ],
+      "temperature": [
+        25,
+        1000
+      ],
+      "pressure": [
+        1000,
+        30000
+      ],
+      "albedo": 0.35,
+      "greenhouseCoefficient": 0.08,
+      "solid": false,
+      "atmosphereRules": {
+        "molecularMass": 2.3,
+        "minimumRetention": 6,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "hydrogen-helium-reducing"
+      }
+    },
+    {
+      "id": "gas-giant",
+      "name": "Gas Giant",
+      "weight": 7,
+      "mass": [
+        45,
+        4000
+      ],
+      "radius": [
+        5,
+        15
+      ],
+      "temperature": [
+        20,
+        1100
+      ],
+      "pressure": [
+        1000,
+        50000
+      ],
+      "albedo": 0.4,
+      "greenhouseCoefficient": 0.01,
+      "solid": false,
+      "atmosphereRules": {
+        "molecularMass": 2.3,
+        "minimumRetention": 6,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "hydrogen-helium-reducing"
+      }
+    },
+    {
+      "id": "ice-giant",
+      "name": "Ice Giant",
+      "weight": 5,
+      "mass": [
+        7,
+        55
+      ],
+      "radius": [
+        2.5,
+        6
+      ],
+      "temperature": [
+        20,
+        230
+      ],
+      "pressure": [
+        1000,
+        30000
+      ],
+      "albedo": 0.45,
+      "greenhouseCoefficient": 0.015,
+      "solid": false,
+      "atmosphereRules": {
+        "molecularMass": 2.3,
+        "minimumRetention": 6,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "hydrogen-helium-reducing"
+      }
+    },
+    {
+      "id": "hot-jupiter",
+      "name": "Hot Jupiter",
+      "weight": 1,
+      "mass": [
+        60,
+        4000
+      ],
+      "radius": [
+        7,
+        20
+      ],
+      "temperature": [
+        800,
+        3500
+      ],
+      "pressure": [
+        1000,
+        50000
+      ],
+      "albedo": 0.15,
+      "greenhouseCoefficient": 0.01,
+      "solid": false,
+      "atmosphereRules": {
+        "molecularMass": 2.3,
+        "minimumRetention": 6,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "hydrogen-helium-reducing"
+      }
+    },
+    {
+      "id": "chthonian",
+      "name": "Chthonian / Stripped Core",
+      "weight": 0.5,
+      "mass": [
+        1,
+        25
+      ],
+      "radius": [
+        0.8,
+        2.5
+      ],
+      "temperature": [
+        650,
+        3000
+      ],
+      "pressure": [
+        0,
+        0.01
+      ],
+      "albedo": 0.15,
+      "greenhouseCoefficient": 0,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    },
+    {
+      "id": "cracked",
+      "name": "Cracked / Shattered",
+      "weight": 1.5,
+      "mass": [
+        0.001,
+        15
+      ],
+      "radius": [
+        0.1,
+        2.5
+      ],
+      "temperature": [
+        3,
+        2200
+      ],
+      "pressure": [
+        0,
+        15
+      ],
+      "albedo": 0.18,
+      "greenhouseCoefficient": 0.05,
+      "solid": true,
+      "atmosphereRules": {
+        "molecularMass": 28,
+        "minimumRetention": 12,
+        "retentionCheckAboveKpa": 10,
+        "compositionRule": "retained-surface-atmosphere"
+      }
+    }
+  ],
+  "temperateWeights": {
+    "terran": 55,
+    "jungle": 15,
+    "savannah": 15,
+    "gaia": 5,
+    "other": 10
+  },
+  "subclasses": [
+    {
+      "id": "ancient-grey-crater",
+      "name": "Ancient Grey Crater",
+      "primary": "barren",
+      "temperature": [
+        3,
+        1900
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "dormant-volcanic",
+      "name": "Dormant Volcanic",
+      "primary": "barren",
+      "temperature": [
+        3,
+        1900
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "iron-rich-rust",
+      "name": "Iron Rich Rust",
+      "primary": "barren",
+      "temperature": [
+        3,
+        1900
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "mineral-highlands",
+      "name": "Mineral Highlands",
+      "primary": "barren",
+      "temperature": [
+        3,
+        1900
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "diamond-rich",
+      "name": "Diamond Rich",
+      "primary": "carbon",
+      "temperature": [
+        3,
+        1600
+      ],
+      "composition": "carbon",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "dormant-carbon-volcanic",
+      "name": "Dormant Carbon Volcanic",
+      "primary": "carbon",
+      "temperature": [
+        3,
+        1600
+      ],
+      "composition": "carbon",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "graphite",
+      "name": "Graphite",
+      "primary": "carbon",
+      "temperature": [
+        3,
+        1600
+      ],
+      "composition": "carbon",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "stripped-core",
+      "name": "Stripped Core",
+      "primary": "chthonian",
+      "temperature": [
+        650,
+        3000
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "atmosphere-loss",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "ancient-collision-scar",
+      "name": "Ancient Collision Scar",
+      "primary": "cracked",
+      "temperature": [
+        3,
+        2200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "catastrophic-impact",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blown-apart",
+      "name": "Blown Apart",
+      "primary": "cracked",
+      "temperature": [
+        3,
+        2200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "catastrophic-impact",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "global-fracture",
+      "name": "Global Fracture",
+      "primary": "cracked",
+      "temperature": [
+        3,
+        2200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "catastrophic-impact",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "partially-shattered",
+      "name": "Partially Shattered",
+      "primary": "cracked",
+      "temperature": [
+        3,
+        2200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "catastrophic-impact",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "golden-dune",
+      "name": "Golden Dune",
+      "primary": "desert",
+      "temperature": [
+        160,
+        720
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "red-canyon",
+      "name": "Red Canyon",
+      "primary": "desert",
+      "temperature": [
+        160,
+        720
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "white-salt",
+      "name": "White Salt",
+      "primary": "desert",
+      "temperature": [
+        160,
+        720
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "evaporated-basin",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-glacier",
+      "name": "Blue Glacier",
+      "primary": "frozen",
+      "temperature": [
+        3,
+        260
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0.85,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cryogenic-hydrocarbon",
+      "name": "Cryogenic Hydrocarbon",
+      "primary": "frozen",
+      "temperature": [
+        80,
+        120
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0.35,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "hydrocarbon-reducing"
+    },
+    {
+      "id": "dirty-ice",
+      "name": "Dirty Ice",
+      "primary": "frozen",
+      "temperature": [
+        3,
+        260
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0.85,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "global-ice",
+      "name": "Global Ice",
+      "primary": "frozen",
+      "temperature": [
+        3,
+        260
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0.85,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "acid-rain",
+      "name": "Acid Rain",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "amber-chemical",
+      "name": "Amber Chemical",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "amber-cloud",
+      "name": "Amber Cloud",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-green-chemical",
+      "name": "Blue Green Chemical",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "corrosive-cloud",
+      "name": "Corrosive Cloud",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cream-cloud",
+      "name": "Cream Cloud",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "green-chemical",
+      "name": "Green Chemical",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "sulfuric-cloud",
+      "name": "Sulfuric Cloud",
+      "primary": "greenhouse",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "migrated-hot-giant",
+      "name": "Migrated Hot Giant",
+      "primary": "hot-jupiter",
+      "temperature": [
+        800,
+        3500
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "blue-cloud",
+      "name": "Blue Cloud",
+      "primary": "mini-neptune",
+      "temperature": [
+        25,
+        1000
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.8,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "archipelago",
+      "name": "Archipelago",
+      "primary": "ocean",
+      "temperature": [
+        273.16,
+        340
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.75,
+      "ice": 0,
+      "vegetation": 0.04,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "global-waterworld",
+      "name": "Global Waterworld",
+      "primary": "ocean",
+      "temperature": [
+        273.16,
+        340
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.75,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "storm-ocean",
+      "name": "Storm Ocean",
+      "primary": "ocean",
+      "temperature": [
+        273.16,
+        340
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.75,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cold-oceanic",
+      "name": "Cold Oceanic",
+      "primary": "super-earth",
+      "temperature": [
+        273.16,
+        286
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.45,
+      "ice": 0.4,
+      "vegetation": 0,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse",
+      "primary": "super-earth",
+      "temperature": [
+        350,
+        1200
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "massive-habitable",
+      "name": "Massive Habitable",
+      "primary": "super-earth",
+      "temperature": [
+        278,
+        320
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.45,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "rocky-high-gravity",
+      "name": "Rocky High Gravity",
+      "primary": "super-earth",
+      "temperature": [
+        3,
+        1400
+      ],
+      "composition": "silicate",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "gaia-balanced",
+      "name": "Gaia Balanced",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "gaia",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "gaia-islands",
+      "name": "Gaia Islands",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "gaia",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "gaia-supercontinent",
+      "name": "Gaia Supercontinent",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "gaia",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "jungle-archipelago",
+      "name": "Jungle Archipelago",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "jungle",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.7,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "jungle-supercontinent",
+      "name": "Jungle Supercontinent",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "jungle",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.7,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "other-temperate",
+      "name": "Other Temperate",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "savannah",
+      "name": "Savannah",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "savannah",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "terran",
+      "name": "Terran",
+      "primary": "temperate",
+      "temperature": [
+        273.16,
+        325
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "terran",
+      "water": 0.5,
+      "ice": 0,
+      "vegetation": 0.35,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "boreal",
+      "name": "Boreal",
+      "primary": "tundra",
+      "temperature": [
+        273.16,
+        285
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.1,
+      "ice": 0.4,
+      "vegetation": 0.12,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "cold-oceanic",
+      "name": "Cold Oceanic",
+      "primary": "tundra",
+      "temperature": [
+        273.16,
+        286
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.1,
+      "ice": 0.4,
+      "vegetation": 0,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cold-steppe",
+      "name": "Cold Steppe",
+      "primary": "tundra",
+      "temperature": [
+        273.16,
+        285
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.1,
+      "ice": 0.4,
+      "vegetation": 0.12,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "oxygen-bearing"
+    },
+    {
+      "id": "semi-frozen",
+      "name": "Semi Frozen",
+      "primary": "tundra",
+      "temperature": [
+        273.16,
+        285
+      ],
+      "composition": "water-rich",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0.1,
+      "ice": 0.4,
+      "vegetation": 0,
+      "clouds": 0.3,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": true,
+      "iceAllowed": true,
+      "volcanismAllowed": false,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "ash-caldera",
+      "name": "Ash Caldera",
+      "primary": "volcanic",
+      "temperature": [
+        3,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "local-geology",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.08,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "fractured-lava",
+      "name": "Fractured Lava",
+      "primary": "volcanic",
+      "temperature": [
+        950,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "global-magma",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.7,
+      "rings": false,
+      "validOrbitalZones": [
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "magma-ocean",
+      "name": "Magma Ocean",
+      "primary": "volcanic",
+      "temperature": [
+        950,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "global-magma",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.7,
+      "rings": false,
+      "validOrbitalZones": [
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "rift",
+      "name": "Rift",
+      "primary": "volcanic",
+      "temperature": [
+        3,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "local-geology",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.08,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "shield-volcano",
+      "name": "Shield Volcano",
+      "primary": "volcanic",
+      "temperature": [
+        3,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "local-geology",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.08,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "sulfur-inferno",
+      "name": "Sulfur Inferno",
+      "primary": "volcanic",
+      "temperature": [
+        950,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "global-magma",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.7,
+      "rings": false,
+      "validOrbitalZones": [
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "sulfur-volcanic",
+      "name": "Sulfur Volcanic",
+      "primary": "volcanic",
+      "temperature": [
+        3,
+        2700
+      ],
+      "composition": "silicate",
+      "heatSource": "local-geology",
+      "history": "undisturbed",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.08,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "icy-hotspots",
+      "name": "Ice World with Local Hotspots",
+      "primary": "frozen",
+      "temperature": [
+        70,
+        250
+      ],
+      "composition": "water-ice-and-silicate",
+      "heatSource": "local-geology",
+      "history": "local-geology",
+      "temperateGroup": "other",
+      "water": 0,
+      "ice": 0.85,
+      "vegetation": 0,
+      "clouds": 0.05,
+      "emission": 0.06,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": true,
+      "volcanismAllowed": true,
+      "generationWeight": 1,
+      "atmosphereRule": "class-pressure-retention"
+    },
+    {
+      "id": "cream-band",
+      "name": "Cream Band Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        450
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 26,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Gas Giants/Gas Giant A - Cream Band Giant",
+      "cloudProfile": "ammonia-water-clouds",
+      "stormActivity": 0.28
+    },
+    {
+      "id": "amber-storm",
+      "name": "Amber Storm Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        30,
+        700
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 25,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Gas Giants/Gas Giant B - Amber Storm Giant",
+      "cloudProfile": "ammonia-hydrosulfide-clouds",
+      "stormActivity": 0.8
+    },
+    {
+      "id": "blue-mist",
+      "name": "Blue Mist Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        20,
+        350
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 20,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Gas Giants/Gas Giant C - Blue Mist Giant",
+      "cloudProfile": "methane-haze",
+      "stormActivity": 0.35
+    },
+    {
+      "id": "emerald-cloud",
+      "name": "Emerald Cloud Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        30,
+        400
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 17,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": false,
+      "sourceFolder": "Gas Giants/Gas Giant D - Emerald Cloud Giant",
+      "cloudProfile": "mixed-condensate-clouds",
+      "stormActivity": 0.55
+    },
+    {
+      "id": "dark-cyclone",
+      "name": "Dark Cyclone Giant",
+      "primary": "gas-giant",
+      "temperature": [
+        35,
+        1100
+      ],
+      "composition": "hydrogen-helium",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold",
+        "temperate",
+        "warm",
+        "hot"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 12,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Gas Giants/Gas Giant E — Dark Cyclone Giant",
+      "cloudProfile": "deep-storm-clouds",
+      "stormActivity": 0.95
+    },
+    {
+      "id": "cyan-haze",
+      "name": "Cyan Haze Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        180
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 27,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Ice Giants/Ice Giant A - Cyan Haze Giant",
+      "cloudProfile": "methane-haze",
+      "stormActivity": 0.25
+    },
+    {
+      "id": "deep-azure",
+      "name": "Deep Azure Ice Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        230
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 24,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Ice Giants/Ice Giant B - Deep Azure Ice Giant",
+      "cloudProfile": "methane-clouds",
+      "stormActivity": 0.6
+    },
+    {
+      "id": "frost-veil",
+      "name": "Frost Veil Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        150
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 20,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Ice Giants/Ice Giant C - Frost Veil Giant",
+      "cloudProfile": "high-condensate-veil",
+      "stormActivity": 0.18
+    },
+    {
+      "id": "teal-storm",
+      "name": "Teal Storm Ice Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        35,
+        230
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 17,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Ice Giants/Ice Giant D - Teal Storm Ice Giant",
+      "cloudProfile": "methane-storm-clouds",
+      "stormActivity": 0.85
+    },
+    {
+      "id": "dark-polar",
+      "name": "Dark Polar Ice Giant",
+      "primary": "ice-giant",
+      "temperature": [
+        20,
+        170
+      ],
+      "composition": "hydrogen-helium-methane",
+      "heatSource": "stellar",
+      "history": "undisturbed",
+      "temperateGroup": "",
+      "water": 0,
+      "ice": 0,
+      "vegetation": 0,
+      "clouds": 1,
+      "emission": 0,
+      "rings": false,
+      "validOrbitalZones": [
+        "deep-cold",
+        "cold"
+      ],
+      "waterAllowed": false,
+      "iceAllowed": false,
+      "volcanismAllowed": false,
+      "generationWeight": 12,
+      "atmosphereRule": "class-pressure-retention",
+      "generationEnabled": true,
+      "sourceFolder": "Ice Giants/Ice Giant E - Dark Polar Ice Giant",
+      "cloudProfile": "polar-haze-and-vortices",
+      "stormActivity": 0.65
+    }
+  ],
+  "orbitalZones": [
+    {
+      "id": "deep-cold",
+      "name": "Deep cold",
+      "equilibriumKelvin": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "cold",
+      "name": "Cold",
+      "equilibriumKelvin": [
+        120,
+        240
+      ]
+    },
+    {
+      "id": "temperate",
+      "name": "Temperate irradiation",
+      "equilibriumKelvin": [
+        240,
+        350
+      ]
+    },
+    {
+      "id": "warm",
+      "name": "Warm",
+      "equilibriumKelvin": [
+        350,
+        700
+      ]
+    },
+    {
+      "id": "hot",
+      "name": "Hot",
+      "equilibriumKelvin": [
+        700,
+        1000000
+      ]
+    }
+  ],
+  "orbitalZoneMeaning": "Equilibrium-temperature bands, evaluated from stellar flux and class albedo. Surface temperature, pressure, retention and heat rules must also pass. Upper boundaries are exclusive."
+}

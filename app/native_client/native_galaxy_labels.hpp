@@ -8,7 +8,7 @@
 
 namespace stellar::native_galaxy_ui {
 
-enum class NativeGalaxyLabelKind { system, empire };
+enum class NativeGalaxyLabelKind { system, empire, central_object };
 enum class NativeGalaxyLabelObstacleKind { hud, star };
 
 struct NativeGalaxyLabelCandidate {
@@ -59,6 +59,8 @@ using NativeGalaxyLabelMeasurer =
 inline constexpr std::size_t maximum_measured_labels = 128;
 inline constexpr std::size_t maximum_measured_empire_labels = 32;
 
+// Finite positive obstacle footprints may extend arbitrarily beyond the view;
+// layout clips them to the bounded viewport before collision checks.
 [[nodiscard]] NativeGalaxyLabelLayout layout_native_galaxy_labels(
     std::vector<NativeGalaxyLabelCandidate> candidates,
     native_map::UiRect viewport,

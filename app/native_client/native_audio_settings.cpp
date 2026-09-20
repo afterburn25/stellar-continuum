@@ -41,12 +41,11 @@ void label(DrawList& draw, Point at, std::string value, int size, UiRect clip,
   draw.overlay.emplace_back(Text{at, std::move(value), text_color, size, clip.width, clip, align, face});
 }
 void button(DrawList& draw, UiRect rect, std::string value, int size, bool selected = false) {
-  draw.overlay.emplace_back(FilledRectangle{rect, selected ? accent : Color{22, 53, 76, 255}});
-  draw.overlay.emplace_back(StrokedRectangle{rect, selected ? Color{222, 255, 244, 255} : panel_stroke});
+  stellar::engine::ui_skin::control(draw,rect,false,selected,true,std::max(.5f,size/17.f));
   const auto at = center(rect);
   draw.overlay.emplace_back(Text{{at.x, at.y - static_cast<float>(size) * .5f},
-      std::move(value), selected ? panel_fill : text_color, size,
-      rect.width, rect, TextAlign::Center});
+      std::move(value), text_color, size,
+      rect.width, rect, TextAlign::Center,FontFace::Interface});
 }
 std::string percentage(float gain) { return std::to_string(static_cast<int>(std::lround(gain * 100.f))) + "%"; }
 }

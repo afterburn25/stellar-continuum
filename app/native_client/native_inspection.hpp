@@ -20,6 +20,7 @@ struct SystemInspection {
   int selected_system_id{-1}, observer_id{};
   std::string name{"SELECT A STAR"}, survey_status{"No target"}, guidance;
   double survey_progress{};
+  bool developer_inspection{};
   std::vector<InspectionFact> facts;
   std::vector<OwnSettlementInspection> own_settlements;
   std::string foreign_settlement_intelligence{"Foreign settlement intelligence unavailable"};

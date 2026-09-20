@@ -1,0 +1,2 @@
+#pragma once
+inline constexpr const char* galaxy_phenomena_data=R"phenomenadata(@STELLAR_PHENOMENA_DATA@)phenomenadata";

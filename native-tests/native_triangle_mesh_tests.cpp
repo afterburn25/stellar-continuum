@@ -29,6 +29,10 @@ int main() {
     rejects([](auto &m) { m.indices[2] = 3; });
     rejects([](auto &m) { m.indices.pop_back(); });
     rejects([](auto &m) { m.indices.clear(); });
+    rejects([](auto &m) { m.texture_coordinates={{0,0}}; });
+    rejects([](auto &m) { m.vertex_colors.resize(2); });
+    rejects([](auto &m) { m.texture_coordinates={{0,0},{1,0},{0,1.01f}}; });
+    rejects([](auto &m) { m.texture_coordinates={{0,0},{1,0},{0,std::numeric_limits<float>::quiet_NaN()}}; });
     rejects([](auto &m) { m.vertices.clear(); });
     rejects([](auto &m) { m.vertices[0].x = std::numeric_limits<float>::quiet_NaN(); });
     rejects([](auto &m) { m.vertices[0].y = std::numeric_limits<float>::infinity(); });

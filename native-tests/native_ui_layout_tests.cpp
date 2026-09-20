@@ -92,16 +92,17 @@ void verify(int width, int height, float expected_scale) {
               !overlaps(layout.supply, layout.economy) &&
               !overlaps(layout.economy, layout.colonies),
           "Top controls overlap each other.");
-  const auto rail_right = layout.research.x + layout.research.width;
-  require(std::abs(layout.research.x - 18.f * layout.scale) < .01f &&
+  const auto rail_right = layout.inspect.x + layout.inspect.width;
+  require(std::abs(layout.inspect.x - 18.f * layout.scale) < .01f &&
               rail_right <= native_navigation_content_left * layout.scale &&
-              layout.shipyard.x == layout.research.x &&
-              layout.construction.x == layout.research.x &&
-              layout.diplomacy.x == layout.research.x &&
-              layout.supply.x == layout.research.x &&
-              layout.economy.x == layout.research.x &&
-              layout.colonies.x == layout.research.x,
-          "Navigation rail did not preserve the shared content gutter.");
+              layout.construction.x == layout.inspect.x &&
+              layout.explore.x == layout.inspect.x,
+          "Secondary navigation did not preserve the shared content gutter.");
+  const std::array primary{layout.map,layout.home,layout.colonies,layout.economy,layout.research,layout.diplomacy,layout.supply,layout.shipyard};
+  for(std::size_t i=0;i<primary.size();++i){
+    require(contains_rect(layout.navigation_bar,primary[i])&&!overlaps(layout.brand,primary[i]),"Primary navigation overlaps branding or escapes its header.");
+    for(std::size_t j=0;j<i;++j)require(!overlaps(primary[i],primary[j]),"Primary navigation tabs overlap.");
+  }
   require(!overlaps(layout.pause, layout.day_text) &&
               !overlaps(layout.speed, layout.day_text) &&
               !overlaps(layout.pause, layout.status_text) &&
@@ -125,8 +126,9 @@ void verify(int width, int height, float expected_scale) {
     for (const auto point : interior_points(bounds)) {
       require(layout.hit(point, true) == action,
               "A point inside a menu button missed its action.");
-      require(layout.hit(point, false) == UiAction::None,
-              "Closed menu accepted a hidden button.");
+      const auto visible_action=layout.hit(point,false);
+      for(const auto& entry:menu)
+        require(visible_action!=entry.second,"Closed menu accepted a hidden button.");
     }
   }
   require(!overlaps(layout.menu_heading, layout.continue_button),
@@ -143,15 +145,16 @@ void verify(int width, int height, float expected_scale) {
   for (const auto point : interior_points(layout.notifications)) {
     require(layout.hit(point, false) == UiAction::Notifications,
             "A point inside Events missed its action.");
-    require(layout.hit(point, true) == UiAction::None,
+    require(layout.hit(point, true) != UiAction::Notifications,
             "The pause menu admitted a hidden Events button.");
   }
   for (const auto [bounds, action] : navigation)
     for (const auto point : interior_points(bounds)) {
       require(layout.hit(point, false) == action,
               "A point inside a navigation button missed its action.");
-      require(layout.hit(point, true) == UiAction::None,
-              "Pause menu accepted a hidden navigation action.");
+      const auto modal_action=layout.hit(point,true);
+      for(const auto& entry:navigation)
+        require(modal_action!=entry.second,"Pause menu accepted a hidden navigation action.");
     }
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,

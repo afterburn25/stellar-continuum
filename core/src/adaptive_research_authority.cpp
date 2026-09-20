@@ -183,12 +183,19 @@ AdaptiveResearchAuthority::start_directed_research(
     std::optional<std::string_view> target_context_view) const {
   const std::string node_id(node_id_view);
   const auto target_context = own(target_context_view);
+  const auto *cancelled = state.cancelled_project(node_id);
   const auto breakdown =
-      get_project_readiness(state, node_id, ResearchMaturity::experimental,
+      get_project_readiness(state, node_id, cancelled ? cancelled->stage : ResearchMaturity::experimental,
                             requested_assigned_labs, view(target_context));
   return storage_->kernel.start_directed_research(
       state, node_id, requested_assigned_labs,
       breakdown.overall_readiness_score, view(target_context));
+}
+
+AdaptiveResearchCommandResult
+AdaptiveResearchAuthority::cancel_directed_research(
+    AdaptiveResearchCivilizationState &state, std::string_view node_id) const {
+  return storage_->kernel.cancel_directed_research(state, node_id);
 }
 
 AdaptiveResearchCommandResult

@@ -55,7 +55,8 @@ const CivilizationEconomy &economy(SettlementPlanningWorldView w, int id) {
 }
 MissionReachAssessment reach(const SettlementReachAssessment &cb,
                              SettlementPlanningWorldView w, const FleetState &f,
-                             int target) {
+                             int target,OperationalReachBatch *batch=nullptr) {
+  if(batch)return batch->assess(f,target,InterstellarMissionKind::Colony);
   return cb ? cb({w.systems, w.colonies, w.lanes}, f.civilization_id, f, target,
                  InterstellarMissionKind::Colony)
             : assess_operational_reach({w.systems, w.colonies, w.lanes},
@@ -203,6 +204,8 @@ ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
                                                    f->civilization_id, sp->id);
   auto reservations =
       build_friendly_colony_mission_reservations(w.knowledge_view(), *f);
+  std::optional<OperationalReachBatch> batch;
+  if(!reach_)batch.emplace(OperationalReachWorldView{w.systems,w.colonies,w.lanes},f->civilization_id);
   std::unordered_map<int, MissionReachAssessment> reaches;
   std::vector<ColonizationOpportunityCandidate> c;
   for (const auto &v : views) {
@@ -210,7 +213,7 @@ ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
       continue;
     auto [it, added] = reaches.try_emplace(v.system_id);
     if (added)
-      it->second = reach(reach_, w, *f, v.system_id);
+      it->second = reach(reach_, w, *f, v.system_id,batch?&*batch:nullptr);
     c.push_back(colony_candidate(w, *f, *systems.at(v.system_id),
                                  *bodies.at(v.planetary_body_id), v, it->second,
                                  sp->display_name, reservations));
@@ -367,6 +370,8 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
   for (auto &v : views)
     if (!suit.emplace(v.planetary_body_id, v).second)
       throw std::invalid_argument(duplicate(v.planetary_body_id));
+  std::optional<OperationalReachBatch> batch;
+  if(!reach_)batch.emplace(OperationalReachWorldView{w.systems,w.colonies,w.lanes},f->civilization_id);
   std::unordered_map<int, MissionReachAssessment> reaches;
   std::vector<ResourceOutpostOpportunityCandidate> c;
   for (const auto &body : w.bodies) {
@@ -376,7 +381,7 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
       continue;
     auto [it, a] = reaches.try_emplace(body.system_id);
     if (a)
-      it->second = reach(reach_, w, *f, body.system_id);
+      it->second = reach(reach_, w, *f, body.system_id,batch?&*batch:nullptr);
     const auto &s = *systems.at(body.system_id);
     const auto &v = suit.at(body.id);
     auto dep = resource_deposit_profile(body);

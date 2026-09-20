@@ -78,7 +78,7 @@ struct CellRange {
                                     const NativeGalaxyLabelCandidate &right) {
   if (left.selected != right.selected) return left.selected;
   if (left.kind != right.kind)
-    return left.kind == NativeGalaxyLabelKind::empire;
+    return static_cast<int>(left.kind) > static_cast<int>(right.kind);
   if (left.priority != right.priority) return left.priority > right.priority;
   if (left.stable_id != right.stable_id) return left.stable_id < right.stable_id;
   return left.label.value < right.label.value;
@@ -94,12 +94,12 @@ placement_options(const NativeGalaxyLabelCandidate &candidate,
                   const TextExtent extent) {
   // Empire labels render a one-pixel drop shadow; their collision/audit bounds
   // cover the union of the measured foreground and that shadow.
-  const float shadow = candidate.kind == NativeGalaxyLabelKind::empire ? 1.f : 0.f;
+  const float shadow = candidate.kind != NativeGalaxyLabelKind::system ? 1.f : 0.f;
   const float width = static_cast<float>(extent.width) + shadow;
   const float height = static_cast<float>(extent.height) + shadow;
   const float clearance = candidate.anchor_radius + label_gap;
   PlacementOptions options;
-  if (candidate.kind == NativeGalaxyLabelKind::empire) {
+  if (candidate.kind != NativeGalaxyLabelKind::system) {
     const float horizontal_step = std::max(28.f, width * .25f);
     const float vertical_step = std::max(24.f, height + 10.f);
     for (int ring = 0; ring < 6; ++ring) {
@@ -149,18 +149,15 @@ placement_options(const NativeGalaxyLabelCandidate &candidate,
         });
     return options;
   }
+  // System names stay below their own marker at every zoom. Crowded names
+  // may step downward; they never jump to the sides or above the object.
+  for(int row=0;row<3;++row)
+    options.bounds[options.count++] =
+        {candidate.anchor.x-width*.5f,candidate.anchor.y+clearance+row*(height+4.f),width,height};
+  // A tight but still padded placement can keep a selected name visible in a
+  // narrow gap between its marker and the HUD without moving it sideways.
   options.bounds[options.count++] =
-      {candidate.anchor.x + clearance,
-       candidate.anchor.y - height * .5f, width, height};
-  options.bounds[options.count++] =
-      {candidate.anchor.x - clearance - width,
-       candidate.anchor.y - height * .5f, width, height};
-  options.bounds[options.count++] =
-      {candidate.anchor.x - width * .5f,
-       candidate.anchor.y - clearance - height, width, height};
-  options.bounds[options.count++] =
-      {candidate.anchor.x - width * .5f,
-       candidate.anchor.y + clearance, width, height};
+      {candidate.anchor.x-width*.5f,candidate.anchor.y+candidate.anchor_radius+2.f,width,height};
   return options;
 }
 
@@ -204,10 +201,26 @@ NativeGalaxyLabelLayout layout_native_galaxy_labels(
     throw std::invalid_argument("Galaxy label viewport must be finite and positive.");
   if (!measure)
     throw std::invalid_argument("Galaxy label layout requires a text measurer.");
-  for (const auto &obstacle : obstacles)
-    if (!positive_rect(obstacle.bounds))
+  // Projected bodies may be millions of pixels away at close map zoom. Only
+  // their intersection with this viewport can block a label. Clip before
+  // applying spatial-grid limits, using doubles so finite float endpoints
+  // cannot overflow while adding an oversized footprint's width or height.
+  std::erase_if(obstacles, [&](auto &obstacle) {
+    const auto bounds = obstacle.bounds;
+    if (!finite_rect(bounds) || bounds.width <= 0.f || bounds.height <= 0.f)
       throw std::invalid_argument(
           "Galaxy label obstacles must be finite and positive.");
+    const double left = std::max<double>(bounds.x, viewport.x);
+    const double top = std::max<double>(bounds.y, viewport.y);
+    const double right = std::min(static_cast<double>(bounds.x) + bounds.width,
+                                  static_cast<double>(viewport.x) + viewport.width);
+    const double bottom = std::min(static_cast<double>(bounds.y) + bounds.height,
+                                   static_cast<double>(viewport.y) + viewport.height);
+    if (left >= right || top >= bottom) return true;
+    obstacle.bounds = {static_cast<float>(left), static_cast<float>(top),
+                       static_cast<float>(right - left), static_cast<float>(bottom - top)};
+    return false;
+  });
 
   NativeGalaxyLabelLayout result;
   candidates.erase(
@@ -234,9 +247,9 @@ NativeGalaxyLabelLayout layout_native_galaxy_labels(
   std::vector<NativeGalaxyLabelCandidate> system_candidates;
   std::vector<NativeGalaxyLabelCandidate> empire_candidates;
   for (auto &candidate : candidates) {
-    auto &destination = candidate.kind == NativeGalaxyLabelKind::system
-                            ? system_candidates
-                            : empire_candidates;
+    auto &destination = candidate.kind == NativeGalaxyLabelKind::empire
+                            ? empire_candidates
+                            : system_candidates;
     destination.push_back(std::move(candidate));
   }
   const auto empire_limit = std::min(maximum_measured_empire_labels,

@@ -1,11 +1,15 @@
 #include "native_territory_projection.hpp"
 #include "native_territory_overlay.hpp"
+#include <stellar/engine/image_clipping.hpp>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
@@ -315,6 +319,31 @@ void overlay_cache_is_bounded_complete_and_camera_independent() {
   require(resized_stats.fog_images == 1 && resized_stats.fill_images == 1 &&
               overlay.cached_image_bytes() == initial_bytes,
           "panning or resizing rebuilt the retained territory images");
+  camera.center={0,0};camera.pixels_per_world=1000.;
+  stellar::native_map::DrawList magnified;
+  const auto magnified_stats=overlay.append(magnified,camera,1280,720,.2f);
+  require(magnified_stats.fog_images==1&&magnified_stats.fill_images==1,
+          "Magnified territory disappeared instead of cropping.");
+  for(const auto& command:magnified.world)if(const auto* image=std::get_if<stellar::native_map::Image>(&command))
+    require(image->source&&image->destination.x>=0&&image->destination.y>=0&&
+        image->destination.width<=1280&&image->destination.height<=720,
+        "Magnified atlas exceeded drawable bounds.");
+}
+
+void projected_image_cropping_preserves_uvs(){
+  using namespace stellar::native_map;
+  const auto art=RgbaImage::create(100,100,std::vector<std::uint8_t>(40000,255));
+  Image original{art,{-100000,-200000,400000,400000},UiRect{20,10,40,80}};
+  auto clipped=clip_image_to_viewport(original,{0,0,1000,800});
+  require(clipped&&clipped->source&&clipped->destination.width==1000&&
+      clipped->destination.height==800&&clipped->source->x==30&&clipped->source->y==50&&
+      std::abs(clipped->source->width-.1f)<.00001f&&std::abs(clipped->source->height-.16f)<.00001f,
+      "Large image crop changed source coordinates or scale.");
+  original.destination={2000,2000,100,100};
+  require(!clip_image_to_viewport(original,{0,0,1000,800}),"Offscreen image was submitted.");
+  original.rotation_degrees=30;
+  bool rejected=false;try{(void)clip_image_to_viewport(original,{0,0,1000,800});}catch(const std::invalid_argument&){rejected=true;}
+  require(rejected,"Axis-aligned crop silently distorted a rotated image.");
 }
 
 void async_request_coalesces_and_clear_invalidates() {
@@ -513,6 +542,145 @@ void run_update_benchmarks() {
   benchmark_update_case(500, 3, 100);
   benchmark_update_case(2500, 6, 30);
   benchmark_update_case(2500, 6, 500);
+  benchmark_update_case(10000, 6, 9994);
+}
+
+void async_source_key_tracks_visible_changes() {
+  auto world = make_world();
+  NativeTerritoryOverlay overlay;
+  std::atomic<int> preparations = 0;
+  overlay.set_preparation_hook_for_tests([&] { ++preparations; });
+  const auto finish = [&] {
+    while (overlay.pending()) { overlay.poll(); std::this_thread::yield(); }
+  };
+  overlay.request_update(world, 0, {}, 1);
+  finish();
+  for (int i = 0; i < 20; ++i) overlay.request_update(world, 0, {}, 1);
+  require(!overlay.pending() && preparations == 1,
+          "Unchanged source key rebuilt territory.");
+  world.civilizations[1].name = "Updated visible empire";
+  world.systems[1].position.x += 1.f;
+  world.knowledge.reveal_system(0, 3);
+  const std::vector<TerritorialClaimSnapshot> claims{make_claim(1, 0, 3)};
+  overlay.request_update(world, 0, claims, 1);
+  finish();
+  const auto &view = *overlay.projection();
+  const auto *region = region_of(view, 1);
+  require(preparations == 2 && region && region->civilization_name == world.civilizations[1].name &&
+              !view.unexplored_system_ids.contains(3) && view.claims.size() == 1 &&
+              region->anchors.front().position.x == world.systems[1].position.x * 14.f,
+          "Source-key reuse hid a rename, coordinate, discovery or claim change.");
+}
+
+void fully_settled_large_galaxy_has_no_visibility_cutoff() {
+  auto world = make_benchmark_world(10000, 6, 9994);
+  std::vector<TerritorialClaimSnapshot> claims;
+  for (int system = 0; system < 10000; ++system) {
+    claims.push_back(make_claim(system * 2, system % 6, system));
+    claims.push_back(make_claim(system * 2 + 1, (system + 1) % 6, system));
+  }
+  const auto input = capture_native_territory_input(world, 0, claims, 14.f);
+  std::size_t captured_anchors = 0;
+  for (const auto &region : input.regions) captured_anchors += region.anchors.size();
+  require(captured_anchors == 10000 && input.claims.size() == 20000,
+          "Large settled galaxy lost visible anchors or competing claims during capture.");
+  NativeTerritoryOverlay overlay;
+  overlay.request_update(world, 0, claims, 17);
+  while (overlay.pending()) {
+    overlay.poll();
+    std::this_thread::yield();
+  }
+  require(overlay.valid() && overlay.projection(), "Large territory worker failed to publish.");
+  const auto &view = *overlay.projection();
+  std::size_t anchors = 0;
+  for (const auto &region : view.territories) {
+    anchors += region.anchors.size();
+    require(!region.fill_runs.empty() || !region.fill_polygons.empty(),
+            "Large galaxy owner lost its territory fill.");
+    require(!region.contours.empty(), "Large galaxy owner lost its border.");
+  }
+  require(anchors == 10000 && view.territories.size() == 6 && view.claims.size() == 20000,
+          "Large territory projection dropped an owner, anchor, or claim.");
+  require(view.unexplored_system_ids.empty() && view.grid_cell_count <= 160 * 160,
+          "Large territory projection changed known space or unbounded its grid.");
+  require(overlay.cached_image_bytes() <= NativeTerritoryOverlay::maximum_cached_image_bytes,
+          "Large galaxy territory exceeded its image cache budget.");
+}
+
+void malformed_coordinates_fail_before_grid_construction() {
+  for (const float coordinate : {std::numeric_limits<float>::quiet_NaN(),
+                                 std::numeric_limits<float>::infinity(), 1.e8f}) {
+    auto input = capture_native_territory_input(make_world(), 0, {}, 14.f);
+    input.systems.front().position.x = coordinate;
+    bool rejected = false;
+    try { (void)build_native_territory_projection(input); }
+    catch (const std::invalid_argument &) { rejected = true; }
+    require(rejected, "Malformed territory coordinates reached grid construction.");
+  }
+}
+
+// Bitwise projection fixtures recorded before spatial acceleration. Cover all
+// fill/contour vertices, fog texels, labels, anchors, claims and unknown systems.
+std::uint64_t projection_digest(const NativeTerritoryProjection &p) {
+  std::uint64_t hash = 14695981039346656037ull;
+  const auto mix = [&](std::uint64_t value) {
+    for (int i = 0; i < 8; ++i) {
+      hash ^= (value >> (i * 8)) & 255;
+      hash *= 1099511628211ull;
+    }
+  };
+  const auto point = [&](stellar::native_map::Point v) {
+    mix(std::bit_cast<std::uint32_t>(v.x));
+    mix(std::bit_cast<std::uint32_t>(v.y));
+  };
+  mix(p.territories.size());
+  for (const auto &r : p.territories) {
+    mix(r.civilization_id);
+    mix(r.civilization_name.size());
+    for (auto c : r.civilization_name) mix(static_cast<unsigned char>(c));
+    mix(r.anchors.size());
+    for (const auto &a : r.anchors) {
+      mix(a.civilization_id); mix(a.system_id);
+      point(a.position); mix(static_cast<int>(a.kind));
+    }
+    point(r.label_position);
+    mix(r.fill_runs.size());
+    for (const auto &f : r.fill_runs) { point(f.position); point(f.size); }
+    for (const auto *lines : {&r.fill_polygons, &r.contours}) {
+      mix(lines->size());
+      for (const auto &line : *lines) {
+        mix(line.size());
+        for (auto v : line) point(v);
+      }
+    }
+  }
+  mix(p.claims.size());
+  for (const auto &c : p.claims) {
+    mix(c.civilization_id); mix(c.system_id); point(c.position);
+    mix(std::bit_cast<std::uint32_t>(c.radius));
+  }
+  point(p.fog.position); point(p.fog.size); mix(p.fog.width); mix(p.fog.height);
+  for (auto a : p.fog.alpha) mix(a);
+  std::vector<int> unknown(p.unexplored_system_ids.begin(), p.unexplored_system_ids.end());
+  std::ranges::sort(unknown);
+  for (auto id : unknown) mix(id);
+  mix(p.unowned_cell_count); mix(p.grid_cell_count);
+  return hash;
+}
+
+void projection_compatibility() {
+  const std::vector<TerritorialClaimSnapshot> claims{make_claim(1, 1, 2)};
+  const std::array worlds{make_world(), make_benchmark_world(500, 3, 100),
+                          make_benchmark_world(2500, 6, 500)};
+  constexpr std::array<std::uint64_t, 3> expected{
+      4113548603923953201ull, 6287520029111258996ull, 11936461440158785964ull};
+  for (std::size_t i = 0; i < worlds.size(); ++i) {
+    auto input = capture_native_territory_input(worlds[i], 0, claims, 14.f);
+    const auto digest = projection_digest(build_native_territory_projection(input));
+    require(digest == expected[i], "Spatial acceleration changed existing territory geometry or fog");
+    require(projection_digest(build_native_territory_projection(worlds[i], 0, claims, 14.f)) == digest,
+            "Direct and detached territory paths disagree");
+  }
 }
 
 void run_async_update_benchmarks() {
@@ -520,6 +688,7 @@ void run_async_update_benchmarks() {
   benchmark_async_update_case(500, 3, 100);
   benchmark_async_update_case(2500, 6, 30);
   benchmark_async_update_case(2500, 6, 500);
+  benchmark_async_update_case(10000, 6, 9994);
 }
 
 } // namespace
@@ -534,6 +703,9 @@ int main(int argc, char **argv) {
       run_async_update_benchmarks();
       return 0;
     }
+    projection_compatibility();
+    fully_settled_large_galaxy_has_no_visibility_cutoff();
+    malformed_coordinates_fail_before_grid_construction();
     anchors_and_visibility();
     settlement_supersedes_foreign_home();
     claim_outlines_are_observer_safe();
@@ -542,7 +714,9 @@ int main(int argc, char **argv) {
     fingerprint_tracks_inputs();
     detail_ramp_and_palette();
     overlay_cache_is_bounded_complete_and_camera_independent();
+    projected_image_cropping_preserves_uvs();
     async_request_coalesces_and_clear_invalidates();
+    async_source_key_tracks_visible_changes();
     async_failures_are_terminal_once_and_stale_failures_are_discarded();
     async_a_b_a_reuses_the_active_request();
     std::cout << "native_territory_projection tests passed\n";

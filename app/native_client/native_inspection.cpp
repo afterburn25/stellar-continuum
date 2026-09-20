@@ -1,4 +1,5 @@
 #include "native_inspection.hpp"
+#include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/interstellar_distance.hpp>
@@ -98,7 +99,7 @@ ContentLayout content_layout(const SystemInspection& value, UiRect bounds,
             layout.body_font,18.f*s);
   y += 5.f*s;
   layout.items.push_back({0.f,y,layout.clip.width,14.f*s,
-                          value.own_settlements.empty()?"SETTLEMENT INTELLIGENCE":"OWN SETTLEMENTS",
+                          value.developer_inspection?"ALL SETTLEMENTS":value.own_settlements.empty()?"SETTLEMENT INTELLIGENCE":"OWN SETTLEMENTS",
                           {105,213,244,255},layout.small_font});
   y += 25.f*s;
   for(const auto& colony:value.own_settlements){
@@ -141,8 +142,10 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   if (observer == state.civilizations.end() || !observer->is_player) { result.name = "INTELLIGENCE UNAVAILABLE"; result.survey_status = "Observer unavailable"; result.guidance = "Player identity could not be validated."; return result; }
   const auto system = std::ranges::find(state.systems, selected_system_id, &StellarSystem::id);
   if (system == state.systems.end()) { result.name = selected_system_id < 0 ? "SELECT A STAR" : "TARGET LOST"; result.survey_status = "Unavailable"; result.guidance = "Select an available system."; return result; }
-  const auto level = state.knowledge.system_survey_level(observer->id, system->id);
-  result.survey_progress = std::clamp(state.knowledge.system_survey_progress(observer->id, system->id), 0., 1.);
+  const auto level = observation_survey_level(state, observer->id, system->id);
+  const bool developer = developer_observation(state, observer->id);
+  result.developer_inspection = developer;
+  result.survey_progress = developer ? 1. : std::clamp(state.knowledge.system_survey_progress(observer->id, system->id), 0., 1.);
   result.survey_status = level == SystemSurveyLevel::unknown ? "Unknown" : level == SystemSurveyLevel::detected ? "Detected" : level == SystemSurveyLevel::partially_surveyed ? "Survey in progress" : "Fully surveyed";
   const auto home = std::ranges::find(state.systems, observer->home_system_id, &StellarSystem::id);
   result.facts.push_back({"DISTANCE FROM HOMEWORLD", home == state.systems.end() ? "Unknown" : format_interstellar_metric_primary(distance_light_years(home->position, system->position)), home != state.systems.end()});
@@ -155,7 +158,8 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
     return result;
   }
   result.name = system->name;
-  result.guidance = "Survey complete. Review stellar findings and owned settlements below.";
+  result.guidance = developer ? "Developer inspection · live stellar and settlement statistics." : "Survey complete. Review stellar findings and owned settlements below.";
+  if (developer) result.foreign_settlement_intelligence = "Developer access: all settlements shown with actual population and development.";
   result.facts.push_back({"PRIMARY STAR", system->stellar_object?stellar_object_definition(system->stellar_object->type).name:star_label(system->primary), true});
   if(system->stellar_object){
     const auto& p=*system->stellar_object;
@@ -172,7 +176,7 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   result.facts.push_back({"PRE-WARP LIFE", system->has_pre_warp_civilization ? "Yes" : "No", system->has_pre_warp_civilization});
   std::vector<const Colony*> own_colonies;
   for (const auto& colony : state.colonies)
-    if (colony.system_id == system->id && colony.civilization_id == observer->id)
+    if (colony.system_id == system->id && can_inspect_settlement(state, observer->id, colony))
       own_colonies.push_back(&colony);
   std::ranges::sort(own_colonies, [](const Colony* a, const Colony* b) {
     return std::tie(a->name, a->id) < std::tie(b->name, b->id);
@@ -183,7 +187,12 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
       if (const auto found = std::ranges::find(state.bodies, *colony->planetary_body_id, &PlanetaryBody::id);
           found != state.bodies.end() && found->system_id == system->id)
         body = found->name;
-    result.own_settlements.push_back({colony->id, colony->name, body,
+    std::string label = colony->name;
+    if (developer) {
+      const auto owner = std::ranges::find(state.civilizations, colony->civilization_id, &Civilization::id);
+      if (owner != state.civilizations.end()) label += " · " + owner->name;
+    }
+    result.own_settlements.push_back({colony->id, label, body,
       colony->population_millions, colony->infrastructure, colony->stability});
   }
   return result;

@@ -72,18 +72,21 @@ def _diagnostic(stdout: str, expected_mode: str):
     regional = _finite_positive(state.get("regional_scale"), "regional scale")
     if regional < fitted * 5.:
         raise RuntimeError("Native wheel input did not reach the regional presentation")
-    if state.get("decoded_sources") != 3:
-        raise RuntimeError("Native galaxy did not cache the exact three approved source images")
+    if state.get("decoded_sources") != 4:
+        raise RuntimeError("Native galaxy did not cache the exact four approved source images")
 
     overview = state.get("overview")
     regional_view = state.get("regional")
     system = state.get("system")
     if not all(isinstance(item, dict) for item in (overview, regional_view, system)):
         raise RuntimeError("Native galaxy diagnostic lacks view render state")
-    expected_overview = {"deep_field": 1, "galaxy_layer": 1,
+    expected_overview = {"deep_field": 1, "galaxy_layer": 1, "star_background": 0,
                          "regional_nebula": 0, "regional_points": 0}
-    expected_regional = {"deep_field": 0, "galaxy_layer": 0,
-                         "regional_nebula": 1, "regional_points": 356}
+    # This replay uses the legacy 500-system fixture without a phenomenon field:
+    # its regional nebula remains above the new fixed star image. Configured
+    # New Game campaigns exercise their generated field in the scale replay.
+    expected_regional = {"deep_field": 0, "galaxy_layer": 0, "star_background": 1,
+                         "regional_nebula": 1, "regional_points": 0}
     for key, value in expected_overview.items():
         if overview.get(key) != value:
             raise RuntimeError(f"Native fitted overview has invalid {key}")

@@ -73,6 +73,64 @@ void require(bool value, const char *message) {
 } // namespace
 
 int main() try {
+  {
+    auto view = player_view(true);
+    view.developer_inspection = true;
+    auto& fleet = view.own_fleets.front();
+    fleet.foreign_inspection = true;
+    fleet.role = stellar::core::FleetRole::Military;
+    fleet.current_system_id = 1;
+    fleet.combat_status.emplace();
+    fleet.combat_status->is_armed = true;
+    NativeFleetWorkspace inspection{FleetWorkspacePresentation::SelectedCommands};
+    inspection.set_view(std::move(view));
+    DrawList draw;
+    inspection.render(draw, 1280, 720, {});
+    require(has_text(draw, "FLEET INSPECTION") && !has_text(draw, "ENGAGE HOSTILES"),
+        "Foreign fleet inspection exposed an engagement control.");
+    const auto engage = inspection.handle({InputEventType::LeftPressed,
+        center(inspection.layout(1280, 720).engage)}, 1280, 720, {}, {});
+    require(engage.kind != FleetWorkspaceCommandKind::Engage,
+        "Invisible engagement control accepted orders for an inspected foreign fleet.");
+    const auto travel = inspection.handle({InputEventType::RightPressed, {500, 400}},
+        1280, 720, {}, 42);
+    require(travel.kind != FleetWorkspaceCommandKind::Preview,
+        "Foreign fleet inspection accepted a travel order preview.");
+  }
+  {
+    NativeFleetWorkspace commands{FleetWorkspacePresentation::SelectedCommands};
+    commands.set_view(player_view());
+    DrawList empty;
+    const std::array markers{FleetScreenMarker{10,{600,380}}};
+    commands.render(empty,1920,1080,markers);
+    require(!commands.panel_bounds(1920,1080) && empty.overlay.empty() &&
+        !empty.circles.empty(), "Unselected fleet commands left an obsolete panel over the navigator.");
+    const auto old_list=FleetWorkspaceLayout::for_viewport(1920,1080).list;
+    require(!commands.handle({InputEventType::LeftPressed,center(old_list)},1920,1080,{},{}).captured,
+        "Invisible old outliner captured navigator/map input.");
+    const auto select=commands.handle({InputEventType::LeftPressed,{600,380}},1920,1080,markers,{});
+    require(select.kind==FleetWorkspaceCommandKind::SelectHits,"Selected-only mode lost fleet map picking.");
+    commands.set_view(player_view(true));
+    for(const auto [w,h]:std::array{std::pair{1280,720},std::pair{1920,1080},std::pair{3840,2160}}){
+      const auto l=commands.layout(w,h);
+      require(commands.panel_bounds(w,h) && contained({0,0,float(w),float(h)},l.panel) &&
+          contained(l.panel,l.confirm) && contained(l.panel,l.route) &&
+          l.panel.x+l.panel.width < w-std::min(340.f*h/1080.f,w*.29f)-12.f &&
+          l.details.height>=150*l.scale && l.route.height>=100*l.scale,
+          "Fleet command card collided with navigator or clipped telemetry/actions.");
+      DrawList draw;commands.render(draw,w,h,{});
+      require(has_text(draw,"FLEET COMMAND")&&!has_text(draw,"PLAYER FLEETS")&&
+          has_text(draw,"Wayfinder")&&!has_text(draw,"CSV Horizon"),
+          "Command card duplicated the fleet list or lost the selected fleet.");
+    }
+    NativeFleetRoutePreview route;
+    route.fleet_id=10;route.command_available=true;
+    commands.set_preview(route,"Known neighbor");
+    const auto confirm=commands.handle({InputEventType::LeftPressed,
+        center(commands.layout(1280,720).confirm)},1280,720,{},{});
+    require(confirm.kind==FleetWorkspaceCommandKind::Confirm,
+        "Selected fleet command card lost canonical travel confirmation.");
+  }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},
@@ -175,7 +233,7 @@ int main() try {
   DrawList supported_draw;
   workspace.render(supported_draw, 1280, 720, markers);
   require(has_text(supported_draw, "Distance 31.25 ly") &&
-              has_text(supported_draw, "Estimated ETA 12.50 days") &&
+              has_text(supported_draw, "Estimated ETA 12.5 days") &&
               has_text(supported_draw, "Confirmed lane route") &&
               has_text(supported_draw, "CONFIRM TRAVEL") &&
               supported_draw.circles.size() == markers.size() * 2,

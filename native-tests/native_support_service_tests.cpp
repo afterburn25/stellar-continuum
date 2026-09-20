@@ -23,6 +23,8 @@ void bounded_single_worker(){
   });
   service.record("session","First campaign");
   require(service.request({}),"First export was not admitted");
+  service.report_capture_failure("Must not replace active worker");
+  require(service.busy(),"Capture failure replaced a running writer");
   const bool duplicate=service.request({});
   const bool polled=service.poll();
   service.record("session","Later campaign");
@@ -43,6 +45,8 @@ void clean_failure_and_explicit_retry(){
     if(++attempt==1)throw std::runtime_error("Disk is not writable");
     return "recovered.zip";
   });
+  service.report_capture_failure("Snapshot failed\n"+std::string(2000,'x'));
+  require(service.state()==SupportExportState::Failed&&service.error().size()<=1024&&service.error().find('\n')==std::string::npos,"Capture failure escaped its bounds");
   require(service.request({}),"Failure test could not start export");complete(service);
   require(service.state()==SupportExportState::Failed&&service.error()=="Disk is not writable",
           "Worker exception escaped or lost its diagnostic");

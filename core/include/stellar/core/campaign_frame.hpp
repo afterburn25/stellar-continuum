@@ -19,10 +19,14 @@ struct CampaignFrameResult {
   std::vector<double> completed_end_days;
   std::vector<IntegratedAdaptiveCampaignStepResult> strategic_results;
   std::vector<CombatEvent> tactical_events;
+  std::vector<TravelingCmeLaunch> stellar_weather_launches;
   double tactical_accepted_seconds{};
   bool tactical_completed{};
-  // True only after every selected strategic substep returned successfully.
+  // True after all selected strategic (or developer tactical) steps complete.
   bool ready_for_save_capture{};
+  // Opt-in wall-clock execution measurements, never serialized or used by
+  // simulation decisions. One sample per completed authoritative tick.
+  std::vector<std::uint64_t> tick_execution_nanoseconds;
 };
 
 // Reconstructed headless adapter for Main's frame routing. Trusted bootstrap
@@ -39,6 +43,14 @@ class CampaignFrame final {
 
   [[nodiscard]] IntegratedAdaptiveCampaignRuntime &runtime() noexcept;
   [[nodiscard]] StrategicClock &clock() noexcept;
+  void set_profiling_enabled(bool enabled) noexcept;
+  // Only explicitly marked developer sessions may opt into accelerated fixed
+  // ticks. Existing Player and legacy developer replay policies are unchanged.
+  void set_developer_speed(std::uint32_t multiplier);
+  [[nodiscard]] std::uint64_t developer_ticks_behind() const noexcept;
+  [[nodiscard]] CampaignFrameResult step_developer();
+  [[nodiscard]] bool can_step_developer() const noexcept;
+  [[nodiscard]] std::span<const double> tactical_speed_options() const noexcept;
   [[nodiscard]] const MassiveCombatClock &tactical_clock() const noexcept;
   [[nodiscard]] double tactical_resume_speed() const noexcept;
   void set_tactical_speed(double speed);

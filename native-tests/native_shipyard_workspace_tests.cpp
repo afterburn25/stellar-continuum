@@ -114,7 +114,7 @@ void layout_is_contained_and_action_stays_visible() {
     const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
     REQUIRE(layout.surface.x >=
-            navigation.research.x + navigation.research.width);
+            navigation.inspect.x + navigation.inspect.width);
     for (const auto bounds : {layout.designs, layout.design_details,
                               layout.orders, layout.readiness,
                               layout.feedback, layout.action})
@@ -301,6 +301,24 @@ int run_tests() {
   full_720p_content_keeps_cost_feedback_and_action_clipped();
   stale_order_notice_clears_only_when_the_canonical_order_changes();
   stale_cancellation_quote_clears_when_its_revision_changes();
+  NativeShipyardWorkspace batch;batch.open();auto projection=view();
+  auto& known=projection.available_designs.front();
+  known.batch_quotes={{1,true,{},12.345,100.,.025,5.},{2,true,{},24.69,200.,.05,10.},{3,false,"Not enough reserved population.",37.035,300.,.075,15.},{4,false,"Queue full.",49.38,400.,.1,20.}};
+  batch.set_view(projection);const auto layout=ShipyardWorkspaceLayout::for_viewport(1920,1080);
+  REQUIRE(layout.surface.width<1920*.9f&&layout.surface.height<1080*.9f);
+  REQUIRE(layout.surface.y>=native_workspace_top(1920,1080));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.plus)},1920,1080);
+  auto command=batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080);
+  REQUIRE(command.kind==ShipyardWorkspaceCommandKind::Start&&command.quantity==2);
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.plus)},1920,1080);
+  REQUIRE(batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080).kind==ShipyardWorkspaceCommandKind::None);
+  DrawList blocked;batch.render(blocked,1920,1080);
+  REQUIRE(std::ranges::any_of(blocked.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Not enough reserved population.");}));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.search)},1920,1080);REQUIRE(batch.wants_text_input());
+  InputEvent typing{InputEventType::TextEntered};typing.text="nonexistent";(void)batch.handle(typing,1920,1080);
+  REQUIRE(!batch.design_bounds("scout",1920,1080));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.sort)},1920,1080);REQUIRE(batch.popover_open());
+  (void)batch.handle({InputEventType::EscapePressed},1920,1080);REQUIRE(batch.visible()&&!batch.popover_open());
   return 0;
 }
 

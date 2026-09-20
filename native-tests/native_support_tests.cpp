@@ -1,4 +1,5 @@
 #include "native_support.hpp"
+#include "diagnostic_zip_test_reader.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -15,17 +16,9 @@ namespace fs = std::filesystem;
 
 namespace {
 void require(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
-std::string read(const fs::path& path) { std::ifstream input(path, std::ios::binary); return {std::istreambuf_iterator<char>(input), {}}; }
-void write(const fs::path& path, const std::string& bytes) { std::ofstream output(path, std::ios::binary); output.write(bytes.data(), static_cast<std::streamsize>(bytes.size())); }
-std::uint16_t u16(const std::string& value, std::size_t at) { require(at + 2 <= value.size(), "truncated zip u16"); return static_cast<unsigned char>(value[at]) | static_cast<std::uint16_t>(static_cast<unsigned char>(value[at + 1]) << 8); }
-std::uint32_t u32(const std::string& value, std::size_t at) { require(at + 4 <= value.size(), "truncated zip u32"); return static_cast<unsigned char>(value[at]) | (static_cast<std::uint32_t>(static_cast<unsigned char>(value[at + 1])) << 8) | (static_cast<std::uint32_t>(static_cast<unsigned char>(value[at + 2])) << 16) | (static_cast<std::uint32_t>(static_cast<unsigned char>(value[at + 3])) << 24); }
-std::uint32_t crc32(const std::string& data) { std::uint32_t value = 0xffffffffu; for (const unsigned char byte : data) { std::uint32_t x = (value ^ byte) & 0xffu; for (int bit = 0; bit < 8; ++bit) x = (x & 1u) ? (x >> 1) ^ 0xedb88320u : x >> 1; value = (value >> 8) ^ x; } return value ^ 0xffffffffu; }
-std::map<std::string, std::string> unzip(const fs::path& path) {
-  const auto zip = read(path); const auto end = zip.rfind(std::string("PK\x05\x06", 4)); require(end != std::string::npos, "missing zip trailer");
-  const auto count = u16(zip, end + 10); const auto central = u32(zip, end + 16); std::size_t cursor = central; std::map<std::string, std::string> entries;
-  for (unsigned i = 0; i < count; ++i) { require(zip.compare(cursor, 4, "PK\x01\x02", 4) == 0, "missing central entry"); const auto checksum = u32(zip, cursor + 16), size = u32(zip, cursor + 20), local = u32(zip, cursor + 42); const auto name_size = u16(zip, cursor + 28); const auto name = zip.substr(cursor + 46, name_size); require(zip.compare(local, 4, "PK\x03\x04", 4) == 0, "missing local entry"); const auto local_name = u16(zip, local + 26), extra = u16(zip, local + 28); const auto bytes = zip.substr(local + 30 + local_name + extra, size); require(bytes.size() == size && crc32(bytes) == checksum, "zip contents or crc mismatch"); entries.emplace(name, bytes); cursor += 46 + name_size; }
-  return entries;
-}
+using diagnostic_zip_test::read;
+using diagnostic_zip_test::write;
+using diagnostic_zip_test::unzip;
 fs::path scratch() { const auto root = fs::temp_directory_path() / ("stellar-native-support-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())); fs::create_directories(root); return root; }
 void expect_throw(const SupportBundleRequest& request, const char* message) { try { (void)export_support_bundle(request); } catch (const std::exception&) { return; } throw std::runtime_error(message); }
 
@@ -50,11 +43,35 @@ void absent_invalid_and_bounded_inputs(const fs::path& root) {
   missing.session_log = "session"; const auto large = root / "large.player17.json"; { std::ofstream out(large, std::ios::binary); out.seekp(64ll * 1024ll * 1024ll); out.put('x'); } missing.save_path = large; expect_throw(missing, "oversize save was accepted");
   SupportBundleRequest bad{root / "not-a-directory", {}, "info", "log"}; write(bad.user_root, "file"); expect_throw(bad, "invalid destination was accepted");
 }
+
+void reusable_archive_guards(const fs::path &root){
+  using namespace stellar::engine;
+  const std::vector<DiagnosticBundleEntry> valid{{"logs/events.jsonl","line\n"},{"empty.txt",{}}};
+  const auto archive=write_diagnostic_bundle(root/"shared","report.zip",valid);
+  require(unzip(archive).at("logs/events.jsonl")=="line\n","Shared ZIP nested entry failed CRC roundtrip.");
+  const auto rejected=root/"rejected";
+  const auto deny=[&](std::vector<DiagnosticBundleEntry> entries,DiagnosticBundleLimits limits=DiagnosticBundleLimits{},std::string filename="report.zip"){
+    bool failed=false;try{(void)write_diagnostic_bundle(rejected,filename,entries,limits);}catch(const std::exception&){failed=true;}
+    require(failed&&!fs::exists(rejected),"Invalid bundle wrote files before validating inputs.");
+  };
+  for(const char *name:{"../escape","/absolute","C:/drive","a\\b","a/../b","a//b","a/","nul.txt","COM1.log","trailing.","a./b"})deny({{name,"x"}});
+  deny({{"FILE.txt","a"},{"file.txt","b"}});deny({{"a","x"},{"a/b","y"}});
+  deny({{std::string("bad\0name",8),"x"}});deny(valid,{2,64,8});deny(valid,{64,2,8});deny(valid,{64,64,1});deny(valid,{},"../report.zip");
+  const auto exact=write_diagnostic_bundle(root/"exact","report.zip",valid,{5,5,2});
+  require(unzip(exact).size()==2,"Exact archive budget rejected or corrupted entries.");
+  require(read_diagnostic_file(exact,1024)==read(exact),"Bounded diagnostic read altered bytes.");
+  bool read_rejected=false;try{(void)read_diagnostic_file(exact,2);}catch(const std::exception&){read_rejected=true;}
+  require(read_rejected,"Oversized diagnostic read accepted.");
+  SupportBundleRequest extended{root,{},"developer","log",{{"latest.dev17.json","checkpoint"}},"Stellar-Continuum-Diagnostic-test.zip"};
+  const auto contents=unzip(export_support_bundle(extended));
+  require(contents.at("latest.dev17.json")=="checkpoint"&&!contents.contains("campaign.player17.json"),"Developer export mislabeled its checkpoint.");
+}
 } // namespace
 
 int main() try {
   const auto root = scratch();
   round_trip_and_unique_destinations(root);
+  reusable_archive_guards(root);
   absent_invalid_and_bounded_inputs(root);
   fs::remove_all(root);
   return 0;

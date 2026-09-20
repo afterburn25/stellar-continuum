@@ -1260,6 +1260,10 @@ int main(int argc, char **argv) {
         wanted_error =
             ErrorInfo{test.at("Error").at("Type").get<std::string>(),
                       test.at("Error").at("Message").get<std::string>()};
+        // The native size extension changes only the supported-options text;
+        // retain the original oracle and its rejection/type/precedence checks.
+        if(wanted_error->message=="Full-galaxy system count must be one of: 250, 500, 1000, 2500. (Parameter 'systemCount')")
+          wanted_error->message="Full-galaxy system count must be one of: 250, 500, 1000, 2500, 5000, 10000, 25000, 50000. (Parameter 'systemCount')";
         check(wanted_error->type == "ArgumentOutOfRangeException" ||
                   wanted_error->type == "ArgumentException" ||
                   wanted_error->type == "InvalidOperationException",

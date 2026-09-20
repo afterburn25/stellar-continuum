@@ -109,7 +109,7 @@ NativeShipArtAssets::image(const ShipArtwork artwork) {
   if (found != storage_->entries.end()) return found->image;
   const auto path = storage_->asset_root / "assets/visual/ships" / file_name(artwork);
   std::shared_ptr<const RgbaImage> decoded;
-  try { decoded = decode_rgba_image(path); }
+  try { decoded = decode_rgba_image(path,0,stellar::native_map::ImageDecodeUsage::PixelsOnly); }
   catch (const std::exception &error) {
     throw std::runtime_error("Approved ship artwork failed to decode: " + utf8(path) + ": " + error.what());
   }

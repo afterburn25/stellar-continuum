@@ -1,0 +1,482 @@
+{
+  "version": "galaxy-phenomena-v2",
+  "maximumCount": 160,
+  "countBands": [
+    {
+      "upTo": 2000,
+      "minimum": 2,
+      "maximum": 4
+    },
+    {
+      "upTo": 8000,
+      "minimum": 4,
+      "maximum": 7
+    },
+    {
+      "upTo": 20000,
+      "minimum": 6,
+      "maximum": 12
+    },
+    {
+      "upTo": 50000,
+      "minimum": 10,
+      "maximum": 18
+    },
+    {
+      "upTo": 100000,
+      "minimum": 16,
+      "maximum": 26
+    },
+    {
+      "upTo": 2147483647,
+      "minimum": 22,
+      "maximum": 36
+    }
+  ],
+  "populationCount": [
+    1.7,
+    1.3,
+    1,
+    0.55,
+    0.25
+  ],
+  "morphologyCount": [
+    1,
+    1.05,
+    0.45,
+    0.25,
+    1.25,
+    1.35
+  ],
+  "regionWeights": [
+    0.7,
+    3,
+    0.15,
+    4,
+    4,
+    0.2,
+    0.7,
+    0.28,
+    0.2,
+    0.08,
+    3.5,
+    2.3
+  ],
+  "extraDefinitions": [
+    {
+      "id": "diffuse_gas",
+      "name": "Diffuse Gas Cloud",
+      "description": "Faint diffuse interstellar gas with mild sensor and survey interference.",
+      "rarity": "common",
+      "shape": 0,
+      "color": [
+        73,
+        169,
+        202
+      ],
+      "extent": [
+        14,
+        29
+      ],
+      "intensity": [
+        0.4,
+        0.8
+      ],
+      "weight": 26,
+      "opacity": 0.38,
+      "elongation": 2.0,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.92,
+        "scanning": 1.1,
+        "movement": 1,
+        "hazard": 0.1,
+        "colonization": 0,
+        "research": 0.15,
+        "anomaly_bias": 0.06,
+        "resource_bias": 0.03,
+        "concealment": 0.08,
+        "combat_visibility": 0.98,
+        "attrition": 0,
+        "interference": 0.1
+      }
+    },
+    {
+      "id": "mixed_nebula",
+      "name": "Mixed Nebula",
+      "description": "A mixed gas and dust complex with varied survey conditions.",
+      "rarity": "common",
+      "shape": 0,
+      "color": [
+        210,
+        80,
+        126
+      ],
+      "extent": [
+        12,
+        26
+      ],
+      "intensity": [
+        0.5,
+        0.85
+      ],
+      "weight": 5,
+      "opacity": 0.4,
+      "elongation": 1.25,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.9,
+        "scanning": 1.1,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.15,
+        "anomaly_bias": 0.08,
+        "resource_bias": 0.02,
+        "concealment": 0.08,
+        "combat_visibility": 0.98,
+        "attrition": 0,
+        "interference": 0.1
+      }
+    },
+    {
+      "id": "rare_energetic",
+      "name": "Rare Energetic Phenomenon",
+      "description": "A rare energetic map feature with interference and scientific interest.",
+      "rarity": "exceptional",
+      "shape": 0,
+      "color": [
+        119,
+        214,
+        181
+      ],
+      "extent": [
+        4,
+        10
+      ],
+      "intensity": [
+        0.45,
+        0.85
+      ],
+      "weight": 1,
+      "opacity": 0.36,
+      "elongation": 1.3,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.8,
+        "scanning": 1.25,
+        "movement": 1,
+        "hazard": 0.3,
+        "colonization": 0,
+        "research": 0.6,
+        "anomaly_bias": 0.3,
+        "resource_bias": 0.12,
+        "concealment": 0.2,
+        "combat_visibility": 0.9,
+        "attrition": 0,
+        "interference": 0.3
+      }
+    }
+  ],
+  "types": [
+    {
+      "id": "emission",
+      "weight": 14,
+      "population": [
+        2.3,
+        1.6,
+        1,
+        0.4,
+        0.05
+      ],
+      "morphology": [
+        1,
+        1.15,
+        0.12,
+        0.015,
+        1.25,
+        1.2
+      ],
+      "extent": [
+        9,
+        21
+      ]
+    },
+    {
+      "id": "reflection",
+      "weight": 7,
+      "population": [
+        1.3,
+        1.2,
+        1,
+        0.6,
+        0.1
+      ],
+      "morphology": [
+        1,
+        1,
+        0.3,
+        0.1,
+        1,
+        1
+      ],
+      "extent": [
+        6,
+        14
+      ]
+    },
+    {
+      "id": "dark_nebula",
+      "weight": 16,
+      "population": [
+        1.3,
+        1.1,
+        1,
+        0.8,
+        0.25
+      ],
+      "morphology": [
+        1,
+        1.1,
+        1.6,
+        0.15,
+        0.9,
+        1
+      ],
+      "extent": [
+        12,
+        28
+      ]
+    },
+    {
+      "id": "molecular_cloud",
+      "weight": 18,
+      "population": [
+        1.8,
+        1.4,
+        1,
+        0.5,
+        0.1
+      ],
+      "morphology": [
+        1,
+        1.2,
+        0.12,
+        0.01,
+        1.4,
+        1.5
+      ],
+      "extent": [
+        11,
+        24
+      ]
+    },
+    {
+      "id": "hii_region",
+      "weight": 11,
+      "population": [
+        3,
+        1.8,
+        1,
+        0.3,
+        0.02
+      ],
+      "morphology": [
+        1,
+        1.3,
+        0.05,
+        0.005,
+        1.6,
+        1.6
+      ],
+      "extent": [
+        8,
+        17
+      ]
+    },
+    {
+      "id": "supernova_remnant",
+      "weight": 2,
+      "population": [
+        2.5,
+        1.5,
+        1,
+        0.6,
+        0.1
+      ],
+      "morphology": [
+        1,
+        1,
+        1.1,
+        1.5,
+        1.1,
+        1.1
+      ],
+      "extent": [
+        4,
+        9
+      ]
+    },
+    {
+      "id": "radiation_cloud",
+      "weight": 0,
+      "population": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "morphology": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "extent": [
+        6,
+        15
+      ]
+    },
+    {
+      "id": "ionized_gas",
+      "weight": 0,
+      "population": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "morphology": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "extent": [
+        8,
+        19
+      ]
+    },
+    {
+      "id": "dust_lane",
+      "weight": 0,
+      "population": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "morphology": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "extent": [
+        10,
+        25
+      ]
+    },
+    {
+      "id": "exotic",
+      "weight": 0,
+      "population": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "morphology": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "extent": [
+        5,
+        13
+      ]
+    },
+    {
+      "id": "diffuse_gas",
+      "weight": 26,
+      "population": [
+        1.2,
+        1.1,
+        1,
+        0.7,
+        0.35
+      ],
+      "morphology": [
+        1,
+        1,
+        2,
+        4,
+        1,
+        1
+      ],
+      "extent": [
+        14,
+        29
+      ]
+    },
+    {
+      "id": "mixed_nebula",
+      "weight": 5,
+      "population": [
+        1.4,
+        1.2,
+        1,
+        0.7,
+        0.2
+      ],
+      "morphology": [
+        1,
+        1,
+        0.8,
+        0.25,
+        1.1,
+        1.1
+      ],
+      "extent": [
+        12,
+        26
+      ]
+    },
+    {
+      "id": "rare_energetic",
+      "weight": 1,
+      "population": [
+        1.5,
+        1.2,
+        1,
+        0.8,
+        0.2
+      ],
+      "morphology": [
+        1,
+        1,
+        1,
+        2,
+        1,
+        1
+      ],
+      "extent": [
+        4,
+        10
+      ]
+    }
+  ]
+}

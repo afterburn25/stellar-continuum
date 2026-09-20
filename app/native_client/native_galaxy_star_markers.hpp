@@ -47,11 +47,11 @@ struct NativeGalaxyStarMarkerStats {
 class NativeGalaxyStarMarkerRenderer final {
 public:
   // Shared high-resolution light profiles retain a sharp core at close zoom.
-  // The entire palette is bounded at 3.25 MiB, independent of system count.
+  // Palette plus the neutral batching atlas stay below 3.6 MiB, independent of system count.
   static constexpr int texture_size = 256;
-  static constexpr std::size_t maximum_cached_resources = 13;
+  static constexpr std::size_t maximum_cached_resources = 14;
   static constexpr std::size_t maximum_cached_bytes =
-      maximum_cached_resources * texture_size * texture_size * 4u;
+      13u * texture_size * texture_size * 4u + (texture_size + 8u) * texture_size * 4u;
 
   NativeGalaxyStarMarkerRenderer();
   ~NativeGalaxyStarMarkerRenderer();
@@ -69,6 +69,14 @@ public:
               bool selected,
               std::optional<stellar::native_map::UiRect> clip = std::nullopt,
               float alpha = 1.f);
+  // Preserves circle/image order in a shared atlas mesh, with no star omission.
+  // Only adjacent neutral markers merge; observed artwork remains independent.
+  // Compact mode crops the core and omits contrast geometry for distant dense
+  // catalogs. Selection always restores the complete marker and halo.
+  void append_neutral_batch(stellar::native_map::DrawList &, stellar::native_map::Point center,
+              float core_radius, bool selected, std::optional<stellar::native_map::UiRect> clip,
+              float alpha, std::optional<stellar::native_map::Color> observed_color = std::nullopt,
+              bool compact = false);
   [[nodiscard]] NativeGalaxyStarMarkerStats stats() const noexcept;
   void clear() noexcept;
 

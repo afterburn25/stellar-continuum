@@ -41,6 +41,9 @@ struct FreshCampaignState {
   std::optional<GalacticCoreMetadata> galactic_core;
   std::optional<CampaignMassiveEncounter> active_combat_encounter;
   std::optional<CampaignDeveloperProvenance> developer_provenance;
+  // Stellar activity has its own persisted 1x clock (one hour per real second).
+  // Absent in older saves; initialized at their saved epoch without rerolling.
+  std::optional<double> stellar_activity_day;
 };
 
 FreshCampaignState
@@ -48,6 +51,7 @@ seed_fresh_campaign(std::int64_t seed, std::span<const CatalogStar> catalog,
                     int system_count = 500, int pre_warp_count = 6,
                     int ancient_count = 1,
                     const std::string &player_species_id = "terran_baseline",
-                    std::optional<StellarPopulationOptions> population = std::nullopt);
+                    std::optional<StellarPopulationOptions> population = std::nullopt,
+                    bool developer_full_coverage = false, bool visual_footprint = false);
 
 } // namespace stellar::core

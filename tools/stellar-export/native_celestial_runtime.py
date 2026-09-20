@@ -11,6 +11,24 @@ NATIVE_CELESTIAL_SOURCES = {
 }
 NATIVE_CELESTIAL_SOURCES["credits"] = (
     "docs/SOL_VISUAL_SOURCES.md", "Licenses/Sol-visual-sources.md")
+# The planetary workspace renders a globe and building cards in addition to
+# the orbital discs. All of its lazy-loaded images must travel with the game.
+for key in ("earth-map", "earth-night-map", "earth-clouds"):
+    path = f"assets/visual/sol/{key}.jpg"
+    NATIVE_CELESTIAL_SOURCES[key] = (path, path)
+for key in ("building-portraits-v1", "colony-panorama-v1"):
+    path = f"assets/visual/planetary/{key}.png"
+    NATIVE_CELESTIAL_SOURCES[key] = (path, path)
+NATIVE_CELESTIAL_SOURCES["globe-credits"] = (
+    "docs/IMMERSIVE_TEXTURE_PROVENANCE.md", "Licenses/Globe-texture-provenance.md")
+NATIVE_CELESTIAL_SOURCES["planetary-credits"] = (
+    "assets/visual/planetary/ARTWORK.md", "Licenses/Planetary-artwork.md")
+NATIVE_CELESTIAL_SOURCES["earth-authored-map"] = ("assets/visual/sol/earth-map.png", "assets/visual/sol/earth-map.png")
+for key in ("mars-map", "jupiter-map", "mercury-map", "venus-map", "moon-map", "saturn-map", "uranus-map", "neptune-map"):
+    path = f"assets/visual/sol/{key}.png"
+    NATIVE_CELESTIAL_SOURCES[key] = (path, path)
+NATIVE_CELESTIAL_SOURCES["authored-planet-credits"] = (
+    "docs/AUTHORED_PLANET_TEXTURE_PROVENANCE.md", "Licenses/Authored-planet-texture-provenance.md")
 
 
 def native_celestial_asset_files(root):

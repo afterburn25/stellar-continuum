@@ -196,7 +196,51 @@ void first_failure_order_and_identity_diagnostics() {
 }
 } // namespace
 
+void atomic_batches_and_canonical_reorder() {
+  auto world=make_world();
+  world.economies.front().credits=400.;
+  const auto quotes=assess_ship_build_batches(world.view().read(),1,"colony_ship");
+  require(quotes.size()==8 && quotes[1].can_start && !quotes[2].can_start,
+      "Batch quotes ignored cumulative authorization cost");
+  require(near(quotes[1].credit_cost,360.) && near(quotes[1].population_cost_millions,500.) &&
+      near(quotes[1].industry_cost,3000.) && near(quotes[1].minimum_build_days_at_full_shipyard_rate,150.),
+      "Batch quote omitted canonical total costs/time");
+  require(near(world.economies.front().credits,400.) && world.shipyards.front().pending_build_count()==0 &&
+      near(world.colonies.front().population_millions,3000.),"Batch quote mutated state");
+  const auto sequence=world.shipyards.front().next_order_sequence;
+  require(!start_ship_build_batch(world.view(),1,"colony_ship",3).accepted &&
+      world.shipyards.front().pending_build_count()==0 &&
+      world.shipyards.front().next_order_sequence==sequence &&
+      near(world.economies.front().credits,400.) && near(world.colonies.front().population_millions,3000.),
+      "Failed batch partially charged or reserved population/IDs");
+  require(start_ship_build_batch(world.view(),1,"colony_ship",2).accepted &&
+      world.shipyards.front().pending_build_count()==2 && near(world.economies.front().credits,40.) &&
+      near(world.colonies.front().population_millions,2500.),"Accepted batch not committed exactly once");
+  auto population=make_world();population.colonies.front().population_millions=800.;
+  const auto population_quotes=assess_ship_build_batches(population.view().read(),1,"colony_ship");
+  require(population_quotes.front().can_start && !population_quotes[1].can_start &&
+      !start_ship_build_batch(population.view(),1,"colony_ship",2).accepted &&
+      near(population.colonies.front().population_millions,800.),"Batch violated retained colony population");
+  auto queue=make_world();
+  require(start_ship_build_batch(queue.view(),1,"warp_scout",3).accepted,"Scout batch setup");
+  auto& yard=queue.shipyards.front();yard.active_build_progress=17.;
+  const auto active=*yard.active_order_id, first=yard.queued_builds[0].order_id,last=yard.queued_builds[1].order_id;
+  const double credits=queue.economies.front().credits;
+  require(move_queued_ship_build(queue.view(),1,last,-1).accepted && yard.queued_builds[0].order_id==last &&
+      yard.queued_builds[1].order_id==first && *yard.active_order_id==active && near(yard.active_build_progress,17.) &&
+      near(queue.economies.front().credits,credits),"Reorder changed active work or authorization");
+  require(!move_queued_ship_build(queue.view(),1,active,1).accepted &&
+      !move_queued_ship_build(queue.view(),2,last,1).accepted &&
+      !move_queued_ship_build(queue.view(),1,last,-1).accepted,"Reorder admitted active/foreign/boundary order");
+  require(!start_ship_build_batch(queue.view(),1,"warp_scout",6).accepted && yard.pending_build_count()==3,
+      "Overflowing batch partially filled queue");
+  const auto events=advance_shipbuilding_for_civilization(queue.view(),1,10000.,100.);
+  require(events.size()==1 && yard.active_order_id==last,"Completion did not promote reordered canonical queue");
+  require(cancel_ship_build(queue.view(),1,first).accepted && yard.queued_builds.empty(),"Reordered cancellation failed");
+}
+
 int main() try {
+  atomic_batches_and_canonical_reorder();
   accepted_assessment_is_non_mutating_and_committed_once();
   denials_match_commit_and_do_not_mutate();
   first_failure_order_and_identity_diagnostics();

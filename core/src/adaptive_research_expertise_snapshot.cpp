@@ -699,7 +699,7 @@ AdaptiveResearchCivilizationState AdaptiveResearchSnapshotV2Codec::deserialize(
       json_fail("Adaptive Research snapshot schemaVersion is outside Int32 range.");
     schema_version = static_cast<int>(schema_integer);
   }
-  if (schema_version == AdaptiveResearchSnapshotCodec::current_schema_version)
+  if (schema_version == 1 || schema_version == AdaptiveResearchSnapshotCodec::current_schema_version)
     return storage_->v1.deserialize(text);
   if (schema_version != current_schema_version)
     fail("Unsupported Adaptive Research snapshot schema " +

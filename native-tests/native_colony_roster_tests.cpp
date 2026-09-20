@@ -56,6 +56,13 @@ void ownership_and_identity_are_sealed() {
   const auto view = build(value, 4);
   require(view.available && view.rows.size() == 2,
           "foreign colony entered owned roster");
+  value.developer_provenance.emplace();
+  const auto dev=build(value,4);
+  const auto alien=std::ranges::find(dev.rows,99,&Row::colony_id);
+  require(dev.developer_inspection&&dev.rows.size()==3&&alien!=dev.rows.end()&&alien->can_open&&alien->population=="999M",
+          "Developer roster withheld alien colony or population");
+  require(value.knowledge.system_survey_level(7,2)==SystemSurveyLevel::unknown,"Developer roster changed survey state");
+  value.developer_provenance.reset();
   value.civilizations.push_back(value.civilizations.front());
   require(!build(value, 4).available, "duplicate player identity was accepted");
   value = world();

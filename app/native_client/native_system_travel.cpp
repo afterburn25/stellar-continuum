@@ -1,4 +1,5 @@
 #include "native_system_travel.hpp"
+#include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/fleet_transit.hpp>
 #include <stellar/core/knowledge.hpp>
@@ -7,6 +8,8 @@
 #include <array>
 #include <cmath>
 #include <map>
+#include <limits>
+#include <numbers>
 #include <ranges>
 #include <set>
 #include <stdexcept>
@@ -23,6 +26,18 @@ float side(Point p1,Point p2,Point p3)noexcept{return (p1.x-p3.x)*(p2.y-p3.y)-(p
 Point add(Point a,Vec2 b,float amount=1)noexcept{return {a.x+b.x*amount,a.y+b.y*amount};}
 Vec2 normalized(Vec2 value)noexcept{const auto squared=value.x*value.x+value.y*value.y;if(squared<=.000001F)return {1,0};const auto length=std::sqrt(squared);return {value.x/length,value.y/length};}
 float distance(Point a,Point b)noexcept{return std::hypot(a.x-b.x,a.y-b.y);}
+// Move only as far as needed along the real lane bearing. Using both rectangles'
+// diagonals here made crowded exits leap hundreds of pixels beyond the chart.
+float outward_clearance(UiRect moving,UiRect fixed,Vec2 direction)noexcept{
+  constexpr float padding=6.25f;
+  const auto axis=[](float start,float size,float obstacle,float obstacle_size,float velocity){
+    if(velocity>0.f)return (obstacle+obstacle_size+padding-start)/velocity;
+    if(velocity<0.f)return (start+size+padding-obstacle)/-velocity;
+    return std::numeric_limits<float>::infinity();
+  };
+  return std::max(.25f,std::min(axis(moving.x,moving.width,fixed.x,fixed.width,direction.x),
+                              axis(moving.y,moving.height,fixed.y,fixed.height,direction.y)));
+}
 const StellarSystem* find_system(std::span<const StellarSystem> systems,int id){const auto found=std::ranges::find(systems,id,&StellarSystem::id);return found==systems.end()?nullptr:&*found;}
 } // namespace
 
@@ -36,14 +51,14 @@ NativeSystemTravelBuildResult NativeSystemTravelController::build(CampaignFrame&
   const auto player=std::ranges::find(world.civilizations,observer,&Civilization::id);
   if(player==world.civilizations.end()||!player->is_player)return {std::nullopt,"The campaign has no valid player observer."};
   if(system_view.campaign_generation!=campaign_generation||system_view.observer_civilization_id!=observer)return {std::nullopt,"The system view belongs to a different campaign observer."};
-  if(!world.knowledge.is_system_known(observer,system_view.system_id)||world.knowledge.system_survey_level(observer,system_view.system_id)<SystemSurveyLevel::partially_surveyed)return {std::nullopt,"Reconnaissance-grade knowledge is required for local travel presentation."};
+  if(observation_survey_level(world,observer,system_view.system_id)<SystemSurveyLevel::partially_surveyed)return {std::nullopt,"Reconnaissance-grade knowledge is required for local travel presentation."};
   const auto*current=find_system(world.systems,system_view.system_id);if(!current)return {std::nullopt,"The known system is unavailable in this campaign."};
 
   NativeSystemTravelSnapshot result{.campaign_generation=campaign_generation,.observer_civilization_id=observer,.system_id=system_view.system_id};
   std::vector<const FleetState*> local;
-  for(const auto&fleet:world.fleets)if(fleet.is_active&&fleet.civilization_id==observer&&fleet.current_system_id==system_view.system_id&&fleet.transit_phase!=FleetTransitPhase::InterstellarWarp)local.push_back(&fleet);
+  for(const auto&fleet:world.fleets)if(fleet.is_active&&(fleet.civilization_id==observer||developer_observation(world,observer))&&fleet.current_system_id==system_view.system_id&&fleet.transit_phase!=FleetTransitPhase::InterstellarWarp)local.push_back(&fleet);
   std::ranges::sort(local,{},[](const FleetState*fleet){return fleet->id;});if(local.size()>64)local.resize(64);result.fleets.reserve(local.size());
-  for(const auto*fleet:local)result.fleets.push_back({fleet->id,fleet->name,fleet->role,fleet->design_id,fleet->local_transit_position,fleet->local_transit_target,fleet->transit_phase,fleet->transit_phase==FleetTransitPhase::LocalDeparture||fleet->transit_phase==FleetTransitPhase::LocalArrival,fleet->hold_requested,fleet->mission_order_revision});
+  for(const auto*fleet:local)result.fleets.push_back({fleet->id,fleet->name,fleet->role,fleet->design_id,fleet->local_transit_position,fleet->local_transit_target,fleet->transit_phase,fleet->transit_phase==FleetTransitPhase::LocalDeparture||fleet->transit_phase==FleetTransitPhase::LocalArrival,fleet->hold_requested,fleet->mission_order_revision,fleet->civilization_id!=observer});
 
   std::map<int,NativeLocalLaneMarker> lanes;
   for(const auto&lane:simulation.lanes().build()){
@@ -51,7 +66,7 @@ NativeSystemTravelBuildResult NativeSystemTravelController::build(CampaignFrame&
     const auto destination_id=lane.other(system_view.system_id);if(lanes.contains(destination_id))continue;
     const auto*destination=find_system(world.systems,destination_id);if(!destination)continue;
     const Vec2 current_position{current->position.x,current->position.y},destination_position{destination->position.x,destination->position.y};
-    const bool known=world.knowledge.system_survey_level(observer,destination_id)>=SystemSurveyLevel::partially_surveyed;
+    const bool known=observation_survey_level(world,observer,destination_id)>=SystemSurveyLevel::partially_surveyed;
     lanes.emplace(destination_id,NativeLocalLaneMarker{destination_id,known?std::optional<std::string>{destination->name}:std::nullopt,{destination_position.x-current_position.x,destination_position.y-current_position.y},fleet_gate_towards(destination_position,current_position),known?std::optional<double>{lane.length_light_years}:std::nullopt});
   }
   result.lanes.reserve(lanes.size());for(auto&[id,lane]:lanes){(void)id;result.lanes.push_back(std::move(lane));}
@@ -68,8 +83,39 @@ std::vector<NativeLocalLaneGeometry> layout_local_lanes(const SystemSpatialSnaps
   std::map<int,NativeLaneLabelMetrics> measured;for(const auto&item:metrics){if(!std::isfinite(item.width)||!std::isfinite(item.height)||item.width<0||item.height<0)throw std::invalid_argument("Lane label metrics must be finite and non-negative.");if(!measured.emplace(item.destination_system_id,item).second)throw std::invalid_argument("Lane label metrics contain a duplicate destination.");}
   std::vector<const NativeLocalLaneMarker*> ordered;ordered.reserve(lanes.size());for(const auto&lane:lanes)ordered.push_back(&lane);std::ranges::sort(ordered,{},[](const auto*lane){return lane->destination_system_id;});
   const Point origin{viewport.center_x,viewport.center_y};const auto factor=system.design_radius*local_chart_render_radius_factor*viewport.scale;const auto boundary=local_orbital_boundary_radius(system,viewport);std::vector<NativeLocalLaneGeometry> result;result.reserve(ordered.size());
-  for(const auto*lane:ordered){const auto found=measured.find(lane->destination_system_id);if(found==measured.end())throw std::invalid_argument("Lane label metrics are missing a destination.");const auto direction=normalized(lane->direction);const Point transit{origin.x+lane->transit_gate.x*factor,origin.y+lane->transit_gate.y*factor};const auto gate_distance=std::max(distance(origin,transit),boundary+12.F);float stagger{};NativeLocalLaneGeometry placed;
-    for(std::size_t attempt=0;attempt<=result.size();++attempt){const auto half_width=found->second.width*.5F,half_height=found->second.height*.5F,label_half_diagonal=std::hypot(half_width,half_height);const auto visual=add(origin,direction,gate_distance+2.F*label_half_diagonal+14.F+stagger);const Vec2 normal{-direction.y,direction.x};const auto base_a=add(visual,normal,20),base_b=add(visual,normal,-20),apex=add(visual,direction,34);const auto label_center=add(visual,direction,-label_half_diagonal-6.F);const UiRect label_bounds{label_center.x-half_width,label_center.y-half_height,found->second.width,found->second.height};const std::array<Point,3> points{base_a,base_b,apex};float min_x=std::min(label_bounds.x,points[0].x),max_x=std::max(label_bounds.x+label_bounds.width,points[0].x),min_y=std::min(label_bounds.y,points[0].y),max_y=std::max(label_bounds.y+label_bounds.height,points[0].y);for(const auto point:points){min_x=std::min(min_x,point.x);max_x=std::max(max_x,point.x);min_y=std::min(min_y,point.y);max_y=std::max(max_y,point.y);}placed={lane->destination_system_id,transit,add(visual,direction,12),base_a,base_b,apex,label_center,{min_x,min_y,max_x-min_x,max_y-min_y},label_bounds,0.F};std::vector<const NativeLocalLaneGeometry*> blockers;for(const auto&prior:result)if(overlap(placed.bounds,prior.bounds,6))blockers.push_back(&prior);if(blockers.empty())break;float step=12.F+std::hypot(placed.bounds.width,placed.bounds.height);for(const auto*blocker:blockers)step=std::max(step,12.F+std::hypot(blocker->bounds.width,blocker->bounds.height)+std::hypot(placed.bounds.width,placed.bounds.height));stagger+=step;}
+  for(const auto*lane:ordered){
+    const auto found=measured.find(lane->destination_system_id);
+    if(found==measured.end())throw std::invalid_argument("Lane label metrics are missing a destination.");
+    const auto direction=normalized(lane->direction);
+    const Vec2 normal{-direction.y,direction.x};
+    // Text runs across the broad base, perpendicular to the pointing direction.
+    // A half-turn keeps the baseline upright without changing that alignment.
+    float angle=std::atan2(normal.y,normal.x);
+    if(angle>std::numbers::pi_v<float>*.5f)angle-=std::numbers::pi_v<float>;
+    if(angle<-std::numbers::pi_v<float>*.5f)angle+=std::numbers::pi_v<float>;
+    const Point transit{origin.x+lane->transit_gate.x*factor,origin.y+lane->transit_gate.y*factor};
+    const auto gate_distance=std::max(distance(origin,transit),boundary+12.F);
+    float stagger{};NativeLocalLaneGeometry placed;
+    for(std::size_t attempt=0;attempt<=result.size();++attempt){
+      const auto half_width=found->second.width*.5F,half_height=found->second.height*.5F;
+      const auto label_half_diagonal=std::hypot(half_width,half_height);
+      const auto visual=add(origin,direction,gate_distance+label_half_diagonal+half_height+14.F+stagger);
+      const auto base_a=add(visual,normal,24),base_b=add(visual,normal,-24),apex=add(visual,direction,41);
+      const auto label_center=add(visual,direction,-half_height-6.F);
+      const auto extent_x=std::abs(normal.x)*half_width+std::abs(direction.x)*half_height;
+      const auto extent_y=std::abs(normal.y)*half_width+std::abs(direction.y)*half_height;
+      const UiRect label_bounds{label_center.x-extent_x,label_center.y-extent_y,2.f*extent_x,2.f*extent_y};
+      const std::array<Point,3> points{base_a,base_b,apex};
+      float min_x=std::min(label_bounds.x,points[0].x),max_x=std::max(label_bounds.x+label_bounds.width,points[0].x);
+      float min_y=std::min(label_bounds.y,points[0].y),max_y=std::max(label_bounds.y+label_bounds.height,points[0].y);
+      for(const auto point:points){min_x=std::min(min_x,point.x);max_x=std::max(max_x,point.x);min_y=std::min(min_y,point.y);max_y=std::max(max_y,point.y);}
+      placed={lane->destination_system_id,transit,add(visual,direction,12),base_a,base_b,apex,label_center,{min_x,min_y,max_x-min_x,max_y-min_y},label_bounds,angle};
+      std::vector<const NativeLocalLaneGeometry*> blockers;
+      for(const auto&prior:result)if(overlap(placed.bounds,prior.bounds,6))blockers.push_back(&prior);
+      if(blockers.empty())break;
+      float step{};for(const auto*blocker:blockers)step=std::max(step,outward_clearance(placed.bounds,blocker->bounds,direction));
+      stagger+=step;
+    }
     result.push_back(placed);
   }return result;
 }

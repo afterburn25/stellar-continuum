@@ -1,8 +1,10 @@
 #pragma once
 #include "native_menu_hover.hpp"
+#include "native_dropdown.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
 #include <filesystem>
+#include <array>
 #include <functional>
 #include <optional>
 #include <string>
@@ -11,6 +13,10 @@ namespace stellar::native_general {
 // Application preference only. Empty means the platform Pictures default.
 struct GeneralPreferences final {
   std::filesystem::path screenshot_directory;
+  std::array<bool,5> asset_categories_collapsed{false,true,false,true,false};
+  bool assets_hidden{};
+  int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
+  int nebula_density{1}; // Low / Medium / High; presentation only.
   bool operator==(const GeneralPreferences&) const = default;
 };
 struct GeneralSettingsLayout final {
@@ -18,6 +24,7 @@ struct GeneralSettingsLayout final {
   int font_pixels{}, heading_pixels{};
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
+  stellar::native_map::UiRect nebula,eruptions;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
@@ -48,6 +55,7 @@ class NativeGeneralSettings final {
   void accept_browse_result(stellar::native_map::FolderDialogResult);
  private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
+  stellar::native_ui::Dropdown nebula_dropdown_,eruption_dropdown_;
   [[nodiscard]] stellar::native_map::Text path_text(const GeneralSettingsLayout&) const;
   std::filesystem::path path_,default_directory_;
   GeneralPreferences saved_,draft_;

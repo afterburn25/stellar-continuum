@@ -1,6 +1,7 @@
 #include "native_territory_overlay.hpp"
 
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/image_clipping.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -236,9 +237,10 @@ void NativeTerritoryOverlay::request_update(
     std::span<const core::TerritorialClaimSnapshot> observer_claims,
     std::uint64_t generation) {
   preparation_->require_owner();
-  auto input = capture_native_territory_input(world, observer_civilization_id,
-                                              observer_claims, coordinate_scale);
-  const auto fingerprint = native_territory_fingerprint(input);
+  // Check the source key before allocating/copying a detached DTO. Settled
+  // large galaxies usually render many frames with unchanged territory.
+  const auto fingerprint = native_territory_fingerprint(
+      world, observer_civilization_id, observer_claims, coordinate_scale);
   const bool same_request =
       preparation_->requested_fingerprint == fingerprint &&
       preparation_->requested_generation == generation;
@@ -250,6 +252,8 @@ void NativeTerritoryOverlay::request_update(
       preparation_->failed_generation == generation &&
       preparation_->failed_epoch == preparation_->epoch)
     return;
+  auto input = capture_native_territory_input(world, observer_civilization_id,
+                                              observer_claims, coordinate_scale);
   preparation_->failed_error = {};
   preparation_->failure_reported = false;
   preparation_->requested_fingerprint = fingerprint;
@@ -418,27 +422,30 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
   };
   const float overview = native_territory_overview_blend(
       scale * world_per_scaled, fitted_pixels_per_world * world_per_scaled);
-  const float detail = native_territory_detail(overview);
+  const float detail = std::max(native_territory_detail(overview),style.emphasize_overview?.8f:0.f);
 
+  const UiRect viewport{0,0,static_cast<float>(width),static_cast<float>(height)};
   if (fog_image_) {
-    out.world.emplace_back(native_map::Image{
+    if(auto image=native_map::clip_image_to_viewport(native_map::Image{
         fog_image_, rect_for(projection_.fog.position, projection_.fog.size),
         std::nullopt,
         map_alpha({0x05, 0x0b, 0x12, 255}, .095f + .095f * detail),
-        std::nullopt});
-    ++stats.fog_images;
+        std::nullopt},viewport)){
+      out.world.emplace_back(std::move(*image));++stats.fog_images;
+    }
   }
 
   if (fill_image_) {
-    out.world.emplace_back(native_map::Image{
+    if(auto image=native_map::clip_image_to_viewport(native_map::Image{
         fill_image_,
         rect_for(projection_.fog.position, projection_.fog.size),
         std::nullopt,
         // The former 3–5 alpha values disappeared into the regional artwork.
         // This remains translucent while making continuous ownership legible.
         map_alpha({255, 255, 255, 255}, .16f * detail),
-        std::nullopt});
-    ++stats.fill_images;
+        std::nullopt},viewport)){
+      out.world.emplace_back(std::move(*image));++stats.fill_images;
+    }
   }
 
   // Contours — the same loops that bound the rasterized fill, drawn as lines.

@@ -78,6 +78,19 @@ void detached_real_io(const Fixture &fixture, const fs::path &directory) {
   try { write_prepared_player_campaign(fs::path(L" \t "), prepared, false); }
   catch (const std::invalid_argument &) { rejected = true; }
   check(rejected, "Whitespace write path was accepted");
+  const auto unicode_player = directory / fs::path(u8"\u73a9\u5bb6-\u661f\u7cfb.player17.json");
+  const auto unicode_developer = directory / fs::path(u8"\u6d4b\u8bd5-\u661f\u7cfb.DeV17.JsOn");
+  check(!is_developer_campaign_save_path(unicode_player) &&
+        is_developer_campaign_save_path(unicode_developer),
+        "Unicode save names failed player/developer suffix classification");
+  PlayerCampaignSaveController unicode_saves;
+  unicode_saves.configure(unicode_player, 1, 0, false);
+  write_prepared_campaign(unicode_player, prepared, false);
+  check(read(unicode_player) == bytes, "Unicode save destination changed the payload");
+  rejected = false;
+  try { unicode_saves.configure(unicode_developer, 2, 0, false); }
+  catch (const std::invalid_argument &) { rejected = true; }
+  check(rejected, "Unicode developer path bypassed the player save boundary");
   runtime.world().campaign().developer_provenance = CampaignDeveloperProvenance{true};
   rejected = false;
   try { (void)PreparedPlayerCampaignSave::capture(runtime, options); }

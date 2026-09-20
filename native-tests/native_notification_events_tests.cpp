@@ -51,7 +51,7 @@ void bounded_categories(){
   summary.counts[static_cast<std::size_t>(FeedbackKind::ResearchReport)]=3;
   summary.counts[static_cast<std::size_t>(FeedbackKind::ShipComplete)]=1;
   publish_campaign_notifications(feed,summary,0.);
-  require(feed.items().size()==2&&feed.items().front().date=="2050-01-01"&&
+  require(feed.items().size()==2&&feed.items().front().date=="2050-03-21"&&
       feed.items().front().message=="Research report available (3)"&&
       !feed.items().front().diplomatic_contact_id,
       "Coalesced observer summary was not retained as dated safe categories");

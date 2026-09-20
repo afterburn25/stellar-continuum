@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_system_view.hpp"
+#include "native_planet_lighting.hpp"
 
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/campaign_economy.hpp>
@@ -49,6 +50,11 @@ struct NativeSurfaceBuildOption {
 };
 
 struct NativeColonyView {
+  double simulation_days{};
+  std::optional<stellar::core::StellarPhysicalProperties> illumination_star;
+  float illumination_x{},illumination_y{};
+  std::optional<stellar::native_planets::Lighting> stellar_lighting;
+  double rotation_parent_bearing{};
   std::uint64_t campaign_generation{}, revision{};
   int player_civilization_id{}, system_id{}, body_id{}, colony_id{};
   std::string colony_name, body_display_name, population_species_id;
@@ -93,6 +99,12 @@ struct NativeColonyView {
   std::string deposit_material_name, deposit_grade, outpost_status;
 
   std::string system_name, population_species_name;
+  std::string owner_name;
+  bool observer_only{};
+  // Full developer inspection of another empire is independent of ownership.
+  bool developer_inspection{}, foreign_settlement{};
+  int owner_civilization_id{};
+  std::optional<double> natural_habitability;
   stellar::native_system::NativeSystemBody planet;
   stellar::core::CreditFlowSnapshot local_credit_flow;
   double operating_funding{}, operating_arrears{}, empire_credit_flow{}, empire_industry_flow{}, construction_multiplier{};

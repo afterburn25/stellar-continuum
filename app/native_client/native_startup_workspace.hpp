@@ -27,6 +27,10 @@ struct StartupIntent {
   int system_count{}, pre_warp_civilization_count{6}, ancient_civilization_count{1};
   stellar::core::StellarPopulationOptions stellar_population;
   std::filesystem::path save_path;
+  stellar::core::DeveloperResearchOptions developer_research;
+  bool developer_full_coverage{};
+  stellar::core::PopulationSelection requested_population{stellar::core::PopulationSelection::Random};
+  bool developer_full_exploration{};
 };
 struct StartupLayout {
   float scale{};
@@ -86,6 +90,7 @@ private:
   int last_loading_tip_{-1};
   std::string failure_;
   std::string build_label_;
+  bool developer_mode_{};
   std::string diagnostics_;
   std::filesystem::path continue_save_;
   stellar::native_map::Point pointer_{};

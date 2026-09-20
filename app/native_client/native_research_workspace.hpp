@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_research_controller.hpp"
+#include "native_dropdown.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
@@ -12,6 +13,8 @@
 #include <vector>
 
 namespace stellar::native_research_ui {
+
+enum class ResearchViewMode { Guided, Tree, Recent, Favorites, Completed, Queue };
 
 enum class WorkspaceCommandKind { None, Close, Select, Execute };
 
@@ -43,6 +46,7 @@ struct ResearchWorkspaceLayout {
   stellar::native_map::UiRect inspector;
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect action;
+  stellar::native_map::UiRect sidebar,view_tabs,toolbar,active,bookmark,enqueue,tree_focus,completed,queue,filter,sort;
 
   [[nodiscard]] static ResearchWorkspaceLayout
   for_viewport(int width, int height, std::size_t tab_count);
@@ -55,9 +59,13 @@ public:
   using ArtworkResolver = std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(
       std::string_view node_id, bool portrait)>;
   void set_text_measurer(TextMeasurer measure);
+  [[nodiscard]] const stellar::core::AdaptiveResearchPlan& plan()const{return plan_;}
+  void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_=0;}
+  [[nodiscard]] ResearchViewMode view_mode()const{return mode_;}
   void set_artwork_resolver(ArtworkResolver resolve);
   void open();
   void close();
+  [[nodiscard]] bool popover_open()const{return dropdown_.visible()||why_open_;}
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool wants_text_input() const noexcept;
 
@@ -93,6 +101,20 @@ private:
   };
 
   void rebuild_topology();
+  struct GuidedCard{std::string id;stellar::native_map::UiRect bounds;bool recommended{};};
+  struct InterfaceHit{stellar::native_map::UiRect bounds;int action{};std::string id;};
+  [[nodiscard]] std::vector<GuidedCard> guided_cards(const ResearchWorkspaceLayout&)const;
+  void render_dashboard(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
+  void render_controls(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
+  std::optional<WorkspaceCommand> handle_controls(const stellar::native_map::InputEvent&,const ResearchWorkspaceLayout&,int,int);
+  stellar::core::AdaptiveResearchPlan plan_;
+  ResearchViewMode mode_{ResearchViewMode::Guided};
+  int filter_{},sort_{};bool list_view_{},why_open_{};
+  float guided_scroll_{},active_scroll_{};
+  std::vector<InterfaceHit> interface_hits_;
+  stellar::native_ui::Dropdown dropdown_;
+  std::optional<stellar::native_map::UiRect> inspector_content_clip_;
+
   void reconcile_selection();
   void select(std::string node_id);
   [[nodiscard]] const stellar::native_research::NativeResearchNode *

@@ -114,6 +114,12 @@ public:
   enabled_deployment_event_ids() const noexcept;
   [[nodiscard]] std::span<const ResearchProjectRuntimeState>
   active_projects() const noexcept;
+  // Cancelled programs retain scientific work and target context, but consume
+  // neither laboratories nor program capacity and never advance.
+  [[nodiscard]] std::span<const ResearchProjectRuntimeState>
+  cancelled_projects() const noexcept;
+  [[nodiscard]] const ResearchProjectRuntimeState *
+  cancelled_project(std::string_view node_id) const noexcept;
 
   // Mirrors the source ApplicabilityContexts property: context enumeration is
   // runtime order and each returned trait collection is ordinally sorted.

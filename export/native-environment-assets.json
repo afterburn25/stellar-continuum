@@ -1,0 +1,681 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/albedo.png",
+      "sha256": "186afaa0d5becd25d147f46fce3e257be7f1afc574f2c44fb1f93b18a6c75518"
+    },
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/clouds.png",
+      "sha256": "86c7fe60a4c84caf030dc48049db1d0e2e764c3d7c0e148d1b3fdb065f4fd10a"
+    },
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/emission.png",
+      "sha256": "eca2a1f56c9b5a0f3e14467eec0aa92757408ab67311c27580edc2405c154aca"
+    },
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/normal.png",
+      "sha256": "d1e15e6678a61395f15a4185dcf1d4308c5d53b7632d282c2c4601b2a4fe8e1b"
+    },
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/properties.png",
+      "sha256": "d8927e16357cad1530a9e0632ad61e25409df3cdbc82b14599fce791e46e9868"
+    },
+    {
+      "path": "assets/visual/planets/sol-pluto-v2/thumbnail.png",
+      "sha256": "7cbb5454f92b402bfe06fd81958e3a79932bace82a21c2fe2b6d9f926cb086db"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-01/radial.png",
+      "sha256": "876a1142c082f364e72b4c3abc15fa7859df1090ad188e17547d286faa07470f"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-02/radial.png",
+      "sha256": "d0bb5c6164ca047fbe08cca8d4ff6bdba6f52c56f7c0372d63a1cfe1fcf80b7d"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-03/radial.png",
+      "sha256": "af53f701f9a6ff23ec9caecb1c1a4cd824633cde377652622140f0432c7300ee"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-04/radial.png",
+      "sha256": "24033f977f95254abb7edb502f3f693577ca932867fe2ce67b559f1d4c4fcb90"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-05/radial.png",
+      "sha256": "1b5b01f22b2a9b6a5a177c4b8a020a742485b7f948cc0f9ac565b476216aab6c"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-06/radial.png",
+      "sha256": "24dc3570c53a84009508c3a67cc07ac87278ebc74f2156f4d0c6c95d8dccacf2"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-07/radial.png",
+      "sha256": "c4b1ff107f9871092e9a730b4fee18e2cd3f9784da5f63bc0ca96a01bf2c01f7"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-08/radial.png",
+      "sha256": "515b39518df57ee4c87261f0197b528d683e1ff429efb8a1d3e82ea416b02282"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-09/radial.png",
+      "sha256": "679b9cacc1775a5af5f43d981e97e3b70012d009864c7d3340ea19e283219a2a"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-10/radial.png",
+      "sha256": "628762ec42d95deb8c9652b8a5bf6baa0292f5efc14c1e394d7f57e9ba554125"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-11/radial.png",
+      "sha256": "c15e9e7690efdcdd79c94b3ee85e007d10dd194b403c7130e3e31438c63d8ed5"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-12/radial.png",
+      "sha256": "32fbd582e50770b7e06796c002f6d5713464ef5d8c01cb90f18647f52c3f6dc5"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-13/radial.png",
+      "sha256": "452e344af745c4ae36ba2f2d1be82e5c5275510c10b165948907210ddc9b0d7e"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-14/radial.png",
+      "sha256": "08d41682b31c3ca1189f5e7a8ec940c97b3819b715f9ac5ed325037b2cd8b003"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-15/radial.png",
+      "sha256": "f6b27be485f4a399b8b350348da1dd96a6e521ddc41e56d25ced16a078d0a709"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-16/radial.png",
+      "sha256": "2c20f135475f7b0218aa227bbfda6e977d4f126ab44fd55f2c92029d07b18297"
+    },
+    {
+      "path": "assets/visual/rings/ring-bright-ice-ring-17/radial.png",
+      "sha256": "680bf777ed08a052c9a0e920f79450bd1787048ebccee66608c9351dd89f7158"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-01/radial.png",
+      "sha256": "b78298a64586365a1f13dc64ecb46cd26ec96a6bfb71a44df7330480e551e4ee"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-03/radial.png",
+      "sha256": "94bf5bb416620501d638ccdec3aafb5f66eccf92494de0ed83fbbc21413eed0c"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-04/radial.png",
+      "sha256": "66542d7ce427d7bc2fca730a6bdfb72d89e05ff160b728ed31b99ac397ed20fc"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-05/radial.png",
+      "sha256": "34f3d32492731a48eeeef788291b5ba473e4df2204cfee5bd3fef0e99d9b995c"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-07/radial.png",
+      "sha256": "05b5eb5021e93fd6bf1a109c49ded38ec4a645af54ac2beaa8d0d2c2071225b1"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-08/radial.png",
+      "sha256": "0e6087ab3120b88acdd7c6b7612e79267ff4c2d1458a53d8179651cbdbbeb115"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-09/radial.png",
+      "sha256": "2576c1e90613bdc159e07413ef23eb56a191bd118ff4ffdf4a38c71e96a4e243"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-10/radial.png",
+      "sha256": "4bab7f7b36c94c2a49b4a5cee43c98b1ee90323181a37e75bec66809de3863f1"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-11/radial.png",
+      "sha256": "c17309271e1f1780bc4ef0ad94a039e82dcb0171715d86e0988da06efbcb63e6"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-12/radial.png",
+      "sha256": "f2db1dc902b61348e484aba8177d5ab67a47b8d47cc379f9dbdcc91cfff5bec4"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-13/radial.png",
+      "sha256": "e5944d75ac26f1f2ba0ef22165d0893b324f24fa15b47cbd36960c6ae3fb23a8"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-14/radial.png",
+      "sha256": "403387039bf3b0e81cffe67841c70369ad22ba1af511cc97158b3d6d11228c51"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-15/radial.png",
+      "sha256": "36744ffc2f183c702d675c4d432a43e5039a5e80c2baa8965392729a027a9b9e"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-16/radial.png",
+      "sha256": "333d5d241d661898e33a2461a9966954ddf76b930042736866f69144d89236bc"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-dust-ring-17/radial.png",
+      "sha256": "f78860b36999d86afe5e6fbfbcc507b23062970ae43efb728fba7b29dadda2e5"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-01/radial.png",
+      "sha256": "2fe94d2a01e3cad07823f36d35f4784b1923938406ad1f4b3c038b9428b34431"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-02/radial.png",
+      "sha256": "b14fd967d43fe7c20e23423167da52b5a9c3413ef5b0fe9cfc1732b32c6ea969"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-03/radial.png",
+      "sha256": "4dd217ecd2c85cd1f81ad733383946987115d6fccf2fb69bd2695bafefc089a7"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-05/radial.png",
+      "sha256": "547bd6b7499d4ec54b2244c80bd5045afc9c367560fb1b0474ad275e2ebce0fd"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-06/radial.png",
+      "sha256": "04b14b46bff6598a8974927434651e9b79515fc12e1454b9e0ca1fcaf5d0937f"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-07/radial.png",
+      "sha256": "f726d1f370ecb1f38f39de9afa45065d6d56f33562dc727effd47f578d398e9b"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-08/radial.png",
+      "sha256": "b39d000f29db1edd9c0c6295f2f89ecec2c47e7ffe0fa36bdf2c9ccf80f55159"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-09/radial.png",
+      "sha256": "923726cbc6ebe9236dff1a39af99245c9aa5d80b26a2efb10273953aebe81205"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-10/radial.png",
+      "sha256": "92158088142d8a567c21f37076f57c420b23bc0637cfaf5eb6d5fa565c8c2626"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-11/radial.png",
+      "sha256": "95d180787853a4700ad623693d0a8470e4356afef0161d0952a848ef08a1a73f"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-12/radial.png",
+      "sha256": "8094e16c5c103e9d293ceacb70349df1f82e5bfbbdfb0b3d0822704edba3b45f"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-13/radial.png",
+      "sha256": "a84c7a352ec0d897c2590f63b8ce0cfa4a4cb8856162c5b9b2c97fe6be645741"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-14/radial.png",
+      "sha256": "a4d14157fb25a3acca4b39248ae7c26335c64a3b5247150434c53c9450f6b4d7"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-15/radial.png",
+      "sha256": "b0245baa8e0b60e975042781e3848187bed9e717b7b64b04ab4da8a6945a85b8"
+    },
+    {
+      "path": "assets/visual/rings/ring-broad-ice-ring-16/radial.png",
+      "sha256": "620de0bacafff6a32c8bd87cc8f3dacc312267c932ae2b3ca50a4d1ce6ddc47f"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-01/radial.png",
+      "sha256": "f56c838a8bff6f4a973ef9e38b49b9564ee8e5a8bb6fef54d33728864dea4b43"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-02/radial.png",
+      "sha256": "c8d397aa9ed96f4c9cd569c135da21d8b15e8fbbf4ce3d5a8e17748bc8d6abad"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-04/radial.png",
+      "sha256": "b7ae0b4ebcb26d07a08987f586dae826650a87e74a98756919d5fd2ff71fd3ba"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-05/radial.png",
+      "sha256": "a22744a55e4dc5da60e71ec63e0633857f3b5cb09b5bba339b1a9bf798c0d899"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-06/radial.png",
+      "sha256": "585cf6085e459f534a5a55b52a44e7b3c2dd7a6fbe5fdc6d71910ffd9464a233"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-07/radial.png",
+      "sha256": "3c89f0cf052cc1112f50ec422b50dc6eacaa025942238490268f4f7d3d3bc680"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-08/radial.png",
+      "sha256": "55c6311a3ffff9b3a271381bfffb3edb410031e75133802e33d84732bc0fc5d8"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-09/radial.png",
+      "sha256": "311c1049fabf95d5106a7e39df3f4f2b9305295ccc38bd87c5d893476e1a3ccd"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-10/radial.png",
+      "sha256": "ddb4e40335df6717b3d1ff2c001ab414db0b1fd97152f25b6ea222b9ef3c8904"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-11/radial.png",
+      "sha256": "92bfb283a80805afb9bfd74977bf4550ecb29a9523eeda2a0b5fc578660440e0"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-12/radial.png",
+      "sha256": "7aad04b3d827eca340d3c57472798480f98f4b5868e3c17f6a33e4e5f1cdc211"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-13/radial.png",
+      "sha256": "8459cf5a42ceb2483e24501d0f518024f5759509fb9cf34fd7dc1553d49b3b08"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-15/radial.png",
+      "sha256": "ffc313fc1efda3061ce0934d4eeee1f13eac41bed924a4017d391e67092d1c0a"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-16/radial.png",
+      "sha256": "0f5383bf12b182fdda46e2a34af2e0956b8cc94d776558b75f19d6650f0868e2"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-17/radial.png",
+      "sha256": "dfd00e5838c2bfbee30906161318898a4e873c32f56d843525138062886b6b5f"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-18/radial.png",
+      "sha256": "fe5fddce0e0afa85eab1fa53d2eeadbf690e1a739abeb70edca6f5285dbef424"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-19/radial.png",
+      "sha256": "c441e1b318963f43230acde55abe5383f0c47d21aa3da427423e45861a2f569a"
+    },
+    {
+      "path": "assets/visual/rings/ring-broken-fragmented-ring-20/radial.png",
+      "sha256": "09a0d008b9eaf816126001078081cf68524f4cd1c55d5e7309fe62a96d02f1f8"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-01/radial.png",
+      "sha256": "ebd4a1a36a8d0e3b3db83180fd6b16969232d766b5b978aa549b416eed6cc61d"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-02/radial.png",
+      "sha256": "6d21cf61e426a36b3cbd16c4030620e507fd5bf6fb51ae4a9f75d52f7f639c10"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-03/radial.png",
+      "sha256": "f0b5295c4860ed69691cd992a9ac894f23b546b76d23f2bb4fd0b8b1df0ade24"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-04/radial.png",
+      "sha256": "f9b5f6dfde9710ef224bf5641256b85bb6e343b14578de5a8485de29bd4a90d3"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-05/radial.png",
+      "sha256": "e2b59a5951dd3c2bf073bf4b360f78661867e399b85bfd864564ec81e0ac4f08"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-07/radial.png",
+      "sha256": "f528dbc4735c1e0f2c1a1e04aff5ea6626455ebb27136262c8c16bb4254d983d"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-08/radial.png",
+      "sha256": "52f540a26a8d52324b50a41b1f3089a30e3cc9e84640cfcd032d5f09c4419943"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-09/radial.png",
+      "sha256": "60b37761c1b1e5cbc27a253f404ef529dd36b7b16d72968ac3693a681a0cfd46"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-10/radial.png",
+      "sha256": "83cf56165943b009ef023e3d85f289a932b3ed85c6496d767924a45c63850b40"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-11/radial.png",
+      "sha256": "125a4e4cfc816260c92cd437b6d55a63d526652cce5ae1d094540adb09e53a68"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-14/radial.png",
+      "sha256": "27afd6c54b1002cb1e95d9e313b0400ce733f90c58a88a23959eb68c8f1c1a8b"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-15/radial.png",
+      "sha256": "900e19ff9bd6d77229dae0568ac49168ccc15af0b88a07dadf3371591ab3b009"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-16/radial.png",
+      "sha256": "a0e0e73398e4a13395f57191e8a84ba9c6eb8457e76c261c88884ae64b2517e2"
+    },
+    {
+      "path": "assets/visual/rings/ring-dark-rocky-ring-17/radial.png",
+      "sha256": "a096c61ac915133554bb7d58b236ac643d483e24ed9fd28890bde13d768d240b"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-01/radial.png",
+      "sha256": "25dd9affb0282c45109c9706e58012b7cd21b952e4b6fa9536143f025ae934fb"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-02/radial.png",
+      "sha256": "867b8d551cee4fa4f39c8067edbfbdc522832acca3f2c320f6835b8f972df030"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-03/radial.png",
+      "sha256": "6111af7a23daa4c9ecb09958dd996d2f4ed00db838c27efb543190271a6bbe01"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-04/radial.png",
+      "sha256": "fa019524706950617de0af54715f13d052f6ee42006931f95917554efbdffecd"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-05/radial.png",
+      "sha256": "8765219bf044664e2d39d6c64f3af8483803444d1bb628e1253168471c3ccf16"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-06/radial.png",
+      "sha256": "9030479c80abfa561777aa953dbf74ccb6650915e1a7d7d9a84198a724b8d85d"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-07/radial.png",
+      "sha256": "3eb1158e0e472224627c3c5b6b02be2a6d6dead977492ea4aca14cf018c641d8"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-08/radial.png",
+      "sha256": "f1266222ea90d5f47e7eae07faf1475881907d8777a56ab8f933b75c2bd31c30"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-09/radial.png",
+      "sha256": "74c7e4ca8a05ea19189d2ebc57e18d208807d81bda270b2b99a744521d8aaa77"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-10/radial.png",
+      "sha256": "1025a230ba5a106332c7dbccfd0125416be6bd8d892b41de22024d4a908ed438"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-11/radial.png",
+      "sha256": "fe483f78d8bfc86800268908e8313848262faf56ff21e629d8b42858a6a12c1a"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-13/radial.png",
+      "sha256": "a0c5d9cc701de82a749e3285400716b4810d7b6ba151847a336a551e47be2f82"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-14/radial.png",
+      "sha256": "8b23005584b352ac3eb49e398fc36150beb5cc20a0af08a17505ef6c0a2d2c40"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-15/radial.png",
+      "sha256": "fcb9603672875a9f23e7a7cfb2ea93f058c74c230d3550bc5828b1ff62dc2342"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-16/radial.png",
+      "sha256": "ba27307bd644a84b8bef2e28cbed768f29e4b5df2a3fcda2e23078b87235acb2"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-17/radial.png",
+      "sha256": "2da3a1890afba1b976d8f4098104a460d588360b1fcc29600dac153e852814d2"
+    },
+    {
+      "path": "assets/visual/rings/ring-dense-banded-ring-18/radial.png",
+      "sha256": "951d5e080e66ec3bcaf8ad4673e227df7eccd74ef118cc5c95bc36cb34a7cf66"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-01/radial.png",
+      "sha256": "3aa37e8ac2d41e4f6affe8780b96c86c34f97ff8861e6070db42d7e8de502cba"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-02/radial.png",
+      "sha256": "b7e9a6677295ba80fd26aece3507afc29a077fa98c3c8c8415d4593136e9f952"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-03/radial.png",
+      "sha256": "20212b644acb5071accb4dab82e8f9473f87023ca642ef44a05b0ee852849e1c"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-04/radial.png",
+      "sha256": "3a1790735350a1e9878632bbd4b3c762b3e039d378614e7a32a9a1336a7c3de6"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-05/radial.png",
+      "sha256": "7e2843bbb7c36ca81aa715f57ba1ae9af8690b018c88c38c554a9faa69d7e0f6"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-06/radial.png",
+      "sha256": "bf4f2e50baab94ac20b33b90b15282f472b850c963e9e017796d307e954bdfe9"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-08/radial.png",
+      "sha256": "1aedcdf5304b41401bd70c832be1355c66c4111446c15c053f4f3b0d05f2a095"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-11/radial.png",
+      "sha256": "6e779c3f9a54b797720461000f016dfacfb79aad94357882c6a33f33ac62ba44"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-13/radial.png",
+      "sha256": "500f94118a0a186a9d604597089d4c8d0da0fd1bee9b01c62c10513839b5b6a4"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-16/radial.png",
+      "sha256": "ca3f04af67cab95e644dd32567f84270c777013435c1453ce1fa66d7f4b1b7d3"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-17/radial.png",
+      "sha256": "f885f4441d7c41c36bf1229be7b3ba7ca498ef5a25ccd241668155bd4263db46"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-18/radial.png",
+      "sha256": "906b6c016e3d59941adf372218a6f23631ac404f9fb6e141d96c334fb2edb3a3"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-20/radial.png",
+      "sha256": "d40d1ad51de32e79cd8ab9f0c8caf1db19da6c406f04bd01adc5c2c1567a75f2"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-21/radial.png",
+      "sha256": "262b783fb09ba4cab8a8f6e152c6e06cfa74a9d9143de8448f0836b56adad1a2"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-22/radial.png",
+      "sha256": "38263e60f2a172ad0baf7a727a915629a2cf0ac1f4a186021e7c7adb04319b9e"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-23/radial.png",
+      "sha256": "f1603aa4076dc47a105e473b4461748e4fbc9ec298c5fdf6b3b0e79b1a45d871"
+    },
+    {
+      "path": "assets/visual/rings/ring-faint-debris-ring-24/radial.png",
+      "sha256": "fa0ef780a91b9fa47c7b490a610b2faf5753617ce2da99baa1c06dce220d348a"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-02/radial.png",
+      "sha256": "17dd9e8cd085e0c8df607b8d7ef2a3bd0c547f17c71eccbbee505ff9c8c193ca"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-03/radial.png",
+      "sha256": "70fcd47d75ae6078a28b18a05cb4019c7fef0b5298e03efdca484aa683c941e0"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-04/radial.png",
+      "sha256": "a2f707891c17b175b2ff18c201004e4da3911286b40c45b0c4712a0340fc0fc2"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-05/radial.png",
+      "sha256": "60fb129f5e054f7fe436f98f6089f510343e1b130bbc00aca4b1f6ea15a65e37"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-06/radial.png",
+      "sha256": "b250b54e1fd199bed65ba44b99448e76622bdc75384392923633fa5c73d10c0d"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-07/radial.png",
+      "sha256": "992debac606b7294fac9b2cf40d47bee569843e4242cd8042e43ba08c447d46b"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-08/radial.png",
+      "sha256": "8d3ce6e596901256bc61bc4a9b09b4b0721cb74669d9016de459179347c7c871"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-09/radial.png",
+      "sha256": "54fe5b43f84e617731a32af26a152652f3dec7c52ec4f46044902cb59e251f9c"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-10/radial.png",
+      "sha256": "7d025deb647153b309fe4fa94afd62243102bae821d1bd5c517893e12eff76d7"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-11/radial.png",
+      "sha256": "78dcdffc6e1caeb4099056a964406b37a0c0e5b865df717b88cf9bd016f6f8b3"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-12/radial.png",
+      "sha256": "bc507d68a93c10405873f50677b04d0c043f5bcc936567cc9bdb726d26a8ec8c"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-13/radial.png",
+      "sha256": "37184c86c95f6af98751708f32d890780533d51fa687696c1fd409f934675c06"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-15/radial.png",
+      "sha256": "920994d46afb6fd42f0ea36eb600a6d7655b2ed6f26a2de8e1da78ec716b5350"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-16/radial.png",
+      "sha256": "3ec9152326202db983b7fd96a3b609c3b642c95f321615830c113cf18911c4b5"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-17/radial.png",
+      "sha256": "916ae0d5c39973ab6555a4e3b641e21ea098a36e7af951bcaf2689bb82c81cb4"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-18/radial.png",
+      "sha256": "34178ee5e81ce8689bfc4052b4ad4c69b16d088bd103e263545236515eb973ef"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-19/radial.png",
+      "sha256": "b9dbdee53f740aeb65414c6439940e576ac2151a65afaecd62dd7bc9de33efb1"
+    },
+    {
+      "path": "assets/visual/rings/ring-mixed-ice-and-dust-ring-20/radial.png",
+      "sha256": "0f1e4a593d9066ad72e915d12ea9fd41af4ea612bd5d8e4a459fc015040823ae"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-01/radial.png",
+      "sha256": "29fcde59a84f487c1bd5c2860b40887730e183d622b43a01b77f26fff07e6f48"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-02/radial.png",
+      "sha256": "adb485f4aa9e69085231ead024ebf8b490ccf42a0ecbb5fd68d9ec1e15abe14c"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-03/radial.png",
+      "sha256": "19b8fc7646421a7ece84318933aebd449a751867ed1a1c2fcee07c3b7b2fc7e7"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-05/radial.png",
+      "sha256": "9116c7aa7d3b7f5d746c344a3265c1c6fa6b9f92729bf789d8d55607f8b0cf4c"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-06/radial.png",
+      "sha256": "4ca3e7f67352b05f56006e7ad58a9eb5afb0fab718150d2971b90965b6e6c961"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-07/radial.png",
+      "sha256": "482a85a857072f45d949161579a69b180632609b62545fdf7093e31d792cbca3"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-08/radial.png",
+      "sha256": "fcaf2a07ad96cccfc1ac437b5b26870dde255537f456d05a6e16b70b94f60195"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-09/radial.png",
+      "sha256": "a01494e0d29d6ac0b034f7eb2724aabbfa0a81871bc756edd14eb523b177ec74"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-10/radial.png",
+      "sha256": "1a2509155709fb16ed1a94347a2d61ec919163edfe37c9898bd833e3eba8d661"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-11/radial.png",
+      "sha256": "1fba776f2c70418df6bc8e0bba072311b17f34a0d919409baec493cde5b243c0"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-13/radial.png",
+      "sha256": "6eb572553ef4eca6ea6b2e7edae7ee5548d43a1dfda56c383e5c696a2f468164"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-14/radial.png",
+      "sha256": "59f3f45cd76fba75efd2a5a0f23d99f483d99aca8428636513fecf28108f99f2"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-15/radial.png",
+      "sha256": "c54bcb51c7e25fa6cd0f9d70522b0285824782fbb8dd9bfd2419472ed11d01b6"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-16/radial.png",
+      "sha256": "de9962addf9bad340d4f672c222ec042a744d5a7f25b80e55a75107054227053"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-17/radial.png",
+      "sha256": "a39b54b5ea865e93f6689d88ef67560da0d883582234e40a55ce7d23224fedee"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-18/radial.png",
+      "sha256": "d6641f0c0c2e7c8ae9624586c349f15192e2ac8a12c8e3c21c9167544380627e"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-19/radial.png",
+      "sha256": "9c8d4884735c5d2eefeb681cc59bf9bbb8640ff4fcc48e376837eec992fb06ff"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-dust-ring-20/radial.png",
+      "sha256": "ed340a63fe954166b29a1dc55d75094aba347cc727c16d4b297e69338747cdb1"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-03/radial.png",
+      "sha256": "b8eeae2ae618294214526688b93dbc3007347650b5c9bafed28d8797600e2d50"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-04/radial.png",
+      "sha256": "143c00aa0dfc5b6b6f9c5eedabec251aff66670f66e0b75bbabcdd9c3e0fa8ed"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-05/radial.png",
+      "sha256": "a3729f472ee5672db44033745afea228fa8e99083d14abfc6a3d4796fe9f0046"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-06/radial.png",
+      "sha256": "85aedb4c08ffea965394f84d97e3709d8ca5856bf035a34ff96a14b4989c63ca"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-09/radial.png",
+      "sha256": "3d26803198923cbac9d0cee977ba6703da0309bc4c6959ebfcabf3625b6c3f73"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-10/radial.png",
+      "sha256": "59c93b7df00a7f34aa3c6556520c7fc7dfda9f71c86f7aad86253a5f9ddfcd64"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-11/radial.png",
+      "sha256": "4f1b33b7e29680d08b0dfc398ded39d345fb95f6c243a392631914b634ca3ffc"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-12/radial.png",
+      "sha256": "a8292f433dcbbb461baaa0d2d57d51becec57d05b0f6785a66535a658868a9f4"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-13/radial.png",
+      "sha256": "1bca21172482af0ac33a0adb4191fee61af16591bf49fc4fecb07e7787f6c7f9"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-14/radial.png",
+      "sha256": "5732c8c63ffc7f9bd4d3f39c53daa892242d82d4eb28e00c9247cac0f6d26d85"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-17/radial.png",
+      "sha256": "55f315b823acdd5f876eee667cc3271b37bfa5a8e6474b9e1c178010a03e9f56"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-18/radial.png",
+      "sha256": "1f45cbdce2c031951ebd153204e1638e056f38eea9bc36adec4221eb58a5c451"
+    },
+    {
+      "path": "assets/visual/rings/ring-thin-elegant-ring-20/radial.png",
+      "sha256": "1e5050a36645c206a4fad720beec1d7eeef912f24ec934ef8946eecc576f7b62"
+    },
+    {
+      "path": "assets/visual/starfields/faint-map-reference.png",
+      "sha256": "7e48914134e12b7498499a20202773f4382b88dc5809ee0e945f4d0b12b57406"
+    }
+  ]
+}

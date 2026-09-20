@@ -20,7 +20,7 @@ bool finite_bounded(float value) noexcept {
 }
 
 bool valid_point(stellar::core::MassivePoint value) noexcept {
-  return finite_bounded(value.x) && finite_bounded(value.y);
+  return finite_bounded(value.x) && finite_bounded(value.y) && finite_bounded(value.z);
 }
 
 bool valid_point(stellar::native_map::Point value) noexcept {
@@ -174,7 +174,7 @@ std::vector<BattleArtSprite> prepare_battle_art(
 
     const auto velocity_valid = valid_point(binding.velocity);
     const auto speed = velocity_valid
-                           ? std::hypot(binding.velocity.x, binding.velocity.y)
+                           ? std::hypot(binding.velocity.x, binding.velocity.y, binding.velocity.z)
                            : 0.F;
     const auto moving = std::isfinite(speed) && speed > moving_epsilon;
     auto heading = moving ? std::atan2(binding.velocity.y, binding.velocity.x)
@@ -193,7 +193,9 @@ std::vector<BattleArtSprite> prepare_battle_art(
     if (!visible)
       continue;
     result.push_back({binding.formation_id, binding.vessel_id, center,
-                      {extent, extent}, degrees, moving, clip});
+                      {extent, extent}, degrees, moving, clip,
+                      moving ? std::atan2(binding.velocity.z, std::hypot(binding.velocity.x,binding.velocity.y)) : 0.f,
+                      binding.position.z * pixels_per_world});
   }
   return result;
 }

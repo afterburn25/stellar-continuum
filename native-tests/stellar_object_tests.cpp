@@ -96,7 +96,15 @@ int main(int argc,char** argv)try {
     auto restored=restore_galaxy_payload_v16(decode_galaxy_payload_v16_json(encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(galaxy,capture))));
     auto& loaded=restored.galaxy.fleets.front();check(loaded.stellar_transit_path==saved.stellar_transit_path,"Hazard route survives save/load");advance_fleet_local_transit(saved,.17);advance_fleet_local_transit(loaded,.17);check(saved.local_transit_position.x==loaded.local_transit_position.x&&saved.local_transit_position.y==loaded.local_transit_position.y,"Mid-route reload continues exact movement");
   }
-  auto legacy=seed_persistable_fresh_campaign(42,catalog,{"2026-09-17T00:00:00+00:00",250});auto old=encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(legacy,capture));check(old.find("StellarObject")==std::string::npos,"Old saves remain legacy");auto load=restore_galaxy_payload_v16(decode_galaxy_payload_v16_json(old));check(nlohmann::json::parse(old)==nlohmann::json::parse(encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(load.galaxy,capture))),"Old save unchanged");
+  auto legacy=seed_persistable_fresh_campaign(42,catalog,{"2026-09-17T00:00:00+00:00",250});auto old=encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(legacy,capture));check(old.find("StellarObject")==std::string::npos,"Old saves remain legacy");auto load=restore_galaxy_payload_v16(decode_galaxy_payload_v16_json(old));
+  const auto migrated=encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(load.galaxy,capture));
+  auto physical_old=nlohmann::json::parse(old),physical_new=nlohmann::json::parse(migrated);
+  const auto remove_visual_migration=[](auto&& self,nlohmann::json& value)->void{if(value.is_object()){value.erase("PlanetAppearance");for(auto& child:value)self(self,child);}else if(value.is_array())for(auto& child:value)self(self,child);};
+  remove_visual_migration(remove_visual_migration,physical_old);remove_visual_migration(remove_visual_migration,physical_new);
+  check(physical_old==physical_new,"Old simulation save unchanged by visual migration");
+  for(const auto& b:load.galaxy.bodies)check(b.appearance.has_value(),"Legacy body receives canonical appearance");
+  auto load_again=restore_galaxy_payload_v16(decode_galaxy_payload_v16_json(migrated));
+  check(nlohmann::json::parse(migrated)==nlohmann::json::parse(encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(load_again.galaxy,capture))),"Migrated appearance never rerolls on subsequent loads");
   if(argc>3){
     const std::filesystem::path captures=argv[3];std::filesystem::create_directories(captures);
     const auto research=std::filesystem::path(argv[1]).parent_path().parent_path()/"research/v1";

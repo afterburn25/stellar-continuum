@@ -60,8 +60,14 @@ void empty_default_and_unicode_round_trip(const TempDirectory& temp) {
           "schema 1 Unicode screenshot folder did not round-trip");
   std::ifstream input(file, std::ios::binary);
   const std::string json((std::istreambuf_iterator<char>(input)), {});
+  input.close();
   require(json.find("\"schemaVersion\":1") != std::string::npos,
           "schema version was not persisted");
+  require(reloaded.saved().nebula_density==1,"Nebula preference did not default to Medium");
+  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;
+  require(reloaded.save(navigator),"Navigator preferences failed to save");
+  NativeGeneralSettings navigator_reload(file);
+  require(navigator_reload.saved()==navigator,"Category collapse/hide preferences did not round-trip with screenshot path");
 }
 
 void invalid_files_use_default(const TempDirectory& temp) {
@@ -433,6 +439,15 @@ int main() {
   try {
     TempDirectory temp;
     empty_default_and_unicode_round_trip(temp);
+    {
+      NativeGeneralSettings density(temp.path/"nebula-visual.json");density.open();const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      click_button(density,l.nebula,"nebula dropdown");
+      InputEvent end{InputEventType::KeyPressed};end.key=0x4000004du;(void)density.handle(end,1280,720);
+      InputEvent accept{InputEventType::KeyPressed};accept.key=13;(void)density.handle(accept,1280,720);
+      require(density.draft().nebula_density==2&&density.saved().nebula_density==1,"Dropdown selection did not stay in draft");
+      click_button(density,l.save,"save nebula density");NativeGeneralSettings reloaded(temp.path/"nebula-visual.json");require(reloaded.saved().nebula_density==2,"Selected nebula visual density was not saved");
+      reloaded.open();click_button(reloaded,l.nebula,"nebula dropdown");InputEvent home{InputEventType::KeyPressed};home.key=0x4000004au;(void)reloaded.handle(home,1280,720);(void)reloaded.handle(accept,1280,720);reloaded.cancel();require(reloaded.saved().nebula_density==2,"Cancel changed nebula density");
+    }
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);
     picker_save_cancel_and_default_flow(temp);

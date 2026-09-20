@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_facilities.hpp>
 
 #include <nlohmann/json.hpp>
@@ -13,7 +14,7 @@ namespace stellar::core {
 namespace {
 using Json = nlohmann::ordered_json;
 [[noreturn]] void fail(std::string message) { throw AdaptiveResearchFacilityCatalogError(std::move(message)); }
-Json read_json(const std::filesystem::path &path) { std::ifstream input(path); if (!input) fail("Unable to read Adaptive Research file: " + path.string()); try { return Json::parse(input); } catch (const Json::exception &) { fail("Malformed Adaptive Research JSON in " + path.string()); } }
+Json read_json(const std::filesystem::path &path) { auto input=stellar::engine::resource_stream(path); if (!input) fail("Unable to read Adaptive Research file: " + path.string()); try { return Json::parse(input); } catch (const Json::exception &) { fail("Malformed Adaptive Research JSON in " + path.string()); } }
 const Json &property(const Json &value, std::string_view name, const std::string &source) { const auto found=value.find(name); if(found==value.end()) fail(source+" is missing property '"+std::string(name)+"'."); return *found; }
 std::string required_string(const Json &value, std::string_view name, const std::string &source) { const auto &item=property(value,name,source); if(!item.is_string()) fail(source+" is missing string '"+std::string(name)+"'."); return item.get<std::string>(); }
 std::vector<std::string> strings(const Json &value, std::string_view name, const std::string &source) { const auto found=value.find(name); if(found==value.end()) return {}; if(!found->is_array()) fail(source+"."+std::string(name)+" must be an array."); std::vector<std::string> result; for(const auto &item:*found) { if(!item.is_string()) fail(std::string(name)+" contains null."); result.push_back(item.get<std::string>()); } return result; }
@@ -45,3 +46,4 @@ AdaptiveResearchFacilityCatalog load_adaptive_research_facility_catalog(const st
   return AdaptiveResearchFacilityCatalog(std::move(storage));
 }
 } // namespace stellar::core
+

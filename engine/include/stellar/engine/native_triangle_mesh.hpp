@@ -22,6 +22,13 @@ inline void validate_triangle_mesh(const TriangleMesh &mesh) {
     return std::isfinite(value) &&
            std::abs(value) <= maximum_triangle_mesh_coordinate;
   };
+  if((mesh.texture&&mesh.texture_coordinates.size()!=mesh.vertices.size())||
+     (!mesh.texture_coordinates.empty()&&mesh.texture_coordinates.size()!=mesh.vertices.size())||
+     (!mesh.vertex_colors.empty()&&mesh.vertex_colors.size()!=mesh.vertices.size()))
+    throw std::invalid_argument("Textured mesh attributes must match its vertices.");
+  for(const auto uv:mesh.texture_coordinates)
+    if(!std::isfinite(uv.x)||!std::isfinite(uv.y)||uv.x<0||uv.x>1||uv.y<0||uv.y>1)
+      throw std::invalid_argument("Mesh texture coordinates must be normalized.");
   for (const auto point : mesh.vertices)
     if (!bounded(point.x) || !bounded(point.y))
       throw std::invalid_argument("Triangle mesh vertices must be finite drawable coordinates.");

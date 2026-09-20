@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/galaxy_configuration.hpp>
+#include <stellar/core/galaxy_phenomena.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -46,6 +48,8 @@ struct GalaxyGenerationMetadata {
   std::optional<GalacticCoreMetadata> galactic_core;
   std::optional<StellarPopulationOptions> stellar_population;
   std::optional<std::string> stellar_profile_version;
+  std::optional<GalaxyGenerationConfig> configuration;
+  std::optional<GalaxyPhenomena> phenomena;
 
   bool operator==(const GalaxyGenerationMetadata &) const = default;
 };

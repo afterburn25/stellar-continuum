@@ -1,5 +1,8 @@
 #include <stellar/core/stellar_object.hpp>
 #include <stellar/core/stellar_population_profiles.hpp>
+#include <stellar/core/stellar_coverage.hpp>
+#include <stellar/core/galaxy_configuration.hpp>
+#include <stellar/engine/spatial_region_index.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/planetary_catalog.hpp>
 #include "stellar_population_config.hpp"
@@ -150,16 +153,25 @@ CentralBlackHoleProperties generate_central_black_hole(std::uint64_t seed) {
   double u=rng.unit()*std::accumulate(weights.begin(),weights.end(),0.);int state=0;while(state<2&&u>=weights[static_cast<std::size_t>(state)])u-=weights[static_cast<std::size_t>(state++)];
   return {"stellar-population-v1",static_cast<CentralBlackHoleState>(state),rng.logarithmic(range(j,"massSolar")),rng.unit()*tau,state==2?hazard("jetHalfAngleRadians"):0};
 }
+CentralBlackHoleProperties central_black_hole_with_state(CentralBlackHoleProperties value,CentralBlackHoleState state){
+  value.state=state;value.jet_half_angle_radians=state==CentralBlackHoleState::RelativisticJets?hazard("jetHalfAngleRadians"):0;
+  validate_central_black_hole(value);return value;
+}
 void validate_central_black_hole(const CentralBlackHoleProperties& p) {
   if(p.generation_version!="stellar-population-v1"||static_cast<unsigned>(p.state)>2||!std::isfinite(p.mass_solar)||p.mass_solar<100000)throw std::invalid_argument("Invalid central black hole");
   finite_nonnegative(p.jet_axis_radians);finite_nonnegative(p.jet_half_angle_radians);
 }
 
-void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>& systems,StellarPopulationOptions options) {
+void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>& systems,StellarPopulationOptions options,bool visual_footprint) {
   (void)stellar_population_weights(options);
-  const auto core=full_galaxy_core(static_cast<int>(systems.size()));const auto radius=full_galaxy_radius(static_cast<int>(systems.size()));
+  auto core=full_galaxy_core(static_cast<int>(systems.size()));const auto radius=full_galaxy_radius(static_cast<int>(systems.size()));
   std::vector<Vec2> placed;double protected_radius=0;
   for(const auto& s:systems)if(s.stellar_catalog_id) {placed.push_back({s.position.x,s.position.y});protected_radius=std::max(protected_radius,std::hypot(s.position.x,s.position.y)+3.5);}
+  stellar::engine::SpatialRegionIndex spacing(3.5);
+  for(std::size_t i=0;i<placed.size();++i)spacing.insert(i,{placed[i].x,placed[i].y,placed[i].x,placed[i].y});
+  const auto frame=visual_footprint?galaxy_footprint_frame(options.morphology,static_cast<int>(systems.size()),options.state):GalaxyFootprintFrame{};
+  if(visual_footprint)core.position={static_cast<float>(frame.left+frame.width*.5),static_cast<float>(frame.top+frame.height*.5)};
+  const auto* mask=visual_footprint?&galaxy_density_mask(galaxy_visual_pair(options.morphology,options.state).map_id):nullptr;
   StellarRegionCounts region_counts{};
   const double formation=stellar_star_forming_density_multiplier(options.state);
   // Position streams never depend on the sampled class. Generate the geometry
@@ -195,7 +207,10 @@ void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>& syst
         region=r<radius*.42?StellarRegion::Bulge:r>radius*.9?StellarRegion::Halo:r>radius*.65?StellarRegion::OuterDisk:StellarRegion::InnerDisk;
       } else {
         if(r>radius*.28&&r<radius*.9&&rng.unit()<.60) {
-          a=2.6*std::log(std::max(.15,r/radius))+std::floor(rng.unit()*4)*tau/4+(rng.unit()-.5)*.36;
+          // Sequence RNG draws explicitly; expression evaluation order must not
+          // change the saved seed's geometry when the placement loop is optimized.
+          const double arm=rng.unit(),jitter=rng.unit();
+          a=2.6*std::log(std::max(.15,r/radius))+std::floor(arm*4)*tau/4+(jitter-.5)*.36;
         }
         const double phase=std::remainder(a-2.6*std::log(std::max(.15,r/radius)),tau/4);
         region=r<radius*.28?StellarRegion::Bulge:r>radius*.92?StellarRegion::Halo:r>radius*.83?StellarRegion::OuterDisk:std::abs(phase)<.22?StellarRegion::Arm:r<radius*.4?StellarRegion::InnerDisk:StellarRegion::InterArm;
@@ -203,9 +218,17 @@ void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>& syst
         if(options.morphology==GalaxyMorphology::BarredSpiral&&r<radius*.36&&std::abs(std::sin(a))<.3)region=StellarRegion::Bar;
       }
       Vec2 p{core.position.x+static_cast<float>(r*std::cos(a)),core.position.y+static_cast<float>(r*std::sin(a)*flatten)};
+      if(mask){
+        const double density=mask->sample((p.x-frame.left)/frame.width,(p.y-frame.top)/frame.height);
+        // The procedural morphology proposes locations. The cached visual field
+        // rejects empty margins and gently weights valid structure, not classes.
+        if(density<.055||rng.unit()>std::clamp(.35+density*1.7,.35,1.))continue;
+      }
       if(std::hypot(p.x-core.position.x,p.y-core.position.y)<core.exclusion_radius||std::hypot(p.x,p.y)<protected_radius)continue;
-      if(std::any_of(placed.begin(),placed.end(),[&](Vec2 other){return std::hypot(other.x-p.x,other.y-p.y)<3.5;}))continue;
-      s.position={p.x,p.y,std::nullopt};s.stellar_region=region;++region_counts[static_cast<std::size_t>(region)];placed.push_back(p);found=true;
+      const auto nearby=spacing.query({p.x-3.5,p.y-3.5,p.x+3.5,p.y+3.5});
+      if(std::any_of(nearby.begin(),nearby.end(),[&](std::size_t id){const auto other=placed[id];return std::hypot(other.x-p.x,other.y-p.y)<3.5;}))continue;
+      s.position={p.x,p.y,std::nullopt};s.stellar_region=region;++region_counts[static_cast<std::size_t>(region)];
+      spacing.insert(placed.size(),{p.x,p.y,p.x,p.y});placed.push_back(p);found=true;
     }
     if(!found)throw std::runtime_error("Stellar placement exhausted safe spacing; generation aborted without a partial galaxy");
   }
@@ -227,6 +250,45 @@ void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>& syst
     }
     if(d.habitability_modifier<.2||d.evolved||d.remnant||type==StellarObjectType::BrownDwarf)s.has_habitable_world=false;
   }
+}
+StellarCoverageResult ensure_stellar_coverage(std::uint64_t seed,std::vector<StellarSystem>& systems) {
+  auto staged=systems;StellarCoverageResult result;
+  std::array<int,stellar_object_type_count> counts{};
+  std::unordered_set<int> ids;
+  for(const auto &s:staged){
+    if(!s.stellar_object||!ids.insert(s.id).second)throw std::invalid_argument("Coverage requires unique, physically typed systems.");
+    validate_stellar_physics(*s.stellar_object);++counts.at(static_cast<std::size_t>(s.stellar_object->type));
+  }
+  for(const auto &definition:stellar_object_definitions()){
+    if(counts[static_cast<std::size_t>(definition.type)])continue;
+    StellarSystem *best=nullptr;std::pair<int,std::uint64_t> best_rank{100,0};
+    for(auto &candidate:staged){
+      const auto &p=*candidate.stellar_object;const auto &current=stellar_object_definition(p.type);
+      if(candidate.stellar_catalog_id||p.measured_anchor||current.hooks.is_rare_discovery||
+         counts[static_cast<std::size_t>(p.type)]<=1||
+         std::ranges::find(result.forced_system_ids,candidate.id)!=result.forced_system_ids.end())continue;
+      const auto region=candidate.stellar_region.value_or(StellarRegion::Disk);
+      const bool forming=region==StellarRegion::Arm||region==StellarRegion::StarForming||
+          region==StellarRegion::IrregularClump||region==StellarRegion::Ring;
+      const bool massive=definition.young||definition.type==StellarObjectType::RedSupergiant||
+          definition.type==StellarObjectType::YellowSupergiant||definition.type==StellarObjectType::BlueSupergiant||
+          definition.type==StellarObjectType::Hypergiant||definition.type==StellarObjectType::WolfRayet;
+      Random stable{seed^0x636f766572616765ULL^(static_cast<std::uint64_t>(candidate.id+1)*0xd6e8feb86659fd93ULL)^static_cast<std::uint64_t>(definition.type)};
+      const std::pair rank{massive&&!forming?1:0,stable.next()};
+      if(!best||rank<best_rank||(rank==best_rank&&candidate.id<best->id)){best=&candidate;best_rank=rank;}
+    }
+    if(!best)throw std::invalid_argument("Insufficient safe procedural systems for complete stellar coverage.");
+    --counts[static_cast<std::size_t>(best->stellar_object->type)];
+    const auto key=seed^0x636f766572616765ULL^(static_cast<std::uint64_t>(best->id+1)*0xd6e8feb86659fd93ULL);
+    best->stellar_object=generate_stellar_physics(key,definition.type);best->primary=coarse(definition.type);
+    best->secondary.reset();best->tertiary.reset();
+    best->archetype=definition.black_hole?StarArchetype::BlackHole:
+      (definition.type==StellarObjectType::QuietNeutronStar||definition.type==StellarObjectType::Pulsar||definition.type==StellarObjectType::Magnetar)?StarArchetype::NeutronPulsar:StarArchetype::Standard;
+    if(definition.habitability_modifier<.2||definition.evolved||definition.remnant||definition.type==StellarObjectType::BrownDwarf)best->has_habitable_world=false;
+    ++counts[static_cast<std::size_t>(definition.type)];result.forced_system_ids.push_back(best->id);
+  }
+  std::sort(result.forced_system_ids.begin(),result.forced_system_ids.end());
+  systems=std::move(staged);return result;
 }
 std::map<int,int> apply_stellar_planetary_physics(std::span<const StellarSystem> systems,std::vector<PlanetaryBody>& bodies) {
   std::unordered_map<int,const StellarPhysicalProperties*> physics;
@@ -262,7 +324,7 @@ std::map<int,int> apply_stellar_planetary_physics(std::span<const StellarSystem>
       b.environment.radiation_hazard=std::clamp(std::max(b.environment.radiation_hazard,p.radiation_modifier/(100*(1+exposure.orbit_au*exposure.orbit_au))),0.,1.);
     }
     if(exposure.baked||p.habitability_modifier<.2||!exposure.in_habitable_zone)b.legacy_colonization_candidate=false;
-    if(exposure.baked) {b.environment.temperature_kelvin=std::max(1200.,b.environment.temperature_kelvin);b.environment.radiation_hazard=1;b.environment.available_solvent=PlanetarySolventRegime::None;}
+    if(exposure.baked) {if(!b.appearance){b.environment.temperature_kelvin=std::max(1200.,b.environment.temperature_kelvin);b.environment.available_solvent=PlanetarySolventRegime::None;}b.environment.radiation_hazard=1;}
   }
   std::map<int,int> removed;
   for(const auto& b:bodies)if(engulfed.contains(b.id))++removed[b.system_id];

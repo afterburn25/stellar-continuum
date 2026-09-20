@@ -1,4 +1,5 @@
 #include "native_system_view.hpp"
+#include <stellar/core/campaign_observation.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -32,7 +33,7 @@ NativeSystemBodyVisualClass visual_class(const PlanetaryBody &body,
       return NativeSystemBodyVisualClass::ice_giant;
   }
   if (!body.environment.has_solid_surface)
-    return body.environment.temperature_kelvin < 170.
+    return classify_planetary_world(body, canonical_sol) == PlanetaryWorldClass::IceGiant
                ? NativeSystemBodyVisualClass::ice_giant
                : NativeSystemBodyVisualClass::gas_giant;
   if (body.environment.is_immersed_environment)
@@ -93,9 +94,8 @@ NativeSystemViewResult NativeSystemViewController::build(
     throw std::runtime_error("The campaign has no valid player civilization.");
 
   // This is the secrecy boundary. Do not find or copy raw system/body records first.
-  const auto level = world.knowledge.system_survey_level(observer, selected_system_id);
-  if (!world.knowledge.is_system_known(observer, selected_system_id) ||
-      level < SystemSurveyLevel::partially_surveyed)
+  const auto level = observation_survey_level(world, observer, selected_system_id);
+  if (level < SystemSurveyLevel::partially_surveyed)
     return {std::nullopt, "Orbital details require reconnaissance of this system."};
 
   const auto system = std::ranges::find(world.systems, selected_system_id,
@@ -108,9 +108,11 @@ NativeSystemViewResult NativeSystemViewController::build(
   NativeSystemSnapshot result{.campaign_generation = generation,
       .observer_civilization_id = observer, .system_id = system->id,
       .catalog_name = system->name, .survey_level = level,
-      .survey_progress = world.knowledge.system_survey_progress(observer, system->id)};
+      .survey_progress = developer_observation(world, observer) ? 1. : world.knowledge.system_survey_progress(observer, system->id)};
   if (detailed) {
+    result.small_body_fields=system->small_body_fields.value_or(std::vector<SmallBodyField>{});
     result.stellar_object=system->stellar_object;
+    result.stellar_orbits=system->stellar_orbits;
     result.archetype = system->archetype;
     result.primary_stellar_class = system->primary;
     result.secondary_stellar_class = system->secondary;
@@ -129,28 +131,42 @@ NativeSystemViewResult NativeSystemViewController::build(
       item.positive_signatures.push_back(NativePositiveSignature::anomaly);
     if (body.has_pre_warp_civilization)
       item.positive_signatures.push_back(NativePositiveSignature::activity);
-    if (detailed)
+    if (detailed){
+      item.appearance=body.appearance;
       item.details = NativeSystemBodyDetails{body.mass_earth,
           body.environment.gravity_g, body.environment.temperature_kelvin,
           body.environment.pressure_kpa, body.environment.atmosphere,
           body.environment.available_solvent, body.environment.radiation_hazard,
           body.environment.is_immersed_environment,
           body.environment.has_solid_surface,body.stellar_exposure};
+    }
+    if (detailed) item.world_class = classify_planetary_world(body, canonical_sol);
     item.visual_class = visual_class(body, detailed, canonical_sol);
     item.sol_texture_key = sol_texture(body, canonical_sol);
+    item.orbit_au=planetary_orbit_au(*system,body);
+    if(item.appearance){const auto host=stellar_host_physics(*system,planetary_stellar_host(*system,body.id));item.appearance->tidally_locked=planet_is_tidally_locked(body,&host);}
+    if(detailed){item.stellar_host=planetary_stellar_host(*system,body.id);if(!body.parent_body_id)item.stellar_orbit=planetary_stellar_orbit(*system,body);
+      else {const auto parent=std::ranges::find(world.bodies,*body.parent_body_id,&PlanetaryBody::id);
+        if(parent==world.bodies.end())throw std::logic_error("Missing satellite parent");
+        item.satellite_orbit=planetary_satellite_orbit(*parent,body);item.stellar_host=planetary_stellar_host(*system,parent->id);}
+    }
     result.bodies.push_back(std::move(item));
   }
   std::ranges::sort(result.bodies, {}, &NativeSystemBody::id);
+  result.simulation_days=frame.clock().simulation_days();
+  result.developer=world.developer_provenance.has_value();
   return {std::move(result), {}};
 }
 
 float body_display_radius(const double value, const PlanetaryBodyKind kind) {
   const auto radius = std::isfinite(value) ? std::clamp(value, .01, 100.) : .01;
   return kind == PlanetaryBodyKind::Moon
-             ? std::clamp(14.f * static_cast<float>(radius), 1.8f, 24.f)
-             : std::clamp(14.f * std::pow(static_cast<float>(radius), .9f), 4.f, 160.f);
+             ? static_cast<float>(small_body_configuration().moon_scale)*std::clamp(14.f * static_cast<float>(radius), 1.8f, 24.f)
+             : static_cast<float>(small_body_configuration().planet_scale)*std::clamp(14.f * std::pow(static_cast<float>(radius), .9f), 4.f, 160.f);
 }
-float star_screen_radius(const float scale) { return std::max(4.f, 560.f * scale); }
+float star_screen_radius(const float scale,const float visual_scale) {
+  return std::min(350.f,std::max(4.f,560.f*scale)*visual_scale);
+}
 SystemSpatialPoint orbit_point(const float radius, const float eccentricity,
     const float inclination_degrees, const float eccentric_anomaly) {
   const auto e = std::clamp(eccentricity, 0.f, .95f);
@@ -179,36 +195,51 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
   std::vector<const NativeSystemBody *> planets;
   for (const auto &body : system.bodies)
     if (body.kind != PlanetaryBodyKind::Moon) planets.push_back(&body);
-  std::ranges::sort(planets, [](const auto *left, const auto *right) {
-    return left->orbit_index < right->orbit_index ||
-           (left->orbit_index == right->orbit_index && left->id < right->id);
+  const auto orbit_au=[](const NativeSystemBody& b){return b.orbit_au>0?b.orbit_au:.4*std::pow(1.85,b.orbit_index);};
+  std::ranges::sort(planets, [&](const auto *left, const auto *right) {
+    return std::pair{orbit_au(*left),left->id}<std::pair{orbit_au(*right),right->id};
   });
   std::map<int, float> family_extents;
   auto parent_extent = [](const NativeSystemBody &body) {
     const auto radius = body_display_radius(body.radius_earth, body.kind);
+    if(body.appearance&&body.appearance->rings.enabled)return radius*static_cast<float>(body.appearance->rings.outer_radius);
     return body.sol_texture_key == "saturn" ? radius * 2.8f : radius;
+  };
+  const auto moon_radius=[&](const NativeSystemBody& parent,const NativeSystemBody& moon){
+    if(!moon.satellite_orbit)return parent_extent(parent)+40.f+moon.orbit_index*24.f+body_display_radius(moon.radius_earth,moon.kind);
+    const auto relative=moon.satellite_orbit->relative.radius/(parent.radius_earth*6371.);
+    return parent_extent(parent)+body_display_radius(parent.radius_earth,parent.kind)*static_cast<float>(std::pow(relative,.6))+24.f;
   };
   for (const auto *planet : planets) {
     auto extent = parent_extent(*planet);
     for (const auto &moon : system.bodies)
       if (moon.kind == PlanetaryBodyKind::Moon && moon.parent_body_id == planet->id) {
-        const auto moon_radius = body_display_radius(moon.radius_earth, moon.kind);
-        extent = std::max(extent, parent_extent(*planet) + 40.f +
-            static_cast<float>(moon.orbit_index) * 24.f + 2.f * moon_radius);
+        extent = std::max(extent, moon_radius(*planet,moon)*static_cast<float>(1+moon.orbital_eccentricity)+2*body_display_radius(moon.radius_earth,moon.kind));
       }
     family_extents.emplace(planet->id, extent);
   }
-  float extent_sum = 0.f;
-  for (const auto &[id, extent] : family_extents) { (void)id; extent_sum += extent; }
-  auto next_orbit = std::max(1700.f, 3.f * extent_sum);
-  float previous_extent = 0.f;
+  const auto& spacing=small_body_configuration();
+  // Build one monotonic AU mapping for planets, orbit guides and belt particles.
+  // Reserve display space at the edges of each entire eccentric moon family;
+  // exaggerated planet and asteroid sizes must not visually erase a real gap.
+  struct Knot{float left{},right{};};std::map<double,Knot> knots;
+  for(const auto* b:planets){const double a=orbit_au(*b),e=std::clamp(b->orbital_eccentricity,0.,.9);
+    knots[a];knots[a*(1-e)].left=std::max(knots[a*(1-e)].left,family_extents.at(b->id)+110.f);
+    knots[a*(1+e)].right=std::max(knots[a*(1+e)].right,family_extents.at(b->id)+110.f);
+  }
+  for(const auto& f:system.small_body_fields)if(!f.planet_centered){knots[f.inner_radius_au];knots[f.outer_radius_au];}
+  double prior_au=0;float prior_display=0,prior_padding=1100;
+  for(const auto& [a,knot]:knots){
+    const auto delta=static_cast<float>(stellar::engine::stretched_orbit_radius(a,spacing.orbit_unit,spacing.orbit_exponent)-stellar::engine::stretched_orbit_radius(prior_au,spacing.orbit_unit,spacing.orbit_exponent));
+    const float display=prior_display+std::max(delta,prior_padding+knot.left);
+    result.orbit_anchors.emplace_back(a,display);prior_au=a;prior_display=display;prior_padding=knot.right;
+  }
   struct ParentPosition { float x{}, y{}, extent{}; };
   std::unordered_map<int, ParentPosition> positions;
   for (std::size_t index = 0; index < planets.size(); ++index) {
     const auto &body = *planets[index];
-    if (index > 0) next_orbit += previous_extent + family_extents.at(body.id) + 160.f;
-    previous_extent = family_extents.at(body.id);
-    const auto point = orbit_point(next_orbit, static_cast<float>(body.orbital_eccentricity),
+    const double au=orbit_au(body);const float next_orbit=system_display_orbit_radius(result,au);
+    const auto point = projected_orbit_point(result,au, static_cast<float>(body.orbital_eccentricity),
                                    static_cast<float>(body.orbital_inclination_degrees),
                                    stable_angle(body.id));
     const auto radius = body_display_radius(body.radius_earth, body.kind);
@@ -216,8 +247,9 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
         body.name, body.kind, body.visual_class, point.x, point.y, point.height,
         next_orbit, radius, body.orbital_eccentricity,
         body.orbital_inclination_degrees, body.positive_signatures,
-        body.sol_texture_key});
+        body.sol_texture_key,au,body.stellar_host});
     positions.emplace(body.id, ParentPosition{point.x, point.y, parent_extent(body)});
+    result.bodies.back().stellar_orbit=body.stellar_orbit;
   }
   std::vector<const NativeSystemBody *> moons;
   for (const auto &body : system.bodies)
@@ -233,7 +265,8 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
       throw std::invalid_argument("Observer-safe moon has no visible parent planet.");
     const auto parent = positions.at(*body->parent_body_id);
     const auto radius = body_display_radius(body->radius_earth, body->kind);
-    const auto orbit = parent.extent + 40.f + body->orbit_index * 24.f + radius;
+    const auto parent_state=std::ranges::find(system.bodies,*body->parent_body_id,&NativeSystemBody::id);
+    const auto orbit = moon_radius(*parent_state,*body);
     const auto angle = stable_angle(body->id ^ *body->parent_body_id);
     result.bodies.push_back({body->id, body->parent_body_id, body->orbit_index,
         body->name, body->kind, body->visual_class,
@@ -241,12 +274,13 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
         0.f, orbit, radius, body->orbital_eccentricity,
         body->orbital_inclination_degrees, body->positive_signatures,
         body->sol_texture_key});
+    result.bodies.back().satellite_orbit=body->satellite_orbit;
   }
   float orbital_extent = 150.f;
   for (const auto &marker : result.bodies) {
     float extent{};
     if (marker.kind != PlanetaryBodyKind::Moon)
-      extent = marker.orbit_radius * (1.f + static_cast<float>(marker.orbital_eccentricity)) +
+      extent = system_display_orbit_radius(result,marker.physical_orbit_au*(1+marker.orbital_eccentricity)) +
                family_extents.at(marker.body_id);
     else if (marker.parent_body_id && positions.contains(*marker.parent_body_id)) {
       const auto parent = positions.at(*marker.parent_body_id);
@@ -255,8 +289,107 @@ SystemSpatialSnapshot project_system(const NativeSystemSnapshot &system) {
     orbital_extent = std::max(orbital_extent, extent);
   }
   result.design_radius = std::max(180.f, orbital_extent + 30.f);
+  for(const auto& field:system.small_body_fields)if(!field.planet_centered)
+    result.design_radius=std::max(result.design_radius,system_display_orbit_radius(result,field.outer_radius_au)*1.02f);
   std::ranges::sort(result.bodies, {}, &SystemSpatialBodyMarker::body_id);
+  if(system.stellar_orbits){const auto& a=*system.stellar_orbits;
+    // Physical star orbits retain their mass ratios. Display AU are expanded
+    // locally so exaggerated globes and their moon families never overlap.
+    const float local_extent=result.design_radius;
+    const float inner_display=a.belt_host==3?std::max(1500.f,system_display_orbit_radius(result,a.relative_orbits[0].radius)):local_extent*3.f;
+    result.stellar_orbit_scales[0]=inner_display/static_cast<float>(a.relative_orbits[0].radius);
+    result.design_radius=inner_display*(1+static_cast<float>(a.relative_orbits[0].eccentricity))+local_extent;
+    if(a.relative_orbits.size()>1){const float outer_display=result.design_radius*2.7f;
+      result.stellar_orbit_scales[1]=outer_display/static_cast<float>(a.relative_orbits[1].radius);
+      result.design_radius+=outer_display*(1+static_cast<float>(a.relative_orbits[1].eccentricity));}
+    result.belt_host=a.belt_host;
+  }
+  update_system_motion(system,result);
   return result;
+}
+
+StellarSystem snapshot_stellar_system(const NativeSystemSnapshot& s){StellarSystem value;value.id=s.system_id;value.name=s.catalog_name;value.primary=s.primary_stellar_class;value.secondary=s.secondary_stellar_class;value.tertiary=s.tertiary_stellar_class;value.stellar_object=s.stellar_object;value.stellar_orbits=s.stellar_orbits;return value;}
+void update_system_motion(const NativeSystemSnapshot& snapshot,SystemSpatialSnapshot& spatial){
+  const auto system=snapshot_stellar_system(snapshot);
+  const auto physical=stellar_positions(system,snapshot.simulation_days);
+  const auto projected_star=[&](const std::array<StellarPosition,4>& positions,int i){
+    const auto& center=positions[3];const float inner=spatial.stellar_orbit_scales[0],outer=spatial.stellar_orbit_scales[1];
+    if(i<2)return SystemSpatialPoint{static_cast<float>((positions[i][0]-center[0])*inner+center[0]*outer),static_cast<float>((positions[i][1]-center[1])*inner+center[1]*outer),0};
+    return SystemSpatialPoint{static_cast<float>(positions[i][0]*outer),static_cast<float>(positions[i][1]*outer),0};
+  };
+  for(int i=0;i<4;++i)spatial.stellar_hosts[i]=projected_star(physical,i);
+  // The inner orbit is translated by the current outer barycentre; the outer
+  // component traces its own full Kepler orbit about the system barycentre.
+  if(snapshot.stellar_orbits){const auto& a=*snapshot.stellar_orbits;
+    const double ma=stellar_host_physics(system,0).mass_solar,mb=a.companions[0].mass_solar,mab=ma+mb;
+    for(int i=0;i<static_cast<int>(a.companions.size()+1);++i){auto& path=spatial.stellar_paths[i];path.clear();path.reserve(129);
+      const auto orbit=a.relative_orbits[i==2?1:0];const double mass_factor=i==0?-mb/mab:i==1?ma/mab:mab/(mab+a.companions[1].mass_solar);
+      for(int j=0;j<=128;++j){auto o=orbit;o.phase=2*std::numbers::pi*j/128;const auto p=stellar::engine::analytic_orbit_position(o,0);
+        const auto c=i<2?spatial.stellar_hosts[3]:SystemSpatialPoint{};const double scale=spatial.stellar_orbit_scales[i==2?1:0]*mass_factor;
+        path.push_back({c.x+static_cast<float>(p[0]*scale),c.y+static_cast<float>(p[1]*scale),0});}
+    }
+  }
+  std::map<int,SystemSpatialPoint> parent_delta;
+  for(auto& marker:spatial.bodies)if(!marker.parent_body_id){const auto found=std::ranges::find(snapshot.bodies,marker.body_id,&NativeSystemBody::id);
+    if(found==snapshot.bodies.end()||!found->stellar_orbit)continue;
+    const auto p=stellar::engine::analytic_orbit_position(*found->stellar_orbit,snapshot.simulation_days);
+    const auto center=spatial.stellar_hosts[found->stellar_host];const double radius=std::hypot(p[0],p[1],p[2]);
+    const double scale=radius>0?system_display_orbit_radius(spatial,radius)/radius:0;
+    const float x=center.x+static_cast<float>(p[0]*scale),y=center.y+static_cast<float>(p[1]*scale);
+    parent_delta[marker.body_id]={x-marker.offset_x,y-marker.offset_y,0};marker.offset_x=x;marker.offset_y=y;marker.offset_height=static_cast<float>(p[2]*scale);
+  }
+  for(auto& moon:spatial.bodies)if(moon.parent_body_id){
+    auto parent=std::ranges::find(spatial.bodies,*moon.parent_body_id,&SystemSpatialBodyMarker::body_id);
+    if(parent==spatial.bodies.end())continue;
+    if(moon.satellite_orbit){
+      const auto& o=*moon.satellite_orbit;const auto p=satellite_relative_position(o,snapshot.simulation_days);
+      const double scale=moon.orbit_radius/o.relative.radius;
+      // For Pluto-Charon the stellar position is the system barycentre.
+      // Re-evaluate the primary above every time, preventing accumulated drift.
+      if(o.binary){parent->offset_x-=static_cast<float>(p[0]*scale*o.parent_mass_fraction);parent->offset_y-=static_cast<float>(p[1]*scale*o.parent_mass_fraction);parent->offset_height-=static_cast<float>(p[2]*scale*o.parent_mass_fraction);}
+      moon.offset_x=parent->offset_x+static_cast<float>(p[0]*scale);moon.offset_y=parent->offset_y+static_cast<float>(p[1]*scale);moon.offset_height=parent->offset_height+static_cast<float>(p[2]*scale);
+    }else if(parent_delta.contains(*moon.parent_body_id)){const auto d=parent_delta.at(*moon.parent_body_id);moon.offset_x+=d.x;moon.offset_y+=d.y;}
+  }
+}
+
+float system_display_orbit_radius(const SystemSpatialSnapshot& spatial,double au){
+  const auto& c=small_body_configuration();
+  const auto transform=[&](double r){return stellar::engine::stretched_orbit_radius(r,c.orbit_unit,c.orbit_exponent);};
+  double previous_au=0;float previous_display=0;
+  for(const auto& [radius,display]:spatial.orbit_anchors){
+    if(radius<=previous_au)continue;
+    if(au<=radius){const double t=(transform(au)-transform(previous_au))/(transform(radius)-transform(previous_au));return std::lerp(previous_display,display,static_cast<float>(t));}
+    previous_au=radius;previous_display=display;
+  }
+  return previous_display+static_cast<float>(transform(au)-transform(previous_au));
+}
+SystemSpatialPoint projected_orbit_point(const SystemSpatialSnapshot& spatial,double au,float eccentricity,float inclination,float anomaly){
+  const auto physical=orbit_point(static_cast<float>(au),eccentricity,inclination,anomaly);
+  const double radius=std::hypot(physical.x,physical.y,physical.height);
+  const float display=system_display_orbit_radius(spatial,radius),factor=radius>0?static_cast<float>(display/radius):0;
+  return {physical.x*factor,physical.y*factor,physical.height*factor};
+}
+std::vector<SystemSpatialPoint> projected_orbit_path(const SystemSpatialSnapshot& spatial,const SystemSpatialBodyMarker& body){
+  if(body.satellite_orbit){std::vector<SystemSpatialPoint> path;path.reserve(193);
+    for(int i=0;i<=192;++i){auto o=*body.satellite_orbit;o.relative.phase=2*std::numbers::pi*i/192;const auto p=satellite_relative_position(o,0);const double scale=body.orbit_radius/o.relative.radius*(o.binary?1-o.parent_mass_fraction:1);
+      path.push_back({static_cast<float>(p[0]*scale),static_cast<float>(p[1]*scale),static_cast<float>(p[2]*scale)});}
+    return path;
+  }
+  if(body.parent_body_id||body.physical_orbit_au<=0)return orbit_path(body.orbit_radius,0,0);
+  if(body.stellar_orbit){std::vector<SystemSpatialPoint> path;path.reserve(193);
+    for(int i=0;i<=192;++i){auto o=*body.stellar_orbit;o.phase=2*std::numbers::pi*i/192;const auto p=stellar::engine::analytic_orbit_position(o,0);const auto r=std::hypot(p[0],p[1],p[2]);const auto scale=system_display_orbit_radius(spatial,r)/r;
+      path.push_back({static_cast<float>(p[0]*scale),static_cast<float>(p[1]*scale),static_cast<float>(p[2]*scale)});}
+    return path;
+  }
+  std::vector<SystemSpatialPoint> result;result.reserve(193);
+  for(int i=0;i<=192;++i)result.push_back(projected_orbit_point(spatial,body.physical_orbit_au,static_cast<float>(body.orbital_eccentricity),static_cast<float>(body.orbital_inclination_degrees),2*pi*i/192));
+  return result;
+}
+
+double parent_facing_bearing(const SystemSpatialSnapshot& spatial,const SystemSpatialBodyMarker& body){
+ auto parent=spatial.stellar_hosts[body.stellar_host];
+ if(body.parent_body_id){const auto found=std::ranges::find(spatial.bodies,*body.parent_body_id,&SystemSpatialBodyMarker::body_id);if(found!=spatial.bodies.end())parent={found->offset_x,found->offset_y,0};}
+ return std::atan2(body.offset_y-parent.y,parent.x-body.offset_x);
 }
 
 SystemSpatialViewport SystemSpatialViewport::fit(const SystemSpatialSnapshot &snapshot,
@@ -277,7 +410,9 @@ SystemSpatialPoint SystemSpatialViewport::screen_to_world(float x, float y) cons
   return {(x - center_x) / scale, (y - center_y) / scale, 0.f};
 }
 float SystemSpatialViewport::body_radius(const SystemSpatialBodyMarker &body) const {
-  return std::max(.9f, body.display_radius * scale);
+  // Resolved satellites need a readable disc against distant star points.
+  // Their physical size remains unchanged; separation still controls visibility.
+  return std::max(body.kind==PlanetaryBodyKind::Moon?2.8f:.9f, body.display_radius * scale);
 }
 bool SystemSpatialViewport::is_body_visible(const SystemSpatialSnapshot &snapshot,
                                              const SystemSpatialBodyMarker &body) const {

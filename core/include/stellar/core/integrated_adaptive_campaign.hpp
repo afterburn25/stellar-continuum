@@ -16,6 +16,19 @@ struct IntegratedSensorContactRecordingResult {
   int civilization_id{};
   int recorded_contacts{};
 };
+struct CampaignPerformanceSample {
+  std::string_view phase;
+  stellar::engine::PerformanceCounter timing;
+};
+
+// Save/checkpoint continuation for delayed decisions. These cached plans and
+// review times affect future simulation, so restoration must not re-plan early.
+struct CampaignRuntimeContinuation {
+  StrategicRuntimeSnapshot strategic;
+  DiplomacyRuntimeSchedule diplomacy;
+};
+void validate_campaign_runtime_continuation(const CampaignRuntimeContinuation &,
+    const FreshCampaignState &, double simulation_days);
 
 struct IntegratedAdaptiveCampaignStepResult {
   SimulationStepResult core;
@@ -72,6 +85,15 @@ public:
   diplomacy_runtime() noexcept;
   [[nodiscard]] std::span<const FleetPowerObservation>
   combat_intelligence() const noexcept;
+  [[nodiscard]] StellarActivityScheduler& stellar_activity() noexcept;
+  [[nodiscard]] double stellar_activity_day() const noexcept;
+  // One unscaled frame interval, independent of strategic substeps/speed.
+  [[nodiscard]] std::vector<TravelingCmeLaunch> advance_stellar_activity(double real_seconds);
+  [[nodiscard]] CampaignRuntimeContinuation continuation() const;
+  void restore_continuation(const CampaignRuntimeContinuation &, double simulation_days);
+  void set_profiling_enabled(bool) noexcept;
+  void reset_performance_counters() noexcept;
+  [[nodiscard]] std::vector<CampaignPerformanceSample> performance_samples() const;
 
   [[nodiscard]] IntegratedAdaptiveCampaignStepResult
   advance(double elapsed_days, double absolute_end_day,

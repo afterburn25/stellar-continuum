@@ -277,7 +277,7 @@ CampaignMassiveCombat &CampaignMassiveCombat::operator=(
 CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
                                                 int civilization_id,
                                                 int actor_fleet_id,
-                                                double day) {
+                                                double day, bool spatial_deployment) {
   if (!std::isfinite(day) || day < 0)
     return {false, "Combat time is invalid."};
   if (galaxy.active_combat_encounter &&
@@ -422,6 +422,7 @@ CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
       formation.name = "Task Force " + grouped(id);
       formation.position = {side * 420.F,
                             (static_cast<int>(formations.size()) % 24 - 12) * 55.F};
+      if(spatial_deployment)formation.position.z = static_cast<float>(static_cast<int>(formation.id % 5) - 2) * 40.F;
       formation.heading = {-side, 0};
       formation.order = group.first.military ? MassiveCombatOrderType::Engage
                                              : MassiveCombatOrderType::Retreat;
@@ -920,7 +921,8 @@ MassiveCombatSnapshot build_massive_combat_snapshot(
       observed.progress_01 = progress;
       const auto inverse = 1.F - progress;
       observed.current_position = MassivePoint{salvo->launch_position->x * inverse + target->second->position.x * progress,
-                                                salvo->launch_position->y * inverse + target->second->position.y * progress};
+                                                salvo->launch_position->y * inverse + target->second->position.y * progress,
+                                                salvo->launch_position->z * inverse + target->second->position.z * progress};
     }
     if (source_known) { const auto spread = uncertainty(salvo->missile_count, source_own || source_confidence >= .999F, source_confidence);
       observed.count_low = std::max(0, salvo->missile_count - spread); observed.count_high = salvo->missile_count + spread; }
@@ -950,15 +952,15 @@ std::vector<MassiveCombatOrder> decide_massive_combat_doctrine(
         if (value->is_interdicting) hostile_interdictors.push_back(value);
       const auto source = std::ranges::min_element(hostile_interdictors, {}, [&](const auto *value) {
         const auto dx = value->position.x - formation->position.x, dy = value->position.y - formation->position.y;
-        return dx * dx + dy * dy; });
+        const auto dz=value->position.z-formation->position.z;return dx * dx + dy * dy + dz*dz; });
       if (source != hostile_interdictors.end())
         orders.push_back({formation->formation_id, MassiveCombatOrderType::Breakout, (*source)->formation_id, std::nullopt, MassiveFormationShape::Breakout});
       else {
-        const auto squared = formation->position.x * formation->position.x + formation->position.y * formation->position.y;
+        const auto squared = formation->position.x * formation->position.x + formation->position.y * formation->position.y + formation->position.z*formation->position.z;
         const auto length = std::sqrt(squared);
         const auto x = squared > .01F ? formation->position.x / length : 1.F, y = squared > .01F ? formation->position.y / length : 0.F;
         orders.push_back({formation->formation_id, MassiveCombatOrderType::EmergencyRetreat, std::nullopt,
-                          MassivePoint{formation->position.x + x * 2000.F, formation->position.y + y * 2000.F}, MassiveFormationShape::RetreatColumn});
+                          MassivePoint{formation->position.x + x * 2000.F, formation->position.y + y * 2000.F, formation->position.z+(squared>.01F?formation->position.z/length*2000.F:0)}, MassiveFormationShape::RetreatColumn});
       }
     } else if (interdictor != own.end() && formation->formation_id != (*interdictor)->formation_id &&
                (formation->shape == MassiveFormationShape::Screen || formation->shape == MassiveFormationShape::Escort)) {
@@ -966,7 +968,7 @@ std::vector<MassiveCombatOrder> decide_massive_combat_doctrine(
     } else if (!hostile.empty()) {
       const auto target = std::ranges::min_element(hostile, {}, [&](const auto *value) {
         const auto dx = value->position.x - formation->position.x, dy = value->position.y - formation->position.y;
-        return std::pair{dx * dx + dy * dy, value->formation_id}; });
+        const auto dz=value->position.z-formation->position.z;return std::pair{dx * dx + dy * dy + dz*dz, value->formation_id}; });
       orders.push_back({formation->formation_id, MassiveCombatOrderType::Engage, (*target)->formation_id});
     }
   }

@@ -41,14 +41,25 @@ private:
     std::size_t size_{};
 };
 
+struct FixedClockSnapshot {
+    std::chrono::nanoseconds step{}, backlog{};
+    Tick tick{};
+    std::uint32_t speed{1};
+    bool paused{};
+    bool operator==(const FixedClockSnapshot &) const = default;
+};
 class FixedClock {
 public:
     explicit FixedClock(std::chrono::nanoseconds step);
     void set_paused(bool paused) noexcept;
     void set_speed(std::uint32_t speed);
+    // Explicit debugger step; consumes pending time first and retains pause/speed.
+    void step_once();
     [[nodiscard]] std::uint64_t advance(std::chrono::nanoseconds elapsed, std::uint64_t max_ticks = 4096);
     [[nodiscard]] Tick tick() const noexcept;
     [[nodiscard]] std::chrono::nanoseconds backlog() const noexcept;
+    [[nodiscard]] FixedClockSnapshot snapshot() const noexcept;
+    void restore(const FixedClockSnapshot &);
 
 private:
     std::uint64_t step_{};

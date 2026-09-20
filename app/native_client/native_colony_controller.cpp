@@ -1,4 +1,5 @@
 #include "native_colony_controller.hpp"
+#include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/adaptive_research_authority.hpp>
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
@@ -70,6 +71,10 @@ std::string signature(const NativeColonyView &view) {
   out.imbue(std::locale::classic());
   out << std::setprecision(17);
   append(out, view.player_civilization_id);
+  append(out, view.owner_civilization_id);
+  append(out, view.owner_name);
+  append(out, view.developer_inspection);
+  append(out, view.foreign_settlement);
   append(out, view.system_id);
   append(out, view.body_id);
   append(out, view.colony_id);
@@ -238,10 +243,7 @@ NativeColonyViewResult NativeColonyController::build(
   auto current = context(frame);
   if (system.campaign_generation != campaign_generation ||
       system.observer_civilization_id != current.player.id ||
-      !current.world.knowledge.is_system_known(current.player.id,
-                                                system.system_id) ||
-      current.world.knowledge.system_survey_level(current.player.id,
-                                                   system.system_id) <
+      observation_survey_level(current.world, current.player.id, system.system_id) <
           SystemSurveyLevel::partially_surveyed)
     return {{}, "The campaign changed; refresh the known system first."};
   const auto shown_body = std::ranges::find(system.bodies, selected_body_id,
@@ -250,12 +252,19 @@ NativeColonyViewResult NativeColonyController::build(
     return {{}, "Select a known body before opening its settlement."};
   const auto colony = std::ranges::find_if(
       current.world.colonies, [&](const Colony &candidate) {
-        return candidate.civilization_id == current.player.id &&
+        return can_inspect_settlement(current.world, current.player.id, candidate) &&
                candidate.system_id == system.system_id &&
                candidate.planetary_body_id == selected_body_id;
       });
   if (colony == current.world.colonies.end())
     return {{}, "The selected known body has no owned settlement."};
+
+  const auto *owner = find_one(current.world.civilizations, colony->civilization_id,
+                                &Civilization::id);
+  const auto *economy = find_one(current.world.economies, colony->civilization_id,
+                                  &CivilizationEconomy::civilization_id);
+  if (!owner || !economy)
+    return {{}, "The settlement owner or economy is unavailable."};
 
   const auto output = surface_colony_output(*colony);
   const auto specialization = surface_colony_specialization(*colony);
@@ -266,7 +275,7 @@ NativeColonyViewResult NativeColonyController::build(
       current.world.bodies, *colony, surface_sustenance_projection(output));
   bool automation = false;
   if (const auto *construction =
-          find_one(current.world.construction, current.player.id,
+          find_one(current.world.construction, owner->id,
                    &ConstructionState::civilization_id))
     automation = std::ranges::contains(construction->completed_project_ids,
                                        "industrial_automation");
@@ -278,30 +287,39 @@ NativeColonyViewResult NativeColonyController::build(
   NativeColonyView view;
   view.campaign_generation = campaign_generation;
   view.player_civilization_id = current.player.id;
+  view.owner_civilization_id = owner->id;
+  view.developer_inspection = developer_observation(current.world, current.player.id);
+  view.foreign_settlement = owner->id != current.player.id;
   view.system_id = system.system_id;
   view.body_id = selected_body_id;
   view.colony_id = colony->id;
   view.system_name=system.catalog_name;view.planet=*shown_body;
+  view.simulation_days=frame.clock().simulation_days();view.illumination_star=stellar_host_physics(native_system::snapshot_stellar_system(system),shown_body->stellar_host);
+  view.stellar_lighting=stellar::native_planets::system_lighting(system,*shown_body);
+  const auto projected=native_system::project_system(system);
+  for(const auto& marker:projected.bodies)if(marker.body_id==selected_body_id){const auto host=projected.stellar_hosts[shown_body->stellar_host];view.rotation_parent_bearing=native_system::parent_facing_bearing(projected,marker);view.illumination_x=marker.offset_x-host.x;view.illumination_y=marker.offset_y-host.y;break;}
+  view.owner_name=owner->name;
+  if(habitat.environment)view.natural_habitability=habitat.environment->natural_habitability;
   std::vector<EconomyConstructionState> econ_construction;
   for(const auto& state:current.world.construction)econ_construction.push_back({state.civilization_id,state.completed_project_ids});
-  auto flow=economy_credit_flow({current.world.civilizations,current.world.bodies,econ_construction,{}},std::span<const Colony>(&*colony,1),current.world.economies,current.player.id,false);
+  auto flow=economy_credit_flow({current.world.civilizations,current.world.bodies,econ_construction,{}},std::span<const Colony>(&*colony,1),current.world.economies,owner->id,false);
   flow.operating_costs_per_day-=flow.orbital_maintenance_per_day;flow.orbital_maintenance_per_day=0;flow.net_credits_per_day=flow.gross_income_per_day-flow.operating_costs_per_day;
   view.local_credit_flow=flow;
-  view.operating_funding=current.economy.last_base_operations_funding_fraction;
-  view.operating_arrears=current.economy.operating_arrears;
-  view.empire_credit_flow=current.economy.last_credits_per_second;view.empire_industry_flow=current.economy.last_industry_per_second;
+  view.operating_funding=economy->last_base_operations_funding_fraction;
+  view.operating_arrears=economy->operating_arrears;
+  view.empire_credit_flow=economy->last_credits_per_second;view.empire_industry_flow=economy->last_industry_per_second;
   view.construction_multiplier=surface_construction_cost_multiplier(current.construction,*colony);
   view.colony_name = colony->name;
   view.body_display_name = shown_body->name;
   view.population_species_id = colony->population_species_id;
   view.population_species_name = species_environment_profile(colony->population_species_id).display_name;
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
-  if (system.system_id == current.player.home_system_id) {
+  if (system.system_id == owner->home_system_id) {
     // Use the same Core body resolution as campaign seeding, never display names.
     // A later hostile environment must not prevent the colony UI from opening.
     try {
-      view.homeworld = resolve_species_homeworld(current.player.id,
-          current.player.species_id, current.player.home_system_id,
+      view.homeworld = resolve_species_homeworld(owner->id,
+          owner->species_id, owner->home_system_id,
           current.world.bodies).planetary_body_id == selected_body_id;
     } catch (const std::invalid_argument &) {
       view.homeworld = false;
@@ -309,10 +327,10 @@ NativeColonyViewResult NativeColonyController::build(
   }
   view.solid_surface = shown_body->details && shown_body->details->has_solid_surface;
   view.currency = sovereign_currency_for_civilization(
-      current.world.civilizations, current.player.id);
-  view.treasury_budget_units = current.economy.credits;
-  view.stored_industry = current.economy.industry;
-  view.formatted_treasury = view.currency.format(current.economy.credits);
+      current.world.civilizations, owner->id);
+  view.treasury_budget_units = economy->credits;
+  view.stored_industry = economy->industry;
+  view.formatted_treasury = view.currency.format(economy->credits);
   view.population_millions = colony->population_millions;
   view.infrastructure = colony->infrastructure;
   view.stability = colony->stability;
@@ -352,10 +370,10 @@ NativeColonyViewResult NativeColonyController::build(
   view.industry_per_day = view.resource_outpost
                               ? 0.
                               : output.industry_per_day *
-                                    current.economy.last_base_operations_funding_fraction;
+                                    economy->last_base_operations_funding_fraction;
   view.science_per_day = output.science_per_day;
   const auto *research_state =
-      current.runtime.research().try_get_civilization(current.player.id);
+      current.runtime.research().try_get_civilization(owner->id);
   if (research_state) {
     const auto context_id = "colony:" + std::to_string(colony->id);
     const auto &institutions =
@@ -395,12 +413,12 @@ NativeColonyViewResult NativeColonyController::build(
                                   output.staffed_building_ids.end());
   bool is_capital_hub = false;
   if (colony->kind == SettlementKind::Colony &&
-      colony->system_id == current.player.home_system_id) {
+      colony->system_id == owner->home_system_id) {
     const Colony *capital = nullptr;
     for (const auto &candidate : current.world.colonies)
-      if (candidate.civilization_id == current.player.id &&
+      if (candidate.civilization_id == owner->id &&
           candidate.kind == SettlementKind::Colony &&
-          candidate.system_id == current.player.home_system_id &&
+          candidate.system_id == owner->home_system_id &&
           (!capital || candidate.population_millions >
                            capital->population_millions))
         capital = &candidate;
@@ -413,7 +431,7 @@ NativeColonyViewResult NativeColonyController::build(
       surface_hub_upgrade_cost(current.construction, *colony);
   const auto hub_lock =
       hub_upgrade ? surface_hub_upgrade_lock_reason(current.construction,
-                                                    current.player.id, *colony)
+                                                    owner->id, *colony)
                   : std::nullopt;
   const bool hub_pending = colony->surface_hub_upgrade_days_remaining > 0.;
   view.hub_upgrade_available = hub_upgrade.has_value() && !hub_pending;
@@ -424,8 +442,8 @@ NativeColonyViewResult NativeColonyController::build(
   view.hub_upgrade_lock_reason = hub_lock.value_or("");
   view.can_afford_hub_upgrade =
       view.hub_upgrade_available && !hub_lock &&
-      current.economy.credits + .0001 >= hub_upgrade->credit_cost &&
-      current.economy.industry + .0001 >= hub_upgrade->industry_cost;
+      economy->credits + .0001 >= hub_upgrade->credit_cost &&
+      economy->industry + .0001 >= hub_upgrade->industry_cost;
   view.hub_upgrade_days_remaining =
       colony->surface_hub_upgrade_days_remaining;
   const auto slots=planetary_building_slots(*colony);
@@ -440,7 +458,7 @@ NativeColonyViewResult NativeColonyController::build(
     const auto upgrade_authorization = surface_upgrade_authorization_cost(
         current.construction, *colony, *definition);
     const auto upgrade_lock = surface_building_upgrade_lock_reason(
-        current.construction, current.player.id, *definition);
+        current.construction, owner->id, *definition);
     const auto repair_cost = surface_repair_industry_cost(building);
     view.construction_sites.push_back(
         {.building_id = building.id,
@@ -477,13 +495,13 @@ NativeColonyViewResult NativeColonyController::build(
          .upgrade_credit_budget_units = upgrade_authorization,
          .upgrade_industry_cost = definition->upgrade_industry_cost,
          .can_afford_upgrade = building.is_complete && upgrade &&
-             current.economy.credits + .0001 >= upgrade_authorization &&
-             current.economy.industry + .0001 >=
+             economy->credits + .0001 >= upgrade_authorization &&
+             economy->industry + .0001 >=
                  definition->upgrade_industry_cost,
          .upgrade_lock_reason = upgrade_lock.value_or(""),
          .repair_industry_cost = repair_cost,
          .can_afford_repair = repair_cost > 0. &&
-             current.economy.industry + .0001 >= repair_cost,
+             economy->industry + .0001 >= repair_cost,
          .essential_service =
              surface_essential_service_priority(building.type_id) > 0,
          .slot_index = slots.at(building.id)});

@@ -39,7 +39,7 @@ struct ImagePreparationQueue::Ticket::Cell final {
     { std::lock_guard lock(mutex); if(canceled){finished=true;factory={};work={};}else{started=true;work=std::move(factory);} }
     if(!work){release_reservation();return;}
     std::shared_ptr<const RgbaImage> result;std::exception_ptr failure;
-    try{result=work();if(!result)throw std::runtime_error("Image preparation factory returned no image.");if(result->byte_size()>reservation)throw std::length_error("Image preparation factory exceeded its reserved output budget.");}
+    try{result=work();if(!result)throw std::runtime_error("Image preparation factory returned no image.");if(result->byte_size()>reservation)throw std::length_error("Image preparation factory exceeded its reserved output budget: actual="+std::to_string(result->byte_size())+" reserved="+std::to_string(reservation)+" dimensions="+std::to_string(result->width())+"x"+std::to_string(result->height()));}
     catch(...){result.reset();failure=std::current_exception();}
     bool drop{};
     { std::lock_guard lock(mutex); finished=true;drop=canceled;if(!drop){image=std::move(result);error=std::move(failure);} }

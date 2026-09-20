@@ -366,7 +366,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
         continue;
       }
     }
-    if (!fleet.destination_system_id && !civilization.is_player &&
+    if (!fleet.destination_system_id && civilization_uses_ai(civilization,world.control) &&
         fleet.embarked_population_millions > 0) {
       std::unordered_map<int, const StellarSystem *> systems;
       for (const auto &system : world.systems)

@@ -363,7 +363,7 @@ def validate_native_battle_export(folder: Path, env: dict[str, str], player17_fi
             result = subprocess.run(args, cwd=work, env=clean_env, capture_output=True,
                                     text=True, encoding="utf-8", errors="strict", timeout=120)
             evidence = folder.parent / f"{folder.name}-{mode}"
-            evidence.with_suffix(".log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
+            evidence.with_name(evidence.name + ".log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
             if result.returncode != 0:
                 raise RuntimeError(f"Native battle replay failed ({result.returncode}):\n"
                                    f"{result.stdout}\n{result.stderr}")
@@ -385,13 +385,13 @@ def validate_native_battle_export(folder: Path, env: dict[str, str], player17_fi
             if prior is not None:
                 _same_paused_payload(prior, payload)
             prior = payload
-            shutil.copy2(save, evidence.with_suffix(".player17.json"))
-            shutil.copy2(capture, evidence.with_suffix(".bmp"))
-            shutil.copy2(sidecar, evidence.with_name(evidence.stem + "-without-ships.bmp"))
-            captures.append(str(evidence.with_suffix(".bmp")))
+            shutil.copy2(save, evidence.with_name(evidence.name + ".player17.json"))
+            shutil.copy2(capture, evidence.with_name(evidence.name + ".bmp"))
+            shutil.copy2(sidecar, evidence.with_name(evidence.name + "-without-ships.bmp"))
+            captures.append(str(evidence.with_name(evidence.name + ".bmp")))
             diagnostics.append(proof)
             art_diagnostics.append(art)
-            art_captures.append(str(evidence.with_name(evidence.stem + "-without-ships.bmp")))
+            art_captures.append(str(evidence.with_name(evidence.name + "-without-ships.bmp")))
     return {"nativeBattleWorkspace": True, "nativeBattleObserverRedaction": True,
             "nativeBattleVisibleTokens": True, "nativeBattleOrder": True,
             "nativeBattlePausedSpeed": True, "nativeBattlePausedCanonicalReload": True,

@@ -89,9 +89,10 @@ double stellar_hazard_extent_au(const StellarPhysicalProperties&);
 double stellar_navigation_au_per_unit(const StellarPhysicalProperties&);
 bool stellar_approach_unsafe(const StellarPhysicalProperties&,double x_au,double y_au);
 CentralBlackHoleProperties generate_central_black_hole(std::uint64_t seed);
+CentralBlackHoleProperties central_black_hole_with_state(CentralBlackHoleProperties,CentralBlackHoleState);
 struct StellarSystem;
 struct PlanetaryBody;
-void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>&,StellarPopulationOptions);
+void apply_stellar_population(std::int64_t seed,std::vector<StellarSystem>&,StellarPopulationOptions,bool visual_footprint=false);
 std::map<int,int> apply_stellar_planetary_physics(std::span<const StellarSystem>,std::vector<PlanetaryBody>&);
 std::string stellar_population_diagnostics(std::span<const StellarSystem>,std::span<const PlanetaryBody>,
     StellarPopulationOptions,std::optional<CentralBlackHoleProperties>,std::uint64_t seed=0);

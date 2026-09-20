@@ -1,4 +1,6 @@
 #include "native_colony_controller.hpp"
+#include <stellar/core/campaign_observation.hpp>
+#include <stellar/core/developer_campaign.hpp>
 #include "native_surface_status.hpp"
 #include "native_settlement_mission_controller.hpp"
 
@@ -226,6 +228,50 @@ void surface_operation_tests(const fs::path &research_root, const fs::path &cata
           "unstaffed or damaged site misleadingly reported a power shortage");
   require(label(normal, 9002) == "OPERATING" && label(low_power, 9003) == "NO POWER",
           "refresh mutated an earlier value-owned view");
+}
+
+void developer_inspection_tests(const fs::path &research_root, const fs::path &catalog) {
+  auto frame = make_frame(research_root, catalog, 127500);
+  auto& world = frame.runtime().world().campaign();
+  auto foreign = std::ranges::find_if(world.colonies, [&](const auto& c) {
+    return c.civilization_id != world.player_civilization_id && c.planetary_body_id;
+  });
+  require(foreign != world.colonies.end(), "Missing alien colony fixture");
+  world.knowledge = CivilizationKnowledgeState{};
+  NativeSystemViewController systems; NativeColonyController colonies;
+  require(!systems.build(frame, 8, foreign->system_id).snapshot,
+          "Developer frame timing granted secret data without provenance");
+  world.developer_provenance.emplace();
+  require(!world.developer_provenance->full_exploration, "Fixture accidentally revealed the map");
+  auto economy = std::ranges::find(world.economies, foreign->civilization_id, &CivilizationEconomy::civilization_id);
+  require(economy != world.economies.end(), "Missing alien economy");
+  economy->credits = 987654.; economy->industry = 12345.;
+  foreign->population_millions = 4321.;
+  const auto capture = [&] { return capture_developer_campaign_json(frame.runtime(),
+      {0., "inspection-test", "2044-05-06T07:08:09Z"}); };
+  const auto before = capture();
+  const auto system = systems.build(frame, 8, foreign->system_id);
+  require(system.snapshot && std::ranges::all_of(system.snapshot->bodies, [](const auto& b) { return b.details && b.world_class; }),
+          "Developer inspection withheld physical data or world classification");
+  const auto result = colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id);
+  require(result.view && result.view->developer_inspection && result.view->foreign_settlement && !result.view->observer_only,
+          "Developer alien colony still uses restricted observer view");
+  const auto& view = *result.view;
+  require(view.owner_civilization_id == foreign->civilization_id && view.player_civilization_id == world.player_civilization_id &&
+      view.population_millions == 4321. && view.treasury_budget_units == 987654. && view.stored_industry == 12345. &&
+      view.construction_sites.size() == foreign->surface_buildings.size(), "Alien statistics use player data or omit structures");
+  require_finite(view);
+  require(before == capture(), "Developer inspection changed canonical campaign state");
+  foreign->population_millions += 1.;
+  const auto refreshed = colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id);
+  require(refreshed.view && refreshed.view->revision > view.revision && refreshed.view->population_millions == 4322.,
+          "Developer colony statistics did not refresh");
+  world.developer_provenance.reset();
+  require(!colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id).view,
+          "Stale developer snapshot leaked after returning to ordinary observation");
+  world.knowledge.mark_system_fully_surveyed(world.player_civilization_id, foreign->system_id);
+  require(!colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id).view,
+          "Full exploration alone revealed alien internal statistics");
 }
 
 void inspector_tests(const fs::path &research_root, const fs::path &catalog) {
@@ -574,13 +620,14 @@ int main(int argc, char **argv) try {
   require(argc == 3, "Usage: native_colony_controller_tests <research-root> <catalog>");
   const auto research_root = fs::absolute(argv[1]);
   const auto catalog = fs::absolute(argv[2]);
+  developer_inspection_tests(research_root, catalog);
   inspector_tests(research_root, catalog);
   surface_operation_tests(research_root, catalog);
   mission_case(research_root, catalog, false);
   mission_case(research_root, catalog, true);
   stale_mission_test(research_root, catalog);
   admission_revalidation_tests(research_root, catalog);
-  std::cout << "native colony controllers: 7/7 bounded cases passed\n";
+  std::cout << "native colony controllers: 8/8 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native colony controller tests failed: " << error.what() << '\n';

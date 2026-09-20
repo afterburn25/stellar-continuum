@@ -40,13 +40,6 @@ void pixel(std::vector<std::uint8_t> &rgba, int width, int x, int y,
   rgba[at] = byte(r); rgba[at + 1] = byte(g); rgba[at + 2] = byte(b);
   rgba[at + 3] = byte(a);
 }
-std::optional<std::pair<Point,Point>> clip_line(Point a,Point b,UiRect r){
-  float first=0,last=1;const float dx=b.x-a.x,dy=b.y-a.y;
-  const std::array p{-dx,dx,-dy,dy};
-  const std::array q{a.x-r.x,r.x+r.width-a.x,a.y-r.y,r.y+r.height-a.y};
-  for(std::size_t i=0;i<p.size();++i){if(p[i]==0){if(q[i]<0)return std::nullopt;continue;}const float value=q[i]/p[i];if(p[i]<0)first=std::max(first,value);else last=std::min(last,value);if(first>last)return std::nullopt;}
-  return std::pair{Point{a.x+first*dx,a.y+first*dy},Point{a.x+last*dx,a.y+last*dy}};
-}
 std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
                                            std::uint32_t seed) {
   constexpr int size = NativeCelestialAppearanceRenderer::stellar_texture_size;
@@ -213,24 +206,8 @@ void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point c
   const auto image=storage_->obtain({a.spectral_color,a.deterministic_seed,a.black_hole,false,false});const float extent=radius*2.20f;
   if(!image){out.world.emplace_back(Circle{center,radius,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,110}});return;}
   out.world.emplace_back(Image{image,{center.x-extent,center.y-extent,extent*2,extent*2},std::nullopt,{255,255,255,255},clip});
-  append_stellar_activity(out,center,radius,a,seconds,clip);
-}
-void NativeCelestialAppearanceRenderer::append_stellar_activity(DrawList&out,Point center,float radius,const NativeStellarDiscAppearance&a,double seconds,std::optional<UiRect>clip){
-  if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0||!std::isfinite(seconds))throw std::invalid_argument("Stellar activity geometry must be finite and positive.");
-  if(a.black_hole)return;
-  const float seed=static_cast<float>(a.deterministic_seed&65535u);
-  const float slot_length=9.5f+hash(seed,4.7f)*3.5f;
-  const double cycles=(seconds+hash(seed,17.1f)*slot_length)/slot_length;
-  const float epoch=static_cast<float>(std::fmod(std::floor(cycles),65536.));
-  const float phase=static_cast<float>(cycles-std::floor(cycles));
-  const float roll=hash(seed*2.31f+epoch,31.7f),previous=hash(seed*2.31f+epoch-1.f,31.7f);
-  const bool enabled=roll>=.48f||previous<.48f;
-  const float start=.08f+hash(seed+epoch*1.17f,8.3f)*.12f;
-  const float duration=.29f+hash(seed*3.07f,epoch+12.4f)*.20f;
-  const float life=std::clamp((phase-start)/duration,0.f,1.f);
-  const auto smoothstep=[](float low,float high,float value){const float u=std::clamp((value-low)/(high-low),0.f,1.f);return u*u*(3.f-2.f*u);};
-  const float envelope=enabled?smoothstep(0,.28f,life)*(1.f-smoothstep(.58f,1.f,life)):0.f;
-  if(envelope>0){const float bearing=(hash(epoch*3.17f+seed,19.3f)-.5f)*tau;const float half_width=.12f+.12f*hash(epoch+4.2f,seed);const float height=.10f+.17f*hash(seed*1.9f,epoch+7.6f);for(int strand=0;strand<2;++strand){Point prior{};for(int segment=0;segment<=18;++segment){const float u=segment/18.f,signed_angle=(u*2.f-1.f)*half_width;const float arch=std::sqrt(std::max(0.f,1.f-(signed_angle/half_width)*(signed_angle/half_width)));const float irregular=(noise(signed_angle*24.f+epoch,static_cast<float>(seconds)*.075f+seed)-.5f)*.032f;const float r=radius*(.96f+arch*height+irregular+strand*.025f);const float theta=bearing+signed_angle;Point next{center.x+std::cos(theta)*r,center.y+std::sin(theta)*r};if(segment){const auto visible=clip?clip_line(prior,next,*clip):std::optional<std::pair<Point,Point>>{{prior,next}};if(visible)out.world.emplace_back(Line{visible->first,visible->second,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,byte(envelope*(strand?.34f:.72f))}});}prior=next;}}}
+  // Eruptions are supplied by Core event state through EruptionArtwork.
+  // The fallback photosphere never spawns presentation-time flares.
 }
 void NativeCelestialAppearanceRenderer::append_ring_back(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const auto image=storage_->obtain({{},0,false,true,false});if(!image)return;const float e=radius*2.30f;out.world.emplace_back(Image{image,{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
 void NativeCelestialAppearanceRenderer::append_ring_front(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const auto image=storage_->obtain({{},0,false,true,true});if(!image)return;const float e=radius*2.30f;out.world.emplace_back(Image{image,{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}

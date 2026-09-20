@@ -67,9 +67,9 @@ StartupLayout StartupLayout::for_viewport(int width,int height) noexcept{
   return {s,static_cast<int>(30*s),static_cast<int>(20*s),static_cast<int>(15*s),p,title,subtitle,n,l,e,list,back,primary,status,settings,return_to_campaign,story,sandbox,{bx,entry_y+426*s,bw,34*s}};
 }
 
-void NativeStartupWorkspace::set_setup(stellar::native_setup::NativeNewCampaignSetupView view){setup_.set_view(std::move(view));}
+void NativeStartupWorkspace::set_setup(stellar::native_setup::NativeNewCampaignSetupView view){developer_mode_=view.developer_mode;setup_.set_view(std::move(view));}
 void NativeStartupWorkspace::set_return_to_campaign_available(bool available)noexcept{return_to_campaign_available_=available;}
-void NativeStartupWorkspace::show_setup()noexcept{screen_=StartupScreen::Setup;setup_.randomize_seed();selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
+void NativeStartupWorkspace::show_setup()noexcept{screen_=StartupScreen::Setup;setup_.begin_sandbox();selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
 void NativeStartupWorkspace::reset_pointer() noexcept{pointer_={};hover_feedback_.reset();}
 void NativeStartupWorkspace::show_entry() noexcept{screen_=StartupScreen::Entry;selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
 void NativeStartupWorkspace::set_slots(stellar::native_startup::NativeStartupSaveSlots slots){slots_=std::move(slots);selected_slot_=slots_.slots.empty()?std::nullopt:std::optional<std::size_t>{0};load_scroll_=0;screen_=StartupScreen::LoadSlots;reset_pointer();}
@@ -83,7 +83,7 @@ StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int he
   if(e.type==InputEventType::PointerMove)pointer_=e.position;
   if(e.type==InputEventType::PointerCancelled){reset_pointer();if(screen_==StartupScreen::Setup)(void)setup_.handle(e,width,height,measure);return {StartupIntentKind::None,true};}
   const auto l=StartupLayout::for_viewport(width,height);
-  if(screen_==StartupScreen::Setup){const auto child=setup_.handle(e,width,height,measure);switch(child.kind){case stellar::native_setup_ui::NativeNewGameIntentKind::Cancel:screen_=StartupScreen::ModeSelection;reset_pointer();return {StartupIntentKind::Back,true};case stellar::native_setup_ui::NativeNewGameIntentKind::CopySetup:return {StartupIntentKind::CopySetup,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count,child.stellar_population};case stellar::native_setup_ui::NativeNewGameIntentKind::Create:return {StartupIntentKind::Create,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count,child.stellar_population};default:return {StartupIntentKind::None,child.captured};}}
+  if(screen_==StartupScreen::Setup){const auto child=setup_.handle(e,width,height,measure);switch(child.kind){case stellar::native_setup_ui::NativeNewGameIntentKind::Cancel:screen_=StartupScreen::ModeSelection;reset_pointer();return {StartupIntentKind::Back,true};case stellar::native_setup_ui::NativeNewGameIntentKind::CopySetup:return {StartupIntentKind::CopySetup,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count,child.stellar_population,{},child.developer_research,child.developer_full_coverage,child.requested_population,child.developer_full_exploration};case stellar::native_setup_ui::NativeNewGameIntentKind::Create:return {StartupIntentKind::Create,true,child.seed_text,child.species_id,child.system_count,child.pre_warp_civilization_count,child.ancient_civilization_count,child.stellar_population,{},child.developer_research,child.developer_full_coverage,child.requested_population,child.developer_full_exploration};default:return {StartupIntentKind::None,child.captured};}}
   std::uint64_t hover_target{};
   using stellar::native_menu_audio::hit;
   if(screen_==StartupScreen::Entry)hover_target=hit(e.position,{l.new_campaign,l.load_campaign,l.settings,l.development,l.exit,(return_to_campaign_available_||!continue_save_.empty())?l.return_to_campaign:UiRect{}});
@@ -155,7 +155,7 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     link(l.development,"Development");
     link(l.exit,"Exit to Windows");
     const UiRect footer{l.title.x,std::max(l.exit.y+l.exit.height+30*s,static_cast<float>(height)-74*s),l.title.width,16*s};
-    text(out,footer,"PLAYER MODE",accent,l.small_font,TextAlign::Left);
+    text(out,footer,developer_mode_?"DEV MODE · ISOLATED SAVES":"PLAYER MODE",accent,l.small_font,TextAlign::Left);
     if(!build_label_.empty()) text(out,{footer.x,footer.y+17*s,footer.width,16*s},build_label_,muted,l.small_font,TextAlign::Left);
     return;
   }
@@ -163,7 +163,7 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,30*s},"DEVELOPMENT & DIAGNOSTICS",gold,l.body_font);
     text(out,{l.panel.x+22*s,l.panel.y+116*s,l.panel.width-44*s,126*s},build_label_+"\n"+diagnostics_,bright,l.body_font);
     text(out,{l.panel.x+22*s,l.panel.y+266*s,l.panel.width-44*s,116*s},
-      "Use Export diagnostics in a campaign's pause menu to collect a support package. F12 captures the current screen.\n\nThe separate Developer world and editing tools from the Godot version are not yet available in this C++ build.",muted,l.small_font);
+      "F12 captures the screen. Export diagnostics from the pause menu.\n\nOpen the Developer Game launcher, then choose New Game > Sandbox. The footer shows DEV MODE. Saves stay separate.\n\nManual launch: --dev-game enters developer mode directly. Ctrl+Shift+F12 toggles mode only in a --devtools launch.",muted,l.small_font);
     native_menu_style::button(out,l.primary,"Copy system info",l.small_font,l.primary.contains(pointer_),true,s);
     native_menu_style::button(out,l.back,"Back",l.body_font,l.back.contains(pointer_),true,s);
     return;

@@ -31,6 +31,9 @@ struct StellarSystemPersistenceDto {
   std::optional<StellarPhysicalProperties> stellar_object;
   int engulfed_planets{};
   std::optional<StellarRegion> stellar_region;
+  std::optional<std::vector<SmallBodyField>> small_body_fields;
+  std::optional<StellarOrbitArchitecture> stellar_orbits;
+  std::optional<std::vector<StellarActivityState>> stellar_activity;
 };
 
 struct CivilizationPersistenceDto {

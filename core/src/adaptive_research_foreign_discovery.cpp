@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_foreign_discovery.hpp>
 
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
@@ -17,7 +18,7 @@ namespace {
 using Json = nlohmann::ordered_json;
 
 Json read_json(const std::filesystem::path &path) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input)
     throw std::runtime_error("Could not open " + std::filesystem::absolute(path).string());
   Json value;
@@ -538,3 +539,4 @@ AdaptiveResearchForeignDiscoveryRuntime::reevaluate(
 }
 
 } // namespace stellar::core
+

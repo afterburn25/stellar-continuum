@@ -1,3 +1,4 @@
+#include <stellar/engine/native_ui_skin.hpp>
 #include "native_notifications.hpp"
 
 #include <algorithm>
@@ -265,7 +266,7 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
   if (!visible_) return;
   const auto layout = notification_layout_for(items, width, height, measure_, scroll_);
   const float s = layout.scale;
-  fill(out, layout.panel, panel_color); stroke(out, layout.panel, border_color);
+  stellar::engine::ui_skin::surface(out,layout.panel,s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
   const Text title_probe{{}, "RECENT EVENTS", title_color, title_pixels, 0.f,
                          std::nullopt, TextAlign::Left, FontFace::Interface};
@@ -273,7 +274,7 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
   clipped_text(out, {layout.header.x,
                      layout.header.y + (layout.header.height - title_extent.height) * .5f},
                "RECENT EVENTS", title_color, title_pixels, 0.f, layout.header);
-  fill(out, layout.close_button, layout.close_button.contains(pointer_) ? button_hover : button_color); stroke(out, layout.close_button, border_color);
+  stellar::engine::ui_skin::control(out,layout.close_button,layout.close_button.contains(pointer_),false,true,s);
   const int close_pixels = std::max(10, static_cast<int>(std::lround(12.f * s)));
   const Text close_probe{{}, "X", muted_color, close_pixels, 0.f,
                          std::nullopt, TextAlign::Center, FontFace::Interface};
@@ -289,13 +290,12 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto& entry = layout.entries[i]; if (!intersects(entry.bounds, layout.list_viewport)) continue;
     const auto& item = items[entry.item_index];
-    const auto visible_card = intersection(entry.bounds, layout.list_viewport);
-    fill(out, visible_card, {16, 34, 52, 255}); stroke(out, visible_card, {64, 96, 128, 255});
+    stellar::engine::ui_skin::surface(out,entry.bounds,s,false,layout.list_viewport);
     clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y}, upper(item.category) + "  " + item.date,
                  category_color(item.category), std::max(9, static_cast<int>(std::lround(11.f * s))), entry.metadata_bounds.width, layout.list_viewport);
     clipped_text(out, {entry.message_bounds.x, entry.message_bounds.y}, item.message, message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))), entry.message_bounds.width, layout.list_viewport);
-    if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button)) { fill(out, *entry.contact_button, entry.contact_button->contains(pointer_) ? button_hover : button_color); stroke(out, *entry.contact_button, border_color);
+    if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button)) { stellar::engine::ui_skin::control(out,*entry.contact_button,entry.contact_button->contains(pointer_),false,true,s);
       const int action_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));
       const Text action_probe{{}, "OPEN RELATIONS", title_color, action_pixels,
                               entry.contact_button->width - 4.f * s,

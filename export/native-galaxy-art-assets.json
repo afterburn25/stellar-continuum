@@ -1,15 +1,10 @@
 {
   "schemaVersion": 1,
   "assets": {
-    "deep-field-v2": {
-      "source": "assets/visual/space/deep-field-v2.png",
-      "runtimePath": "assets/visual/space/deep-field-v2.png",
-      "sha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5"
-    },
     "credits": {
       "source": "docs/engine/NATIVE_GALAXY_ART_SOURCES.md",
       "runtimePath": "Licenses/Galaxy-art-sources.md",
-      "sha256": "3bdd1d628818badbb98047fb1c6ed0a73f06a74a809c38a1e454ce5e60f63852"
+      "sha256": "bb9586903fd293d68a2827110cf73d175319d1f013f997170e8e7320ceeb8698"
     },
     "regional-nebula-b": {
       "source": "assets/visual/space/regional-nebula-b.png",
@@ -20,6 +15,76 @@
       "source": "assets/visual/space/spiral-galaxy-v3.png",
       "runtimePath": "assets/visual/space/spiral-galaxy-v3.png",
       "sha256": "a11ba4111ed57a73c602b124af1ed888cbda854aa129f058b7490ecdc2cb3488"
+    },
+    "barred_spiral-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/barred_spiral-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/barred_spiral-generic-gas_dust_only.png",
+      "sha256": "dcd447c07f9b7f4c4afcf54c25f38afa614678a605f791c33f88d43067c2c4db"
+    },
+    "barred_spiral-generic-stars_included": {
+      "source": "assets/visual/galaxies/barred_spiral-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/barred_spiral-generic-stars_included.png",
+      "sha256": "4852913585d3962bc8e4382bf00adb42e6573d36c61793a5eca72435f5cb1a46"
+    },
+    "elliptical-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/elliptical-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/elliptical-generic-gas_dust_only.png",
+      "sha256": "dca2a8a5cf6265b8c59c1b3544b1cabb846de724bbe2058362206b22f42642ba"
+    },
+    "elliptical-generic-stars_included": {
+      "source": "assets/visual/galaxies/elliptical-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/elliptical-generic-stars_included.png",
+      "sha256": "ddb584958c324f62f9ab94579274693eb1574a332efaf97a04c374af457c2445"
+    },
+    "irregular-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/irregular-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/irregular-generic-gas_dust_only.png",
+      "sha256": "a4e449dd7ae05b42fa15185fbe07c76db75f7c59bfa2ddeea677801063b820ea"
+    },
+    "irregular-generic-stars_included": {
+      "source": "assets/visual/galaxies/irregular-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/irregular-generic-stars_included.png",
+      "sha256": "1b19664619590ee56ad0e5325224738039e4fa9a9fca658e9b11091a58345745"
+    },
+    "lenticular-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/lenticular-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/lenticular-generic-gas_dust_only.png",
+      "sha256": "d302be1a03891789c7a59fc9b07cc9c228f4bb2da547f42e396b2d59405f2057"
+    },
+    "lenticular-generic-stars_included": {
+      "source": "assets/visual/galaxies/lenticular-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/lenticular-generic-stars_included.png",
+      "sha256": "68df3f0342e3e895f4c3ea0b7f03e4923019e5605493117d1fd2fca2a69c99ad"
+    },
+    "ring-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/ring-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/ring-generic-gas_dust_only.png",
+      "sha256": "18b4510591460addf1f310a781fdb6730248955220ee7112779c8be1cc2e12cb"
+    },
+    "ring-generic-stars_included": {
+      "source": "assets/visual/galaxies/ring-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/ring-generic-stars_included.png",
+      "sha256": "21b04d9afbf95a693635f503721f044f7eda080a7928fe1a36adbf8fa943a686"
+    },
+    "spiral-generic-gas_dust_only": {
+      "source": "assets/visual/galaxies/spiral-generic-gas_dust_only.png",
+      "runtimePath": "assets/visual/galaxies/spiral-generic-gas_dust_only.png",
+      "sha256": "798c717e1911dfe46c90f8c5680731c081fe2b4081d46f7628bb6df9b61abb53"
+    },
+    "spiral-generic-stars_included": {
+      "source": "assets/visual/galaxies/spiral-generic-stars_included.png",
+      "runtimePath": "assets/visual/galaxies/spiral-generic-stars_included.png",
+      "sha256": "0b6db16b67623cc402e59c2db35cbb3f513871dcace10ea3c7ea7642006d7ab7"
+    },
+    "deep-field-v3": {
+      "source": "assets/visual/space/deep-field-v3.png",
+      "runtimePath": "assets/visual/space/deep-field-v3.png",
+      "sha256": "f18e121dd515a1ae775512e3ed7afea2fcfd370867c65dd6b3a7e970134e4cb9"
+    },
+    "star-background": {
+      "source": "assets/visual/space/star-background.png",
+      "runtimePath": "assets/visual/space/star-background.png",
+      "sha256": "7e48914134e12b7498499a20202773f4382b88dc5809ee0e945f4d0b12b57406"
     }
   }
 }

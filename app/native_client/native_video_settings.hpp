@@ -31,6 +31,7 @@ struct NativeVideoSettings {
   VideoVsync vsync{VideoVsync::On};
   VideoFrameCap frame_cap{VideoFrameCap::Automatic};
   int scene_resolution_percent{100}, scene_samples{1};
+  int starfield_quality{2}, starfield_density{1};
   [[nodiscard]] NativeVideoSettings sanitized() const noexcept;
   // Startup never changes desktop geometry. Saved exclusive resolution/refresh
   // choices remain available when explicitly selecting Exclusive in Settings.

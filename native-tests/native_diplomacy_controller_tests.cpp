@@ -57,7 +57,7 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
   const auto empty = controller.build(frame, 7, 0);
   require(empty.contacts.empty() && !empty.selected.present,
           "empty campaign projected a diplomatic contact");
-  require(empty.date == "2050-01-01",
+  require(empty.date == "2050-03-21",
           "campaign epoch date diverged from the calendar");
   require(empty.proposals.empty() && empty.agreements.empty() &&
               empty.history.empty(),

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/mercury.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/mercury.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/venus.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/venus.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/earth.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/earth.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/mars.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/mars.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/jupiter.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/jupiter.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/saturn.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/saturn.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/uranus.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/uranus.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/neptune.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/neptune.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/moon.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/moon.jpg"
+    },
+    {
+      "reason": "Superseded by the native surface/material catalog; no production consumer requests this original disc or legacy Earth map.",
+      "id": "assets/visual/sol/earth-map.jpg",
+      "state": "DEPRECATED",
+      "source": "assets/visual/sol/earth-map.jpg"
+    }
+  ]
+}

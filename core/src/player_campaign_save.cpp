@@ -3,6 +3,7 @@
 #include <stellar/engine/atomic_file_write.hpp>
 
 #include <chrono>
+#include <cctype>
 #include <algorithm>
 #include <span>
 #include <typeinfo>
@@ -18,27 +19,68 @@ void require_save_path(const std::filesystem::path &path) {
       })) throw std::invalid_argument("A save path is required.");
 }
 }
+bool is_developer_campaign_save_path(const std::filesystem::path &path) {
+  auto name=path.filename().u8string();
+  // The suffix is ASCII; converting the entire name through the Windows ANSI
+  // code page rejects otherwise valid Unicode save paths.
+  std::ranges::transform(name,name.begin(),[](char8_t c){
+    return c>=u8'A'&&c<=u8'Z'?static_cast<char8_t>(c+(u8'a'-u8'A')):c;
+  });
+  return name.ends_with(u8".dev17.json");
+}
+PreparedPlayerCampaignSave::PreparedPlayerCampaignSave(DeveloperCampaignPayload payload)
+    : developer_payload_(std::make_shared<const DeveloperCampaignPayload>(std::move(payload))) {}
 PreparedPlayerCampaignSave::PreparedPlayerCampaignSave(PlayerCampaignPayloadV17Dto payload)
     : payload_(std::make_shared<const PlayerCampaignPayloadV17Dto>(std::move(payload))) {}
 PreparedPlayerCampaignSave PreparedPlayerCampaignSave::capture(
     IntegratedAdaptiveCampaignRuntime &runtime, const PlayerCampaignCaptureOptions &options) {
   return PreparedPlayerCampaignSave(capture_player_campaign_v17(runtime, options));
 }
-const PlayerCampaignPayloadV17Dto &PreparedPlayerCampaignSave::payload() const noexcept {
+PreparedPlayerCampaignSave PreparedPlayerCampaignSave::capture_developer(
+    IntegratedAdaptiveCampaignRuntime &runtime,const PlayerCampaignCaptureOptions &options) {
+  return PreparedPlayerCampaignSave(capture_developer_campaign(runtime,options));
+}
+CampaignSaveKind PreparedPlayerCampaignSave::kind() const noexcept {
+  return developer_payload_?CampaignSaveKind::Developer:CampaignSaveKind::Player;
+}
+const DeveloperCampaignPayload &PreparedPlayerCampaignSave::developer_payload() const {
+  if(!developer_payload_)throw std::logic_error("This is a player campaign capture.");
+  return *developer_payload_;
+}
+const PlayerCampaignPayloadV17Dto &PreparedPlayerCampaignSave::payload() const {
+  if(!payload_)throw std::logic_error("Developer campaigns cannot be written as player saves.");
   return *payload_;
 }
 void write_prepared_player_campaign(const std::filesystem::path &path,
                                    const PreparedPlayerCampaignSave &prepared,
                                    bool preserve_existing_backup) {
   require_save_path(path);
-  const auto json = encode_player_campaign_v17_json(prepared.payload());
-  stellar::engine::write_file_atomically(path,
-      std::as_bytes(std::span(json.data(), json.size())), {preserve_existing_backup});
+  stellar::engine::write_file_atomically_stream(path,[&](const stellar::engine::AtomicTextSink& sink){
+    stream_player_campaign_v17_json(prepared.payload(),sink);
+  },{preserve_existing_backup});
 }
 
+void write_prepared_campaign(const std::filesystem::path &path,
+                            const PreparedPlayerCampaignSave &prepared,bool preserve) {
+  if(prepared.kind()==CampaignSaveKind::Player){
+    if(is_developer_campaign_save_path(path))throw std::invalid_argument("A player campaign cannot overwrite a developer save.");
+    write_prepared_player_campaign(path,prepared,preserve);return;
+  }
+  if(!is_developer_campaign_save_path(path))
+    throw std::invalid_argument("Developer campaigns require a separate .dev17.json save path.");
+  stellar::engine::write_file_atomically_stream(path,[&](const stellar::engine::AtomicTextSink& sink){
+    stream_developer_campaign_json(prepared.developer_payload(),sink);
+  },{preserve});
+}
+
+PreparedPlayerCampaignSave PlayerCampaignSaveController::capture(
+    IntegratedAdaptiveCampaignRuntime &runtime,const PlayerCampaignCaptureOptions &options) const {
+  return kind_==CampaignSaveKind::Developer?PreparedPlayerCampaignSave::capture_developer(runtime,options)
+      :PreparedPlayerCampaignSave::capture(runtime,options);
+}
 PlayerCampaignSaveController::PlayerCampaignSaveController(
-    CampaignAutosavePolicy policy, PlayerCampaignPreparedWriter writer)
-    : scheduler_(policy), writer_(std::move(writer)) {
+    CampaignAutosavePolicy policy, PlayerCampaignPreparedWriter writer,CampaignSaveKind kind)
+    : scheduler_(policy), writer_(std::move(writer)),kind_(kind) {
   if (!writer_) throw std::invalid_argument("A prepared campaign writer is required.");
 }
 PlayerCampaignSaveController::~PlayerCampaignSaveController() {
@@ -55,6 +97,8 @@ void PlayerCampaignSaveController::configure(std::filesystem::path path,
   require_owner();
   if (pending_) throw std::logic_error("Drain the pending campaign save before replacing its session.");
   require_save_path(path);
+  if(is_developer_campaign_save_path(path)!=(kind_==CampaignSaveKind::Developer))
+    throw std::invalid_argument("Player and developer campaigns must use separate save paths.");
   scheduler_.reset(day);
   path_ = std::move(path); revision_ = revision;
   preserve_backup_ = recovered_from_backup; configured_ = true;
@@ -116,7 +160,7 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::after_fram
   if (pending_ || !scheduler_.is_due(day)) return completed;
   const bool preserve = preserve_backup_;
   try {
-    auto prepared = PreparedPlayerCampaignSave::capture(frame.runtime(), {day, game_version, saved_at_utc});
+    auto prepared = capture(frame.runtime(), {day, game_version, saved_at_utc});
     submit(std::move(prepared), day, preserve);
   } catch (...) {
     auto failed = failure(std::current_exception(), day, path_, preserve);
@@ -131,7 +175,7 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
   if (pending_) throw std::logic_error("Consume and report the pending autosave before a manual save.");
   const bool preserve = preserve_backup_;
   try {
-    const auto prepared = PreparedPlayerCampaignSave::capture(runtime, options);
+    const auto prepared = capture(runtime, options);
     writer_(path_, prepared, preserve);
     scheduler_.mark_success(options.simulation_days); preserve_backup_ = false;
     return {true, path_, options.simulation_days, preserve, {}, {}};
@@ -148,7 +192,7 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::begin_manu
   if (pending_) throw std::logic_error("Consume and report the pending autosave before a manual save.");
   const bool preserve = preserve_backup_;
   try {
-    auto prepared = PreparedPlayerCampaignSave::capture(runtime, options);
+    auto prepared = capture(runtime, options);
     submit(std::move(prepared), options.simulation_days, preserve);
   } catch (...) {
     auto result = failure(std::current_exception(), options.simulation_days, path_, preserve);

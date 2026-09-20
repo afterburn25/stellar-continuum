@@ -68,6 +68,9 @@ public:
   pause_directed_research(AdaptiveResearchCivilizationState &state,
                           std::string_view node_id) const;
   [[nodiscard]] AdaptiveResearchCommandResult
+  cancel_directed_research(AdaptiveResearchCivilizationState &state,
+                           std::string_view node_id) const;
+  [[nodiscard]] AdaptiveResearchCommandResult
   resume_directed_research(AdaptiveResearchCivilizationState &state,
                            std::string_view node_id,
                            double requested_assigned_labs) const;

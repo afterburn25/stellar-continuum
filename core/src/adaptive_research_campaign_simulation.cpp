@@ -4,6 +4,7 @@
 #include <limits>
 #include <stdexcept>
 #include <stellar/core/adaptive_research_campaign_simulation.hpp>
+#include <stellar/core/campaign_civilization_control.hpp>
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/detail/adaptive_research_campaign_state_access.hpp>
@@ -242,9 +243,11 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     auto *economy = first(w.economies, [&](auto &e) { return e.civilization_id == c->id; });
     if (!economy)
       throw AdaptiveResearchCampaignOperationError("Sequence contains no matching element");
+    append(out,c->id,AdaptiveResearchCampaignCommands::start_queued_research(
+        {w.civilizations,w.economies},campaign,c->id));
     bool allpaused = std::all_of(state.active_projects().begin(), state.active_projects().end(),
                                  [](auto &p) { return p.paused; });
-    if (!c->is_player && allpaused) {
+    if (campaign_civilization_uses_ai(w,c->id) && allpaused) {
       for (auto &candidate : campaign.runtime().agenda().build_visible_shortlist(state)) {
         if (!candidate.can_start)
           continue;

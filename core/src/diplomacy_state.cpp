@@ -250,6 +250,16 @@ bool DiplomacyState::is_transit_authorized(int grantor, int visitor) const {
          get_access_permission(grantor, visitor) == AccessPermission::granted;
 }
 
+std::vector<TerritorialClaimSnapshot> DiplomacyState::territorial_claims(std::optional<int> observer) const {
+  std::vector<TerritorialClaimSnapshot> result;
+  for(const auto &value:storage_->claims) {
+    auto claim=value.snapshot();
+    if(!observer || std::ranges::find(claim.known_to_civilization_ids,*observer)!=claim.known_to_civilization_ids.end())
+      result.push_back(std::move(claim));
+  }
+  std::ranges::sort(result,{},&TerritorialClaimSnapshot::claim_id);
+  return result;
+}
 DiplomacyStateSnapshot DiplomacyState::snapshot() const {
   DiplomacyStateSnapshot result;
   for (const auto &value : storage_->contacts)

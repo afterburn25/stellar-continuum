@@ -21,6 +21,8 @@ public:
   [[nodiscard]] static AdaptiveResearchCivilizationState &
   get_civilization(AdaptiveResearchCampaignState &campaign,
                    int civilization_id);
+  static void restore_plan(AdaptiveResearchCampaignState &campaign,
+                           int civilization_id, const AdaptiveResearchPlan &plan);
 
   static void reserve_project_milestones(
       AdaptiveResearchCampaignState &campaign, int civilization_id,
@@ -35,6 +37,8 @@ public:
   static void restore_project_funding(
       AdaptiveResearchCampaignState &campaign, int civilization_id,
       std::span<const AdaptiveResearchProjectFundingSnapshot> snapshots);
+  static void release_project_funding(AdaptiveResearchCampaignState &campaign,
+                                      int civilization_id, std::string_view node_id);
 };
 
 } // namespace stellar::core::detail

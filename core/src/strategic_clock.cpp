@@ -36,6 +36,10 @@ void StrategicClock::set_maximum_multiplier(double multiplier) {
   validate_positive_finite(multiplier,"Maximum clock multiplier must be positive and finite.");
   maximum_multiplier_=multiplier;
 }
+void StrategicClock::set_days_per_second(double value) {
+  validate_positive_finite(value,"Clock cadence must be positive and finite.");
+  days_per_second_=value;backlog_days_=0.;
+}
 void StrategicClock::set_speed(StrategicSpeed speed) noexcept {
   if (speed != StrategicSpeed::Paused) last_running_speed_ = speed;
   speed_ = speed;
@@ -50,8 +54,14 @@ void StrategicClock::restore(double simulation_days) noexcept {
   simulation_days_ = dotnet_max(0., simulation_days);
   backlog_days_ = 0.;
 }
+void StrategicClock::record_fixed_advance(double days,double real_seconds,double backlog_days){
+  if(!finite(days)||days<0||!finite(real_seconds)||real_seconds<0||!finite(backlog_days)||backlog_days<0||!finite(simulation_days_+days))
+    throw std::invalid_argument("Invalid completed fixed simulation interval.");
+  simulation_days_+=days;backlog_days_=backlog_days;
+  effective_multiplier_=real_seconds>0?days/real_seconds/days_per_second_:0.;
+}
 double StrategicClock::advance(double real_delta_seconds, double maximum_step_days) {
-  const auto requested = requested_multiplier();
+  const auto requested = requested_multiplier() * days_per_second_;
   if (requested <= 0.) { effective_multiplier_ = 0.; return 0.; }
   const auto requested_days = real_delta_seconds * requested;
   auto accepted = dotnet_min(requested_days, maximum_step_days);
@@ -60,7 +70,7 @@ double StrategicClock::advance(double real_delta_seconds, double maximum_step_da
   accepted += drain;
   backlog_days_ -= drain;
   simulation_days_ += accepted;
-  effective_multiplier_ = real_delta_seconds > 0. ? accepted / real_delta_seconds : requested;
+  effective_multiplier_ = real_delta_seconds > 0. ? accepted / real_delta_seconds / days_per_second_ : requested_multiplier();
   return accepted;
 }
 double StrategicClock::advance_bounded_frame(double real_delta_seconds, double maximum_days,
@@ -68,7 +78,7 @@ double StrategicClock::advance_bounded_frame(double real_delta_seconds, double m
   if (!finite(real_delta_seconds) || real_delta_seconds < 0. || !finite(maximum_days) ||
       maximum_days <= 0. || !finite(maximum_backlog_days) || maximum_backlog_days < 0.)
     throw std::invalid_argument("Frame time and budgets must be finite and nonnegative; step budget must be positive.");
-  const auto requested = requested_multiplier();
+  const auto requested = requested_multiplier() * days_per_second_;
   if (requested <= 0. || real_delta_seconds == 0.) { effective_multiplier_ = 0.; return 0.; }
   const auto requested_days = dotnet_min(real_delta_seconds,
       (maximum_days + maximum_backlog_days) / requested) * requested;
@@ -76,7 +86,7 @@ double StrategicClock::advance_bounded_frame(double real_delta_seconds, double m
   const auto accepted = dotnet_min(available, maximum_days);
   backlog_days_ = dotnet_min(maximum_backlog_days, dotnet_max(0., available - accepted));
   simulation_days_ += accepted;
-  effective_multiplier_ = accepted / real_delta_seconds;
+  effective_multiplier_ = accepted / real_delta_seconds / days_per_second_;
   return accepted;
 }
 

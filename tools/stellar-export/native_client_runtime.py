@@ -12,12 +12,14 @@ import struct
 
 from native_ui_runtime import native_ui_asset_files
 from native_celestial_runtime import native_celestial_asset_files
+from native_small_body_runtime import native_small_body_asset_files
+from native_planet_runtime import native_planet_asset_files
+from native_environment_runtime import native_environment_asset_files
 from native_species_runtime import native_species_asset_files
 from native_startup_art_runtime import native_startup_art_asset_files
 from native_galaxy_art_runtime import native_galaxy_art_asset_files
 from native_ship_art_runtime import native_ship_art_asset_files
 from native_audio_assets import native_audio_asset_files
-from native_surface_art_assets import native_surface_art_asset_files
 from native_navigation_assets import native_navigation_asset_files
 from native_research_assets import native_research_asset_files
 
@@ -53,12 +55,14 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     }
     files.update(native_ui_asset_files(root))
     files.update(native_celestial_asset_files(root))
+    files.update(native_small_body_asset_files(root))
+    files.update(native_planet_asset_files(root))
+    files.update(native_environment_asset_files(root))
     files.update(native_species_asset_files(root))
     files.update(native_startup_art_asset_files(root))
     files.update(native_galaxy_art_asset_files(root))
     files.update(native_ship_art_asset_files(root))
     files.update(native_audio_asset_files(root))
-    files.update(native_surface_art_asset_files(root))
     files.update(native_navigation_asset_files(root))
     files.update(native_research_asset_files(root))
     stellar_manifest=root / "assets/visual/stellar/manifest.json"
@@ -79,6 +83,21 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
         if Path(name).name!=name: raise RuntimeError("Unsafe stellar artwork filename")
         files["assets/visual/stellar/"+name]=_verified_file(stellar_manifest.parent/name,item["sha256"])
     files["assets/visual/stellar/manifest.json"]=stellar_manifest
+    eruption_root=root/"assets/visual/stellar-eruptions"
+    eruption_manifest=json.loads((eruption_root/"manifest.json").read_text(encoding="utf-8"))
+    if eruption_manifest.get("schemaVersion")!=1 or len(eruption_manifest["visualSets"])!=204:
+        raise RuntimeError("Incomplete stellar eruption sequence registry")
+    files["assets/visual/stellar-eruptions/manifest.json"]=eruption_root/"manifest.json"
+    for sequence in eruption_manifest["visualSets"]:
+        for name in sequence["textures"]:
+            path=Path(name)
+            if path.is_absolute() or '..' in path.parts:raise RuntimeError("Unsafe eruption texture path")
+            for size in (256,512,1024):
+                relative=f"assets/visual/stellar-eruptions/{size}/{path.as_posix()}"
+                source=eruption_root/str(size)/path
+                if not source.is_file():raise RuntimeError(f"Missing eruption image: {source}")
+                files[relative]=source
+    files["Data/stellar/stellar-activity-v1.json"]=root/"data/stellar/stellar-activity-v1.json"
     files["Data/stellar/population-v1.json"]=root/"data/stellar/population-v1.json"
     files["Data/stellar/population-profiles-v1.json"]=root/"data/stellar/population-profiles-v1.json"
     files["Licenses/Stellar-artwork.md"]=root/"docs/stellar-asset-validation.md"

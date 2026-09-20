@@ -294,13 +294,25 @@ int run(int argc, char **argv) {
     } catch (...) {
       ep = std::current_exception();
     }
-    if (err(ep) != row.at("Error")) {
+    // Native schema 3 adds campaign-owned planning. The historical oracle
+    // rejected 3; verify the intentional extension against its schema-2 state,
+    // and retain rejection coverage for the next unsupported version.
+    if(name=="schema-three"){
+      if(ep||!result)throw std::runtime_error("Planning schema 3 did not restore.");
+      auto legacy=*input_snapshot;legacy.schema_version=2;
+      auto old=codec.restore(input_civs,legacy);
+      if(projection(codec,*result)!=projection(codec,old))
+        throw std::runtime_error("Schema 3 changed legacy research with an empty plan.");
+      legacy.schema_version=4;bool rejected=false;
+      try{(void)codec.restore(input_civs,legacy);}catch(const AdaptiveResearchCampaignDataError&){rejected=true;}
+      if(!rejected)throw std::runtime_error("Unsupported research schema was accepted.");
+    }else if (err(ep) != row.at("Error")) {
       std::cerr << name << " error mismatch\n"
                 << err(ep).dump() << "\n"
                 << row.at("Error").dump() << "\n";
       return 1;
     }
-    if (result && projection(codec, *result) != row.at("Result")) {
+    if (name!="schema-three" && result && projection(codec, *result) != row.at("Result")) {
       std::cerr << name << " result mismatch\n";
       return 1;
     }

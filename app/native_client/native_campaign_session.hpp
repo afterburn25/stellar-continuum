@@ -56,9 +56,10 @@ using NativeCampaignLoader = std::function<stellar::core::LoadedPlayerCampaignV1
 
 struct NativeCampaignSessionDependencies {
   stellar::core::PlayerCampaignPreparedWriter save_writer{
-      stellar::core::write_prepared_player_campaign};
+      stellar::core::write_prepared_campaign};
   NativeCampaignLoader loader{stellar::core::load_existing_player_campaign_v17};
   std::function<void(stellar::core::CampaignFrame &)> validate_candidate;
+  bool developer_session{};
 };
 
 class NativeCampaignSession final {
@@ -106,7 +107,7 @@ public:
   void cancel_new_campaign();
 
   [[nodiscard]] stellar::core::CampaignFrameResult
-  advance(double real_delta_seconds, const std::string &saved_at_utc);
+  advance(double real_delta_seconds, const std::string &saved_at_utc, bool developer_single_step = false);
   void request_save();
   void request_load();
   void request_exit();

@@ -67,6 +67,7 @@ struct AdaptiveResearchStateSnapshot {
   std::vector<std::string> facility_capabilities;
   std::vector<std::string> enabled_deployment_event_ids;
   std::vector<AdaptiveResearchProjectSnapshot> active_projects;
+  std::vector<AdaptiveResearchProjectSnapshot> cancelled_projects;
 };
 
 class AdaptiveResearchSnapshotError final : public std::runtime_error {
@@ -83,7 +84,7 @@ public:
 // content.
 class AdaptiveResearchSnapshotCodec final {
 public:
-  static constexpr int current_schema_version = 1;
+  static constexpr int current_schema_version = 6; // Versions 2-5 identify the existing outer envelopes.
   AdaptiveResearchSnapshotCodec(
       const AdaptiveResearchCatalog &catalog,
       const AdaptiveResearchApplicabilityCatalog &applicability,

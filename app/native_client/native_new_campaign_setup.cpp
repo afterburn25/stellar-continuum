@@ -10,10 +10,11 @@
 namespace stellar::native_setup {
 namespace {
 constexpr std::string_view terran = "terran_baseline";
-constexpr std::array<int, 4> sizes{250, 500, 1000, 2500};
-constexpr std::array<std::string_view, 4> size_labels{
+constexpr auto sizes=stellar::core::full_galaxy_system_counts;
+constexpr std::array<std::string_view, 8> size_labels{
     "Small - 250 systems", "Medium - 500 systems",
-    "Large - 1,000 systems", "Huge - 2,500 systems"};
+    "Large - 1,000 systems", "Huge - 2,500 systems",
+    "Vast - 5,000 systems", "Immense - 10,000 systems", "Expansive - 25,000 systems", "Grand - 50,000 systems"};
 
 bool whitespace(const char value) noexcept {
   return value == ' ' || value == '\t' || value == '\r' || value == '\n' ||
@@ -24,20 +25,6 @@ std::string_view trim(std::string_view value) noexcept {
   while (!value.empty() && whitespace(value.front())) value.remove_prefix(1);
   while (!value.empty() && whitespace(value.back())) value.remove_suffix(1);
   return value;
-}
-
-std::optional<std::int64_t> numeric_seed(std::string_view value) noexcept {
-  value = trim(value);
-  if (value.empty()) return {};
-  if (value.front() == '+') {
-    value.remove_prefix(1);
-    if (value.empty() || value.front() < '0' || value.front() > '9') return {};
-  }
-  std::int64_t result{};
-  const auto [end, error] =
-      std::from_chars(value.data(), value.data() + value.size(), result);
-  if (error != std::errc{} || end != value.data() + value.size()) return {};
-  return result;
 }
 
 bool present(const std::string_view value) noexcept { return !trim(value).empty(); }
@@ -102,8 +89,9 @@ NativeSpeciesSetupOption copy_species(
 }
 } // namespace
 
-NativeNewCampaignSetupView NativeNewCampaignSetupController::build() const {
+NativeNewCampaignSetupView NativeNewCampaignSetupController::build(bool developer_mode) const {
   NativeNewCampaignSetupView result;
+  result.developer_mode=developer_mode;
   for (const auto &profile : stellar::core::species_environment_profiles())
     result.species.push_back(copy_species(profile));
   for (std::size_t index = 0; index < sizes.size(); ++index)
@@ -124,10 +112,14 @@ NativeNewCampaignSetupView NativeNewCampaignSetupController::build() const {
   return result;
 }
 
+
+
 NativeNewCampaignSetupAssessment NativeNewCampaignSetupController::prepare(
-    const NativeNewCampaignSetupInput &input) const {
+    const NativeNewCampaignSetupInput &input,bool developer_mode) const {
+  if(!developer_mode&&(input.developer_research.complete_normal_research||input.developer_research.complete_special_research||input.developer_full_coverage||input.developer_full_exploration))
+    return {false,"Overrides require a developer session.",{}};
   try{(void)stellar::core::stellar_population_weights(input.stellar_population);}catch(const std::exception&){return {false,"Choose a supported morphology and population state.",{}};}
-  const auto seed = numeric_seed(input.seed_text);
+  const auto seed = parse_campaign_seed(input.seed_text);
   if (!seed)
     return {false,
             "Enter a whole-number seed from -9223372036854775808 to "
@@ -153,9 +145,16 @@ NativeNewCampaignSetupAssessment NativeNewCampaignSetupController::prepare(
   stellar::core::PersistableFreshCampaignOptions options{
       input.created_at_utc, input.system_count,
       input.pre_warp_civilization_count, input.ancient_civilization_count,
-      input.player_species_id, input.stellar_population};
+      input.player_species_id, input.stellar_population,input.developer_full_coverage};
+  stellar::core::GalaxyGenerationConfig configuration;
+  configuration.base_seed=*seed;configuration.morphology=input.stellar_population.morphology;
+  configuration.requested_population=input.requested_population;configuration.system_count=input.system_count;
+  configuration.pre_warp_count=input.pre_warp_civilization_count;configuration.ancient_count=input.ancient_civilization_count;
+  configuration.player_species_id=input.player_species_id;configuration.developer_full_coverage=input.developer_full_coverage;
+  options.configuration=stellar::core::resolve_galaxy_configuration(std::move(configuration));
+  options.stellar_population=stellar::core::StellarPopulationOptions{options.configuration->morphology,options.configuration->resolved_population};
   return {true, "Campaign setup is ready.",
-          NativePreparedNewCampaign{*seed, std::move(options)}};
+          NativePreparedNewCampaign{*seed, std::move(options),developer_mode,input.developer_research,input.developer_full_exploration}};
 }
 
 stellar::core::IntegratedAdaptiveCampaignRuntime
@@ -163,9 +162,17 @@ NativeNewCampaignSetupController::create_runtime(
     const NativePreparedNewCampaign &prepared,
     stellar::core::AdaptiveResearchStrategicRuntime research,
     const std::span<const stellar::core::CatalogStar> catalog) const {
-  return stellar::core::IntegratedAdaptiveCampaignRuntime::create_fresh(
-      std::move(research), stellar::core::seed_persistable_fresh_campaign(
-                               prepared.seed(), catalog, prepared.options()));
+  auto world=stellar::core::seed_persistable_fresh_campaign(prepared.seed(),catalog,prepared.options());
+  if(prepared.developer_mode()){
+    if(!world.developer_provenance)world.developer_provenance=stellar::core::CampaignDeveloperProvenance{};
+    if(prepared.developer_full_exploration())stellar::core::fully_explore_developer_galaxy(world);
+  }
+  auto runtime=stellar::core::IntegratedAdaptiveCampaignRuntime::create_fresh(std::move(research),std::move(world));
+  if(prepared.developer_mode()){
+    if(!runtime.world().campaign().developer_provenance)runtime.world().campaign().developer_provenance=stellar::core::CampaignDeveloperProvenance{};
+    (void)stellar::core::initialize_developer_research(runtime,prepared.developer_research());
+  }
+  return runtime;
 }
 
 } // namespace stellar::native_setup

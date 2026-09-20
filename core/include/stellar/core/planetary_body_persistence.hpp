@@ -55,6 +55,8 @@ struct PlanetaryBodyPersistenceDto {
   double orbital_eccentricity{};
   double orbital_inclination_degrees{};
   std::optional<StellarPlanetProperties> stellar_exposure;
+  bool cracked_world{};
+  std::optional<PlanetAppearance> appearance;
 };
 
 // Preserves the nullable list and nullable element distinctions accepted by the
@@ -64,8 +66,9 @@ struct PlanetaryBodyPersistenceInput {
   std::vector<std::optional<PlanetaryBodyPersistenceDto>> bodies;
 };
 
-// Materializes every DTO in source order, then applies ValidatePlanetaryCatalog
-// in its authored order. The returned records own all strings and environments.
+// Rejects null entries, validates the complete catalog in its authored order,
+// then materializes records owning all strings and environments. DTOs are read
+// in place without an intermediate full-catalog copy.
 [[nodiscard]] std::vector<PlanetaryBody> restore_planetary_bodies(
     const PlanetaryBodyPersistenceInput &input,
     std::span<const StellarSystem> systems);

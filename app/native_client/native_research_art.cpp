@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include "native_research_art.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -16,7 +17,7 @@ bool safe_id(std::string_view value) {
 }
 NativeResearchArt::NativeResearchArt(std::filesystem::path asset_root)
     : root_(std::move(asset_root) / "assets/visual/catalog") {
-  std::ifstream stream(root_ / "catalog.json");
+  auto stream=stellar::engine::resource_stream(root_ / "catalog.json");
   if (!stream) throw std::runtime_error("Cannot load research illustration catalog: " + root_.string());
   const auto catalog = nlohmann::json::parse(stream);
   if (catalog.at("schemaVersion") != 1 || !catalog.at("research").is_array() ||
@@ -45,7 +46,7 @@ NativeResearchArt::image(std::string_view known_node_id, bool portrait) {
     return found->second.image;
   }
   const auto path = root_ / (portrait ? "portraits" : "thumbnails") / (binding->second + ".png");
-  auto image = stellar::native_map::decode_rgba_image(path);
+  auto image = stellar::native_map::decode_rgba_image(path,0,stellar::native_map::ImageDecodeUsage::PixelsOnly);
   const int expected = portrait ? 512 : 128;
   if (!image || image->width() != expected || image->height() != expected)
     throw std::runtime_error("Research illustration has incorrect dimensions: " + path.string());
@@ -65,3 +66,4 @@ std::size_t NativeResearchArt::cached_bytes() const noexcept {
   return bytes;
 }
 }
+

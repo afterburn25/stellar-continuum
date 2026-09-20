@@ -12,7 +12,9 @@
 
 namespace stellar::native_research {
 
-enum class NativeResearchIntent { None, Start, Pause, Resume, Cancel };
+enum class NativeResearchIntent { None, Start, Pause, Resume, Cancel,
+  AddFavorite, RemoveFavorite, Enqueue, RemoveQueued, MoveUp, MoveDown,
+  SuggestionsOn, SuggestionsOff };
 
 struct NativeResearchQuery {
   std::optional<std::string> domain_id;
@@ -67,6 +69,12 @@ struct NativeResearchNode {
   std::string purpose;
   std::string benefits;
   double research_points{};
+  double recommendation_score{-1.};
+  std::vector<std::string> recommendation_reasons;
+  std::optional<double> recent_year;
+  bool special_project{};
+  bool requirements_met{true};
+  bool cancelled{};
 };
 
 struct NativeResearchDomainTab {
@@ -90,10 +98,14 @@ struct NativeResearchWindow {
   std::optional<std::string> formatted_treasury;
   double free_effective_labs{};
   double total_effective_labs{};
+  std::optional<int> maximum_programs;
+  int active_program_count{};
+  bool lab_capacity_only{};
   std::vector<NativeResearchDomainTab> domain_tabs;
   std::vector<NativeResearchNode> nodes;
   std::vector<NativeResearchEdge> edges;
   std::optional<std::string> selected_node_id;
+  stellar::core::AdaptiveResearchPlan plan;
 };
 
 struct NativeResearchCommandOutcome {

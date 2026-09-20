@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include "native_audio_director.hpp"
 #include "native_voice_filter.hpp"
 
@@ -73,7 +74,7 @@ NativeAudioDirector::NativeAudioDirector(std::filesystem::path asset_root, bool 
         std::size_t total{};
         auto decode = [&](const std::filesystem::path& relative) -> Clip {
           const auto path = root / relative;
-          if (!std::filesystem::is_regular_file(path))
+          if (!stellar::engine::resource_exists(path))
             throw std::runtime_error("audio asset is missing: " + path.string());
           auto clip = stellar::engine::audio::decode_audio_clip(path);
           if (!clip) throw std::runtime_error("audio decoder returned no clip: " + path.string());
@@ -96,7 +97,7 @@ NativeAudioDirector::NativeAudioDirector(std::filesystem::path asset_root, bool 
           std::size_t voice_total{};
           auto decode_voice = [&](const std::filesystem::path& relative) -> Clip {
             const auto path = root / relative;
-            if (!std::filesystem::is_regular_file(path))
+            if (!stellar::engine::resource_exists(path))
               throw std::runtime_error("voice asset is missing: " + path.string());
             auto clip = stellar::engine::audio::decode_audio_clip(path);
             if (!clip) throw std::runtime_error("voice decoder returned no clip: " + path.string());
@@ -398,3 +399,4 @@ std::string NativeAudioDirector::failure_message() const { require_owner(); retu
 NativeAudioStats NativeAudioDirector::stats() const { require_owner(); return stats_; }
 
 } // namespace stellar::native_audio
+

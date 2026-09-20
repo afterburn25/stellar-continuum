@@ -76,7 +76,7 @@ NativeStartupArtworkAssets::image(const StartupArtworkKind kind) {
   if (cached) return cached;
   const auto path = asset_root_ / paths[index];
   try {
-    cached = decode_rgba_image(path);
+    cached = decode_rgba_image(path,0,stellar::native_map::ImageDecodeUsage::PixelsOnly);
   } catch (const std::exception &error) {
     throw std::runtime_error("Startup artwork failed to decode: " + utf8(path) +
                              ": " + error.what());

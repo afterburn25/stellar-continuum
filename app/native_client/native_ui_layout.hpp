@@ -78,6 +78,7 @@ struct NativeUiLayout {
   UiRect explore;
   UiRect menu;
   UiRect zoom_text;
+  UiRect navigation_bar,brand;
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
@@ -153,9 +154,18 @@ struct NativeUiLayout {
     result.pause={screen_width-146.f*scale,3.f*scale,40.f*scale,30.f*scale};
     result.speed={screen_width-102.f*scale,3.f*scale,90.f*scale,30.f*scale};
     result.notifications={screen_width-216.f*scale,3.f*scale,64.f*scale,30.f*scale};
-    result.day_text={screen_width-340.f*scale,9.f*scale,116.f*scale,20.f*scale};
+    result.day_text={screen_width-340.f*scale,2.f*scale,116.f*scale,32.f*scale};
     result.status_text={80.f*scale,screen_height-30.f*scale,std::max(0.f,screen_width*.5f-310.f*scale),20.f*scale};
-    result.zoom_text={80.f*scale,43.f*scale,210.f*scale,20.f*scale};
+    result.navigation_bar={0,36.f*scale,screen_width,66.f*scale};
+    result.brand={18.f*scale,44.f*scale,190.f*scale,46.f*scale};
+    const float start=226.f*scale,nav_width=std::min(116.f*scale,std::max(64.f*scale,(screen_width-start-76.f*scale)/8.f));
+    const auto nav=[&](int i){return UiRect{start+i*nav_width,40.f*scale,nav_width-4.f*scale,58.f*scale};};
+    result.map=nav(0);result.home=nav(1);result.colonies=nav(2);result.economy=nav(3);
+    result.research=nav(4);result.diplomacy=nav(5);result.supply=nav(6);result.shipyard=nav(7);
+    result.menu={screen_width-52.f*scale,49.f*scale,34.f*scale,34.f*scale};
+    const auto secondary=[&](int i){return UiRect{inset,120.f*scale+i*(rail_size+rail_gap),rail_size,rail_size};};
+    result.inspect=secondary(0);result.zoom_in=secondary(1);result.zoom_out=secondary(2);result.construction=secondary(3);result.explore=secondary(4);
+    result.zoom_text={80.f*scale,110.f*scale,210.f*scale,20.f*scale};
     return result;
   }
 
@@ -190,6 +200,11 @@ struct NativeUiLayout {
     return UiAction::None;
   }
 };
+
+inline float native_workspace_top(int width,int height)noexcept{
+  const auto layout=NativeUiLayout::for_viewport(width,height);
+  return layout.navigation_bar.y+layout.navigation_bar.height+10.f*layout.scale;
+}
 
 // Shared by presentation and hit testing, in drawable pixels (never desktop DPI).
 struct CommandHudLayout {

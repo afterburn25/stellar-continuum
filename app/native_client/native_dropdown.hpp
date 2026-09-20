@@ -80,12 +80,11 @@ class Dropdown final {
     if(!visible())return;
     const auto l=layout(anchor,width,height);
     out.overlay.emplace_back(FilledRectangle{{l.panel.x+3,l.panel.y+4,l.panel.width,l.panel.height},{0,0,0,165}});
-    out.overlay.emplace_back(FilledRectangle{l.panel,{9,27,43,255}});
-    out.overlay.emplace_back(StrokedRectangle{l.panel,{111,190,216,255}});
+    stellar::engine::ui_skin::surface(out,l.panel,std::max(.5f,font/15.f));
     for(int i=0;i<static_cast<int>(l.rows.size());++i){
       const int index=first_+i;if(index>=static_cast<int>(options_.size()))break;
       const auto r=l.rows[i];
-      if(index==highlighted_||index==selected_)out.overlay.emplace_back(FilledRectangle{r,index==highlighted_?Color{35,89,122,255}:Color{23,56,78,255}});
+      if(index==highlighted_||index==selected_)stellar::engine::ui_skin::control(out,r,index==highlighted_,index==selected_,true,std::max(.5f,font/15.f),l.panel);
       if(index==selected_)native_menu_style::text(out,{r.x+5,r.y+(r.height-font)*.5f,18.f,r.height},"✓",font,native_menu_style::cyan);
       native_menu_style::text(out,{r.x+26,r.y+(r.height-font)*.5f,r.width-32,r.height},options_[index],font);
     }

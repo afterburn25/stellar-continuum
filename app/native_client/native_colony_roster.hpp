@@ -25,6 +25,7 @@ struct View {
   std::vector<Row> rows;
   std::string message;
   bool available{};
+  bool developer_inspection{};
 };
 
 [[nodiscard]] View build(const stellar::core::FreshCampaignState &,

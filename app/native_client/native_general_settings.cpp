@@ -29,20 +29,19 @@ void label(DrawList& draw,UiRect rect,std::string text,int size) {
   draw.overlay.emplace_back(Text{{rect.x,rect.y},std::move(text),text_color,size,rect.width,rect});
 }
 void button(DrawList& draw,UiRect rect,std::string text,int size,bool primary=false,bool disabled=false) {
-  draw.overlay.emplace_back(FilledRectangle{rect,primary?Color{104,224,188,255}:Color{22,53,76,255}});
-  draw.overlay.emplace_back(StrokedRectangle{rect,{104,184,212,255}});
+  stellar::engine::ui_skin::control(draw,rect,false,primary,!disabled,std::max(.5f,size/17.f));
   draw.overlay.emplace_back(Text{{rect.x+rect.width*.5f,rect.y+(rect.height-static_cast<float>(size))*.5f},
-    std::move(text),disabled?Color{123,147,162,255}:primary?panel_fill:text_color,size,rect.width,rect,TextAlign::Center});
+    std::move(text),disabled?Color{123,147,162,255}:text_color,size,rect.width,rect,TextAlign::Center,FontFace::Interface});
 }
 }
 GeneralSettingsLayout GeneralSettingsLayout::for_viewport(int width,int height) noexcept {
   const float w=static_cast<float>(std::max(width,1)),h=static_cast<float>(std::max(height,1));
-  const float s=std::max(.001f,std::min({2.6f,w/1280.f,h/720.f,std::max(1.f,w-24.f)/680.f,std::max(1.f,h-24.f)/450.f}));
-  const UiRect panel{(w-680.f*s)*.5f,(h-450.f*s)*.5f,680.f*s,450.f*s};
+  const float s=std::max(.001f,std::min({2.6f,w/1280.f,h/720.f,std::max(1.f,w-24.f)/680.f,std::max(1.f,h-24.f)/500.f}));
+  const UiRect panel{(w-680.f*s)*.5f,(h-500.f*s)*.5f,680.f*s,500.f*s};
   const auto r=[&](float x,float y,float rw,float rh){return UiRect{panel.x+x*s,panel.y+y*s,rw*s,rh*s};};
   return {s,std::max(12,static_cast<int>(std::lround(17*s))),std::max(16,static_cast<int>(std::lround(26*s))),panel,
-    r(30,65,150,32),r(192,65,150,32),r(30,181,620,112),r(30,307,620,48),
-    r(30,376,146,40),r(188,376,146,40),r(346,376,146,40),r(504,376,146,40)};
+    r(30,65,150,32),r(192,65,150,32),r(30,229,620,112),r(30,355,620,48),
+    r(30,424,146,40),r(188,424,146,40),r(346,424,146,40),r(504,424,146,40),r(358,65,292,32),r(30,111,620,32)};
 }
 NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(std::move(path)) {
   try {
@@ -57,21 +56,26 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     const auto json=nlohmann::json::parse(std::string(bytes.data(),static_cast<std::size_t>(input.gcount())),
       [&](int depth,nlohmann::json::parse_event_t event,nlohmann::json& value){
         if(depth==1&&event==nlohmann::json::parse_event_t::key){auto key=value.get<std::string>();if(std::find(keys.begin(),keys.end(),key)!=keys.end())duplicate=true;keys.push_back(std::move(key));}return true;});
-    if(duplicate||!json.is_object()||json.size()!=2||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
+    if(duplicate||!json.is_object()||(json.size()!=2&&json.size()!=4&&json.size()!=5&&json.size()!=6)||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
        json.at("schemaVersion")!=1||!json.contains("screenshotDirectory")||!json.at("screenshotDirectory").is_string())throw std::runtime_error("unsupported settings schema");
     const auto encoded=json.at("screenshotDirectory").get<std::string>();
     const auto value=std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(encoded.data()),encoded.size()));
     if(!valid_directory(value))throw std::runtime_error("saved screenshot directory is invalid or unavailable");
     saved_.screenshot_directory=value;
+    if(json.contains("assetCategoriesCollapsed")){saved_.asset_categories_collapsed=json.at("assetCategoriesCollapsed").get<std::array<bool,5>>();saved_.assets_hidden=json.at("assetsHidden").get<bool>();}
+    if(json.contains("eruptionQuality")){if(!json.at("eruptionQuality").is_number_integer())throw std::runtime_error("Invalid eruption quality");saved_.eruption_quality=json.at("eruptionQuality").get<int>();if(saved_.eruption_quality<0||saved_.eruption_quality>3)throw std::runtime_error("Invalid eruption quality");}
+    if(json.contains("nebulaDensity")){if(!json.at("nebulaDensity").is_number_integer())throw std::runtime_error("Invalid visual density");const auto density=json.at("nebulaDensity").get<int>();if(density<0||density>2)throw std::runtime_error("Invalid visual density");saved_.nebula_density=density;}
   } catch(const std::exception& error) {
     error_="Saved screenshot folder unavailable. The default location is active.";
     std::cerr<<"General settings load failed: "<<error.what()<<'\n';
   }
 }
 bool NativeGeneralSettings::save(GeneralPreferences value) {
+  if(value.eruption_quality<0||value.eruption_quality>3){error_="Choose a stellar eruption quality.";return false;}
+  if(value.nebula_density<0||value.nebula_density>2){error_="Choose Low, Medium or High nebula density.";return false;}
   if(!valid_directory(value.screenshot_directory)){error_="Choose an existing absolute folder.";return false;}
   try {
-    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)}}.dump();
+    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality}}.dump();
     if(text.size()>maximum_bytes)throw std::runtime_error("settings are oversized");
     stellar::engine::write_file_atomically(path_,std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
   } catch(const std::exception& error) {
@@ -80,8 +84,8 @@ bool NativeGeneralSettings::save(GeneralPreferences value) {
   }
   saved_=std::move(value);error_.clear();if(apply_)apply_(saved_);return true;
 }
-void NativeGeneralSettings::open(){hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
-void NativeGeneralSettings::cancel(){draft_=saved_;pending_request_.reset();visible_=false;}
+void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
+void NativeGeneralSettings::cancel(){nebula_dropdown_.close();eruption_dropdown_.close();draft_=saved_;pending_request_.reset();visible_=false;}
 Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
   const UiRect clip{l.folder.x+12*l.scale,l.folder.y+12*l.scale,l.folder.width-24*l.scale,l.folder.height-24*l.scale};
   const auto& path=draft_.screenshot_directory.empty()?default_directory_:draft_.screenshot_directory;
@@ -124,9 +128,11 @@ void NativeGeneralSettings::accept_browse_result(FolderDialogResult result) {
 }
 bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height) {
   if(!visible_)return false;
+  if(eruption_dropdown_.visible()){if(const auto choice=eruption_dropdown_.handle(event,GeneralSettingsLayout::for_viewport(width,height).eruptions,width,height))draft_.eruption_quality=*choice;return true;}
+  if(nebula_dropdown_.visible()){if(const auto choice=nebula_dropdown_.handle(event,GeneralSettingsLayout::for_viewport(width,height).nebula,width,height))draft_.nebula_density=*choice;return true;}
   if(event.type==InputEventType::EscapePressed){cancel();return true;}
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
-  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.browse,layout.defaults,layout.cancel,layout.save}));
+  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.browse,layout.defaults,layout.cancel,layout.save}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
     const auto max_scroll=std::max(0.f,static_cast<float>(measure_(text).height)-text.clip->height);
@@ -135,6 +141,8 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   if(event.type!=InputEventType::LeftPressed)return true;
   if(layout.cancel.contains(event.position)){cancel();return true;}
   if(browsing())return true;
+  if(layout.eruptions.contains(event.position)){eruption_dropdown_.open(0,{"Low","Medium","High","Ultra"},draft_.eruption_quality);return true;}
+  if(layout.nebula.contains(event.position)){nebula_dropdown_.open(0,{"Low","Medium","High"},draft_.nebula_density);return true;}
   if(layout.audio.contains(event.position)&&audio_){cancel();audio_();}
   else if(layout.video.contains(event.position)&&video_){cancel();video_();}
   else if(layout.browse.contains(event.position)) {
@@ -145,7 +153,7 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
         pending_request_.reset();error_="Finish the open folder browser before trying again.";
       } else error_.clear();
     } catch(const std::exception& error){pending_request_.reset();error_="Folder browser could not open. Please try again.";std::cerr<<error.what()<<'\n';}
-  } else if(layout.defaults.contains(event.position)){draft_={};path_scroll_=0;error_.clear();}
+  } else if(layout.defaults.contains(event.position)){draft_.screenshot_directory.clear();path_scroll_=0;error_.clear();}
   else if(layout.save.contains(event.position)&&save(draft_))visible_=false;
   return true;
 }
@@ -156,8 +164,10 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   native_menu_style::panel(draw,l.panel,l.scale);
   label(draw,{l.panel.x+30*s,l.panel.y+20*s,l.panel.width-60*s,36*s},"GENERAL SETTINGS",l.heading_pixels);
   button(draw,l.audio,"AUDIO",l.font_pixels,false,browsing());button(draw,l.video,"VIDEO",l.font_pixels,false,browsing());
-  label(draw,{l.folder.x,l.panel.y+119*s,l.folder.width,26*s},"SCREENSHOT FOLDER",l.font_pixels);
-  label(draw,{l.folder.x,l.panel.y+149*s,l.folder.width,25*s},"Press F12 to save a PNG of the game.",l.font_pixels);
+  button(draw,l.nebula,"Space phenomena density: "+std::array<std::string,3>{"Low","Medium","High"}.at(draft_.nebula_density)+" ▾",l.font_pixels,false,browsing());
+  button(draw,l.eruptions,"Stellar eruption detail: "+std::array<std::string,4>{"Low","Medium","High","Ultra"}.at(draft_.eruption_quality)+" ▾",l.font_pixels,false,browsing());
+  label(draw,{l.folder.x,l.panel.y+167*s,l.folder.width,26*s},"SCREENSHOT FOLDER",l.font_pixels);
+  label(draw,{l.folder.x,l.panel.y+197*s,l.folder.width,25*s},"Press F12 to save a PNG of the game.",l.font_pixels);
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});
   auto path=path_text(l);
   const auto maximum=measure_?std::max(0.f,static_cast<float>(measure_(path).height)-path.clip->height):0.f;
@@ -167,5 +177,7 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   button(draw,l.browse,browsing()?"BROWSING...":"BROWSE",l.font_pixels,false,browsing());
   button(draw,l.defaults,"USE DEFAULT",l.font_pixels,false,browsing());button(draw,l.cancel,"CANCEL",l.font_pixels);
   button(draw,l.save,"SAVE",l.font_pixels,true,browsing());
+  nebula_dropdown_.render(draw,l.nebula,width,height,l.font_pixels);
+  eruption_dropdown_.render(draw,l.eruptions,width,height,l.font_pixels);
 }
 } // namespace stellar::native_general

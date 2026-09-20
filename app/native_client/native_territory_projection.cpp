@@ -1,4 +1,5 @@
 #include "native_territory_projection.hpp"
+#include <stellar/engine/spatial_point_index.hpp>
 
 #include <algorithm>
 #include <array>
@@ -18,9 +19,6 @@ namespace {
 
 using native_map::Point;
 
-[[nodiscard]] float distance(Point a, Point b) {
-  return std::hypot(a.x - b.x, a.y - b.y);
-}
 [[nodiscard]] float distance_squared(Point a, Point b) {
   const float dx = a.x - b.x, dy = a.y - b.y;
   return dx * dx + dy * dy;
@@ -109,23 +107,45 @@ struct AnchorMap {
   }
 };
 
-using RadiusMap = std::map<AnchorKey, float>;
+using PointIndex = engine::SpatialPointIndex;
 
-[[nodiscard]] float anchor_radius(const NativeTerritoryAnchor &anchor,
-                                  std::span<const NativeTerritoryAnchor> all,
-                                  std::size_t self) {
-  float nearest_friendly = std::numeric_limits<float>::infinity();
-  for (std::size_t index = 0; index < all.size(); ++index) {
-    if (index == self || all[index].civilization_id != anchor.civilization_id)
-      continue;
-    nearest_friendly =
-        std::min(nearest_friendly, distance(anchor.position, all[index].position));
+struct TerritoryInfluenceIndex {
+  PointIndex all;
+  std::map<int, PointIndex> owners;
+
+  TerritoryInfluenceIndex(std::span<const NativeTerritoryAnchor> anchors,
+                          float cell_size) {
+    std::map<int, std::vector<PointIndex::Point>> groups;
+    for (const auto &anchor : anchors)
+      groups[anchor.civilization_id].push_back(
+          {anchor.position.x, anchor.position.y, 0.f, anchor.civilization_id});
+    std::vector<PointIndex::Point> weighted;
+    weighted.reserve(anchors.size());
+    for (auto &[owner, points] : groups) {
+      const PointIndex neighbors(points);
+      for (std::size_t i = 0; i < points.size(); ++i) {
+        auto &point = points[i];
+        const auto nearest = neighbors.maximum_influence(point.x, point.y,
+                                                         {i, std::nullopt});
+        const float radius = std::clamp(
+            nearest ? std::max(48.f, -nearest->value * .58f) : 58.f, 42.f, 118.f);
+        point.weight = std::max(radius, cell_size * .72f);
+      }
+      // Owners and their anchors are sorted just like the original scan,
+      // preserving the lowest-civilization tie break for cell assignment.
+      weighted.insert(weighted.end(), points.begin(), points.end());
+      owners.emplace(owner, PointIndex(points));
+    }
+    all = PointIndex(weighted);
   }
-  return std::clamp(std::isfinite(nearest_friendly)
-                        ? std::max(48.f, nearest_friendly * .58f)
-                        : 58.f,
-                    42.f, 118.f);
-}
+
+  [[nodiscard]] float dominance(Point point, int owner) const {
+    const auto own = owners.at(owner).maximum_influence(point.x, point.y);
+    const auto rival = all.maximum_influence(point.x, point.y,
+                                             {std::nullopt, owner});
+    return own->value - (rival ? std::max(0.f, rival->value) : 0.f);
+  }
+};
 
 struct CellGrid {
   int width{}, height{};
@@ -136,33 +156,22 @@ struct CellGrid {
 
 [[nodiscard]] CellGrid assign(const TerritoryGrid &grid,
                               std::span<const NativeTerritoryAnchor> anchors,
-                              const RadiusMap &radii) {
+                              const TerritoryInfluenceIndex &influence) {
   CellGrid out{grid.width, grid.height,
                std::vector<int>(
                    static_cast<std::size_t>(grid.width) * grid.height, -1)};
   for (int x = 0; x < grid.width; ++x)
     for (int y = 0; y < grid.height; ++y) {
-      int best_owner = -1;
-      float best_score = 0.f;
       const Point point = grid.center(x, y);
-      for (const auto &anchor : anchors) {
-        const float score =
-            radii.at({anchor.civilization_id, anchor.system_id}) -
-            distance(point, anchor.position);
-        if (score > best_score ||
-            (score == best_score && score > 0.f &&
-             (best_owner < 0 || anchor.civilization_id < best_owner))) {
-          best_score = score;
-          best_owner = anchor.civilization_id;
-        }
-      }
-      out.at(x, y) = best_owner;
+      const auto best = influence.all.maximum_influence(point.x, point.y);
+      out.at(x, y) = best && best->value > 0.f
+                         ? anchors[best->index].civilization_id : -1;
     }
   return out;
 }
 
 void preserve_visible_owners(const TerritoryGrid &grid, CellGrid &cells,
-                             std::span<const NativeTerritoryAnchor> anchors) {
+                             const TerritoryInfluenceIndex &influence) {
   std::unordered_map<int, int> counts;
   for (int x = 0; x < grid.width; ++x)
     for (int y = 0; y < grid.height; ++y) {
@@ -170,12 +179,7 @@ void preserve_visible_owners(const TerritoryGrid &grid, CellGrid &cells,
       if (owner >= 0) ++counts[owner];
     }
 
-  // Group anchors by civilization in ascending order.
-  std::map<int, std::vector<const NativeTerritoryAnchor *>> groups;
-  for (const auto &anchor : anchors)
-    groups[anchor.civilization_id].push_back(&anchor);
-
-  for (const auto &[civilization, group] : groups) {
+  for (const auto &[civilization, group] : influence.owners) {
     if (counts[civilization] > 0) continue;
     int best_x = -1, best_y = -1;
     float best_distance = std::numeric_limits<float>::infinity();
@@ -184,10 +188,7 @@ void preserve_visible_owners(const TerritoryGrid &grid, CellGrid &cells,
         const int previous_owner = cells.at(x, y);
         if (previous_owner >= 0 && counts[previous_owner] <= 1) continue;
         const Point center = grid.center(x, y);
-        float nearest = std::numeric_limits<float>::infinity();
-        for (const auto *anchor : group)
-          nearest =
-              std::min(nearest, distance_squared(center, anchor->position));
+        const float nearest = group.nearest(center.x, center.y)->value;
         if (nearest >= best_distance) continue;
         best_distance = nearest;
         best_x = x;
@@ -199,20 +200,6 @@ void preserve_visible_owners(const TerritoryGrid &grid, CellGrid &cells,
     cells.at(best_x, best_y) = civilization;
     counts[civilization] = 1;
   }
-}
-
-[[nodiscard]] float dominance(Point point, int owner,
-                              std::span<const NativeTerritoryAnchor> anchors,
-                              const RadiusMap &radii) {
-  float own = -std::numeric_limits<float>::infinity(), rival = 0.f;
-  for (const auto &anchor : anchors) {
-    const float influence =
-        radii.at({anchor.civilization_id, anchor.system_id}) -
-        distance(point, anchor.position);
-    if (anchor.civilization_id == owner) own = std::max(own, influence);
-    else rival = std::max(rival, influence);
-  }
-  return own - rival;
 }
 
 struct FieldVertex {
@@ -393,14 +380,13 @@ struct FillGeometry {
 
 [[nodiscard]] FillGeometry
 smooth_fill(const TerritoryGrid &grid,
-            std::span<const NativeTerritoryAnchor> anchors,
-            const RadiusMap &radii, int owner) {
+            const TerritoryInfluenceIndex &influence, int owner) {
   std::unordered_map<GridPoint, float, GridPointHash> values;
   const auto value = [&](GridPoint point) {
     const auto found = values.find(point);
     if (found != values.end()) return found->second;
     const float computed =
-        dominance(grid.node(point), owner, anchors, radii);
+        influence.dominance(grid.node(point), owner);
     values.emplace(point, computed);
     return computed;
   };
@@ -419,7 +405,7 @@ smooth_fill(const TerritoryGrid &grid,
                                          value(corners[2]), value(corners[3])};
       const Point center{(points[0].x + points[2].x) * .5f,
                          (points[0].y + points[2].y) * .5f};
-      const float center_value = dominance(center, owner, anchors, radii);
+      const float center_value = influence.dominance(center, owner);
       if (center_value > 0.f &&
           std::ranges::all_of(samples, [](float v) { return v > 0.f; })) {
         if (x >= 0 && y >= 0 && x < grid.width && y < grid.height)
@@ -507,21 +493,20 @@ owner_contours(const TerritoryGrid &grid, const CellGrid &cells, int owner) {
     std::span<const NativeTerritorySystemInput> systems,
     const std::unordered_map<int, Point> &positions,
     const std::unordered_set<int> &unknown) {
+  std::vector<PointIndex::Point> points;
+  points.reserve(systems.size());
+  for (const auto &system : systems) {
+    const auto point = positions.at(system.id);
+    points.push_back({point.x, point.y});
+  }
+  const PointIndex index(points);
   CellGrid out{grid.width, grid.height,
                std::vector<int>(
                    static_cast<std::size_t>(grid.width) * grid.height, 0)};
   for (int x = 0; x < grid.width; ++x)
     for (int y = 0; y < grid.height; ++y) {
       const Point point = grid.center(x, y);
-      int nearest = systems.front().id;
-      float best = distance_squared(point, positions.at(nearest));
-      for (std::size_t index = 1; index < systems.size(); ++index) {
-        const float candidate =
-            distance_squared(point, positions.at(systems[index].id));
-        if (candidate >= best) continue;
-        best = candidate;
-        nearest = systems[index].id;
-      }
+      const int nearest = systems[index.nearest(point.x, point.y)->index].id;
       out.at(x, y) = unknown.contains(nearest) ? 1 : 0;
     }
   return out;
@@ -600,6 +585,11 @@ NativeTerritoryProjection build_native_territory_projection(
   for (const auto &system : input.systems) {
     const Point position{system.position.x * input.coordinate_scale,
                          system.position.y * input.coordinate_scale};
+    // Contour stitching quantizes positions into signed millipixel keys.
+    // Reject malformed snapshots before grid dimensions or keys can overflow.
+    if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+        std::max(std::abs(position.x), std::abs(position.y)) > 1.e6f)
+      throw std::invalid_argument("Territory coordinates exceed the projection range.");
     positions.emplace(system.id, position);
     all_positions.push_back(position);
   }
@@ -618,19 +608,16 @@ NativeTerritoryProjection build_native_territory_projection(
     return std::pair{anchor.civilization_id, anchor.system_id};
   });
   const TerritoryGrid grid = TerritoryGrid::create(all_positions);
-  RadiusMap radii;
-  for (std::size_t index = 0; index < all.size(); ++index)
-    radii[{all[index].civilization_id, all[index].system_id}] =
-        std::max(anchor_radius(all[index], all, index), grid.cell_size * .72f);
-  CellGrid cells = assign(grid, all, radii);
-  preserve_visible_owners(grid, cells, all);
+  const TerritoryInfluenceIndex influence(all, grid.cell_size);
+  CellGrid cells = assign(grid, all, influence);
+  preserve_visible_owners(grid, cells, influence);
   NativeTerritoryProjection projection;
   projection.grid_cell_count = grid.width * grid.height;
   for (const auto &input_region : input.regions) {
     const int owner = input_region.civilization_id;
     const auto occupied = owner_runs(grid, cells, owner);
     if (occupied.empty()) continue;
-    auto fill = smooth_fill(grid, all, radii, owner);
+    auto fill = smooth_fill(grid, influence, owner);
     const auto &largest = *std::ranges::max_element(
         occupied, {}, [](const NativeTerritoryFillRun &run) {
           return run.size.x * run.size.y;
@@ -671,9 +658,7 @@ NativeTerritoryInput capture_native_territory_input(
     const core::FreshCampaignState &world, int observer_civilization_id,
     std::span<const core::TerritorialClaimSnapshot> observer_claims,
     float coordinate_scale) {
-  constexpr std::size_t maximum_catalog_systems = 2500;
-  constexpr std::size_t maximum_visible_anchors = 4096;
-  constexpr std::size_t maximum_visible_claims = 4096;
+  constexpr std::size_t maximum_catalog_systems = core::maximum_full_galaxy_system_count;
   constexpr std::size_t maximum_civilization_name_bytes = 256;
   if (world.systems.size() > maximum_catalog_systems)
     throw std::length_error("Native territory input exceeds the supported catalog size.");
@@ -738,8 +723,6 @@ NativeTerritoryInput capture_native_territory_input(
   };
   for (const auto &anchor : anchors.all()) {
     input.regions[ensure_region(anchor.civilization_id)].anchors.push_back(anchor);
-  if (anchors.entries.size() > maximum_visible_anchors)
-    throw std::length_error("Native territory input exceeds its visible-anchor cap.");
   }
   for (const auto &claim : observer_claims)
     if (claim.active && civilizations.contains(claim.claimant_civilization_id) &&
@@ -750,8 +733,6 @@ NativeTerritoryInput capture_native_territory_input(
         input.claims.push_back(
             {claim.claimant_civilization_id, claim.system_id});
       }
-  if (input.claims.size() > maximum_visible_claims)
-    throw std::length_error("Native territory input exceeds its visible-claim cap.");
   return input;
 }
 
@@ -759,148 +740,8 @@ NativeTerritoryProjection build_native_territory_projection(
     const core::FreshCampaignState &world, int observer_civilization_id,
     std::span<const core::TerritorialClaimSnapshot> observer_claims,
     float coordinate_scale) {
-  if (!std::isfinite(coordinate_scale) || coordinate_scale <= 0.f)
-    throw std::invalid_argument("coordinate_scale must be finite and positive.");
-  if (world.systems.empty())
-    throw std::invalid_argument(
-        "Territory projection needs at least one system.");
-
-  std::unordered_map<int, const core::StellarSystem *> systems;
-  std::unordered_map<int, Point> positions;
-  systems.reserve(world.systems.size());
-  positions.reserve(world.systems.size());
-  for (const auto &system : world.systems) {
-    systems.emplace(system.id, &system);
-    positions.emplace(system.id, Point{system.position.x * coordinate_scale,
-                                       system.position.y * coordinate_scale});
-  }
-  std::unordered_map<int, const core::Civilization *> civilizations;
-  for (const auto &civilization : world.civilizations)
-    civilizations.emplace(civilization.id, &civilization);
-
-  std::unordered_map<int, int> settlement_owners;
-  {
-    std::map<int, std::vector<const core::Colony *>> by_system;
-    for (const auto &colony : world.colonies)
-      by_system[colony.system_id].push_back(&colony);
-    for (auto &[system_id, group] : by_system) {
-      const auto *first = *std::ranges::min_element(
-          group, {}, [](const core::Colony *colony) { return colony->id; });
-      settlement_owners.emplace(system_id, first->civilization_id);
-    }
-  }
-
-  const auto visible = [&](int civilization_id, int system_id) {
-    return civilization_id == observer_civilization_id ||
-           (world.knowledge.is_civilization_known(observer_civilization_id,
-                                                  civilization_id) &&
-            world.knowledge.is_system_fully_surveyed(observer_civilization_id,
-                                                   system_id));
-  };
-
-  AnchorMap anchors;
-  const auto add = [&](int civilization_id, int system_id,
-                       NativeTerritoryAnchorKind kind) {
-    const auto found = systems.find(system_id);
-    if (found == systems.end() || !visible(civilization_id, system_id)) return;
-    const AnchorKey key{civilization_id, system_id};
-    const auto existing = anchors.entries.find(key);
-    if (existing != anchors.entries.end() && kind >= existing->second.kind)
-      return;
-    anchors.entries[key] = {civilization_id, system_id,
-                            positions.at(system_id), kind};
-  };
-
-  for (const auto &[id, civilization] : civilizations) {
-    const auto owner = settlement_owners.find(civilization->home_system_id);
-    if (owner == settlement_owners.end() ||
-        owner->second == civilization->id ||
-        !visible(owner->second, civilization->home_system_id))
-      add(civilization->id, civilization->home_system_id,
-          NativeTerritoryAnchorKind::home);
-  }
-  for (const auto &colony : world.colonies)
-    add(colony.civilization_id, colony.system_id,
-        NativeTerritoryAnchorKind::settlement);
-
-  const auto all = anchors.all();
-  std::vector<Point> all_positions;
-  all_positions.reserve(positions.size());
-  for (const auto &[id, position] : positions) all_positions.push_back(position);
-  const TerritoryGrid grid = TerritoryGrid::create(all_positions);
-  RadiusMap radii;
-  for (std::size_t index = 0; index < all.size(); ++index)
-    radii[{all[index].civilization_id, all[index].system_id}] =
-        std::max(anchor_radius(all[index], all, index), grid.cell_size * .72f);
-
-  CellGrid cells = assign(grid, all, radii);
-  preserve_visible_owners(grid, cells, all);
-
-  NativeTerritoryProjection projection;
-  projection.grid_cell_count = grid.width * grid.height;
-
-  // Regions.
-  {
-    std::vector<int> owners;
-    for (const auto &anchor : all)
-      if (std::ranges::find(owners, anchor.civilization_id) == owners.end())
-        owners.push_back(anchor.civilization_id);
-    std::ranges::sort(owners);
-    for (const int owner : owners) {
-      std::vector<NativeTerritoryAnchor> owned;
-      for (const auto &anchor : all)
-        if (anchor.civilization_id == owner) owned.push_back(anchor);
-      const auto occupied = owner_runs(grid, cells, owner);
-      if (occupied.empty()) continue;
-      auto fill = smooth_fill(grid, all, radii, owner);
-      const auto &largest = *std::ranges::max_element(
-          occupied, {}, [](const NativeTerritoryFillRun &run) {
-            return run.size.x * run.size.y;
-          });
-      NativeTerritoryRegion region;
-      region.civilization_id = owner;
-      region.civilization_name = civilizations.at(owner)->name;
-      region.anchors = std::move(owned);
-      region.label_position = {largest.position.x + largest.size.x * .5f,
-                               largest.position.y + largest.size.y * .5f};
-      region.fill_runs = std::move(fill.runs);
-      region.fill_polygons = std::move(fill.polygons);
-      region.contours = std::move(fill.contours);
-      projection.territories.push_back(std::move(region));
-    }
-  }
-
-  // Claims — observer-safe: the caller passes only the observer's claim view.
-  for (const auto &claim : observer_claims) {
-    if (!claim.active || !systems.contains(claim.system_id) ||
-        !civilizations.contains(claim.claimant_civilization_id) ||
-        !visible(claim.claimant_civilization_id, claim.system_id))
-      continue;
-    projection.claims.push_back(
-        {claim.claimant_civilization_id, claim.system_id,
-         positions.at(claim.system_id),
-         std::max(28.f, grid.cell_size * 1.3f)});
-  }
-  std::ranges::sort(projection.claims, {}, [](const auto &claim) {
-    return std::pair{claim.civilization_id, claim.system_id};
-  });
-
-  for (const auto &system : world.systems)
-    if (!world.knowledge.is_system_known(observer_civilization_id, system.id))
-      projection.unexplored_system_ids.insert(system.id);
-
-  projection.unowned_cell_count = static_cast<int>(
-      std::ranges::count(cells.cells, -1));
-  std::vector<NativeTerritorySystemInput> fog_systems;
-  fog_systems.reserve(world.systems.size());
-  for (const auto &system : world.systems)
-    fog_systems.push_back({system.id, {},
-                           !projection.unexplored_system_ids.contains(system.id)});
-  const CellGrid fog_cells =
-      build_fog_cells(grid, fog_systems, positions,
-                      projection.unexplored_system_ids);
-  projection.fog = build_fog_mask(grid, fog_cells);
-  return projection;
+  return build_native_territory_projection(capture_native_territory_input(
+      world, observer_civilization_id, observer_claims, coordinate_scale));
 }
 
 std::uint64_t native_territory_fingerprint(
@@ -961,6 +802,8 @@ std::uint64_t native_territory_fingerprint(
     hash = fnv_mix(hash, static_cast<std::uint64_t>(system.id));
     hash = fnv_float(hash, system.position.x);
     hash = fnv_float(hash, system.position.y);
+    hash = fnv_mix(hash, world.knowledge.is_system_known(
+                            observer_civilization_id, system.id) ? 1ull : 0ull);
     hash = fnv_mix(hash, static_cast<std::uint64_t>(
                             world.knowledge.system_survey_level(
                                 observer_civilization_id, system.id)));

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "edits": {
+    "Irregular galaxy — gas-dust only.png": {
+      "path": "assets/source/galaxies-16x9/irregular-gas-dust-only.png",
+      "sha256": "7ff1a5fb1470e446e85bd6238e8930e6ba29a99c0287b66fde781996fd1b8a32",
+      "method": "built-in imagegen edit",
+      "requestedAspect": "16:9"
+    },
+    "Irregular galaxy — stars included.png": {
+      "path": "assets/source/galaxies-16x9/irregular-stars-included.png",
+      "sha256": "4d8bd42e65b271aec82cf8c540688d87be118fc6dbb413036fb825e67c0a5fc4",
+      "method": "built-in imagegen edit",
+      "requestedAspect": "16:9"
+    },
+    "Spiral galaxy — gas-dust only.png": {
+      "path": "assets/source/galaxies-16x9/spiral-gas-dust-only.png",
+      "sha256": "aa1516d67112f8c6f32bea280ef77ffc79969848d1bd618935bbcfb126721c60",
+      "method": "built-in imagegen edit",
+      "requestedAspect": "16:9"
+    },
+    "Spiral galaxy — stars included.png": {
+      "path": "assets/source/galaxies-16x9/spiral-stars-included.png",
+      "sha256": "a24f6175805a60b6813887278d787946d04c13b46ea62a2cbae05a2a0190d639",
+      "method": "built-in imagegen edit",
+      "requestedAspect": "16:9"
+    }
+  }
+}

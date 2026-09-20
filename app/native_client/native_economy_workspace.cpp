@@ -56,7 +56,7 @@ EconomyLayout EconomyLayout::for_viewport(int width,int height) noexcept {
   const auto requested=std::max(1.f,h/900.f);
   const auto fit=std::max(.72f,std::min(w/1280.f,h/720.f));
   const auto s=std::min(requested,fit);
-  const float x=native_navigation_content_left*s, top=58.f*s, margin=14.f*s;
+  const float x=native_navigation_content_left*s, top=native_workspace_top(width,height), margin=14.f*s;
   const UiRect panel{x,top,std::max(180.f,w-x-margin),std::max(180.f,h-top-margin)};
   const float pad=14.f*s;
   EconomyLayout result; result.scale=s;

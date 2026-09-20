@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stellar/engine/diagnostic_bundle.hpp>
+#include <vector>
 #include <filesystem>
 #include <string>
 
@@ -12,6 +14,8 @@ struct SupportBundleRequest final {
   std::filesystem::path save_path;
   std::string system_info;
   std::string session_log;
+  std::vector<stellar::engine::DiagnosticBundleEntry> additional_entries{};
+  std::string archive_name{"support.zip"};
 };
 
 // Writes a store-format ZIP below user_root/support/<unique>/support.zip.

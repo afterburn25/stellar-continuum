@@ -36,8 +36,9 @@ bool pointer_event(InputEventType type) {
 }
 SupplyLayout SupplyLayout::for_viewport(int width,int height) {
   const float s=NativeUiLayout::for_viewport(width,height).scale;
-  const UiRect panel{80.f*s,88.f*s,std::max(200.f,static_cast<float>(width)-98.f*s),
-                      std::max(180.f,static_cast<float>(height)-122.f*s)};
+  const auto top=native_workspace_top(width,height);
+  const UiRect panel{80.f*s,top,std::max(200.f,static_cast<float>(width)-98.f*s),
+                      std::max(180.f,static_cast<float>(height)-top-34.f*s)};
   return {panel,{panel.x+18.f*s,panel.y+244.f*s,panel.width-44.f*s,std::max(0.f,panel.height-260.f*s)},
     {panel.x+panel.width-46.f*s,panel.y+14.f*s,30.f*s,30.f*s},
     {panel.x+panel.width-188.f*s,panel.y+14.f*s,128.f*s,30.f*s},s};

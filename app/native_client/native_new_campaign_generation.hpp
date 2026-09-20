@@ -45,6 +45,7 @@ struct NativeNewCampaignGenerationStart {
 struct NativeDetachedNewCampaign {
   stellar::core::FreshCampaignState world;
   stellar::core::AdaptiveResearchStrategicRuntime research;
+  stellar::core::DeveloperResearchOptions developer_research;
 };
 
 using NativeNewCampaignPhaseSink =

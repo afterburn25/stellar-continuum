@@ -30,12 +30,16 @@ public:
       const stellar::native_setup::NativeNewCampaignSetupInput &);
   [[nodiscard]] StartupHostResult start_load(const std::filesystem::path &);
   void service();
+  void set_developer_mode(bool enabled);
+  [[nodiscard]] bool developer_mode() const noexcept {return developer_mode_;}
   [[nodiscard]] stellar::native_startup::NativeStartupView poll() const;
   [[nodiscard]] bool cancel();
   [[nodiscard]] std::unique_ptr<stellar::native_map::NativeCampaignSession>
   take_ready();
 private:
   StartupHostConfig config_;
+  bool developer_mode_{};
+  [[nodiscard]] std::filesystem::path active_save_path() const;
   stellar::native_setup::NativeNewCampaignSetupController setup_controller_;
   stellar::native_startup::NativeStartupSessionController startup_;
   std::uint64_t request_id_{};

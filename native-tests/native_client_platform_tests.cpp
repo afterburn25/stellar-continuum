@@ -171,6 +171,20 @@ int main(int argc,char **argv){
       bool text_over_panel{};for(int y=60;y<80;++y)for(int x=60;x<80;++x)if(!matches(x,y,230,190,30))text_over_panel=true;
       check(text_over_panel,"text layer was skipped after circle rendering");
     }
+
+    {
+      const auto texture=RgbaImage::create(1,1,{255,255,255,255});
+      TriangleMesh mesh{{{10,10},{110,10},{110,110},{10,110}},{0,1,2,0,2,3},{255,255,255,255},UiRect{30,30,60,60}};
+      mesh.texture=texture;mesh.texture_coordinates={{0,0},{1,0},{1,1},{0,1}};mesh.vertex_colors.assign(4,{40,180,220,255});
+      DrawList draw;draw.overlay.emplace_back(FilledRectangle{{0,0,120,120},{3,7,11,255}});
+      // Prior image tint must not bleed into the globe's per-vertex lighting.
+      draw.overlay.emplace_back(Image{texture,{0,0,5,5},std::nullopt,{255,0,0,40}});draw.overlay.emplace_back(mesh);
+      const auto before=window.image_upload_count();const auto capture=fixtures.path()/L"textured-mesh.bmp";
+      window.draw(draw,capture);window.draw(draw);check(window.image_upload_count()==before+1,"Textured mesh re-uploaded stable globe texture");
+      const auto rgba=decode_rgba_image(capture);const auto channel=[&](int x,int y,int c){return rgba->pixels()[(y*rgba->width()+x)*4+c];};
+      check(channel(50,50,0)==40&&channel(50,50,1)==180&&channel(50,50,2)==220,"Textured mesh UV/tint rendering failed");
+      check(channel(20,20,0)==3&&channel(100,100,2)==11,"Textured globe mesh escaped its clip");
+    }
     auto first_image=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,255));std::weak_ptr<const RgbaImage> first_weak=first_image;DrawList image_frame;image_frame.world.emplace_back(Image{first_image,{24,24,48,48}});window.draw(image_frame);const auto first_uploads=window.image_upload_count();window.draw(image_frame);check(window.image_upload_count()==first_uploads,"identical image resource was uploaded more than once");image_frame.world.clear();first_image.reset();check(!first_weak.expired(),"texture cache did not retain strong immutable image ownership");
     auto never_uploaded=RgbaImage::create(2,2,std::vector<std::uint8_t>(16,128));DrawList invalid_image;invalid_image.world.emplace_back(Image{never_uploaded,{20,20,20,20},UiRect{1,1,4,4}});const auto uploads_before_invalid=window.image_upload_count();bool invalid_source_rejected{};try{window.draw(invalid_image);}catch(const std::invalid_argument&){invalid_source_rejected=true;}check(invalid_source_rejected&&window.image_upload_count()==uploads_before_invalid,"invalid source bounds uploaded or rendered a resource");
     DrawList image_pressure;for(std::size_t index=0;index<maximum_image_cache_entries;++index){auto pixels=std::vector<std::uint8_t>(16,static_cast<std::uint8_t>(index));pixels[3]=255;pixels[7]=255;pixels[11]=255;pixels[15]=255;image_pressure.world.emplace_back(Image{RgbaImage::create(2,2,std::move(pixels)),{-100,-100,2,2}});}window.draw(image_pressure);image_pressure.world.clear();check(first_weak.expired(),"evicted image cache entry retained its resource");check(window.image_cache_entries()<=maximum_image_cache_entries,"image cache exceeded entry capacity");check(window.image_cache_resident_bytes()<=maximum_image_cache_resident_bytes,"image cache exceeded resident byte capacity");

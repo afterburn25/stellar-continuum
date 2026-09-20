@@ -34,6 +34,7 @@ struct BattleArtSprite {
   float heading_degrees{};
   bool moving{};
   stellar::native_map::UiRect clip{};
+  float pitch_radians{}, depth_pixels{};
 };
 
 using BattleArtProjection = std::function<stellar::native_map::Point(

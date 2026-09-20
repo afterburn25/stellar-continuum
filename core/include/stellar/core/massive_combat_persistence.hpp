@@ -66,6 +66,7 @@ enum class MassiveCombatEventType {
 struct MassivePoint {
   float x{};
   float y{};
+  float z{}; // Optional depth in old saves; zero retains their planar motion.
   [[nodiscard]] bool is_finite() const noexcept;
 };
 

@@ -375,7 +375,7 @@ void ensure_automatic_construction_orders(ConstructionWorld w) {
     if (!s)
       throw std::out_of_range("Sequence contains no matching element");
     promote(w.read(), c.id, *s);
-    if (c.is_player || s->active_project_id || !s->queued_projects.empty())
+    if (!civilization_uses_ai(c,w.control) || s->active_project_id || !s->queued_projects.empty())
       continue;
     auto *e = economy_for(w, c.id);
     if (!e)

@@ -61,4 +61,10 @@ struct LoadedPlayerCampaignV17 {
     const std::function<void(const PlayerCampaignRestorationProgress &)> &
         progress = {});
 
+// Explicit developer entry uses the same recovery/validation pipeline but
+// accepts only the tagged developer envelope; it never promotes a player save.
+[[nodiscard]] LoadedPlayerCampaignV17 load_existing_developer_campaign(
+    const std::filesystem::path &, const PlayerCampaignRuntimeFactory &,
+    const std::function<void(const PlayerCampaignRestorationProgress &)> & = {});
+
 } // namespace stellar::core

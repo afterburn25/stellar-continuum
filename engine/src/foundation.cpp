@@ -83,6 +83,21 @@ std::uint64_t FixedClock::advance(std::chrono::nanoseconds elapsed, std::uint64_
 }
 
 Tick FixedClock::tick() const noexcept { return tick_; }
+void FixedClock::step_once() {
+    if(tick_==std::numeric_limits<Tick>::max())throw std::overflow_error("FixedClock tick overflow");
+    accumulated_=accumulated_>step_?accumulated_-step_:0;
+    ++tick_;
+}
+FixedClockSnapshot FixedClock::snapshot() const noexcept {
+    return {std::chrono::nanoseconds{static_cast<std::chrono::nanoseconds::rep>(step_)},backlog(),tick_,speed_,paused_};
+}
+void FixedClock::restore(const FixedClockSnapshot &value) {
+    if(value.step.count()<=0||value.backlog.count()<0||value.speed==0||value.speed>64)
+        throw std::invalid_argument("Invalid fixed clock snapshot");
+    step_=static_cast<std::uint64_t>(value.step.count());
+    accumulated_=static_cast<std::uint64_t>(value.backlog.count());
+    tick_=value.tick;speed_=value.speed;paused_=value.paused;
+}
 std::chrono::nanoseconds FixedClock::backlog() const noexcept { return std::chrono::nanoseconds{static_cast<std::chrono::nanoseconds::rep>(accumulated_)}; }
 
 std::uint64_t DeterministicRandom::next_u64() noexcept {
