@@ -190,6 +190,18 @@ NativeDeveloperToolsPanel::handle(const native_map::InputEvent &event,
         return command;
       }
   }
+  // Scrollable tabs: wheel over the content region moves the virtual window.
+  if (event.type == InputEventType::Wheel &&
+      layout.content.contains(event.position) &&
+      active_tab_ != DeveloperToolsTab::Commands) {
+    auto &list = active_tab_ == DeveloperToolsTab::Diagnostics
+                     ? diagnostics_list_
+                     : saves_list_;
+    list.scroll_to(list.scroll_offset -
+                   event.wheel_y * 60.f * layout.scale);
+    command.captured = true;
+    return command;
+  }
   if ((event.type == InputEventType::LeftPressed ||
        event.type == InputEventType::RightPressed ||
        event.type == InputEventType::LeftReleased ||
@@ -259,29 +271,32 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
            layout.small_font_pixels, rect.width - 20.f * scale);
     }
   } else if (active_tab_ == DeveloperToolsTab::Diagnostics) {
-    const auto row_height = 20.f * scale;
+    diagnostics_list_.row_count = view.diagnostics.size();
+    diagnostics_list_.row_height = 20.f * scale;
+    diagnostics_list_.viewport_height = layout.content.height;
+    const auto range = diagnostics_list_.visible_range();
     auto cursor = layout.content.y;
-    for (const auto &row : view.diagnostics) {
-      if (cursor + row_height >
-          layout.content.y + layout.content.height)
-        break;
+    for (std::size_t i = range.first; i < range.last; ++i) {
+      const auto &row = view.diagnostics[i];
       const bool section = row.starts_with("--");
       text(out, {layout.content.x, cursor}, row,
            section ? gold_color : muted_color,
            section ? layout.body_font_pixels : layout.small_font_pixels);
-      cursor += section ? row_height + 4.f * scale : row_height;
+      cursor += diagnostics_list_.row_height;
     }
     if (view.diagnostics.empty())
       text(out, {layout.content.x, cursor}, tr("DEVTOOLS_EMPTY_DIAGNOSTICS"),
            muted_color, layout.small_font_pixels);
   } else {
-    const auto row_height = 34.f * scale;
+    saves_list_.row_count = view.save_slots.size();
+    saves_list_.row_height = 34.f * scale;
+    saves_list_.viewport_height = layout.content.height;
+    const auto range = saves_list_.visible_range();
     auto cursor = layout.content.y;
-    for (const auto &slot : view.save_slots) {
-      if (cursor + row_height > layout.content.y + layout.content.height)
-        break;
+    for (std::size_t i = range.first; i < range.last; ++i) {
+      const auto &slot = view.save_slots[i];
       const UiRect rect{layout.content.x, cursor, layout.content.width,
-                        row_height - 4.f * scale};
+                        saves_list_.row_height - 4.f * scale};
       fill(out, rect, tile_color);
       stroke(out, rect, border_color);
       text(out, {rect.x + 8.f * scale, rect.y + 4.f * scale}, slot.label,
@@ -291,7 +306,7 @@ void NativeDeveloperToolsPanel::render(DrawList &out,
             rect.y + 4.f * scale + layout.small_font_pixels + 2.f},
            slot.detail, muted_color, layout.small_font_pixels,
            rect.width - 16.f * scale);
-      cursor += row_height;
+      cursor += saves_list_.row_height;
     }
     if (view.save_slots.empty())
       text(out, {layout.content.x, cursor}, tr("DEVTOOLS_EMPTY_SAVES"),

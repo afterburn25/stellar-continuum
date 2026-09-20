@@ -160,6 +160,51 @@ void verify_localization_override() {
           "A rejected locale document corrupted the loaded strings.");
 }
 
+void verify_virtualized_scroll() {
+  constexpr int width = 1280, height = 720;
+  NativeDeveloperToolsPanel panel;
+  panel.open();
+  const auto layout = developer_tools_layout_for(width, height);
+
+  // Switch to Diagnostics and fill it with more rows than the viewport holds.
+  (void)panel.handle(tap(center(layout.tabs[1])), width, height);
+  NativeDeveloperToolsView view;
+  view.developer = true;
+  for (int i = 0; i < 40; ++i)
+    view.diagnostics.push_back("row " + std::to_string(i));
+
+  const auto rendered_texts = [&] {
+    DrawList out;
+    panel.render(out, view, width, height, nullptr);
+    std::vector<std::string> texts;
+    for (const auto &primitive : out.overlay)
+      if (const auto *text = std::get_if<Text>(&primitive))
+        texts.push_back(text->value);
+    return texts;
+  };
+  const auto has = [](const std::vector<std::string> &texts,
+                      std::string_view needle) {
+    return std::ranges::find(texts, needle) != texts.end();
+  };
+
+  require(has(rendered_texts(), "row 0"),
+          "The first diagnostics row was not rendered.");
+  require(!has(rendered_texts(), "row 39"),
+          "An off-screen diagnostics row was rendered before scrolling.");
+
+  // Wheel down inside the content region scrolls the virtual window.
+  InputEvent wheel{InputEventType::Wheel,
+                   {layout.content.x + 10.f, layout.content.y + 10.f},
+                   {},
+                   -8.f};
+  const auto command = panel.handle(wheel, width, height);
+  require(command.captured, "The wheel scroll was not captured.");
+  require(has(rendered_texts(), "row 39"),
+          "Scrolling did not reveal the last diagnostics row.");
+  require(!has(rendered_texts(), "row 0"),
+          "The first row remained visible after scrolling past it.");
+}
+
 }  // namespace
 
 int main() {
@@ -168,6 +213,7 @@ int main() {
     verify_tab_switching();
     verify_render_all_tabs();
     verify_localization_override();
+    verify_virtualized_scroll();
     std::cout << "Developer tools panel tabs passed\n";
     return 0;
   } catch (const std::exception &error) {

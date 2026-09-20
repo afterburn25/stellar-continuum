@@ -9,6 +9,7 @@
 #include <stellar/core/developer_commands.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <array>
 #include <string>
@@ -100,6 +101,8 @@ class NativeDeveloperToolsPanel final {
   }
 
   engine::LocalizationService localization_;
+  // Scroll windows for the Diagnostics and Saves tabs (req 24 adoption).
+  mutable engine::VirtualizedList diagnostics_list_, saves_list_;
   bool visible_{};
   DeveloperToolsTab active_tab_{DeveloperToolsTab::Commands};
 };
