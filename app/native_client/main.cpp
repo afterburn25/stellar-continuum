@@ -61,6 +61,7 @@
 #include <stellar/core/save_preview.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/crash_reporter.hpp>
+#include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/save_history.hpp>
@@ -526,7 +527,37 @@ class NativeCampaign final {
     refresh_knowledge();
     fit_camera(width,height);
     bind_galaxy_backdrop(width,height);
+    configure_input_actions();
     refresh_fleets(true);
+  }
+
+  // Reference Main.cs keyboard shortcuts, expressed as a data-driven GALAXY
+  // input context (engine InputActions): Space pauses, 1-5 select strategic
+  // speeds (5 is the Developer-only Demo rate), T/R/C/B cycle and start the
+  // research/construction candidates, N starts a new campaign, F6 saves and
+  // F8 exports a support bundle.
+  void configure_input_actions(){
+    static constexpr std::string_view kGalaxyContext=R"json({
+      "contexts":[{"name":"GALAXY","exclusive":false,"actions":[
+        {"name":"toggle_pause","type":"Button","bindings":[{"kind":"KeyPress","code":32}]},
+        {"name":"speed_normal","type":"Button","bindings":[{"kind":"KeyPress","code":49}]},
+        {"name":"speed_fast","type":"Button","bindings":[{"kind":"KeyPress","code":50}]},
+        {"name":"speed_very_fast","type":"Button","bindings":[{"kind":"KeyPress","code":51}]},
+        {"name":"speed_maximum","type":"Button","bindings":[{"kind":"KeyPress","code":52}]},
+        {"name":"speed_demo","type":"Button","bindings":[{"kind":"KeyPress","code":53}]},
+        {"name":"cycle_research","type":"Button","bindings":[{"kind":"KeyPress","code":116},{"kind":"KeyPress","code":84}]},
+        {"name":"start_research","type":"Button","bindings":[{"kind":"KeyPress","code":114},{"kind":"KeyPress","code":82}]},
+        {"name":"cycle_construction","type":"Button","bindings":[{"kind":"KeyPress","code":99},{"kind":"KeyPress","code":67}]},
+        {"name":"start_construction","type":"Button","bindings":[{"kind":"KeyPress","code":98},{"kind":"KeyPress","code":66}]},
+        {"name":"new_campaign","type":"Button","bindings":[{"kind":"KeyPress","code":110},{"kind":"KeyPress","code":78}]},
+        {"name":"quicksave","type":"Button","bindings":[{"kind":"KeyPress","code":1073741887}]},
+        {"name":"support_bundle","type":"Button","bindings":[{"kind":"KeyPress","code":1073741889}]}
+      ]}]}
+    )json";
+    std::string error;
+    if(input_mapper_.load_contexts(kGalaxyContext,&error))
+      input_mapper_.push_context("GALAXY");
+    else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
   }
 
   // Loads the reviewed voice catalogue from Data/voice_profiles, binds the
@@ -604,6 +635,13 @@ class NativeCampaign final {
     if(session_->frame().clock().speed()==StrategicSpeed::Paused)click_pause();
     click_pause();
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke did not pause through player input.");
+    // Keyboard parity: Space routes through the GALAXY input context and
+    // resumes the paused clock, then pauses it again for the scene capture.
+    const auto press_space=[&]{InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.events={{InputEventType::KeyPressed,{},{},0.f,{},0,' '}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke key input closed the campaign.");};
+    press_space();
+    if(session_->frame().clock().speed()==StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke Space action did not resume the clock.");
+    press_space();
+    if(session_->frame().clock().speed()!=StrategicSpeed::Paused)throw std::runtime_error("Galaxy artwork smoke Space action did not pause the clock.");
     smoke_galaxy_paused_=true;fit_camera(width,height);smoke_galaxy_fitted_scale_=camera_.pixels_per_world;
   }
   [[nodiscard]] GalaxyArtSceneEvidence galaxy_scene_evidence(int width,int height){
@@ -2413,6 +2451,7 @@ class NativeCampaign final {
       if(battle_workspace_.visible()){battle_refresh_elapsed_+=elapsed;if(battle_refresh_elapsed_>=.1){const auto passed=battle_refresh_elapsed_;battle_refresh_elapsed_=0.;battle_workspace_.set_snapshot(session_->frame().tactical_snapshot(),passed);battle_workspace_.set_tactical_speed(session_->frame().tactical_clock().speed_multiplier(),session_->frame().tactical_resume_speed());}}
     }
     const auto layout=NativeUiLayout::for_viewport(width,height,session_->developer_mode());
+    input_mapper_.begin_frame();
     for(const auto &event:input.events){
       if(battle_workspace_.visible()&&!menu_){
         const auto command=battle_workspace_.handle(event,width,height);
@@ -2643,34 +2682,39 @@ class NativeCampaign final {
         else toggle_menu();
         continue;
       }
-      // Reference keyboard shortcuts (Main.cs): Space pauses, 1-4 select a
-      // strategic speed, F6 saves. Suppressed while the menu, surface view, or
-      // diplomacy blocks gameplay input, or a text field owns the keyboard.
+      // Reference keyboard shortcuts (Main.cs): resolved through the GALAXY
+      // input context. Suppressed while the menu, surface view, or diplomacy
+      // blocks gameplay input, or a text field owns the keyboard.
       if(event.type==InputEventType::KeyPressed&&!menu_&&
          !surface_workspace_.visible()&&!diplomacy_workspace_.visible()&&
          !wants_text_input()){
         auto &clock=session_->frame().clock();
-        bool handled=true;
-        switch(event.key){
-          case ' ':
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        raw.code=event.key;
+        const auto fired=[this](std::string_view name){
+          return input_mapper_.just_pressed(name);};
+        bool handled=input_mapper_.feed(raw);
+        if(handled){
+          if(fired("toggle_pause")){
             if(clock.speed()==StrategicSpeed::Paused)clock.resume();
             else clock.set_speed(StrategicSpeed::Paused);
-            break;
-          case '1':clock.set_speed(StrategicSpeed::Normal);break;
-          case '2':clock.set_speed(StrategicSpeed::Fast);break;
-          case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
-          case '4':clock.set_speed(StrategicSpeed::Maximum);break;
+          }
+          else if(fired("speed_normal"))clock.set_speed(StrategicSpeed::Normal);
+          else if(fired("speed_fast"))clock.set_speed(StrategicSpeed::Fast);
+          else if(fired("speed_very_fast"))clock.set_speed(StrategicSpeed::VeryFast);
+          else if(fired("speed_maximum"))clock.set_speed(StrategicSpeed::Maximum);
           // Reference UiResumeAtSpeed: the Demo rate is Developer-only;
           // Player mode coerces the request to Normal.
-          case '5':clock.set_speed(session_->developer_mode()?StrategicSpeed::Demo:StrategicSpeed::Normal);break;
-          case 't':case 'T':cycle_research_candidate();break;
-          case 'r':case 'R':start_research_candidate();break;
-          case 'c':case 'C':cycle_construction_candidate();break;
-          case 'b':case 'B':start_construction_candidate();break;
-          case 'n':case 'N':request_new_game();break;
-          case 0x4000003fu:session_->request_save();break; // SDLK_F6
-          case 0x40000041u:export_support_bundle();break; // SDLK_F8
-          default:handled=false;break;
+          else if(fired("speed_demo"))clock.set_speed(session_->developer_mode()?StrategicSpeed::Demo:StrategicSpeed::Normal);
+          else if(fired("cycle_research"))cycle_research_candidate();
+          else if(fired("start_research"))start_research_candidate();
+          else if(fired("cycle_construction"))cycle_construction_candidate();
+          else if(fired("start_construction"))start_construction_candidate();
+          else if(fired("new_campaign"))request_new_game();
+          else if(fired("quicksave"))session_->request_save();
+          else if(fired("support_bundle"))export_support_bundle();
+          else handled=false;
         }
         if(handled)continue;
       }
@@ -4131,6 +4175,7 @@ class NativeCampaign final {
   std::optional<std::int64_t> new_developer_seed_{};
   native_development::NativeDevelopmentMenu development_menu_;
   native_developer::NativeDeveloperToolsPanel developer_tools_;
+  stellar::engine::InputMapper input_mapper_;
   std::string developer_result_{};bool developer_result_accepted_{};
   std::filesystem::path player_save_path_{};
   UiAction hovered_action_{UiAction::None};
