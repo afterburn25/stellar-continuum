@@ -200,7 +200,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
     throw std::invalid_argument("A native campaign save path is required.");
   }
   validate_dependencies(dependencies);
-  const bool recovered = loaded.origin == PlayerCampaignLoadOrigin::Backup;
+  const bool recovered = loaded.origin != PlayerCampaignLoadOrigin::Primary;
   const auto day = loaded.campaign.simulation_days();
   if (!std::isfinite(day) || day < 0.) {
     throw std::runtime_error("Loaded campaign has an invalid simulation day.");
@@ -221,10 +221,13 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
   auto session = std::unique_ptr<NativeCampaignSession>(new NativeCampaignSession(
       std::move(live), std::move(research_root), std::move(save_path),
       std::move(game_version), std::move(dependencies)));
+  const auto recovered_message =
+      loaded.origin == PlayerCampaignLoadOrigin::History
+          ? "Recovered campaign from an older autosave"
+          : "Recovered campaign from backup";
   session->notice_ = {recovered ? SessionNoticeKind::Recovered
                                 : SessionNoticeKind::Loaded,
-                      recovered ? "Recovered campaign from backup"
-                                : "Loaded campaign",
+                      recovered ? recovered_message : "Loaded campaign",
                       1.};
   return session;
 }
@@ -598,7 +601,7 @@ std::unique_ptr<NativeCampaignSession::Live> NativeCampaignSession::activate(
   clock.set_speed(StrategicSpeed::Paused);
   auto candidate = std::make_unique<Live>(
       std::move(loaded.campaign).activate(), std::move(clock), save_path_, revision,
-      loaded.origin == PlayerCampaignLoadOrigin::Backup,
+      loaded.origin != PlayerCampaignLoadOrigin::Primary,
       dependencies_.save_writer, cache_generation);
   if (candidate->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");
@@ -622,7 +625,7 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
         std::future_status::ready) {
       try {
         auto loaded = pending_load_->result.get();
-        const bool recovered = loaded.origin == PlayerCampaignLoadOrigin::Backup;
+        const bool recovered = loaded.origin != PlayerCampaignLoadOrigin::Primary;
         auto candidate = activate(std::move(loaded), menu_open,
                                   live_->saves.revision() + 1,
                                   live_->cache.generation + 1);
@@ -630,10 +633,13 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
         manual_capture_ready_ = false;
         notifications_.clear();
         seed_notification_history();
+        const auto recovered_message =
+            loaded.origin == PlayerCampaignLoadOrigin::History
+                ? "Recovered campaign from an older autosave"
+                : "Recovered campaign from backup";
         notice_ = {recovered ? SessionNoticeKind::Recovered
                              : SessionNoticeKind::Loaded,
-                   recovered ? "Recovered campaign from backup"
-                             : "Loaded campaign",
+                   recovered ? recovered_message : "Loaded campaign",
                    1.};
         replaced = true;
       } catch (...) {

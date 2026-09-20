@@ -17,7 +17,10 @@ namespace stellar::engine {
 // loader can fall back to the .bak copy.
 
 std::uint64_t save_digest(std::span<const std::byte> bytes) noexcept;
-std::string integrity_sidecar_path(const std::filesystem::path &save_path);
+// Returns a path (not string) so save directories with non-ANSI characters
+// keep their wide name — narrow conversion would throw or mangle them.
+std::filesystem::path
+integrity_sidecar_path(const std::filesystem::path &save_path);
 
 // Atomically writes the sidecar for `bytes`. Returns false on IO failure —
 // a missing sidecar is acceptable by design, so callers log rather than

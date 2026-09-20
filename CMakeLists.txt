@@ -26,7 +26,7 @@ if(NOT STELLAR_SOURCE_COMMIT)
   set(STELLAR_SOURCE_COMMIT "unknown")
 endif()
 configure_file(app/build_version.hpp.in generated/stellar/build_version.hpp @ONLY)
-add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp)
+add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/save_history.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp)
 target_include_directories(stellar_engine PUBLIC engine/include)
 target_link_libraries(stellar_engine PUBLIC Threads::Threads)
 if(WIN32)
@@ -116,6 +116,7 @@ add_library(stellar_core STATIC core/src/interstellar_distance.cpp core/src/lega
   core/src/player_campaign_json.cpp
   core/src/player_campaign_recovery.cpp
   core/src/player_campaign_save.cpp
+  core/src/save_preview.cpp
   core/src/legacy_campaign_recovery.cpp)
 target_include_directories(stellar_core PUBLIC core/include)
 target_link_libraries(stellar_core PUBLIC stellar_engine PRIVATE stellar_json)
@@ -465,6 +466,9 @@ if(BUILD_TESTING)
   add_executable(stellar_save_integrity_tests native-tests/save_integrity_tests.cpp)
   target_link_libraries(stellar_save_integrity_tests PRIVATE stellar_engine)
   add_test(NAME save_integrity COMMAND stellar_save_integrity_tests)
+  add_executable(stellar_save_history_tests native-tests/save_history_tests.cpp)
+  target_link_libraries(stellar_save_history_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME save_history COMMAND stellar_save_history_tests)
   add_executable(stellar_batcher_ui_tests native-tests/batcher_ui_tests.cpp)
   target_link_libraries(stellar_batcher_ui_tests PRIVATE stellar_engine)
   add_test(NAME batcher_ui COMMAND stellar_batcher_ui_tests)

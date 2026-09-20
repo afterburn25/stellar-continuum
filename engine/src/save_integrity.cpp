@@ -16,10 +16,11 @@ std::uint64_t save_digest(std::span<const std::byte> bytes) noexcept {
   return hash;
 }
 
-std::string integrity_sidecar_path(const std::filesystem::path &save_path) {
+std::filesystem::path
+integrity_sidecar_path(const std::filesystem::path &save_path) {
   auto copy = save_path;
   copy += ".integrity";
-  return copy.string();
+  return copy;
 }
 
 bool write_integrity_sidecar(const std::filesystem::path &save_path,

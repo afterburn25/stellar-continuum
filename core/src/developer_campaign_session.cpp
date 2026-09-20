@@ -1,6 +1,10 @@
 #include <stellar/core/developer_campaign_session.hpp>
 
+#include <stellar/engine/save_history.hpp>
+#include <stellar/engine/save_integrity.hpp>
+
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -62,12 +66,21 @@ using DeveloperLoader = std::function<RestoredPlayerCampaignV17(
     std::vector<PlayerCampaignLoadAttempt> &failures,
     const LoadProgress &progress) {
   const auto kind = importing_legacy ? "legacy demo" : "Developer";
+  const auto slot_label = [&](const bool capitalized) {
+    const auto noun = origin == PlayerCampaignLoadOrigin::History
+                          ? "history " + std::string(kind) + " save"
+                          : "backup " + std::string(kind) + " save";
+    return capitalized ? std::string(1, static_cast<char>(
+                                           std::toupper(noun.front()))) +
+                             noun.substr(1)
+                       : noun;
+  };
   if (!is_regular(candidate)) {
     failures.push_back(
         {origin, candidate, PlayerCampaignLoadAttemptKind::Missing,
          origin == PlayerCampaignLoadOrigin::Primary
              ? "Primary " + std::string(kind) + " save was missing."
-             : "No backup " + std::string(kind) + " save was available.",
+             : "No " + slot_label(false) + " was available.",
          {}});
     return std::nullopt;
   }
@@ -105,7 +118,7 @@ using DeveloperLoader = std::function<RestoredPlayerCampaignV17(
         {origin, candidate, PlayerCampaignLoadAttemptKind::Failed,
          (origin == PlayerCampaignLoadOrigin::Primary
               ? "Primary " + std::string(kind) + " save failed:\n"
-              : "Backup " + std::string(kind) + " save also failed:\n") +
+              : slot_label(true) + " also failed:\n") +
              failure.what(),
          std::current_exception()});
     return std::nullopt;
@@ -114,7 +127,7 @@ using DeveloperLoader = std::function<RestoredPlayerCampaignV17(
         {origin, candidate, PlayerCampaignLoadAttemptKind::Failed,
          (origin == PlayerCampaignLoadOrigin::Primary
               ? "Primary " + std::string(kind) + " save failed:\n"
-              : "Backup " + std::string(kind) + " save also failed:\n") +
+              : slot_label(true) + " also failed:\n") +
              std::string("Unknown native exception."),
          std::current_exception()});
     return std::nullopt;
@@ -133,11 +146,27 @@ using DeveloperLoader = std::function<RestoredPlayerCampaignV17(
                            : DeveloperCampaignSource::LoadedSave,
           importing_legacy, loader, failures, progress))
     return loaded;
-  return attempt_load(
-      backup, requested, PlayerCampaignLoadOrigin::Backup,
-      importing_legacy ? DeveloperCampaignSource::ImportedLegacyDemoBackup
-                       : DeveloperCampaignSource::RecoveredFromBackup,
-      importing_legacy, loader, failures, progress);
+  if (auto loaded = attempt_load(
+          backup, requested, PlayerCampaignLoadOrigin::Backup,
+          importing_legacy ? DeveloperCampaignSource::ImportedLegacyDemoBackup
+                           : DeveloperCampaignSource::RecoveredFromBackup,
+          importing_legacy, loader, failures, progress))
+    return loaded;
+  // Rolling history slots (.bak.2 .. .bak.N) — only existing slots attempt.
+  for (std::size_t slot = 2;
+       slot <= stellar::engine::k_default_save_history_depth; ++slot) {
+    const auto history =
+        stellar::engine::history_slot_path(primary, slot);
+    if (!is_regular(history)) continue;
+    if (auto loaded = attempt_load(
+            history, requested, PlayerCampaignLoadOrigin::History,
+            importing_legacy
+                ? DeveloperCampaignSource::ImportedLegacyDemoBackup
+                : DeveloperCampaignSource::RecoveredFromBackup,
+            importing_legacy, loader, failures, progress))
+      return loaded;
+  }
+  return std::nullopt;
 }
 
 [[nodiscard]] DeveloperLoader developer_loader(
@@ -212,7 +241,8 @@ DeveloperCampaignBootstrap load_existing_developer_campaign(
 
   std::vector<PlayerCampaignLoadAttempt> failures;
   const auto backup = backup_of(save_path);
-  if (is_regular(save_path) || is_regular(backup))
+  if (is_regular(save_path) || is_regular(backup) ||
+      stellar::engine::has_save_history(save_path))
     if (auto loaded =
             load_pair(save_path, save_path, false,
                       developer_loader(make_runtime), failures, progress))
@@ -220,7 +250,8 @@ DeveloperCampaignBootstrap load_existing_developer_campaign(
 
   const auto legacy = save_path.parent_path() /
                       std::string(legacy_demo_save_file_name);
-  if (is_regular(legacy) || is_regular(backup_of(legacy)))
+  if (is_regular(legacy) || is_regular(backup_of(legacy)) ||
+      stellar::engine::has_save_history(legacy))
     if (auto loaded =
             load_pair(legacy, save_path, true, legacy_loader(make_runtime),
                       failures, progress))
@@ -244,7 +275,8 @@ DeveloperCampaignBootstrap load_or_create_developer_campaign(
 
   std::vector<PlayerCampaignLoadAttempt> failures;
   const auto backup = backup_of(save_path);
-  if (is_regular(save_path) || is_regular(backup)) {
+  if (is_regular(save_path) || is_regular(backup) ||
+      stellar::engine::has_save_history(save_path)) {
     if (auto loaded =
             load_pair(save_path, save_path, false,
                       developer_loader(make_runtime), failures, progress))
@@ -255,7 +287,8 @@ DeveloperCampaignBootstrap load_or_create_developer_campaign(
 
   const auto legacy = save_path.parent_path() /
                       std::string(legacy_demo_save_file_name);
-  if (is_regular(legacy) || is_regular(backup_of(legacy))) {
+  if (is_regular(legacy) || is_regular(backup_of(legacy)) ||
+      stellar::engine::has_save_history(legacy)) {
     if (auto loaded =
             load_pair(legacy, save_path, true, legacy_loader(make_runtime),
                       failures, progress))

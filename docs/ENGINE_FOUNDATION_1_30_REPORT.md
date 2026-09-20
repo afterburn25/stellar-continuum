@@ -115,6 +115,15 @@ parity tests, artwork, audio, and observer-secrecy behavior are unchanged.
   (`fnv1a64:<hex>`) atomically alongside canonical bytes, including `.bak`
   copies. Loads verify when present and fall back to the backup on
   mismatch. Pre-expansion saves without sidecars load unchanged.
+- **Rolling save history** (`save_history.hpp`, both writers and both
+  recovery paths): before each atomic write that produces a fresh `.bak`,
+  the chain rotates `.bak`→`.bak.2`→`.bak.3`→`.bak.4` with sidecars
+  moving alongside; preserved-backup writes skip rotation. Loads probe
+  deeper slots only when present, reporting `History` origin.
+- **Save preview reader** (`save_preview.*`): top-level metadata
+  (`FormatVersion`, `GalaxyFormatVersion`, `GameVersion`, `SavedAtUtc`,
+  `SimulationDays`, developer flag, size, integrity status) without
+  building a campaign runtime — for save-slot UIs.
 - **Crash capture in the client** (`crash_reporter.hpp`,
   `app/native_client/main.cpp`): an unhandled-exception filter writes a
   minidump plus context/event-log bundle beside the save directory at
@@ -178,8 +187,9 @@ existing saves), verifies when present, and preserves `.bak` fallback.
   SDK credentials.
 - Requirement 30's tabbed inspector host is follow-on work; the existing
   developer tools panel is untouched.
-- Requirement 16 still lacks rolling multi-slots and a metadata preview
-  reader; integrity sidecars are the delivered piece.
+- Requirement 16 now includes rolling history slots (`.bak.2`–`.bak.4`)
+  and a metadata preview reader; a named multi-slot *UI* (choose-which-
+  autosave) remains follow-on.
 - Engine systems are not yet broadly adopted by gameplay code — `World`,
   `EventBus`, `SimulationScheduler`, `InputMapper`, `LocalizationService`,
   `MissionGraph`, `ResourceEconomy`, `VfxSystem`, and the view models are

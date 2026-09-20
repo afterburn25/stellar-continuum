@@ -2,6 +2,7 @@
 
 #include <stellar/core/developer_campaign_json.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
+#include <stellar/engine/save_history.hpp>
 #include <stellar/engine/save_integrity.hpp>
 
 #include <algorithm>
@@ -37,14 +38,12 @@ void write_prepared_developer_campaign(
   const auto json =
       encode_developer_campaign_json(prepared.payload(), prepared.tools_used());
   const auto bytes = std::as_bytes(std::span(json.data(), json.size()));
+  if (!preserve_existing_backup)
+    stellar::engine::rotate_save_history(path);
   stellar::engine::write_file_atomically(path, bytes,
                                          {preserve_existing_backup});
   stellar::engine::write_integrity_sidecar(path, bytes);
-  auto backup = path;
-  backup += ".bak";
-  std::error_code ec;
-  if (std::filesystem::is_regular_file(backup, ec))
-    stellar::engine::write_integrity_sidecar_for_file(backup);
+  stellar::engine::write_history_sidecars(path);
 }
 
 } // namespace stellar::core
