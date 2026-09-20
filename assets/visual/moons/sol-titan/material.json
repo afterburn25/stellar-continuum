@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.3089370627708,
+      1030.796399201544,
+      840.063246748557
+    ],
+    "id": "sol-titan",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.19769088593113204,
+      0.7
+    ],
+    "seamError": 0.004685923088759069,
+    "usable": true
+  },
+  "id": "sol-titan",
+  "name": "Titan",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": true,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "a9322d1ce47180ef27726497cfc7f52dfaa0642de967846c0d6da4b29627e817",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Titan.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

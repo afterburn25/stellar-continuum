@@ -138,6 +138,7 @@ struct RestoredPlayerCampaignV17::Storage {
   double simulation_days{};
   std::string game_version;
   std::string saved_at_utc;
+  std::optional<CampaignRuntimeContinuation> continuation;
 
   Storage(AdaptiveResearchStrategicRuntime runtime,
           RestoredGalaxyPayloadV16 restored,
@@ -201,6 +202,10 @@ std::string_view RestoredPlayerCampaignV17::saved_at_utc() const noexcept {
   return storage_->saved_at_utc;
 }
 
+void RestoredPlayerCampaignV17::set_runtime_continuation(CampaignRuntimeContinuation state){
+  validate_campaign_runtime_continuation(state,storage_->galaxy,storage_->simulation_days);
+  storage_->continuation=std::move(state);
+}
 IntegratedAdaptiveCampaignRuntime RestoredPlayerCampaignV17::activate() && {
   auto owned = std::move(storage_);
   const auto research_snapshot =
@@ -209,9 +214,11 @@ IntegratedAdaptiveCampaignRuntime RestoredPlayerCampaignV17::activate() && {
   owned->research.reset();
   DiplomacyState diplomacy = std::move(*owned->diplomacy);
   owned->diplomacy.reset();
-  return IntegratedAdaptiveCampaignRuntime::restore_research(
+  auto runtime=IntegratedAdaptiveCampaignRuntime::restore_research(
       std::move(owned->research_runtime), std::move(owned->galaxy),
       research_snapshot, std::move(diplomacy), owned->simulation_days);
+  if(owned->continuation)runtime.restore_continuation(*owned->continuation,owned->simulation_days);
+  return runtime;
 }
 
 RestoredPlayerCampaignV17 detail::finalize_restored_player_campaign_v17(

@@ -66,7 +66,14 @@ public:
                           ResearchProjectRuntimeState project);
   static bool remove_project(AdaptiveResearchCivilizationState &state,
                              std::string_view node_id);
+  static void set_cancelled_project(AdaptiveResearchCivilizationState &state,
+                                    ResearchProjectRuntimeState project);
+  static bool remove_cancelled_project(AdaptiveResearchCivilizationState &state,
+                                       std::string_view node_id);
   static void mark_view_dirty(AdaptiveResearchCivilizationState &state);
+  // Companion campaign state (such as planning) participates in stale-command
+  // detection without manufacturing a change to a scientific node/project.
+  static void mark_state_changed(AdaptiveResearchCivilizationState &state);
 };
 
 } // namespace stellar::core::detail

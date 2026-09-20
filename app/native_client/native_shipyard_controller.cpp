@@ -71,6 +71,8 @@ void append(std::ostringstream &out, std::string_view value) {
   view.campaign_generation = generation;
   view.player_civilization_id = player->id;
   view.home_system_id = player->home_system_id;
+  const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
+  view.yard_name=(home==world.systems.end()?std::string("Home"):home->name)+" Orbital Shipyard";
   view.orbital_shipyard_complete = std::ranges::contains(
       construction->completed_project_ids, std::string("orbital_shipyard"));
   view.currency = sovereign_currency_for_civilization(world.civilizations,
@@ -120,6 +122,11 @@ void append(std::ostringstream &out, std::string_view value) {
          .population_species_id = readiness.population_species_id,
          .population_source_current_millions =
              readiness.population_source_current_millions});
+    auto& projected=view.available_designs.back();
+    const auto& combat=get_combat_profile(design.combat_profile_id.value_or(std::string(default_combat_profile_id(design.role))));
+    projected.hull=combat.max_hull;projected.armor=combat.max_armor;projected.shields=combat.max_shields;projected.weapon_damage=combat.weapon_damage;projected.weapon_interval_days=combat.weapon_interval_days;
+    projected.cargo_capacity=design.cargo_material_capacity;projected.crew=design.crew_complement_individuals;
+    projected.batch_quotes=assess_ship_build_batches(read,player->id,design.id);
   }
 
   auto add_order = [&](std::string order_id, std::string design_id,
@@ -291,7 +298,7 @@ NativeShipyardView NativeShipyardController::build(
 NativeShipyardCommandOutcome NativeShipyardController::start(
     CampaignFrame &frame, const std::uint64_t campaign_generation,
     const std::uint64_t expected_shipyard_revision,
-    const std::string_view design_id) {
+    const std::string_view design_id,int quantity) {
   require_owner();
   if (!valid_bound_command(campaign_generation, expected_shipyard_revision,
                            generation_, revision_, projected_view_))
@@ -331,8 +338,8 @@ NativeShipyardCommandOutcome NativeShipyardController::start(
       world.shipyards,     world.colonies, world.economies,
       world.fleets,        {},             {},
       query,               {}};
-  const auto result = start_ship_build(
-      command, current.view.player_civilization_id, design_id);
+  const auto result = start_ship_build_batch(
+      command, current.view.player_civilization_id, design_id,quantity);
   if (result.accepted) {
     signature_.reset();
     projected_player_species_id_.reset();
@@ -384,4 +391,15 @@ NativeShipyardCommandOutcome NativeShipyardController::cancel(
   return {result.accepted, result.message, result.refunded_credits};
 }
 
+NativeShipyardCommandOutcome NativeShipyardController::reorder(CampaignFrame& frame,std::uint64_t generation,std::uint64_t revision,std::string_view id,int direction){
+  require_owner();if(!valid_bound_command(generation,revision,generation_,revision_,projected_view_))return {false,"The queue changed; review it again."};
+  const auto current=project(frame,generation);
+  if(current.view.player_civilization_id!=projected_view_->player_civilization_id||current.view.home_system_id!=projected_view_->home_system_id||
+      !std::ranges::equal(current.view.orders,projected_view_->orders,{},&NativeShipyardOrder::order_id,&NativeShipyardOrder::order_id))return {false,"The queue changed; review it again."};
+  auto& world=frame.runtime().world().campaign();
+  ShipbuildingWorld command{world.civilizations,world.systems,world.construction,world.shipyards,world.colonies,world.economies,world.fleets,{},{},{},{}};
+  const auto result=move_queued_ship_build(command,current.view.player_civilization_id,id,direction);
+  if(result.accepted){signature_.reset();projected_view_.reset();projected_player_species_id_.reset();}
+  return {result.accepted,result.message};
+}
 } // namespace stellar::native_shipyard

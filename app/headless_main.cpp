@@ -1,4 +1,5 @@
 #include "galaxy_main.hpp"
+#include "developer_qa_host.hpp"
 #include "stellar/build_version.hpp"
 #include "stellar/core/interstellar_distance.hpp"
 #include "stellar/engine/foundation.hpp"
@@ -79,10 +80,12 @@ void save(const Scenario &s, const std::filesystem::path &path) {
 }
 int run(int argc, char **argv) {
   bool catalog_mode = false;
+  bool developer_qa=false;
   // Inspect option names only: file paths and other values may themselves begin
   // with '--'. Global help/version also apply to the campaign commands.
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
+    if(arg=="--developer-qa")developer_qa=true;
     if (arg == "--help") {
       std::cout
           << "Stellar Engine native commands:\n  --headless [--systems N] "
@@ -118,11 +121,13 @@ int run(int argc, char **argv) {
         arg == "--repeat" || arg == "--asset-root" ||
         arg == "--catalog-output" || arg == "--civilizations" ||
         arg == "--ancients" || arg == "--player-species" ||
-        arg == "--step-days") {
+        arg == "--step-days" || arg=="--output" || arg=="--years" ||
+        arg=="--speed" || arg=="--checkpoint-days" || arg=="--log-level") {
       require(i + 1 < argc, "Missing option value");
       ++i;
     }
   }
+  if(developer_qa)return run_developer_qa(argc,argv);
   if (catalog_mode)
     return run_galaxy_catalog(argc, argv);
   Scenario scenario;

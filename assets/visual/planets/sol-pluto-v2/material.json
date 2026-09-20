@@ -1,0 +1,44 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0002532005310058594,
+    "disc": [
+      1024.2219887181568,
+      1050.4470243137412,
+      832.3355743484797
+    ],
+    "id": "sol-pluto-v2",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.18593106582194655,
+      0.2812359144682947,
+      0.5950126045836713
+    ],
+    "seamError": 0.008681350747488138,
+    "usable": true
+  },
+  "filename": "afterburn25._photorealistic_Pluto_dwarf_planet_scientifically_1f187f5c-c043-4903-b65e-b68d5a9332af_3.png",
+  "id": "sol-pluto-v2",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "5a48815fab8721ba141ef7e4ae9cdb2617832c79c1a0a18ef0fe0a18cef0662b",
+  "source": "C:/Users/after/Downloads/afterburn25._photorealistic_Pluto_dwarf_planet_scientifically_1f187f5c-c043-4903-b65e-b68d5a9332af_3.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography.",
+  "visualAudit": {
+    "inspected": true,
+    "lighting": "mild broad gradient; cleanable",
+    "orientation": "upright supplied image",
+    "reason": "User-selected Pluto replacement"
+  }
+}

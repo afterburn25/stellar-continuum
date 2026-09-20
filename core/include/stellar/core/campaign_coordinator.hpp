@@ -13,6 +13,8 @@
 #include <stellar/core/legacy_research.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/strategic_runtime.hpp>
+#include <stellar/engine/phase_timing.hpp>
+#include <array>
 
 #include <cstddef>
 #include <functional>
@@ -123,13 +125,19 @@ struct SourceCompatibleCampaignConfiguration {
 // injection without turning coordinator phases into replaceable callbacks.
 struct CampaignSubsystemRuntime {
   LegacyResearchSimulation research{};
-  ExplorationSimulation exploration{ExplorationReachAssessment{}};
+  ExplorationSimulation exploration{ExplorationReachAssessment{},MissionFuelPolicy::RetainReturnToService};
   FreightSimulation freight{FreightReachAssessor{}};
   ColonizationSimulation colonization{SettlementReachAssessment{}};
 };
 
 class GalaxySimulationStepCoordinator {
 public:
+  inline static constexpr std::array<std::string_view,12> phase_names{
+    "economy","strategic_ai","automatic_orders","industry_allocation","construction","shipbuilding",
+    "legacy_research","exploration","freight","combat","colonization","economy_storage"};
+  void set_profiling_enabled(bool enabled) noexcept {profiling_enabled_=enabled;}
+  void reset_performance_counters() noexcept {performance_={};}
+  [[nodiscard]] const auto &performance_counters()const noexcept {return performance_;}
   explicit GalaxySimulationStepCoordinator(
       SourceCompatibleCampaignConfiguration configuration = {});
   GalaxySimulationStepCoordinator(
@@ -229,6 +237,8 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
 
 private:
+  bool profiling_enabled_{};
+  std::array<stellar::engine::PerformanceCounter,phase_names.size()> performance_{};
   bool advance_legacy_research_{};
   bool use_strategic_shipbuilding_preferences_{};
   std::shared_ptr<CampaignConstructionCapabilityQuery>

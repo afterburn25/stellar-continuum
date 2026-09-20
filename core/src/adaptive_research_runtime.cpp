@@ -345,9 +345,10 @@ struct AdaptiveResearchRuntime::Storage {
 
   void mature(AdaptiveResearchCivilizationState &state,
               const AdaptiveResearchNodeDefinition &node,
-              const ResearchProjectRuntimeState &project,
+              const std::optional<std::string> &target_context,
               std::vector<AdaptiveResearchRuntimeEvent> &events) const {
     Writer::remove_project(state, node.id);
+    Writer::remove_cancelled_project(state, node.id);
     Writer::set_node_state(
         state, {node.id, ResearchMaturity::mature, std::nullopt, 0.0,
                 node.project_requirements.base_research_points, 0});
@@ -357,17 +358,17 @@ struct AdaptiveResearchRuntime::Storage {
       grant_capability(
           state, capability_id,
           context_for_capability(capability_id,
-                                 project.target_applicability_context_id),
+                                 target_context),
           node.id, events);
     }
     apply_stage_grant(state, node, ResearchMaturity::mature,
-                      project.target_applicability_context_id, events);
+                      target_context, events);
     events.push_back(event(
         AdaptiveResearchRuntimeEventType::technology_matured, state, node.id,
         std::nullopt,
         node.name + " reached Mature scientific/engineering knowledge."));
     append_materialized(state, content->catalog().children_for(node.id),
-                        project.target_applicability_context_id, events);
+                        target_context, events);
   }
 
   void advance_one(AdaptiveResearchCivilizationState &state,
@@ -404,7 +405,7 @@ struct AdaptiveResearchRuntime::Storage {
         break;
       }
       if (project.stage == ResearchMaturity::engineering) {
-        mature(state, node, project, events);
+        mature(state, node, project.target_applicability_context_id, events);
         break;
       }
       const auto next = project.stage == ResearchMaturity::experimental
@@ -665,10 +666,19 @@ AdaptiveResearchCommandResult AdaptiveResearchRuntime::start_directed_research(
       owned_node_id, ResearchMaturity::experimental, owned_context_id,
       requested_assigned_labs, readiness, false, std::nullopt, 0.0,
       node.total_research_points, 0};
+  if (const auto *cancelled = state.cancelled_project(owned_node_id)) {
+    project = *cancelled;
+    project.assigned_effective_labs = requested_assigned_labs;
+    project.readiness_efficiency = readiness;
+    // A cancelled hypothesis cannot bypass its scientific resolution gate.
+    project.paused = project.pause_reason == "hypothesis_resolution_required";
+    if (!project.paused) project.pause_reason.reset();
+  }
   Writer::set_project(state, project);
+  Writer::remove_cancelled_project(state, owned_node_id);
   auto updated_node = node;
-  updated_node.maturity = ResearchMaturity::experimental;
-  updated_node.stage_research_points = 0.0;
+  updated_node.maturity = project.stage;
+  updated_node.stage_research_points = project.stage_research_points;
   updated_node.revision = 0;
   Writer::set_node_state(state, std::move(updated_node));
   auto started = event(
@@ -677,6 +687,24 @@ AdaptiveResearchCommandResult AdaptiveResearchRuntime::start_directed_research(
       "Directed research started: " +
           catalog().get_node(owned_node_id).name + ".");
   return {true, started.message, {started}, {}};
+}
+
+AdaptiveResearchCommandResult AdaptiveResearchRuntime::cancel_directed_research(
+    AdaptiveResearchCivilizationState &state, std::string_view node_id) const {
+  const std::string owned_node_id(node_id);
+  const auto *found = find_project(state, owned_node_id);
+  if (!found)
+    return AdaptiveResearchCommandResult::rejected("No active research project exists for that node.");
+  auto project = *found;
+  project.paused = true;
+  if (project.pause_reason != "hypothesis_resolution_required")
+    project.pause_reason = "cancelled_by_order";
+  Writer::set_cancelled_project(state, project);
+  Writer::remove_project(state, owned_node_id);
+  auto cancelled = event(AdaptiveResearchRuntimeEventType::project_cancelled,
+      state, owned_node_id, std::nullopt,
+      "Research cancelled; laboratories released and scientific work preserved.");
+  return {true, cancelled.message, {cancelled}, {}};
 }
 
 AdaptiveResearchCommandResult AdaptiveResearchRuntime::pause_directed_research(
@@ -708,6 +736,9 @@ AdaptiveResearchCommandResult AdaptiveResearchRuntime::resume_directed_research(
     return AdaptiveResearchCommandResult::rejected(
         "The project is not currently paused.");
   auto project = *found;
+  if (project.pause_reason == "hypothesis_resolution_required")
+    return AdaptiveResearchCommandResult::rejected(
+        "This hypothesis requires scientific resolution before research can resume.");
   std::vector<ResearchBlocker> blockers;
   auto scientific = eligibility().evaluate_scientific_eligibility(
       state, owned_node_id,
@@ -914,6 +945,26 @@ AdaptiveResearchCommandResult AdaptiveResearchRuntime::resolve_hypothesis(
             "; the principle is Demonstrated."));
   }
   return {true, events.back().message, events, {}};
+}
+
+AdaptiveResearchCommandResult AdaptiveResearchRuntime::establish_technology(
+    AdaptiveResearchCivilizationState &state,std::string_view node_id,
+    std::string_view context_id) const {
+  const auto *node=catalog().find_node(node_id);
+  if(!node)return AdaptiveResearchCommandResult::rejected("Unknown scenario technology.");
+  if(context_id.empty())return AdaptiveResearchCommandResult::rejected("Scenario research requires an applicability context.");
+  if(const auto *current=state.try_get_node_state(node_id);current&&current->maturity==ResearchMaturity::mature)
+    return {true,"Technology is already mature.",{}, {}};
+  const std::optional<std::string> context{std::string(context_id)};
+  // Content was validated at load. Use the normal stage grants and maturation;
+  // do not synthesize capabilities from technology names in a developer UI.
+  std::vector<AdaptiveResearchRuntimeEvent> events;
+  storage_->apply_stage_grant(state,*node,ResearchMaturity::demonstrated,context,events);
+  storage_->mature(state,*node,context,events);
+  for(const auto &entry:events)
+    if(entry.type==AdaptiveResearchRuntimeEventType::deployment_event_unlocked&&entry.subject_id)
+      Writer::add_enabled_deployment_event(state,*entry.subject_id);
+  return {true,"Scenario technology established.",std::move(events),{}};
 }
 
 AdaptiveResearchRuntime load_adaptive_research_runtime(

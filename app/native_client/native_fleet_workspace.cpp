@@ -1,4 +1,7 @@
+#include "native_campaign_calendar.hpp"
 #include "native_fleet_workspace.hpp"
+#include "native_ui_layout.hpp"
+#include "native_menu_style.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +16,6 @@ namespace {
 using namespace stellar::native_fleet;
 using namespace stellar::native_map;
 
-constexpr Color panel_color{7, 17, 32, 242};
 constexpr Color row_color{12, 31, 54, 248};
 constexpr Color hover_color{24, 61, 94, 252};
 constexpr Color selected_color{19, 73, 68, 252};
@@ -97,23 +99,24 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
 } // namespace
 
 FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
-                                                         int height) noexcept {
+    int height, FleetWorkspacePresentation presentation) noexcept {
   const auto w = static_cast<float>(width);
   const auto h = static_cast<float>(height);
-  const auto scale = std::min(std::max(1.f, h / 900.f),
-                              std::max(1.f, w / 900.f));
-  const auto inset = 18.f * scale;
-  const auto top = 64.f * scale;
-  const auto panel_width = std::clamp(w * .255f, 270.f * scale,
-                                      360.f * scale);
-  const UiRect panel{w - inset - panel_width, top, panel_width,
-                     std::max(260.f * scale, h - top - inset)};
+  const auto scale = NativeUiLayout::for_viewport(width,height).scale;
+  const auto inset = 12.f * scale;
+  const bool commands = presentation == FleetWorkspacePresentation::SelectedCommands;
+  const auto top = commands ? 108.f * scale :
+      std::min(260.f * scale, std::max(52.f * scale,h-440.f*scale));
+  const auto panel_width = (commands ? 286.f : 254.f) * scale;
+  const UiRect panel{commands ? (native_navigation_content_left + 8.f) * scale : w - inset - panel_width,
+      top, panel_width, std::max(0.f, std::min((commands ? 462.f : 620.f)*scale,
+          h - top - (commands ? 104.f * scale : inset)))};
   const auto inner_x = panel.x + 12.f * scale;
   const auto inner_width = panel.width - 24.f * scale;
   const UiRect heading{inner_x, panel.y + 12.f * scale, inner_width,
-                       28.f * scale};
-  const auto list_height = std::clamp(panel.height * .31f, 82.f * scale,
-                                      190.f * scale);
+                       22.f * scale};
+  const auto list_height = commands ? 0.f : std::clamp(panel.height * .16f, 68.f * scale,
+                                      112.f * scale);
   const UiRect list{inner_x, heading.y + heading.height + 8.f * scale,
                     inner_width, list_height};
   const UiRect confirm{inner_x, panel.y + panel.height - 48.f * scale,
@@ -122,13 +125,32 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                         46.f * scale};
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
-  const auto fleet_height = detail_space * .43f;
+  // Keep seven telemetry lines plus the pinned order rail legible at 720p.
+  const auto fleet_height = std::min(180.f * scale,
+                                      std::max(0.f,detail_space - 78.f * scale));
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
                      std::max(0.f, detail_space - fleet_height - 6.f * scale)};
+  // Strategic choices use the details footer; Locate/Engage share the action
+  // rail that recovery already owns. This keeps every action distinct at 720p.
+  const auto order_gap = 6.f * scale;
+  const auto order_width = (inner_width - 2.f * order_gap) / 3.f;
+  const auto details_action_height=std::min(28.f*scale,details.height);
+  const auto details_action_y=details.y+details.height-details_action_height;
+  const UiRect order_hold{details.x, details_action_y,order_width,details_action_height};
+  const UiRect order_defend{order_hold.x + order_width + order_gap, order_hold.y,
+                            order_width, order_hold.height};
+  const UiRect order_retreat{order_defend.x + order_width + order_gap, order_hold.y,
+                             order_width, order_hold.height};
+  const auto paired_width = (confirm.width - 8.f * scale) * .5f;
+  const UiRect military_locate{confirm.x, confirm.y, paired_width, confirm.height};
+  const UiRect engage{confirm.x + paired_width + 8.f * scale, confirm.y,
+                       paired_width, confirm.height};
+  const UiRect locate{confirm};
+  const UiRect civilian_locate{details.x, details_action_y,details.width,details_action_height};
   return {scale,
-          static_cast<int>(std::lround(20.f * scale)),
+          static_cast<int>(std::lround(15.f * scale)),
           static_cast<int>(std::lround(14.f * scale)),
           static_cast<int>(std::lround(11.f * scale)),
           panel,
@@ -137,7 +159,35 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           details,
           route,
           feedback,
-          confirm};
+           confirm,
+           {confirm.x, confirm.y, (confirm.width - 8.f * scale) * .5f, confirm.height},
+           {confirm.x + (confirm.width + 8.f * scale) * .5f, confirm.y,
+           (confirm.width - 8.f * scale) * .5f, confirm.height},
+           order_hold, order_defend, order_retreat, locate, military_locate,
+          civilian_locate, engage};
+}
+
+FleetWorkspaceLayout NativeFleetWorkspace::layout(int width, int height) const noexcept {
+  return FleetWorkspaceLayout::for_viewport(width, height, presentation_);
+}
+
+std::optional<UiRect> NativeFleetWorkspace::panel_bounds(int width, int height) const noexcept {
+  if (presentation_ == FleetWorkspacePresentation::SelectedCommands && !selected_fleet())
+    return std::nullopt;
+  auto bounds = layout(width, height).panel;
+  if (!view_ || view_->own_fleets.empty()) bounds.height = 142.f * layout(width,height).scale;
+  return bounds;
+}
+
+[[nodiscard]] std::string military_order_name(stellar::core::MilitaryOrderType order) {
+  using stellar::core::MilitaryOrderType;
+  switch (order) {
+  case MilitaryOrderType::Hold: return "Hold";
+  case MilitaryOrderType::Defend: return "Defend";
+  case MilitaryOrderType::Attack: return "Attack";
+  case MilitaryOrderType::Retreat: return "Retreat";
+  }
+  return "Hold";
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
@@ -149,12 +199,30 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
     notice_.clear();
     list_scroll_ = 0.f;
   }
+  const auto selected_changed = [&] {
+    if (!view_ || view_->selected_fleet_id != view.selected_fleet_id ||
+        view_->player_civilization_id != view.player_civilization_id)
+      return true;
+    if (!view_->selected_fleet_id) return false;
+    const auto before=std::ranges::find(view_->own_fleets,*view_->selected_fleet_id,&NativeOwnFleet::id);
+    const auto after=std::ranges::find(view.own_fleets,*view.selected_fleet_id,&NativeOwnFleet::id);
+    return before==view_->own_fleets.end()||after==view.own_fleets.end()||
+        before->mission_order_revision!=after->mission_order_revision||
+        before->military_order_quote!=after->military_order_quote||before->locate!=after->locate;
+  };
+  if (generation_changed || selected_changed()) clear_pressed_action();
   view_ = std::move(view);
   const auto selected = view_->selected_fleet_id
                             ? std::ranges::find(view_->own_fleets,
                                                 *view_->selected_fleet_id,
                                                 &NativeOwnFleet::id)
                             : view_->own_fleets.end();
+  if (pending_return_ && (selected == view_->own_fleets.end() ||
+      selected->recovery != pending_return_)) {
+    cancel_recovery();
+    notice_ = "Mission changed. Review Return to Base again before confirming.";
+    notice_accepted_ = false;
+  }
   if (preview_ &&
       (selected == view_->own_fleets.end() ||
        preview_->fleet_id != selected->id ||
@@ -166,23 +234,28 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 }
 
 void NativeFleetWorkspace::discard_campaign() {
+  cancel_recovery();
   view_.reset();
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
   list_scroll_ = 0.f;
+  clear_pressed_action();
 }
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
                                        std::string target_display_name) {
+  cancel_recovery();
   preview_ = std::move(preview);
   target_display_name_ = std::move(target_display_name);
   notice_.clear();
+  clear_pressed_action();
 }
 
 void NativeFleetWorkspace::clear_preview() {
   preview_.reset();
   target_display_name_.clear();
+  clear_pressed_action();
 }
 
 void NativeFleetWorkspace::set_notice(std::string message, bool accepted) {
@@ -190,14 +263,83 @@ void NativeFleetWorkspace::set_notice(std::string message, bool accepted) {
   notice_accepted_ = accepted;
 }
 
+void NativeFleetWorkspace::cancel_recovery() noexcept {
+  pending_return_.reset();
+  return_warning_.clear();
+  // Main invokes this public cancellation hook for focus loss, navigation,
+  // and menu transitions. It must also revoke a release-gated tactical press.
+  clear_pressed_action();
+}
+
+void NativeFleetWorkspace::clear_pressed_action() noexcept {
+  pressed_action_=PressTarget::None;
+  pressed_bounds_={};
+  pressed_military_quote_.reset();
+  pressed_locate_quote_.reset();
+}
+
+NativeFleetWorkspace::PressTarget NativeFleetWorkspace::pressed_target_at(
+    Point point,const FleetWorkspaceLayout& layout) const noexcept {
+  if(layout.order_hold.contains(point)) return PressTarget::Hold;
+  if(layout.order_defend.contains(point)) return PressTarget::Defend;
+  if(layout.order_retreat.contains(point)) return PressTarget::Retreat;
+  if(layout.locate.contains(point)||layout.military_locate.contains(point)||
+     layout.civilian_locate.contains(point)) return PressTarget::Locate;
+  return PressTarget::None;
+}
+
+void NativeFleetWorkspace::set_recovery_result(
+    const NativeCivilianRecoveryQuote &quote, const NativeFleetOrderOutcome &outcome) {
+  cancel_recovery();
+  const auto *fleet = selected_fleet();
+  if (!outcome.accepted && outcome.requires_confirmation && fleet &&
+      fleet->recovery == quote) {
+    pending_return_ = quote;
+    return_warning_ = outcome.message;
+  }
+  set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
+}
+
 FleetWorkspaceCommand NativeFleetWorkspace::handle(
     const InputEvent &event, int width, int height,
     std::span<const FleetScreenMarker> markers,
     std::optional<int> target_system_id) {
   pointer_ = event.position;
-  const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
-  if (event.type == InputEventType::PointerCancelled) return {};
-  if (event.type == InputEventType::Wheel && layout.list.contains(event.position)) {
+  auto layout = this->layout(width, height);
+  const auto visible_panel = panel_bounds(width, height);
+  if (!visible_panel) { layout.panel = {}; layout.list = {}; }
+  if(!view_||view_->own_fleets.empty())layout.panel.height=142.f*layout.scale;
+  if (event.type == InputEventType::PointerCancelled) {
+    clear_pressed_action();
+    cancel_recovery();
+    return {FleetWorkspaceCommandKind::None, true};
+  }
+  if (event.type == InputEventType::LeftReleased &&
+      pressed_action_ != PressTarget::None) {
+    const auto pressed=std::exchange(pressed_action_,PressTarget::None);
+    const auto pressed_bounds=std::exchange(pressed_bounds_,UiRect{});
+    const auto military=std::exchange(pressed_military_quote_,std::nullopt);
+    const auto locate=std::exchange(pressed_locate_quote_,std::nullopt);
+    FleetWorkspaceCommand command;
+    command.captured=true;
+    const auto *fleet=selected_fleet();
+    if(!pressed_bounds.contains(event.position)||preview_||pending_return_||!fleet) return command;
+    if(military&&fleet->military_order_quote==military) {
+      command.kind=FleetWorkspaceCommandKind::MilitaryOrder;
+      command.fleet_id=fleet->id;
+      command.military_order_quote=std::move(military);
+      command.military_order=pressed==PressTarget::Hold?stellar::core::MilitaryOrderType::Hold:
+          pressed==PressTarget::Defend?stellar::core::MilitaryOrderType::Defend:
+                                          stellar::core::MilitaryOrderType::Retreat;
+    } else if(locate&&fleet->locate==locate) {
+      command.kind=FleetWorkspaceCommandKind::Locate;
+      command.fleet_id=fleet->id;
+      command.locate_quote=std::move(locate);
+    }
+    return command;
+  }
+  if (event.type == InputEventType::Wheel &&
+      presentation_ == FleetWorkspacePresentation::Outliner && layout.list.contains(event.position)) {
     const auto count = view_ ? view_->own_fleets.size() : 0;
     const auto content = static_cast<float>(count) * 45.f * layout.scale;
     const auto minimum = std::min(0.f, layout.list.height - content);
@@ -206,19 +348,71 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     return {FleetWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::RightPressed) {
-    if (layout.panel.contains(event.position))
+    if (visible_panel && layout.panel.contains(event.position))
       return {FleetWorkspaceCommandKind::None, true};
-    if (target_system_id && selected_fleet_id())
+    if (target_system_id && selected_fleet_id() && selected_fleet() && !selected_fleet()->foreign_inspection)
       return {FleetWorkspaceCommandKind::Preview, true, 0,
               *target_system_id};
     return {};
   }
   if (event.type != InputEventType::LeftPressed) return {};
-  if (layout.panel.contains(event.position)) {
+  if (visible_panel && layout.panel.contains(event.position)) {
+    // New strategic and Locate controls require an exact matched release and
+    // retain the displayed quote, never a later selection's authority.
+    if (!preview_ && !pending_return_) {
+      if(const auto *fleet=selected_fleet();fleet) {
+        const auto target=pressed_target_at(event.position,layout);
+        const bool military_target=target==PressTarget::Hold||target==PressTarget::Defend||target==PressTarget::Retreat;
+        const bool locate_target=fleet->locate&&
+            ((fleet->recovery&&layout.civilian_locate.contains(event.position))||
+             (fleet->military_order_quote&&layout.military_locate.contains(event.position))||
+             (!fleet->recovery&&!fleet->military_order_quote&&layout.locate.contains(event.position)));
+        if(military_target&&fleet->military_order_quote) {
+          pressed_action_=target;
+          pressed_bounds_=target==PressTarget::Hold?layout.order_hold:
+              target==PressTarget::Defend?layout.order_defend:layout.order_retreat;
+          pressed_military_quote_=fleet->military_order_quote;
+          pressed_locate_quote_.reset();
+          return {FleetWorkspaceCommandKind::None,true};
+        }
+        if(locate_target) {
+          pressed_action_=PressTarget::Locate;
+          pressed_bounds_=fleet->recovery?layout.civilian_locate:
+              fleet->military_order_quote?layout.military_locate:layout.locate;
+          pressed_locate_quote_=fleet->locate;
+          pressed_military_quote_.reset();
+          return {FleetWorkspaceCommandKind::None,true};
+        }
+      }
+    }
+    if (const auto *fleet = selected_fleet(); !preview_ && fleet && fleet->recovery) {
+      const bool left = layout.recovery_left.contains(event.position);
+      const bool right = layout.recovery_right.contains(event.position);
+      if (pending_return_ && right) {
+        cancel_recovery();
+        set_notice("Return cancelled. The existing mission is unchanged.", true);
+        return {FleetWorkspaceCommandKind::None, true};
+      }
+      if (left || (right && !fleet->recovery->return_requested)) {
+        FleetWorkspaceCommand command{FleetWorkspaceCommandKind::Recovery, true, fleet->id};
+        command.recovery_quote = pending_return_.value_or(*fleet->recovery);
+        command.confirm_abandon = pending_return_.has_value();
+        command.recovery_action = pending_return_ || right
+            ? NativeCivilianRecoveryAction::ReturnToBase
+            : fleet->recovery->hold_requested ? NativeCivilianRecoveryAction::Resume
+                                               : NativeCivilianRecoveryAction::Hold;
+        return command;
+      }
+    }
     if (preview_ && preview_->command_available &&
         layout.confirm.contains(event.position))
       return {FleetWorkspaceCommandKind::Confirm, true};
-    if (view_) {
+    if (const auto* fleet=selected_fleet(); !preview_&&fleet&&!fleet->foreign_inspection&&
+        fleet->role==stellar::core::FleetRole::Military&&fleet->current_system_id&&
+        !fleet->destination_system_id&&fleet->combat_status&&fleet->combat_status->is_armed&&
+        layout.engage.contains(event.position))
+      return {FleetWorkspaceCommandKind::Engage,true,fleet->id};
+    if (view_ && presentation_ == FleetWorkspacePresentation::Outliner) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
                          layout.list.y + list_scroll_ +
@@ -248,7 +442,11 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
                                   std::span<const FleetScreenMarker> markers,
                                   stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
   last_ship_art_rows_ = 0;
-  const auto layout = FleetWorkspaceLayout::for_viewport(width, height);
+  auto layout = this->layout(width, height);
+  if(!view_||view_->own_fleets.empty()){
+    layout.panel.height=142.f*layout.scale;
+    layout.list.height=80.f*layout.scale;
+  }
   const auto artwork = [&](const stellar::native_fleet::NativeOwnFleet &fleet) {
     if (!ship_art) return std::shared_ptr<const RgbaImage>{};
     return ship_art->image_for(
@@ -266,12 +464,13 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
          own_color});
   }
 
-  fill(out, layout.panel, panel_color);
-  stroke(out, layout.panel, border_color);
-  text(out, layout.heading, "PLAYER FLEETS", bright,
+  if (!panel_bounds(width, height)) return;
+  stellar::native_menu_style::panel(out, layout.panel, layout.scale);
+  const bool outliner = presentation_ == FleetWorkspacePresentation::Outliner;
+  text(out, layout.heading, outliner ? (view_&&view_->developer_inspection?"ALL FLEETS":"PLAYER FLEETS") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET INSPECTION":"FLEET COMMAND"), bright,
        layout.title_font_pixels, FontFace::Heading);
-  fill(out, layout.list, {5, 14, 27, 250});
-  stroke(out, layout.list, border_color);
+  if (outliner) {
+  stellar::engine::ui_skin::surface(out,layout.list,layout.scale);
   if (!view_ || view_->own_fleets.empty()) {
     text(out,
          {layout.list.x + 10.f * layout.scale,
@@ -324,42 +523,75 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
                text_width, 17.f * layout.scale}))
         out.overlay.emplace_back(Text{
             {text_left, row.y + 23.f * layout.scale},
-            role_name(fleet.role) + "  |  " + transit_name(fleet.transit_phase),
+            role_name(fleet.role) + "  |  " + (fleet.foreign_inspection ? fleet.owner_name : transit_name(fleet.transit_phase)),
             muted, layout.small_font_pixels,
             text_width, *role_clip});
     }
   }
 
+  }
   const auto *fleet = selected_fleet();
+  if(!view_||view_->own_fleets.empty())return;
+  const auto action_button = [&](UiRect bounds,const char *label) {
+    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,true,layout.scale);
+    text(out,{bounds.x,bounds.y+bounds.height*.3f,bounds.width,bounds.height*.7f},
+         label,bright,layout.small_font_pixels,FontFace::Interface,TextAlign::Center);
+  };
   if (!fleet) {
     text(out, layout.details,
-         "Select an owned fleet on the map or in the outliner.", muted,
+         view_->developer_inspection ? "Select any fleet on the map or in the outliner." : "Select an owned fleet on the map or in the outliner.", muted,
          layout.body_font_pixels);
+  } else if (pending_return_) {
+    // Use the entire details region: never truncate the paid-mission warning.
+    const UiRect warning_bounds{layout.details.x, layout.details.y,
+        layout.details.width, layout.feedback.y - layout.details.y - 8.f * layout.scale};
+    text(out, warning_bounds, "ABANDON COLONY MISSION?\n\n" + return_warning_,
+         warning, layout.body_font_pixels);
   } else {
-    const std::string details =
+    std::string details =
         fleet->name + "\n" + role_name(fleet->role) + "  |  " +
-        transit_name(fleet->transit_phase) + "\nOwn strength " +
+        transit_name(fleet->transit_phase) + "\nStrength " +
         number(fleet->combat_power) + "\nFuel " +
         number(fleet->fuel_remaining_light_years, 2) + " / " +
-        number(fleet->fuel_capacity_light_years, 2) + " ly\nMaximum leg " +
+        number(fleet->fuel_capacity_light_years, 2) + " ly\nRange " +
         number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
         number(fleet->strategic_speed, 2) + " ly/day";
+    if (fleet->military_order_quote)
+      details += "\nOrder " +
+          military_order_name(fleet->military_order_quote->current_order);
+    const bool armed_order = !preview_ && !pending_return_ &&
+        fleet->military_order_quote.has_value();
+    const bool recovery_locate = !preview_ && !pending_return_ &&
+        fleet->recovery.has_value() && fleet->locate.has_value();
     auto details_bounds = layout.details;
+    if (armed_order || recovery_locate)
+      details_bounds.height = std::max(0.f, details_bounds.height - 36.f * layout.scale);
     if (ship_art) {
       const auto image = artwork(*fleet);
-      const float side = std::min(layout.details.height - 8.f * layout.scale,
-                                  96.f * layout.scale);
+      const float side = std::min(details_bounds.height - 8.f * layout.scale,
+                                  (details_bounds.width>300.f*layout.scale?96.f:52.f) * layout.scale);
       if (image && side >= 8.f * layout.scale) {
         out.overlay.emplace_back(Image{
             image,
-            {layout.details.x + layout.details.width - side -
+            {details_bounds.x + details_bounds.width - side -
                  4.f * layout.scale,
-             layout.details.y + 4.f * layout.scale, side, side},
-            std::nullopt, {255, 255, 255, 255}, layout.details});
+             details_bounds.y + 4.f * layout.scale, side, side},
+            std::nullopt, {255, 255, 255, 255}, details_bounds});
         details_bounds.width -= side + 10.f * layout.scale;
+        if (!outliner) ++last_ship_art_rows_;
       }
     }
     text(out, details_bounds, details, bright, layout.small_font_pixels);
+    if (armed_order) {
+      // The selected fleet's quote is retained until release, and becomes
+      // invalid as soon as selection, observer, campaign, or order changes.
+      action_button(layout.order_hold,"HOLD");
+      action_button(layout.order_defend,"DEFEND");
+      action_button(layout.order_retreat,"RETREAT");
+    } else if (recovery_locate) {
+      // Recovery keeps both paid-mission controls in the confirm rail.
+      action_button(layout.civilian_locate,"LOCATE");
+    }
     std::string route;
     if (preview_) {
       route = "ROUTE PREVIEW\nDestination " + target_display_name_ +
@@ -369,36 +601,120 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
                                              : "Route awaiting confirmation");
       if (preview_->estimated_transit_days)
         route += "\nEstimated ETA " +
-                 number(*preview_->estimated_transit_days, 2) + " days";
+                 stellar::native_campaign::format_campaign_duration(*preview_->estimated_transit_days);
     } else if (fleet->destination_system_id) {
       route = "TRAVEL STATUS\nTravel order active\nTransit progress " +
               number(fleet->transit_progress * 100., 1) + "%";
+    } else if (fleet->reconnaissance) {
+      const auto &reconnaissance = *fleet->reconnaissance;
+      if (reconnaissance.completed) {
+        route = reconnaissance.fully_surveyed
+                    ? "RECONNAISSANCE\nRapid reconnaissance complete\nSystem fully surveyed"
+                    : "RECONNAISSANCE\nRapid reconnaissance complete\nSend a science vessel for a full survey.";
+      } else {
+        route = "RECONNAISSANCE\n" +
+                std::string(reconnaissance.held ? "Held; work paused\nWork "
+                                                : "Local work\nWork ") +
+                number(reconnaissance.days_completed, 1) + " / " +
+                number(reconnaissance.required_days, 1) + " work-days";
+        const auto progress = reconnaissance.required_days > 0.
+                                  ? std::clamp(reconnaissance.days_completed /
+                                                   reconnaissance.required_days,
+                                               0., 1.)
+                                  : 0.;
+        const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
+                             7.f * layout.scale,
+                         layout.route.width, 4.f * layout.scale};
+        fill(out, bar, row_color);
+        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(progress),
+                   bar.height},
+             reconnaissance.held ? muted : own_color);
+        stroke(out, bar, border_color);
+      }
+    } else if (fleet->science_survey) {
+      const auto &survey = *fleet->science_survey;
+      if (survey.completed) {
+        route = "SCIENCE SURVEY\nSystem fully surveyed\nSelect a planet to review findings.";
+      } else {
+        route = "SCIENCE SURVEY\n" +
+                std::string(survey.held ? "Held; work paused\nFull survey "
+                                         : "Detailed local work\nFull survey ") +
+                number(survey.progress * 100., 1) + "%";
+        const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
+                             7.f * layout.scale,
+                         layout.route.width, 4.f * layout.scale};
+        fill(out, bar, row_color);
+        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(survey.progress),
+                   bar.height}, survey.held ? muted : own_color);
+        stroke(out, bar, border_color);
+      }
     } else {
-      route = "ROUTE PREVIEW\nRight-click a system to preview travel.";
+      route = fleet->foreign_inspection ? "LIVE INSPECTION\nFleet is stationed locally.\nSelect LOCATE to view its position." : "ROUTE PREVIEW\nRight-click a system to preview travel.";
     }
     text(out, layout.route, std::move(route), bright,
          layout.small_font_pixels);
   }
 
-  const auto feedback = !notice_.empty()
+  const auto* selected=selected_fleet();
+  const auto tactical_help = [&]() -> std::string {
+    if (!selected || !selected->military_order_quote || preview_ || pending_return_)
+      return {};
+    if (layout.order_hold.contains(pointer_))
+      return "Hold changes combat stance; it does not stop travel. No movement or resource charge now.";
+    if (layout.order_defend.contains(pointer_))
+      return "Defend protects this system in combat. No movement or resource charge now.";
+    if (layout.order_retreat.contains(pointer_))
+      return "Retreat requests combat disengagement; it does not route home. No movement or resource charge now.";
+    return {};
+  }();
+  const auto feedback = !tactical_help.empty() ? tactical_help
+                        : pending_return_ ? "Cancel keeps the existing mission and its progress."
+                        : !notice_.empty()
                             ? notice_
                             : preview_ && !preview_->command_available
                                   ? preview_->message
-                                  : std::string{};
+                                  : selected && selected->military_order_quote
+                                      ? "Hold changes stance; Defend protects this system; Retreat requests disengagement. No movement or resource charge now."
+                                  : selected ? selected->recovery_message : std::string{};
   if (!feedback.empty())
     text(out, layout.feedback, visible_message(feedback),
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
+  if (!preview_ && selected && selected->recovery) {
+    const bool queued = selected->recovery->return_requested;
+    for (const bool left : {true, false}) {
+      const auto bounds = left ? layout.recovery_left : layout.recovery_right;
+      const bool enabled = left || pending_return_ || !queued;
+      stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),pending_return_&&left,enabled,layout.scale);
+      const auto label = pending_return_ ? (left ? "CONFIRM RETURN" : "CANCEL")
+          : left ? (selected->recovery->hold_requested ? "RESUME" : "HOLD")
+                 : queued ? "RETURN QUEUED" : "RETURN TO BASE";
+      text(out, {bounds.x, bounds.y + 10.f * layout.scale, bounds.width,
+                 bounds.height - 10.f * layout.scale}, label,
+           enabled ? bright : muted, layout.small_font_pixels, FontFace::Interface,
+           TextAlign::Center);
+    }
+  }
+  const bool engage=!preview_&&!pending_return_&&selected&&!selected->foreign_inspection&&selected->role==stellar::core::FleetRole::Military&&
+      selected->current_system_id&&!selected->destination_system_id&&
+      selected->combat_status&&selected->combat_status->is_armed;
+  const bool locate_on_rail=!preview_&&!pending_return_&&selected&&selected->locate&&
+      !selected->recovery&&!selected->military_order_quote;
   if (preview_ && preview_->command_available) {
-    fill(out, layout.confirm,
-         layout.confirm.contains(pointer_) ? hover_color : selected_color);
-    stroke(out, layout.confirm, own_color);
+    stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,true,layout.scale);
     text(out, {layout.confirm.x + 6.f * layout.scale,
                layout.confirm.y + 9.f * layout.scale,
                layout.confirm.width - 12.f * layout.scale,
                layout.confirm.height - 12.f * layout.scale},
          "CONFIRM TRAVEL", bright, layout.body_font_pixels,
          FontFace::Interface, TextAlign::Center);
+  } else if (selected && selected->military_order_quote && !preview_ && !pending_return_) {
+    action_button(layout.military_locate,"LOCATE");
+    if (engage) action_button(layout.engage,"ENGAGE HOSTILES");
+  } else if (locate_on_rail) {
+    action_button(layout.locate,"LOCATE");
+  } else if (engage) {
+    action_button(layout.engage,"ENGAGE HOSTILES");
   }
 }
 

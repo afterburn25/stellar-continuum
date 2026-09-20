@@ -1,0 +1,23 @@
+# The manifest is the single source of truth for the supplied library.
+file(READ "${CMAKE_SOURCE_DIR}/data/stellar/phenomenon-art-v1.json" STELLAR_PHENOMENON_ASSETS)
+string(JSON PHENOMENON_COUNT LENGTH "${STELLAR_PHENOMENON_ASSETS}" assets)
+add_custom_target(stellar_native_phenomenon_art_assets)
+math(EXPR PHENOMENON_LAST "${PHENOMENON_COUNT}-1")
+set(PHENOMENON_SEEN)
+foreach(INDEX RANGE ${PHENOMENON_LAST})
+  string(JSON ART_PATH GET "${STELLAR_PHENOMENON_ASSETS}" assets ${INDEX} path)
+  string(JSON ART_NAME GET "${STELLAR_PHENOMENON_ASSETS}" assets ${INDEX} filename)
+  string(JSON ART_HASH GET "${STELLAR_PHENOMENON_ASSETS}" assets ${INDEX} sha256)
+  if(NOT ART_PATH STREQUAL "assets/visual/phenomena/${ART_NAME}" OR ART_PATH IN_LIST PHENOMENON_SEEN)
+    message(FATAL_ERROR "Invalid or duplicate phenomenon path: ${ART_PATH}")
+  endif()
+  list(APPEND PHENOMENON_SEEN "${ART_PATH}")
+  file(SHA256 "${CMAKE_SOURCE_DIR}/${ART_PATH}" ACTUAL_HASH)
+  if(NOT ART_HASH STREQUAL ACTUAL_HASH)
+    message(FATAL_ERROR "Phenomenon source checksum differs: ${ART_NAME}")
+  endif()
+  add_custom_command(TARGET stellar_native_phenomenon_art_assets POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/assets/visual/phenomena"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/${ART_PATH}" "${CMAKE_BINARY_DIR}/${ART_PATH}")
+endforeach()
+message(STATUS "Validated ${PHENOMENON_COUNT} original phenomenon artwork files")

@@ -1,0 +1,137 @@
+{
+  "version": "galaxy-configuration-v2",
+  "morphologies": {
+    "spiral": {
+      "randomPopulationWeights": [
+        5,
+        30,
+        40,
+        20,
+        5
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.92,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    },
+    "barred_spiral": {
+      "randomPopulationWeights": [
+        7,
+        32,
+        36,
+        20,
+        5
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.94,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    },
+    "elliptical": {
+      "randomPopulationWeights": [
+        1,
+        3,
+        8,
+        36,
+        52
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.96,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    },
+    "lenticular": {
+      "randomPopulationWeights": [
+        2,
+        6,
+        15,
+        37,
+        40
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.86,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    },
+    "irregular": {
+      "randomPopulationWeights": [
+        25,
+        38,
+        25,
+        9,
+        3
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.4,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    },
+    "ring": {
+      "randomPopulationWeights": [
+        28,
+        38,
+        24,
+        8,
+        2
+      ],
+      "smbhEligible": true,
+      "smbhOccupationChance": 0.65,
+      "minimumGalaxySize": 250,
+      "sizeOccupationMultiplier": {
+        "250": 0.8,
+        "500": 1,
+        "1000": 1.025,
+        "2500": 1.04,
+        "5000": 1.04,
+        "10000": 1.04,
+        "25000": 1.04,
+        "50000": 1.04
+      }
+    }
+  }
+}

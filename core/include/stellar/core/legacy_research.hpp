@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/legacy_technology.hpp>
+#include <stellar/core/civilization_control.hpp>
 
 #include <span>
 #include <optional>
@@ -26,6 +27,7 @@ struct LegacyResearchWorldView {
   std::span<TechnologyState> technologies;
   std::span<const ConstructionState> construction;
   std::span<CivilizationEconomy> economies;
+  CivilizationControlQuery control;
 };
 
 class LegacyResearchSimulation {

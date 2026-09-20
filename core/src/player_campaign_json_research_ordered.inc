@@ -25,6 +25,7 @@ enum class ResearchRecord {
   outcome_summary,
   outcome_record,
   funding,
+  planning,
 };
 
 void validate_research_record(const OrderedValue &value,
@@ -171,6 +172,10 @@ void check_research_representability(const OrderedValue &value,
         child(ResearchRecord::v5);
       else if (name == "ProjectFunding")
         records(ResearchRecord::funding, true);
+      else if(name=="Planning")child(ResearchRecord::planning);
+      break;
+    case ResearchRecord::planning:
+      if(name=="Favorites"||name=="Queue")check_research_string_list(field,p);
       break;
     case ResearchRecord::v5:
       if (name == "CatalogId")
@@ -226,7 +231,7 @@ void check_research_representability(const OrderedValue &value,
                                   ResearchDictionaryValue::string_list);
       else if (name == "Capabilities")
         records(ResearchRecord::capability);
-      else if (name == "ActiveProjects")
+      else if (name == "ActiveProjects" || name == "CancelledProjects")
         records(ResearchRecord::project);
       break;
     case ResearchRecord::node:
@@ -382,6 +387,11 @@ void validate_research_record(const OrderedValue &value,
         child(ResearchRecord::v5);
       else if (name == "ProjectFunding")
         records(ResearchRecord::funding);
+      else if(name=="Planning")child(ResearchRecord::planning);
+      break;
+    case ResearchRecord::planning:
+      if(name=="Favorites"||name=="Queue")validate_string_list(field,p);
+      else if(name=="Suggestions")(void)typed_bool(field,p);
       break;
     case ResearchRecord::v5:
       if (name == "SchemaVersion")
@@ -449,7 +459,7 @@ void validate_research_record(const OrderedValue &value,
                                      ResearchDictionaryValue::string_list);
       else if (name == "Capabilities")
         records(ResearchRecord::capability);
-      else if (name == "ActiveProjects")
+      else if (name == "ActiveProjects" || name == "CancelledProjects")
         records(ResearchRecord::project);
       break;
     case ResearchRecord::node:

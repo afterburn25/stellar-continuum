@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "main-music": {
+      "source": "assets/audio/music/claimed-by-the-void-loop.mp3",
+      "runtimePath": "assets/audio/music/claimed-by-the-void-loop.mp3",
+      "sha256": "25c81bee74c37dc91f0895fa68db72b026c028c65d951634d07cd4ae0b325fa2"
+    },
+    "ui-hover": {
+      "source": "assets/audio/sfx/ui-hover.wav",
+      "runtimePath": "assets/audio/sfx/ui-hover.wav",
+      "sha256": "60338bf12e826353b8e0de7081c15a5cf70d867b009f454dadab4b36addb96a4"
+    },
+    "ui-confirm": {
+      "source": "assets/audio/sfx/ui-confirm.wav",
+      "runtimePath": "assets/audio/sfx/ui-confirm.wav",
+      "sha256": "36049cb345858b2bc50cc75ce517dac6baa934d6d8ebbe155b8986141c95b966"
+    },
+    "discovery-reveal": {
+      "source": "assets/audio/sfx/discovery-reveal.wav",
+      "runtimePath": "assets/audio/sfx/discovery-reveal.wav",
+      "sha256": "507bf49c84e0e4e0cb20493854f7ec3d9e32dbc0e96c42fdc8e5328fb6435705"
+    },
+    "construction-complete": {
+      "source": "assets/audio/sfx/construction-complete.wav",
+      "runtimePath": "assets/audio/sfx/construction-complete.wav",
+      "sha256": "4778d617ae878cf2a580acd5df07ed2323b9861609b9600bbe6d70e3d4e5f9f5"
+    },
+    "ship-launch": {
+      "source": "assets/audio/sfx/ship-launch.wav",
+      "runtimePath": "assets/audio/sfx/ship-launch.wav",
+      "sha256": "178eff8c1ec31df5eb7da35d6257b4ef9bc4b6b925a115e06de5b871a9d0b159"
+    },
+    "strategic-alert": {
+      "source": "assets/audio/sfx/strategic-alert.wav",
+      "runtimePath": "assets/audio/sfx/strategic-alert.wav",
+      "sha256": "000cef3e7f0d0519dea4d9edd90a852aefc90b23ccd231ef0af411115cb13409"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_AUDIO_SOURCES.md",
+      "runtimePath": "Licenses/Audio-sources.md",
+      "sha256": "62f59c33aff70b5eb570a0224db676f27f5fa8e1c02b09c22a492ce675a3eb10"
+    },
+    "scientist-reconnaissance": {
+      "source": "assets/audio/voice/scientist-reconnaissance.wav",
+      "runtimePath": "assets/audio/voice/scientist-reconnaissance.wav",
+      "sha256": "56369c6d0d23bb57c5c54ce44f2063693b8d8e50d1597bd55f3e78eb2c7c1541"
+    },
+    "scientist-research-report": {
+      "source": "assets/audio/voice/scientist-research-report.wav",
+      "runtimePath": "assets/audio/voice/scientist-research-report.wav",
+      "sha256": "704f5681d7453720946352e22759e1bec0e2cbdcfb212325b2da3750141a0e46"
+    },
+    "scientist-survey-complete": {
+      "source": "assets/audio/voice/scientist-survey-complete.wav",
+      "runtimePath": "assets/audio/voice/scientist-survey-complete.wav",
+      "sha256": "331b99bebf9895c5d7c0164738de015ffaeed15f264e0d51ff7bcdb29393b3a4"
+    },
+    "scientist-manifest": {
+      "source": "assets/audio/voice/scientist-cues.json",
+      "runtimePath": "Licenses/Scientist-cues.json",
+      "sha256": "166d2c7d873fd28a217f5b73422f7802524791e7622c6cc6c39d6e80542ba912"
+    },
+    "scientist-credits": {
+      "source": "docs/engine/NATIVE_SCIENTIST_VOICE.md",
+      "runtimePath": "Licenses/Scientist-voice.md",
+      "sha256": "7dbd8b0f8e1dd07a88493384737b0d7444a1faa75ce55b216aa7689515ab6f33"
+    },
+    "scientist-license": {
+      "source": "assets/audio/voice/Kokoro-Apache-2.0.txt",
+      "runtimePath": "Licenses/Scientist-Kokoro-Apache-2.0.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    }
+  }
+}

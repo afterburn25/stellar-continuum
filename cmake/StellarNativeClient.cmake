@@ -1,27 +1,95 @@
+include("${CMAKE_CURRENT_LIST_DIR}/NativeBrandingAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PinnedSDL3.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudio.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioSettings.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeGeneralSettings.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeVideoSettings.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeAudioAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeNavigationAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeResearchAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeUiAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
-add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp)
+include("${CMAKE_CURRENT_LIST_DIR}/NativeSmallBodyAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativePlanetAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeScene3D.cmake")
+add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp engine/src/native_scene3d_gpu.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
-  PRIVATE SDL3::SDL3 Gdi32 User32)
+  PRIVATE SDL3::SDL3 Gdi32 User32 Shell32)
 add_executable(stellar-continuum-native app/native_client/main.cpp
+  app/native_client/native_phenomena.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
   app/native_client/native_research_workspace.cpp app/native_client/native_fleet_controller.cpp
   app/native_client/native_fleet_workspace.cpp app/native_client/native_fleet_presentation.cpp
   app/native_client/native_shipyard_controller.cpp app/native_client/native_shipyard_workspace.cpp
   app/native_client/native_construction_controller.cpp app/native_client/native_construction_workspace.cpp
   app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
+  app/native_client/native_small_body_renderer.cpp app/native_client/native_small_body_panel.cpp
+  app/native_client/native_logistics.cpp app/native_client/native_logistics_workspace.cpp
+  app/native_client/native_economy.cpp app/native_client/native_economy_workspace.cpp
+  app/native_client/native_body_inspection.cpp app/native_client/native_body_inspection_panel.cpp
+  app/native_client/native_inspection.cpp
   app/native_client/native_planet_disc_assets.cpp app/native_client/native_system_travel.cpp)
 add_dependencies(stellar-continuum-native stellar_native_ui_assets stellar_native_celestial_assets stellar_runtime_data)
+add_dependencies(stellar-continuum-native stellar_native_small_body_assets)
+add_dependencies(stellar-continuum-native stellar_native_planet_assets)
 target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
-target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core Shell32 Ole32)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core stellar_json Shell32 Ole32)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_navigation_art)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_research_art)
+add_dependencies(stellar-continuum-native stellar_native_research_assets)
+add_dependencies(stellar-continuum-native stellar_native_navigation_assets)
+target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stellar_native_audio_settings stellar_native_general_settings stellar_native_video_settings stellar_native_campaign_feedback)
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
+  app/native_client/native_support.cpp app/native_client/native_support_service.cpp
+  app/native_client/native_battle_workspace.cpp
+  app/native_client/native_battle_art.cpp
+  app/native_client/native_battle_sprites.cpp)
+add_dependencies(stellar-continuum-native stellar_native_audio_assets)
 add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_native_moon_tests native-tests/native_moon_tests.cpp
+    app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
+    app/native_client/native_system_travel.cpp app/native_client/native_fleet_controller.cpp
+    app/native_client/native_celestial_appearance.cpp app/native_client/native_small_body_renderer.cpp
+    app/native_client/native_small_body_panel.cpp app/native_client/native_body_inspection.cpp
+    app/native_client/native_body_inspection_panel.cpp)
+  target_include_directories(stellar_native_moon_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_moon_tests PRIVATE stellar_native_platform stellar_core stellar_json)
+  add_test(NAME native_moons COMMAND stellar_native_moon_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/moon-test-captures")
+  set_tests_properties(native_moons PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
+  add_executable(stellar_native_giant_visual_tests native-tests/native_giant_visual_tests.cpp app/native_client/native_system_view.cpp app/native_client/native_small_body_renderer.cpp)
+  target_include_directories(stellar_native_giant_visual_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_giant_visual_tests PRIVATE stellar_native_platform stellar_core stellar_json)
+  add_test(NAME native_giant_visual COMMAND stellar_native_giant_visual_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/giant-test-captures")
+  set_tests_properties(native_giant_visual PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE)
+  add_executable(stellar_scene3d_gpu_tests native-tests/native_scene3d_gpu_tests.cpp)
+  target_link_libraries(stellar_scene3d_gpu_tests PRIVATE stellar_native_platform)
+  add_test(NAME native_scene3d_gpu COMMAND stellar_scene3d_gpu_tests
+    "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf" "${CMAKE_BINARY_DIR}/scene3d-test-captures")
+  set_tests_properties(native_scene3d_gpu PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+  if(MSVC)
+    target_compile_options(stellar_scene3d_gpu_tests PRIVATE /WX)
+  endif()
+  add_executable(stellar_native_audio_director_tests
+    native-tests/native_audio_director_tests.cpp app/native_client/native_audio_director.cpp)
+  target_include_directories(stellar_native_audio_director_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_audio_director_tests PRIVATE stellar_native_audio stellar_engine)
+  add_custom_command(TARGET stellar_native_audio_director_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
+      "$<TARGET_FILE_DIR:stellar_native_audio_director_tests>/SDL3.dll")
+  add_test(NAME native_audio_director COMMAND stellar_native_audio_director_tests "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(native_audio_director PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+    ENVIRONMENT "SDL_AUDIODRIVER=dummy")
+  if(MSVC)
+    target_compile_options(stellar_native_audio_director_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_text_measure_tests native-tests/native_text_measure_tests.cpp)
   target_link_libraries(stellar_native_text_measure_tests PRIVATE stellar_native_platform)
   add_test(NAME native_text_measure COMMAND stellar_native_text_measure_tests
@@ -58,20 +126,22 @@ if(BUILD_TESTING)
 endif()
 if(MSVC)
   target_compile_options(stellar_native_platform PRIVATE /WX)
-  target_compile_options(stellar-continuum-native PRIVATE /WX)
+  target_compile_options(stellar-continuum-native PRIVATE /WX /bigobj)
 endif()
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_colony_controller.cpp
+  app/native_client/native_colony_roster.cpp app/native_client/native_controlled_assets.cpp
+  app/native_client/native_outpost_freight_controller.cpp
   app/native_client/native_colony_workspace.cpp)
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_settlement_mission_controller.cpp
+  app/native_client/native_settlement_preparation.cpp
   app/native_client/native_settlement_workspace.cpp)
 
 target_sources(stellar-continuum-native PRIVATE
-  app/native_client/native_surface_construction_controller.cpp
-  app/native_client/native_surface_workspace.cpp)
+  app/native_client/native_surface_construction_controller.cpp)
 
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSpeciesAssets.cmake")
@@ -95,16 +165,96 @@ add_dependencies(stellar-continuum-native stellar_native_startup_art_assets)
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_startup_artwork.cpp)
 
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_celestial_appearance.cpp)
+target_sources(stellar-continuum-native PRIVATE app/native_client/native_galaxy_labels.cpp)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeGalaxyArtAssets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativePhenomenonArtAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_phenomenon_art_assets)
 add_dependencies(stellar-continuum-native stellar_native_galaxy_art_assets)
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_galaxy_backdrop.cpp
-  app/native_client/native_galaxy_star_markers.cpp)
+  app/native_client/native_galaxy_star_markers.cpp
+  app/native_client/native_stellar_art.cpp
+  app/native_client/native_stellar_eruptions.cpp
+  app/native_client/native_territory_projection.cpp
+  app/native_client/native_territory_overlay.cpp)
+
+# The supplied stellar artwork has its own content-addressed inventory and LOD manifest.
+file(READ "${CMAKE_SOURCE_DIR}/assets/visual/stellar/manifest.json" STELLAR_ART_MANIFEST)
+string(JSON STELLAR_ART_COUNT LENGTH "${STELLAR_ART_MANIFEST}" files)
+math(EXPR STELLAR_ART_LAST "${STELLAR_ART_COUNT}-1")
+foreach(INDEX RANGE 0 ${STELLAR_ART_LAST})
+  string(JSON NAME GET "${STELLAR_ART_MANIFEST}" files ${INDEX} filename)
+  string(JSON EXPECTED GET "${STELLAR_ART_MANIFEST}" files ${INDEX} sha256)
+  file(SHA256 "${CMAKE_SOURCE_DIR}/assets/visual/stellar/${NAME}" ACTUAL)
+  if(NOT ACTUAL STREQUAL EXPECTED)
+    message(FATAL_ERROR "Supplied stellar artwork digest mismatch: ${NAME}")
+  endif()
+endforeach()
+if(BUILD_TESTING)
+  add_executable(stellar_native_stellar_art_tests native-tests/native_stellar_art_tests.cpp app/native_client/native_stellar_art.cpp)
+  target_include_directories(stellar_native_stellar_art_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_native_stellar_art_tests PRIVATE stellar_native_platform stellar_json)
+  add_test(NAME native_stellar_art COMMAND stellar_native_stellar_art_tests "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(native_stellar_art PROPERTIES TIMEOUT 90)
+endif()
+add_custom_target(stellar_native_stellar_art
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets/visual/stellar" "${CMAKE_BINARY_DIR}/assets/visual/stellar")
+add_dependencies(stellar-continuum-native stellar_native_stellar_art)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeShipArtAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_ship_art_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_ship_art_assets.cpp
   app/native_client/native_fleet_route_effects.cpp)
+
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_diplomacy_controller.cpp
+  app/native_client/native_diplomacy_workspace.cpp)
+
+
+if(BUILD_TESTING)
+  add_executable(stellar_battle_sprites_tests
+    native-tests/native_battle_sprites_tests.cpp
+    app/native_client/native_battle_sprites.cpp
+    app/native_client/native_battle_workspace.cpp)
+  target_include_directories(stellar_battle_sprites_tests PRIVATE app/native_client)
+  target_link_libraries(stellar_battle_sprites_tests PRIVATE stellar_native_image stellar_core)
+  if(MSVC)
+    target_compile_options(stellar_battle_sprites_tests PRIVATE /W4 /WX /permissive-)
+  endif()
+  add_test(NAME native_battle_sprites COMMAND stellar_battle_sprites_tests "${CMAKE_SOURCE_DIR}")
+endif()
+
+add_custom_target(stellar_native_eruption_assets
+ COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets/visual/stellar-eruptions" "$<TARGET_FILE_DIR:stellar-continuum-native>/assets/visual/stellar-eruptions")
+add_dependencies(stellar-continuum-native stellar_native_eruption_assets)
+
+if(BUILD_TESTING)
+ add_executable(stellar_cooked_eruption_tests native-tests/cooked_eruption_tests.cpp app/native_client/native_stellar_eruptions.cpp)
+ target_include_directories(stellar_cooked_eruption_tests PRIVATE app/native_client)
+ target_link_libraries(stellar_cooked_eruption_tests PRIVATE stellar_core stellar_native_platform stellar_json)
+ add_executable(stellar_native_eruption_tests native-tests/native_stellar_eruption_tests.cpp app/native_client/native_stellar_eruptions.cpp app/native_client/native_general_settings.cpp)
+ target_include_directories(stellar_native_eruption_tests PRIVATE app/native_client)
+ target_link_libraries(stellar_native_eruption_tests PRIVATE stellar_core stellar_native_platform stellar_json)
+ add_test(NAME native_stellar_eruptions COMMAND stellar_native_eruption_tests "${CMAKE_SOURCE_DIR}")
+ set_tests_properties(native_stellar_eruptions PROPERTIES TIMEOUT 180)
+ add_executable(stellar_native_navigation_visual_tests native-tests/native_navigation_visual_tests.cpp app/native_client/native_system_travel.cpp app/native_client/native_system_view.cpp)
+ target_include_directories(stellar_native_navigation_visual_tests PRIVATE app/native_client)
+ target_link_libraries(stellar_native_navigation_visual_tests PRIVATE stellar_core stellar_native_platform)
+ add_test(NAME native_navigation_visual COMMAND stellar_native_navigation_visual_tests "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf" "${CMAKE_BINARY_DIR}/navigation-visual")
+endif()
+
+add_custom_target(stellar_native_starfield_assets ALL
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/assets/visual/starfields"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/assets/visual/starfields/faint-map-reference.png" "${CMAKE_BINARY_DIR}/assets/visual/starfields/faint-map-reference.png")
+add_dependencies(stellar-continuum-native stellar_native_starfield_assets)
+
+if(BUILD_TESTING)
+ add_executable(stellar_system_background_tests native-tests/system_background_tests.cpp app/native_client/native_phenomena.cpp)
+ target_include_directories(stellar_system_background_tests PRIVATE app/native_client)
+ target_link_libraries(stellar_system_background_tests PRIVATE stellar_native_platform stellar_core stellar_json)
+ add_test(NAME system_background COMMAND stellar_system_background_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/sky-test-captures")
+ set_tests_properties(system_background PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE)
+endif()

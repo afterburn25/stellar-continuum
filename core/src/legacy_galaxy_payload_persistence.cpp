@@ -184,6 +184,8 @@ restore_legacy_galaxy_payload(const LegacyGalaxyPayloadDto &input) {
   for (auto &fleet : galaxy.fleets)
     ensure_fleet_combat_state(fleet);
 
+  validate_stellar_activity_clock(payload.stellar_activity_day);
+  galaxy.stellar_activity_day = payload.stellar_activity_day;
   galaxy.generation_metadata = validate_galaxy_generation_metadata(
       payload.generation_metadata, galaxy.seed, galaxy.systems);
   galaxy.galactic_core =

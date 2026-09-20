@@ -54,6 +54,7 @@ struct FleetSaveDto {
   std::optional<FleetCombatSaveDto> combat;
   std::optional<MassiveCombatLoadout> tactical_loadout;
   std::optional<MassiveVesselState> tactical_vessel;
+  std::vector<std::array<float,2>> stellar_transit_path;
 };
 
 std::vector<FleetState> restore_fleet_dtos(

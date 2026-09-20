@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 9.5367431640625e-07,
+    "disc": [
+      1023.5821841163715,
+      1031.10147757675,
+      842.7964918466408
+    ],
+    "id": "sol-ariel",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.5113605267816611,
+      0.6086423242055272,
+      0.7
+    ],
+    "seamError": 0.015065438365352658,
+    "usable": true
+  },
+  "id": "sol-ariel",
+  "name": "Ariel",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "1aa3df47cf89195634b16aac746c0dfb37678b36bbf8fb7c99b7f7bc771368de",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Ariel.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

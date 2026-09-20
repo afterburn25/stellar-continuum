@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1025.5699299755354,
+      1023.8556790211348,
+      943.6298285498032
+    ],
+    "id": "giant-amber-storm-06",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.37213417691321915,
+      -0.2918900277548501
+    ],
+    "seamError": 0.01427162930911827,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_gas_giant_planet_Amber__0f50660c-41bb-4895-8845-d89be6f56df9_1.png",
+  "folder": "Gas Giants/Gas Giant B - Amber Storm Giant",
+  "height": 2048,
+  "id": "giant-amber-storm-06",
+  "index": 34,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": -18
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "gas-giant",
+  "reason": "",
+  "sha256": "bddd4e0694a976ef618b9d412915cdc78d703790ceb38ace848acd9926f4a7c1",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Gas Giants/Gas Giant B - Amber Storm Giant/afterburn25._fictional_photorealistic_gas_giant_planet_Amber__0f50660c-41bb-4895-8845-d89be6f56df9_1.png",
+  "status": "candidate",
+  "subclass": "amber-storm",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "detailed-clouds",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-03.png",
+    "sourceBandRollDegrees": -18,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

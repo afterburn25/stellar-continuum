@@ -2,6 +2,8 @@
 
 #include "native_shipyard_controller.hpp"
 #include "native_ship_art_assets.hpp"
+#include "native_dropdown.hpp"
+#include <filesystem>
 
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -25,24 +27,34 @@ struct ShipyardWorkspaceLayout {
   stellar::native_map::UiRect readiness;
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect action;
+  stellar::native_map::UiRect categories,search,sort,filter,minus,plus,quantity,favorite;
 
   [[nodiscard]] static ShipyardWorkspaceLayout for_viewport(int width,
                                                              int height) noexcept;
 };
 
-enum class ShipyardWorkspaceCommandKind { None, Start, PrepareCancel, Cancel };
+enum class ShipyardWorkspaceCommandKind { None, Start, PrepareCancel, Cancel, MoveUp, MoveDown };
 
 struct ShipyardWorkspaceCommand {
   ShipyardWorkspaceCommandKind kind{ShipyardWorkspaceCommandKind::None};
   bool captured{};
   std::string id;
+  int quantity{1};
 };
 
 class NativeShipyardWorkspace final {
 public:
   void open() noexcept;
+  using TextMeasurer=std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>;
+  void set_text_measurer(TextMeasurer value){measure_=std::move(value);}
+  [[nodiscard]] bool popover_open()const{return dropdown_.visible();}
+  void bind_preferences(std::filesystem::path);
+  [[nodiscard]] bool wants_text_input()const{return visible_&&search_focused_;}
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
+  [[nodiscard]] bool confirmation_open() const noexcept {
+    return cancel_confirmation_id_.has_value();
+  }
 
   void set_view(stellar::native_shipyard::NativeShipyardView view);
   void discard_campaign();
@@ -52,6 +64,8 @@ public:
   view() const noexcept;
   [[nodiscard]] const std::optional<std::string> &selected_design_id() const noexcept;
   [[nodiscard]] const std::optional<std::string> &selected_order_id() const noexcept;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  design_bounds(std::string_view design_id, int width, int height) const;
 
   [[nodiscard]] ShipyardWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
@@ -62,6 +76,10 @@ public:
   }
 
 private:
+  [[nodiscard]] std::vector<const stellar::native_shipyard::NativeShipDesign*> filtered_designs()const;
+  [[nodiscard]] std::string batch_blocker()const;
+  [[nodiscard]] stellar::native_map::UiRect card(std::size_t,const ShipyardWorkspaceLayout&)const;
+  bool save_preferences();
   [[nodiscard]] const stellar::native_shipyard::NativeShipDesign *
   selected_design() const noexcept;
   [[nodiscard]] const stellar::native_shipyard::NativeShipyardOrder *
@@ -79,6 +97,15 @@ private:
   float design_scroll_{};
   float order_scroll_{};
   mutable int last_ship_art_rows_{};
+  std::filesystem::path preferences_path_;
+  std::vector<std::string> favorites_;
+  std::string search_;
+  int category_{},sort_{},filter_{},quantity_{1};
+  bool search_focused_{};
+  float detail_scroll_{};
+  mutable float detail_limit_{};
+  stellar::native_ui::Dropdown dropdown_;
+  TextMeasurer measure_;
 };
 
 } // namespace stellar::native_shipyard_ui

@@ -1,3 +1,5 @@
+#include <stellar/engine/native_ui_skin.hpp>
+#include "native_campaign_calendar.hpp"
 #include "native_settlement_workspace.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
@@ -39,17 +41,39 @@ SettlementWorkspaceLayout SettlementWorkspaceLayout::for_viewport(int width,int 
   return {scale,static_cast<int>(std::lround(23.f*scale)),static_cast<int>(std::lround(16.f*scale)),static_cast<int>(std::lround(13.f*scale)),{0,0,w,h},panel_rect,{panel_rect.x+panel_rect.width-button_w-18.f*scale,bottom,button_w,button_h},{panel_rect.x+18.f*scale,bottom,button_w,button_h}};
 }
 
-void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){preview_=std::move(value);}
-void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};}
+void NativeSettlementWorkspace::reset_gesture() noexcept { pointer_owned_=false; pressed_=PressTarget::None; press_width_=press_height_=0; }
+void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();preview_=std::move(value);}
+void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};reset_gesture();}
 
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};
   pointer_=event.position;
   if(event.type==InputEventType::EscapePressed){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
   const auto layout=SettlementWorkspaceLayout::for_viewport(width,height);
+  if(event.type==InputEventType::PointerCancelled){reset_gesture();return {SettlementWorkspaceCommandKind::None,true};}
+  if(pointer_owned_&&(width!=press_width_||height!=press_height_)){reset_gesture();}
   if(event.type==InputEventType::LeftPressed){
-    if(layout.cancel.contains(event.position)){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
-    if(layout.confirm.contains(event.position)&&preview_->accepted)return {SettlementWorkspaceCommandKind::Confirm,true};
+    if(!layout.panel.contains(event.position))return {SettlementWorkspaceCommandKind::None,true};
+    pointer_owned_=true;press_width_=width;press_height_=height;
+    pressed_=layout.cancel.contains(event.position)?PressTarget::Cancel:
+             (layout.confirm.contains(event.position)&&preview_->accepted?PressTarget::Confirm:PressTarget::None);
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
+  if(event.type==InputEventType::PointerMove){
+    if(pointer_owned_ && pressed_==PressTarget::Confirm && !layout.confirm.contains(event.position)) pressed_=PressTarget::None;
+    if(pointer_owned_ && pressed_==PressTarget::Cancel && !layout.cancel.contains(event.position)) pressed_=PressTarget::None;
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
+  if(event.type==InputEventType::LeftReleased){
+    const bool captured=true;
+    const auto target=pressed_;
+    const bool activate=pointer_owned_&&target!=PressTarget::None&&
+      ((target==PressTarget::Cancel&&layout.cancel.contains(event.position))||
+       (target==PressTarget::Confirm&&preview_->accepted&&layout.confirm.contains(event.position)));
+    reset_gesture();
+    if(!activate)return {SettlementWorkspaceCommandKind::None,captured};
+    if(target==PressTarget::Cancel){clear();return {SettlementWorkspaceCommandKind::Cancel,true};}
+    return {SettlementWorkspaceCommandKind::Confirm,true};
   }
   return {SettlementWorkspaceCommandKind::None,true};
 }
@@ -57,7 +81,7 @@ SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&ev
 void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   if(!preview_)return;
   const auto layout=SettlementWorkspaceLayout::for_viewport(width,height);const auto&p=*preview_;
-  fill(out,layout.shade,shade);fill(out,layout.panel,panel);stroke(out,layout.panel,border);
+  fill(out,layout.shade,shade);stellar::engine::ui_skin::surface(out,layout.panel,layout.scale);
   float x=layout.panel.x+20.f*layout.scale,y=layout.panel.y+17.f*layout.scale;
   const float content_w=layout.panel.width-40.f*layout.scale,line=25.f*layout.scale;
   auto add=[&](std::string value,Color color=muted,int size=0,float step=0.f){label(out,{x,y,content_w,line},std::move(value),color,size?size:layout.body_font);y+=step?step:line;};
@@ -71,7 +95,7 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
     add("Route distance  "+stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years));
     if(p.candidate->reach.route_system_ids)add("Confirmed lane route  "+std::to_string(p.candidate->reach.route_system_ids->size()>0?p.candidate->reach.route_system_ids->size()-1:0)+" hop(s)");
     add("Travel duration estimate unavailable",muted,layout.small_font);
-    add("Establishment after arrival  "+number(establishment_days(p.kind),0)+" days");
+    add("Establishment after arrival  "+stellar::native_campaign::format_campaign_duration(establishment_days(p.kind)));
     if(p.kind==NativeSettlementMissionKind::Colony){
       add("Natural habitability  "+number(p.candidate->natural_habitability*100.,1)+"%  |  Operational capacity  "+number(p.candidate->unprotected_operational_capacity*100.,1)+"%");
     }else{
@@ -80,7 +104,7 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   }
   y=layout.confirm.y-66.f*layout.scale;
   label(out,{x,y,content_w,55.f*layout.scale},p.message,p.accepted?good:bad,layout.small_font);
-  fill(out,layout.cancel,layout.cancel.contains(pointer_)?Color{33,67,91,255}:row);stroke(out,layout.cancel,border);label(out,layout.cancel,"CANCEL",text_color,layout.body_font,TextAlign::Center);
-  const auto can_confirm=p.accepted;fill(out,layout.confirm,can_confirm?(layout.confirm.contains(pointer_)?Color{30,91,72,255}:Color{17,66,56,255}):Color{31,39,49,255});stroke(out,layout.confirm,can_confirm?good:muted);label(out,layout.confirm,"CONFIRM MISSION",can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
+  stellar::engine::ui_skin::control(out,layout.cancel,layout.cancel.contains(pointer_),false,true,layout.scale);label(out,layout.cancel,"CANCEL",text_color,layout.body_font,TextAlign::Center);
+  const auto can_confirm=p.accepted;stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,can_confirm,layout.scale);label(out,layout.confirm,"CONFIRM MISSION",can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
 }
 } // namespace stellar::native_colony_ui

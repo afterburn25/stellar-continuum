@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 1.430511474609375e-06,
+    "clippedFraction": 2.002716064453125e-05,
+    "disc": [
+      1016.9206896586052,
+      1029.459199541446,
+      926.4314052282597
+    ],
+    "id": "sol-rhea",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      -0.2544068573014404,
+      0.7
+    ],
+    "seamError": 0.01594195305217888,
+    "usable": true
+  },
+  "id": "sol-rhea",
+  "name": "Rhea",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "bc2a06f2733fcda62dfc4c0843ed6a6c20c3c6d471355ca63a291a72a23adc8b",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Rhea.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

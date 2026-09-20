@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Immersive system map handoff
 
 Updated: 2026-09-10. Branch: `work/immersive-system-map`. Integration baseline: `5763a1e` (`integration`). This handoff records the current working tree candidate; no commit or direct integration change was made here.

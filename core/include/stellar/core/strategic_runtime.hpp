@@ -2,6 +2,7 @@
 
 #include <stellar/core/strategic_input_builder.hpp>
 #include <stellar/core/strategic_planning.hpp>
+#include <stellar/core/civilization_control.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -29,6 +30,8 @@ public:
   void remove_civilization(int civilization_id) noexcept;
   void clear() noexcept;
   [[nodiscard]] std::size_t cached_plan_count() const noexcept;
+  [[nodiscard]] std::vector<CivilizationStrategicPlan> snapshot() const;
+  void restore(std::span<const CivilizationStrategicPlan>);
 
 private:
   CivilizationStrategicInputBuilder input_builder_;
@@ -39,6 +42,13 @@ private:
 struct StrategicRuntimeWorldView {
   std::int64_t campaign_seed{};
   StrategicInputWorldView input;
+  CivilizationControlQuery control;
+};
+
+struct StrategicRuntimeSnapshot {
+  std::optional<std::int64_t> campaign_seed;
+  double strategic_days{};
+  std::vector<CivilizationStrategicPlan> plans;
 };
 
 class CivilizationStrategicRuntimeCoordinator {
@@ -59,6 +69,9 @@ public:
   [[nodiscard]] double strategic_days() const noexcept;
   [[nodiscard]] std::optional<std::int64_t> campaign_seed() const noexcept;
   void reset() noexcept;
+  void remove_civilization(int civilization_id) noexcept;
+  [[nodiscard]] StrategicRuntimeSnapshot snapshot() const;
+  void restore(const StrategicRuntimeSnapshot &);
 
 private:
   void ensure_campaign(std::int64_t seed) noexcept;

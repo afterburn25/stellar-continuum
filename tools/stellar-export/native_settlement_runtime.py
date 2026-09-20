@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_bmp import validate_bmp
 
 _COST = {"colony": 120.0, "outpost": 90.0}
 _DURATION = {"colony": 30.0, "outpost": 20.0}
@@ -70,25 +71,8 @@ def _diagnostic(stdout: str, expected_mode: str, expected_kind: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native settlement did not capture a BMP frame")
-    declared = struct.unpack_from("<I", data, 2)[0]
-    offset = struct.unpack_from("<I", data, 10)[0]
-    header = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required = row * abs(actual_height)
-    if (declared != len(data) or offset < 54 or header < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or required <= 0 or
-            offset + required > len(data)):
-        raise RuntimeError("Native settlement capture has invalid renderer geometry")
-    pixels = data[offset:]
-    if not pixels or min(pixels) == max(pixels):
-        raise RuntimeError("Native settlement capture contains no rendered variation")
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "settlement", stdout=stdout)
 
 
 def _player_parts(payload):
@@ -261,7 +245,7 @@ def validate_native_settlement_export(folder: Path, env: dict[str, str]):
                                  base_result.stdout)
         if not base_uploads:
             raise RuntimeError("Native settlement fresh-base launch lacked image-upload diagnostics")
-        _bmp(base_capture, 1280, 720)
+        _bmp(base_capture, 1280, 720, base_result.stdout)
         if not base_save.is_file():
             raise RuntimeError("Native settlement fresh-base launch wrote no Player17 save")
         base = json.loads(base_save.read_text(encoding="utf-8-sig"))
@@ -298,7 +282,7 @@ def validate_native_settlement_export(folder: Path, env: dict[str, str]):
                 if not uploads or int(uploads.group(1)) < 1:
                     raise RuntimeError("Native settlement did not prove orbital image uploads")
                 state = _diagnostic(result.stdout, label, kind)
-                _bmp(capture, width, height)
+                _bmp(capture, width, height, result.stdout)
                 payload = json.loads(save.read_text(encoding="utf-8-sig"))
                 payload_day = _finite(payload.get("SimulationDays"), "saved day")
                 if (payload.get("FormatVersion") != 17 or

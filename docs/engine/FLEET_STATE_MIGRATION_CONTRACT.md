@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Native fleet state dependency
 
 This gate follows the paid construction migration and is required before real shipyard completion. It preserves current game data and combat initialization without claiming fleet travel, battle simulation or save-v16 parity. The ship-design contract and `fleet_role.hpp` in this draft directory are already frozen.

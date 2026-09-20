@@ -3,7 +3,7 @@ on:
   push:
     branches: ["engine/**"]
   pull_request:
-    branches: [integration, main]
+    branches: [integration, main, "engine/stellar-engine-migration"]
     paths:
       - "engine/**"
       - "core/**"
@@ -77,9 +77,17 @@ on:
       - "third_party/**"
       - "tools/stellar-export/**"
       - "export/**"
+      - ".gitattributes"
+      - "assets/visual/**"
+      - "assets/audio/**"
+      - "docs/SOL_VISUAL_SOURCES.md"
+      - "docs/engine/NATIVE_*_SOURCES.md"
       - "CMake*"
       - ".github/workflows/stellar-engine.yml"
   workflow_dispatch:
+concurrency:
+  group: stellar-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -88,6 +96,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -99,6 +109,28 @@ jobs:
       - name: Build, test and export native foundation
         shell: pwsh
         run: python tools/stellar-export/stellar.py export windows-benchmark
+      - name: Build native client and check presentation without a graphics device
+        shell: pwsh
+        run: |
+          @'
+          import sys
+          sys.path.insert(0, 'tools/stellar-export')
+          import stellar
+          env = stellar.build_environment()
+          stellar.run(['cmake', '--preset', 'windows-native-preview'], env=env)
+          stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4',
+                       '--target', 'stellar-continuum-native', 'stellar_native_audio_tests',
+                       'stellar_native_audio_director_tests', 'stellar_native_audio_settings_tests',
+                       'stellar_native_surface_art_tests', 'stellar_territory_tests',
+                       'stellar_galaxy_marker_tests', 'stellar_galaxy_label_tests',
+                       'stellar_native_triangle_mesh_tests', 'stellar_surface_view_tests',
+                       'stellar_surface_visual_tests',
+                       'stellar_native_diplomacy_workspace_tests'],
+                      env=env, timeout=600)
+          stellar.run(['ctest', '--preset', 'windows-native-preview', '-R',
+                       '^(native_audio|native_audio_director|native_audio_settings|native_surface_art|native_territory_projection|native_galaxy_star_markers|native_galaxy_labels|native_diplomacy_workspace|native_surface_workspace|native_triangle_mesh)$', '--output-on-failure'], env=env)
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report
         uses: actions/upload-artifact@v4
         with:

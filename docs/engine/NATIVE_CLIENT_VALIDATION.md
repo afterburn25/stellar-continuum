@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Native C++ galaxy preview
 
 The engine and client target is C++23. The preserved Godot/C# game remains the behavioral reference and current full playable baseline. C# added under `tests/` generates reference fixtures; it is not shipped with the native runtime.
@@ -5,6 +12,35 @@ The engine and client target is C++23. The preserved Godot/C# game remains the b
 The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`. SDL 3.4.16 supplies the window, input and explicit Vulkan GPU rendering. The Engine platform accepts projected lines, soft round points, cached antialiased text, immutable RGBA images and ordered world/panel/text layers, with no Core dependency. The client owns the selected 250/500/1,000/2,500-system campaign through the integrated runtime and campaign frame adapter.
 
 ## Current interaction
+
+- Selecting a system-view planet shows grouped metric physical/environment facts
+  and known moons/signals. Measured rows scroll at 720p; Focus Planet centers the
+  selection without changing zoom. Exact values remain survey-gated; Open Colony
+  keeps its existing ownership checks. See `NATIVE_BODY_INSPECTION.md`.
+
+- A single chart-star click opens a survey-gated system inspector. Header/progress
+  stay pinned while measured findings/own-colony rows scroll; pointer gestures
+  cannot pan the map or issue fleet orders through the panel. The maintained
+  720p/1080p replay preserves campaign, camera, selection and paused saves, with
+  known/unknown/scrolled-end captures. See `NATIVE_SYSTEM_INSPECTION.md`.
+
+- Research has renderer-measured detail sections, independently bounded scroll,
+  a pinned action/result, and stable reading position during routine simulation
+  updates. Its maintained replay requires 720p fresh and 1080p reload captures
+  plus final-line sidecars, funded progress and exact paused Player17 equality.
+  See `NATIVE_RESEARCH.md` for the focused regression and actual-frame evidence.
+
+- RELATIONS opens an observer-safe contact directory, communications artwork, relationship meters, agreements/proposals/history/intelligence, and canonical negotiation/war/proposal commands. Contact changes refresh while paused; stale confirmations are rejected. Scroll drawing and hit areas are clipped together. The C# workspace has no grievance display or full demand/trade composer, and claims belong on the strategic map, so those are not outstanding native parity gaps.
+
+- The territory candidate preserves the C# strategic smoothing, continuous fills,
+  stitched contours, fog, unexplored dimming and observer-visible claim outlines.
+  It consumes an observer-filtered DTO and prepares on one Engine `JobSystem`
+  worker; the owner admits at most one job, coalesces the newest input, and accepts
+  only the current generation/fingerprint/clear epoch. Current terminal failures
+  report once without retry; stale results and failures are discarded. Requests
+  are capped at 2 Hz, 2,500 systems, 4,096 visible anchors, 4,096 claims and
+  256-byte names. The fill atlas plus fog is below 2.1 MiB. This changes no Core
+  rule or Player17 field.
 
 - Approved main-menu and loading artwork uses immutable cached images, responsive translucent controls and the requested seven-second application boot. Generation/save artwork follows the request through activation; each operation displays a gameplay tip. See NATIVE_STARTUP_ARTWORK.md.
 
@@ -38,6 +74,351 @@ The opt-in `windows-native-preview` preset builds `stellar-continuum-native.exe`
 - VSync follows display refresh. If the backend rejects it, the reason is logged and presentation is bounded to the detected refresh.
 
 ## Validation evidence
+
+### HUD/pause capture gate (2026-09-15)
+
+The native client validator now runs fresh pause-menu capture at 1280x720
+and paused reload capture at 1920x1080 with separate output paths. Both
+BMPs must have the requested dimensions, a complete pixel payload and
+nonuniform rendered pixels. It retains both images for inspection and
+preserves complete Player17 equality apart from the save timestamp.
+Package paths are resolved before entering the isolated working directory.
+This prevents a stale fresh screenshot from satisfying a reload check.
+See `../CPP_MIGRATION_HANDOFF.md` for current runtime evidence.
+
+### Current readability checkpoint (2026-09-15)
+
+This native C++ checkpoint builds the full MSVC app with the galaxy-label target at
+`/W4 /WX`. Six focused CTests passed in 1.67 seconds: `native_diplomacy_controller`,
+`native_diplomacy_workspace`, `native_galaxy_backdrop`, `native_galaxy_star_markers`,
+`native_galaxy_labels`, and `native_territory_projection`
+(`work/native-label-runtime.log`). Ninety-seven Python checks passed in 6.183 seconds
+across `test_native_diplomacy_runtime`, `test_native_galaxy_runtime`, and
+`test_native_client_runtime` (`work/native-label-python.log`).
+
+Four relocated real-Vulkan runs passed: 500-system galaxy fresh/reload at 720p and
+1080p, plus diplomacy acceptance/reload at 720p and 1080p. Evidence is in
+`work/native-label-galaxy-evidence.json` and `work/native-label-diplomacy-evidence.json`.
+The runs preserve complete paused Player17 equality, observer secrecy, unrelated
+acceptance state and claims, and the source-fixture hash. Overview has 500 canonical
+markers and zero label audit counts; it does not have zero markers. Regional 720p and
+1080p each report 6 candidates, 6 measured, 3 placed, and zero collision/offscreen
+audit counts. Root inspection covered overview 1080p, regional 720p/1080p, and
+diplomacy 720p: Sol and empire names are visible, territory fill is stronger, names
+do not stack, and a 720p empire leader line terminates outside its territory border.
+
+The algorithm measures the actual render font, filters invalid/offscreen candidates
+before deterministic sorting, and collision-tests placements after measurement. It
+prioritizes selected system, empire, then nearby known stars; tries 48 fixed,
+size-aware empire positions nearest first; retains an anchor leader line when the gap
+exceeds 32px; and checks HUD, stars, the fleet panel, labels, and viewport bounds. Its
+maximum is 128 measurements, including 32 empires. The 2,500-candidate dense test
+establishes only the measurement budget, not 2,500 GPU labels or
+60 FPS. Fill multiplier/contour are `0.16`/`0.72`; known names with no legal location
+are omitted. Selected priority has unit coverage only, not a selected-runtime capture.
+This is presentation-only: C++ Core, projection math, and Player17 remain unchanged.
+
+`43622e72` is the prior readability checkpoint: 95 Python checks and CI
+`34985891256` covered seven existing presentation targets before galaxy labels. Its
+faint-fill/overlapping-label finding is addressed by this pass. The current 97 tests
+and label evidence belong to this checkpoint; new-label CI is pending. `graphicalParity=false`;
+Engine 0.1.58 candidate/game 0.1.7-alpha is unmerged and unsealed, and clean-machine
+and broad-hardware 60 FPS remain unproven. `891fbcb2` and duplicate-audio `dbf07f81`
+remain unimported: PR #332 audio is authoritative, while review found callback races,
+clip-tail looping, non-atomic lowercase preferences, and lifecycle conflicts (issue
+#324 comment `5682904661`). Orbital `eb1ab876` remains unimported pending Core's
+physical-body/system/orbit contract. Next: colony buildings/roads and wider casting.
+
+Territory preparation measurements for 500 systems/3 empires/6 colonies,
+500/3/100, 2,500/6/30 and 2,500/6/500 were respectively: synchronous cold
+179/347/591/3,915 ms; final owner request 0.0937/0.0948/0.4770/0.4718 ms;
+unchanged poll 0.0432/0.0889/0.4609/0.4915 ms; scheduling-inclusive worker
+completion 392/479/609/4,985 ms. At the prior territory checkpoint, the full-native
+MSVC build passed and five focused CTests passed in 1.79 seconds. The suites
+`test_native_diplomacy_runtime`, `test_native_galaxy_runtime` and
+`test_native_client_runtime` passed all 95 checks in 5.778 seconds, including 26 diplomacy
+checks and two duplicated-map sidecar rejection cases. A closed RELATIONS workspace
+had retained its view and performed hidden drawing/portrait work. Close intentionally
+retains its view for reopening; visibility-gated rendering skips all hidden
+draw/provider work, and regression coverage verifies a clean reopen. Relations Escape/Close also cancels its
+stale map gesture so the next wheel event zooms immediately.
+
+Two repaired real-Vulkan diplomacy runs passed at acceptance 720p and paused
+reload 1080p. Both inspected BMPs show the map, rounded cyan home border, purple
+dashed foreign claim, original nebula art and no hidden RELATIONS panel. Each
+reports one region/claim, 14 contour and 36 claim draws, one fill atlas, one fog
+image, 1,998,656 cached bytes and 19 unknown systems. Acceptance preserved the
+entire unrelated payload and claims; paused reload matched the whole Player17
+payload, and the fixture hash was unchanged. The two existing 500-system galaxy
+runs remain valid, making four territory runtime runs in total; overview/regional
+images were inspected. Evidence: `work/native-territory-diplomacy-evidence.json`,
+`work/native-territory-visibility-runtime.log` and
+`work/native-territory-final-python.log`.
+
+The preceding `43622e72` checkpoint found faint regional fill and overlapping nearby
+labels; the current readability pass above addresses that polish debt. Published head
+`c4744e1c` passed CI run `34978964654`; the updated GPU-free job compiles the full
+native application plus territory, star-marker and diplomacy-workspace targets. The
+new galaxy-label CI remains pending. This is an unmerged local candidate, not a
+release. The preparation timings establish bounded owner responsiveness and background latency, not
+sustained frame rate.
+
+The combined Engine 0.1.58 candidate passed seven focused native CTests, 18 diplomacy-validator Python checks, 45 packaging/checkout checks and six actual Vulkan diplomacy/system/galaxy launches at 720p/1080p. The diplomacy fixture retains existing contacts and agreements while adding isolated observations and an incoming research exchange. Real UI input changes selection, accepts the proposal, scrolls the new agreement into view, renders the packaged 2172×724 communications scene and hides unidentified identities/metrics/art. Progress validation preserves unrelated state; paused reload compares the complete saved payload except its timestamp. Baseline normalization follows the existing Player17 parity contract for fixture-only metadata and single-precision map coordinates. See the current C++ migration handoff and `work/native-diplomacy-final-*.json`; this is focused candidate evidence, not a new sealed release or full visual parity.
+
+The async manual-save candidate keeps the existing atomic writer/recovery and save schema: immutable snapshots are captured on the owner thread, encoding/IO runs on the existing worker, and queued requests coalesce. Completion is polled even while minimized; failed completion cancels queued manual save/exit requests so they cannot conceal the error. Autosave retry scheduling is unchanged. Explicit load/exit drains remain synchronous. Nine actual Vulkan map/transit/diplomacy launches passed; focused save/session/JSON/recovery results are in `native-save-background-tests.log`. Manual-save CPU update maxima improved from 130.901/130.302 to 7.272/2.610 ms (system), 130.953/129.773 to 5.080/2.955 ms (galaxy), and 32.392–35.940 to 1.008–1.157 ms (travel). Cold system scene remains ~340–346 ms; frame p95 remains ~33 ms including VSync, so this is not a 60 FPS claim. Evidence: `native-save-background-runtime.log`, `native-save-background-diplomacy.log`, and `work/save-background-diplomacy.json`. Earlier diplomacy head `0e0835ae` passed CI `34934085259`; the save candidate requires its own run.
+
+Smoke diagnostics retain the existing frame-interval mean and p95 and now report
+`phase_samples` plus mean/p95 for `update`, `scene`, and `render_present` in
+milliseconds. These measure campaign update, CPU draw-list preparation, and
+renderer submission/presentation respectively. The last phase includes VSync or
+fallback waiting; it is not a GPU-only measurement. Capture frames are excluded
+from phase samples so screenshot readback and file writes do not inflate them.
+Normal play does not retain timing histories. These short checks locate likely
+bottlenecks; they are not sustained-FPS certification.
+
+`smoke_timing` also records phase maxima and frame indices for cold frames 1–10,
+the frame-61 save request service, capture/transition frames (normally 120 onward), and other
+steady frames. Unlike the existing phase means/p95, maxima include capture frames
+in their separate bucket; expensive cold work remains visible in the overall maxima.
+
+Cold celestial follow-up: five focused CTests (celestial appearance, planet discs,
+system workspace, system colony entry, settlement workspace) and four final Vulkan
+system/galaxy launches passed. Optional `--capture` in the existing celestial/planet
+test executables records RGBA and dimensions/timings; eight before/after resources
+match exactly across all 19,398,656 bytes. This covers three star colors/seeds, the
+black hole, front/back rings, and Mercury/Neptune. Star generation improved from
+207.7–210.4 to 79.8–80.3 ms by skipping mathematically invisible work; resolution,
+granulation, sunspots, corona and transient flare behavior are retained. Full first
+system scene is now 209.7–213.0 ms, and final frame p95 remains about 33 ms including
+VSync. Further entry/pacing work is needed. Evidence: `native-celestial-cold-tests.log`,
+`native-celestial-cold-final-runtime.log`, `work/celestial-pixel-comparison.json`, and
+`work/cold-after-{system,galaxy}.json`. Native CI `34936942630` covers the preceding
+save fix at `b110e223`; the celestial head `c373aed4` subsequently passed native
+CI `34939226242`.
+
+### Background system imagery
+
+The native client now shares one Engine `ImagePreparationQueue` between stars,
+rings and planet discs. It uses the existing JobSystem with one worker, a maximum
+of 16 outstanding jobs and 32 MiB of reserved output. Ready results still consume
+capacity until collected. CPU factories capture immutable appearance/root values;
+simulation, image-cache changes and GPU work stay on the owner thread. Existing
+final-image/cache limits remain. Missing/corrupt assets deliver a useful path and
+cause on the owner thread; they do not become silent fallback successes.
+
+While images prepare, navigation and temporary imagery remain available with a
+progress label. Screenshot gates wait for the completed rendered frame (or fail
+after 600 extra frames). Added wait frames never extend the steady sample window.
+Smoke output reports `artwork_pending_frames`, `artwork_prepare_max_ms` and
+`artwork_capture_wait_frames` separately from scene CPU time.
+
+Six focused CTests passed (queue ownership/lifetime/error behavior, complete
+synchronous/background RGBA equality, observer-safe planet requests, workspace,
+colony entry and settlement). An added workspace readiness/progress/mouse-input
+regression and 42 Python system/galaxy/travel export tests then passed. Seven real
+Vulkan launches passed the existing image, travel, secrecy and exact paused
+save/reload gates; finished Sol and galaxy-to-Sol captures were inspected.
+
+| Scene CPU maximum | 720p before | 720p after | 1080p before | 1080p after |
+| --- | ---: | ---: | ---: | ---: |
+| First Sol frame | 211.452 ms | 2.936 ms | 211.567 ms | 2.807 ms |
+| Galaxy capture transitions | 207.769 ms | 19.779 ms | 209.287 ms | 19.577 ms |
+
+Final artwork arrives asynchronously in about 213–258 ms. Galaxy-to-Sol capture
+waits were 15/16 frames, so these images include finished textures, not placeholders.
+Four 600-frame paused-map profiles averaged 16.717–16.722 ms, with p95
+16.913–17.026 ms and p99 17.487–18.950 ms. Galaxy startup still costs 45–46 ms;
+regional scenery and upload/presentation tails remain, and busy campaigns/hardware
+are not certified at 60 FPS. No visual-quality reduction or gameplay rule change.
+
+Evidence: `native-background-art-{tests,capture-tests,owner-tests,runtime}.log`,
+`work/background-art-{system,galaxy,travel}.json`, and `build-native/preview-*.bmp`.
+Baseline: `work/steady-baseline-{system,galaxy}.json`. Previous head `b491783c`
+passed native CI `34942125331`; system-art head `96b83092` passed `34946960470`.
+
+### Background galaxy imagery
+
+Deep-field, galaxy-layer and regional-nebula decoding now shares the same bounded
+Engine queue as system imagery. Three cache slots allow at most 8 MiB per image;
+the existing WIC decode scratch bound is separate. Completed layers retain their
+original pixels, order and geometry. Central secrecy fog is present even while
+scenery is pending. Main keeps navigation active, shows preparation in the existing
+status region and waits for final galaxy imagery before smoke screenshots.
+
+The strict build, three focused CTests and 46 Python galaxy/system/diplomacy export
+checks passed. Backdrop tests exercise a deliberately blocked worker, saturation,
+duplicate requests, view changes, cancellation, owner-thread violations, missing
+paths and an oversized WIC-readable source. Repeated synchronous and asynchronous
+oversize attempts fail with the path/cause and leave the cache empty. Final RGBA
+bytes match the synchronous path, including the secrecy fog.
+
+Six real Vulkan launches at 720p/1080p passed existing galaxy/system/diplomacy
+artwork, UI, observer and exact paused Player17 save/reload checks. Galaxy and Sol
+each included 600 steady frames per resolution. Four completed overview/regional
+BMP files are byte-identical to the preceding `96b83092` captures.
+
+| Scene CPU maximum | 720p before | 720p after | 1080p before | 1080p after |
+| --- | ---: | ---: | ---: | ---: |
+| First galaxy frame | 45.432 ms | 3.163 ms | 46.248 ms | 2.695 ms |
+| Regional capture transitions | 19.779 ms | 1.027 ms | 19.577 ms | 0.833 ms |
+
+Sol cold scene remains 2.907/2.867 ms. Across all four profiles, steady interval
+means were 16.716–16.721 ms, p95 16.935–17.087 ms and p99 17.338–19.141 ms. A cold
+render/present maximum of about 67 ms at frame 7 remains to investigate; these
+measurements do not certify every frame, busy campaigns or other hardware at
+60 FPS. There is no visual-quality reduction or authoritative simulation change.
+
+Evidence: `native-galaxy-background-{tests,runtime}.log`,
+`work/galaxy-background-{galaxy,system,diplomacy}.json`,
+`work/galaxy-background-pixel-comparison.json`, and `build-native/preview-*.bmp`.
+Previous head `96b83092` passed native CI `34946960470`; the galaxy checkpoint
+requires its own run. It remains an unmerged Engine 0.1.58 candidate.
+
+### Optional running-campaign profile
+
+Use `--campaign-profile <capture.bmp> --save-path <isolated.player17.json>
+--profile-frames 600` to run the canonical 500-system Player campaign at 8X.
+`--load` resumes a provided save; omitting it creates a fresh campaign. The
+profiler selects speed, resumes and pauses using real UI inputs. Frames 120
+through 119+N advance the existing simulation with real elapsed time, including
+ordinary autosave and AI scheduling. Manual saving is requested halfway through.
+The check requires save completion and further time advancement, then freezes the
+clock with UI pause and completes a final save. Bounded final waiting cannot
+silently replace active samples; any session/save failure fails the process.
+
+`campaign_profile` adds exact start, mid-save request/completion and final days,
+8X speed, requested sample count and UI/save completion flags. `steady_profile`
+and `cold_profile` retain their strict contracts. The older `smoke_timing`
+frame-61 save-service bucket is a legacy fixed-frame label; it does not describe
+this mode's mid-run save. Use active `steady_profile` for campaign performance.
+
+Maintained helper (after a preview build):
+
+```python
+import sys
+sys.path.insert(0, 'tools/stellar-export')
+import stellar
+from native_campaign_profile import validate_native_campaign_profile
+result = validate_native_campaign_profile(
+    stellar.ROOT / 'build-native/preview', stellar.build_environment(),
+    profile_frames=600)
+```
+
+The helper runs active 720p fresh, paused reload of a separate copy, active 1080p
+from the prior save, and another independent paused reload. It requires Vulkan,
+finished artwork/BMPs, exact days, whole Player17 equality except SavedAtUtc, and
+an unchanged active-source payload. No user saves are modified.
+`native_build` runs both frame-profile and campaign-profile Python fault tests;
+actual performance runs remain opt-in rather than altering sealed export defaults.
+
+Initial 600-frame active results on this host:
+
+| Resolution | Start / final game day | Interval mean / p95 / p99 (ms) | Update mean / max (ms) |
+|---|---|---|---|
+| 1280x720 | 0 / 80.2483424 | 16.718 / 16.917 / 18.181 | 0.305 / 5.941 |
+| 1920x1080 reload | 80.2483424 / 160.514568 | 16.722 / 17.113 / 18.817 | 0.359 / 4.434 |
+
+Mid-save request/completion days: 40.2683928/41.4707128 and
+120.5386096/121.7399. Readback and fallback throttle are zero during measurement.
+Four actual active/paused Vulkan launches passed, plus two default system runs,
+four focused CTests, 88 Python checks and four invalid CLI cases. The strict
+native build passed. See `native-active-campaign-{build,unit,runtime,validation}.log`,
+`work/active-campaign-baseline.json`, and `work/active-profile-default-system.json`.
+This is an early campaign baseline with no developed player fleet, not a late-game
+benchmark, all-hardware 60 FPS certification or a fix for the separate cold tail.
+
+### Developed campaign profile
+
+Use the maintained fresh-progression test's `--profile-save` option described in
+`NATIVE_FRESH_PROGRESSION.md` to prepare a real, paid 24-ship campaign. Pass that
+file as `initial_save` to `validate_native_campaign_profile`, with
+`profile_frames=600` and `minimum_moving_fleets=24`. The helper copies it into
+an isolated slot; the actual game never receives the original file path.
+
+The helper requires 24 owned fleets in transit at the start of each active run,
+and actual changes in their position/transit fields by stable fleet ID afterward.
+Both paused reloads retain the whole payload except the new timestamp. The
+original file bytes must remain unchanged; its SHA-256 and before/after workload
+counts are returned with the timing evidence. Stationary fleets, missing fleets,
+source mutations and insufficient workloads fail rather than qualifying as load.
+
+The fixed fixture starts on day 10154 with 500 systems, 24 ships (12 scouts and
+12 science vessels), nine total colonies and three owned colonies. Both 600-frame
+8X Vulkan runs pass, followed by independent paused reloads. All 24 ships move
+in each interval; they remain in transit after 720p and have arrived by the final
+1080p save. This does not claim all 24 remain in transit for every measured frame.
+
+| Resolution | Start / final game day | Interval mean / p95 / p99 (ms) | Update mean / max (ms) |
+|---|---|---|---|
+| 1280x720 | 10154 / 10234.2218632 | 16.713 / 17.401 / 18.516 | 0.476 / 6.154 |
+| 1920x1080 reload | 10234.2218632 / 10314.4471072 | 16.714 / 17.604 / 18.560 | 0.385 / 3.586 |
+
+Four developed active/paused launches and two default system runs pass. The
+actual 1080p frame shows finished galaxy art, fleet outliner, final pause and saved
+day. Evidence: `work/developed-fleet-24-profile.json`,
+`work/developed-fleet-fixed-system.json`, `native-developed-fleet-fixed-runtime.log`.
+The associated enum writer repair passes eight focused CTests and 17 Python checks.
+This is a bounded fleet workload, not huge-fleet/combat/surface parity or universal
+60 FPS certification. Engine 0.1.58 remains a candidate with graphicalParity=false.
+
+### Optional steady-frame profile
+
+Add `--profile-frames 600` to an isolated `--system-smoke <capture.bmp>` or
+`--galaxy-art-smoke <capture.bmp>` invocation. Only whole numbers 120–3600 are
+accepted. The existing warm-up and frame-60 manual-save request remain; the
+requested extra frames run before screenshot/transition work. Existing smoke
+defaults are unchanged. The helpers `validate_native_system_export` and
+`validate_native_galaxy_export` accept keyword `profile_frames=600`, retain all
+their normal gates and return `systemProfiles` / `galaxyProfiles` respectively.
+
+`steady_profile` contains the exact sample count and mean/p50/p95/p99/max for
+frame interval, update, scene, CPU submission, readback/write, fallback throttle,
+and present. Readback must be zero for these samples. The validator rejects
+missing/duplicate/truncated JSON, nonfinite/negative metrics, invalid counts and
+inconsistent quantiles. A minimize/restore interruption cannot replace a valid
+sample with a discarded interval. No sample history or per-phase draw clocks
+are collected in normal play. CPU presentation time can include GPU/driver/display
+waits; it is not GPU execution time and should not be summed with interval time.
+
+Four 600-frame profiles of a paused 500-system campaign:
+
+| View | Resolution | Interval mean / p95 / p99 (ms) | Update / scene / submission mean (ms) | Present mean (ms) |
+|---|---|---|---|---|
+| Sol | 1280×720 | 16.716 / 16.869 / 17.375 | 0.026 / 0.137 / 0.258 | 16.275 |
+| Sol reload | 1920×1080 | 16.717 / 17.025 / 17.284 | 0.033 / 0.175 / 0.323 | 16.158 |
+| Galaxy overview | 1280×720 | 16.718 / 16.834 / 18.382 | 0.026 / 0.053 / 0.260 | 16.355 |
+| Galaxy overview reload | 1920×1080 | 16.723 / 16.973 / 19.705 | 0.026 / 0.059 / 0.279 | 16.317 |
+
+All four passed actual Vulkan rendering, artwork/observer validation and exact
+paused save/reload. Readback and fallback throttle were zero throughout. Evidence:
+`native-steady-baseline-runtime.log`, `work/steady-baseline-{system,galaxy}.json`.
+The strict build, platform pixel/timing-reset test, 34 Python tests and four
+rejected native CLI cases are recorded in `native-steady-profile-{build,tests}.log`.
+These measurements support roughly 60 FPS after warm-up on this host; they do not
+cover busy campaigns or certify every resolution/GPU. Cold entry still takes
+~210–213 ms and needs staged asset preparation. Screenshot work remains visible
+in the separate timing maxima. No quality, authoritative simulation or save
+contract was changed by profiling.
+
+The subsequent cold diagnostic supplements `steady_profile` with exactly ten
+`cold_profile.rows` records when `--profile-frames` is requested. Each contains
+its frame, CPU update/scene, four `FrameTiming` phases, enclosing draw time and
+image upload before/after counts. Export results include `systemColdProfiles` or
+`galaxyColdProfiles`. Strict parsing rejects incomplete/duplicate/out-of-order
+data, nonfinite/negative timings, readback during these early frames, backwards
+upload counts and inconsistent phase totals. Normal rendering is unchanged.
+
+The strict native build and 57 Python checks passed. Four actual 600-frame map
+profiles at 720p/1080p passed artwork, UI, secrecy and exact paused reload; two
+default diplomacy runs passed too. At frame 7, present takes 65.471–66.460 ms.
+Sol's submission takes 0.236/0.258 ms with zero image uploads on that frame;
+galaxy submission takes 1.563/1.687 ms. SDL performs its deferred command flush
+inside [`SDL_RenderPresent`](https://github.com/libsdl-org/SDL/blob/release-3.4.16/src/render/SDL_render.c#L5110), so this phase includes driver/GPU/display work and
+cannot establish a GPU-only duration or a specific driver cause. Steady means
+remain 16.717–16.722 ms; no stall fix or universal 60 FPS result is claimed.
+Evidence: `native-cold-render-runtime.log`, `work/cold-render-{galaxy,system}.json`,
+`native-cold-profile-final-validation.log`, and
+`work/cold-profile-default-diplomacy.json`.
 
 Engine0.1.54 passed143CTest,245Python checks and28actualVulkan launches. New-game input and reload prove selected species/size/seed metadata, independent Unicode save paths, unchanged existing campaign bytes and whole paused payload equality exceptSavedAtUtc. The four screenshot sidecars cover setup, actual generation status, new campaign and restored campaign. Tests reject spoofed diagnostics, unsafe paths, malformed captures and altered payloads. The final load-list scrolling fix is included in the combined build.
 
@@ -90,4 +471,16 @@ One drawable-pixel layout supplies both painted rectangles and hit targets. Main
 
 ## Remaining migration
 
-Production HUD styling, full construction/unlock progression, diplomacy, 3D planet/surface views, tactical presentation and audio remain. Orbital, owned-colony telemetry, ship-delivered settlement and operational surface placement/cancellation are integrated. Native new-game selection/generation is the next integration step. Research, fleet and shipyard interaction are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The point-map/debug-text preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+Production HUD styling, full construction/unlock progression, detailed 3D planet/surface views, authoritative physical orbital sites, tactical presentation, broader character casting and dynamic speech remain. The native RELATIONS workspace covers the sections present in its C# reference; grievances and a demand/trade composer would be new product work rather than an unported reference gap. Native new-game selection/generation, orbital browsing, owned-colony telemetry, ship-delivered settlement, operational surface placement/cancellation, fixed audio/voice cues and diplomacy are integrated. These are native migration workspaces; complete source-game behavior and visuals remain unfinished. Current Player17 UTF-8 recovery is maintained; UTF-16 input remains explicitly excluded. The preview is not a replacement player release and does not claim visual parity with the user's reference images. `windows-release` remains blocked.
+
+## Native home-system supply validation
+
+The Supply rail entry opens read-only home-system totals and every authorized
+location. Maintained headless tests cover disclosure, missing state, failure and
+explicit retry, text geometry and pointer capture. The graphical exporter also
+runs fresh 720p and loaded 1080p native input replays with isolated Player17 saves,
+restricted PATH and an unrelated Unicode working directory. It verifies one
+projection per explicit refresh, paused caching, canonical totals, workspace
+isolation and complete save equality. See NATIVE_SUPPLY_NETWORK.md for scope,
+failure contracts and evidence details. A supply deficit is displayed as reported
+by Core; this UI does not manufacture a healthy network or alter economy rules.

@@ -38,35 +38,78 @@ void verify(int width, int height, float expected_scale) {
   const auto layout = NativeUiLayout::for_viewport(width, height);
   const UiRect viewport{0, 0, static_cast<float>(width),
                        static_cast<float>(height)};
-  const std::array<std::pair<UiRect, UiAction>, 4> menu{{
+  const auto hud=CommandHudLayout::make(width,height);
+  require(contains_rect(viewport,hud.context)&&contains_rect(viewport,hud.planets)&&
+      contains_rect(hud.context,hud.switch_view)&&!overlaps(hud.context,hud.planets),"HUD panels escaped or overlapped");
+  require(contains_rect(hud.resource_strip,layout.pause)&&contains_rect(hud.resource_strip,layout.speed),"Time controls escaped resource strip");
+  const std::array<std::pair<UiRect, UiAction>, 7> menu{{
       {layout.continue_button, UiAction::Continue},
       {layout.save_button, UiAction::Save},
       {layout.load_button, UiAction::Load},
+      {layout.settings_button, UiAction::Settings},
+      {layout.support_button, UiAction::Support},
+      {layout.new_game_button, UiAction::NewGame},
       {layout.exit_button, UiAction::Exit},
+  }};
+  const std::array<std::pair<UiRect, UiAction>, 14> navigation{{
+      {layout.map, UiAction::Map}, {layout.home, UiAction::Home},
+      {layout.inspect, UiAction::Inspect}, {layout.zoom_in, UiAction::ZoomIn},
+      {layout.zoom_out, UiAction::ZoomOut}, {layout.economy, UiAction::Economy},
+      {layout.research, UiAction::Research}, {layout.construction, UiAction::Construction},
+      {layout.shipyard, UiAction::Shipyard}, {layout.explore, UiAction::Explore},
+      {layout.colonies, UiAction::Colonies}, {layout.supply, UiAction::Supply},
+      {layout.diplomacy, UiAction::Diplomacy}, {layout.menu, UiAction::Menu},
   }};
 
   require(std::abs(layout.scale - expected_scale) < .001f,
           "Viewport produced the wrong UI scale.");
   require(contains_rect(viewport, layout.pause) &&
               contains_rect(viewport, layout.speed) &&
-              contains_rect(viewport, layout.research) &&
-              contains_rect(viewport, layout.shipyard) &&
-              contains_rect(viewport, layout.construction) &&
+              contains_rect(viewport, layout.notifications) &&
               contains_rect(viewport, layout.day_text) &&
               contains_rect(viewport, layout.status_text) &&
+              contains_rect(viewport, layout.zoom_text) &&
               contains_rect(viewport, layout.menu_panel) &&
               contains_rect(layout.menu_panel, layout.menu_heading),
           "A UI rectangle escaped the drawable viewport.");
+  for (const auto [bounds, action] : navigation) {
+    (void)action;
+    require(contains_rect(viewport, bounds),
+            "A navigation button escaped the drawable viewport.");
+  }
+  for (std::size_t left = 0; left < navigation.size(); ++left)
+    for (std::size_t right = left + 1; right < navigation.size(); ++right)
+      require(!overlaps(navigation[left].first, navigation[right].first),
+              "Navigation buttons overlap.");
   require(!overlaps(layout.pause, layout.speed) &&
-              !overlaps(layout.speed, layout.research) &&
+              !overlaps(layout.notifications, layout.pause) &&
+              !overlaps(layout.notifications, layout.speed) &&
+              !overlaps(layout.notifications, layout.status_text) &&
               !overlaps(layout.research, layout.shipyard) &&
-              !overlaps(layout.shipyard, layout.construction),
+              !overlaps(layout.shipyard, layout.construction) &&
+              !overlaps(layout.construction, layout.diplomacy) &&
+              !overlaps(layout.diplomacy, layout.supply) &&
+              !overlaps(layout.supply, layout.economy) &&
+              !overlaps(layout.economy, layout.colonies),
           "Top controls overlap each other.");
+  const auto rail_right = layout.inspect.x + layout.inspect.width;
+  require(std::abs(layout.inspect.x - 18.f * layout.scale) < .01f &&
+              rail_right <= native_navigation_content_left * layout.scale &&
+              layout.construction.x == layout.inspect.x &&
+              layout.explore.x == layout.inspect.x,
+          "Secondary navigation did not preserve the shared content gutter.");
+  const std::array primary{layout.map,layout.home,layout.colonies,layout.economy,layout.research,layout.diplomacy,layout.supply,layout.shipyard};
+  for(std::size_t i=0;i<primary.size();++i){
+    require(contains_rect(layout.navigation_bar,primary[i])&&!overlaps(layout.brand,primary[i]),"Primary navigation overlaps branding or escapes its header.");
+    for(std::size_t j=0;j<i;++j)require(!overlaps(primary[i],primary[j]),"Primary navigation tabs overlap.");
+  }
   require(!overlaps(layout.pause, layout.day_text) &&
               !overlaps(layout.speed, layout.day_text) &&
               !overlaps(layout.pause, layout.status_text) &&
               !overlaps(layout.speed, layout.status_text) &&
-              !overlaps(layout.day_text, layout.status_text),
+              !overlaps(layout.day_text, layout.status_text) &&
+              !overlaps(layout.zoom_text, layout.day_text) &&
+              !overlaps(layout.zoom_text, layout.status_text),
           "Top controls or metrics overlap.");
   require(layout.control_font_pixels >= layout.metric_font_pixels &&
               layout.heading_font_pixels > layout.control_font_pixels,
@@ -83,8 +126,9 @@ void verify(int width, int height, float expected_scale) {
     for (const auto point : interior_points(bounds)) {
       require(layout.hit(point, true) == action,
               "A point inside a menu button missed its action.");
-      require(layout.hit(point, false) == UiAction::None,
-              "Closed menu accepted a hidden button.");
+      const auto visible_action=layout.hit(point,false);
+      for(const auto& entry:menu)
+        require(visible_action!=entry.second,"Closed menu accepted a hidden button.");
     }
   }
   require(!overlaps(layout.menu_heading, layout.continue_button),
@@ -98,32 +142,47 @@ void verify(int width, int height, float expected_scale) {
     require(layout.hit(point, false) == UiAction::Speed,
             "A point inside Speed missed its action.");
   }
-  for (const auto point : interior_points(layout.research)) {
-    require(layout.hit(point, false) == UiAction::Research,
-            "A point inside Research missed its action.");
+  for (const auto point : interior_points(layout.notifications)) {
+    require(layout.hit(point, false) == UiAction::Notifications,
+            "A point inside Events missed its action.");
+    require(layout.hit(point, true) != UiAction::Notifications,
+            "The pause menu admitted a hidden Events button.");
   }
-  for (const auto point : interior_points(layout.shipyard)) {
-    require(layout.hit(point, false) == UiAction::Shipyard,
-            "A point inside Shipyard missed its action.");
-  }
-  for (const auto point : interior_points(layout.construction)) {
-    require(layout.hit(point, false) == UiAction::Construction,
-            "A point inside Construction missed its action.");
-  }
+  for (const auto [bounds, action] : navigation)
+    for (const auto point : interior_points(bounds)) {
+      require(layout.hit(point, false) == action,
+              "A point inside a navigation button missed its action.");
+      const auto modal_action=layout.hit(point,true);
+      for(const auto& entry:navigation)
+        require(modal_action!=entry.second,"Pause menu accepted a hidden navigation action.");
+    }
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,
           "Outside point activated the menu.");
 }
 
+void verify_navigation_blockers() {
+  require(native_navigation_available(false, false, false, false, false),
+          "Unobstructed navigation was disabled.");
+  for (const auto blocked : {
+           native_navigation_available(true, false, false, false, false),
+           native_navigation_available(false, true, false, false, false),
+           native_navigation_available(false, false, true, false, false),
+           native_navigation_available(false, false, false, true, false),
+           native_navigation_available(false, false, false, false, true)})
+    require(!blocked, "A menu or modal exposed navigation underneath it.");
+}
+
 } // namespace
 
 int main() try {
-  verify(640, 360, 1.f);
+  verify_navigation_blockers();
+  verify(640, 360, 324.f/430.f);
   verify(1280, 720, 1.f);
-  verify(1920, 1080, 1.2f);
-  verify(1280, 1080, 1.2f);
-  verify(2560, 1440, 1.6f);
-  verify(3840, 2160, 2.4f);
+  verify(1920, 1080, 1.f);
+  verify(1280, 1080, 1.f);
+  verify(2560, 1440, 4.f/3.f);
+  verify(3840, 2160, 2.f);
   std::cout << "Native UI 720p through 4K scaling, containment and full hit "
                "tests passed\n";
   return 0;

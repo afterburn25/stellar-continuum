@@ -1,0 +1,7 @@
+# Tactical corvette generation prompt
+
+Built-in image generation, 2026-09-15. Reference:
+`assets/visual/ships/patrol-corvette.jpg`. Output:
+`assets/visual/ships/patrol-corvette-tactical-v1.png`.
+
+Use case: precise-object-edit / background-extraction. Asset type: production transparent top-down tactical ship sprite for Stellar Continuum. Input image is the approved human patrol corvette design reference. Re-render this SAME corvette as a single complete ship viewed straight from above, orthographic top view, nose points exactly horizontally RIGHT, stern left. Preserve recognizable long armored charcoal gunmetal hull, broad paired aft engine housings, segmented plates, amber cabin lights, visible dorsal turrets and greebles. Sharp detailed realistic materials with soft neutral overhead illumination. Actual RGBA transparent background everywhere outside the ship including between engine housings, no black background, no checkerboard painted into image, no stars, no nebula, no planet, no text, no frame, no drop shadow. No active thruster flames: engines may have small blue emitter lights confined to the nozzles, dynamic thrust is added in the game. Entire ship centered with at least 12% transparent padding on all edges. Square 1024x1024 output if possible. Designed to read beautifully at 60-180 pixels while preserving details at close zoom. Do not include any inset or alternative views.

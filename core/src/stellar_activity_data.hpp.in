@@ -1,0 +1,2 @@
+#pragma once
+namespace stellar::core {inline constexpr char stellar_activity_json[]=R"activity(@STELLAR_ACTIVITY_DATA@)activity";}

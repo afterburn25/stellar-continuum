@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Native Player17 save ownership
 
 The C++ save controller captures the existing Player17 DTO on the simulation owner thread. The captured value owns immutable nested state. A single Engine job writes that value through the existing JSON codec and durable atomic-file writer; it never borrows the live campaign. This ports the prepared-save and scheduled-autosave behavior from `CampaignStatePersistenceService.cs` and `Main.CampaignSession.cs` without changing authoritative simulation rules.

@@ -1,0 +1,423 @@
+{
+  "version": "galaxy-phenomena-v1",
+  "baseCount500": 18,
+  "maximumCount": 160,
+  "morphologyCount": [
+    1,
+    1.15,
+    0.42,
+    0.13,
+    1.15,
+    1.25
+  ],
+  "populationCount": [
+    2.2,
+    1.5,
+    1,
+    0.48,
+    0.16
+  ],
+  "formationMultiplier": [
+    2.4,
+    1.6,
+    1,
+    0.3,
+    0.05
+  ],
+  "regionWeights": [
+    0.7,
+    3,
+    0.15,
+    4,
+    4,
+    0.2,
+    0.7,
+    0.28,
+    0.2,
+    0.08,
+    3.5,
+    2.3
+  ],
+  "types": [
+    {
+      "id": "emission",
+      "name": "Emission Nebula",
+      "description": "Luminous gas introduces mild sensor interference and valuable survey targets.",
+      "rarity": "common",
+      "shape": 0,
+      "color": [
+        210,
+        80,
+        126
+      ],
+      "extent": [
+        8,
+        18
+      ],
+      "intensity": [
+        0.5,
+        0.85
+      ],
+      "weight": 24,
+      "opacity": 0.4,
+      "elongation": 1.25,
+      "star_forming": true,
+      "effects": {
+        "sensor": 0.9,
+        "scanning": 1.1,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.15,
+        "anomaly_bias": 0.08,
+        "resource_bias": 0.02,
+        "concealment": 0.08,
+        "combat_visibility": 0.98,
+        "attrition": 0,
+        "interference": 0.1
+      }
+    },
+    {
+      "id": "reflection",
+      "name": "Reflection Nebula",
+      "description": "Blue scattered light marks diffuse gas and potential research sites.",
+      "rarity": "common",
+      "shape": 0,
+      "color": [
+        78,
+        145,
+        230
+      ],
+      "extent": [
+        7,
+        17
+      ],
+      "intensity": [
+        0.4,
+        0.75
+      ],
+      "weight": 16,
+      "opacity": 0.35,
+      "elongation": 1.4,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.96,
+        "scanning": 1.04,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.12,
+        "anomaly_bias": 0.04,
+        "resource_bias": 0.02,
+        "concealment": 0.04,
+        "combat_visibility": 1,
+        "attrition": 0,
+        "interference": 0.03
+      }
+    },
+    {
+      "id": "dark_nebula",
+      "name": "Dark Nebula",
+      "description": "Dense dust reduces long-range sensor clarity and slows surveying.",
+      "rarity": "uncommon",
+      "shape": 2,
+      "color": [
+        28,
+        35,
+        58
+      ],
+      "extent": [
+        8,
+        20
+      ],
+      "intensity": [
+        0.6,
+        0.95
+      ],
+      "weight": 14,
+      "opacity": 0.6,
+      "elongation": 1.6,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.65,
+        "scanning": 1.35,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.08,
+        "anomaly_bias": 0.04,
+        "resource_bias": 0.06,
+        "concealment": 0.4,
+        "combat_visibility": 0.8,
+        "attrition": 0,
+        "interference": 0.12
+      }
+    },
+    {
+      "id": "molecular_cloud",
+      "name": "Molecular Cloud",
+      "description": "Dense stellar nursery with survey interference and research potential.",
+      "rarity": "common",
+      "shape": 2,
+      "color": [
+        93,
+        89,
+        146
+      ],
+      "extent": [
+        10,
+        24
+      ],
+      "intensity": [
+        0.5,
+        0.85
+      ],
+      "weight": 22,
+      "opacity": 0.45,
+      "elongation": 1.5,
+      "star_forming": true,
+      "effects": {
+        "sensor": 0.82,
+        "scanning": 1.22,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.2,
+        "anomaly_bias": 0.1,
+        "resource_bias": 0.08,
+        "concealment": 0.22,
+        "combat_visibility": 0.93,
+        "attrition": 0,
+        "interference": 0.13
+      }
+    },
+    {
+      "id": "hii_region",
+      "name": "H II Region",
+      "description": "Ionized star-forming gas surrounds young stellar populations.",
+      "rarity": "common",
+      "shape": 0,
+      "color": [
+        222,
+        113,
+        147
+      ],
+      "extent": [
+        7,
+        18
+      ],
+      "intensity": [
+        0.55,
+        0.9
+      ],
+      "weight": 20,
+      "opacity": 0.42,
+      "elongation": 1.2,
+      "star_forming": true,
+      "effects": {
+        "sensor": 0.89,
+        "scanning": 1.12,
+        "movement": 1,
+        "hazard": 0.1,
+        "colonization": 0,
+        "research": 0.18,
+        "anomaly_bias": 0.1,
+        "resource_bias": 0.03,
+        "concealment": 0.1,
+        "combat_visibility": 0.97,
+        "attrition": 0,
+        "interference": 0.12
+      }
+    },
+    {
+      "id": "supernova_remnant",
+      "name": "Supernova Remnant",
+      "description": "Filamentary debris has elevated radiation and research potential.",
+      "rarity": "uncommon",
+      "shape": 3,
+      "color": [
+        125,
+        169,
+        192
+      ],
+      "extent": [
+        7,
+        18
+      ],
+      "intensity": [
+        0.4,
+        0.85
+      ],
+      "weight": 7,
+      "opacity": 0.45,
+      "elongation": 1.12,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.93,
+        "scanning": 1.14,
+        "movement": 1,
+        "hazard": 0.32,
+        "colonization": 0,
+        "research": 0.35,
+        "anomaly_bias": 0.18,
+        "resource_bias": 0.09,
+        "concealment": 0.06,
+        "combat_visibility": 0.97,
+        "attrition": 0,
+        "interference": 0.14
+      }
+    },
+    {
+      "id": "radiation_cloud",
+      "name": "Radiation Cloud",
+      "description": "Energetic haze interferes with sensors; radiation is recorded for hazard assessment.",
+      "rarity": "rare",
+      "shape": 4,
+      "color": [
+        159,
+        108,
+        229
+      ],
+      "extent": [
+        6,
+        15
+      ],
+      "intensity": [
+        0.5,
+        0.9
+      ],
+      "weight": 3,
+      "opacity": 0.4,
+      "elongation": 1.3,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.83,
+        "scanning": 1.25,
+        "movement": 1,
+        "hazard": 0.55,
+        "colonization": 0,
+        "research": 0.4,
+        "anomaly_bias": 0.2,
+        "resource_bias": 0.05,
+        "concealment": 0.1,
+        "combat_visibility": 0.92,
+        "attrition": 0,
+        "interference": 0.3
+      }
+    },
+    {
+      "id": "ionized_gas",
+      "name": "Ionized Gas Cloud",
+      "description": "Electric blue gas causes mild scanning interference.",
+      "rarity": "common",
+      "shape": 1,
+      "color": [
+        73,
+        169,
+        202
+      ],
+      "extent": [
+        8,
+        19
+      ],
+      "intensity": [
+        0.4,
+        0.8
+      ],
+      "weight": 12,
+      "opacity": 0.38,
+      "elongation": 2.0,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.92,
+        "scanning": 1.1,
+        "movement": 1,
+        "hazard": 0.1,
+        "colonization": 0,
+        "research": 0.15,
+        "anomaly_bias": 0.06,
+        "resource_bias": 0.03,
+        "concealment": 0.08,
+        "combat_visibility": 0.98,
+        "attrition": 0,
+        "interference": 0.1
+      }
+    },
+    {
+      "id": "dust_lane",
+      "name": "Dust Lane Concentration",
+      "description": "A band of dust mildly reduces sensor effectiveness.",
+      "rarity": "common",
+      "shape": 5,
+      "color": [
+        45,
+        43,
+        53
+      ],
+      "extent": [
+        10,
+        25
+      ],
+      "intensity": [
+        0.45,
+        0.85
+      ],
+      "weight": 22,
+      "opacity": 0.5,
+      "elongation": 3.2,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.88,
+        "scanning": 1.1,
+        "movement": 1,
+        "hazard": 0,
+        "colonization": 0,
+        "research": 0.05,
+        "anomaly_bias": 0.02,
+        "resource_bias": 0.05,
+        "concealment": 0.15,
+        "combat_visibility": 0.95,
+        "attrition": 0,
+        "interference": 0.04
+      }
+    },
+    {
+      "id": "exotic",
+      "name": "Exotic Phenomenon",
+      "description": "An unusual spatial region merits scientific investigation.",
+      "rarity": "exceptional",
+      "shape": 4,
+      "color": [
+        119,
+        214,
+        181
+      ],
+      "extent": [
+        5,
+        13
+      ],
+      "intensity": [
+        0.45,
+        0.85
+      ],
+      "weight": 0.6,
+      "opacity": 0.36,
+      "elongation": 1.3,
+      "star_forming": false,
+      "effects": {
+        "sensor": 0.8,
+        "scanning": 1.25,
+        "movement": 1,
+        "hazard": 0.3,
+        "colonization": 0,
+        "research": 0.6,
+        "anomaly_bias": 0.3,
+        "resource_bias": 0.12,
+        "concealment": 0.2,
+        "combat_visibility": 0.9,
+        "attrition": 0,
+        "interference": 0.3
+      }
+    }
+  ]
+}

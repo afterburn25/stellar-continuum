@@ -234,14 +234,16 @@ restore_stellar_systems(std::span<const StellarSystemPersistenceDto> source) {
                       value.has_habitable_world,
                       value.has_anomaly,
                       value.has_rare_resource,
-                      value.has_pre_warp_civilization});
+                      value.has_pre_warp_civilization, value.stellar_object, value.engulfed_planets, value.stellar_region, value.small_body_fields, value.stellar_orbits, value.stellar_activity});
   validate_stellar_catalog(result);
+  for (const auto& s:result) { validate_stellar_orbits(s); validate_stellar_activity(s); if(s.stellar_object) validate_stellar_physics(*s.stellar_object); if(s.engulfed_planets<0) throw std::invalid_argument("Invalid engulfed count"); if(s.stellar_region&&static_cast<unsigned>(*s.stellar_region)>=12)throw std::invalid_argument("Invalid stellar region"); }
   return result;
 }
 
 std::vector<StellarSystemPersistenceDto>
 capture_stellar_systems(std::span<const StellarSystem> source) {
   validate_stellar_catalog(source);
+  for (const auto& s:source) if(s.stellar_object) validate_stellar_physics(*s.stellar_object);
   std::vector<StellarSystemPersistenceDto> result;
   result.reserve(source.size());
   for (const auto &value : source)
@@ -251,7 +253,7 @@ capture_stellar_systems(std::span<const StellarSystem> source) {
                       value.has_pre_warp_civilization, value.catalog_preset_id,
                       value.primary, value.secondary, value.tertiary,
                       value.position.depth_light_years,
-                      value.stellar_catalog_id});
+                      value.stellar_catalog_id, value.stellar_object, value.engulfed_planets, value.stellar_region, value.small_body_fields, value.stellar_orbits, value.stellar_activity});
   return result;
 }
 

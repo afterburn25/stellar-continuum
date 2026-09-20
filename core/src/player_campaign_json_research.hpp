@@ -6,6 +6,9 @@
 #include <nlohmann/json.hpp>
 
 #include <cctype>
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
 
 namespace stellar::core::player_json_detail {
 
@@ -90,9 +93,60 @@ inline AdaptiveResearchCampaignSnapshot decode_research(const Json &value) {
              funding.at("AuthorizationCredits").get<double>()});
       }
     }
+    if(const auto plan=item.find("Planning");plan!=item.end()){
+      civilization.plan.favorites=plan->at("Favorites").get<std::vector<std::string>>();
+      civilization.plan.queue=plan->at("Queue").get<std::vector<std::string>>();
+      civilization.plan.suggestions=plan->at("Suggestions").get<bool>();
+    }
     result.civilizations.push_back(std::move(civilization));
   }
   return result;
+}
+
+// Player17 persists these schema-defined enum fields as numbers, while the
+// standalone Adaptive Research DTO deliberately uses readable enum names. Keep
+// this conversion at the typed snapshot paths so arbitrary string fields and
+// dictionary values retain their standalone representation.
+inline void canonicalize_player_research_enums(
+    Json &research, const AdaptiveResearchStateSnapshotV5 &snapshot) {
+  auto &records = research.at("Outcomes").at("RecentRecords");
+  if (records.size() != snapshot.outcomes.recent_records.size())
+    throw std::logic_error(
+        "Research outcome snapshot record count changed while encoding.");
+  for (std::size_t index = 0; index < records.size(); ++index)
+    records.at(index).at("Outcome") = static_cast<int>(
+        snapshot.outcomes.recent_records.at(index).outcome);
+
+  auto &v4 = research.at("Research");
+  auto &assessments = v4.at("ForeignAssessments");
+  if (assessments.size() != snapshot.research.foreign_assessments.size())
+    throw std::logic_error(
+        "Research foreign assessment count changed while encoding.");
+  for (std::size_t index = 0; index < assessments.size(); ++index) {
+    const auto &source = snapshot.research.foreign_assessments.at(index);
+    auto &target = assessments.at(index);
+    target.at("Understanding") = static_cast<int>(source.understanding);
+    target.at("Operability") = static_cast<int>(source.operability);
+    target.at("Reproduction") = static_cast<int>(source.reproduction);
+    target.at("Adaptation") = static_cast<int>(source.adaptation);
+  }
+
+  auto &assets = v4.at("Research")
+                     .at("Research")
+                     .at("Expertise")
+                     .at("TacitAssets");
+  const auto &source_assets =
+      snapshot.research.research.research.expertise.tacit_assets;
+  if (assets.size() != source_assets.size())
+    throw std::logic_error(
+        "Research tacit asset count changed while encoding.");
+  for (std::size_t index = 0; index < assets.size(); ++index) {
+    const auto &source = source_assets.at(index);
+    auto &target = assets.at(index);
+    target.at("ScopeKind") = static_cast<int>(source.scope_kind);
+    target.at("AssimilationStage") =
+        static_cast<int>(source.assimilation_stage);
+  }
 }
 
 inline Json encode_research(const AdaptiveResearchCampaignSnapshot &snapshot) {
@@ -106,15 +160,20 @@ inline Json encode_research(const AdaptiveResearchCampaignSnapshot &snapshot) {
            {"ConsumedMilestoneCredits", entry.consumed_milestone_credits},
            {"AuthorizationCredits", entry.authorization_credits}});
     }
-    const auto research = Json::parse(
+    const auto standalone = Json::parse(
         detail::encode_adaptive_research_snapshot_v5_dto(value.research));
+    auto research = rename_initials(standalone, true);
+    canonicalize_player_research_enums(research, value.research);
     civilizations.push_back(
         {{"CivilizationId", value.civilization_id},
          {"SpeciesId", value.species_id},
          {"ReferenceProfileId", value.reference_profile_id},
          {"ApplicabilityContextId", value.applicability_context_id},
-         {"Research", rename_initials(research, true)},
+         {"Research", std::move(research)},
          {"ProjectFunding", funding}});
+    if(snapshot.schema_version>=3)
+      civilizations.back()["Planning"]={{"Favorites",value.plan.favorites},
+        {"Queue",value.plan.queue},{"Suggestions",value.plan.suggestions}};
   }
   return {{"SchemaVersion", snapshot.schema_version},
           {"CatalogId", snapshot.catalog_id},

@@ -52,6 +52,8 @@ struct FleetState {
   std::optional<FleetCombatState> combat;
   std::optional<MassiveCombatLoadout> tactical_loadout;
   std::optional<MassiveVesselState> tactical_vessel;
+  // Persisted collision-free local path; absent on pre-stellar-physics saves.
+  std::vector<std::array<float,2>> stellar_transit_path;
 };
 std::vector<EconomyFleetState>
 economic_fleet_projection(std::span<const FleetState> fleets);

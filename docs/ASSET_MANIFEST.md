@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Stellar Continuum Asset Manifest
 
 Status: **Authoritative early-release asset registry**  
@@ -13,6 +20,25 @@ This registry prevents duplicate visual concepts, records provenance/status, and
 - **Superseded** — retained only for continuity/history; do not use in new work.
 
 ## Runtime visual system
+
+### Native research and photographic navigation restoration — 2026-09-16
+
+The existing catalog from `work/module-research-thumbnails` commit `411910f1`
+(content definitions pinned there to `3aeeb9a4`) is now retained under
+`assets/visual/catalog/`, including original jobs, prompts, methods and hashes
+in `production/`. Its 99 distinct illustrations each have 128px thumbnail and
+512px portrait deliveries: 21 research families, 42 human station modules and
+36 alien modules. The 370 current research bindings share the 21 family images;
+42 reserved bindings remain planned content.
+
+Status: **Production candidate**, reviewed in actual native research at 720p and
+1080p. Module images do not imply implemented module gameplay. The native loader
+resolves only current, observer-projected research. `export/native-research-assets.json`
+pins the 42 current research images and two metadata files. Photographic
+navigation reuses these illustrations, existing ships, Sol and space artwork;
+its fourteen mappings and credits are in `engine/NATIVE_NAVIGATION_ART_SOURCES.md`.
+No new image generation or replacement of the preserved reference client is
+part of this integration. See `engine/NATIVE_PRESENTATION_RESTORATION.md`.
 
 ### Cinematic revision — 2026-09-10
 

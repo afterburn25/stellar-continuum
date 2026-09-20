@@ -1,0 +1,106 @@
+#pragma once
+
+// Bounded, player-visible recent-event presentation.  Publishers are
+// responsible for observer filtering; this UI never reads simulation state.
+
+#include <stellar/engine/native_map_platform.hpp>
+
+#include <deque>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace stellar::native_notifications {
+
+struct NativePlayerNotification {
+  std::int64_t sequence{};
+  std::string category, date, message;
+  std::optional<int> diplomatic_contact_id;
+};
+
+class NativeNotificationFeed final {
+ public:
+  static constexpr std::size_t maximum_items = 32;
+
+  void publish(std::string category, std::string date, std::string message,
+               std::optional<int> diplomatic_contact_id = std::nullopt);
+  [[nodiscard]] const std::deque<NativePlayerNotification>& items() const noexcept { return items_; }
+  [[nodiscard]] std::int64_t latest_sequence() const noexcept { return next_sequence_ - 1; }
+  [[nodiscard]] int unread_count(std::int64_t last_read) const noexcept;
+  void clear() noexcept { items_.clear(); }
+
+ private:
+  std::deque<NativePlayerNotification> items_;
+  std::int64_t next_sequence_{1};
+};
+
+struct NotificationCardLayout {
+  std::size_t item_index{}; // Index into the feed, newest first in layout order.
+  native_map::UiRect bounds, metadata_bounds, message_bounds;
+  std::optional<native_map::UiRect> contact_button;
+};
+
+struct NotificationLayout {
+  native_map::UiRect panel, header, close_button, empty_hint, list_viewport;
+  std::vector<native_map::UiRect> cards;
+  std::vector<std::optional<native_map::UiRect>> contact_buttons;
+  std::vector<NotificationCardLayout> entries;
+  float scale{};
+  float content_height{};
+  float max_scroll{};
+  float scroll{};
+};
+
+using TextMeasurer = std::function<native_map::TextExtent(const native_map::Text&)>;
+
+[[nodiscard]] NotificationLayout notification_layout_for(
+    const std::deque<NativePlayerNotification>& items, int width, int height,
+    const TextMeasurer& measure = {}, float scroll = 0.f);
+
+enum class NotificationViewCommandKind { None, Close, OpenDiplomaticContact };
+struct NotificationViewCommand {
+  NotificationViewCommandKind kind{NotificationViewCommandKind::None};
+  bool captured{};
+  int civilization_id{-1};
+};
+
+class NativeNotificationView final {
+ public:
+  void set_text_measurer(TextMeasurer measure) { measure_ = std::move(measure); }
+  [[nodiscard]] bool visible() const noexcept { return visible_; }
+  // Every retained event is reachable through the panel's bounded scroll, so
+  // opening deliberately acknowledges the full retained feed.
+  void open(std::int64_t latest_sequence) noexcept;
+  void close() noexcept;
+  void toggle(std::int64_t latest_sequence) noexcept;
+  [[nodiscard]] std::int64_t last_read() const noexcept { return last_read_; }
+  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+
+  [[nodiscard]] NotificationViewCommand handle(
+      const native_map::InputEvent& event,
+      const std::deque<NativePlayerNotification>& items, int width, int height);
+  void render(native_map::DrawList& out,
+              const std::deque<NativePlayerNotification>& items, int width,
+              int height) const;
+
+ private:
+  enum class PressTarget { None, Close, Contact };
+  void cancel_press() noexcept;
+
+  bool visible_{};
+  std::int64_t last_read_{};
+  float scroll_{};
+  native_map::Point pointer_{};
+  native_map::Point press_origin_{};
+  bool pointer_captured_{};
+  PressTarget press_target_{PressTarget::None};
+  std::optional<int> pressed_contact_id_;
+  std::optional<native_map::UiRect> pressed_bounds_;
+  TextMeasurer measure_;
+};
+
+} // namespace stellar::native_notifications

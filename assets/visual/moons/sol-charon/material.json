@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 5.6743621826171875e-05,
+    "clippedFraction": 2.002716064453125e-05,
+    "disc": [
+      1025.9339976092872,
+      1028.3962628078793,
+      878.8963808718955
+    ],
+    "id": "sol-charon",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.6783818279616309,
+      0.6841291780174374,
+      0.10238515856622225
+    ],
+    "seamError": 0.0297010549604898,
+    "usable": true
+  },
+  "id": "sol-charon",
+  "name": "Charon",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "9516596b4e0f143f8e7d8575481fb351bb88585d4190472aa886a0fb1d8978f3",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Charon.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

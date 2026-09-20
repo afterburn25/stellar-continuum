@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Event-driven voice integration
 
 Branch: `work/event-driven-voice-integration`. Targets `integration` and builds on the existing voice-engine work in PR #306. The user-approved integration follow-up includes graphics PR #305 as a merge ancestor. PR #307 records the combined acceptance and merge status; the component evidence below retains its original source attribution.

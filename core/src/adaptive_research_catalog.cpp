@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_catalog.hpp>
 
 #include <nlohmann/json.hpp>
@@ -145,10 +146,10 @@ std::vector<ResearchNumberRequirement> number_dictionary(
 Json load_json(const std::filesystem::path &root,
                const std::filesystem::path &relative) {
   const auto path = root / relative;
-  if (!std::filesystem::is_regular_file(path))
+  if (!stellar::engine::resource_exists(path))
     throw AdaptiveResearchCatalogError(
         "Required Adaptive Research file not found: " + path.string());
-  std::ifstream stream(path, std::ios::binary);
+  auto stream=stellar::engine::resource_stream(path);
   if (!stream)
     throw AdaptiveResearchCatalogError("Unable to read Adaptive Research file: " +
                                        path.string());
@@ -538,7 +539,8 @@ AdaptiveResearchCatalog load_adaptive_research_catalog(
       }))
     throw std::invalid_argument("Value cannot be null or whitespace. (Parameter 'rootPath')");
   const auto root = std::filesystem::absolute(root_path).lexically_normal();
-  if (!std::filesystem::is_directory(root))
+  if (!std::filesystem::is_directory(root) &&
+      !stellar::engine::resource_exists(root / "index.json"))
     throw AdaptiveResearchCatalogError("Adaptive Research data directory not found: " + root.string());
 
   AdaptiveResearchCatalog::Storage storage;
@@ -750,3 +752,4 @@ AdaptiveResearchCatalog load_adaptive_research_catalog(
   return AdaptiveResearchCatalog(std::move(storage));
 }
 } // namespace stellar::core
+

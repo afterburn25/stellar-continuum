@@ -36,7 +36,11 @@ Known systems open through map input. Within a system, left dragging pans and
 wheel zoom remains anchored to the pointer without requiring a selected body.
 Body selection uses the same transform as drawing. Reset fits the complete
 system; Back and Escape return to the galaxy. The inspector consumes its own
-input. Global research, shipyard and construction controls retain explicit
+input. Its grouped physical/environment/satellite facts scroll independently;
+Focus Planet centers the selected body without changing zoom, while Open Colony
+retains ownership gating. Exact measurements require full survey even when
+reconnaissance geometry is available. See NATIVE_BODY_INSPECTION.md.
+Global research, shipyard and construction controls retain explicit
 routing and cannot silently issue a fleet command.
 
 The workspace uses system-specific decorative stars, with no background galaxy

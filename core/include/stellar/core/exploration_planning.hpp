@@ -72,7 +72,9 @@ public:
 
   ExplorationMissionPlan
   build_plan(ExplorationPlanningWorldView world, int fleet_id,
-             int maximum_candidates = default_maximum_candidates) const;
+             int maximum_candidates = default_maximum_candidates,
+             MissionFuelPolicy fuel_policy = MissionFuelPolicy::ReachDestination) const;
+  [[nodiscard]] bool uses_canonical_reach() const noexcept { return uses_canonical_reach_; }
   ExplorationMissionOrderAssessment
   assess_order(ExplorationPlanningWorldView world, int fleet_id,
                int destination_system_id,
@@ -89,7 +91,10 @@ public:
 private:
   ExplorationMissionCandidate
   build_candidate(ExplorationPlanningWorldView world, const FleetState &fleet,
-                  const StellarSystem &system) const;
+                  const StellarSystem &system,OperationalReachBatch *batch=nullptr,
+                  MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination,
+                  SurveyOperationsBatch *surveys=nullptr) const;
+  bool uses_canonical_reach_{};
   ExplorationReachAssessment operational_reach_;
   SurveyOperationsProfiler survey_profiler_;
 };
@@ -102,7 +107,8 @@ public:
   ExplorationAiMissionCoordinator(const ExplorationMissionPlanner &&) = delete;
   ExplorationAiMissionSelection
   select_mission(ExplorationPlanningWorldView world,
-                 const FleetState &fleet) const;
+                 const FleetState &fleet,
+                 MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination) const;
 
 private:
   const ExplorationMissionPlanner &mission_planner_;

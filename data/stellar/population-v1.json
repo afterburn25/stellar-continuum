@@ -1,0 +1,1314 @@
+{
+  "version": "stellar-population-v1",
+  "description": "User-defined game weights, not a measured stellar census.",
+  "objects": [
+    {
+      "id": "m-red-dwarf",
+      "name": "M-Class Red Dwarf",
+      "weightMillionths": 646000,
+      "massSolar": [
+        0.08,
+        0.6
+      ],
+      "radiusSolar": [
+        0.1,
+        0.62
+      ],
+      "luminositySolar": [
+        0.0003,
+        0.08
+      ],
+      "temperatureKelvin": [
+        2400,
+        3900
+      ],
+      "ageMyr": [
+        100,
+        13000
+      ],
+      "lifetimeMyr": [
+        50000,
+        1000000
+      ],
+      "radiationModifier": 1.6,
+      "windModifier": 0.6,
+      "habitabilityModifier": 0.75,
+      "young": false,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        255,
+        95,
+        58
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "k-orange",
+      "name": "K-Class Orange Star",
+      "weightMillionths": 105000,
+      "massSolar": [
+        0.6,
+        0.9
+      ],
+      "radiusSolar": [
+        0.6,
+        0.96
+      ],
+      "luminositySolar": [
+        0.08,
+        0.6
+      ],
+      "temperatureKelvin": [
+        3900,
+        5200
+      ],
+      "ageMyr": [
+        100,
+        12000
+      ],
+      "lifetimeMyr": [
+        15000,
+        50000
+      ],
+      "radiationModifier": 0.7,
+      "windModifier": 0.7,
+      "habitabilityModifier": 1,
+      "young": false,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        255,
+        175,
+        82
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "white-dwarf",
+      "name": "White Dwarf",
+      "weightMillionths": 85000,
+      "massSolar": [
+        0.3,
+        1.35
+      ],
+      "radiusSolar": [
+        0.008,
+        0.025
+      ],
+      "luminositySolar": [
+        1e-05,
+        1
+      ],
+      "temperatureKelvin": [
+        4000,
+        45000
+      ],
+      "ageMyr": [
+        100,
+        13000
+      ],
+      "lifetimeMyr": [
+        10000,
+        100000
+      ],
+      "radiationModifier": 4,
+      "windModifier": 0.05,
+      "habitabilityModifier": 0.1,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "remnant",
+      "color": [
+        198,
+        222,
+        255
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "high-energy",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "g-yellow",
+      "name": "G-Class Yellow Star",
+      "weightMillionths": 65000,
+      "massSolar": [
+        0.9,
+        1.1
+      ],
+      "radiusSolar": [
+        0.85,
+        1.2
+      ],
+      "luminositySolar": [
+        0.6,
+        1.8
+      ],
+      "temperatureKelvin": [
+        5200,
+        6000
+      ],
+      "ageMyr": [
+        100,
+        9500
+      ],
+      "lifetimeMyr": [
+        8000,
+        15000
+      ],
+      "radiationModifier": 1,
+      "windModifier": 1,
+      "habitabilityModifier": 1,
+      "young": false,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        255,
+        230,
+        147
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "brown-dwarf",
+      "name": "Brown Dwarf",
+      "weightMillionths": 50000,
+      "massSolar": [
+        0.013,
+        0.079
+      ],
+      "radiusSolar": [
+        0.08,
+        0.13
+      ],
+      "luminositySolar": [
+        1e-07,
+        0.001
+      ],
+      "temperatureKelvin": [
+        400,
+        2400
+      ],
+      "ageMyr": [
+        100,
+        13000
+      ],
+      "lifetimeMyr": [
+        10000,
+        100000
+      ],
+      "radiationModifier": 0.1,
+      "windModifier": 0.05,
+      "habitabilityModifier": 0.1,
+      "young": false,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "substellar",
+      "color": [
+        146,
+        55,
+        36
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 0.15,
+      "fallbackDistanceMode": "dim-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "f-yellow-white",
+      "name": "F-Class Yellow-White Star",
+      "weightMillionths": 26000,
+      "massSolar": [
+        1.1,
+        1.6
+      ],
+      "radiusSolar": [
+        1.1,
+        1.7
+      ],
+      "luminositySolar": [
+        1.5,
+        8
+      ],
+      "temperatureKelvin": [
+        6000,
+        7500
+      ],
+      "ageMyr": [
+        50,
+        4000
+      ],
+      "lifetimeMyr": [
+        2000,
+        8000
+      ],
+      "radiationModifier": 2,
+      "windModifier": 1.5,
+      "habitabilityModifier": 0.65,
+      "young": false,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        255,
+        246,
+        209
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "common",
+      "isRareDiscovery": false,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "quiet-neutron",
+      "name": "Quiet Neutron Star",
+      "weightMillionths": 7000,
+      "massSolar": [
+        1.1,
+        2.3
+      ],
+      "radiusSolar": [
+        1.4e-05,
+        2.2e-05
+      ],
+      "luminositySolar": [
+        1e-05,
+        0.1
+      ],
+      "temperatureKelvin": [
+        10000,
+        300000
+      ],
+      "ageMyr": [
+        1,
+        10000
+      ],
+      "lifetimeMyr": [
+        10000,
+        100000
+      ],
+      "radiationModifier": 20,
+      "windModifier": 0.1,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "remnant",
+      "color": [
+        176,
+        219,
+        255
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "high-energy",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "red-giant",
+      "name": "Red Giant",
+      "weightMillionths": 6000,
+      "massSolar": [
+        0.8,
+        8
+      ],
+      "radiusSolar": [
+        5,
+        150
+      ],
+      "luminositySolar": [
+        15,
+        3000
+      ],
+      "temperatureKelvin": [
+        3000,
+        5000
+      ],
+      "ageMyr": [
+        500,
+        12000
+      ],
+      "lifetimeMyr": [
+        30,
+        1000
+      ],
+      "radiationModifier": 3,
+      "windModifier": 8,
+      "habitabilityModifier": 0.35,
+      "young": false,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        255,
+        94,
+        42
+      ],
+      "visualScale": 1.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "a-white",
+      "name": "A-Class White / Blue-White Star",
+      "weightMillionths": 5500,
+      "massSolar": [
+        1.6,
+        2.4
+      ],
+      "radiusSolar": [
+        1.5,
+        2.6
+      ],
+      "luminositySolar": [
+        8,
+        50
+      ],
+      "temperatureKelvin": [
+        7500,
+        10000
+      ],
+      "ageMyr": [
+        10,
+        1500
+      ],
+      "lifetimeMyr": [
+        500,
+        2500
+      ],
+      "radiationModifier": 5,
+      "windModifier": 3,
+      "habitabilityModifier": 0.3,
+      "young": true,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        213,
+        231,
+        255
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "b-blue-white",
+      "name": "B-Class Blue-White Star",
+      "weightMillionths": 1200,
+      "massSolar": [
+        2.4,
+        16
+      ],
+      "radiusSolar": [
+        2.4,
+        8
+      ],
+      "luminositySolar": [
+        50,
+        30000
+      ],
+      "temperatureKelvin": [
+        10000,
+        30000
+      ],
+      "ageMyr": [
+        1,
+        400
+      ],
+      "lifetimeMyr": [
+        10,
+        500
+      ],
+      "radiationModifier": 16,
+      "windModifier": 12,
+      "habitabilityModifier": 0.04,
+      "young": true,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        136,
+        188,
+        255
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "pulsar",
+      "name": "Pulsar",
+      "weightMillionths": 1000,
+      "massSolar": [
+        1.1,
+        2.3
+      ],
+      "radiusSolar": [
+        1.4e-05,
+        2.2e-05
+      ],
+      "luminositySolar": [
+        0.001,
+        1
+      ],
+      "temperatureKelvin": [
+        100000,
+        1000000
+      ],
+      "ageMyr": [
+        0.001,
+        100
+      ],
+      "lifetimeMyr": [
+        10,
+        1000
+      ],
+      "radiationModifier": 50,
+      "windModifier": 1,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": false,
+      "directionalJets": true,
+      "evolutionClass": "remnant",
+      "color": [
+        118,
+        204,
+        255
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "polar-pulse",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "high-energy",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "quiescent-black-hole",
+      "name": "Quiescent Stellar-Mass Black Hole",
+      "weightMillionths": 800,
+      "massSolar": [
+        3,
+        60
+      ],
+      "radiusSolar": [
+        1e-05,
+        0.0003
+      ],
+      "luminositySolar": [
+        0,
+        0
+      ],
+      "temperatureKelvin": [
+        0,
+        0
+      ],
+      "ageMyr": [
+        10,
+        13000
+      ],
+      "lifetimeMyr": [
+        10000,
+        1000000
+      ],
+      "radiationModifier": 0,
+      "windModifier": 0,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": true,
+      "directionalJets": false,
+      "evolutionClass": "black-hole",
+      "color": [
+        90,
+        120,
+        151
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 0.15,
+      "fallbackDistanceMode": "gravitational-sensor",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "gravitational",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "yellow-giant",
+      "name": "Yellow Giant",
+      "weightMillionths": 800,
+      "massSolar": [
+        1.5,
+        10
+      ],
+      "radiusSolar": [
+        3,
+        60
+      ],
+      "luminositySolar": [
+        10,
+        5000
+      ],
+      "temperatureKelvin": [
+        5000,
+        6500
+      ],
+      "ageMyr": [
+        50,
+        4000
+      ],
+      "lifetimeMyr": [
+        10,
+        500
+      ],
+      "radiationModifier": 4,
+      "windModifier": 8,
+      "habitabilityModifier": 0.2,
+      "young": false,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        255,
+        213,
+        87
+      ],
+      "visualScale": 1.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "blue-giant",
+      "name": "Blue Giant",
+      "weightMillionths": 200,
+      "massSolar": [
+        8,
+        40
+      ],
+      "radiusSolar": [
+        5,
+        50
+      ],
+      "luminositySolar": [
+        2000,
+        300000
+      ],
+      "temperatureKelvin": [
+        10000,
+        35000
+      ],
+      "ageMyr": [
+        1,
+        80
+      ],
+      "lifetimeMyr": [
+        1,
+        30
+      ],
+      "radiationModifier": 30,
+      "windModifier": 25,
+      "habitabilityModifier": 0.01,
+      "young": true,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        129,
+        193,
+        255
+      ],
+      "visualScale": 1.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "accreting-black-hole",
+      "name": "Accreting Stellar-Mass Black Hole",
+      "weightMillionths": 150,
+      "massSolar": [
+        3,
+        60
+      ],
+      "radiusSolar": [
+        1e-05,
+        0.0003
+      ],
+      "luminositySolar": [
+        0,
+        0
+      ],
+      "temperatureKelvin": [
+        0,
+        0
+      ],
+      "ageMyr": [
+        10,
+        13000
+      ],
+      "lifetimeMyr": [
+        1,
+        100
+      ],
+      "radiationModifier": 80,
+      "windModifier": 20,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": true,
+      "directionalJets": false,
+      "evolutionClass": "black-hole",
+      "color": [
+        255,
+        185,
+        107
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "accretion-disk",
+      "rarityTier": "rare",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "gravitational",
+      "hazardProfile": "accretion-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "red-supergiant",
+      "name": "Red Supergiant",
+      "weightMillionths": 100,
+      "massSolar": [
+        8,
+        30
+      ],
+      "radiusSolar": [
+        200,
+        1600
+      ],
+      "luminositySolar": [
+        10000,
+        500000
+      ],
+      "temperatureKelvin": [
+        3000,
+        4500
+      ],
+      "ageMyr": [
+        5,
+        40
+      ],
+      "lifetimeMyr": [
+        0.1,
+        2
+      ],
+      "radiationModifier": 12,
+      "windModifier": 35,
+      "habitabilityModifier": 0.015,
+      "young": true,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        255,
+        79,
+        36
+      ],
+      "visualScale": 2.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "blue-supergiant",
+      "name": "Blue Supergiant",
+      "weightMillionths": 50,
+      "massSolar": [
+        10,
+        60
+      ],
+      "radiusSolar": [
+        10,
+        100
+      ],
+      "luminositySolar": [
+        10000,
+        1000000
+      ],
+      "temperatureKelvin": [
+        10000,
+        35000
+      ],
+      "ageMyr": [
+        2,
+        30
+      ],
+      "lifetimeMyr": [
+        0.1,
+        3
+      ],
+      "radiationModifier": 50,
+      "windModifier": 50,
+      "habitabilityModifier": 0.005,
+      "young": true,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        126,
+        190,
+        255
+      ],
+      "visualScale": 2.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "o-hot-blue",
+      "name": "O-Class Hot Blue Star",
+      "weightMillionths": 50,
+      "massSolar": [
+        16,
+        100
+      ],
+      "radiusSolar": [
+        6,
+        25
+      ],
+      "luminositySolar": [
+        30000,
+        2000000
+      ],
+      "temperatureKelvin": [
+        30000,
+        50000
+      ],
+      "ageMyr": [
+        0.1,
+        6
+      ],
+      "lifetimeMyr": [
+        2,
+        10
+      ],
+      "radiationModifier": 70,
+      "windModifier": 60,
+      "habitabilityModifier": 0,
+      "young": true,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        119,
+        175,
+        255
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "magnetar",
+      "name": "Magnetar",
+      "weightMillionths": 50,
+      "massSolar": [
+        1.2,
+        2.3
+      ],
+      "radiusSolar": [
+        1.4e-05,
+        2.2e-05
+      ],
+      "luminositySolar": [
+        0.001,
+        1
+      ],
+      "temperatureKelvin": [
+        200000,
+        1500000
+      ],
+      "ageMyr": [
+        0.001,
+        0.1
+      ],
+      "lifetimeMyr": [
+        0.01,
+        1
+      ],
+      "radiationModifier": 100,
+      "windModifier": 5,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "remnant",
+      "color": [
+        125,
+        218,
+        255
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "magnetic-halo",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "high-energy",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "wolf-rayet",
+      "name": "Wolf-Rayet Star",
+      "weightMillionths": 40,
+      "massSolar": [
+        10,
+        80
+      ],
+      "radiusSolar": [
+        1,
+        20
+      ],
+      "luminositySolar": [
+        100000,
+        3000000
+      ],
+      "temperatureKelvin": [
+        40000,
+        150000
+      ],
+      "ageMyr": [
+        2,
+        10
+      ],
+      "lifetimeMyr": [
+        0.1,
+        0.8
+      ],
+      "radiationModifier": 100,
+      "windModifier": 100,
+      "habitabilityModifier": 0,
+      "young": true,
+      "evolved": false,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "main-sequence",
+      "color": [
+        166,
+        211,
+        255
+      ],
+      "visualScale": 1,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "wind-halo",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "jet-black-hole",
+      "name": "Black Hole With Relativistic Jets",
+      "weightMillionths": 30,
+      "massSolar": [
+        3,
+        60
+      ],
+      "radiusSolar": [
+        1e-05,
+        0.0003
+      ],
+      "luminositySolar": [
+        0,
+        0
+      ],
+      "temperatureKelvin": [
+        0,
+        0
+      ],
+      "ageMyr": [
+        10,
+        13000
+      ],
+      "lifetimeMyr": [
+        0.01,
+        10
+      ],
+      "radiationModifier": 90,
+      "windModifier": 30,
+      "habitabilityModifier": 0,
+      "young": false,
+      "evolved": false,
+      "remnant": true,
+      "blackHole": true,
+      "directionalJets": true,
+      "evolutionClass": "black-hole",
+      "color": [
+        155,
+        212,
+        255
+      ],
+      "visualScale": 0.6,
+      "distanceLuminosity": 1,
+      "fallbackDistanceMode": "bipolar-accretion",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "gravitational",
+      "hazardProfile": "directional-jets",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "yellow-supergiant",
+      "name": "Yellow Supergiant",
+      "weightMillionths": 20,
+      "massSolar": [
+        8,
+        40
+      ],
+      "radiusSolar": [
+        30,
+        400
+      ],
+      "luminositySolar": [
+        5000,
+        300000
+      ],
+      "temperatureKelvin": [
+        4500,
+        7500
+      ],
+      "ageMyr": [
+        3,
+        60
+      ],
+      "lifetimeMyr": [
+        0.01,
+        1
+      ],
+      "radiationModifier": 15,
+      "windModifier": 30,
+      "habitabilityModifier": 0.01,
+      "young": true,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        255,
+        213,
+        93
+      ],
+      "visualScale": 2.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    },
+    {
+      "id": "hypergiant",
+      "name": "Hypergiant",
+      "weightMillionths": 10,
+      "massSolar": [
+        20,
+        100
+      ],
+      "radiusSolar": [
+        50,
+        2000
+      ],
+      "luminositySolar": [
+        300000,
+        5000000
+      ],
+      "temperatureKelvin": [
+        3500,
+        30000
+      ],
+      "ageMyr": [
+        1,
+        10
+      ],
+      "lifetimeMyr": [
+        0.01,
+        0.5
+      ],
+      "radiationModifier": 70,
+      "windModifier": 100,
+      "habitabilityModifier": 0,
+      "young": true,
+      "evolved": true,
+      "remnant": false,
+      "blackHole": false,
+      "directionalJets": false,
+      "evolutionClass": "evolved",
+      "color": [
+        255,
+        189,
+        117
+      ],
+      "visualScale": 2.8,
+      "distanceLuminosity": 1.6,
+      "fallbackDistanceMode": "stellar-point",
+      "rarityTier": "exceptional",
+      "isRareDiscovery": true,
+      "discoveryEventId": "",
+      "discoveryTextKey": "",
+      "sensorSignature": "optical",
+      "hazardProfile": "stellar-radiation",
+      "specialFeatureIds": [],
+      "researchOpportunityIds": [],
+      "resourceOpportunityIds": [],
+      "uniqueInteractionIds": []
+    }
+  ],
+  "hazards": {
+    "bakedFlux": 40,
+    "safeFlux": 40,
+    "radiationApproachAu": 0.012,
+    "windApproachAu": 0.008,
+    "photosphereClearance": 1.12,
+    "jetHalfAngleRadians": 0.12,
+    "jetExtentAu": 12
+  },
+  "centralBlackHole": {
+    "stateWeights": [
+      90,
+      9,
+      1
+    ],
+    "massSolar": [
+      3000000,
+      8000000
+    ]
+  }
+}

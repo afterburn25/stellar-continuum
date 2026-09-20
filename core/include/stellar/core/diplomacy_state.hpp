@@ -280,6 +280,10 @@ public:
   get_access_permission(int grantor, int visitor) const noexcept;
   [[nodiscard]] bool is_transit_authorized(int grantor, int visitor) const;
   [[nodiscard]] DiplomaticStateView build_view_for(int observer) const;
+  // Owned, stable claim-id order. A missing observer is an authoritative
+  // inspection snapshot; normal presentation must supply its observer.
+  [[nodiscard]] std::vector<TerritorialClaimSnapshot>
+  territorial_claims(std::optional<int> observer = std::nullopt) const;
   [[nodiscard]] DiplomacyStateSnapshot snapshot() const;
 
   // Low-level historical conversion matching DiplomacyState.Restore. This is

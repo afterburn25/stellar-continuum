@@ -1,0 +1,65 @@
+#include "native_controlled_assets.hpp"
+#include <chrono>
+#include <iostream>
+#include <stdexcept>
+using namespace stellar::native_assets;
+using namespace stellar::native_map;
+namespace {
+void require(bool ok,const char* why){if(!ok)throw std::runtime_error(why);}
+Point center(UiRect r){return {r.x+r.width*.5f,r.y+r.height*.5f};}
+Command click(Navigator& n,UiRect r,int count=1,int w=1920,int h=1080){InputEvent e{InputEventType::LeftPressed,center(r)};e.click_count=static_cast<std::uint8_t>(count);(void)n.handle(e,w,h);return n.handle({InputEventType::LeftReleased,center(r)},w,h);}
+View sample(){View v{7,3,{}};for(int c:{0,1,2,4}){Row r;r.key={static_cast<Category>(c),10+c};r.name="Owned "+std::to_string(c);r.detail="Sol";r.search="owned sol "+std::to_string(c);v.rows.push_back(r);}return v;}
+void projection(){
+  using namespace stellar::core;FreshCampaignState world;world.player_civilization_id=3;
+  Colony colony;colony.id=10;colony.civilization_id=3;colony.stability=.9;world.colonies.push_back(colony);
+  colony.id=11;colony.kind=SettlementKind::ResourceOutpost;world.colonies.push_back(colony);colony.id=99;colony.civilization_id=8;world.colonies.push_back(colony);
+  FleetState fleet;fleet.id=12;fleet.civilization_id=3;fleet.current_system_id=0;world.fleets.push_back(fleet);fleet.id=99;fleet.civilization_id=8;world.fleets.push_back(fleet);
+  stellar::native_colony_roster::View colonies;colonies.generation=7;colonies.player_id=3;colonies.available=true;
+  for(int id:{10,11,99}){stellar::native_colony_roster::Row row;row.colony_id=id;row.name="Colony";row.system_name="Sol";row.population="1M";row.can_open=true;colonies.rows.push_back(row);}
+  stellar::native_fleet::NativeFleetMapView fleets;fleets.campaign_generation=7;fleets.player_civilization_id=3;
+  for(int id:{12,99}){stellar::native_fleet::NativeOwnFleet f;f.id=id;f.name="Fleet";f.current_system_id=0;fleets.own_fleets.push_back(f);}
+  stellar::native_shipyard::NativeShipyardView yard;yard.campaign_generation=7;yard.player_civilization_id=3;yard.home_system_id=0;yard.orbital_shipyard_complete=true;yard.maximum_pending_builds=8;
+  const auto project=[&]{return build(world,colonies,fleets,&yard,[](int){return "Sol";});};
+  auto v=project();require(v.rows.size()==4,"Enemy record leaked or asset missing");
+  require(v.rows[0].key.category==Category::Planets&&v.rows[1].key.category==Category::Outposts&&v.rows[2].key.category==Category::Fleets&&v.rows[3].key.category==Category::Shipyards,"Stable categories or yard deduplication failed");
+  require(!v.rows.back().progress,"Idle yard displayed fake progress");
+  stellar::native_shipyard::NativeShipyardOrder order;order.active=true;order.design_name="Scout";order.progress_fraction=.42;yard.orders.push_back(order);v=project();require(v.rows.back().progress==.42,"Construction progress not live");
+  world.colonies.front().stability=.1;world.fleets.front().transit_phase=FleetTransitPhase::InterstellarWarp;v=project();require(v.rows.front().severity==2&&v.rows[2].activity.find("Moving")!=std::string::npos,"Live alert/order lost");
+  world.colonies.front().civilization_id=8;v=project();require(v.rows.size()==3&&v.rows.front().key.category==Category::Outposts,"Lost ownership retained");
+  yard.orbital_shipyard_complete=false;v=project();require(v.rows.size()==2,"Unbuilt yard exposed");
+  fleets.campaign_generation=8;require(project().rows.empty(),"Mixed generation accepted");
+}
+void interactions(){
+  Navigator n;n.set_view(sample());auto p=n.preferences();p.collapsed.fill(false);n.set_preferences(p);Preferences persisted;
+  n.set_persist([&](const Preferences& value){persisted=value;return true;});
+  require(n.category_bounds(Category::Stations,1920,1080).width==0,"Empty category visible");
+  (void)click(n,n.category_bounds(Category::Planets,1920,1080));require(n.preferences().collapsed[0]&&!n.preferences().collapsed[2]&&persisted.collapsed[0],"Independent collapse persistence failed");
+  const auto l=Layout::make(1920,1080);(void)n.handle({InputEventType::LeftPressed,center(l.search)},1920,1080);
+  InputEvent typing{InputEventType::TextEntered};typing.text="sol";(void)n.handle(typing,1920,1080);
+  require(n.row_bounds({Category::Planets,10},1920,1080).has_value(),"Search hid collapsed result");
+  (void)n.handle({InputEventType::LeftPressed,center(l.clear)},1920,1080);
+  require(!n.row_bounds({Category::Planets,10},1920,1080),"Search destroyed collapse preference");
+  n.set_selection(Key{Category::Planets,10});DrawList d;n.render(d,1920,1080,{});require(n.row_bounds({Category::Planets,10},1920,1080).has_value()&&n.preferences().collapsed[0],"External selection failed temporary reveal");
+  n.set_selection(Key{Category::Fleets,12});require(!n.row_bounds({Category::Planets,10},1920,1080),"Temporary reveal not restored");
+  auto row=n.row_bounds({Category::Shipyards,14},1920,1080);require(row.has_value(),"Yard missing");
+  auto command=click(n,*row);require(command.key==Key{Category::Shipyards,14}&&!command.manage,"Single click did not focus exact yard");
+  command=click(n,*row,2);require(command.manage&&command.generation==7&&command.observer==3,"Double click lost identity");
+  (void)n.handle({InputEventType::LeftPressed,center(*row)},1920,1080);
+  auto progressed=sample();progressed.rows.back().progress=.6;progressed.rows.back().activity="Building scout";n.set_view(progressed);
+  require(n.handle({InputEventType::LeftReleased,center(*row)},1920,1080).key==Key{Category::Shipyards,14},"Live progress refresh swallowed click");
+  UiRect manage=*row;manage.x+=manage.width-20;manage.width=12;require(click(n,manage).manage,"Manage arrow unavailable");
+  (void)n.handle({InputEventType::LeftPressed,center(*row)},1920,1080);auto changed=sample();changed.generation=8;n.set_view(changed);require(!n.handle({InputEventType::LeftReleased,center(*row)},1920,1080).key,"Stale generation click accepted");
+  (void)click(n,l.hide);require(n.preferences().hidden,"Hide failed");(void)click(n,l.restore);require(!n.preferences().hidden,"Restore failed");
+  auto empty=sample();empty.rows.clear();n.set_view(empty);require(n.category_bounds(Category::Planets,1920,1080).width==0,"Last asset category retained");n.set_view(sample());require(n.category_bounds(Category::Planets,1920,1080).width>0,"First asset category absent");
+}
+void scale_and_virtualization(){
+  for(auto size:std::array{std::pair{1280,720},std::pair{1920,1080},std::pair{2560,1440},std::pair{3440,1440},std::pair{3840,2160}}){Navigator n;auto v=sample();v.rows.clear();for(int i=0;i<1500;++i){Row r;r.key={Category::Fleets,i};r.name="Fleet "+std::to_string(i);r.search="fleet";v.rows.push_back(r);}n.set_view(v);
+    const auto l=Layout::make(size.first,size.second);require(l.panel.x>size.first*.65f&&l.panel.y+l.panel.height<size.second,"Panel consumes map or clips");
+    int thumbnails=0;DrawList draw;const auto start=std::chrono::steady_clock::now();n.render(draw,size.first,size.second,[&](const Row&){++thumbnails;return Navigator::Picture{};});
+    require(thumbnails<25&&draw.overlay.size()<300,"Offscreen assets rendered eagerly");require(std::chrono::steady_clock::now()-start<std::chrono::milliseconds(200),"Large roster rendering too slow");
+    n.set_selection(Key{Category::Fleets,1499});draw={};n.render(draw,size.first,size.second,{});require(n.row_bounds({Category::Fleets,1499},size.first,size.second).has_value(),"Selected asset not scrolled into view");
+    (void)n.handle({InputEventType::Wheel,center(l.list),{},10000},size.first,size.second);require(n.scroll_offset()==0,"Scroll did not return to top");
+  }
+}
+}
+int main(){try{projection();interactions();scale_and_virtualization();std::cout<<"Controlled Assets ownership, live projection, preferences, input, search and virtualization passed.\n";return 0;}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -427,7 +427,7 @@ AdaptiveResearchStrategicSnapshotCodec::deserialize(std::string_view json) const
   if (schema_found == root.end())
     fail("Adaptive Research snapshot is missing schemaVersion.");
   const auto schema = checked_int32(*schema_found);
-  if (schema == 1 || schema == 2) {
+  if (schema == 1 || schema == 2 || schema == AdaptiveResearchSnapshotCodec::current_schema_version) {
     auto state = storage_->v2.deserialize(json);
     auto &support = detail::AdaptiveResearchPressureSupportAccess::state(
         storage_->runtime->pressure(), state);

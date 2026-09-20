@@ -1,9 +1,22 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace stellar::core {
+void validate_campaign_runtime_continuation(const CampaignRuntimeContinuation &state,
+    const FreshCampaignState &world,double day){
+  CivilizationStrategicRuntimeCoordinator probe;probe.restore(state.strategic);
+  state.diplomacy.validate();
+  if(!std::isfinite(day)||day<0||state.strategic.strategic_days>day+1e-7||
+      (state.strategic.campaign_seed&&*state.strategic.campaign_seed!=world.seed)||
+      state.diplomacy.last_processed_tick>DiplomacyCampaignClock::from_simulation_days(day))
+    throw std::invalid_argument("Campaign continuation does not match its world or date.");
+  for(const auto &plan:state.strategic.plans)
+    if(std::ranges::none_of(world.civilizations,[&](const auto &c){return c.id==plan.civilization_id&&!c.is_seeded_ancient;}))
+      throw std::invalid_argument("Strategic plan references an absent civilization.");
+}
 namespace {
 SourceCompatibleCampaignConfiguration configuration(
     AdaptiveResearchConstructionCapabilityView *construction,
@@ -56,6 +69,9 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   DiplomacyCampaignRuntimeCoordinator diplomacy_runtime;
   GalaxySimulationStepCoordinator core;
   AdaptiveResearchCampaignSimulation research_simulation;
+  StellarActivityScheduler stellar_activity;
+  bool profiling_enabled{};
+  std::array<stellar::engine::PerformanceCounter,4> performance{};
 
   Storage(AdaptiveResearchStrategicRuntime runtime, FreshCampaignState campaign,
           DiplomacyState diplomacy_state,
@@ -74,8 +90,49 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
              strategic_runtime(&shipbuilding, &diplomacy),
              diplomacy_runtime.create_combat_command_runtime()) {
     diplomacy_runtime.reset(current_day, true);
+    auto& activity_day=world.campaign().stellar_activity_day;
+    if(!activity_day)activity_day=current_day;
+    validate_stellar_activity_clock(activity_day);
+    initialize_stellar_activity(world.campaign().seed,world.campaign().systems,*activity_day);
+    stellar_activity.rebuild(world.campaign().systems);
   }
 };
+
+StellarActivityScheduler& IntegratedAdaptiveCampaignRuntime::stellar_activity() noexcept {return storage_->stellar_activity;}
+double IntegratedAdaptiveCampaignRuntime::stellar_activity_day() const noexcept {return storage_->world.campaign().stellar_activity_day.value_or(0.);}
+std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stellar_activity(double seconds){
+  if(!std::isfinite(seconds)||seconds<0)throw std::invalid_argument("Invalid stellar activity frame time");
+  if(seconds==0)return {};
+  const double day=stellar_activity_day()+seconds/24.;
+  validate_stellar_activity_clock(day);
+  auto launches=storage_->stellar_activity.advance(storage_->world.campaign().systems,day);
+  storage_->world.campaign().stellar_activity_day=day;
+  return launches;
+}
+
+CampaignRuntimeContinuation IntegratedAdaptiveCampaignRuntime::continuation() const {
+  return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule()};
+}
+void IntegratedAdaptiveCampaignRuntime::restore_continuation(
+    const CampaignRuntimeContinuation &state,double day){
+  validate_campaign_runtime_continuation(state,storage_->world.campaign(),day);
+  storage_->core.strategic_runtime().restore(state.strategic);
+  storage_->diplomacy_runtime.restore_schedule(state.diplomacy);
+}
+void IntegratedAdaptiveCampaignRuntime::set_profiling_enabled(bool enabled) noexcept {
+  storage_->profiling_enabled=enabled;storage_->core.set_profiling_enabled(enabled);
+}
+void IntegratedAdaptiveCampaignRuntime::reset_performance_counters() noexcept {
+  storage_->performance={};storage_->core.reset_performance_counters();
+}
+std::vector<CampaignPerformanceSample> IntegratedAdaptiveCampaignRuntime::performance_samples() const {
+  std::vector<CampaignPerformanceSample> result;
+  for(std::size_t i=0;i<GalaxySimulationStepCoordinator::phase_names.size();++i)
+    result.push_back({GalaxySimulationStepCoordinator::phase_names[i],storage_->core.performance_counters()[i]});
+  constexpr std::array<std::string_view,4> names{"core_total","sensor_contacts","adaptive_research","diplomacy"};
+  for(std::size_t i=0;i<names.size();++i)result.push_back({names[i],storage_->performance[i]});
+  return result;
+}
 
 IntegratedAdaptiveCampaignRuntime::IntegratedAdaptiveCampaignRuntime(
     std::unique_ptr<Storage> storage) noexcept
@@ -151,7 +208,9 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   IntegratedAdaptiveCampaignStepResult result;
   if (trace)
     *trace = {};
+  stellar::engine::PhaseTimer timing(storage_->profiling_enabled);
   result.core = storage_->core.advance(&storage_->world, elapsed_days);
+  timing.finish(storage_->performance[0]);
   if (trace)
     trace->core = result.core;
   if (elapsed_days > 0.0) {
@@ -177,14 +236,17 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
         trace->sensor_contacts.push_back({civilization->id, recorded});
     }
   }
+  timing.finish(storage_->performance[1]);
   result.research_events = storage_->research_simulation.advance(
       storage_->world.campaign(), storage_->research, elapsed_days,
       absolute_end_day);
+  timing.finish(storage_->performance[2]);
   if (trace)
     trace->research_events = result.research_events;
   result.diplomacy = storage_->diplomacy_runtime.process(
       result.core.exploration_events, result.core.combat_events,
       absolute_end_day);
+  timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
   return result;

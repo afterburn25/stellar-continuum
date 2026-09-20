@@ -227,6 +227,9 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
                           int system_id, double simulation_delta,
                           const SurveyOperationsProfiler &profiler,
                           std::vector<ExplorationEvent> &events) {
+  const auto& location=first_system(world.systems,system_id);
+  const auto scan_effort=phenomenon_context(world.phenomena,location.position.x,location.position.y,system_id).effects.scanning;
+  simulation_delta/=scan_effort;
   if (fleet.role == FleetRole::Scout) {
     if (world.knowledge.system_survey_level(fleet.civilization_id, system_id) >=
         SystemSurveyLevel::partially_surveyed)
@@ -252,7 +255,7 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
         fleet.id, system_id,
         fleet.name + " completed a rapid reconnaissance pass of " +
             system.name + "; estimated detailed survey effort is " +
-            detail::legacy_custom_fixed(profile.estimated_science_survey_days,
+            detail::legacy_custom_fixed(profile.estimated_science_survey_days*scan_effort,
                                         0, 1) +
             " days (" + hazard_name(profile.operational_hazard) +
             " survey conditions)."});
@@ -285,7 +288,7 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
                       fleet.name + " began a detailed science survey of " +
                           system.name + "; estimated total effort is " +
                           detail::legacy_custom_fixed(
-                              profile.estimated_science_survey_days, 0, 1) +
+                              profile.estimated_science_survey_days*scan_effort, 0, 1) +
                           " days."});
     if (current_level == SystemSurveyLevel::partially_surveyed)
       emit_reconnaissance_signatures(world, fleet, system_id, events);
@@ -312,7 +315,7 @@ bool handle_inbound(ExplorationAdvanceWorldView world, FleetState &fleet,
   const auto already_known =
       world.knowledge.is_system_known(fleet.civilization_id, target.id);
   const auto revealed = world.knowledge.reveal_within_sensor_range(
-      fleet.civilization_id, target.id, world.systems, fleet.sensor_range);
+      fleet.civilization_id, target.id, world.systems, fleet.sensor_range*phenomenon_context(world.phenomena,target.position.x,target.position.y,target.id).effects.sensor);
   if (!already_known)
     events.push_back({ExplorationEventType::SystemDetected,
                       fleet.civilization_id, fleet.id, target.id,
@@ -336,8 +339,11 @@ bool handle_inbound(ExplorationAdvanceWorldView world, FleetState &fleet,
 } // namespace
 
 ExplorationSimulation::ExplorationSimulation(
-    ExplorationReachAssessment operational_reach)
-    : mission_planner_(std::move(operational_reach)) {}
+    ExplorationReachAssessment operational_reach,MissionFuelPolicy ai_fuel_policy)
+    : mission_planner_(std::move(operational_reach)),ai_fuel_policy_(ai_fuel_policy) {
+  if(ai_fuel_policy_==MissionFuelPolicy::RetainReturnToService&&!mission_planner_.uses_canonical_reach())
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
+}
 
 MissionReachAssessment ExplorationSimulation::assess_operational_reach(
     ExplorationPlanningWorldView world, int fleet_id,
@@ -437,17 +443,25 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     }
 
     if (fleet.transit_phase == FleetTransitPhase::None &&
-        !fleet.destination_system_id && !civilization.is_player &&
+        !fleet.destination_system_id && civilization_uses_ai(civilization,world.control) &&
         is_survey_fleet(fleet)) {
       ExplorationAiMissionCoordinator coordinator(mission_planner_);
       const auto selection = coordinator.select_mission(
           {world.systems, world.bodies, world.fleets, world.colonies,
            world.knowledge, world.lanes},
-          fleet);
+          fleet,ai_fuel_policy_);
       if (selection.candidate)
         assign_fleet_route({world.systems, world.colonies, world.lanes}, fleet,
                            selection.candidate->system_id,
                            selection.candidate->reach);
+      else if(ai_fuel_policy_==MissionFuelPolicy::RetainReturnToService&&fleet.current_system_id&&
+          refueling_service_level(world,fleet.civilization_id,*fleet.current_system_id)<=0){
+        const auto recovery=request_civilian_fleet_return(
+            {world.systems,world.colonies,world.fleets,world.lanes},fleet.civilization_id,fleet.id);
+        // Do not manufacture fuel for old saves that are already stranded.
+        // Persist an actionable explanation and retry when the world changes.
+        if(!recovery.accepted)fleet.return_to_base_failure_reason=recovery.message;
+      }
     }
 
     if (!fleet.destination_system_id &&
@@ -459,7 +473,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
         fleet.transit_origin_system_id.reset();
         fleet.transit_target_system_id.reset();
         fleet.transit_progress = 0;
-        fleet.local_transit_position = {};
+        if(fleet.stellar_transit_path.empty())fleet.local_transit_position = {};
       }
       continue;
     }
@@ -495,7 +509,8 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
             finite_fleet_chart_position(fleet.local_transit_position)
                 ? fleet.local_transit_position
                 : Vec2{},
-            fleet_gate_towards(chart_position(target), chart_position(origin)));
+            fleet_gate_towards(chart_position(target), chart_position(origin)),
+            origin.stellar_object?&*origin.stellar_object:nullptr);
       }
 
       if (fleet.transit_phase == FleetTransitPhase::LocalDeparture ||
@@ -609,7 +624,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
             chart_position(target));
       }
       begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival, inbound,
-                                final_target);
+                                final_target,target.stellar_object?&*target.stellar_object:nullptr);
       if (handle_inbound(world, fleet, target, events))
         break;
       if (fleet.hold_requested)

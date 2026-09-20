@@ -16,13 +16,16 @@ using namespace stellar::native_map;
 using namespace stellar::native_setup;
 
 namespace {
-constexpr std::u8string_view suffix = u8".player17.json";
+std::u8string_view save_suffix(const fs::path &path) {
+  return is_developer_campaign_save_path(path)?u8".dev17.json":u8".player17.json";
+}
 
 void require_path(const fs::path &path, const char *message) {
   if (path.empty()) throw std::invalid_argument(message);
 }
 
 std::u8string base_name(const fs::path &anchor) {
+  const auto suffix=save_suffix(anchor);
   auto name = anchor.filename().u8string();
   if (name.ends_with(suffix)) name.resize(name.size() - suffix.size());
   return name;
@@ -43,6 +46,7 @@ fs::path unique_fresh_native_save_path(const fs::path &configured_default) {
                                            configured_default, error);
     return configured_default;
   }
+  const auto suffix=save_suffix(configured_default);
   const auto stem = base_name(configured_default);
   const auto parent = configured_default.parent_path();
   for (std::uint64_t index = 1; index <= 1000000; ++index) {
@@ -78,6 +82,7 @@ NativeStartupSaveSlots list_native_startup_save_slots(
                                    parent, path_error);
       return result;
     }
+    const auto suffix=save_suffix(anchor);
     const auto stem = base_name(anchor);
     const auto prefix = stem + u8"-native-";
     for (const auto &entry : fs::directory_iterator(parent)) {
@@ -156,11 +161,20 @@ NativeStartupSessionController::~NativeStartupSessionController() {
   if (storage_->loader.joinable()) storage_->loader.join();
 }
 
+void NativeStartupSessionController::set_developer_mode(bool enabled) {
+  storage_->require_owner();
+  const auto current=poll();
+  if(current.phase!=NativeStartupPhase::Idle&&!terminal(current.phase))
+    throw std::logic_error("Cannot change campaign mode while a startup operation is active.");
+  storage_->dependencies.developer_session=enabled;
+}
 NativeStartupStart NativeStartupSessionController::start_new(
     const NativePreparedNewCampaign &prepared, fs::path research_root,
     fs::path catalog_path, fs::path configured_default_save,
     std::string game_version) {
   storage_->require_owner();
+  if(prepared.developer_mode()!=storage_->dependencies.developer_session)
+    return {false,0,"Prepared campaign mode does not match the startup session."};
   require_path(configured_default_save, "A configured campaign save path is required.");
   const auto current = poll();
   if (current.phase != NativeStartupPhase::Idle && !terminal(current.phase))
@@ -212,7 +226,7 @@ NativeStartupStart NativeStartupSessionController::start_load(
   }
   auto *state = storage_.get();
   try {
-    auto loader = storage_->dependencies.loader;
+    auto loader = storage_->dependencies.developer_session?NativeCampaignLoader{load_existing_developer_campaign}:storage_->dependencies.loader;
     storage_->loader = std::jthread([state, loader = std::move(loader),
                                     selected_save = std::move(selected_save),
                                     research_root = std::move(research_root), id] {

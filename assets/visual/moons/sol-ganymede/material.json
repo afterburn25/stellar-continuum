@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 1.9073486328125e-06,
+    "clippedFraction": 0.00017213821411132813,
+    "disc": [
+      1024.5138231587114,
+      1023.526547893718,
+      996.5861771948912
+    ],
+    "id": "sol-ganymede",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.40766721175653564,
+      0.3549180672872138,
+      -0.7
+    ],
+    "seamError": 0.03377839686043218,
+    "usable": true
+  },
+  "id": "sol-ganymede",
+  "name": "Ganymede",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "a069fb576cb3f778b4c7f8154a0bebaaa63e3860e358480ae2f05bbd1096bd21",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Ganymede.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

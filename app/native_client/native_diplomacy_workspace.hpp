@@ -1,0 +1,138 @@
+#pragma once
+
+#include "native_diplomacy_controller.hpp"
+
+#include <stellar/engine/native_map_platform.hpp>
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace stellar::native_diplomacy_ui {
+
+struct DiplomacyWorkspaceLayout {
+  float scale{};
+  int title_font_pixels{};
+  int body_font_pixels{};
+  int small_font_pixels{};
+  stellar::native_map::UiRect surface;
+  stellar::native_map::UiRect title;
+  stellar::native_map::UiRect date;
+  stellar::native_map::UiRect close;
+  stellar::native_map::UiRect contact_panel;
+  stellar::native_map::UiRect contact_rows;
+  stellar::native_map::UiRect stage;
+  stellar::native_map::UiRect stage_caption;
+  stellar::native_map::UiRect meter_panel;
+  stellar::native_map::UiRect meters;
+  stellar::native_map::UiRect actions;
+  stellar::native_map::UiRect tabs;
+  stellar::native_map::UiRect detail_rows;
+  stellar::native_map::UiRect feedback;
+  stellar::native_map::UiRect modal_panel;
+
+  [[nodiscard]] static DiplomacyWorkspaceLayout
+  for_viewport(int width, int height) noexcept;
+};
+
+enum class DiplomacyWorkspaceTab {
+  agreements,
+  proposals,
+  history,
+  intelligence,
+  overview,
+};
+
+enum class DiplomacyWorkspaceCommandKind {
+  None,
+  Close,
+  SelectContact,
+  Action,
+  ProposalAction,
+  FocusSystem,
+};
+
+struct DiplomacyWorkspaceCommand {
+  DiplomacyWorkspaceCommandKind kind{DiplomacyWorkspaceCommandKind::None};
+  bool captured{};
+  std::size_t contact_index{};
+  std::optional<int> target_civilization_id;
+  std::optional<std::int64_t> proposal_id;
+  stellar::native_diplomacy::DiplomacyWorkspaceAction action{
+      stellar::native_diplomacy::DiplomacyWorkspaceAction::
+          establish_communication};
+  int focus_system_id{};
+  std::uint64_t campaign_generation{};
+  std::uint64_t diplomacy_revision{};
+};
+
+class NativeDiplomacyWorkspace final {
+public:
+  using PortraitProvider = std::function<std::shared_ptr<
+      const stellar::native_map::RgbaImage>(std::string_view)>;
+
+  void open() noexcept;
+  void close() noexcept;
+  [[nodiscard]] bool visible() const noexcept;
+  void set_view(stellar::native_diplomacy::NativeDiplomacyView view);
+  void discard_campaign();
+  void set_notice(std::string message, bool accepted);
+  [[nodiscard]] bool modal_open() const noexcept;
+  void dismiss_modal() noexcept;
+
+  [[nodiscard]] const std::optional<
+      stellar::native_diplomacy::NativeDiplomacyView> &
+  view() const noexcept;
+  [[nodiscard]] std::size_t selected_contact_index() const noexcept;
+  [[nodiscard]] bool select_contact_civilization(int civilization_id);
+  [[nodiscard]] const std::string &notice() const noexcept;
+
+  [[nodiscard]] DiplomacyWorkspaceCommand
+  handle(const stellar::native_map::InputEvent &event, int width, int height);
+  void render(stellar::native_map::DrawList &out, int width, int height,
+              const PortraitProvider *portrait_provider = nullptr) const;
+
+private:
+  struct ModalState {
+    bool negotiation{};
+    std::string title;
+    std::string description;
+    stellar::native_diplomacy::DiplomacyWorkspaceAction action{
+        stellar::native_diplomacy::DiplomacyWorkspaceAction::declare_war};
+    std::optional<int> target_civilization_id;
+    std::uint64_t campaign_generation{};
+    std::uint64_t diplomacy_revision{};
+    bool danger{};
+    std::string confirm_label;
+    std::vector<std::pair<std::string,
+                          stellar::native_diplomacy::DiplomacyWorkspaceAction>>
+        terms;
+  };
+
+  void reconcile_selection();
+  [[nodiscard]] float
+  detail_scroll_limit(const DiplomacyWorkspaceLayout &layout) const noexcept;
+  [[nodiscard]] std::vector<const stellar::native_diplomacy::
+                                NativeDiplomacyContact *>
+  filtered_contacts() const;
+
+  bool visible_{};
+  stellar::native_map::Point pointer_{};
+  std::optional<stellar::native_diplomacy::NativeDiplomacyView> view_;
+  std::size_t selected_contact_index_{};
+  std::optional<std::string> selected_contact_id_;
+  stellar::native_diplomacy::NativeDiplomacyContactFilter filter_{
+      stellar::native_diplomacy::NativeDiplomacyContactFilter::all};
+  DiplomacyWorkspaceTab tab_{DiplomacyWorkspaceTab::agreements};
+  std::optional<ModalState> modal_;
+  std::string notice_;
+  bool notice_accepted_{};
+  float contact_scroll_{};
+  float detail_scroll_{};
+};
+
+} // namespace stellar::native_diplomacy_ui

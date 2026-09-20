@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/planet_appearance.hpp>
 
 namespace stellar::core {
 
@@ -41,6 +42,9 @@ struct PlanetaryBody {
     bool has_pre_warp_civilization{};
     double orbital_eccentricity{};
     double orbital_inclination_degrees{};
+    std::optional<StellarPlanetProperties> stellar_exposure;
+    bool cracked_world{};
+    std::optional<PlanetAppearance> appearance;
 };
 
 inline constexpr std::string_view sol_catalog_preset_id = "sol-v1";
@@ -52,7 +56,7 @@ inline constexpr double pluto_orbital_eccentricity = 0.2444;
 inline constexpr double pluto_orbital_inclination_degrees = 17.16;
 
 void validate_planetary_body(const PlanetaryBody& body);
-std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed,std::span<const StellarSystem> systems);
+std::vector<PlanetaryBody> generate_planetary_catalog(std::int64_t seed,std::span<const StellarSystem> systems, std::map<int,int>* engulfed=nullptr);
 std::vector<PlanetaryBody> apply_environmental_diversity(std::int64_t seed,std::span<const StellarSystem> systems,std::span<const PlanetaryBody> bodies);
 std::vector<PlanetaryBody> create_sol_catalog(const StellarSystem& system);
 std::vector<PlanetaryBody> upgrade_saved_sol_catalog(

@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace stellar::core {
 
@@ -25,6 +26,15 @@ struct MissionReachAssessment {
   std::string reason;
   std::optional<std::vector<int>> route_system_ids;
   double route_distance_light_years{};
+  // Present for canonical route assessments; custom/provisional providers may
+  // omit it. Includes fuel actually available at arrival after owned services.
+  std::optional<double> arrival_fuel_light_years;
+};
+
+enum class MissionFuelPolicy { ReachDestination, RetainReturnToService };
+struct RefuelingReach {
+  int system_id{};
+  MissionReachAssessment reach;
 };
 
 MissionReachAssessment supported_mission_reach(
@@ -42,6 +52,29 @@ struct OperationalReachWorldView {
   std::span<const StellarSystem> systems;
   std::span<const Colony> colonies;
   InterstellarLaneNetwork &lanes;
+};
+
+// Scope this to one read-only planning operation. It borrows the current world
+// and indexes geometry/refueling once for many destinations. Discard it before
+// mutating systems, colonies or lanes; fleet fuel/range is read on each assess.
+// No cross-tick cache or save state, and the single-target API uses this same
+// authoritative calculation.
+class OperationalReachBatch {
+public:
+  OperationalReachBatch(OperationalReachWorldView world,int civilization_id)
+      :world_(world),civilization_id_(civilization_id){}
+  MissionReachAssessment assess(const FleetState &,int target_system_id,InterstellarMissionKind,
+      MissionFuelPolicy = MissionFuelPolicy::ReachDestination);
+  std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
+private:
+  void prepare();
+  MissionReachAssessment evaluate_route(const FleetState &,std::vector<int> route);
+  bool has_return_service_route(const FleetState &);
+  OperationalReachWorldView world_;
+  int civilization_id_{};
+  bool prepared_{};
+  std::unordered_map<int,const StellarSystem *> systems_;
+  std::unordered_map<int,double> refueling_;
 };
 
 MissionReachAssessment

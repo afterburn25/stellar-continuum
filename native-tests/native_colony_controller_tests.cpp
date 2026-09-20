@@ -1,11 +1,17 @@
 #include "native_colony_controller.hpp"
+#include <stellar/core/campaign_observation.hpp>
+#include <stellar/core/developer_campaign.hpp>
+#include "native_surface_status.hpp"
 #include "native_settlement_mission_controller.hpp"
 
 #include "../../app/native_client/native_system_view.hpp"
 
+#include <stellar/core/adaptive_research_authority.hpp>
+#include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/surface_construction.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -61,11 +67,211 @@ void require_finite(const NativeColonyView &view) {
                         view.power_demand,
                         view.credits_per_day,
                         view.industry_per_day,
-                        view.science_per_day};
+                        view.science_per_day,
+                        view.active_research_lab_units};
   require(std::ranges::all_of(values, [](const double value) {
             return std::isfinite(value);
           }),
           "colony projection emitted non-finite operational telemetry");
+}
+
+void surface_operation_tests(const fs::path &research_root, const fs::path &catalog) {
+  using stellar::native_colony_ui::surface_site_status;
+  auto frame = make_frame(research_root, catalog, 127506);
+  auto &world = frame.runtime().world().campaign();
+  const auto player = world.player_civilization_id;
+  auto &colony = *std::ranges::find(world.colonies, player, &Colony::civilization_id);
+  require(colony.planetary_body_id.has_value(), "operation fixture lacks a body");
+  world.knowledge.mark_system_fully_surveyed(player, colony.system_id);
+  NativeSystemViewController systems;
+  const auto system = systems.build(frame, 7, colony.system_id);
+  NativeColonyController controller;
+  colony.population_millions = 1.;
+  colony.surface_buildings.clear();
+  for (int id = 1; id <= 6; ++id) {
+    SurfaceBuilding building;
+    building.id = 9000 + id;
+    building.type_id = id == 1 ? "power_generator" : "science_lab";
+    building.x = static_cast<float>(id * 70);
+    building.is_complete = id != 6;
+    building.is_enabled = id != 4;
+    building.condition = id == 5 ? minimum_operational_condition : 1.;
+    building.industry_progress = building.is_complete ?
+        find_surface_building(building.type_id)->industry_cost : 20.;
+    colony.surface_buildings.push_back(building);
+  }
+  (void)frame.advance(1.);
+  const auto project = [&] {
+    const auto output = surface_colony_output(colony);
+    const auto result = controller.build(frame, 7, *system.snapshot,
+                                         *colony.planetary_body_id);
+    require(result.view.has_value(), "operation fixture was not projected");
+    for (const auto &site : result.view->construction_sites) {
+      require(site.powered == std::ranges::contains(output.powered_building_ids, site.building_id) &&
+                  site.staffed == std::ranges::contains(output.staffed_building_ids, site.building_id),
+              "surface status diverged from authoritative allocation");
+    }
+    return *result.view;
+  };
+  const auto label = [](const NativeColonyView &view, int id) {
+    const auto site = std::ranges::find(view.construction_sites, id,
+                                       &NativeSurfaceSite::building_id);
+    require(site != view.construction_sites.end(), "missing operational site");
+    return surface_site_status(*site).label;
+  };
+  const auto normal = project();
+  const auto *research = frame.runtime().research().try_get_civilization(player);
+  require(research != nullptr, "operation fixture has no adaptive research state");
+  const auto context_id = "colony:" + std::to_string(colony.id);
+  int expected_active_facilities{};
+  double expected_effective_labs{};
+  const auto &institution_catalog =
+      frame.runtime().research_runtime().authority().expertise_catalog();
+  for (const auto &institution : research->expertise().institutions()) {
+    if (institution.context_id != std::optional<std::string>{context_id} ||
+        institution.active_count <= 0)
+      continue;
+    expected_active_facilities += institution.active_count;
+    expected_effective_labs += institution_catalog
+                                   .get_institution(institution.institution_archetype_id)
+                                   .effective_lab_units * institution.active_count;
+  }
+  require(normal.active_research_facilities == expected_active_facilities &&
+              std::abs(normal.active_research_lab_units - expected_effective_labs) < 1e-9,
+          "colony research capacity was not projected from active local institutions");
+  const auto unchanged = project();
+  require(unchanged.revision == normal.revision,
+          "an unchanged colony projection advanced its revision");
+  const auto site = [&](const NativeColonyView &view, const int id)
+      -> const NativeSurfaceSite & {
+    const auto found = std::ranges::find(view.construction_sites, id,
+                                         &NativeSurfaceSite::building_id);
+    require(found != view.construction_sites.end(),
+            "missing management projection site");
+    return *found;
+  };
+  const auto &generator = site(normal, 9001);
+  const auto &lab = site(normal, 9002);
+  const auto &damaged = site(normal, 9005);
+  require(generator.essential_service && !lab.essential_service &&
+              lab.can_upgrade && lab.pending_upgrade_type_id == std::nullopt &&
+              lab.upgrade_name ==
+                  find_surface_building("advanced_science_lab")->name &&
+              lab.upgrade_credit_budget_units ==
+                  surface_upgrade_authorization_cost(
+                      ConstructionReadView{world.civilizations, world.bodies,
+                                           world.construction, world.colonies,
+                                           world.economies, {}, {}},
+                      colony, *find_surface_building("science_lab")) &&
+              lab.upgrade_industry_cost ==
+                  find_surface_building("science_lab")->upgrade_industry_cost &&
+              damaged.repair_industry_cost ==
+                  surface_repair_industry_cost(colony.surface_buildings[4]),
+          "surface management projection diverged from canonical costs or service priority");
+  require(generator.can_upgrade && !generator.upgrade_lock_reason.empty(),
+          "surface upgrade lock was not projected for a visible upgrade path");
+  const auto hub_cost = surface_hub_upgrade_cost(
+      ConstructionReadView{world.civilizations, world.bodies,
+                           world.construction, world.colonies,
+                           world.economies, {}, {}},
+      colony);
+  require(!normal.hub_name.empty() && normal.hub_upgrade_available ==
+              hub_cost.has_value() &&
+              normal.hub_upgrade_credit_budget_units ==
+                  (hub_cost ? hub_cost->credit_cost : 0.) &&
+              normal.hub_upgrade_industry_cost ==
+                  (hub_cost ? hub_cost->industry_cost : 0.),
+          "hub management projection diverged from canonical upgrade costs");
+  const auto original_revision = normal.revision;
+  colony.surface_buildings[1].pending_upgrade_type_id = "advanced_science_lab";
+  colony.surface_buildings[1].upgrade_days_remaining = 4.;
+  const auto pending = project();
+  require(!site(pending, 9002).can_upgrade &&
+              site(pending, 9002).upgrade_days_remaining == 4. &&
+              pending.revision > original_revision,
+          "pending surface upgrade remained actionable or failed to invalidate revision");
+  colony.surface_buildings[1].pending_upgrade_type_id.reset();
+  colony.surface_buildings[1].upgrade_days_remaining = 0.;
+  auto &economy = *std::ranges::find(world.economies, player,
+                                      &CivilizationEconomy::civilization_id);
+  const auto credits = economy.credits;
+  const auto industry = economy.industry;
+  economy.credits = 0.;
+  economy.industry = 0.;
+  const auto unaffordable = project();
+  require(site(unaffordable, 9002).can_upgrade &&
+              !site(unaffordable, 9002).can_afford_upgrade &&
+              !site(unaffordable, 9005).can_afford_repair &&
+              unaffordable.revision > pending.revision,
+          "surface management affordability did not invalidate the quote");
+  economy.credits = credits;
+  economy.industry = industry;
+  colony.surface_hub_upgrade_days_remaining = 3.;
+  const auto pending_hub = project();
+  require(!pending_hub.hub_upgrade_available &&
+              pending_hub.hub_upgrade_days_remaining == 3.,
+          "pending hub expansion remained actionable");
+  colony.surface_hub_upgrade_days_remaining = 0.;
+  require(label(normal, 9002) == "OPERATING" && label(normal, 9004) == "DISABLED" &&
+              label(normal, 9005) == "REPAIR NEEDED" && label(normal, 9006) == "CONSTRUCTION",
+          "facility completion was confused with operational readiness");
+  colony.surface_buildings.front().is_enabled = false;
+  const auto low_power = project();
+  require(label(low_power, 9001) == "DISABLED" && label(low_power, 9002) == "OPERATING" &&
+              label(low_power, 9003) == "NO POWER" && low_power.revision > normal.revision,
+          "power allocation or revision was not visible to the player");
+  colony.surface_buildings.front().is_enabled = true;
+  colony.population_millions = .08;
+  const auto low_labor = project();
+  require(label(low_labor, 9001) == "OPERATING" && label(low_labor, 9002) == "NO WORKERS" &&
+              label(low_labor, 9005) == "REPAIR NEEDED" && low_labor.revision > low_power.revision,
+          "unstaffed or damaged site misleadingly reported a power shortage");
+  require(label(normal, 9002) == "OPERATING" && label(low_power, 9003) == "NO POWER",
+          "refresh mutated an earlier value-owned view");
+}
+
+void developer_inspection_tests(const fs::path &research_root, const fs::path &catalog) {
+  auto frame = make_frame(research_root, catalog, 127500);
+  auto& world = frame.runtime().world().campaign();
+  auto foreign = std::ranges::find_if(world.colonies, [&](const auto& c) {
+    return c.civilization_id != world.player_civilization_id && c.planetary_body_id;
+  });
+  require(foreign != world.colonies.end(), "Missing alien colony fixture");
+  world.knowledge = CivilizationKnowledgeState{};
+  NativeSystemViewController systems; NativeColonyController colonies;
+  require(!systems.build(frame, 8, foreign->system_id).snapshot,
+          "Developer frame timing granted secret data without provenance");
+  world.developer_provenance.emplace();
+  require(!world.developer_provenance->full_exploration, "Fixture accidentally revealed the map");
+  auto economy = std::ranges::find(world.economies, foreign->civilization_id, &CivilizationEconomy::civilization_id);
+  require(economy != world.economies.end(), "Missing alien economy");
+  economy->credits = 987654.; economy->industry = 12345.;
+  foreign->population_millions = 4321.;
+  const auto capture = [&] { return capture_developer_campaign_json(frame.runtime(),
+      {0., "inspection-test", "2044-05-06T07:08:09Z"}); };
+  const auto before = capture();
+  const auto system = systems.build(frame, 8, foreign->system_id);
+  require(system.snapshot && std::ranges::all_of(system.snapshot->bodies, [](const auto& b) { return b.details && b.world_class; }),
+          "Developer inspection withheld physical data or world classification");
+  const auto result = colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id);
+  require(result.view && result.view->developer_inspection && result.view->foreign_settlement && !result.view->observer_only,
+          "Developer alien colony still uses restricted observer view");
+  const auto& view = *result.view;
+  require(view.owner_civilization_id == foreign->civilization_id && view.player_civilization_id == world.player_civilization_id &&
+      view.population_millions == 4321. && view.treasury_budget_units == 987654. && view.stored_industry == 12345. &&
+      view.construction_sites.size() == foreign->surface_buildings.size(), "Alien statistics use player data or omit structures");
+  require_finite(view);
+  require(before == capture(), "Developer inspection changed canonical campaign state");
+  foreign->population_millions += 1.;
+  const auto refreshed = colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id);
+  require(refreshed.view && refreshed.view->revision > view.revision && refreshed.view->population_millions == 4322.,
+          "Developer colony statistics did not refresh");
+  world.developer_provenance.reset();
+  require(!colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id).view,
+          "Stale developer snapshot leaked after returning to ordinary observation");
+  world.knowledge.mark_system_fully_surveyed(world.player_civilization_id, foreign->system_id);
+  require(!colonies.build(frame, 8, *system.snapshot, *foreign->planetary_body_id).view,
+          "Full exploration alone revealed alien internal statistics");
 }
 
 void inspector_tests(const fs::path &research_root, const fs::path &catalog) {
@@ -93,6 +299,16 @@ void inspector_tests(const fs::path &research_root, const fs::path &catalog) {
               frozen.body_id == *owned->planetary_body_id,
           "colony projection lost its ownership binding");
   require_finite(frozen);
+  require(frozen.homeworld, "seeded home colony lost its Core homeworld identity");
+  const auto dependent = std::ranges::find_if(world.colonies, [&](const auto &candidate) {
+    return candidate.civilization_id == player && candidate.system_id == owned->system_id &&
+           candidate.id != owned->id && candidate.planetary_body_id;
+  });
+  if (dependent != world.colonies.end()) {
+    const auto other = controller.build(frame, 7, *system.snapshot, *dependent->planetary_body_id);
+    require(other.view && !other.view->homeworld,
+            "another colony in the home system received capital identity");
+  }
   require(std::ranges::is_sorted(frozen.construction_sites, {},
                                  &NativeSurfaceSite::building_id),
           "surface construction sites are not deterministic");
@@ -404,12 +620,14 @@ int main(int argc, char **argv) try {
   require(argc == 3, "Usage: native_colony_controller_tests <research-root> <catalog>");
   const auto research_root = fs::absolute(argv[1]);
   const auto catalog = fs::absolute(argv[2]);
+  developer_inspection_tests(research_root, catalog);
   inspector_tests(research_root, catalog);
+  surface_operation_tests(research_root, catalog);
   mission_case(research_root, catalog, false);
   mission_case(research_root, catalog, true);
   stale_mission_test(research_root, catalog);
   admission_revalidation_tests(research_root, catalog);
-  std::cout << "native colony controllers: 6/6 bounded cases passed\n";
+  std::cout << "native colony controllers: 8/8 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native colony controller tests failed: " << error.what() << '\n';

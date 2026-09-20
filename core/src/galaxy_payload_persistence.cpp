@@ -43,6 +43,8 @@ void validate_surface_economies(std::span<const EconomySaveDto> economies,
 }
 
 void validate_references(FreshCampaignState &galaxy) {
+  validate_small_body_catalog(galaxy.systems,galaxy.bodies);
+  validate_stellar_orbit_catalog(galaxy.systems,galaxy.bodies);
   validate_galaxy_references(
       {galaxy.systems, galaxy.bodies, galaxy.civilizations, galaxy.colonies,
        galaxy.economies, galaxy.fleets, galaxy.combat_intelligence,
@@ -116,6 +118,8 @@ capture_galaxy_payload_v16(FreshCampaignState &galaxy,
   result.saved_at_utc = options.saved_at_utc;
   result.simulation_days = options.simulation_days;
   result.seed = galaxy.seed;
+  validate_stellar_activity_clock(galaxy.stellar_activity_day);
+  result.stellar_activity_day = galaxy.stellar_activity_day;
   result.generation_metadata = std::move(metadata.generation_metadata);
   result.galactic_core = std::move(metadata.galactic_core);
   result.systems = std::move(systems);
@@ -159,6 +163,9 @@ restore_galaxy_payload_v16(const GalaxyPayloadV16Dto &payload) {
         "The saved canonical Sol catalog cannot be upgraded safely.",
         "InvalidOperationException", error.what());
   }
+  reconcile_frozen_planet_orbits(galaxy.systems,galaxy.bodies);
+  reconcile_small_body_orbits(galaxy.systems,galaxy.bodies);
+  initialize_stellar_orbits(galaxy.seed,galaxy.systems,galaxy.bodies);
 
   const auto &civilization_dtos = required(payload.civilizations);
   if (civilization_dtos.empty()) {
@@ -243,6 +250,8 @@ restore_galaxy_payload_v16(const GalaxyPayloadV16Dto &payload) {
   for (auto &fleet : galaxy.fleets)
     ensure_fleet_combat_state(fleet);
 
+  validate_stellar_activity_clock(payload.stellar_activity_day);
+  galaxy.stellar_activity_day = payload.stellar_activity_day;
   galaxy.generation_metadata = validate_galaxy_generation_metadata(
       payload.generation_metadata, galaxy.seed, galaxy.systems);
   galaxy.galactic_core =

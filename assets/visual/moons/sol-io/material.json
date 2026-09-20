@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5,
+      1023.5000000000001,
+      819.6000000000001
+    ],
+    "id": "sol-io",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.3545525505302041,
+      0.38983341584865105,
+      0.2541707933202789
+    ],
+    "seamError": 0.01113722103244876,
+    "usable": true
+  },
+  "id": "sol-io",
+  "name": "Io",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "volcanic",
+  "sha256": "1d06f2dc20efd9339aee36aac48676d12cea55355f3c90e916942909b85b785e",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon -Io.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

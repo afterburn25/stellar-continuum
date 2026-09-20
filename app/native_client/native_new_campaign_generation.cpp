@@ -154,6 +154,11 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
         try {
           auto generated =
               generator(prepared, research_root, catalog_path, report);
+          if(prepared.developer_mode()){
+            if(!generated.world.developer_provenance)generated.world.developer_provenance=stellar::core::CampaignDeveloperProvenance{};
+            generated.developer_research=prepared.developer_research();
+            if(prepared.developer_full_exploration())stellar::core::fully_explore_developer_galaxy(generated.world);
+          }
           std::lock_guard lock(state->mutex);
           if (state->request_id != request_id || state->cancel_requested) {
             state->phase = NativeNewCampaignGenerationPhase::Cancelled;
@@ -273,8 +278,11 @@ NativeNewCampaignGenerationController::activate_ready(
   auto detached = take_ready(request_id);
   if (!detached) return {};
   try {
-    return stellar::core::IntegratedAdaptiveCampaignRuntime::create_fresh(
+    auto runtime=stellar::core::IntegratedAdaptiveCampaignRuntime::create_fresh(
         std::move(detached->research), std::move(detached->world));
+    if(runtime.world().campaign().developer_provenance)
+      (void)stellar::core::initialize_developer_research(runtime,detached->developer_research);
+    return runtime;
   } catch (const std::exception &error) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeNewCampaignGenerationPhase::Failed;

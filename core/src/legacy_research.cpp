@@ -123,7 +123,7 @@ std::vector<LegacyResearchEvent> LegacyResearchSimulation::advance_core(
         world.economies,
         [&](const auto &value) { return value.civilization_id == civilization.id; });
 
-    if (!state.active_research_id && !civilization.is_player) {
+    if (!state.active_research_id && civilization_uses_ai(civilization,world.control)) {
       const auto *selection =
           select_ai_research(civilization, state, construction);
       if (selection)

@@ -163,7 +163,7 @@ void validate_formation(MassiveFormationState &formation) {
 } // namespace
 
 bool MassivePoint::is_finite() const noexcept {
-  return std::isfinite(x) && std::isfinite(y);
+  return std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
 }
 
 bool MassiveMissileSalvoState::is_valid() const noexcept {
@@ -349,7 +349,7 @@ void validate_campaign_massive_encounter(
     const auto matches_important = std::ranges::any_of(
         formation->second->important_vessels,
         [&](const MassiveVesselState &vessel) {
-          return vessel.id == binding.fleet_id;
+          return vessel.id == campaign_vessel_id_for_fleet(binding.fleet_id);
         });
     std::optional<std::string_view> fleet_design;
     if (fleet->second->design_id)
@@ -380,7 +380,8 @@ void validate_campaign_massive_encounter(
       important.insert(vessel.id);
     const auto important_count = std::ranges::count_if(
         bound, [&](const CampaignCombatBinding *binding) {
-          return important.contains(binding->fleet_id);
+          return important.contains(
+              campaign_vessel_id_for_fleet(binding->fleet_id));
         });
     if (important_count !=
         static_cast<std::ptrdiff_t>(formation.important_vessels.size()))

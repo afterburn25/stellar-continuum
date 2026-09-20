@@ -239,9 +239,13 @@ bool AtomicFileWriteError::recovery_file_retained() const noexcept {
   return recovery_file_retained_;
 }
 
-void write_file_atomically(const std::filesystem::path &path,
-                           std::span<const std::byte> bytes,
-                           AtomicFileWriteOptions options) {
+void write_file_atomically(const std::filesystem::path& path,std::span<const std::byte> bytes,AtomicFileWriteOptions options){
+  write_file_atomically_stream(path,[&](const AtomicTextSink& sink){sink({reinterpret_cast<const char*>(bytes.data()),bytes.size()});},options);
+}
+void write_file_atomically_stream(const std::filesystem::path &path,
+                                  const AtomicTextProducer& producer,
+                                  AtomicFileWriteOptions options) {
+  if(!producer)throw std::invalid_argument("An atomic write producer is required");
 #if !defined(_WIN32)
   throw AtomicFileWriteError(
       std::make_error_code(std::errc::operation_not_supported),
@@ -329,6 +333,7 @@ void write_file_atomically(const std::filesystem::path &path,
         AtomicFileWriteOperation::create_temporary, primary, backup,
         temporary, false);
 
+  const auto write_chunk=[&](std::string_view bytes){
   std::size_t offset = 0;
   while (offset < bytes.size()) {
     auto remaining = bytes.size() - offset;
@@ -363,6 +368,22 @@ void write_file_atomically(const std::filesystem::path &path,
                 AtomicFileWriteOperation::write_temporary, primary, backup,
                 temporary, handle);
 #endif
+  }
+  };
+  try {
+    std::string buffer;buffer.reserve(65536);
+    producer([&](std::string_view bytes){
+      while(!bytes.empty()){
+        const auto count=std::min<std::size_t>(65536-buffer.size(),bytes.size());
+        buffer.append(bytes.data(),count);bytes.remove_prefix(count);
+        if(buffer.size()==65536){write_chunk(buffer);buffer.clear();}
+      }
+    });
+    if(!buffer.empty())write_chunk(buffer);
+  }catch(...){
+    if(handle.valid())CloseHandle(handle.release());
+    DeleteFileW(extended_path(temporary).c_str());
+    throw;
   }
 
 #if defined(STELLAR_ATOMIC_FILE_WRITE_TESTING)

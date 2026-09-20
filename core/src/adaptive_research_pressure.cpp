@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_pressure.hpp>
 
 #include <stellar/core/detail/adaptive_research_pressure_state_writer.hpp>
@@ -94,7 +95,7 @@ bool ordinal_less(std::string_view left, std::string_view right) {
 
 Json read_json(const std::filesystem::path &path,
                bool reject_duplicate_rule_ids = false) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input)
     throw std::runtime_error("Could not open " + path.string());
   if (!reject_duplicate_rule_ids) {
@@ -767,3 +768,4 @@ AdaptiveResearchPressureState &detail::AdaptiveResearchPressureSupportAccess::st
 }
 
 } // namespace stellar::core
+

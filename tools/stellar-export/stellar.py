@@ -17,16 +17,30 @@ import tempfile
 from research_runtime_files import copy_research_runtime_files
 from native_client_runtime import copy_native_client_runtime, validate_native_client_export
 from native_research_runtime import validate_native_research_export
+from native_navigation_runtime import validate_native_navigation_export
+from native_support_runtime import validate_native_support_export
+from native_battle_runtime import validate_native_battle_export
 from native_fleet_runtime import validate_native_fleet_export
+from native_military_runtime import validate_native_military_export
 from native_production_runtime import validate_native_shipyard_export, validate_native_construction_export
 from native_system_runtime import validate_native_system_export
+from native_inspection_runtime import validate_native_inspection_export
+from native_supply_runtime import validate_native_supply_export
+from native_economy_runtime import validate_native_economy_export
 from native_system_travel_runtime import validate_native_system_travel_export
 from native_colony_runtime import validate_native_colony_export
+from native_planetary_runtime import validate_native_planetary_export
+from native_freight_runtime import validate_native_freight_export
+from native_fresh_progression_runtime import validate_native_fresh_progression_export
+from native_first_exploration_runtime import validate_native_first_exploration_export
+from native_first_survey_runtime import validate_native_first_survey_export
+from native_settlement_preparation_runtime import validate_native_settlement_preparation_export
+from native_earned_settlement_runtime import validate_native_earned_settlement_export
 from native_settlement_runtime import validate_native_settlement_export
-from native_surface_runtime import validate_native_surface_export
 from native_new_game_runtime import validate_native_new_game_export
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
+from native_diplomacy_runtime import validate_native_diplomacy_export
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
@@ -78,22 +92,34 @@ def native_build(preset, env):
     # 30-minute allowance specific to compilation; runtime smoke
     # checks retain their short deadlines so a hung game still fails promptly.
     run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
-    run(["ctest", "--preset", preset], env=env)
+    # The expanded suite includes 25k/50k persistence roundtrips. Individual
+    # tests retain their own deadlines; allow time for the complete serial suite.
+    run(["ctest", "--preset", preset], env=env, timeout=900)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
     run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_military_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_system_travel_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_freight_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_surface_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_battle_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
     run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_frame_profile.py", "-v"], env=test_env)
+    run([sys.executable, ROOT / "tools/stellar-export/test_native_campaign_profile.py", "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
@@ -392,7 +418,7 @@ def export(preset_name):
     commit = run(["git", "rev-parse", "HEAD"], capture=True).strip()
     dirty = bool(run(["git", "status", "--porcelain", "--untracked-files=normal"], capture=True).strip())
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    output = ROOT / "Builds/Windows" / f"StellarContinuum-{preset_name}-{commit[:8]}-{stamp}"
+    output = ROOT / "Builds/Windows" / f"StellarContinuum-{version['gameVersion']}-{preset_name}-{commit[:8]}-{stamp}"
     output.mkdir(parents=True, exist_ok=False)
     try:
         shutil.copy2(exe, output / exe.name)
@@ -416,7 +442,7 @@ def export(preset_name):
             "Fresh initialization: stellar-continuum.exe --headless --seed-campaign --systems 500 --catalog-output fresh.json\n"
             "Campaign simulation diagnostics: stellar-continuum.exe --headless --simulate-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output simulated.json\n"
             "Adaptive campaign diagnostics: stellar-continuum.exe --headless --simulate-adaptive-campaign --systems 500 --ticks 40 --step-days 0.25 --catalog-output adaptive.json\n"
-            "Supported sizes: 250, 500, 1000, 2500. Use --help for seed, species and civilization options.\n"
+            "Supported sizes: 250, 500, 1000, 2500, 5000, 10000, 25000, 50000. Use --help for seed, species and civilization options.\n"
             "Fresh and simulated outputs are diagnostics, not player saves. The Adaptive command uses the packaged research data and integrated research, diplomacy and intelligence runtime; it does not claim complete gameplay or rendering parity. Existing output files are preserved.\n"
             "Windows 10/11 x64 required. No Godot, .NET, compiler, CMake, Ninja, Vulkan SDK or Python required at runtime.\n",
             encoding="utf-8")
@@ -427,22 +453,12 @@ def export(preset_name):
             native_client = copy_native_client_runtime(ROOT, directory, output,
                 lambda binary, runtime, windows: executable_dependencies(binary, env, runtime, windows))
             dependencies = sorted(set(dependencies + native_client["windowsImports"]))
-            readme = output / "README.txt"
-            readme.write_text("NATIVE C++ GALAXY PREVIEW - incomplete graphical migration.\n"
-                "Launch stellar-continuum-native.exe for the fullscreen galaxy preview.\n"
-                "Left drag pans; mouse wheel zooms; Escape opens Continue / Save / Load / Exit to Windows.\n"
-                "Research opens the native workspace. Select a known program to inspect its costs and available action.\n"
-                "Select a green fleet or its outliner entry, then right-click a destination to preview and confirm travel.\n"
-                "Shipyard shows available designs, authorization costs, population requirements and timed build orders.\n"
-                "Cancel pauses the campaign to review the current refund; confirm explicitly, then resume when ready.\n"
-                "The native campaign saves separately under LocalAppData/Stellar Continuum/NativePreview.\n"
-                "Use --save-path <path> for another slot, and --load to restore it; restored games start paused.\n"
-                "An installed Vulkan graphics driver is required. No Godot or .NET runtime is used.\n"
-                "Known systems open orbital maps; owned planets show grouped colony information.\n"
-                "Open Surface on an owned solid world to place available buildings, review cost, and confirm.\n"
-                "Unfinished sites can be cancelled for the displayed canonical refund; progress uses available materials.\n"
-                "New Campaign offers four species, galaxy sizes and a seed; Load Campaign lists native saves. New campaigns use independent save slots. Detailed 3D surfaces, audio and full gameplay controls remain in migration.\n\n"
-                + readme.read_text(encoding="utf-8"), encoding="utf-8")
+            (output / "README.txt").write_text(
+                f"Stellar Continuum {version['gameVersion']} / Engine {version['engineVersion']}\n\n"
+                + (ROOT / "docs/releases/NATIVE_ALPHA_README.txt").read_text(encoding="utf-8"), encoding="utf-8")
+            notes = output / "Documentation/ReleaseNotes.md"
+            notes.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / f"docs/releases/{version['gameVersion']}.md", notes)
         manifest = {"schemaVersion": 1, "gameVersion": version["gameVersion"], "engineVersion": version["engineVersion"],
                     "sourceCommit": commit, "sourceDirty": dirty, "contentVersion": "stellar-catalog-1", "preset": preset_name,
                     "configuration": preset["configurePreset"], "architecture": "x86_64", "mode": preset["mode"],
@@ -458,23 +474,46 @@ def export(preset_name):
         smoke = relocated_smoke(output)
         if native_client:
             smoke.update(validate_native_client_export(output, env))
+            smoke.update(validate_native_navigation_export(output, env))
+            smoke.update(validate_native_support_export(output, env))
+            smoke.update(validate_native_battle_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_research_export(output, env))
             smoke.update(validate_native_fleet_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_military_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_shipyard_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_construction_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_export(output, env))
+            smoke.update(validate_native_inspection_export(output, env))
+            smoke.update(validate_native_supply_export(output, env))
+            smoke.update(validate_native_economy_export(output, env))
             smoke.update(validate_native_colony_export(output, env))
+            smoke.update(validate_native_planetary_export(output, env))
+            smoke.update(validate_native_freight_export(output, env))
+            smoke.update(validate_native_fresh_progression_export(output, env))
+            smoke.update(validate_native_first_exploration_export(
+                output, env, Path(smoke["freshProgressionSaveCaptures"][0])))
+            smoke.update(validate_native_first_survey_export(
+                output, env, Path(smoke["firstExplorationSaveCaptures"][-1])))
+            smoke.update(validate_native_settlement_preparation_export(
+                output, env, Path(smoke["firstSurveySaveCaptures"][-1])))
+            smoke.update(validate_native_earned_settlement_export(
+                output, env, Path(smoke["firstSurveySaveCaptures"][-1]),
+                directory / "stellar_native_earned_settlement_tests.exe",
+                output / "Data/astronomy/hyg-nearby-500-v1.json"))
             smoke.update(validate_native_settlement_export(output, env))
-            smoke.update(validate_native_surface_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_travel_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_galaxy_export(output, env))
             smoke.update(validate_native_ship_art_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_diplomacy_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]
@@ -485,7 +524,10 @@ def export(preset_name):
             smoke["campaignSimulationBenchmarks"]=[json.loads(run([output/"stellar-continuum.exe","--headless","--simulate-campaign","--systems",count,"--ticks",40,"--step-days",0.25],env=env,capture=True)) for count in (250,500,1000,2500)]
         (output.parent / (output.name+"-validation.json")).write_text(json.dumps(smoke, indent=2)+"\n", encoding="utf-8")
         archive = shutil.make_archive(str(output), "zip", output)
-        print(json.dumps({"export": str(output), "archive": archive, "validation": smoke}, indent=2))
+        with open(archive, "rb") as stream:
+            archive_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+        Path(archive + ".sha256").write_text(archive_hash + "  " + Path(archive).name + "\n", encoding="ascii")
+        print(json.dumps({"export": str(output), "archive": archive, "sha256": archive_hash, "validation": smoke}, indent=2))
     except Exception:
         # Retain failed output for diagnosis, but never label/package it as validated.
         (output / "EXPORT_FAILED.txt").write_text("Export failed validation; do not distribute. See terminal diagnostics.\n", encoding="utf-8")

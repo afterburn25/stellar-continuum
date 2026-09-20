@@ -1,9 +1,13 @@
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/player_campaign_json.hpp>
+#include <stellar/core/galaxy_payload_json.hpp>
+
+#include "../core/src/player_campaign_json_research.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -14,6 +18,10 @@
 namespace fs = std::filesystem;
 using Json = nlohmann::json;
 using namespace stellar::core;
+
+namespace stellar::core::player_json_detail {
+nlohmann::ordered_json jsnapshot(const DiplomacyStateSnapshot &snapshot);
+}
 
 namespace {
 
@@ -49,8 +57,128 @@ std::optional<std::string> optional_text(const Json &value,
                           : std::optional(member.get<std::string>());
 }
 
+// Original composition path, kept only as a compatibility oracle: production
+// must no longer serialize and parse a complete intermediate galaxy document.
+std::string legacy_composed_encoding(const PlayerCampaignPayloadV17Dto &payload) {
+  auto root = nlohmann::ordered_json::parse(encode_galaxy_payload_v16_json(payload.galaxy));
+  root["FormatVersion"] = payload.format_version;
+  root["GalaxyFormatVersion"] = payload.galaxy_format_version
+      ? nlohmann::ordered_json(*payload.galaxy_format_version) : nlohmann::ordered_json(nullptr);
+  root["Diplomacy"] = payload.diplomacy
+      ? player_json_detail::jsnapshot(*payload.diplomacy) : nlohmann::ordered_json(nullptr);
+  root["AdaptiveResearch"] = payload.adaptive_research
+      ? player_json_detail::encode_research(*payload.adaptive_research) : nlohmann::ordered_json(nullptr);
+  return root.dump(2);
+}
+
+void benchmark_encoding(const fs::path &save, const fs::path &research_root) {
+  auto restored = restore_player_campaign_v17_json(
+      load_adaptive_research_strategic_runtime(research_root), read_bytes(save));
+  const PlayerCampaignCaptureOptions options{restored.simulation_days(),
+      std::string(restored.game_version()), std::string(restored.saved_at_utc())};
+  auto active = std::move(restored).activate();
+  const auto payload = capture_player_campaign_v17(active, options);
+  for (int trial = 0; trial < 3; ++trial) {
+    const auto start = std::chrono::steady_clock::now();
+    const auto encoded = encode_player_campaign_v17_json(payload);
+    const auto end = std::chrono::steady_clock::now();
+    std::cout << "campaign_encode trial=" << trial << " systems=" << active.world().campaign().systems.size()
+              << " bytes=" << encoded.size() << " ms="
+              << std::chrono::duration<double, std::milli>(end - start).count()
+              << " sha256=" << sha256(encoded) << '\n';
+  }
+}
+
+void check_player_research_enum_encoding() {
+  AdaptiveResearchCampaignSnapshot snapshot;
+  snapshot.schema_version = 2;
+  snapshot.catalog_id = "enum-regression";
+  AdaptiveResearchCampaignCivilizationSnapshot civilization;
+  civilization.civilization_id = 7;
+  civilization.species_id = "species-id";
+  civilization.reference_profile_id = "profile-id";
+  civilization.applicability_context_id = "context-id";
+
+  ResearchOutcomeHistoryRecord outcome;
+  outcome.sequence = 5;
+  outcome.node_id = "node-id";
+  outcome.checkpoint_id = "checkpoint-id";
+  outcome.attempt_index = 2;
+  outcome.outcome = ResearchOutcomeKind::hypothesis_supported;
+  outcome.year = 42.5;
+  outcome.explanation = "A readable explanation remains a string.";
+  civilization.research.outcomes.recent_records.push_back(std::move(outcome));
+
+  ForeignTechnologyAssessmentSnapshot assessment;
+  assessment.foreign_technology_reference = "foreign-reference";
+  assessment.source_lineage_reference = "lineage-reference";
+  assessment.understanding = ForeignUnderstandingState::engineering_understood;
+  assessment.operability = ForeignOperabilityState::adapted_operation;
+  assessment.reproduction = ForeignReproductionState::foreign_process_replication;
+  assessment.adaptation = ForeignAdaptationState::native_derivative;
+  civilization.research.research.foreign_assessments.push_back(
+      std::move(assessment));
+
+  ResearchTacitAssetSnapshot asset;
+  asset.asset_id = "asset-id";
+  asset.asset_type_id = "asset-type-id";
+  asset.scope_kind = ResearchTacitScopeKind::facility_or_process;
+  asset.scope_ref = "scope-reference";
+  asset.assimilation_stage = ResearchTacitAssimilationStage::native_practice;
+  asset.provenance = "provenance";
+  civilization.research.research.research.research.expertise.tacit_assets
+      .push_back(std::move(asset));
+  snapshot.civilizations.push_back(std::move(civilization));
+
+  const auto encoded = player_json_detail::encode_research(snapshot);
+  const auto &research = encoded.at("Civilizations").at(0).at("Research");
+  const auto &record = research.at("Outcomes").at("RecentRecords").at(0);
+  check(record.at("Outcome").is_number_integer(),
+        "Player17 outcome enum must be numeric");
+  check(record.at("Outcome") ==
+            static_cast<int>(ResearchOutcomeKind::hypothesis_supported),
+        "Player17 outcome enum value");
+  check(record.at("Explanation") == "A readable explanation remains a string.",
+        "Player17 preserves non-enum outcome strings");
+
+  const auto &v4 = research.at("Research");
+  const auto &foreign = v4.at("ForeignAssessments").at(0);
+  for (const auto key : {"Understanding", "Operability", "Reproduction",
+                         "Adaptation"})
+    check(foreign.at(key).is_number_integer(),
+          std::string("Player17 foreign enum must be numeric: ") + key);
+  check(foreign.at("Understanding") ==
+            static_cast<int>(ForeignUnderstandingState::engineering_understood) &&
+            foreign.at("Operability") ==
+                static_cast<int>(ForeignOperabilityState::adapted_operation) &&
+            foreign.at("Reproduction") == static_cast<int>(
+                ForeignReproductionState::foreign_process_replication) &&
+            foreign.at("Adaptation") ==
+                static_cast<int>(ForeignAdaptationState::native_derivative),
+        "Player17 foreign enum values");
+  check(foreign.at("ForeignTechnologyReference") == "foreign-reference",
+        "Player17 preserves foreign reference string");
+
+  const auto &tacit = v4.at("Research")
+                          .at("Research")
+                          .at("Expertise")
+                          .at("TacitAssets")
+                          .at(0);
+  check(tacit.at("ScopeKind").is_number_integer() &&
+            tacit.at("AssimilationStage").is_number_integer(),
+        "Player17 tacit enums must be numeric");
+  check(tacit.at("ScopeKind") ==
+            static_cast<int>(ResearchTacitScopeKind::facility_or_process) &&
+            tacit.at("AssimilationStage") ==
+                static_cast<int>(ResearchTacitAssimilationStage::native_practice),
+        "Player17 tacit enum values");
+  check(tacit.at("ScopeRef") == "scope-reference",
+        "Player17 preserves tacit scope reference string");
+}
+
 void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
-                   const std::string &label, const fs::path &native_output) {
+                   const std::string &label, const fs::path &native_output,
+                   const fs::path &research_root) {
   check(restored.simulation_days() ==
             expected.at("SimulationDays").get<double>(),
         label + ": simulation days");
@@ -67,11 +195,33 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
       expected.at("SavedAtUtc").get<std::string>()};
   const auto recaptured = capture_player_campaign_v17(active, options);
   const auto encoded = encode_player_campaign_v17_json(recaptured);
+  check(encoded == legacy_composed_encoding(recaptured),
+        label + ": composed encoder changed persisted bytes");
   check(encode_player_campaign_v17_json(recaptured) == encoded,
         label + ": repeated encoding changed bytes or input state");
   auto actual_json = Json::parse(encoded);
   auto expected_json = expected;
   expected_json.erase("Control");
+  // The frozen C# oracle predates native appearance migration and the unscaled
+  // stellar clock. Check the new data by a complete second load/capture, then
+  // compare every original field to the immutable compatibility fixture.
+  auto replay=restore_player_campaign_v17_json(load_adaptive_research_strategic_runtime(research_root),encoded);
+  auto replay_active=std::move(replay).activate();
+  check(encode_player_campaign_v17_json(capture_player_campaign_v17(replay_active,options))==encoded,
+        label+": migrated appearance/activity metadata changed on second load");
+  if(!expected_json.at("Galaxy").contains("StellarActivityDay")){
+    check(actual_json.at("Galaxy").at("StellarActivityDay")==options.simulation_days,
+          label+": old-save activity clock did not initialize at the saved epoch");
+    actual_json["Galaxy"].erase("StellarActivityDay");
+  }
+  auto& actual_bodies=actual_json["Galaxy"]["PlanetaryBodies"];
+  const auto& expected_bodies=expected_json.at("Galaxy").at("PlanetaryBodies");
+  check(actual_bodies.size()==expected_bodies.size(),label+": migrated body count changed");
+  for(std::size_t i=0;i<expected_bodies.size();++i)if(!expected_bodies[i].contains("PlanetAppearance")){
+    check(actual_bodies[i].contains("PlanetAppearance")&&actual_bodies[i]["PlanetAppearance"].is_object(),
+          label+": missing native planet appearance migration");
+    actual_bodies[i].erase("PlanetAppearance");
+  }
   auto normalize_float_coordinates = [&](auto &&self, Json &value) -> void {
     if (value.is_array()) {
       for (auto &item : value)
@@ -102,6 +252,37 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
   }
 
   if (label == "valid-current17") {
+    auto unicode = recaptured;
+    unicode.galaxy.game_version = "Unicode \xc3\xa9 \xe6\x98\x9f \xf0\x9f\x8c\x8c";
+    unicode.galaxy.simulation_days = -0.0;
+    unicode.galaxy.systems->front().name = "Escapes \"\n\\ and \xc3\xb1";
+    check(encode_player_campaign_v17_json(unicode) == legacy_composed_encoding(unicode),
+          "Unicode, escapes or negative zero changed during save composition");
+    unicode.diplomacy.reset();
+    unicode.adaptive_research.reset();
+    unicode.galaxy_format_version.reset();
+    check(encode_player_campaign_v17_json(unicode) == legacy_composed_encoding(unicode),
+          "Optional empty save sections changed during composition");
+    for (const auto &bad : {std::string(1, static_cast<char>(0xc3)),
+                            std::string("\xed\xa0\x80"), std::string("\xc0\xaf")}) {
+      unicode.galaxy.game_version = bad;
+      try {
+        (void)encode_player_campaign_v17_json(unicode);
+        throw std::runtime_error("Invalid UTF-8 player encoding succeeded");
+      } catch (const PlayerCampaignJsonError &error) {
+        check(error.stage() == PlayerCampaignJsonStage::Encode && error.path() == "$",
+              "Invalid UTF-8 galaxy error lost its player encode stage/path");
+      }
+    }
+    auto bad_text = recaptured;
+    bad_text.adaptive_research->catalog_id = std::string("\xf4\x90\x80\x80");
+    try {
+      (void)encode_player_campaign_v17_json(bad_text);
+      throw std::runtime_error("Invalid UTF-8 research encoding succeeded");
+    } catch (const PlayerCampaignJsonError &error) {
+      check(error.stage() == PlayerCampaignJsonStage::Encode && error.path().empty(),
+            "Invalid UTF-8 research error changed its encode stage/path");
+    }
     auto bad_research = recaptured;
     bad_research.adaptive_research->civilizations.front()
         .project_funding.push_back(
@@ -163,12 +344,17 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
 } // namespace
 
 int main(int argc, char **argv) try {
+  if (argc == 4 && std::string_view(argv[1]) == "--benchmark") {
+    benchmark_encoding(argv[2], argv[3]);
+    return 0;
+  }
   if (argc != 4)
     throw std::runtime_error("Usage: player_campaign_json_tests <fixture> "
                              "<research root> <native output>");
   const fs::path fixture = fs::absolute(argv[1]);
   const fs::path research_root = fs::absolute(argv[2]);
   const fs::path native_output = fs::absolute(argv[3]);
+  check_player_research_enum_encoding();
   const auto fixture_bytes = read_bytes(fixture);
   check(sha256(fixture_bytes) ==
             "138CDDA12594A77352294FE265F0632FCF9D3CAE9DEEDBAE869D51FE30ED8FCF",
@@ -192,7 +378,7 @@ int main(int argc, char **argv) try {
       auto restored =
           restore_player_campaign_v17_json(std::move(runtime), input);
       check(!expected_type, name + ": native succeeded unexpectedly");
-      check_success(std::move(restored), row.at("Result"), name, native_output);
+      check_success(std::move(restored), row.at("Result"), name, native_output,research_root);
       ++successes;
     } catch (const PlayerCampaignJsonError &error) {
       check(expected_type.has_value(), name + ": unexpected native JSON error");

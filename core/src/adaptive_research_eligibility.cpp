@@ -311,8 +311,14 @@ AdaptiveResearchEligibilityEvaluator::evaluate_project_start(
             "Not enough unassigned Effective Research Labs are available.",
     });
   }
+  const auto *cancelled = state.cancelled_project(node_id);
+  if (cancelled && cancelled->target_applicability_context_id !=
+      (target_context_id ? std::optional<std::string>(*target_context_id) : std::nullopt))
+    blockers.push_back({.code = ResearchBlockerCode::missing_applicability_context,
+        .subject_id = std::string(node_id),
+        .message = "Restart this research in its original applicability context."});
   add_facility_blockers(*facilities_, state, node_id,
-                        ResearchMaturity::experimental, blockers);
+                        cancelled ? cancelled->stage : ResearchMaturity::experimental, blockers);
   return finish(std::move(blockers));
 }
 

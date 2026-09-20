@@ -71,9 +71,16 @@ struct NativeCampaignSession::Live final {
   Live(IntegratedAdaptiveCampaignRuntime runtime, StrategicClock clock,
        const std::filesystem::path &path, std::uint64_t revision,
        bool recovered, PlayerCampaignPreparedWriter writer,
-       std::uint64_t cache_generation)
-      : frame(std::move(runtime), std::move(clock), CampaignFramePolicy::Player),
-        saves({}, std::move(writer)) {
+       std::uint64_t cache_generation,bool developer)
+      : frame(std::move(runtime), std::move(clock), developer?CampaignFramePolicy::Developer:CampaignFramePolicy::Player),
+        saves({}, std::move(writer),developer?CampaignSaveKind::Developer:CampaignSaveKind::Player) {
+    if(frame.runtime().world().campaign().developer_provenance.has_value()!=developer)
+      throw std::invalid_argument("Campaign provenance does not match the requested session mode.");
+    frame.clock().set_days_per_second(1./24.);
+    if(developer)frame.set_developer_speed(frame.runtime().world().campaign().developer_provenance->simulation.speed);
+    auto& campaign=frame.runtime().world().campaign();
+    initialize_small_body_fields(campaign.seed,campaign.systems,campaign.bodies);
+    initialize_stellar_orbits(campaign.seed,campaign.systems,campaign.bodies);
     cache = NativeCampaignSession::build_cache(frame, cache_generation);
     saves.configure(path, revision, frame.clock().simulation_days(), recovered);
   }
@@ -146,7 +153,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_fresh(
   validate_dependencies(dependencies);
   auto live = std::make_unique<Live>(
       std::move(runtime), StrategicClock{}, save_path, 1, false,
-      dependencies.save_writer, 1);
+      dependencies.save_writer, 1,dependencies.developer_session);
   return std::unique_ptr<NativeCampaignSession>(new NativeCampaignSession(
       std::move(live), std::move(research_root), std::move(save_path),
       std::move(game_version), std::move(dependencies)));
@@ -164,7 +171,8 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::load_startup(
   const auto make_runtime = [root = research_root] {
     return load_adaptive_research_strategic_runtime(root);
   };
-  auto loaded = dependencies.loader(save_path, make_runtime, progress);
+  auto loaded = dependencies.developer_session?load_existing_developer_campaign(save_path,make_runtime,progress)
+      :dependencies.loader(save_path, make_runtime, progress);
   return create_loaded(std::move(loaded), std::move(research_root),
                        std::move(save_path), std::move(game_version),
                        std::move(dependencies));
@@ -189,7 +197,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
   clock.set_speed(StrategicSpeed::Paused);
   auto live = std::make_unique<Live>(
       std::move(loaded.campaign).activate(), std::move(clock), save_path, 1,
-      recovered, dependencies.save_writer, 1);
+      recovered, dependencies.save_writer, 1,dependencies.developer_session);
   if (live->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");
   }
@@ -257,6 +265,37 @@ bool NativeCampaignSession::exit_ready() const {
   return exit_ready_;
 }
 
+NewCampaignTransition NativeCampaignSession::new_campaign_transition() const {
+  require_owner();
+  return new_campaign_transition_;
+}
+bool NativeCampaignSession::new_campaign_pending() const {
+  require_owner();
+  return new_campaign_transition_ == NewCampaignTransition::Waiting ||
+         new_campaign_transition_ == NewCampaignTransition::Saving ||
+         new_campaign_transition_ == NewCampaignTransition::Ready;
+}
+bool NativeCampaignSession::request_new_campaign() {
+  require_owner();
+  if (new_campaign_pending()) return false;
+  if (pending_load_ || exit_requested_ || exit_ready_ || !manual_capture_ready_) {
+    publish_failure("New Game is unavailable until the current campaign operation finishes");
+    return false;
+  }
+  save_requested_ = false;
+  new_campaign_transition_ = NewCampaignTransition::Waiting;
+  notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+  return true;
+}
+void NativeCampaignSession::cancel_new_campaign() {
+  require_owner();
+  if (!new_campaign_pending() && new_campaign_transition_ != NewCampaignTransition::Failed)
+    return;
+  // A writer in flight may finish, but cannot authorize any later request.
+  new_campaign_transition_ = NewCampaignTransition::Inactive;
+  notice_ = {SessionNoticeKind::None, "Current campaign retained", 0.};
+}
+
 PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {
   return [root = research_root_] {
     return load_adaptive_research_strategic_runtime(root);
@@ -275,14 +314,32 @@ void NativeCampaignSession::publish_save_result(
 }
 
 void NativeCampaignSession::publish_failure(std::string message) {
+  if (new_campaign_pending()) new_campaign_transition_ = NewCampaignTransition::Failed;
   std::cerr << "Stellar Continuum native session: " << message << '\n';
   notice_ = {SessionNoticeKind::Failure, std::move(message), 0.};
+}
+
+void NativeCampaignSession::publish_background_save_result(
+    const PlayerCampaignSaveResult &result) {
+  if (result.succeeded && new_campaign_transition_ == NewCampaignTransition::Saving)
+    new_campaign_transition_ = NewCampaignTransition::Ready;
+  const bool manual = std::exchange(manual_save_pending_, false);
+  if (!result.succeeded) {
+    // A queued action must not conceal a failed write with an immediate retry.
+    // The player can retry explicitly after seeing the original diagnostic.
+    save_requested_ = false;
+    exit_requested_ = false;
+  }
+  publish_save_result(result, manual ? "Saved campaign" : "Autosaved campaign");
 }
 
 bool NativeCampaignSession::drain_live_save() {
   const auto completed = live_->saves.complete(
       live_->frame.clock().simulation_days(), save_path_,
       live_->saves.revision(), true);
+  if (completed) {
+    manual_save_pending_ = false;
+  }
   if (completed && !completed->succeeded) {
     publish_save_result(*completed, "Saved campaign");
     return false;
@@ -291,19 +348,24 @@ bool NativeCampaignSession::drain_live_save() {
 }
 
 CampaignFrameResult NativeCampaignSession::advance(
-    double real_delta_seconds, const std::string &saved_at_utc) {
+    double real_delta_seconds, const std::string &saved_at_utc, bool developer_single_step) {
   require_owner();
+  // Freeze even tactical reconciliation and preserve the completed capture boundary.
+  if (new_campaign_pending()) return {};
   manual_capture_ready_ = false;
-  auto result = live_->frame.advance(real_delta_seconds);
-  manual_capture_ready_ = result.route == CampaignFrameRoute::Strategic &&
-                          result.ready_for_save_capture;
+  auto result = developer_single_step ? live_->frame.step_developer() : live_->frame.advance(real_delta_seconds);
+  // A returned tactical frame has finished its owned advance/reconciliation.
+  // Player17 already captures its pending time, orders and encounter state.
+  // Exceptions leave this false, and autosaves remain strategic-day driven.
+  manual_capture_ready_ = result.ready_for_save_capture ||
+                          result.route == CampaignFrameRoute::Tactical;
   if (pending_load_) {
     return result;
   }
   try {
     if (const auto completed = live_->saves.after_frame(
             live_->frame, result, game_version_, saved_at_utc)) {
-      publish_save_result(*completed, "Autosaved campaign");
+      publish_background_save_result(*completed);
     } else if (live_->saves.pending() && !pending_load_) {
       notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
     }
@@ -315,6 +377,7 @@ CampaignFrameResult NativeCampaignSession::advance(
 
 void NativeCampaignSession::request_save() {
   require_owner();
+  if (new_campaign_pending()) return;
   if (pending_load_) {
     publish_failure("Wait for the current load before saving");
     return;
@@ -325,7 +388,7 @@ void NativeCampaignSession::request_save() {
 
 void NativeCampaignSession::begin_load() {
   auto progress = std::make_shared<LoadProgress>();
-  auto loader = dependencies_.loader;
+  auto loader = dependencies_.developer_session?NativeCampaignLoader{load_existing_developer_campaign}:dependencies_.loader;
   auto path = save_path_;
   auto make_runtime = runtime_factory();
   auto task = std::async(
@@ -343,6 +406,7 @@ void NativeCampaignSession::begin_load() {
 
 void NativeCampaignSession::request_load() {
   require_owner();
+  if (new_campaign_pending()) return;
   if (pending_load_) {
     publish_failure("A campaign load is already in progress");
     return;
@@ -363,6 +427,7 @@ void NativeCampaignSession::request_load() {
 
 void NativeCampaignSession::request_exit() {
   require_owner();
+  cancel_new_campaign();
   if (pending_load_) {
     publish_failure("Wait for the current load before exiting");
     return;
@@ -386,7 +451,7 @@ std::unique_ptr<NativeCampaignSession::Live> NativeCampaignSession::activate(
   auto candidate = std::make_unique<Live>(
       std::move(loaded.campaign).activate(), std::move(clock), save_path_, revision,
       loaded.origin == PlayerCampaignLoadOrigin::Backup,
-      dependencies_.save_writer, cache_generation);
+      dependencies_.save_writer, cache_generation,dependencies_.developer_session);
   if (candidate->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");
   }
@@ -432,25 +497,66 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
     }
   }
 
+  // Poll even when simulation advancement is suspended (for example while the
+  // window is minimized). Ordinary manual saves encode and write on the worker.
+  if (const auto completed = live_->saves.complete(
+          live_->frame.clock().simulation_days(), save_path_,
+          live_->saves.revision())) {
+    publish_background_save_result(*completed);
+    if (!completed->succeeded) {
+      return replaced;
+    }
+  }
+
+  if (new_campaign_transition_ == NewCampaignTransition::Waiting &&
+      !live_->saves.pending()) {
+    try {
+      const PlayerCampaignCaptureOptions options{
+          live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
+      const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
+      if (failed) {
+        publish_save_result(*failed, "Saved campaign");
+      } else {
+        manual_save_pending_ = true;
+        new_campaign_transition_ = NewCampaignTransition::Saving;
+        notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+      }
+    } catch (const std::exception &error) {
+      publish_failure(std::string("Save before New Game failed: ") + error.what());
+    }
+  }
+
   if (save_requested_ || exit_requested_) {
     const bool exiting = exit_requested_;
+    // Coalesce clicks while one writer owns the destination. Explicit load and
+    // exit still drain synchronously before replacement or durable shutdown.
+    if (!exiting && live_->saves.pending()) {
+      return replaced;
+    }
     save_requested_ = false;
     exit_requested_ = false;
     if (!manual_capture_ready_) {
-      publish_failure("Save is unavailable until a strategic frame completes");
+      publish_failure("Save is unavailable until a campaign frame completes");
       return replaced;
     }
     try {
       if (!drain_live_save()) {
         return replaced;
       }
-      const auto result = live_->saves.save_manual(
-          live_->frame.runtime(),
-          {live_->frame.clock().simulation_days(), game_version_, saved_at_utc});
-      publish_save_result(result,
-                          exiting ? "Saved campaign; exiting" : "Saved campaign");
-      if (exiting && result.succeeded) {
-        exit_ready_ = true;
+      const PlayerCampaignCaptureOptions options{
+          live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
+      if (exiting) {
+        const auto result = live_->saves.save_manual(live_->frame.runtime(), options);
+        publish_save_result(result, "Saved campaign; exiting");
+        exit_ready_ = result.succeeded;
+      } else {
+        const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
+        if (failed) {
+          publish_save_result(*failed, "Saved campaign");
+        } else {
+          manual_save_pending_ = true;
+          notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
+        }
       }
     } catch (const std::exception &error) {
       publish_failure(std::string("Save failed: ") + error.what());

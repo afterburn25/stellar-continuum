@@ -1,0 +1,824 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "assetId": "blue-reflection-nebula-1",
+      "filename": "Blue Reflection Nebula 1.png",
+      "sourceCategory": "Blue Reflection Nebula",
+      "functionalType": "reflection",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Blue Reflection Nebula 1.png",
+      "sha256": "8cb9130b146a412128e5f0fe71b0a1817eb7c83c7252bbd3aacbe76834d8a456"
+    },
+    {
+      "assetId": "blue-reflection-nebula-2",
+      "filename": "Blue Reflection Nebula 2.png",
+      "sourceCategory": "Blue Reflection Nebula",
+      "functionalType": "reflection",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Blue Reflection Nebula 2.png",
+      "sha256": "b79aa705246ea3d62769380f3a3b9cc1089e87778b5d44159a76f9e12c2bfa75"
+    },
+    {
+      "assetId": "blue-reflection-nebula-3",
+      "filename": "Blue Reflection Nebula 3.png",
+      "sourceCategory": "Blue Reflection Nebula",
+      "functionalType": "reflection",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Blue Reflection Nebula 3.png",
+      "sha256": "76b565fb34bb610018be14412f31a6ba6160e5e1b17786607e1b69df1f661753"
+    },
+    {
+      "assetId": "blue-reflection-nebula-4",
+      "filename": "Blue Reflection Nebula 4.png",
+      "sourceCategory": "Blue Reflection Nebula",
+      "functionalType": "reflection",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Blue Reflection Nebula 4.png",
+      "sha256": "6ffaf723edd3519a874218e4a72e80aa1cf8c63f0c98279d265a7ae557cce653"
+    },
+    {
+      "assetId": "cleaner-gas-cloud-for-star-map-use-1",
+      "filename": "Cleaner Gas Cloud for Star Map Use 1.png",
+      "sourceCategory": "Cleaner Gas Cloud for Star Map Use",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Cleaner Gas Cloud for Star Map Use 1.png",
+      "sha256": "c55d3e6efb993d17ae60f19c3b0ec8fe986eff272c9da4aea231c731c5397d43"
+    },
+    {
+      "assetId": "cleaner-gas-cloud-for-star-map-use-2",
+      "filename": "Cleaner Gas Cloud for Star Map Use 2.png",
+      "sourceCategory": "Cleaner Gas Cloud for Star Map Use",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Cleaner Gas Cloud for Star Map Use 2.png",
+      "sha256": "b5d078fb8fd51df5e65e3fa33d474334e9da01bd493022b9c0e23292d161683b"
+    },
+    {
+      "assetId": "cleaner-gas-cloud-for-star-map-use-3",
+      "filename": "Cleaner Gas Cloud for Star Map Use 3.png",
+      "sourceCategory": "Cleaner Gas Cloud for Star Map Use",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Cleaner Gas Cloud for Star Map Use 3.png",
+      "sha256": "d5a9f0562df755546437f6e44fd1f53119cb72111a5e83c71a6beff6f0fb03db"
+    },
+    {
+      "assetId": "cleaner-gas-cloud-for-star-map-use-4",
+      "filename": "Cleaner Gas Cloud for Star Map Use 4.png",
+      "sourceCategory": "Cleaner Gas Cloud for Star Map Use",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Cleaner Gas Cloud for Star Map Use 4.png",
+      "sha256": "78cfbbb1e5d6b68ba40061fac6531261ab0513f50f076a405a56d7abf6d082b4"
+    },
+    {
+      "assetId": "dark-nebula-1",
+      "filename": "Dark Nebula 1.png",
+      "sourceCategory": "Dark Nebula",
+      "functionalType": "dark_nebula",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "obscuring",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Dark Nebula 1.png",
+      "sha256": "6a6f19a5d8f541597f9801690e565016e008c22695422213b311c4128e5aa558"
+    },
+    {
+      "assetId": "dark-nebula-2",
+      "filename": "Dark Nebula 2.png",
+      "sourceCategory": "Dark Nebula",
+      "functionalType": "dark_nebula",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "obscuring",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Dark Nebula 2.png",
+      "sha256": "b4c952cc15fdd539ab826b8e0797568d6952d5055eedca652028b751dac9825f"
+    },
+    {
+      "assetId": "dark-nebula-3",
+      "filename": "Dark Nebula 3.png",
+      "sourceCategory": "Dark Nebula",
+      "functionalType": "dark_nebula",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "obscuring",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Dark Nebula 3.png",
+      "sha256": "0eee937008c863898cbcb131b854fb781cf69e7aa2e38fb33d1fa36046653fd4"
+    },
+    {
+      "assetId": "dark-nebula-4",
+      "filename": "Dark Nebula 4.png",
+      "sourceCategory": "Dark Nebula",
+      "functionalType": "dark_nebula",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "obscuring",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Dark Nebula 4.png",
+      "sha256": "8aacdf655a07967a56bb352a32de5b4c880e758645e69a67d0bb2b2255e3ca16"
+    },
+    {
+      "assetId": "diffuse-space-gas-cloud-1",
+      "filename": "Diffuse Space Gas Cloud 1.png",
+      "sourceCategory": "Diffuse Space Gas Cloud",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Diffuse Space Gas Cloud 1.png",
+      "sha256": "ee28c6d604020c8440684a05c1858be283e63149fcfed6bf0268b66f4db09c6a"
+    },
+    {
+      "assetId": "diffuse-space-gas-cloud-2",
+      "filename": "Diffuse Space Gas Cloud 2.png",
+      "sourceCategory": "Diffuse Space Gas Cloud",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Diffuse Space Gas Cloud 2.png",
+      "sha256": "4aaed70485fc851805af5f72aac6922c8bae60671a01937b03e486235ed3b882"
+    },
+    {
+      "assetId": "diffuse-space-gas-cloud-3",
+      "filename": "Diffuse Space Gas Cloud 3.png",
+      "sourceCategory": "Diffuse Space Gas Cloud",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Diffuse Space Gas Cloud 3.png",
+      "sha256": "f19fe7822a77fff675622c37908fb84d7f6f9014cff321d40bf162fa413face6"
+    },
+    {
+      "assetId": "diffuse-space-gas-cloud-4",
+      "filename": "Diffuse Space Gas Cloud 4.png",
+      "sourceCategory": "Diffuse Space Gas Cloud",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Diffuse Space Gas Cloud 4.png",
+      "sha256": "83e5edca8f17f9724711e4eb29f5e94bfd8579a8fe9fcd0d0dc956d172f5a426"
+    },
+    {
+      "assetId": "emission-nebula-1",
+      "filename": "Emission Nebula 1.png",
+      "sourceCategory": "Emission Nebula",
+      "functionalType": "emission",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Emission Nebula 1.png",
+      "sha256": "0cfce8fe8a5fc47c522a0f3fb995e6a42ea99e82fc5b1bde84d28ace296ae0c2"
+    },
+    {
+      "assetId": "emission-nebula-2",
+      "filename": "Emission Nebula 2.png",
+      "sourceCategory": "Emission Nebula",
+      "functionalType": "emission",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Emission Nebula 2.png",
+      "sha256": "cfcfff331c46a97425dfe2c2eb9ee8ab81e7894f46b407549145778551dedfec"
+    },
+    {
+      "assetId": "emission-nebula-3",
+      "filename": "Emission Nebula 3.png",
+      "sourceCategory": "Emission Nebula",
+      "functionalType": "emission",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Emission Nebula 3.png",
+      "sha256": "ef8b82fc1c25c251b48309a44de4af39d1001e0e245c8f9feb871c0c41e13aa2"
+    },
+    {
+      "assetId": "emission-nebula-4",
+      "filename": "Emission Nebula 4.png",
+      "sourceCategory": "Emission Nebula",
+      "functionalType": "emission",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Emission Nebula 4.png",
+      "sha256": "806fc5af9c17981eb410e0991ca3b70cde1b39a4ecb1a71bc2718724b0e4bdfd"
+    },
+    {
+      "assetId": "faint-nebula-1",
+      "filename": "Faint Nebula 1.png",
+      "sourceCategory": "Faint Nebula",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Faint Nebula 1.png",
+      "sha256": "847b9c3cf119fe7e52037cf98db3cdb91eb327ca6890ff6f21acd30890465567"
+    },
+    {
+      "assetId": "faint-nebula-2",
+      "filename": "Faint Nebula 2.png",
+      "sourceCategory": "Faint Nebula",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Faint Nebula 2.png",
+      "sha256": "0f4da19e9f8b02ca51f3915ff886012f14285f41050771ce1b599bcc986e2165"
+    },
+    {
+      "assetId": "faint-nebula-3",
+      "filename": "Faint Nebula 3.png",
+      "sourceCategory": "Faint Nebula",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Faint Nebula 3.png",
+      "sha256": "f70d66be0ed0c4b2c9a64f3bd98adedd4715f6f7f5f40a6eaea911913d068eaf"
+    },
+    {
+      "assetId": "faint-nebula-4",
+      "filename": "Faint Nebula 4.png",
+      "sourceCategory": "Faint Nebula",
+      "functionalType": "diffuse_gas",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Faint Nebula 4.png",
+      "sha256": "9e2a6ab12e18b603193c9cc6b5f88e45a31fb40ad2a9318ebd0e6cd6769849ec"
+    },
+    {
+      "assetId": "large-cinematic-nebula-1",
+      "filename": "Large Cinematic Nebula 1.png",
+      "sourceCategory": "Large Cinematic Nebula",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Large Cinematic Nebula 1.png",
+      "sha256": "30c1b08b87314eb651ba821466a4caf4c2225b85a83fbe012ba3988862b7a701"
+    },
+    {
+      "assetId": "large-cinematic-nebula-2",
+      "filename": "Large Cinematic Nebula 2.png",
+      "sourceCategory": "Large Cinematic Nebula",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Large Cinematic Nebula 2.png",
+      "sha256": "8ad1530c264bfd0d6e4625fe05ae15caf03717d8109cc6ae78bbe629ee41ce28"
+    },
+    {
+      "assetId": "large-cinematic-nebula-3",
+      "filename": "Large Cinematic Nebula 3.png",
+      "sourceCategory": "Large Cinematic Nebula",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Large Cinematic Nebula 3.png",
+      "sha256": "8df1c82376672ed26e13fcf942cd0ba1284cd4da1242982566aeefb6a76a389a"
+    },
+    {
+      "assetId": "large-cinematic-nebula-4",
+      "filename": "Large Cinematic Nebula 4.png",
+      "sourceCategory": "Large Cinematic Nebula",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Large Cinematic Nebula 4.png",
+      "sha256": "6386ef6d85027ec93b5b7bafcf70789ed7566a63afcbad90d074ef99dd383b2e"
+    },
+    {
+      "assetId": "large-cinematic-nebula-5",
+      "filename": "Large Cinematic Nebula 5.png",
+      "sourceCategory": "Large Cinematic Nebula",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 5,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Large Cinematic Nebula 5.png",
+      "sha256": "ec83057efd936c095c99d494cca0a5bee13ae8ec2d9f775a78cac710408a0120"
+    },
+    {
+      "assetId": "mixed-nebula-background-1",
+      "filename": "Mixed Nebula Background 1.png",
+      "sourceCategory": "Mixed Nebula Background",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Mixed Nebula Background 1.png",
+      "sha256": "43d5826a272e6af162a05592f8c77efe49b3523300295987b0d545717996755b"
+    },
+    {
+      "assetId": "mixed-nebula-background-2",
+      "filename": "Mixed Nebula Background 2.png",
+      "sourceCategory": "Mixed Nebula Background",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Mixed Nebula Background 2.png",
+      "sha256": "1f6497bc25b19d26dd542aa85518af04df557cab3fef845fe04164911f79c603"
+    },
+    {
+      "assetId": "mixed-nebula-background-4",
+      "filename": "Mixed Nebula Background 4.png",
+      "sourceCategory": "Mixed Nebula Background",
+      "functionalType": "mixed_nebula",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Mixed Nebula Background 4.png",
+      "sha256": "7c68b3ca4acf37a9dfe79ceb84c385ba4cf699c8e4ed773caedc171aa5b2373b"
+    },
+    {
+      "assetId": "molecular-cloud-stellar-nursery-1",
+      "filename": "Molecular Cloud - Stellar Nursery 1.png",
+      "sourceCategory": "Molecular Cloud - Stellar Nursery",
+      "functionalType": "molecular_cloud",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Molecular Cloud - Stellar Nursery 1.png",
+      "sha256": "6d029cfbca16f579aefa9609d79a637c4ee60a746906b5af02caa6f11feb7480"
+    },
+    {
+      "assetId": "molecular-cloud-stellar-nursery-2",
+      "filename": "Molecular Cloud - Stellar Nursery 2.png",
+      "sourceCategory": "Molecular Cloud - Stellar Nursery",
+      "functionalType": "molecular_cloud",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Molecular Cloud - Stellar Nursery 2.png",
+      "sha256": "2d5d963487819f048598eb01828a1ce7b891e8b8f01cf4ff875653b4adfa3275"
+    },
+    {
+      "assetId": "molecular-cloud-stellar-nursery-3",
+      "filename": "Molecular Cloud - Stellar Nursery 3.png",
+      "sourceCategory": "Molecular Cloud - Stellar Nursery",
+      "functionalType": "molecular_cloud",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Molecular Cloud - Stellar Nursery 3.png",
+      "sha256": "34db2fcdaf19cbe6d824df8b3fc84b3f8c3ae86da7e1d58b67ba5b89fa3d4d80"
+    },
+    {
+      "assetId": "molecular-cloud-stellar-nursery-4",
+      "filename": "Molecular Cloud - Stellar Nursery 4.png",
+      "sourceCategory": "Molecular Cloud - Stellar Nursery",
+      "functionalType": "molecular_cloud",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Molecular Cloud - Stellar Nursery 4.png",
+      "sha256": "2c043e2bc9d3a0dd332d17e479b1cd040d419a0c8f910e79c63b06175c6ba0da"
+    },
+    {
+      "assetId": "rare-energetic-space-phenomenon-1",
+      "filename": "Rare Energetic Space Phenomenon 1.png",
+      "sourceCategory": "Rare Energetic Space Phenomenon",
+      "functionalType": "rare_energetic",
+      "variantIndex": 1,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Rare Energetic Space Phenomenon 1.png",
+      "sha256": "cd064a593f547c6c8098d30c7c96375307ed1e925dddeddf70221c60d6477980"
+    },
+    {
+      "assetId": "rare-energetic-space-phenomenon-2",
+      "filename": "Rare Energetic Space Phenomenon 2.png",
+      "sourceCategory": "Rare Energetic Space Phenomenon",
+      "functionalType": "rare_energetic",
+      "variantIndex": 2,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Rare Energetic Space Phenomenon 2.png",
+      "sha256": "a720436dccb87fc3be0ba95d812f6de6db999c791bf576f73f36eaf723d36b04"
+    },
+    {
+      "assetId": "rare-energetic-space-phenomenon-3",
+      "filename": "Rare Energetic Space Phenomenon 3.png",
+      "sourceCategory": "Rare Energetic Space Phenomenon",
+      "functionalType": "rare_energetic",
+      "variantIndex": 3,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Rare Energetic Space Phenomenon 3.png",
+      "sha256": "6140f2f66cd3f23b4bb4d2c692f727d8f210587f2ab53054e882644076965b5c"
+    },
+    {
+      "assetId": "rare-energetic-space-phenomenon-4",
+      "filename": "Rare Energetic Space Phenomenon 4.png",
+      "sourceCategory": "Rare Energetic Space Phenomenon",
+      "functionalType": "rare_energetic",
+      "variantIndex": 4,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Rare Energetic Space Phenomenon 4.png",
+      "sha256": "840630120f5bf84f79152ea1d3509dc91ba7af2cf897d695b942da3ff8c25a03"
+    },
+    {
+      "assetId": "star-forming-region-h-ii-region-1",
+      "filename": "Star-Forming Region - H II Region 1.png",
+      "sourceCategory": "Star-Forming Region - H II Region",
+      "functionalType": "hii_region",
+      "variantIndex": 1,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Star-Forming Region - H II Region 1.png",
+      "sha256": "17c74e49423fce6d9d45ae988d7616e5e9f0b2c17529a914c63982676dbabb9a"
+    },
+    {
+      "assetId": "star-forming-region-h-ii-region-2",
+      "filename": "Star-Forming Region - H II Region 2.png",
+      "sourceCategory": "Star-Forming Region - H II Region",
+      "functionalType": "hii_region",
+      "variantIndex": 2,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Star-Forming Region - H II Region 2.png",
+      "sha256": "da4509be5701f09fc2d9026c45710c630edc2eeee010157ed608d18a4a09a5ab"
+    },
+    {
+      "assetId": "star-forming-region-h-ii-region-3",
+      "filename": "Star-Forming Region - H II Region 3.png",
+      "sourceCategory": "Star-Forming Region - H II Region",
+      "functionalType": "hii_region",
+      "variantIndex": 3,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Star-Forming Region - H II Region 3.png",
+      "sha256": "cc352ae2100d921218413882fac02d03b5aa7880ff9d4393ea524d61fc78b897"
+    },
+    {
+      "assetId": "star-forming-region-h-ii-region-4",
+      "filename": "Star-Forming Region - H II Region 4.png",
+      "sourceCategory": "Star-Forming Region - H II Region",
+      "functionalType": "hii_region",
+      "variantIndex": 4,
+      "systemViewEligible": true,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Star-Forming Region - H II Region 4.png",
+      "sha256": "d60e838d9f83a2c7714336ab3bfd7f863f649416d961d42dd6a85699e6ee3ac0"
+    },
+    {
+      "assetId": "supernova-remnant-1",
+      "filename": "Supernova Remnant 1.png",
+      "sourceCategory": "Supernova Remnant",
+      "functionalType": "supernova_remnant",
+      "variantIndex": 1,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Supernova Remnant 1.png",
+      "sha256": "2c82e9f88727f3b0a2c5e43f5798ecd2109ce39507ec1633e3d11091983afcaa"
+    },
+    {
+      "assetId": "supernova-remnant-2",
+      "filename": "Supernova Remnant 2.png",
+      "sourceCategory": "Supernova Remnant",
+      "functionalType": "supernova_remnant",
+      "variantIndex": 2,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Supernova Remnant 2.png",
+      "sha256": "63cc144bb06e7f093ea215e568e39bd8102c650e5261d9aff499330bba7f233c"
+    },
+    {
+      "assetId": "supernova-remnant-3",
+      "filename": "Supernova Remnant 3.png",
+      "sourceCategory": "Supernova Remnant",
+      "functionalType": "supernova_remnant",
+      "variantIndex": 3,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Supernova Remnant 3.png",
+      "sha256": "c1698d6ee64327bd4d0d8b2247d06de7894d96369160459c8ef98150353d39c9"
+    },
+    {
+      "assetId": "supernova-remnant-4",
+      "filename": "Supernova Remnant 4.png",
+      "sourceCategory": "Supernova Remnant",
+      "functionalType": "supernova_remnant",
+      "variantIndex": 4,
+      "systemViewEligible": false,
+      "galaxyViewEligible": true,
+      "blendMode": "luminous",
+      "aspectRatio": 1.7864077669902914,
+      "dimensions": [
+        2944,
+        1648
+      ],
+      "path": "assets/visual/phenomena/Supernova Remnant 4.png",
+      "sha256": "8e17505a3fe40a9e14154a187d4615235a6d5010f1042bc65f37e2a573ad4f1b"
+    }
+  ],
+  "roles": {
+    "undisclosed_core_fog": "cleaner-gas-cloud-for-star-map-use-2"
+  }
+}

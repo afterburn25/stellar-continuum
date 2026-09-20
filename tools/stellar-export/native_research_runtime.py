@@ -8,6 +8,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import re
+
+from native_client_runtime import _validate_capture
 
 
 def _player_research(payload):
@@ -24,6 +27,7 @@ def _player_research(payload):
 
 
 def validate_native_research_export(folder: Path, env: dict[str, str]):
+    folder = folder.resolve()
     with tempfile.TemporaryDirectory(prefix="stellar-native-research-") as temporary:
         work = Path(temporary)
         save = work / "research.player17.json"
@@ -31,11 +35,14 @@ def validate_native_research_export(folder: Path, env: dict[str, str]):
         clean_env = dict(env, PATH=str(system_root/"System32") + os.pathsep + str(system_root))
         diagnostics = []
         captures = []
+        inspector_captures = []
         before = None
         for loading in (False, True):
             capture = work / ("loaded.bmp" if loading else "started.bmp")
+            width, height = (1920, 1080) if loading else (1280, 720)
             args = [str(folder/"stellar-continuum-native.exe"), "--asset-root", str(folder),
-                    "--save-path", str(save), "--research-smoke", str(capture)]
+                    "--save-path", str(save), "--width", str(width), "--height", str(height),
+                    "--research-smoke", str(capture)]
             if loading:
                 args.append("--load")
             result = subprocess.run(args, cwd=work, env=clean_env, capture_output=True,
@@ -46,8 +53,25 @@ def validate_native_research_export(folder: Path, env: dict[str, str]):
                 raise RuntimeError(f"Native research did not confirm renderer/campaign: {result.stdout}")
             if "save=ok " not in result.stdout:
                 raise RuntimeError("Native research did not confirm an actual manual save")
-            if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
-                raise RuntimeError("Native research did not capture its rendered workspace")
+            _validate_capture(capture, width, height)
+            inspector = capture.with_name(capture.stem + "-inspector-end.bmp")
+            markers = re.findall(r"(?m)^research_inspector=(\{[^\n]+\})$", result.stdout)
+            if len(markers) != 1:
+                raise RuntimeError("Native research did not report its inspector-end proof")
+            try:
+                inspector_state = json.loads(markers[0])
+            except ValueError as error:
+                raise RuntimeError("Native research inspector proof is malformed") from error
+            if (set(inspector_state) != {"final_line_visible", "graph_stationary"} or
+                    any(type(inspector_state[key]) is not bool or inspector_state[key] is not True
+                        for key in inspector_state)):
+                raise RuntimeError("Native research inspector proof is invalid")
+            if not inspector.is_file():
+                raise RuntimeError("Native research inspector-end capture is missing")
+            try:
+                _validate_capture(inspector, width, height)
+            except RuntimeError as error:
+                raise RuntimeError("Native research inspector-end capture is invalid") from error
             if not save.is_file():
                 raise RuntimeError("Native research did not save its campaign")
             payload = json.loads(save.read_text(encoding="utf-8"))
@@ -69,6 +93,10 @@ def validate_native_research_export(folder: Path, env: dict[str, str]):
             evidence = folder.parent / (folder.name + ("-research-loaded.bmp" if loading else "-research-started.bmp"))
             shutil.copy2(capture, evidence)
             captures.append(str(evidence))
+            inspector_evidence = folder.parent / (folder.name + ("-research-loaded-inspector-end.bmp" if loading else "-research-started-inspector-end.bmp"))
+            shutil.copy2(inspector, inspector_evidence)
+            inspector_captures.append(str(inspector_evidence))
             diagnostics.append(result.stdout.strip())
         return {"nativeResearchPlayerInput": True, "nativeResearchProgressReload": True,
-                "researchCaptures": captures, "researchDiagnostics": diagnostics}
+                "researchCaptures": captures, "researchInspectorCaptures": inspector_captures,
+                "researchDiagnostics": diagnostics}

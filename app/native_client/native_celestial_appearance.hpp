@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_image_preparation.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +51,10 @@ public:
       std::optional<stellar::native_map::UiRect> clip = std::nullopt);
 
   [[nodiscard]] NativeCelestialAppearanceStats stats() const noexcept;
+  void use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
+  void begin_frame() noexcept;
+  [[nodiscard]] bool preparation_pending() const noexcept;
+  void cancel_preparation() noexcept;
   void clear() noexcept;
 
 private:

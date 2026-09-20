@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_applicability_catalog.hpp>
 
 #include <nlohmann/json.hpp>
@@ -76,7 +77,7 @@ const ResearchApplicabilityTraitDefinition &AdaptiveResearchApplicabilityCatalog
 AdaptiveResearchApplicabilityCatalog load_adaptive_research_applicability_catalog(
     const std::filesystem::path &root_path, const AdaptiveResearchCatalog &catalog) {
   const auto path = std::filesystem::absolute(root_path) / "applicability_traits.json";
-  std::ifstream stream(path, std::ios::binary);
+  auto stream=stellar::engine::resource_stream(path);
   if (!stream) throw std::ios_base::failure("Unable to read applicability traits file: " + path.string());
   Json root;
   try {
@@ -112,3 +113,4 @@ AdaptiveResearchApplicabilityCatalog load_adaptive_research_applicability_catalo
   return AdaptiveResearchApplicabilityCatalog(std::move(storage));
 }
 } // namespace stellar::core
+
