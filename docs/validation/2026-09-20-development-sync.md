@@ -1,4 +1,4 @@
-# Development synchronization verification â€” 2026-09-20
+# Development synchronization verification — 2026-09-20
 
 **Build succeeds; the full test gate fails. This is a development-state handoff,
 not a release certification.** Current architecture: custom Stellar Engine,
@@ -16,10 +16,10 @@ or work on other branches declared integrated.
 
 Source/art/build synchronization commits:
 
-- `bd7f9621` â€” assets: publish reviewed native runtime artwork with Git LFS
-- `544ccce0` â€” feat: synchronize native engine, celestial content, diagnostics and maintenance
-- `84159ebe` â€” build: enable large COFF objects for campaign persistence tests
-- `7552d3f0` â€” build: link native audio resources and fetch LFS inputs in native CI
+- `bd7f9621` — assets: publish reviewed native runtime artwork with Git LFS
+- `544ccce0` — feat: synchronize native engine, celestial content, diagnostics and maintenance
+- `84159ebe` — build: enable large COFF objects for campaign persistence tests
+- `7552d3f0` — build: link native audio resources and fetch LFS inputs in native CI
 
 Verified code baseline: `7552d3f0d5ac7b8b4a4d80dbb5222df3d9e11e92`. Documentation is committed
 after that baseline. The branch contains the previous nine commits too. Exact
@@ -156,6 +156,16 @@ trailing whitespace; their review content was not reformatted during this audit.
 
 The original working tree has exactly the **736 documented asset exclusions**
 and no other untracked files. They are deliberately preserved, not deleted to
-make status look clean. Final Git push and remote-ref comparison occur after
-this receipt is committed; the assistant's completion report gives the published
-tip. Source and handoff are on the same existing native development branch.
+make status look clean. Source and handoff are on the same existing native
+development branch.
+
+## GitHub publication verification
+
+The normal, non-force push succeeded. `git ls-remote origin` independently
+confirmed `708add13c4e9f2f02dc9b995832b5c0a4c7cf0ba` on
+`refs/heads/cpp/codex-native-architecture-integration`. LFS reported all
+**4,114 objects uploaded**, including the seven previously tracked PNGs.
+The subsequent documentation-only commit records this verification and fixes
+text encoding in two audit documents. The final remote tip is checked again
+after that commit is pushed; use the branch log for its enclosing commit hash.
+No release tag, release binary or default-branch merge was created.

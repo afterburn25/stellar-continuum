@@ -1,4 +1,4 @@
-# Known issues â€” native branch, 2026-09-20
+# Known issues — native branch, 2026-09-20
 
 Scope: `cpp/codex-native-architecture-integration`. The
 [verification receipt](validation/2026-09-20-development-sync.md) contains exact
@@ -6,7 +6,7 @@ current totals and every failed CTest name. Severity refers to development/relea
 impact, not a claim that every failure reproduces in normal play. **Do not label
 all save/fixture differences harmless without inspecting their semantics.**
 
-## SYNC-001 â€” generation baselines differ
+## SYNC-001 — generation baselines differ
 
 - **Subsystem / severity:** Core galaxy generation; High release-validation blocker.
 - **Description:** the complete baseline campaign fingerprint and a smaller
@@ -21,7 +21,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   updating any expected fingerprint.
 - **Status:** OPEN; expected values deliberately not changed in this audit.
 
-## SYNC-002 â€” save round-trip state changes
+## SYNC-002 — save round-trip state changes
 
 - **Subsystem / severity:** Core persistence/appearance and consuming workflows;
   High release-validation blocker.
@@ -39,7 +39,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   solely from a successful graphical launch.
 - **Status:** OPEN; no gameplay or migration change made during documentation task.
 
-## SYNC-003 â€” Python packaging fixture omissions
+## SYNC-003 — Python packaging fixture omissions
 
 - **Subsystem / severity:** Export verification; High validation blocker.
 - **Description:** `test_native_client_runtime` constructs temporary roots without
@@ -54,7 +54,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   not replace these fixture checks. Repair fake roots and retain negative tests.
 - **Status:** OPEN; tests are not disabled or expected failures.
 
-## SYNC-004 â€” galaxy-art audit key and Sol ordering assumptions
+## SYNC-004 — galaxy-art audit key and Sol ordering assumptions
 
 - **Subsystem / severity:** Python import/export tests; Medium.
 - **Description:** widescreen import test cannot find an irregular-galaxy source
@@ -70,7 +70,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Workaround:** none for a clean test gate.
 - **Status:** OPEN; both reproduced in this audit.
 
-## SYNC-005 â€” missing-file error contract in research tests
+## SYNC-005 — missing-file error contract in research tests
 
 - **Subsystem / severity:** Catalog/resource IO and native research tests; Medium.
 - **Description:** negative-input fixtures fail through filesystem `file_size`
@@ -83,7 +83,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Workaround:** none; callers and negative tests need an explicit error contract.
 - **Status:** OPEN; no exception suppression introduced.
 
-## SYNC-006 â€” broad developer graphical smoke remains red
+## SYNC-006 — broad developer graphical smoke remains red
 
 - **Subsystem / severity:** Native celestial presentation/QA; High visual-validation blocker.
 - **Description:** prior broad `--developer-smoke` stopped at
@@ -98,7 +98,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   the assertion. Targeted `--eruption-smoke` covers only the zoom/flare path.
 - **Status:** OPEN from the prior investigation; broad smoke not rerun in this audit.
 
-## SYNC-007 â€” CI still references the retired surface workspace
+## SYNC-007 — CI still references the retired surface workspace
 
 - **Subsystem / severity:** Native build/release workflow; High CI blocker.
 - **Description:** `stellar-engine.yml` still requests removed surface targets;
@@ -114,7 +114,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Status:** OPEN. LFS checkout was enabled, but obsolete targets/trigger policy
   were not silently redesigned during the handoff task.
 
-## SYNC-008 â€” stale runtime metadata label
+## SYNC-008 — stale runtime metadata label
 
 - **Subsystem / severity:** Build/status metadata; Low.
 - **Description:** `export/runtime-config.json` still says `mode: headless-foundation`
@@ -127,7 +127,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   metadata cleanup without claiming complete graphical parity.
 - **Status:** OPEN, explicitly documented.
 
-## SYNC-009 â€” combined late-game performance is not certified
+## SYNC-009 — combined late-game performance is not certified
 
 - **Subsystem / severity:** Simulation/save/assets; Medium risk, not a reproduced universal crash.
 - **Description:** scoped generation/spatial/save/colony measurements do not prove
@@ -142,7 +142,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   do not promise they remove all late-game lag.
 - **Status:** OPEN measurement/optimization work.
 
-## SYNC-010 â€” stellar engulfment invariant fails at 1,000 systems
+## SYNC-010 — stellar engulfment invariant fails at 1,000 systems
 
 - **Subsystem / severity:** Core stellar/planet generation; High correctness blocker.
 - **Description:** `stellar_objects` passes its 250/500-system steps but stops
@@ -155,7 +155,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Workaround:** none established; preserve the invariant and investigate the seed.
 - **Status:** OPEN, reproduced after the full build.
 
-## SYNC-011 â€” headless acceleration/checkpoint continuation diverges
+## SYNC-011 — headless acceleration/checkpoint continuation diverges
 
 - **Subsystem / severity:** Developer QA clock/persistence; High replay blocker.
 - **Description:** `developer_qa_host` ends with `Headless acceleration/checkpoint
@@ -175,6 +175,10 @@ all save/fixture differences harmless without inspecting their semantics.**
   unit. Target-specific `/bigobj` added; no test/source semantics changed.
 - **SYNC-R02 / resolved:** `stellar_native_audio_tests` could not resolve Engine
   `read_resource`. Added the missing native-audio link to `stellar_engine`.
+- **SYNC-R03 / resolved:** fresh checkout rejected the shader hash because local
+  CRLF bytes differed from committed LF bytes. Corrected the manifest without
+  changing shader contents or compiled SPIR-V; seven existing PNGs were also
+  normalized to LFS pointers. The isolated checkout then configured successfully.
 - These fixes permit the all-target build; they do not resolve the failures above.
 
 Additional failed assertions in the machine-readable receipt remain open under

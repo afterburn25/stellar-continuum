@@ -6258,5 +6258,15 @@
       "status": "A",
       "path": "docs/validation/2026-09-20-development-sync.md"
     }
-  ]
+  ],
+  "publicationVerification": {
+    "verifiedPublishedCommit": "708add13c4e9f2f02dc9b995832b5c0a4c7cf0ba",
+    "remoteRef": "refs/heads/cpp/codex-native-architecture-integration",
+    "normalPush": "passed",
+    "independentLsRemote": "matched",
+    "lfsUploadedObjects": 4114,
+    "forcePush": false,
+    "releaseCreated": false,
+    "note": "This documentation-only follow-up records the verified publication; final enclosing tip is rechecked after push."
+  }
 }
