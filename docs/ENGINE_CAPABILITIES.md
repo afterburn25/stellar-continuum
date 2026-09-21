@@ -719,6 +719,10 @@ static portraits and the policy against added cloud layers remain unchanged.
   and bounded ring geometry. GPU uploads remain on the renderer thread, validated
   against combined-frame 128-entry/192 MiB image admission limits. 3,990 prepared
   map files are allowlisted and hash-verified; original renders are not runtime data.
+  The owner thread must call `NativePlanetMaterialCache::poll()` once per update
+  frame (`native_client/main.cpp` `update()`); polling is no longer lazy inside
+  `request()`, so completed material jobs drain and `ready()` resolves even when
+  no active view requests more materials.
 - **Tests:** `planet_appearance`, `native_planet_materials`,
   `engine_spherical_material`, `native_developer_index`, `native_scene3d_gpu`,
   fresh/persistable campaigns, legacy migration, body persistence, system/planetary
