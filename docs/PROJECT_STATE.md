@@ -88,7 +88,7 @@ development synchronization.
 
 ## Foundation-expansion integration (2026-09-20)
 
-`integration/foundation-1-30-into-codex` merges the older
+`work/foundation-1-30-codex-integration` merges the older
 `engine/foundation-expansion-1-30` line (save history `.bak.N`, deterministic
 replay capture/playback, data-driven input mapping, engine localization,
 developer-tools host and the 30-item engine-library expansion) onto this

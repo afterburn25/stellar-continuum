@@ -4,7 +4,9 @@ Scope: merge of `engine/foundation-expansion-1-30` (`aa90d0e6`, 13 commits
 after `fbb3165b`) into `cpp/codex-native-architecture-integration` tip
 `e20e83a9a10fe82b6ce886890e0f50fc0ad91707`.
 
-- Work branch: `integration/foundation-1-30-into-codex`
+- Work branch: `work/foundation-1-30-codex-integration` (renamed from
+  `integration/foundation-1-30-into-codex`; the existing
+  `refs/heads/integration` branch blocks `integration/*` ref creation)
 - Merge commit: `0f6637a1`; post-merge fixes: `f1baa31b`, packaging compat
   and CI/docs commits on top.
 - Authoritative versions: game `0.1.14.2-dev`, engine `0.1.64`

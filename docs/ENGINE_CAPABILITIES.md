@@ -2405,7 +2405,7 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 
 ## Foundation expansion integration into the codex native line (2026-09-20)
 
-Branch `integration/foundation-1-30-into-codex` merges
+Branch `work/foundation-1-30-codex-integration` merges
 `engine/foundation-expansion-1-30` (`aa90d0e6`, 13 commits over `fbb3165b`)
 onto `cpp/codex-native-architecture-integration` tip `e20e83a9`
 (game `0.1.14.2-dev`, engine `0.1.64`). The codex architecture won every

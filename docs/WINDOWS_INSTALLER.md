@@ -262,7 +262,7 @@ Download: `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev.zi
 Archive SHA-256:
 `dc7983b5292eb4b878af3ea64dfd45b627f0cf7cb472610660c0f73f0596a648`.
 
-Integration-line update (`integration/foundation-1-30-into-codex`):
+Integration-line update (`work/foundation-1-30-codex-integration`):
 `0.1.14.2-dev-5c4003dd3b821af9` from the same exact `0.1.14.1` base.
 Thirteen files changed — all seven `Content/*.stpak` packages carry new
 content-hash names because merged assets altered every package — so the ZIP

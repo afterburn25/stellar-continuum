@@ -68,7 +68,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `test_galaxy_asset_import.py`, `test_export.py`,
   `export/galaxy-asset-edits.json`, `data/stellar/galaxy-visuals-v1.json`.
 - **Workaround:** none for a clean test gate.
-- **Status:** OPEN. On `integration/foundation-1-30-into-codex` the edit-map
+- **Status:** OPEN. On `work/foundation-1-30-codex-integration` the edit-map
   key mismatch is fixed (`galaxy-asset-edits.json` now escapes non-ASCII keys
   so cp1252 checkouts match the manifest's `\u2014` entries); the test then
   correctly reports the still-absent `assets/source/galaxies-16x9/*.png`
@@ -100,7 +100,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `app/native_client/main.cpp`, native planet globe/materials.
 - **Workaround:** inspect actual captured image/material identity before altering
   the assertion. Targeted `--eruption-smoke` covers only the zoom/flare path.
-- **Status:** OPEN. Reproduced on `integration/foundation-1-30-into-codex`
+- **Status:** OPEN. Reproduced on `work/foundation-1-30-codex-integration`
   (2026-09-20): `--developer-smoke` passes celestial index, empire monitor and
   live-reveal checks, then stops at the same planet-map assertion.
 
@@ -117,7 +117,7 @@ all save/fixture differences harmless without inspecting their semantics.**
   `cmake/StellarNativeClient.cmake`, `tools/stellar-export/stellar.py`.
 - **Workaround:** use the current local build/CTest commands and manual GPU cook
   workflow; do not claim this is equivalent to green hosted CI.
-- **Status:** RESOLVED on `integration/foundation-1-30-into-codex`
+- **Status:** RESOLVED on `work/foundation-1-30-codex-integration`
   (2026-09-20). The workflow now triggers for `cpp/**` and `integration/**`
   pushes and `cpp/**` pull requests, builds the full `windows-native-preview`
   preset (no retired explicit target list), and runs the entire CTest suite
