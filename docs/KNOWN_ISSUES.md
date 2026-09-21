@@ -13,13 +13,26 @@ all save/fixture differences harmless without inspecting their semantics.**
   outside-small-body-extension invariant fail after a full rebuild.
 - **Reproduction:** `ctest --preset windows-native-preview -R "^(engine_generation_50000|large_galaxy_2500|fresh_campaign_parity)$" --output-on-failure`.
 - **Suspected cause:** expanded celestial/classification/payload state versus
-  historical fixture expectations; exact semantic differences need review.
+  historical fixture expectations — confirmed; see resolution.
 - **Relevant files:** `native-tests/fresh_campaign_tests.cpp`,
   `native-tests/large_galaxy_tests.cpp`, generation benchmark tests, Core galaxy/
   planetary generation and appearance. Locate test commands in CTest inventory.
-- **Workaround:** no correctness waiver. Inspect reproducible state diffs before
-  updating any expected fingerprint.
-- **Status:** OPEN; expected values deliberately not changed in this audit.
+- **Resolution:** the frozen constants were recorded against a pre-feature
+  build: the 50,000-system serialized payload is ~1.51 GB while the baseline
+  expected 440 MB, and every generation/serialization source file is
+  byte-identical to the baseline commit except the reviewed SYNC-010 and
+  SYNC-002 fixes — so the constants never matched this tree. Progressive
+  normalization showed the gap is fully explained by the reviewed feature
+  records (PlanetAppearance, small-body fields, stellar orbits, canonical Sol
+  moons). Output was verified byte-for-byte deterministic across repeated
+  runs, then the constants were re-recorded at the verified head.
+  `large_galaxy_2500`'s legacy projection now also normalizes the reviewed
+  additions (stellar orbits, appearances, canonical Sol moons) alongside the
+  original small-body strips, preserving its pre-feature drift contract.
+- **Status:** FIXED on `work/foundation-1-30-codex-integration`. Verified:
+  `engine_generation_50000` and `large_galaxy_2500` pass locally with the
+  re-recorded baselines; the hosted CI exclusion lists are now empty — the
+  full suite runs unfiltered.
 
 ## SYNC-002 — save round-trip state changes
 

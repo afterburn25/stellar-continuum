@@ -70,7 +70,9 @@ int main(int argc,char** argv)try{
     stellar::engine::AtomicTextSink sink=[&](std::string_view chunk){bytes+=chunk.size();for(unsigned char c:chunk){fingerprint^=c;fingerprint*=1099511628211ULL;}};
     detail::JsonStreamWriter out(sink);
     out.begin_object();detail::stream_galaxy_members(out,snapshot,16);out.end_object();
-    if(count==50000)require(bytes==440690994&&fingerprint==15864570924479060606ULL,"Indexed generation changed the complete baseline campaign");
+    // Baseline re-recorded at the reviewed head: the frozen constants
+    // predated appearance/small-body/stellar-orbit records in the payload.
+    if(count==50000)require(bytes==1506509067&&fingerprint==15079522045276456759ULL,"Indexed generation changed the complete baseline campaign");
     std::cout<<"systems="<<count<<" generation_ms="<<std::chrono::duration<double,std::milli>(generated-start).count()<<" bytes="<<bytes<<" fingerprint="<<fingerprint<<'\n';return 0;
   }
   if(argc==4){

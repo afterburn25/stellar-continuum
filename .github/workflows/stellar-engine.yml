@@ -108,10 +108,6 @@ jobs:
           .tools/build-tools/Scripts/python.exe -m pip install cmake==4.4.3 ninja==1.13.2
       - name: Build, test and export native foundation
         shell: pwsh
-        env:
-          # Documented baseline failures (docs/validation/2026-09-20-development-sync.json
-          # SYNC items) — the suite still runs and fails on anything else.
-          STELLAR_CTEST_EXCLUDE: "^(large_galaxy_2500|engine_generation_50000)$"
         run: python tools/stellar-export/stellar.py export windows-benchmark
       - name: Build native client and check presentation without a graphics device
         shell: pwsh
@@ -126,12 +122,9 @@ jobs:
           # hand-picked target list, so CI covers the actual shipping client.
           stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4'],
                       env=env, timeout=3600)
-          # Run the full suite, excluding only the documented baseline failures
-          # recorded in docs/validation/2026-09-20-development-sync.json (SYNC items).
-          baseline_failures = 'large_galaxy_2500|engine_generation_50000'
+          # Run the full suite — the documented baseline failures are resolved.
           stellar.run(['ctest', '--preset', 'windows-native-preview', '--parallel', '2',
-                       '-E', '^(' + baseline_failures + ')$', '--output-on-failure'],
-                      env=env, timeout=1200)
+                       '--output-on-failure'], env=env, timeout=1200)
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report
