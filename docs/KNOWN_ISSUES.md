@@ -172,15 +172,19 @@ all save/fixture differences harmless without inspecting their semantics.**
 ## SYNC-008 — stale runtime metadata label
 
 - **Subsystem / severity:** Build/status metadata; Low.
-- **Description:** `export/runtime-config.json` still says `mode: headless-foundation`
+- **Description:** `export/runtime-config.json` said `mode: headless-foundation`
   although a real graphical client exists. `graphicalParity: false` must not be
   flipped to true merely because the client runs.
-- **Reproduction:** compare the JSON with native CMake targets and current source.
-- **Suspected cause:** incremental metadata lag.
-- **Relevant files:** `export/runtime-config.json` and generated build version.
-- **Workaround:** use this handoff's verified architecture/status; plan a reviewed
-  metadata cleanup without claiming complete graphical parity.
-- **Status:** OPEN, explicitly documented.
+- **Resolution:** `mode` now reads `native-preview`, matching the
+  `windows-native-preview` build preset and the `NativePreview` save location;
+  `graphicalParity` stays `false` because complete graphical parity is not
+  certified. The description now records that the native audio mixer, voice
+  playback and packaged audio ship while bus routing, spatialization and
+  incremental streaming remain unfinished. Per-export `mode` values in
+  `export/stellar-presets.json` are unchanged: the headless presets genuinely
+  build the headless binary. No consumer reads `mode` — `_runtime_game_version`
+  uses `gameVersion` only.
+- **Status:** FIXED.
 
 ## SYNC-009 — combined late-game performance is not certified
 
