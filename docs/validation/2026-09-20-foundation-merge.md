@@ -99,13 +99,14 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
 
 - Full internal release rebuilt via `tools/build-release-installer.ps1` at
   the CI-validated head `7580b11a` (the `sha256_file` hardening changed the
-  executable after the earlier build):
-  `D:/StellarContinuum/integration-release/StellarContinuum-Setup-0.1.14.2-dev`.
-  Payload: 4,345,855,962 bytes, 20 files, 3,781 cooked assets (baseline had
+  executable after the earlier build), then rebuilt again at `6613a3e6` after
+  the SYNC resolutions and the atomic-write transient-lock hardening:
+  `D:/stellar-scratch/sc-integration-merge/work/download-release/StellarContinuum-Setup-0.1.14.2-dev`.
+  Payload: 4,345,859,034 bytes, 20 files, 3,781 cooked assets (baseline had
   3,737). Both maintenance test suites and `--check-package` passed.
-  Target build ID: `0.1.14.2-dev-f096329692cd50ba`; game executable SHA-256
-  `6f3a06c036771bfc02ef87d8fa21ea7dc1c32afadf94b2f499499dda530bb7d4`;
-  setup SHA-256 `043fbdc682473116c7326ff4b6882829fa1982faa78cdae8302bab7cef34b3d4`.
+  Target build ID: `0.1.14.2-dev-8afd6d0fd95b9d2a`; game executable SHA-256
+  `6ee426469a30cb2e844efcba60f30be925be508737b2a814306e398578f654f5`;
+  setup SHA-256 `4dd3e8f281a40cef173f824f6a757b7b3c4f210dcc18adb2e1c0bd18aafb68fe`.
 - Changed-files update via `tools/build-update-installer.ps1` against the
   exact verified base `0.1.14.1-dev-6e758b928d87af02` (manifest SHA-256
   `1a1773e6…5305`, matching the documented pin). 13 changed files —
@@ -120,12 +121,20 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   content timestamps, save/mod preservation and clean uninstall.
 - Update download:
   `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`
-  — 4,309,378,332 bytes; SHA-256
-  `0b210eb9839e6e2104828b3888823da77655171d8801daeec0c661f83e056578`;
+  — 4,309,665,446 bytes; SHA-256
+  `32c28a9057338216197e9bd3274ce05fd6660cfeae22f619b3bc9439dfc1c841`;
   update `StellarContinuumSetup.exe` SHA-256
-  `2037798a6f8ca8a6208b6b778e09e257afe20861a9e9aa4c3dc1c544f1e23394`
+  `1138af1a63696eb3db3af30afd0b4e3d37f40cc44befbaee344a67d786f5895e`
   (`.sha256.txt` sidecar beside it). Matching PDBs retained under
-  `work/cooker/symbols/0.1.14.2-dev/`.
+  `work/cooker/symbols/0.1.14.2-dev/`. Matching offline setup archive:
+  `D:/StellarContinuum/Downloads/StellarContinuum-Setup-0.1.14.2-dev-integration.zip`
+  — 4,310,877,287 bytes; SHA-256
+  `501688ebc6944361f27439883925b90e698b9d70fa3a617978b42561ac21f712`.
+  Both artifacts re-validated at `6613a3e6` via `stellar_maintenance_tests
+  --update-package` (real baseline install, changed-files apply, full hash
+  verification, no-op and damaged-executable repair, unchanged timestamps,
+  save/mod preservation) and `--full-package` (install, no-op repair,
+  corruption repair, uninstall, user preservation).
 
 ## Hosted CI (subsequent runs)
 

@@ -99,7 +99,7 @@ omitted. The merged tree matches the documented test baseline — 236/257 CTest
 with only 1 documented baseline failure remaining (absent widescreen review
 masters) after the SYNC-003 fixture repair and the SYNC-004 assertion fix. The
 branch produced a validated changed-files update from `0.1.14.1-dev` to
-`0.1.14.2-dev-f096329692cd50ba`. Full evidence:
+`0.1.14.2-dev-8afd6d0fd95b9d2a`. Full evidence:
 [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
 The branch is awaiting PR integration, not merged yet.
 
