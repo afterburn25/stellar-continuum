@@ -1,6 +1,8 @@
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/galaxy_payload_json.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include "../core/src/player_campaign_json_research.hpp"
 
@@ -216,7 +218,24 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
   }
   auto& actual_bodies=actual_json["Galaxy"]["PlanetaryBodies"];
   const auto& expected_bodies=expected_json.at("Galaxy").at("PlanetaryBodies");
-  check(actual_bodies.size()==expected_bodies.size(),label+": migrated body count changed");
+  // The frozen oracle predates the canonical Sol expansion: loading a legacy
+  // save performs upgrade_saved_sol_catalog (verified by sol_catalog and
+  // native_moons tests). Drop exactly those appended canonical bodies — a
+  // missing expected body or an unexpected addition still fails below.
+  std::unordered_set<int> canonical_sol_additions;
+  for(const auto& moon:sol_moon_definitions())canonical_sol_additions.insert(moon.id);
+  canonical_sol_additions.insert(pluto_body_id);
+  Json migrated_bodies=Json::array();
+  for(const auto& body:actual_bodies){
+    const bool canonical_addition=body.at("SystemId").get<int>()==sol_system_id&&
+        canonical_sol_additions.contains(body.at("Id").get<int>())&&
+        std::none_of(expected_bodies.begin(),expected_bodies.end(),
+            [&](const Json& e){return e.at("Id")==body.at("Id");});
+    if(!canonical_addition)migrated_bodies.push_back(body);
+  }
+  actual_bodies=std::move(migrated_bodies);
+  check(actual_bodies.size()==expected_bodies.size(),label+": migrated body count changed: expected "+
+      std::to_string(expected_bodies.size())+" got "+std::to_string(actual_bodies.size()));
   for(std::size_t i=0;i<expected_bodies.size();++i)if(!expected_bodies[i].contains("PlanetAppearance")){
     check(actual_bodies[i].contains("PlanetAppearance")&&actual_bodies[i]["PlanetAppearance"].is_object(),
           label+": missing native planet appearance migration");
