@@ -211,6 +211,15 @@ all save/fixture differences harmless without inspecting their semantics.**
   emitted `CR CR LF` into `.cmd` files on `core.autocrlf` checkouts. They now
   run on Windows PowerShell 5.1 with identical output bytes; full release and
   changed-files update were built and validated with them.
+- **SYNC-R08 / resolved:** the merge placed the InputMapper dispatch after the
+  system-workspace handler, whose unconditional `continue` swallowed every
+  key press and release while a system was open — speed, pause and F6 save
+  shortcuts were unreachable in system view and held keys never cleared.
+  The mapper feed now runs before workspace handling, `begin_frame()` clears
+  per-frame pressed state at the top of `update()`, and the planet material
+  queue is pumped once per frame so pending decodes cannot stall when no
+  view is requesting art. `--navigation-smoke` verifies galaxy and system
+  playback, F6 save and four blocked contexts.
 
 Additional failed assertions in the machine-readable receipt remain open under
 their subsystem owners even if not individually root-caused here. The installed

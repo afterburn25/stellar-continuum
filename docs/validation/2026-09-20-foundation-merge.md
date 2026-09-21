@@ -66,6 +66,20 @@ escaping non-ASCII keys in `export/galaxy-asset-edits.json`.
   and live reveal pass; stops at the documented SYNC-006 planet-map
   assertion. Not a new regression.
 - `--new-game-restart-smoke`: `saved_previous:true`, `activated:true`.
+- `--navigation-smoke`: `keyboard_galaxy_playback:true`,
+  `keyboard_system_playback:true`, `keyboard_save_requested:true`,
+  `menu_blocked:true`, `modal_blocked:true`, four blocked contexts,
+  `day_unchanged:true`, `no_charge:true`. Required two fixes after the
+  merge: the InputMapper feed was moved back ahead of the system-workspace
+  handler (its unconditional `continue` swallowed every key press/release
+  in system view), `begin_frame()` now runs at the top of `update()`, and
+  the planet material queue is pumped per frame so pending decodes cannot
+  stall behind a closed view.
+- `--system-smoke`: entry/hit/pan/zoom/reset/back, `pause_retained:1`,
+  `speed_retained:1`, `focused:1`, `day_unchanged:1`.
+- `--planetary-smoke` and `--colony-smoke`: planetary views, colony roster
+  (3 rows, selected/readonly/exclusive/scrolled), `pause_retained:true`,
+  `speed_retained:true`, `day_unchanged:true`.
 
 ## Installer evidence
 
@@ -73,7 +87,8 @@ escaping non-ASCII keys in `export/galaxy-asset-edits.json`.
   `D:/StellarContinuum/integration-release/StellarContinuum-Setup-0.1.14.2-dev`.
   Payload: 4,345,850,336 bytes, 20 files, 3,781 cooked assets (baseline had
   3,737). Both maintenance test suites and `--check-package` passed.
-  Target build ID: `0.1.14.2-dev-5c4003dd3b821af9`.
+  Target build ID: `0.1.14.2-dev-4e7b44c310640d98` (regenerated after the
+  navigation input fix; the executable changed).
 - Changed-files update via `tools/build-update-installer.ps1` against the
   exact verified base `0.1.14.1-dev-6e758b928d87af02` (manifest SHA-256
   `1a1773e6…5305`, matching the documented pin). 13 changed files —
@@ -88,8 +103,10 @@ escaping non-ASCII keys in `export/galaxy-asset-edits.json`.
   content timestamps, save/mod preservation and clean uninstall.
 - Update download:
   `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`
-  — 4,309,374,528 bytes; SHA-256
-  `cfd6e2a15484b6f3d05a17f233fb40273499eecff41e47446944e685c2aa2af1`
+  — 4,309,374,403 bytes; SHA-256
+  `0a6a2cdf4c8c8207dcbbe140c8e71d589cc0ec05b6af6621e42fdfbe0cd371b6`;
+  update `StellarContinuumSetup.exe` SHA-256
+  `6279c51d23365a0ca10368302795761d0b1db567b4b2d2ceca4051988d1d6554`
   (`.sha256.txt` sidecar beside it). Matching PDBs retained under
   `work/cooker/symbols/0.1.14.2-dev/`.
 
