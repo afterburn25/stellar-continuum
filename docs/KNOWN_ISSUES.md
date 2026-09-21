@@ -212,15 +212,25 @@ all save/fixture differences harmless without inspecting their semantics.**
 ## SYNC-010 — stellar engulfment invariant fails at 1,000 systems
 
 - **Subsystem / severity:** Core stellar/planet generation; High correctness blocker.
-- **Description:** `stellar_objects` passes its 250/500-system steps but stops
+- **Description:** `stellar_objects` passed its 250/500-system steps but stopped
   during the 1,000-system step with `No intact engulfed planet`.
-- **Reproduction:** `ctest --preset windows-native-preview -R "^stellar_objects$" --output-on-failure`.
-- **Suspected cause:** interaction between generated stellar radius, orbital
-  placement and planet survival/classification; not root-caused by this audit.
-- **Relevant files:** `native-tests/stellar_object_tests.cpp`, Core stellar
-  objects and planet generation. Use the CTest source registration to locate the test.
-- **Workaround:** none established; preserve the invariant and investigate the seed.
-- **Status:** OPEN, reproduced after the full build.
+- **Root cause:** the invariant compared every body's exposure orbit against the
+  *primary's* destruction radius, but fresh binary systems can assign S-type
+  planets to a companion star (`initialize_stellar_orbits` rescales the orbit
+  by `sqrt(L_companion/L_primary)`). The offending body orbited a red-dwarf
+  companion at 0.0204 AU — safely outside the companion's 0.00064 AU radius but
+  inside the primary yellow giant's 0.033 AU radius. The assertion was stale
+  for S-type planets, and the rescale itself never re-checked engulfment
+  against the companion — a flux-equivalent orbit inside the companion's
+  destruction radius would have produced a genuinely impossible planet.
+- **Resolution:** the test now checks `orbit_au > host.destruction_radius_au`
+  using the body's actual stellar host (`planetary_stellar_host` /
+  `stellar_host_physics`), and `initialize_stellar_orbits` keeps a body bound
+  to the primary when its rescaled companion orbit would fall inside the
+  companion's destruction radius (periapsis included). `stellar_objects`
+  passes all sizes locally (250/500/1000/2500) and was removed from the hosted
+  CI exclusion lists.
+- **Status:** FIXED.
 
 ## SYNC-011 — headless acceleration/checkpoint continuation diverges
 

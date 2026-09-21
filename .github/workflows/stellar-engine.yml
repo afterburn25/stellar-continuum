@@ -111,7 +111,7 @@ jobs:
         env:
           # Documented baseline failures (docs/validation/2026-09-20-development-sync.json
           # SYNC items) — the suite still runs and fails on anything else.
-          STELLAR_CTEST_EXCLUDE: "^(stellar_objects|developer_qa_host|fresh_campaign_parity|persistable_fresh_campaign_parity|sol_catalog|galaxy_catalog_parity|civilization_parity|galaxy_payload_persistence_parity|galaxy_payload_json_parity|legacy_galaxy_payload_persistence_parity|player_campaign_persistence_parity|player_campaign_json_parity|player_campaign_recovery_parity|native_research_controller|native_fresh_progression|large_galaxy_2500|engine_generation_50000)$"
+          STELLAR_CTEST_EXCLUDE: "^(developer_qa_host|fresh_campaign_parity|persistable_fresh_campaign_parity|sol_catalog|galaxy_catalog_parity|civilization_parity|galaxy_payload_persistence_parity|galaxy_payload_json_parity|legacy_galaxy_payload_persistence_parity|player_campaign_persistence_parity|player_campaign_json_parity|player_campaign_recovery_parity|native_research_controller|native_fresh_progression|large_galaxy_2500|engine_generation_50000)$"
         run: python tools/stellar-export/stellar.py export windows-benchmark
       - name: Build native client and check presentation without a graphics device
         shell: pwsh
@@ -129,7 +129,7 @@ jobs:
           # Run the full suite, excluding only the documented baseline failures
           # recorded in docs/validation/2026-09-20-development-sync.json (SYNC items).
           baseline_failures = (
-            'stellar_objects|developer_qa_host|fresh_campaign_parity|'
+            'developer_qa_host|fresh_campaign_parity|'
             'persistable_fresh_campaign_parity|sol_catalog|galaxy_catalog_parity|'
             'civilization_parity|galaxy_payload_persistence_parity|'
             'galaxy_payload_json_parity|legacy_galaxy_payload_persistence_parity|'
