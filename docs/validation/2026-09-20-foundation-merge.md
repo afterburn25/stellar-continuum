@@ -97,12 +97,15 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
 
 ## Installer evidence
 
-- Full internal release built via `tools/build-release-installer.ps1`:
+- Full internal release rebuilt via `tools/build-release-installer.ps1` at
+  the CI-validated head `7580b11a` (the `sha256_file` hardening changed the
+  executable after the earlier build):
   `D:/StellarContinuum/integration-release/StellarContinuum-Setup-0.1.14.2-dev`.
-  Payload: 4,345,851,354 bytes, 20 files, 3,781 cooked assets (baseline had
+  Payload: 4,345,855,962 bytes, 20 files, 3,781 cooked assets (baseline had
   3,737). Both maintenance test suites and `--check-package` passed.
-  Target build ID: `0.1.14.2-dev-b9692f416ad57ef4` (regenerated after the
-  developer-smoke renderer/accessor fixes; the executable changed).
+  Target build ID: `0.1.14.2-dev-f096329692cd50ba`; game executable SHA-256
+  `6f3a06c036771bfc02ef87d8fa21ea7dc1c32afadf94b2f499499dda530bb7d4`;
+  setup SHA-256 `043fbdc682473116c7326ff4b6882829fa1982faa78cdae8302bab7cef34b3d4`.
 - Changed-files update via `tools/build-update-installer.ps1` against the
   exact verified base `0.1.14.1-dev-6e758b928d87af02` (manifest SHA-256
   `1a1773e6…5305`, matching the documented pin). 13 changed files —
@@ -117,10 +120,10 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   content timestamps, save/mod preservation and clean uninstall.
 - Update download:
   `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`
-  — 4,309,374,645 bytes; SHA-256
-  `1d4739337b8779105c2967aa846f8d0ae3dfc30d55e75ace00f1c4304133006b`;
+  — 4,309,378,332 bytes; SHA-256
+  `0b210eb9839e6e2104828b3888823da77655171d8801daeec0c661f83e056578`;
   update `StellarContinuumSetup.exe` SHA-256
-  `d11ffa90dc2bbb6db5b98ea8af536052592d2668aab49a3e1e4ec669fa8b7b25`
+  `2037798a6f8ca8a6208b6b778e09e257afe20861a9e9aa4c3dc1c544f1e23394`
   (`.sha256.txt` sidecar beside it). Matching PDBs retained under
   `work/cooker/symbols/0.1.14.2-dev/`.
 
@@ -143,15 +146,30 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   by `asset_registry.cpp`) — added to `SYSTEM_DLLS` as a system component.
   Build/suite subprocess timeouts were also raised for shared-runner
   variance (3600 s build, 900 s/1200 s suites).
-- Later heads exposed three shared-runner issues, each fixed in turn:
+- Later heads exposed shared-runner issues, each fixed in turn:
   `df8a3189` failed `engine_runtime_diagnostics` when the child-fault
   fixture lost its report/minidump once (now retried, with artifact-specific
   diagnostics); `86fac6ec` failed `engine_asset_cooker` when `sha256_file`
   hit a transient antivirus open lock on a just-published chunk (retried on
   `EACCES`); `f0731623` passed all CTest/Python suites then failed in
   `relocated_smoke` on a stale `solBodies == 10` assertion — Sol now carries
-  28 catalogued bodies, matching the `native_moon_tests` pin. Final hosted
-  result pending on `1dccdbbd`.
+  28 catalogued bodies, matching the `native_moon_tests` pin.
+- The merged presentation step runs the full preview suite (the prior
+  workflow ran a curated `-R` subset), which exposed three hosted-runner
+  constraints, each fixed: the `windows-native-preview` build exceeded the
+  2400 s subprocess timeout on a cold shared runner (raised to 3600 s,
+  `04cf27c6`); eight GPU-dependent tests failed on the runner's missing
+  Vulkan ICD — they now carry `SKIP_REGULAR_EXPRESSION "GPU device creation
+  failed"` so GPU-less hosts report them *skipped* while Vulkan hosts still
+  run them (`55f79238`); and `system_background` verified absolute
+  artwork-workstation source paths that hosted checkouts cannot have — the
+  per-source existence check now runs only when the source tree is present
+  while all coverage accounting and CPU-side checks still execute on every
+  host (`7580b11a`).
+- **Final hosted result: `windows-export` PASS on `7580b11a`** — headless
+  foundation export, full preview build, filtered CTest (236 tests, 7 GPU
+  tests skipped, zero failures), relocated restricted-PATH smoke, cooked
+  package audit and dependency allowlist all green end to end.
 
 ## Boundaries
 
