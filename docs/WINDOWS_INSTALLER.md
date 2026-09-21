@@ -263,15 +263,15 @@ Archive SHA-256:
 `dc7983b5292eb4b878af3ea64dfd45b627f0cf7cb472610660c0f73f0596a648`.
 
 Integration-line update (`work/foundation-1-30-codex-integration`):
-`0.1.14.2-dev-4e7b44c310640d98` from the same exact `0.1.14.1` base.
+`0.1.14.2-dev-b9692f416ad57ef4` from the same exact `0.1.14.1` base.
 Thirteen files changed — all seven `Content/*.stpak` packages carry new
 content-hash names because merged assets altered every package — so the ZIP
-is 4,309,374,403 bytes despite the changed-files-only mechanism. Validated
+is 4,309,374,645 bytes despite the changed-files-only mechanism. Validated
 against an isolated real `0.1.14.1` install (apply, hash check, no-op and
 executable repair, save/mod preservation, uninstall). Download:
 `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`.
 Archive SHA-256:
-`0a6a2cdf4c8c8207dcbbe140c8e71d589cc0ec05b6af6621e42fdfbe0cd371b6`.
+`1d4739337b8779105c2967aa846f8d0ae3dfc30d55e75ace00f1c4304133006b`.
 
 ## 26–28. Size, future reuse and remaining limits
 

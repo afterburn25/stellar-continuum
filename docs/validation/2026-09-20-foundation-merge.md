@@ -99,10 +99,10 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
 
 - Full internal release built via `tools/build-release-installer.ps1`:
   `D:/StellarContinuum/integration-release/StellarContinuum-Setup-0.1.14.2-dev`.
-  Payload: 4,345,850,336 bytes, 20 files, 3,781 cooked assets (baseline had
+  Payload: 4,345,851,354 bytes, 20 files, 3,781 cooked assets (baseline had
   3,737). Both maintenance test suites and `--check-package` passed.
-  Target build ID: `0.1.14.2-dev-4e7b44c310640d98` (regenerated after the
-  navigation input fix; the executable changed).
+  Target build ID: `0.1.14.2-dev-b9692f416ad57ef4` (regenerated after the
+  developer-smoke renderer/accessor fixes; the executable changed).
 - Changed-files update via `tools/build-update-installer.ps1` against the
   exact verified base `0.1.14.1-dev-6e758b928d87af02` (manifest SHA-256
   `1a1773e6…5305`, matching the documented pin). 13 changed files —
@@ -117,10 +117,10 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   content timestamps, save/mod preservation and clean uninstall.
 - Update download:
   `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`
-  — 4,309,374,403 bytes; SHA-256
-  `0a6a2cdf4c8c8207dcbbe140c8e71d589cc0ec05b6af6621e42fdfbe0cd371b6`;
+  — 4,309,374,645 bytes; SHA-256
+  `1d4739337b8779105c2967aa846f8d0ae3dfc30d55e75ace00f1c4304133006b`;
   update `StellarContinuumSetup.exe` SHA-256
-  `6279c51d23365a0ca10368302795761d0b1db567b4b2d2ceca4051988d1d6554`
+  `d11ffa90dc2bbb6db5b98ea8af536052592d2668aab49a3e1e4ec669fa8b7b25`
   (`.sha256.txt` sidecar beside it). Matching PDBs retained under
   `work/cooker/symbols/0.1.14.2-dev/`.
 
