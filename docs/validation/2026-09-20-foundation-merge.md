@@ -142,8 +142,16 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   dependency audit then flagged `Cabinet.dll` (Windows Compression API used
   by `asset_registry.cpp`) — added to `SYSTEM_DLLS` as a system component.
   Build/suite subprocess timeouts were also raised for shared-runner
-  variance (3600 s build, 900 s/1200 s suites). Final hosted result pending
-  on the next head.
+  variance (3600 s build, 900 s/1200 s suites).
+- Later heads exposed three shared-runner issues, each fixed in turn:
+  `df8a3189` failed `engine_runtime_diagnostics` when the child-fault
+  fixture lost its report/minidump once (now retried, with artifact-specific
+  diagnostics); `86fac6ec` failed `engine_asset_cooker` when `sha256_file`
+  hit a transient antivirus open lock on a just-published chunk (retried on
+  `EACCES`); `f0731623` passed all CTest/Python suites then failed in
+  `relocated_smoke` on a stale `solBodies == 10` assertion — Sol now carries
+  28 catalogued bodies, matching the `native_moon_tests` pin. Final hosted
+  result pending on `1dccdbbd`.
 
 ## Boundaries
 
@@ -151,7 +159,9 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   `integration/**` pushes and `cpp/**` PRs.
 - The update is large because every cooked package's bytes changed; the
   changed-files mechanism operates at file granularity, not intra-package.
-- SYNC-001/002/005/006/008/009/010/011 remain open as documented;
-  SYNC-003 (fixture omissions) and SYNC-004 (audit-key encoding, Sol-ordering
-  assertion) are fixed — see KNOWN_ISSUES. The widescreen review masters are
-  still absent, so `test_widescreen_revisions_keep_both_variants` remains red.
+- SYNC-001/002/005/008/009/010/011 remain open as documented;
+  SYNC-003 (fixture omissions), SYNC-004 (audit-key encoding, Sol-ordering
+  assertion) and SYNC-006 (developer-smoke LOD/scene-selection/ice-focus
+  assertions — now passing end to end) are fixed — see KNOWN_ISSUES. The
+  widescreen review masters are still absent, so
+  `test_widescreen_revisions_keep_both_variants` remains red.
