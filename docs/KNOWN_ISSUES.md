@@ -73,14 +73,17 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `test_galaxy_asset_import.py`, `test_export.py`,
   `export/galaxy-asset-edits.json`, `data/stellar/galaxy-visuals-v1.json`.
 - **Workaround:** none for a clean test gate.
-- **Status:** OPEN. On `work/foundation-1-30-codex-integration` the edit-map
+- **Status:** FIXED on `work/foundation-1-30-codex-integration`. The edit-map
   key mismatch is fixed (`galaxy-asset-edits.json` now escapes non-ASCII keys
-  so cp1252 checkouts match the manifest's `\u2014` entries); the test then
-  correctly reports the still-absent `assets/source/galaxies-16x9/*.png`
-  review masters. The Sol-ordering assertion is unchanged; CI excludes exactly
-  `NativeRecovery.test_galaxy_loads_assets_relative_to_executable` via
-  `STELLAR_UNITTEST_EXCLUDE` in `tools/stellar-export/stellar.py` — a named-ID
-  filter, not a pattern, so no other test is hidden.
+  so cp1252 checkouts match the manifest's `\u2014` entries); the widescreen
+  test then correctly reports the still-absent
+  `assets/source/galaxies-16x9/*.png` review masters (never committed —
+  outside-repo inputs, test remains red for the honest reason). The
+  Sol-ordering assertion was rewritten identity-based: `solBodies` lists
+  primaries then moons grouped by parent, so the test now asserts the last
+  primary is Pluto and the final body is Charon (Pluto's moon) instead of
+  assuming Pluto is last. `STELLAR_UNITTEST_EXCLUDE` machinery remains in
+  `native_build()` for future documented baselines but is currently unused.
 
 ## SYNC-005 — missing-file error contract in research tests
 

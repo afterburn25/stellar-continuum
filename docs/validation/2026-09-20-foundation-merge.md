@@ -46,16 +46,17 @@ in [KNOWN_ISSUES.md](../KNOWN_ISSUES.md)):
 (`build-native/preview/stellar-continuum.exe`; the graphical
 `stellar-continuum-native.exe` rejects the CLI options these tests use and
 produces spurious "Unknown or incomplete native client option" failures):
-**570 tests, 2 unsuccessful**. The 34 `NativeClientDependencyTests` fixture
+**570 tests, 1 unsuccessful**. The 34 `NativeClientDependencyTests` fixture
 failures (SYNC-003) are fixed — the fixture now seeds the full validator
 contract — and the `Data/` packaging-casing collision is fixed in
-`native_planet_runtime.py`/`native_environment_runtime.py`. The two remaining
-unsuccessful tests are documented baselines: the absent
-`assets/source/galaxies-16x9/*.png` review masters
-(`test_galaxy_asset_import`) and the SYNC-004 Sol-ordering assertion
-(`test_export.NativeRecovery.test_galaxy_loads_assets_relative_to_executable`).
-The em-dash key mismatch inside SYNC-004 was fixed by escaping non-ASCII keys
-in `export/galaxy-asset-edits.json`.
+`native_planet_runtime.py`/`native_environment_runtime.py`. The SYNC-004
+Sol-ordering assertion was rewritten identity-based (last *primary* is Pluto;
+final body is Charon) and now passes. The sole remaining unsuccessful test is
+`test_galaxy_asset_import.test_widescreen_revisions_keep_both_variants`: the
+`assets/source/galaxies-16x9/*.png` review masters were never committed to
+the repository, so the sha256 cross-check cannot pass. The em-dash key
+mismatch inside that test was fixed by escaping non-ASCII keys in
+`export/galaxy-asset-edits.json`.
 
 ## Graphical runtime smokes
 
@@ -125,9 +126,10 @@ in `export/galaxy-asset-edits.json`.
   21-test baseline exclusion; the first run failed inside
   `stellar.py export windows-benchmark` because the internal headless CTest
   invocation ignored the exclusion. `native_build()` now honors
-  `STELLAR_CTEST_EXCLUDE`/`STELLAR_UNITTEST_EXCLUDE` (verified locally:
-  257→236 tests excluded = exactly the documented 21; the filtered runner
-  drops exactly the named test). Final hosted result pending on `f4d36d44`.
+  `STELLAR_CTEST_EXCLUDE` (verified locally: 257→236 tests = exactly the
+  documented 21) and `STELLAR_UNITTEST_EXCLUDE` (named test IDs via
+  `filtered_test_runner.py`; currently unused — the SYNC-004 assertion was
+  repaired instead of excluded). Final hosted result pending.
 
 ## Boundaries
 
@@ -135,5 +137,7 @@ in `export/galaxy-asset-edits.json`.
   `integration/**` pushes and `cpp/**` PRs.
 - The update is large because every cooked package's bytes changed; the
   changed-files mechanism operates at file granularity, not intra-package.
-- SYNC-001/002/004/005/006/008/009/010/011 remain open as documented;
-  SYNC-003 (fixture omissions) is fixed — see KNOWN_ISSUES.
+- SYNC-001/002/005/006/008/009/010/011 remain open as documented;
+  SYNC-003 (fixture omissions) and SYNC-004 (audit-key encoding, Sol-ordering
+  assertion) are fixed — see KNOWN_ISSUES. The widescreen review masters are
+  still absent, so `test_widescreen_revisions_keep_both_variants` remains red.

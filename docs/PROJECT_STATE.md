@@ -95,8 +95,10 @@ developer-tools host and the 30-item engine-library expansion) onto this
 branch's architecture. Codex systems (renderer, artwork policy, session,
 cooker, installer) remain authoritative; superseded expansion duplicates were
 omitted. The merged tree matches the documented test baseline — 236/257 CTest
-(21 SYNC failures), Python suite at baseline parity with zero new failures —
-and produced a validated changed-files update from `0.1.14.1-dev` to
+(21 SYNC failures) — and improves the Python suite beyond baseline: 570 tests
+with only 1 documented baseline failure remaining (absent widescreen review
+masters) after the SYNC-003 fixture repair and the SYNC-004 assertion fix. The
+branch produced a validated changed-files update from `0.1.14.1-dev` to
 `0.1.14.2-dev-4e7b44c310640d98`. Full evidence:
 [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
 The branch is awaiting PR integration, not merged yet.
