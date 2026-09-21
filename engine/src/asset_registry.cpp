@@ -118,6 +118,6 @@ std::shared_ptr<const AssetRegistry> mounted_asset_registry(){std::lock_guard lo
 std::string asset_alias(const std::filesystem::path&p){std::lock_guard lock(mount_mutex);if(!p.is_absolute())return asset_path_utf8(p.lexically_normal());return asset_path_utf8(p.lexically_normal().lexically_relative(mount_root));}
 bool resource_exists(const std::filesystem::path&p){auto r=mounted_asset_registry();if(r&&r->find(asset_alias(p)))return true;{std::lock_guard lock(mount_mutex);if(r&&!fallback)return false;}return std::filesystem::is_regular_file(p);}
 std::vector<std::uint8_t> read_resource(const std::filesystem::path&p,std::size_t maximum){auto r=mounted_asset_registry();if(r){if(const auto*a=r->find(asset_alias(p))){if(a->chunks.front().raw_bytes>maximum)throw std::runtime_error("Resource exceeds requested budget: "+a->id);return r->read(*a);}std::lock_guard lock(mount_mutex);if(!fallback)throw std::runtime_error("Missing cooked asset (source fallback disabled): "+asset_path_utf8(p));}return read_file(p,maximum);}
-std::istringstream resource_stream(const std::filesystem::path&p){auto b=read_resource(p);return std::istringstream(std::string(b.begin(),b.end()));}
+std::istringstream resource_stream(const std::filesystem::path&p){if(!resource_exists(p)){std::istringstream s;s.setstate(std::ios_base::failbit);return s;}auto b=read_resource(p);return std::istringstream(std::string(b.begin(),b.end()));}
 }
 

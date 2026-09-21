@@ -93,10 +93,18 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Reproduction:** `ctest --preset windows-native-preview -R "^adaptive_research_(applicability|policy|agenda|outcomes)_parity$" --output-on-failure`.
 - **Suspected cause:** catalog reading moved through the Engine resource boundary,
   changing exception behavior expected by existing tests; inspect full traces.
-- **Relevant files:** Engine `asset_registry.cpp`; Core adaptive research catalog/
-  applicability readers; corresponding `native-tests/adaptive_research_*` tests.
-- **Workaround:** none; callers and negative tests need an explicit error contract.
-- **Status:** OPEN; no exception suppression introduced.
+- **Resolution:** `engine::resource_stream` now returns a failed stream for
+  absent resources instead of letting `std::filesystem::file_size` throw a raw
+  `filesystem_error` through it. Every caller already checked `!stream` and
+  raised its own domain error (`AdaptiveResearchOutcomeFileError`,
+  `ios_base::failure`, `AdaptiveResearchCatalogError`, …), so the explicit
+  error contract is restored at one boundary without weakening read errors:
+  files that exist but fail to open or exceed their budget still throw.
+  Verified: `adaptive_research_applicability_parity`,
+  `adaptive_research_policy_parity`, `adaptive_research_agenda_parity` and
+  `adaptive_research_outcomes_parity` all pass locally; the four tests were
+  removed from the hosted CI exclusion lists.
+- **Status:** FIXED.
 
 ## SYNC-006 — broad developer graphical smoke remains red
 
