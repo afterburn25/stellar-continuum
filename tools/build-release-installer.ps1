@@ -11,6 +11,22 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+# Windows PowerShell 5.1 compatibility: .NET Framework lacks Path.GetRelativePath,
+# Convert.ToHexString, SHA256.HashData and the utf8NoBOM encoding name. These
+# helpers produce identical output on both PowerShell editions.
+function Get-RelativePathCompat([string]$Base,[string]$Full){
+    return ($Full.Substring($Base.Length) -replace '^[\\/]+','')
+}
+function Write-Utf8NoBomFile([string]$Path,[string]$Text){
+    $Text=$Text -replace "`r`n","`n"
+    $Text=$Text -replace "`n","`r`n"
+    [IO.File]::WriteAllText($Path,$Text+"`r`n")
+}
+function Get-Sha256HexCompat([byte[]]$Bytes){
+    $sha=[Security.Cryptography.SHA256]::Create()
+    try{return (-join ($sha.ComputeHash($Bytes) | ForEach-Object {$_.ToString('x2')}))}
+    finally{$sha.Dispose()}
+}
 $versions = Get-Content -LiteralPath (Join-Path $repo 'export/runtime-config.json') -Raw | ConvertFrom-Json
 if ($versions.gameVersion -notmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)-(dev|beta|stable)$') {throw 'Invalid authoritative game version.'}
 $numeric = $versions.gameVersion.Split('-')[0]
@@ -65,20 +81,20 @@ $allowedTop=@('stellar-continuum-native.exe','SDL3.dll','StellarContinuumUninsta
 foreach ($file in Get-ChildItem -LiteralPath $payload) {if ($file.Name -notin $allowedTop) {throw "Unapproved payload: $($file.Name)"}}
 $files=@(Get-ChildItem -LiteralPath $payload -File -Recurse | Where-Object {$_.Name -notin @('release-manifest.json','package-files.json')} | Sort-Object FullName | ForEach-Object {
     if ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) {throw 'Release payload cannot contain reparse points.'}
-    $path=[IO.Path]::GetRelativePath($payload,$_.FullName).Replace('\','/')
+    $path=(Get-RelativePathCompat $payload $_.FullName).Replace('\','/')
     $package=if($path -like 'Content/*.stpak'){([IO.Path]::GetFileNameWithoutExtension($path) -split '-')[0]}else{'Runtime'}
     @{path=$path;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant();package=$package}
 })
-$runtimeBytes=[uint64]($files | Measure-Object bytes -Sum).Sum
+$runtimeBytes=[uint64]($files | ForEach-Object {$_.bytes} | Measure-Object -Sum).Sum
 $identity=[Text.Encoding]::UTF8.GetBytes(($files | ForEach-Object {$_.path+':'+$_.sha256}) -join "`n")
-$hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($identity)).ToLowerInvariant()
+$hash=Get-Sha256HexCompat $identity
 $buildId="$($versions.gameVersion)-$($hash.Substring(0,16))"
 $validation=Get-Content -LiteralPath (Join-Path $repo 'work/cooker/release-validation.json') -Raw | ConvertFrom-Json
 $release=@{manifestVersion=2;productId='StellarContinuum';gameVersion=$versions.gameVersion;engineVersion=$versions.engineVersion;channel=$channel;buildId=$buildId;platform='windows-x64';assets='cooked-only';cookerVersion='stellar-cooker-v1.0.0-20260920';assetCount=$validation.assets;runtimeBytes=$runtimeBytes;maximumAdditionalBytes=$runtimeBytes+64MB;gameExecutableHash=($files | Where-Object path -eq 'stellar-continuum-native.exe').sha256;packages=@($files | Where-Object {$_.path -like 'Content/*.stpak'});files=$files}
 $manifest=Join-Path $payload 'release-manifest.json'
-$release | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifest -Encoding utf8NoBOM
+Write-Utf8NoBomFile $manifest ($release | ConvertTo-Json -Depth 8)
 $indexedFiles=@($files)+@{path='release-manifest.json';bytes=(Get-Item -LiteralPath $manifest).Length;sha256=(Get-FileHash -LiteralPath $manifest).Hash.ToLowerInvariant();package='Metadata'}
-@{profile='release';assets='cooked-only';files=$indexedFiles} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $payload 'package-files.json') -Encoding utf8NoBOM
+Write-Utf8NoBomFile (Join-Path $payload 'package-files.json') (@{profile='release';assets='cooked-only';files=$indexedFiles} | ConvertTo-Json -Depth 8)
 # Rebuild bootstrapper only after the final signed binaries and manifest exist.
 # The metadata SHA256 is compiled into setup, then setup itself is signed.
 & $cmake -S $repo -B $build "-DSTELLAR_SETUP_RELEASE_MANIFEST=$manifest"
@@ -101,8 +117,8 @@ $check=Start-Process -FilePath $setup -ArgumentList '--check-package' -WindowSty
 if ($check.ExitCode) {throw 'Final setup/payload verification failed.'}
 if ($VerifyLaunch) {& (Join-Path $PSScriptRoot 'test-cooked-game.ps1') -PackageDirectory $payload}
 $report=@{buildId=$buildId;gameVersion=$versions.gameVersion;engineVersion=$versions.engineVersion;channel=$channel;platform='windows-x64';scope='current-user';payloadBytes=$runtimeBytes;setupBytes=(Get-Item -LiteralPath $setup).Length;manifestSha256=(Get-FileHash -LiteralPath $manifest).Hash.ToLowerInvariant();setupSha256=(Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant();authenticode=if($SigningCertificateThumbprint){'signed-and-verified'}else{'unsigned-development-build'};assetCount=$validation.assets;packages=$release.packages;maintenanceTests='passed';offlinePackageVerification='passed';onlineUpdates='not configured';binaryDeltaPatches='not implemented'}
-$report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output 'build-report.json') -Encoding utf8NoBOM
-@'
+Write-Utf8NoBomFile (Join-Path $output 'build-report.json') ($report | ConvertTo-Json -Depth 8)
+$installText=@'
 STELLAR CONTINUUM — WINDOWS SETUP
 
 Extract this entire folder, then run StellarContinuumSetup.exe.
@@ -121,7 +137,8 @@ Saves, settings, mods and unlisted files are preserved during maintenance.
 This development build is unsigned unless build-report.json says otherwise.
 No online update service, automatic telemetry or binary delta patching is used.
 Future signed releases use the same package manifest and version comparison.
-'@ | Set-Content -LiteralPath (Join-Path $output 'INSTALL.txt') -Encoding utf8NoBOM
+'@
+Write-Utf8NoBomFile (Join-Path $output 'INSTALL.txt') $installText
 if ($ArchivePath) {
     $archive=[IO.Path]::GetFullPath($ArchivePath)
     if (Test-Path -LiteralPath $archive) {throw 'Choose a new archive name; existing releases are preserved.'}
