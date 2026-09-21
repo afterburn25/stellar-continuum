@@ -228,6 +228,36 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   optimization scope is not implied complete. See [cooker guide](ASSET_COOKER.md).
   Actual sizes and acceptance evidence: [cooked release report](ASSET_COOKER_REPORT.md).
 
+## Package codec escalation and BC7 quality retries (2026-10-08)
+
+- **Purpose/ownership:** shrink cooked packages without relaxing the texture
+  quality gates. Engine `texture_cook` retries quality-gate failures at maximum
+  BC7 encoder effort before declaring a lossless RGBA8 fallback; engine
+  `asset_registry` selects the smallest result across `None`, `XpressHuff`,
+  `XpressRgbaDelta`, `Lzms` and `LzmsRgbaDelta` per chunk. Failed compressor
+  output is never tagged as compressed.
+- **Public APIs:** `AssetCodec` gains `Lzms`/`LzmsRgbaDelta` (values 3/4);
+  `compress_asset_bytes`, `decompress_asset_bytes`, chunk headers and manifest
+  codec validation accept the expanded bounded range. BC4/BC5 paths are
+  unaffected because encoder effort is a BC7-only parameter.
+- **Consumers:** every cooked-package reader (image/GPU loaders, fonts, audio,
+  catalogs) transparently decodes the new codecs through `decompress_asset_bytes`.
+  Package readers and manifests produced before this change remain readable:
+  codec 0–2 data is unchanged and old loaders reject unknown tags safely.
+- **Data/performance:** measured on the four fallback-heavy categories (vfx,
+  properties, critical, background): cooked unique bytes 3.88 GB → 3.42 GB
+  (−11.9%) with identical fallback counts and unchanged quality metrics.
+  LZMS encoding roughly doubles per-chunk cook time on those categories;
+  decompression cost stays in the same class as XPRESS. BC7 effort escalation
+  rescued 2 of 1,013 fallbacks and is retained mainly for diagnostic quality
+  reporting; remaining fallbacks are legitimate gate failures.
+- **Tests:** `engine_asset_cooker` covers codec-tag bounds, predictor round
+  trips, LZMS and LZMS+delta round trips, empty-input handling, damaged-size
+  rejection, and failed-compressor fallback to `None`. Deterministic-cache,
+  integrity and maintenance suites unchanged.
+- **Limits/reuse:** LZMS is Windows Compression API only; portable cooks would
+  need another codec id. No adaptive streaming yet — storage saving only.
+
 ## Canonical moons, stable axes and quiet skies (2026-09-20)
 
 - **Purpose:** import all 18 supplied major Sol moons into fresh and saved games,

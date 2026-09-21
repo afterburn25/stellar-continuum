@@ -47,7 +47,9 @@ void texture_tests(){
  AssetCodec codec{};const std::vector<std::uint8_t> bytes(8192,13);auto packed=compress_asset_bytes(bytes,codec);require(codec==AssetCodec::XpressHuff&&decompress_asset_bytes(packed,codec,bytes.size())==bytes,"Compression round trip failed");
  require(compress_asset_bytes({},codec).empty(),"Empty compression failed");
  std::vector<std::uint8_t> gradient(256*256*4);for(std::size_t i=0;i<gradient.size();++i)gradient[i]=static_cast<std::uint8_t>(i/4+i%4*37);
- const auto delta=compress_asset_bytes(gradient,codec,true);require(decompress_asset_bytes(delta,codec,gradient.size())==gradient,"Lossless RGBA predictor changed pixels");
+ const auto delta=compress_asset_bytes(gradient,codec,true);require(codec==AssetCodec::XpressHuff||codec==AssetCodec::XpressRgbaDelta||codec==AssetCodec::Lzms||codec==AssetCodec::LzmsRgbaDelta,"Compressed codec tag out of range");require(decompress_asset_bytes(delta,codec,gradient.size())==gradient,"Lossless RGBA predictor changed pixels");
+ std::vector<std::uint8_t> smooth(512*512*4);for(std::size_t i=0;i<smooth.size();++i)smooth[i]=static_cast<std::uint8_t>((i/4)%256/2+(i/2048)%64);
+ const auto smooth_packed=compress_asset_bytes(smooth,codec,true);require(codec==AssetCodec::Lzms||codec==AssetCodec::LzmsRgbaDelta,"LZMS path never selected for smooth RGBA");require(decompress_asset_bytes(smooth_packed,codec,smooth.size())==smooth,"LZMS round trip changed pixels");
  rejects([&]{(void)decompress_asset_bytes(packed,AssetCodec::XpressHuff,1);},"Wrong decompressed size accepted");
 }
 int main(int argc,char**argv){try{
