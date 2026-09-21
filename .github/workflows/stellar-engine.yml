@@ -93,7 +93,7 @@ permissions:
 jobs:
   windows-export:
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,7 +139,8 @@ jobs:
             'player_campaign_recovery_parity|native_research_controller|'
             'native_fresh_progression|large_galaxy_2500|engine_generation_50000')
           stellar.run(['ctest', '--preset', 'windows-native-preview', '--parallel', '2',
-                       '-E', '^(' + baseline_failures + ')$', '--output-on-failure'], env=env)
+                       '-E', '^(' + baseline_failures + ')$', '--output-on-failure'],
+                      env=env, timeout=1200)
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report

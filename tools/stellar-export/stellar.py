@@ -87,11 +87,12 @@ def build_environment():
 
 def native_build(preset, env):
     run(["cmake", "--fresh", "--preset", preset], env=env)
-    # A clean Windows CI build compiles more than 650 native build actions and
-    # exceeded 15 minutes while still progressing in run 34800861449. Keep the
-    # 30-minute allowance specific to compilation; runtime smoke
-    # checks retain their short deadlines so a hung game still fails promptly.
-    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
+    # A clean Windows CI build compiles ~1,600 native build actions; a shared
+    # runner exceeded the 30-minute allowance at 81% while still progressing
+    # (run 35563093331). Keep the 60-minute allowance specific to compilation;
+    # runtime smoke checks retain their short deadlines so a hung game still
+    # fails promptly.
+    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=3600)
     # The expanded suite includes 25k/50k persistence roundtrips. Individual
     # tests retain their own deadlines; allow time for the complete serial suite.
     # STELLAR_CTEST_EXCLUDE lets CI skip documented baseline failures while
