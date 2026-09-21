@@ -12,6 +12,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/NativeCelestialAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSmallBodyAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativePlanetAssets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NativeScene3D.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/NativeLeaderArtAssets.cmake")
 add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp engine/src/native_scene3d_gpu.cpp)
 target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
@@ -50,6 +51,8 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_battle_art.cpp
   app/native_client/native_battle_sprites.cpp)
 add_dependencies(stellar-continuum-native stellar_native_audio_assets)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_orbital_structure.cpp)
 add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
@@ -115,14 +118,50 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/assets/visual/sol/earth.jpg"
     "${CMAKE_SOURCE_DIR}/assets/visual/space/campaign-galaxy-four-arm-v1.png")
   set_tests_properties(native_client_platform PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
-  add_executable(stellar_native_campaign_session_tests
-    native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp)
-  target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client)
+    add_executable(stellar_native_voice_tests
+    native-tests/native_voice_tests.cpp
+    app/native_client/native_voice.cpp
+    app/native_client/native_voice_playback.cpp
+    app/native_client/native_audio.cpp)
+  target_include_directories(stellar_native_voice_tests PRIVATE
+    app/native_client engine/include third_party)
+  target_link_libraries(stellar_native_voice_tests PRIVATE stellar_core)
+  add_test(NAME native_voice COMMAND stellar_native_voice_tests
+    "${CMAKE_BINARY_DIR}/native-voice-cases")
+  set_tests_properties(native_voice PROPERTIES TIMEOUT 60)
+  if(MSVC)
+    target_compile_options(stellar_native_voice_tests PRIVATE /WX)
+  endif()
+          add_executable(stellar_native_overview_tests
+    native-tests/native_overview_tests.cpp
+    app/native_client/native_overview.cpp)
+  target_include_directories(stellar_native_overview_tests PRIVATE
+    app/native_client engine/include)
+  target_link_libraries(stellar_native_overview_tests PRIVATE stellar_core)
+  add_test(NAME native_overview COMMAND stellar_native_overview_tests)
+  if(MSVC)
+    target_compile_options(stellar_native_overview_tests PRIVATE /WX)
+  endif()
+  add_executable(stellar_native_missions_tests
+    native-tests/native_missions_tests.cpp
+    app/native_client/native_missions.cpp)
+  target_include_directories(stellar_native_missions_tests PRIVATE
+    app/native_client engine/include)
+  target_link_libraries(stellar_native_missions_tests PRIVATE stellar_core)
+  add_test(NAME native_missions COMMAND stellar_native_missions_tests)
+  if(MSVC)
+    target_compile_options(stellar_native_missions_tests PRIVATE /WX)
+  endif()
+    add_executable(stellar_native_campaign_session_tests
+    native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
+    app/native_client/native_notifications.cpp)
+  target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client engine/include)
   target_link_libraries(stellar_native_campaign_session_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
   add_test(NAME native_campaign_session COMMAND stellar_native_campaign_session_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
     "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/native-session-cases")
   set_tests_properties(native_campaign_session PROPERTIES TIMEOUT 180)
+
 endif()
 if(MSVC)
   target_compile_options(stellar_native_platform PRIVATE /WX)
@@ -141,7 +180,9 @@ target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_settlement_workspace.cpp)
 
 target_sources(stellar-continuum-native PRIVATE
-  app/native_client/native_surface_construction_controller.cpp)
+  app/native_client/native_surface_construction_controller.cpp
+  app/native_client/native_surface_relief.cpp
+  app/native_client/native_surface_scene.cpp)
 
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeSpeciesAssets.cmake")
@@ -205,6 +246,7 @@ add_dependencies(stellar-continuum-native stellar_native_stellar_art)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeShipArtAssets.cmake")
 add_dependencies(stellar-continuum-native stellar_native_ship_art_assets)
+add_dependencies(stellar-continuum-native stellar_native_leader_art_assets)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_ship_art_assets.cpp
   app/native_client/native_fleet_route_effects.cpp)
@@ -258,3 +300,18 @@ if(BUILD_TESTING)
  add_test(NAME system_background COMMAND stellar_system_background_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/sky-test-captures")
  set_tests_properties(system_background PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE)
 endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/NativeVoiceAssets.cmake")
+add_dependencies(stellar-continuum-native stellar_native_voice_assets)
+target_sources(stellar-continuum-native PRIVATE
+  app/native_client/native_audio.cpp
+  app/native_client/native_audio_device.cpp
+  app/native_client/native_audio_settings.cpp
+  app/native_client/native_missions.cpp
+  app/native_client/native_overview.cpp
+  app/native_client/native_voice.cpp
+  app/native_client/native_voice_bridge.cpp
+  app/native_client/native_voice_playback.cpp
+  app/native_client/native_voice_sapi.cpp
+  app/native_client/native_voice_settings.cpp)
+target_include_directories(stellar-continuum-native PRIVATE third_party)

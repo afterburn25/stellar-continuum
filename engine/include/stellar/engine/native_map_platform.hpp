@@ -111,8 +111,8 @@ struct FolderDialogResult {
 };
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
-                            EscapePressed, BackspacePressed, KeyPressed, TextEntered,
-                            PointerCancelled };
+                            EscapePressed, BackspacePressed, KeyPressed,
+                            KeyReleased, TextEntered, PointerCancelled };
 struct InputEvent {
   InputEventType type{};
   Point position{}, delta{};

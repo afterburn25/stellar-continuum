@@ -13,8 +13,11 @@ from native_client_runtime import (_validate_capture, copy_native_client_runtime
                                    validate_native_client_export)
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
+from native_audio_runtime import NATIVE_AUDIO_SOURCES
+from native_voice_runtime import NATIVE_VOICE_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
+from native_leader_art_runtime import NATIVE_LEADER_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
 from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
@@ -174,6 +177,15 @@ class NativeClientDependencyTests(unittest.TestCase):
         manifest_path = self.root / "data/stellar/phenomenon-art-v1.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(phenomenon_manifest))
+        leader_art_records = {}
+        for key, (source, destination) in NATIVE_LEADER_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only leader art " + key).encode())
+            leader_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.leader_art_declaration = self.root / "export/native-leader-art-assets.json"
+        self.leader_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":leader_art_records}))
         ship_art_records = {}
         for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
             asset = fixture_asset(source, "ship art " + key)
@@ -181,6 +193,42 @@ class NativeClientDependencyTests(unittest.TestCase):
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
+        planet_art_records = {}
+        for key, (source, destination) in NATIVE_PLANET_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only planet art " + key).encode())
+            planet_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.planet_art_declaration = self.root / "export/native-planet-art-assets.json"
+        self.planet_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":planet_art_records}))
+        star_art_records = {}
+        for key, (source, destination) in NATIVE_STAR_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only star art " + key).encode())
+            star_art_records[key] = {"source": source, "runtimePath": destination,
+                                     "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.star_art_declaration = self.root / "export/native-star-art-assets.json"
+        self.star_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":star_art_records}))
+        audio_records = {}
+        for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only audio " + key).encode())
+            audio_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.audio_declaration = self.root / "export/native-audio-assets.json"
+        self.audio_declaration.write_text(json.dumps({"schemaVersion":1,"assets":audio_records}))
+        voice_records = {}
+        for key, (source, destination) in NATIVE_VOICE_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only voice " + key).encode())
+            voice_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.voice_declaration = self.root / "export/native-voice-assets.json"
+        self.voice_declaration.write_text(json.dumps({"schemaVersion":1,"assets":voice_records}))
 
         audio_records = {}
         for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():

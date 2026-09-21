@@ -13,7 +13,7 @@
 
 namespace stellar::core {
 
-enum class PlayerCampaignLoadOrigin { Primary, Backup };
+enum class PlayerCampaignLoadOrigin { Primary, Backup, History };
 enum class PlayerCampaignLoadAttemptKind { Missing, Failed };
 
 struct PlayerCampaignRestorationProgress {
@@ -53,8 +53,9 @@ struct LoadedPlayerCampaignV17 {
   std::vector<PlayerCampaignLoadAttempt> prior_attempts;
 };
 
-// Bounded current-Player recovery only: request path once, then request path
-// plus .bak once. It neither creates a campaign nor writes/repairs either file.
+// Bounded current-Player recovery: request path, then .bak, then rolling
+// history slots ".bak.2" .. ".bak.N" for whichever exist. It neither creates
+// a campaign nor writes/repairs any file.
 [[nodiscard]] LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
     const std::filesystem::path &save_path,
     const PlayerCampaignRuntimeFactory &make_runtime,

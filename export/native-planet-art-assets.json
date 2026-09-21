@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "arid-world": {
+      "source": "assets/visual/planets/arid-world.png",
+      "runtimePath": "assets/visual/planets/arid-world.png",
+      "sha256": "6ecec47996645d1b994c056104d31494d02142c7405517c56fd473305453be9e"
+    },
+    "barren-world": {
+      "source": "assets/visual/planets/barren-world.png",
+      "runtimePath": "assets/visual/planets/barren-world.png",
+      "sha256": "2dac13fd36781be6fbe6d29febef56cfa975b7d22424abafbc0cc17045b7c1e3"
+    },
+    "continental-world": {
+      "source": "assets/visual/planets/continental-world.png",
+      "runtimePath": "assets/visual/planets/continental-world.png",
+      "sha256": "ca4ecf540f6274413c5784f7f29da6d643abe35f1b70d1ab09c3f1b478a7454c"
+    },
+    "cracked-world": {
+      "source": "assets/visual/planets/cracked-world.png",
+      "runtimePath": "assets/visual/planets/cracked-world.png",
+      "sha256": "ec1aad588b868489550ebc6f792bbe9037151a6ba304a56fa154feff8b497e4b"
+    },
+    "desert-world": {
+      "source": "assets/visual/planets/desert-world.png",
+      "runtimePath": "assets/visual/planets/desert-world.png",
+      "sha256": "446c7513152263d29a6cbe6b86802d75fc4d38fba2b774e78a8b7d76d8682521"
+    },
+    "frozen-world": {
+      "source": "assets/visual/planets/frozen-world.png",
+      "runtimePath": "assets/visual/planets/frozen-world.png",
+      "sha256": "0d8370ac8b255f59d3737b21c0950d25ba28a25030b1b5b638a611b71c6ddf37"
+    },
+    "gaia-world": {
+      "source": "assets/visual/planets/gaia-world.png",
+      "runtimePath": "assets/visual/planets/gaia-world.png",
+      "sha256": "8351ca39b5d80d220ffd3891e2d071b9baf5216a423d3451627f481dfca5d907"
+    },
+    "inferno-world": {
+      "source": "assets/visual/planets/inferno-world.png",
+      "runtimePath": "assets/visual/planets/inferno-world.png",
+      "sha256": "23e1ac379396755ac11062bff3285fb959eea09676e3d4d711ee74f91b9a56ae"
+    },
+    "ocean-world": {
+      "source": "assets/visual/planets/ocean-world.png",
+      "runtimePath": "assets/visual/planets/ocean-world.png",
+      "sha256": "2dd8178d9da937755781644dd5c604311b3a6d97e210530cda7e33950f1f6d53"
+    },
+    "tomb-world": {
+      "source": "assets/visual/planets/tomb-world.png",
+      "runtimePath": "assets/visual/planets/tomb-world.png",
+      "sha256": "60b1c56a50859ffe87d241bfac555c3bb5c35819d3daa7334ecb5df53455c719"
+    },
+    "tropical-world": {
+      "source": "assets/visual/planets/tropical-world.png",
+      "runtimePath": "assets/visual/planets/tropical-world.png",
+      "sha256": "026aeb469273abd246d326c035b06b254be99d1ab87070b416d2e439b5cf8e77"
+    },
+    "volcano-world": {
+      "source": "assets/visual/planets/volcano-world.png",
+      "runtimePath": "assets/visual/planets/volcano-world.png",
+      "sha256": "7145dfc0c71a42dd2e96bd3f500fbe741295b2e909ab1f9771f3d49b4ad83c16"
+    },
+    "wormhole-anomaly": {
+      "source": "assets/visual/planets/wormhole-anomaly.png",
+      "runtimePath": "assets/visual/planets/wormhole-anomaly.png",
+      "sha256": "ec1e40ed53f83c19e79de750ba73067df9f98b6d205bb852221315a2e52a9485"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_PLANET_ART_SOURCES.md",
+      "runtimePath": "Licenses/Planet-art-sources.md",
+      "sha256": "c98c0e90a2cad2dba4f52e9db88655bc6146061ea4bf7a03a638e4c287fe72bf"
+    },
+    "mercury": {
+      "source": "assets/visual/planets/mercury.png",
+      "runtimePath": "assets/visual/planets/mercury.png",
+      "sha256": "5e6741ec6bb6941107e4cb1f595009fb0f4f64f906facc041146f7dd15433834"
+    },
+    "venus": {
+      "source": "assets/visual/planets/venus.png",
+      "runtimePath": "assets/visual/planets/venus.png",
+      "sha256": "c09ef16128b851e291fc608158e4e9f4bf1583b5f043da8eb959402bb03ac7bc"
+    },
+    "earth": {
+      "source": "assets/visual/planets/earth.png",
+      "runtimePath": "assets/visual/planets/earth.png",
+      "sha256": "478aaad358cb7ba71bb1c6d2cfdb73b97a1d03cf10cbfee618413c63338609a7"
+    },
+    "mars": {
+      "source": "assets/visual/planets/mars.png",
+      "runtimePath": "assets/visual/planets/mars.png",
+      "sha256": "523ebb8f2fbbdc2c6ef47c038e0864a9743acbac8c29ce66902f5acbb1d22947"
+    },
+    "jupiter": {
+      "source": "assets/visual/planets/jupiter.png",
+      "runtimePath": "assets/visual/planets/jupiter.png",
+      "sha256": "848b6d85b36e2c59d7c34613522f0cb1fa2ba7c5c452502478d337e6f10dff03"
+    },
+    "saturn": {
+      "source": "assets/visual/planets/saturn.png",
+      "runtimePath": "assets/visual/planets/saturn.png",
+      "sha256": "adc02d3aeba7bd27ede8a50a28511f5e0282bf1aa44dfb813844a6233791f71d"
+    },
+    "uranus": {
+      "source": "assets/visual/planets/uranus.png",
+      "runtimePath": "assets/visual/planets/uranus.png",
+      "sha256": "9d3aed05ffe84b6baf03963c1253d833fe26d5c10295326b39df8e735b43b0ec"
+    },
+    "neptune": {
+      "source": "assets/visual/planets/neptune.png",
+      "runtimePath": "assets/visual/planets/neptune.png",
+      "sha256": "cdbc8d828b38f1a9c1b777428fd4eb6dfb33233fcabd25ba64165efd009be0ff"
+    },
+    "moon": {
+      "source": "assets/visual/planets/moon.png",
+      "runtimePath": "assets/visual/planets/moon.png",
+      "sha256": "9c26e7ce0c162fb059d2a774c9428a51705441a007f3ca2aa637bc001056f43a"
+    }
+  }
+}

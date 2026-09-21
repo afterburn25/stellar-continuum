@@ -1,6 +1,7 @@
 #include "native_campaign_session.hpp"
 
 #include <stellar/core/player_campaign_json.hpp>
+#include <stellar/engine/save_history.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -149,13 +150,38 @@ void save_load_and_transactional_failure(const fs::path &research_root,
   { std::ofstream backup(fs::path(save_path).concat(".bak"),
                          std::ios::binary | std::ios::trunc);
     backup << "broken backup"; }
+  // Two prior saves rotated a valid generation into .bak.2 — recovery must
+  // reach the history slot rather than fail on the corrupted pair.
+  session->request_load();
+  require(wait_for_load(*session, false) &&
+              session->notice().kind == SessionNoticeKind::Recovered,
+          "History autosave was not recovered.");
+  const auto history_generation = session->cache().generation;
+  const auto history_system = session->cache().systems_by_id.begin()->second;
+  const auto history_day = session->frame().clock().simulation_days();
+
+  // Corrupt the entire chain — no valid save anywhere must fail cleanly.
+  { std::ofstream primary(save_path, std::ios::binary | std::ios::trunc);
+    primary << "broken primary"; }
+  { std::ofstream backup(fs::path(save_path).concat(".bak"),
+                         std::ios::binary | std::ios::trunc);
+    backup << "broken backup"; }
+  for (std::size_t slot = 2;
+       slot <= stellar::engine::k_default_save_history_depth; ++slot) {
+    const auto slot_path =
+        stellar::engine::history_slot_path(save_path, slot);
+    if (fs::is_regular_file(slot_path)) {
+      std::ofstream broken(slot_path, std::ios::binary | std::ios::trunc);
+      broken << "broken history";
+    }
+  }
   session->request_load();
   require(!wait_for_load(*session) &&
               session->notice().kind == SessionNoticeKind::Failure,
-          "Invalid primary and backup were reported as loaded.");
-  require(session->cache().generation == stable_generation &&
-              session->cache().systems_by_id.begin()->second == stable_system &&
-              session->frame().clock().simulation_days() == stable_day,
+          "Invalid save chain was reported as loaded.");
+  require(session->cache().generation == history_generation &&
+              session->cache().systems_by_id.begin()->second == history_system &&
+              session->frame().clock().simulation_days() == history_day,
           "Decode failure changed the live campaign.");
 }
 
@@ -687,6 +713,10 @@ void tactical_save_reload_and_continuation(const fs::path &research_root,
       "Running tactical capture lost its orders, pending time or combat events.");
   // Failed activation keeps this live encounter and its clock untouched.
   write(path,"broken tactical save");write(fs::path(path.string()+".bak"),"broken backup");
+  for(std::size_t slot=2;slot<=stellar::engine::k_default_save_history_depth;++slot){
+    const auto slot_path=stellar::engine::history_slot_path(path,slot);
+    if(fs::is_regular_file(slot_path))write(slot_path,"broken history");
+  }
   session->request_load();require(!wait_for_load(*session,false),"Broken tactical save replaced live state.");
   require(session->notice().kind==SessionNoticeKind::Failure&&capture(*session)==running,
       "Failed tactical load damaged the running campaign.");

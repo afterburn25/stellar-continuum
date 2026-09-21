@@ -27,6 +27,7 @@ enum class SessionNoticeKind {
   Saved,
   Loaded,
   Recovered,
+  Status,
   Failure,
 };
 
@@ -116,6 +117,18 @@ public:
   // when a fully validated load candidate replaced the live session.
   [[nodiscard]] bool service(const std::string &saved_at_utc,
                              bool menu_open);
+
+  // Forwards a capture observer onto the live save controller. Reinstall after
+  // service() replaces the live session (replay recording/verification).
+  void set_save_capture_observer(
+      stellar::core::PlayerCampaignCaptureObserver observer);
+
+  // Reference SetStatus: a transient status line for keyboard and
+  // command-driven feedback (candidate cycling, speed changes, rejections).
+  void publish_status(std::string message) {
+    require_owner();
+    notice_ = {SessionNoticeKind::Status, std::move(message), 1.};
+  }
 
 private:
   struct Live;

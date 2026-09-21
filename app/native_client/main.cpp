@@ -15,6 +15,11 @@
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
+#include "native_audio_settings.hpp"
+#include "native_battle_workspace.hpp"
+
+#include "native_notifications.hpp"
+#include "native_support.hpp"
 #include "native_galaxy_star_markers.hpp"
 #include "native_stellar_art.hpp"
 #include "native_stellar_eruptions.hpp"
@@ -22,6 +27,11 @@
 #include "native_stellar_observation.hpp"
 #include "native_navigation_art.hpp"
 #include "native_galaxy_labels.hpp"
+#include "native_inspection.hpp"
+#include "native_economy.hpp"
+#include "native_logistics.hpp"
+#include "native_missions.hpp"
+#include "native_overview.hpp"
 #include "native_campaign_session.hpp"
 #include "native_developer_simulation_panel.hpp"
 #include "native_developer_diagnostics.hpp"
@@ -77,10 +87,13 @@
 #include "native_territory_overlay.hpp"
 #include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/exploration_advance.hpp>
+#include "native_video_settings.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/build_version.hpp>
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/developer_campaign.hpp>
+#include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/lane_network.hpp>
@@ -88,12 +101,25 @@
 #include <stellar/core/player_campaign_save.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/survey_operations.hpp>
+#include <stellar/core/player_campaign_recovery.hpp>
+#include <stellar/core/save_preview.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/runtime_directory_lease.hpp>
+#include <stellar/engine/atomic_file_write.hpp>
+#include <stellar/engine/crash_reporter.hpp>
+#include <stellar/engine/input_actions.hpp>
+#include <stellar/engine/memory_tracker.hpp>
+#include <stellar/engine/profiler.hpp>
+#include <stellar/engine/replay.hpp>
+#include <stellar/engine/save_history.hpp>
+#include <stellar/engine/save_integrity.hpp>
 #include <nlohmann/json.hpp>
+
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -121,6 +147,13 @@ namespace native_battle_art=stellar::native_battle_art;
 using namespace stellar::core;
 using namespace stellar::native_map;
 
+// Ends the profiler frame opened at the top of ClientApp::update.
+struct ProfileFrameGuard {
+  ~ProfileFrameGuard() {
+    (void)stellar::engine::Profiler::instance().end_frame();
+  }
+};
+
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
 using namespace stellar::native_diplomacy;
@@ -133,6 +166,17 @@ using namespace stellar::native_research;
 using namespace stellar::native_research_ui;
 using namespace stellar::native_shipyard;
 using namespace stellar::native_shipyard_ui;
+namespace native_audio = stellar::native_audio;
+namespace native_battle_ui = stellar::native_battle_ui;
+namespace native_developer = stellar::native_developer;
+namespace native_inspection = stellar::native_inspection;
+namespace native_economy = stellar::native_economy;
+namespace native_logistics = stellar::native_logistics;
+namespace native_missions = stellar::native_missions;
+namespace native_notifications = stellar::native_notifications;
+namespace native_overview = stellar::native_overview;
+namespace native_support = stellar::native_support;
+namespace native_video_settings = stellar::native_video_settings;
 using namespace stellar::native_system;
 using namespace stellar::native_system_travel;
 using namespace stellar::native_system_ui;
@@ -281,6 +325,7 @@ struct Options {
   bool settlement_reload_smoke{};
   bool settlement_preparation_smoke{};
   bool new_game_smoke{},restart_smoke{},developer_smoke{},eruption_smoke{};
+  bool new_game_restart_smoke{};
   StartupEntryAutomationAction restart_action{StartupEntryAutomationAction::Create};
   bool galaxy_art_smoke{};
   bool ship_art_smoke{};
@@ -295,6 +340,11 @@ struct Options {
   bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},voice_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{},devtools{},dev_game{},smoke_full_exploration{};
   std::optional<int> profile_frames;
+  // Deterministic replay: --record captures the GALAXY command stream and a
+  // canonical-state hash at every save capture; --replay re-feeds the commands
+  // under a fixed 60 Hz step and verifies the checkpoint hashes in order.
+  std::filesystem::path record_path;
+  std::filesystem::path replay_path;
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -338,6 +388,7 @@ struct Options {
     else if(arg==L"--developer-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.developer_smoke=true;result.windowed=true;}
     else if(arg==L"--eruption-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.developer_smoke=true;result.eruption_smoke=true;result.windowed=true;}
     else if(arg==L"--new-game-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_smoke=true;result.windowed=true;}
+    else if(arg==L"--new-game-restart-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.new_game_restart_smoke=true;result.windowed=true;}
     else if(arg==L"--research-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.research_smoke=true;result.windowed=true;}
     else if(arg==L"--navigation-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.navigation_smoke=true;result.windowed=true;}
     else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
@@ -361,6 +412,8 @@ struct Options {
     else if((arg==L"--settlement-completion-smoke"||arg==L"--settlement-founded-smoke")&&i+1<argc){if(result.settlement_completion_mode)throw std::invalid_argument("Choose one settlement completion mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_completion_mode=arg==L"--settlement-completion-smoke"?Options::SettlementCompletionMode::Resume:Options::SettlementCompletionMode::Paused;result.windowed=true;}
     else if(arg==L"--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
+    else if(arg==L"--record"&&i+1<argc) result.record_path=argv[++i];
+    else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -393,6 +446,7 @@ struct Options {
     else if(arg=="--developer-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.developer_smoke=true;result.windowed=true;}
     else if(arg=="--eruption-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.developer_smoke=true;result.eruption_smoke=true;result.windowed=true;}
     else if(arg=="--new-game-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_smoke=true;result.windowed=true;}
+    else if(arg=="--new-game-restart-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.new_game_restart_smoke=true;result.windowed=true;}
     else if(arg=="--research-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.research_smoke=true;result.windowed=true;}
     else if(arg=="--navigation-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.navigation_smoke=true;result.windowed=true;}
     else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
@@ -416,6 +470,8 @@ struct Options {
     else if((arg=="--settlement-completion-smoke"||arg=="--settlement-founded-smoke")&&i+1<argc){if(result.settlement_completion_mode)throw std::invalid_argument("Choose one settlement completion mode.");result.smoke_screenshot=argv[++i];result.settlement_completion_mode=arg=="--settlement-completion-smoke"?Options::SettlementCompletionMode::Resume:Options::SettlementCompletionMode::Paused;result.windowed=true;}
     else if(arg=="--settlement-preparation-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.settlement_preparation_smoke=true;result.windowed=true;}
     else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
+    else if(arg=="--record"&&i+1<argc) result.record_path=argv[++i];
+    else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -456,6 +512,7 @@ struct Options {
   if(result.window_width<640||result.window_width>3840||result.window_height<360||result.window_height>2160)throw std::invalid_argument("Native window dimensions are out of range.");
   if(result.dev_game&&!result.save_path_overridden)
     result.save_path=default_native_campaign_save_path().parent_path()/"developer"/"campaign.dev17.json";
+  if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
   return result;
 }
 
@@ -608,6 +665,35 @@ struct ResearchStamp {
   bool operator==(const ResearchStamp &) const = default;
 };
 
+
+// Deterministic replay state, owned by main() so one stream spans the
+// per-session NativeCampaign rebuilds that mode switches and new games cause.
+struct ReplayState {
+  std::optional<stellar::engine::ReplayRecorder> recorder;
+  std::optional<stellar::engine::ReplayRecorder> recording;
+  std::size_t command_cursor{};
+  std::size_t checkpoint_cursor{};
+  std::uint64_t verified_checkpoints{};
+  std::string divergence;
+};
+
+// Writes the recording on scope exit, including early returns and failures.
+struct ReplayFileFlush {
+  const ReplayState *state{};
+  std::filesystem::path path;
+  ~ReplayFileFlush() {
+    if (!state || !state->recorder || path.empty()) return;
+    try {
+      const auto bytes = state->recorder->serialize();
+      stellar::engine::write_file_atomically(
+          path, std::as_bytes(std::span<const char>(bytes.data(), bytes.size())));
+    } catch (const std::exception &error) {
+      std::cerr << "Stellar Continuum native client: replay recording write "
+                   "failed: " << error.what() << '\n';
+    }
+  }
+};
+
 class NativeCampaign final {
  public:
   NativeCampaign(std::unique_ptr<NativeCampaignSession> session,int width,int height,
@@ -626,7 +712,7 @@ class NativeCampaign final {
         eruption_art_(std::filesystem::absolute(asset_root)),
         galaxy_assets_(std::filesystem::absolute(asset_root)),
         galaxy_backdrop_(galaxy_assets_),
-        planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual/sol"),
+        planet_discs_(std::filesystem::absolute(asset_root)/"assets/visual"),
         ship_art_(std::filesystem::absolute(asset_root)),
         battle_sprites_(std::filesystem::absolute(asset_root)),
         asset_root_(std::filesystem::absolute(asset_root)),
@@ -696,6 +782,243 @@ class NativeCampaign final {
     settings_hub_=settings_hub;voice_settings_=voice_settings;
     presentation_audio_=presentation_audio;
     menu_hover_feedback_.set_callback([this]{if(presentation_audio_)presentation_audio_->hover();});
+    configure_input_actions();
+  }
+
+  // Reference Main.cs keyboard shortcuts, expressed as a data-driven GALAXY
+  // input context (engine InputActions): Space pauses, 1-5 select strategic
+  // speeds (5 is the Developer-only Demo rate), T/R/C/B cycle and start the
+  // research/construction candidates, N starts a new campaign and F6 saves.
+  void configure_input_actions(){
+    static constexpr std::string_view kGalaxyContext=R"json({
+      "contexts":[{"name":"GALAXY","exclusive":false,"actions":[
+        {"name":"toggle_pause","type":"Button","bindings":[{"kind":"KeyPress","code":32}]},
+        {"name":"speed_normal","type":"Button","bindings":[{"kind":"KeyPress","code":49}]},
+        {"name":"speed_fast","type":"Button","bindings":[{"kind":"KeyPress","code":50}]},
+        {"name":"speed_very_fast","type":"Button","bindings":[{"kind":"KeyPress","code":51}]},
+        {"name":"speed_maximum","type":"Button","bindings":[{"kind":"KeyPress","code":52}]},
+        {"name":"speed_demo","type":"Button","bindings":[{"kind":"KeyPress","code":53}]},
+        {"name":"cycle_research","type":"Button","bindings":[{"kind":"KeyPress","code":116},{"kind":"KeyPress","code":84}]},
+        {"name":"start_research","type":"Button","bindings":[{"kind":"KeyPress","code":114},{"kind":"KeyPress","code":82}]},
+        {"name":"cycle_construction","type":"Button","bindings":[{"kind":"KeyPress","code":99},{"kind":"KeyPress","code":67}]},
+        {"name":"start_construction","type":"Button","bindings":[{"kind":"KeyPress","code":98},{"kind":"KeyPress","code":66}]},
+        {"name":"new_campaign","type":"Button","bindings":[{"kind":"KeyPress","code":110},{"kind":"KeyPress","code":78}]},
+        {"name":"quicksave","type":"Button","bindings":[{"kind":"KeyPress","code":1073741887}]}
+      ]}]}
+    )json";
+    std::string error;
+    if(input_mapper_.load_contexts(kGalaxyContext,&error))
+      input_mapper_.push_context("GALAXY");
+    else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
+  }
+
+  // Deterministic replay (engine ReplayRecorder adoption): --record stores
+  // each dispatched GALAXY keypress and a canonical-state hash at every save
+  // capture; --replay re-feeds the keypresses under the fixed step that main()
+  // applies and verifies the recorded hashes in order. Verification failures
+  // surface as a thrown divergence after advance(), never inside the writer.
+  void attach_replay(ReplayState *state){
+    replay_=state;
+    install_replay_observer();
+  }
+
+  [[nodiscard]] std::uint64_t replay_tick()const{
+    return static_cast<std::uint64_t>(std::llround(
+        session_->frame().clock().simulation_days()*1000.));
+  }
+
+  void install_replay_observer(){
+    if(!replay_||!session_||(!replay_->recorder&&!replay_->recording))return;
+    session_->set_save_capture_observer(
+        [this](double day,const PlayerCampaignPayloadV17Dto &payload){
+          if(!replay_||!replay_->divergence.empty())return;
+          const auto tick=static_cast<std::uint64_t>(std::llround(day*1000.));
+          // The canonical payload carries two wall-clock provenance fields —
+          // SavedAtUtc and the campaign's CreatedAtUtc generation stamp. Strip
+          // both so checkpoint hashes compare simulation state only.
+          auto document=nlohmann::ordered_json::parse(
+              encode_player_campaign_v17_json(payload));
+          document.erase("SavedAtUtc");
+          if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
+            if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+              meta->erase("CreatedAtUtc");
+          const auto hash=stellar::engine::fnv1a64(document.dump());
+          if(replay_->recorder){
+            replay_->recorder->checkpoint(tick,hash,"save");
+            return;
+          }
+          const auto &expected=replay_->recording->checkpoints();
+          if(replay_->checkpoint_cursor>=expected.size()){
+            replay_->divergence=
+                "replay produced an unrecorded save checkpoint at tick "+
+                std::to_string(tick);
+            return;
+          }
+          const auto &want=expected[replay_->checkpoint_cursor];
+          if(want.tick!=tick){
+            replay_->divergence=
+                "replay checkpoint tick diverged: expected "+
+                std::to_string(want.tick)+", captured "+std::to_string(tick);
+            return;
+          }
+          if(want.hash!=hash){
+            replay_->divergence=
+                "replay state hash diverged at tick "+std::to_string(tick);
+            return;
+          }
+          ++replay_->checkpoint_cursor;
+          ++replay_->verified_checkpoints;
+        });
+  }
+
+  [[nodiscard]] std::string_view first_galaxy_action_pressed()const{
+    static constexpr std::string_view actions[]={
+        "toggle_pause","speed_normal","speed_fast","speed_very_fast",
+        "speed_maximum","speed_demo","cycle_research","start_research",
+        "cycle_construction","start_construction","new_campaign","quicksave"};
+    for(const auto name:actions)
+      if(input_mapper_.just_pressed(name))return name;
+    return {};
+  }
+
+  [[nodiscard]] std::vector<const NativeResearchNode *>
+  research_candidates(const NativeResearchWindow &view){
+    std::vector<const NativeResearchNode *> candidates;
+    for(const auto &node:view.nodes)
+      if(node.primary_action.enabled&&
+         node.primary_action.intent==NativeResearchIntent::Start)
+        candidates.push_back(&node);
+    return candidates;
+  }
+  void cycle_research_candidate(){
+    const auto view=research_controller_.build(
+        session_->frame(),session_->cache().generation,{});
+    const auto candidates=research_candidates(view);
+    if(candidates.empty()){
+      research_candidate_index_=0;
+      session_->publish_status(
+          "No research choices are currently available. A construction "
+          "prerequisite may be missing.");
+      return;
+    }
+    research_candidate_index_=
+        (research_candidate_index_+1)%
+        static_cast<int>(candidates.size());
+    session_->publish_status("Research candidate: "+
+        candidates[research_candidate_index_]->display_name);
+  }
+  void start_research_candidate(){
+    const auto view=research_controller_.build(
+        session_->frame(),session_->cache().generation,{});
+    const auto candidates=research_candidates(view);
+    if(candidates.empty()){
+      research_candidate_index_=0;
+      session_->publish_status(
+          "No available research project selected. Check construction "
+          "prerequisites.");
+      return;
+    }
+    research_candidate_index_=std::clamp(research_candidate_index_,0,
+        static_cast<int>(candidates.size())-1);
+    const auto *candidate=candidates[research_candidate_index_];
+    const auto outcome=research_controller_.execute(
+        session_->frame(),session_->cache().generation,
+        view.research_revision,view.funding_revision,
+        NativeResearchIntent::Start,candidate->id);
+    session_->publish_status(outcome.message);
+    if(outcome.accepted){
+      publish_notification("Research",outcome.message);
+      research_candidate_index_=0;
+    }
+    if(research_workspace_.visible())refresh_research(true);
+  }
+  [[nodiscard]] std::vector<const NativeConstructionProject *>
+  construction_candidates(const NativeConstructionView &view){
+    std::vector<const NativeConstructionProject *> candidates;
+    for(const auto &project:view.projects)
+      if(project.start.enabled)candidates.push_back(&project);
+    return candidates;
+  }
+  [[nodiscard]] bool construction_project_active(
+      const NativeConstructionView &view){
+    for(const auto &project:view.projects)
+      if(project.active)return true;
+    return false;
+  }
+  void cycle_construction_candidate(){
+    const auto view=construction_controller_.build(
+        session_->frame(),session_->cache().generation);
+    if(construction_project_active(view)){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "Complete the current construction project before selecting "
+          "another.");
+      return;
+    }
+    const auto candidates=construction_candidates(view);
+    if(candidates.empty()){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No construction choices are currently available. Research may be "
+          "required.");
+      return;
+    }
+    construction_candidate_index_=
+        (construction_candidate_index_+1)%
+        static_cast<int>(candidates.size());
+    session_->publish_status("Construction candidate: "+
+        candidates[construction_candidate_index_]->name);
+  }
+  void start_construction_candidate(){
+    const auto view=construction_controller_.build(
+        session_->frame(),session_->cache().generation);
+    if(construction_project_active(view)){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No available construction project selected.");
+      return;
+    }
+    const auto candidates=construction_candidates(view);
+    if(candidates.empty()){
+      construction_candidate_index_=0;
+      session_->publish_status(
+          "No available construction project selected.");
+      return;
+    }
+    construction_candidate_index_=std::clamp(construction_candidate_index_,0,
+        static_cast<int>(candidates.size())-1);
+    const auto *candidate=candidates[construction_candidate_index_];
+    const auto outcome=construction_controller_.start(
+        session_->frame(),session_->cache().generation,
+        view.construction_revision,candidate->id);
+    session_->publish_status(outcome.message);
+    if(outcome.accepted){
+      publish_notification("Construction",outcome.message);
+      construction_candidate_index_=0;
+    }
+    if(construction_workspace_.visible())refresh_construction(true);
+  }
+
+  void dispatch_galaxy_action(std::string_view action,int width,int height){
+    auto &clock=session_->frame().clock();
+    if(action=="toggle_pause"){
+      if(clock.speed()==StrategicSpeed::Paused)clock.resume();
+      else clock.set_speed(StrategicSpeed::Paused);
+    }
+    else if(action=="speed_normal")clock.set_speed(StrategicSpeed::Normal);
+    else if(action=="speed_fast")clock.set_speed(StrategicSpeed::Fast);
+    else if(action=="speed_very_fast")clock.set_speed(StrategicSpeed::VeryFast);
+    else if(action=="speed_maximum")clock.set_speed(StrategicSpeed::Maximum);
+    // Reference UiResumeAtSpeed: the Demo rate is Developer-only; Player mode
+    // coerces the request to Normal.
+    else if(action=="speed_demo")clock.set_speed(developer_session()?StrategicSpeed::Demo:StrategicSpeed::Normal);
+    else if(action=="cycle_research")cycle_research_candidate();
+    else if(action=="start_research")start_research_candidate();
+    else if(action=="cycle_construction")cycle_construction_candidate();
+    else if(action=="start_construction")start_construction_candidate();
+    else if(action=="new_campaign"){(void)session_->request_new_campaign();}
+    else if(action=="quicksave")session_->request_save();
+    (void)width;(void)height;
   }
 
   [[nodiscard]] bool developer_session(){return session_->frame().runtime().world().campaign().developer_provenance.has_value();}
@@ -2066,6 +2389,22 @@ class NativeCampaign final {
     session_->frame().clock().set_speed(StrategicSpeed::Normal);
   }
 
+  [[nodiscard]] bool send_key(std::uint32_t key,int width,int height){
+    InputSnapshot input;
+    input.drawable_width=width;
+    input.drawable_height=height;
+    InputEvent event{};
+    event.type=InputEventType::KeyPressed;
+    event.key=key;
+    input.events.push_back(event);
+    event.type=InputEventType::KeyReleased;
+    input.events.push_back(event);
+    return update(input,width,height,0.,false);
+  }
+  [[nodiscard]] bool shortcut_status_reported()const noexcept{
+    return session_->notice().kind==SessionNoticeKind::Status&&
+           !session_->notice().message.empty();
+  }
   void prepare_research_smoke(int width,int height,bool execute_action){
     const auto click=[&](Point point){
       InputSnapshot input;
@@ -2096,6 +2435,12 @@ class NativeCampaign final {
       if(session_->frame().clock().speed()==StrategicSpeed::Paused)
         click({refreshed_layout.pause.x+refreshed_layout.pause.width*.5f,
                refreshed_layout.pause.y+refreshed_layout.pause.height*.5f});
+      // T/R keyboard parity evidence: candidate cycling and the one-key start
+      // must both surface a status notice. Only exercised on the mutating
+      // launch so the paused-reload payload comparison stays clean.
+      smoke_shortcut_=send_key('t',width,height)&&
+                      send_key('r',width,height)&&
+                      shortcut_status_reported();
     }
     smoke_research_node_=research_workspace_.selected_id();
   }
@@ -2387,7 +2732,15 @@ class NativeCampaign final {
       }
       if(!target)throw std::runtime_error(
           "Fleet smoke found no visible authoritative route target.");
-      click(target_point,InputEventType::RightPressed);
+      // Hover parity: UiFleetDestinationPreview shows the route on pointer
+      // motion alone, without arming CONFIRM.
+      {
+        InputSnapshot hover;hover.drawable_width=width;hover.drawable_height=height;
+        hover.pointer=target_point;
+        hover.events={{InputEventType::PointerMove,target_point,{}}};
+        if(!update(hover,width,height,0.,false))
+          throw std::runtime_error("Fleet smoke hover closed the campaign.");
+      }
       if(!fleet_workspace_.preview()||
          !fleet_workspace_.preview()->command_available||
          fleet_workspace_.preview()->target_system_id!=target)
@@ -2979,6 +3332,11 @@ class NativeCampaign final {
       smoke_construction_paused_for_quote_=
           session_->frame().clock().speed()==StrategicSpeed::Paused;
     }
+    // C/B keyboard parity evidence: the active-project and no-candidate
+    // guards keep these presses status-only on both smoke launches.
+    smoke_shortcut_=send_key('c',width,height)&&
+                    send_key('b',width,height)&&
+                    shortcut_status_reported();
   }
   void prepare_fresh_progression_smoke(int width, int height, bool reload,
                                        const std::function<void()> &pump) {
@@ -4924,6 +5282,10 @@ class NativeCampaign final {
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused||session_->frame().clock().resume_speed()!=StrategicSpeed::Maximum)throw std::runtime_error("Campaign profile did not select 8X through UI input.");
   }
   [[nodiscard]] bool smoke_save_succeeded()const{return session_->notice().kind==SessionNoticeKind::Saved;}
+  [[nodiscard]] bool shortcut_smoke_succeeded()const noexcept{return smoke_shortcut_;}
+  // Mid-session setup cancellation hands the (already saved) session back so
+  // the campaign can resume, matching the reference mode-select cancel.
+  [[nodiscard]] std::unique_ptr<NativeCampaignSession> release_session(){return std::move(session_);}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
   [[nodiscard]] std::string player_species_id()const{
     const auto &world=session_->frame().runtime().world().campaign();
@@ -5111,6 +5473,7 @@ class NativeCampaign final {
       if(research_workspace_.visible())refresh_research(true);
       if(shipyard_workspace_.visible())refresh_shipyard(true);
       if(construction_workspace_.visible())refresh_construction(true);
+      install_replay_observer();
     }
     session_->frame().clock().set_maximum_multiplier(4.);
     if(session_->exit_ready())return false;
@@ -5210,6 +5573,33 @@ class NativeCampaign final {
       }
     };
     if(!input.focused||!input.renderable())menu_hover_feedback_.reset();
+    // Replay: feed recorded keypresses whose ticks have arrived through the
+    // same GALAXY context and dispatch path as live input. The same input
+    // gates apply — a suppressed tick replays when the gate opens.
+    if(replay_&&replay_->recording&&session_&&!menu_&&
+       !diplomacy_workspace_.visible()&&!wants_text_input()){
+      const auto tick=replay_tick();
+      const auto &commands=replay_->recording->commands();
+      while(replay_->command_cursor<commands.size()&&
+            commands[replay_->command_cursor].tick<=tick){
+        const auto &command=commands[replay_->command_cursor++];
+        if(command.name!="key_press")continue;
+        int code=0;
+        const auto parsed=std::from_chars(command.payload.data(),
+            command.payload.data()+command.payload.size(),code);
+        if(parsed.ec!=std::errc{})continue;
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        raw.code=static_cast<std::uint32_t>(code);
+        (void)input_mapper_.feed(raw);
+        const auto action=first_galaxy_action_pressed();
+        if(!action.empty())dispatch_galaxy_action(action,width,height);
+        // Replayed presses are edge-triggered: release immediately so the next
+        // recorded press of the same key fires like real input does.
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        (void)input_mapper_.feed(raw);
+      }
+    }
     for(const auto &event:input.events){
       if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){
         focus_stellar_activity(width,height);gesture_.capture_for_ui();continue;
@@ -5354,32 +5744,6 @@ class NativeCampaign final {
           const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
         }gesture_.capture_for_ui();continue;
       }
-      if(event.type==InputEventType::KeyPressed&&input.focused&&input.renderable()&&
-         !menu_&&!diplomacy_workspace_.visible()&&
-         !colony_workspace_.planetary_modal()&&
-         !settlement_workspace_.visible()&&!wants_text_input()&&
-         !shipyard_workspace_.confirmation_open()&&
-         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
-        auto& clock=session_->frame().clock();
-        bool handled=true;
-        switch(event.key){
-        case ' ':
-          if(clock.speed()==StrategicSpeed::Paused)clock.resume();
-          else clock.set_speed(StrategicSpeed::Paused);
-          break;
-        case '1':clock.set_speed(StrategicSpeed::Normal);break;
-        case '2':clock.set_speed(StrategicSpeed::Fast);break;
-        case '3':clock.set_speed(StrategicSpeed::VeryFast);break;
-        case '4':clock.set_speed(StrategicSpeed::Maximum);break;
-        case 0x4000003fu:session_->request_save();break; // SDLK_F6
-        default:handled=false;break;
-        }
-        if(handled){
-          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
-          if(audio_confirm_)audio_confirm_();
-          continue;
-        }
-      }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
           (colony_workspace_.planetary_modal()),
@@ -5492,6 +5856,7 @@ class NativeCampaign final {
           continue;
         }
       }
+
       if(event.type==InputEventType::EscapePressed){
         if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
@@ -5502,6 +5867,44 @@ class NativeCampaign final {
         else toggle_menu();
         gesture_.cancel();
         continue;
+      }
+      // Key releases always reach the input mapper so held state clears even
+      // when a menu or workspace suppressed the matching press.
+      if(event.type==InputEventType::KeyReleased){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        raw.code=event.key;
+        (void)input_mapper_.feed(raw);
+        continue;
+      }
+      // Reference keyboard shortcuts (Main.cs): resolved through the GALAXY
+      // input context. Suppressed while the menu, surface view, or diplomacy
+      // blocks gameplay input, or a text field owns the keyboard.
+      if(event.type==InputEventType::KeyPressed&&input.focused&&input.renderable()&&
+         !menu_&&!diplomacy_workspace_.visible()&&
+         !colony_workspace_.planetary_modal()&&
+         !settlement_workspace_.visible()&&!wants_text_input()&&
+         !shipyard_workspace_.confirmation_open()&&
+         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        raw.code=event.key;
+        bool handled=input_mapper_.feed(raw);
+        if(handled){
+          const auto action=first_galaxy_action_pressed();
+          if(action.empty())handled=false;
+          else{
+            if(replay_&&replay_->recorder)
+              replay_->recorder->record(replay_tick(),"key_press",
+                                        std::to_string(event.key));
+            dispatch_galaxy_action(action,width,height);
+          }
+        }
+        if(handled){
+          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
+          if(audio_confirm_)audio_confirm_();
+          continue;
+        }
       }
       if(event.type==InputEventType::PointerCancelled){
         gesture_.cancel();
@@ -5574,7 +5977,9 @@ class NativeCampaign final {
                               :std::nullopt;
         const auto fleet_command=fleet_workspace_.handle(
             event,width,height,markers,target);
-        handle_fleet_command(fleet_command);
+        if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)
+          open_overview_colony(fleet_command.colony_id,width,height);
+        else handle_fleet_command(fleet_command);
         if(fleet_command.captured){
           if(event.type==InputEventType::LeftPressed)gesture_.begin(true);
           else if(event.type==InputEventType::LeftReleased)gesture_.cancel();
@@ -5628,6 +6033,8 @@ class NativeCampaign final {
       refresh_diplomacy(false);
       colony_refresh_elapsed_+=elapsed;
       refresh_colony(false);
+      if(replay_&&!replay_->divergence.empty())
+        throw std::runtime_error("Replay divergence: "+replay_->divergence);
       system_refresh_elapsed_+=elapsed;
       refresh_system(false);
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
@@ -5954,7 +6361,7 @@ class NativeCampaign final {
     }
     }
     if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!system_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible())
-      fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_);
+      fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_,&overview_portrait_provider_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
     if(!menu_&&!system_workspace_.visible()&&!settings_visible()){
@@ -6734,6 +7141,23 @@ class NativeCampaign final {
     return result;
   }
 
+  // Reference UiOpenOwnedColony(colonyId, land:false): enter the owning
+  // system's orbital view already focused on the colony world.
+  void open_overview_colony(int colony_id,int width,int height){
+    const auto &campaign=session_->frame().runtime().world().campaign();
+    const auto colony=std::ranges::find(campaign.colonies,colony_id,
+                                        &Colony::id);
+    if(colony==campaign.colonies.end()||!colony->planetary_body_id)return;
+    notification_view_.close();
+    if(!enter_system(colony->system_id,width,height)||
+       !system_workspace_.select_body(*colony->planetary_body_id)){
+      session_->publish_status(
+          "The colony world is not available in the current orbital survey.");
+      return;
+    }
+    refresh_colony_entry(true);
+  }
+
   void refresh_fleets(bool force){
     if(!force&&fleet_refresh_elapsed_<.1)return;
     auto view=fleet_controller_.build(session_->frame(),
@@ -6755,8 +7179,49 @@ class NativeCampaign final {
     }
     fleet_marker_offsets_=deterministic_fleet_marker_offsets(view.own_fleets);
     fleet_workspace_.set_view(std::move(view));
+    fleet_workspace_.set_overview(native_overview::build_empire_overview(
+        session_->frame().runtime().world().campaign(),selected_id_));
     if(force||assets_refresh_elapsed_>=.25)refresh_assets();
     fleet_refresh_elapsed_=0.;
+  }
+
+  // Reference UiFleetDestinationPreview: while an owned fleet is selected,
+  // hovering a star continuously previews its route in the detail panel. The
+  // hover preview is display-only — command_available stays false so CONFIRM
+  // is never armed, and an armed right-click preview takes precedence.
+  void update_fleet_hover_preview(Point pointer,int width,int height){
+    // An armed right-click preview owns the panel; hover must not touch it.
+    if(pending_fleet_preview_){
+      hover_preview_target_.reset();hover_preview_shown_=false;return;
+    }
+    const bool blocked=menu_||
+        colony_workspace_.visible()||research_workspace_.visible()||
+        shipyard_workspace_.visible()||construction_workspace_.visible()||
+        diplomacy_workspace_.visible()||notification_view_.visible()||
+        gesture_.captured_by_ui()||gesture_.allows_world_drag()||
+        !fleet_workspace_.selected_fleet_id();
+    const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
+    if(target==hover_preview_target_){
+      // refresh_fleets drops preview_ when the selection or order revision
+      // changes; recompute instead of staying dark on the same target.
+      if(target&&hover_preview_shown_&&!fleet_workspace_.preview())
+        hover_preview_shown_=false;
+      else return;
+    }
+    hover_preview_target_=target;
+    if(!target||FleetWorkspaceLayout::for_viewport(width,height)
+                  .panel.contains(pointer)){
+      if(hover_preview_shown_){fleet_workspace_.clear_preview();hover_preview_shown_=false;}
+      return;
+    }
+    auto preview=fleet_controller_.preview_selected_route(
+        session_->frame(),session_->cache().generation,*target);
+    preview.message=observer_safe_fleet_message(preview.message,
+                                                observed_system_names());
+    preview.command_available=false;
+    fleet_workspace_.set_preview(std::move(preview),
+                                 system_display_name(*target));
+    hover_preview_shown_=true;
   }
 
   void handle_fleet_command(const FleetWorkspaceCommand &command){
@@ -6843,8 +7308,10 @@ class NativeCampaign final {
                                   outcome.accepted);
       last_fleet_command_accepted_=outcome.accepted;
       refresh_fleets(true);
+      return;
     }
   }
+
 
   [[nodiscard]] Camera galaxy_overview_camera(int width,int height)const{
     const auto scale=NativeUiLayout::for_viewport(width,height).scale;
@@ -7170,6 +7637,7 @@ class NativeCampaign final {
   [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){selected_id_=system_hit(pointer,width,height);pinned_phenomenon_=selected_id_?std::nullopt:std::optional{camera_.unproject(pointer,width,height)};refresh_inspection();}
   std::unique_ptr<NativeCampaignSession> session_;
+  Window *window_{};
   Camera camera_;
   int galaxy_view_width_{},galaxy_view_height_{};
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
@@ -7238,6 +7706,17 @@ class NativeCampaign final {
   std::string smoke_diplomacy_unknown_,smoke_diplomacy_status_;
   std::string smoke_diplomacy_other_;
   int smoke_diplomacy_target_{-1};
+  std::unordered_map<std::string,std::shared_ptr<const RgbaImage>>
+      overview_portraits_;
+  stellar::native_overview::OverviewImageProvider overview_portrait_provider_ =
+      [this](std::string_view relative){
+        auto [entry,inserted]=overview_portraits_.try_emplace(std::string(relative));
+        if(inserted){
+          try{entry->second=decode_rgba_image(asset_root_/entry->first);}
+          catch(...){entry->second.reset();}
+        }
+        return entry->second;
+      };
   NativeDiplomacyWorkspace::PortraitProvider diplomacy_portrait_provider_ =
       [this](std::string_view relative){
         static constexpr std::array<std::string_view,4> approved{
@@ -7294,6 +7773,8 @@ class NativeCampaign final {
   NativeSystemWorkspace system_workspace_;
   std::vector<FleetMarkerOffset> fleet_marker_offsets_;
   std::optional<NativeFleetRoutePreview> pending_fleet_preview_;
+  std::optional<int> hover_preview_target_;
+  bool hover_preview_shown_{};
   std::optional<ResearchStamp> projected_research_stamp_;
   double research_refresh_elapsed_{};
   double fleet_refresh_elapsed_{};
@@ -7353,6 +7834,26 @@ class NativeCampaign final {
   std::size_t smoke_ship_art_decoded_{};
   std::size_t smoke_ship_art_cached_{};
   std::size_t smoke_ship_art_bytes_{};
+  bool last_diplomacy_command_accepted_{};
+  std::size_t smoke_battle_formations_{},smoke_battle_own_{},
+      smoke_battle_foreign_{},smoke_battle_redacted_{},
+      smoke_battle_vessels_hidden_{},smoke_battle_own_inexact_{},
+      smoke_battle_selected_{},smoke_battle_events_{},smoke_battle_salvos_{};
+  int smoke_battle_tokens_{};
+  std::int64_t smoke_battle_tick_{};
+  std::size_t smoke_diplomacy_contacts_{},smoke_diplomacy_identified_{},
+      smoke_diplomacy_unidentified_{},smoke_diplomacy_redacted_{},
+      smoke_diplomacy_channels_{},smoke_diplomacy_agreements_{},
+      smoke_diplomacy_history_{},smoke_diplomacy_proposals_{},
+      smoke_diplomacy_pending_after_{},smoke_diplomacy_incoming_{};
+  int smoke_diplomacy_selected_civ_{-1},smoke_diplomacy_last_system_{-1};
+  std::int64_t smoke_diplomacy_proposal_id_{-1};
+  bool smoke_diplomacy_portrait_{};
+  bool smoke_notification_panel_{},
+      smoke_logistics_delivered_{},smoke_logistics_shortfall_{};
+  int smoke_notification_items_{},smoke_notification_unread_{},
+      smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
+      smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_civilian_recovery_{};
   bool smoke_fleet_located_{};
@@ -7389,6 +7890,10 @@ class NativeCampaign final {
   stellar::native_notifications::NativeNotificationView notification_view_;
   stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
   double notification_refresh_elapsed_{};
+  stellar::engine::InputMapper input_mapper_;
+  int research_candidate_index_{};
+  int construction_candidate_index_{};
+  ReplayState *replay_{};
   stellar::native_audio::NativeAudioDirector* presentation_audio_{};
   stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;
   std::chrono::steady_clock::time_point last_event_sound_{};
@@ -7398,7 +7903,7 @@ class NativeCampaign final {
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
-  bool menu_{};bool smoke_save_pending_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
   GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};
@@ -7523,8 +8028,30 @@ int main(int argc,char **argv){
       config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.caption=[&](DrawList& draw,int w,int h){stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);});};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
-    StartupEntryEvidence startup_evidence;
-    std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot;
+    StartupEntryEvidence startup_evidence,restart_evidence;
+    std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot,restart_save_path;
+    bool new_game_restart{};
+    ReplayState replay;
+    if(!options.record_path.empty())
+      replay.recorder.emplace(stellar::engine::ReplayHeader{
+          static_cast<std::uint64_t>(options.seed),STELLAR_GAME_VERSION,
+          STELLAR_GAME_VERSION});
+    if(!options.replay_path.empty()){
+      std::ifstream replay_file(options.replay_path,std::ios::binary);
+      if(!replay_file)throw std::invalid_argument("Replay file cannot be opened.");
+      std::ostringstream contents;contents<<replay_file.rdbuf();
+      std::string parse_error;
+      auto parsed=stellar::engine::ReplayRecorder::parse(contents.str(),&parse_error);
+      if(!parsed)throw std::invalid_argument("Replay file is not a valid recording: "+parse_error);
+      replay.recording=std::move(parsed);
+    }
+    // Fixed-step: record/replay share one deterministic advance quantum so
+    // command ticks and checkpoint days reproduce exactly.
+    constexpr double kReplayStepSeconds=1./60.;
+    const bool fixed_step=!options.record_path.empty()||!options.replay_path.empty();
+    const ReplayFileFlush replay_flush{&replay,options.record_path};
+    if(options.new_game_restart_smoke&&!std::filesystem::is_regular_file(options.save_path))
+      throw std::invalid_argument("--new-game-restart-smoke requires a preexisting save-path anchor.");
     if(options.new_game_smoke){
       if(!std::filesystem::is_regular_file(options.save_path))throw std::invalid_argument("--new-game-smoke requires a preexisting save-path anchor.");
       setup_screenshot=sidecar_path(*options.smoke_screenshot,L"-setup");
@@ -7573,6 +8100,7 @@ int main(int argc,char **argv){
     while(session){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
+    campaign.attach_replay(&replay);
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';
     if(options.smoke_screenshot){
@@ -7669,7 +8197,7 @@ int main(int argc,char **argv){
     const auto voice_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
     const int campaign_active_first=120;
     const int campaign_active_last=119+options.profile_frames.value_or(0);
-    bool campaign_started{},campaign_pause_requested{},campaign_final_requested{},campaign_mid_requested{},campaign_mid_saved{},campaign_advanced_after_mid{};int campaign_wait_frames{};
+    bool campaign_started{},campaign_pause_requested{},campaign_final_requested{},campaign_mid_requested{},campaign_mid_saved{},campaign_advanced_after_mid{};int campaign_wait_frames{};bool new_game{};
     double campaign_before_days{},campaign_after_days{},campaign_mid_save_day{},campaign_mid_save_completed_day{},campaign_frozen_days{};
     while(true){
       const auto now=std::chrono::steady_clock::now();
@@ -7725,11 +8253,12 @@ int main(int argc,char **argv){
       if(!input.renderable()){
         discard_elapsed=true;
         if(!campaign.update(input,input.drawable_width,input.drawable_height,0.,false))break;
+        if(campaign.new_game_ready()){new_game=true;break;}
         window.set_text_input(campaign.wants_text_input());
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         continue;
       }
-      const auto elapsed=discard_elapsed?0.:measured_elapsed;
+      const auto elapsed=discard_elapsed?0.:(fixed_step?kReplayStepSeconds:measured_elapsed);
       const bool valid_interval=!discard_elapsed;
       if(options.campaign_profile&&(frames==119||(campaign_pause_requested&&!campaign_final_requested))){
         const auto bounds=NativeUiLayout::for_viewport(input.drawable_width,input.drawable_height).pause;const auto point=center(bounds);input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};
@@ -8035,6 +8564,16 @@ int main(int argc,char **argv){
                  <<" frame_mean_ms="<<total/static_cast<double>(frame_ms.size())
                  <<" frame_p95_ms="<<p95<<" image_uploads="<<window.image_upload_count()<<" save=ok screenshot="
                  <<utf8_path(*options.smoke_screenshot)<<" territory="<<campaign.territory_smoke_status();
+        if(replay.recorder)
+          std::cout<<" replay={\"commands\":"<<replay.recorder->commands().size()
+                   <<",\"checkpoints\":"<<replay.recorder->checkpoints().size()
+                   <<",\"file\":"<<json_string(utf8_path(options.record_path))<<"}";
+        if(replay.recording)
+          std::cout<<" replay={\"verified_checkpoints\":"
+                   <<replay.verified_checkpoints<<",\"of\":"
+                   <<replay.recording->checkpoints().size()
+                   <<",\"commands_consumed\":"<<replay.command_cursor
+                   <<",\"diverged\":false}";
         const auto print_phase=[&](const char* name,std::vector<double>&samples){
           if(samples.empty())throw std::runtime_error("Native smoke has no frame phase samples.");
           std::ranges::sort(samples);
@@ -8057,7 +8596,8 @@ int main(int argc,char **argv){
         if(options.shipyard_smoke)
           std::cout<<" shipyard="<<campaign.shipyard_smoke_status();
         if(options.construction_smoke)
-          std::cout<<" construction="<<campaign.construction_smoke_status();
+          std::cout<<" construction="<<campaign.construction_smoke_status()
+                   <<" shortcut="<<(campaign.shortcut_smoke_succeeded()?1:0);
         if(options.system_smoke)
           std::cout<<" system="<<campaign.system_smoke_status();
         if(options.system_travel_smoke||options.system_travel_reload_smoke)
@@ -8084,6 +8624,21 @@ int main(int argc,char **argv){
             <<",\"loading_screenshot\":"<<json_string(utf8_path(*loading_screenshot))<<",\"statuses\":[";
           for(std::size_t i=0;i<startup_evidence.displayed_statuses.size();++i){if(i)std::cout<<',';std::cout<<json_string(startup_evidence.displayed_statuses[i]);}
           std::cout<<"]}";
+        }
+        if(options.new_game_restart_smoke){
+          std::cout<<" new_game_restart={\"saved_previous\":true,\"restarted\":"<<(new_game_restart?"true":"false")
+            <<",\"entry_opened\":"<<(restart_evidence.entry_opened?"true":"false")
+            <<",\"setup_opened\":"<<(restart_evidence.setup_opened?"true":"false")
+            <<",\"species_selected\":"<<(restart_evidence.species_selected?"true":"false")
+            <<",\"size_selected\":"<<(restart_evidence.size_selected?"true":"false")
+            <<",\"seed_entered\":"<<(restart_evidence.seed_entered?"true":"false")
+            <<",\"create_requested\":"<<(restart_evidence.create_requested?"true":"false")
+            <<",\"activated\":true,\"system_count\":"<<campaign.system_count()
+            <<",\"species_id\":"<<json_string(campaign.player_species_id())
+            <<",\"seed\":"<<json_string(std::to_string(options.seed+1))
+            <<",\"generated_save_path\":"<<json_string(utf8_path(restart_save_path.value_or({})))
+            <<",\"previous_save_path\":"<<json_string(utf8_path(options.save_path))
+            <<",\"unique_slot\":"<<((restart_save_path&&*restart_save_path!=options.save_path)?"true":"false")<<"}";
         }
         std::cout<<'\n';
         break;

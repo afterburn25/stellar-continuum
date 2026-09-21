@@ -1,6 +1,7 @@
 #include "native_campaign_calendar.hpp"
 #include "native_fleet_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include "native_menu_style.hpp"
 
 #include <algorithm>
@@ -193,12 +194,16 @@ std::optional<UiRect> NativeFleetWorkspace::panel_bounds(int width, int height) 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
   const auto generation_changed =
       view_ && view_->campaign_generation != view.campaign_generation;
+  const auto selection_changed =
+      !view_ || view_->selected_fleet_id != view.selected_fleet_id;
   if (generation_changed) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
     list_scroll_ = 0.f;
   }
+  if (generation_changed || selection_changed)
+    return_needs_confirmation_ = false;
   const auto selected_changed = [&] {
     if (!view_ || view_->selected_fleet_id != view.selected_fleet_id ||
         view_->player_civilization_id != view.player_civilization_id)
@@ -236,6 +241,7 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
 void NativeFleetWorkspace::discard_campaign() {
   cancel_recovery();
   view_.reset();
+  overview_.reset();
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
@@ -424,6 +430,20 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
                   view_->own_fleets[index].id};
       }
     }
+    // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
+    if (overview_ && !selected_fleet_id()) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      const auto overview_layout =
+          native_overview::overview_layout_for(*overview_, content);
+      for (std::size_t index = 0;
+           index < overview_layout.colony_rows.size(); ++index)
+        if (overview_layout.colony_rows[index].contains(event.position))
+          return {FleetWorkspaceCommandKind::OpenColony, true, 0, 0, {},
+                  overview_->colonies[index].colony_id};
+    }
     return {FleetWorkspaceCommandKind::None, true};
   }
   std::vector<int> hits;
@@ -438,9 +458,11 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   return {};
 }
 
-void NativeFleetWorkspace::render(DrawList &out, int width, int height,
-                                  std::span<const FleetScreenMarker> markers,
-                                  stellar::native_ship_ui::NativeShipArtAssets *ship_art) const {
+void NativeFleetWorkspace::render(
+    DrawList &out, int width, int height,
+    std::span<const FleetScreenMarker> markers,
+    stellar::native_ship_ui::NativeShipArtAssets *ship_art,
+    const stellar::native_overview::OverviewImageProvider *portraits) const {
   last_ship_art_rows_ = 0;
   auto layout = this->layout(width, height);
   if(!view_||view_->own_fleets.empty()){
@@ -493,6 +515,8 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
       fill(out, *clipped,
            selected ? selected_color
                     : clipped->contains(pointer_) ? hover_color : row_color);
+      if (selected)
+        fill(out, {clipped->x, clipped->y, 3.f, clipped->height}, own_color);
       float text_left = row.x + 8.f * layout.scale;
       float text_width = row.width - 16.f * layout.scale;
       if (ship_art) {
@@ -538,9 +562,22 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
          label,bright,layout.small_font_pixels,FontFace::Interface,TextAlign::Center);
   };
   if (!fleet) {
-    text(out, layout.details,
-         view_->developer_inspection ? "Select any fleet on the map or in the outliner." : "Select an owned fleet on the map or in the outliner.", muted,
-         layout.body_font_pixels);
+    // Reference EmpireOverviewPanel empire mode: the selected-system home
+    // reference plus the own-colony quick list fill the detail area.
+    if (overview_) {
+      const UiRect content{layout.details.x, layout.details.y,
+                           layout.details.width,
+                           layout.route.y + layout.route.height -
+                               layout.details.y};
+      native_overview::render_empire_overview(
+          out, *overview_,
+          native_overview::overview_layout_for(*overview_, content),
+          pointer_, portraits);
+    } else {
+      text(out, layout.details,
+           view_->developer_inspection ? "Select any fleet on the map or in the outliner." : "Select an owned fleet on the map or in the outliner.", muted,
+           layout.body_font_pixels);
+    }
   } else if (pending_return_) {
     // Use the entire details region: never truncate the paid-mission warning.
     const UiRect warning_bounds{layout.details.x, layout.details.y,
@@ -651,8 +688,18 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
     } else {
       route = fleet->foreign_inspection ? "LIVE INSPECTION\nFleet is stationed locally.\nSelect LOCATE to view its position." : "ROUTE PREVIEW\nRight-click a system to preview travel.";
     }
-    text(out, layout.route, std::move(route), bright,
-         layout.small_font_pixels);
+    text(out, {layout.route.x + 10.f * layout.scale,
+               layout.route.y + 8.f * layout.scale,
+               layout.route.width - 20.f * layout.scale,
+               layout.route.height - 16.f * layout.scale},
+         std::move(route), bright, layout.small_font_pixels);
+    if (fleet->destination_system_id)
+      native_ui::progress(
+          out,
+          {layout.route.x + 10.f * layout.scale,
+           layout.route.y + layout.route.height - 10.f * layout.scale,
+           layout.route.width - 20.f * layout.scale, 5.f * layout.scale},
+          fleet->transit_progress, native_ui::Tone::Selected);
   }
 
   const auto* selected=selected_fleet();
@@ -716,6 +763,22 @@ void NativeFleetWorkspace::render(DrawList &out, int width, int height,
   } else if (engage) {
     action_button(layout.engage,"ENGAGE HOSTILES");
   }
+  if (view_)
+    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
+      const auto &candidate = view_->own_fleets[index];
+      const UiRect row{layout.list.x,
+                       layout.list.y + list_scroll_ +
+                           static_cast<float>(index) * 45.f * layout.scale,
+                       layout.list.width, 41.f * layout.scale};
+      if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
+      native_ui::tooltip(
+          out, {layout.panel.x - 330.f * layout.scale, row.y}, candidate.name,
+          role_name(candidate.role) + " · " +
+              transit_name(candidate.transit_phase) +
+              ". Select for readiness, range, fuel and orders.",
+          width, height, layout.scale, native_ui::Tone::Military);
+      break;
+    }
 }
 
 const std::optional<NativeFleetMapView> &NativeFleetWorkspace::view() const noexcept {

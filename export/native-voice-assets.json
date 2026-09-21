@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "events": {
+      "source": "data/voice_profiles/events.json",
+      "runtimePath": "Data/voice_profiles/events.json",
+      "sha256": "585c6301f7e545d99736b81240c85de9bf7adeb4992b900ac4e22c2af2403a76"
+    },
+    "human": {
+      "source": "data/voice_profiles/human.json",
+      "runtimePath": "Data/voice_profiles/human.json",
+      "sha256": "18ba3128faefd773d6d3ec3fe52523c018cfb8cdaa37cd3b7025b46f70a19d8b"
+    },
+    "roles": {
+      "source": "data/voice_profiles/roles.json",
+      "runtimePath": "Data/voice_profiles/roles.json",
+      "sha256": "4b32f544bd5330d427c8b0beeaa90a63303eed5103d3bd23be8b18bf73174b63"
+    }
+  }
+}
