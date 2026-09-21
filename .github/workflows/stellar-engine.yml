@@ -125,7 +125,7 @@ jobs:
           # Build the complete graphical preview configuration rather than a
           # hand-picked target list, so CI covers the actual shipping client.
           stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4'],
-                      env=env, timeout=2400)
+                      env=env, timeout=3600)
           # Run the full suite, excluding only the documented baseline failures
           # recorded in docs/validation/2026-09-20-development-sync.json (SYNC items).
           baseline_failures = (
