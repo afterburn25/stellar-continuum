@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch the LFS artwork the validators hash and measure
+        run: git lfs pull --include="assets/visual/space/campaign-galaxy-four-arm-v1.png"
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
