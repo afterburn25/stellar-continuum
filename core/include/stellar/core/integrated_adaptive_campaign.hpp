@@ -87,8 +87,9 @@ public:
   combat_intelligence() const noexcept;
   [[nodiscard]] StellarActivityScheduler& stellar_activity() noexcept;
   [[nodiscard]] double stellar_activity_day() const noexcept;
-  // One unscaled frame interval, independent of strategic substeps/speed.
-  [[nodiscard]] std::vector<TravelingCmeLaunch> advance_stellar_activity(double real_seconds);
+  // Simulated hours elapsed; the serialized activity clock and generated
+  // events are authoritative, so the interval must track simulated time.
+  [[nodiscard]] std::vector<TravelingCmeLaunch> advance_stellar_activity(double simulation_hours);
   [[nodiscard]] CampaignRuntimeContinuation continuation() const;
   void restore_continuation(const CampaignRuntimeContinuation &, double simulation_days);
   void set_profiling_enabled(bool) noexcept;

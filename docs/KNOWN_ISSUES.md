@@ -28,7 +28,7 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Description:** rebuilt tests report differences across save/load, including
   added `PlanetAppearance` records. Native progression/research and recovery
   contracts are among affected consumers; see the exact failed-test receipt.
-- **Reproduction:** `ctest --preset windows-native-preview -R "(player_campaign|native_fresh_progression|native_research_controller|developer_qa_host)" --output-on-failure`.
+- **Reproduction:** `ctest --preset windows-native-preview -R "(player_campaign|native_fresh_progression|native_research_controller)" --output-on-failure`.
 - **Suspected cause:** current appearance/migration enrichment is applied during
   load to state or fixtures lacking that enrichment. Idempotence, schema boundary
   and intended semantic changes must be checked; not yet root-caused completely.
@@ -239,12 +239,17 @@ all save/fixture differences harmless without inspecting their semantics.**
   continuation diverged.` The diff includes stellar activity events. This is
   distinct from the generic appearance enrichment failures.
 - **Reproduction:** `ctest --preset windows-native-preview -R "^developer_qa_host$" --output-on-failure`.
-- **Suspected cause:** accelerated or resumed activity-clock ownership/state;
-  inspect the checkpoint diff before claiming deterministic equivalence.
-- **Relevant files:** `app/developer_qa_host.cpp`, Core developer campaign,
-  campaign frame, stellar activity and Developer persistence.
-- **Workaround:** none for replay certification; keep checkpoints and diagnostics.
-- **Status:** OPEN, reproduced after the full build.
+- **Cause:** `CampaignFrame::advance` fed `advance_stellar_activity` the
+  unscaled real frame interval, so the authoritative `StellarActivityDay`
+  clock, CME counters and scheduled events advanced per wall-clock second —
+  accelerated runs progressed activity ~1/speed as far per simulated day as
+  resumed speed-1 runs, diverging the final checkpoint.
+- **Fix:** both strategic frame paths now advance stellar activity by the
+  simulated days the frame actually consumed (`simulation_days` delta x 24
+  hours), making the activity clock deterministic across speed and
+  checkpoint continuation. `developer_qa_host` passes locally and was
+  removed from the hosted CI exclusion lists.
+- **Status:** FIXED.
 
 ## Build defects corrected during synchronization
 

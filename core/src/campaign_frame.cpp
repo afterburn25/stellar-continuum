@@ -199,8 +199,6 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     return result; // Completion consumes this frame.
   }
   result.route = CampaignFrameRoute::Strategic;
-  const double activity_seconds=!s.menu_open&&s.clock.speed()!=StrategicSpeed::Paused&&
-      std::isfinite(real_delta_seconds)?std::max(0.,real_delta_seconds):0.;
   const auto start = s.clock.simulation_days();
   if(world.developer_provenance&&world.developer_provenance->simulation.fixed_ticks){
     if(!std::isfinite(real_delta_seconds)||real_delta_seconds<0||real_delta_seconds>=
@@ -231,7 +229,8 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     }
     saved.completed_ticks=snapshot.tick;saved.backlog_nanoseconds=snapshot.backlog.count();
     if(!count)s.clock.record_fixed_advance(0,0,static_cast<double>(snapshot.backlog.count())/1e9*s.clock.days_per_second());
-    result.stellar_weather_launches=s.runtime->advance_stellar_activity(activity_seconds);
+    result.stellar_weather_launches=s.runtime->advance_stellar_activity(
+        std::max(0.,s.clock.simulation_days()-start)*24.);
     result.ready_for_save_capture=true;return result;
   }
   result.completed_substeps = s.policy == CampaignFramePolicy::Developer
@@ -243,7 +242,8 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     result.completed_end_days.push_back(end_day);
     result.strategic_results.push_back(s.runtime->advance(step, end_day));
   }
-  result.stellar_weather_launches=s.runtime->advance_stellar_activity(activity_seconds);
+  result.stellar_weather_launches=s.runtime->advance_stellar_activity(
+      std::max(0.,s.clock.simulation_days()-start)*24.);
   result.ready_for_save_capture = true;
   return result;
 }

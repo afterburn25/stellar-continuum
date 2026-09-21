@@ -100,10 +100,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
 
 StellarActivityScheduler& IntegratedAdaptiveCampaignRuntime::stellar_activity() noexcept {return storage_->stellar_activity;}
 double IntegratedAdaptiveCampaignRuntime::stellar_activity_day() const noexcept {return storage_->world.campaign().stellar_activity_day.value_or(0.);}
-std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stellar_activity(double seconds){
-  if(!std::isfinite(seconds)||seconds<0)throw std::invalid_argument("Invalid stellar activity frame time");
-  if(seconds==0)return {};
-  const double day=stellar_activity_day()+seconds/24.;
+std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stellar_activity(double simulation_hours){
+  if(!std::isfinite(simulation_hours)||simulation_hours<0)throw std::invalid_argument("Invalid stellar activity frame time");
+  if(simulation_hours==0)return {};
+  const double day=stellar_activity_day()+simulation_hours/24.;
   validate_stellar_activity_clock(day);
   auto launches=storage_->stellar_activity.advance(storage_->world.campaign().systems,day);
   storage_->world.campaign().stellar_activity_day=day;
