@@ -399,6 +399,32 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   appearance path (no stellar class eligibility without a star); systems with
   stellar objects are unaffected.
 
+## Combined-scenario benchmark instrumentation (2026-09-21)
+
+- **Purpose/modules:** `app/adaptive_campaign_host.cpp` — the
+  `--simulate-adaptive-campaign` benchmark measures combined late-game
+  workload: `--autosave-every N` runs the real Player17
+  capture/encode/atomic-write inside the running campaign every N ticks, and
+  `--stress-fleets N` injects N active military fleets per spacefaring
+  civilization (half in interstellar transit toward Sol, exercising movement
+  and sensor/contact phases). The campaign seeds via
+  `seed_persistable_fresh_campaign` so the world carries the authoritative
+  galactic core and metadata the real save path requires.
+- **Interfaces/consumers:** CLI flags on the headless executable; the JSON
+  report gains `autosaveIntervalTicks/Count/MeanMs/P95Ms/PeakMs/Bytes`,
+  `stressFleetsPerCivilization`, `finalStateCounts.fleets` and per-phase
+  `phaseTimings` from the existing `CampaignPerformanceSample` counters.
+- **Save/determinism/performance:** autosaves write to a benchmark temp file
+  and are deleted afterwards; capture does not mutate campaign state, so
+  repeat determinism checks still hold. Phase profiling is the existing
+  counter path (~sub-microsecond per phase per tick).
+- **Tests/verification:** measured scenario in
+  `docs/PERFORMANCE_AUDIT_20260920.md` (2500 systems, 1,000 fleets, 4,000
+  ticks, 8 autosaves).
+- **Limits/reuse:** stress fleets are uniform military squadrons for load
+  measurement, not gameplay content; organic combat engagement is not
+  forced.
+
 ## Volumetric eruptions, shared visual spin and navigation (2026-09-19)
 
 - **Purpose/modules:** `SurfaceEffect3D`, closed `surface_emission_volume` proxies,

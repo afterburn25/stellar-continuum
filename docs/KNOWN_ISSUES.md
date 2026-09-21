@@ -237,9 +237,19 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Suspected cause:** workload interactions and unmeasured bottlenecks.
 - **Relevant files:** campaign frame/runtime, persistence, massive combat,
   image/GPU caches; [performance audit](PERFORMANCE_AUDIT_20260920.md).
-- **Workaround:** bounded caches/phase timings and scoped indexes already exist;
-  do not promise they remove all late-game lag.
-- **Status:** OPEN measurement/optimization work.
+- **Resolution:** a reproducible combined scenario now exists and was
+  measured: `--simulate-adaptive-campaign --systems 2500 --ticks 4000
+  --step-days 0.25 --autosave-every 500 --stress-fleets 1000` (new
+  `--autosave-every`/`--stress-fleets` options plus per-phase profiling in
+  the benchmark report). At 1,000 active fleets over 1,000 simulated days:
+  step mean 2.36 ms, p95 3.18 ms, peak 8.85 ms; 66.7 MB Player17 autosaves
+  average 1,481 ms. Recorded numbers and remaining limits (no resolved
+  combat engagements, founding-level colony counts, uniform squadron
+  composition) are in the audit's combined-scenario section.
+- **Status:** MEASURED on `work/foundation-1-30-codex-integration` —
+  certification-grade evidence for the covered workload; organic
+  massive-combat engagement and heterogeneous fleet stress remain open
+  measurement limits rather than known defects.
 
 ## SYNC-010 — stellar engulfment invariant fails at 1,000 systems
 
