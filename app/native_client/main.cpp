@@ -1169,10 +1169,14 @@ class NativeCampaign final {
         click(find("●  Geographic provinces")); // Layer choice survives planet switching.
       capture_planet(label+L"-globe-front");
       const auto rendered=scene(width,height);
-      const auto canonical=planet_material_cache_.request(*colony_workspace_.view()->planet.appearance,1024);
+      // The globe binds the canonical material at its 2048 LOD; compare the
+      // submitted texture against that same cache entry. Albedo width is
+      // source-limited (resize_map never upscales), so assert it exceeds the
+      // 256 LOD tier rather than a fixed size.
+      const auto canonical=planet_material_cache_.request(*colony_workspace_.view()->planet.appearance,2048);
       bool authored=false;for(const auto& command:rendered.overlay)if(const auto* s=std::get_if<Scene3DView>(&command);s&&s->scene&&!s->scene->instances().empty())
         authored|=canonical&&s->scene->instances()[0].material.texture==canonical->albedo;
-      if(!authored||!canonical||canonical->albedo->width()!=1024)throw std::runtime_error("3D screen did not submit the supplied planet map.");
+      if(!authored||!canonical||!canonical->albedo||canonical->albedo->width()<256)throw std::runtime_error("3D screen did not submit the supplied planet map.");
       const auto area=stellar::native_colony_ui::PlanetaryLayout::make(width,height).globe;
       const auto center=colony_workspace_.planetary().globe().center(area);
       const auto start_rotation=colony_workspace_.planetary().globe().rotation();
@@ -1211,11 +1215,15 @@ class NativeCampaign final {
     if(inspected!=inspection_after)throw std::runtime_error("Small-body inspection modified campaign state.");
     // Replay both material families; only checking ice missed flat rocky overlays.
     const auto verify_belt_motion=[&](std::wstring prefix,bool icy){
-    const auto solid_scene=[&](){const auto rendered=scene(width,height);
-      for(const auto& command:rendered.world)if(const auto* view=std::get_if<Scene3DView>(&command);view&&view->scene&&!view->scene->instances().empty())return view->scene;
-      throw std::runtime_error("Motion replay lost its solid scene.");};
+    // Sky domes and planet globes submit their own Scene3DViews to the frame;
+    // inspect the exact scene the small-body renderer submitted.
+    const auto solid_scene=[&](){(void)scene(width,height);
+      auto submitted=system_workspace_.small_body_scene();
+      if(!submitted||submitted->instances().empty())throw std::runtime_error("Motion replay lost its solid scene.");
+      return submitted;};
     const auto motion_before=solid_scene();const auto day_before=session_->frame().clock().simulation_days();
-    if(icy&&std::ranges::none_of(motion_before->instances(),[](const auto& body){return body.material.dielectric.has_value();}))throw std::runtime_error("Icy solids did not use reflective/refractive materials.");
+    if(icy&&std::ranges::none_of(motion_before->instances(),[](const auto& body){return body.material.dielectric.has_value();}))
+      throw std::runtime_error("Icy solids did not use reflective/refractive materials.");
     const auto motion_field=system_workspace_.snapshot()->small_body_fields[icy?1:0];
     const auto reference=small_body_instance(motion_field,0);
     const auto orbit_before=stellar::engine::analytic_orbit_position(reference.orbit,day_before-motion_field.epoch_days);
@@ -1239,6 +1247,14 @@ class NativeCampaign final {
     session_->frame().set_developer_speed(previous_developer_speed);
     capture_planet(prefix+L"paused");
     };
+    // Ice belts legitimately contain rocky inclusions, so the largest focused
+    // body may be non-dielectric. Advance to an icy body so the optics check
+    // exercises reflective/refractive materials on an actual ice solid.
+    for(int i=0;;++i){
+      const auto focused=system_workspace_.focused_small_body();
+      if(focused&&focused->material>=stellar::core::SmallBodyMaterial::WaterIce)break;
+      if(i>=64)throw std::runtime_error("Ice field has no large icy body to focus.");
+      click(find("BELTS & DEBRIS"));click(find("Next large"));click(find("Focus body"));}
     verify_belt_motion(L"-belts-motion-",true);
     click(find("BELTS & DEBRIS"));click(find("Previous field"));click(find("Next large"));click(find("Focus body"));
     verify_belt_motion(L"-belts-rock-motion-",false);
@@ -1291,7 +1307,7 @@ class NativeCampaign final {
       system_workspace_.focus_selected_body(width,height);capture_planet(label+L"-system-close");
       open_colony_from_system(target.second);capture_planet(label+L"-globe");
       if(colony_workspace_.view()->planet.appearance!=appearance)throw std::runtime_error("System/planetary view changed canonical imported appearance.");
-      const auto pack=planet_material_cache_.request(*appearance,1024);bool submitted=false;
+      const auto pack=planet_material_cache_.request(*appearance,2048);bool submitted=false;
       for(const auto& command:scene(width,height).overlay)if(const auto* view=std::get_if<Scene3DView>(&command);view&&view->scene)
         for(const auto& mesh:view->scene->instances())submitted|=pack&&mesh.material.texture==pack->albedo;
       if(!submitted)throw std::runtime_error("Imported globe did not submit its canonical 3D material.");

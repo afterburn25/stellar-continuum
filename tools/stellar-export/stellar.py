@@ -43,7 +43,10 @@ from native_ship_art_runtime import validate_native_ship_art_export
 from native_diplomacy_runtime import validate_native_diplomacy_export
 
 ROOT = Path(__file__).resolve().parents[2]
-SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
+# cabinet.dll hosts the Windows Compression API (compressapi.h /
+# CreateCompressor) used by engine/src/asset_registry.cpp for packaged assets;
+# it ships with Windows 10/11, so it is a system dependency, not a redistributable.
+SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll", "cabinet.dll"}
 
 def run(args, *, env=None, cwd=ROOT, capture=False, timeout=300):
     command = [str(a) for a in args]

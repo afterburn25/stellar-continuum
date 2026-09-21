@@ -68,9 +68,17 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
 - `--record` + `--replay` on `--new-game-smoke`: checkpoint recorded and
   replayed — `verified_checkpoints:1`, `commands_consumed:0`,
   `diverged:false`.
-- `--developer-smoke` (developer-eligible): celestial index, empire monitor
-  and live reveal pass; stops at the documented SYNC-006 planet-map
-  assertion. Not a new regression.
+- `--developer-smoke` (developer-eligible): **passes end to end** after three
+  stale smoke assumptions were repaired (SYNC-006 resolved — see
+  KNOWN_ISSUES): canonical material LOD is 2048 with source-limited widths,
+  `solid_scene()` now reads `small_body_scene()` instead of grabbing the sky
+  dome's `Scene3DView`, and the icy dielectric check focuses an actual icy
+  body via `focused_small_body()`. All sections green: celestial index,
+  empire monitor, live reveal, alien colony/economy read-only inspection,
+  nine authored Sol bodies + rotating globes, binary/triple systems,
+  belt/debris solids, dielectric motion+pause, four spawn commands,
+  save/load round trip, imported planet materials/ring shadows/portraits,
+  eruption continuity, diagnostic bundles and the final capture.
 - `--new-game-restart-smoke`: `saved_previous:true`, `activated:true`.
 - `--navigation-smoke`: `keyboard_galaxy_playback:true`,
   `keyboard_system_playback:true`, `keyboard_save_requested:true`,
@@ -129,7 +137,13 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   `STELLAR_CTEST_EXCLUDE` (verified locally: 257→236 tests = exactly the
   documented 21) and `STELLAR_UNITTEST_EXCLUDE` (named test IDs via
   `filtered_test_runner.py`; currently unused — the SYNC-004 assertion was
-  repaired instead of excluded). Final hosted result pending.
+  repaired instead of excluded). Follow-on run `0ca613af`: headless build,
+  filtered CTest and all 22 Python test files passed; the packaged
+  dependency audit then flagged `Cabinet.dll` (Windows Compression API used
+  by `asset_registry.cpp`) — added to `SYSTEM_DLLS` as a system component.
+  Build/suite subprocess timeouts were also raised for shared-runner
+  variance (3600 s build, 900 s/1200 s suites). Final hosted result pending
+  on the next head.
 
 ## Boundaries
 

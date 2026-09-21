@@ -2328,6 +2328,11 @@ campaign, save-memory and physical-simulation limits remain unchanged. See
   schematic planet phases. No GPU instancing, n-body physics, rock collision
   or automatic fleet mining/logistics consumption. Compiled configuration requires
   rebuilding. Comets, satellites and fragment effects can reuse Engine primitives.
+  Read-only inspection: `NativeSmallBodyRenderer::last_scene()` exposes the exact
+  solids `Scene3D` submitted to the current frame (the frame also carries the
+  sky dome and planet globe views, so tests must not guess by list order), and
+  `NativeSystemWorkspace::focused_small_body()`/`small_body_scene()` forward the
+  focused seeded instance and submitted scene for validation tools.
   See [the complete implementation report](NATIVE_SMALL_BODY_FIELDS_REPORT.md).
 
 ## Directional solids, per-object lighting and system zoom

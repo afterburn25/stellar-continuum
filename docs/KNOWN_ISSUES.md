@@ -111,9 +111,27 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `app/native_client/main.cpp`, native planet globe/materials.
 - **Workaround:** inspect actual captured image/material identity before altering
   the assertion. Targeted `--eruption-smoke` covers only the zoom/flare path.
-- **Status:** OPEN. Reproduced on `work/foundation-1-30-codex-integration`
-  (2026-09-20): `--developer-smoke` passes celestial index, empire monitor and
-  live-reveal checks, then stops at the same planet-map assertion.
+- **Status:** RESOLVED on `work/foundation-1-30-codex-integration`
+  (2026-09-21). The full `--developer-smoke` now passes end to end. Three stale
+  smoke assumptions were repaired without weakening coverage:
+  (1) the authored-map and imported-globe checks compared against the 1024 LOD
+  while `native_planet_globe.hpp` binds canonical materials at 2048, and the
+  exact-width assertion ignored `resize_map`'s no-upscale contract (Mercury's
+  source is 1774 px wide) — the checks now compare texture identity at the
+  globe's real LOD and floor the albedo at the 256 tier;
+  (2) `verify_belt_motion` picked the first `Scene3DView` in the frame, which
+  is the full-screen sky dome — it now inspects the exact scene the small-body
+  renderer submitted via `NativeSmallBodyRenderer::last_scene()` /
+  `NativeSystemWorkspace::small_body_scene()`;
+  (3) the icy dielectric check assumed the ice belt's largest focused body is
+  icy — belts legitimately mix rocky inclusions, so the smoke now advances the
+  focus to an icy body (verified through the new
+  `NativeSystemWorkspace::focused_small_body()` accessor) before asserting
+  reflective/refractive materials. Subsequent checks then passed: rocky/icy
+  resume-orbit-tumble-pause, four spawn commands, small-body save/load round
+  trip, imported planet materials in both consumers, ring mutual shadows,
+  canonical portraits, eruption continuity and the final capture — with no
+  campaign mutation.
 
 ## SYNC-007 — CI still references the retired surface workspace
 
@@ -141,6 +159,15 @@ all save/fixture differences harmless without inspecting their semantics.**
   `filtered_test_runner.py`, used only for the SYNC-004 Sol-ordering test),
   both unset by default so local runs remain unfiltered. The `-E` exclusion
   list must be kept in sync with the receipt until the SYNC items are fixed.
+  Follow-on hosted run (2026-09-21): the headless build, excluded CTest suite
+  and all 22 Python test files passed; the export then failed the packaged
+  dependency audit with `Unpackaged runtime dependencies: Cabinet.dll`. The
+  merged `asset_registry.cpp` uses the Windows Compression API
+  (`compressapi.h`/`CreateCompressor`, XPRESS_HUFF) which lives in
+  `cabinet.dll` — an OS component since Windows 8 — so `SYSTEM_DLLS` now
+  includes `cabinet.dll` rather than weakening the audit. The headless build
+  and preview suite also needed their subprocess timeouts raised (3600 s
+  build, 900 s/1200 s suites) for shared-runner variance.
 
 ## SYNC-008 — stale runtime metadata label
 
