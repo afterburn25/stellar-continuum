@@ -289,7 +289,9 @@ def relocated_smoke(folder):
             raise RuntimeError("Relocated headless save/restore or worker determinism failed")
         catalog_path = root / "surface-support-catalog.json"
         galaxy=json.loads(run([exe,"--headless","--generate-galaxy","--seed-colonies","--systems","500","--catalog-output",catalog_path],cwd=root,env=env,capture=True,timeout=30))
-        if galaxy["systems"]!=500 or galaxy["solBodies"]!=10 or galaxy["planetaryBodies"]<=10:
+        # Sol carries 28 catalogued bodies (10 primaries plus grouped moons);
+        # native_moon_tests and the relocated JSON report pin the same count.
+        if galaxy["systems"]!=500 or galaxy["solBodies"]!=28 or galaxy["planetaryBodies"]<=10:
             raise RuntimeError("Relocated runtime catalog generation failed")
         if Path(galaxy["assetPath"]).resolve() != (copy/"Data/astronomy/hyg-nearby-500-v1.json").resolve():
             raise RuntimeError("Export used catalog outside its runtime directory")
