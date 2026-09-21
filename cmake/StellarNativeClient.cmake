@@ -66,17 +66,20 @@ if(BUILD_TESTING)
   target_include_directories(stellar_native_moon_tests PRIVATE app/native_client)
   target_link_libraries(stellar_native_moon_tests PRIVATE stellar_native_platform stellar_core stellar_json)
   add_test(NAME native_moons COMMAND stellar_native_moon_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/moon-test-captures")
-  set_tests_properties(native_moons PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
+  set_tests_properties(native_moons PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   add_executable(stellar_native_giant_visual_tests native-tests/native_giant_visual_tests.cpp app/native_client/native_system_view.cpp app/native_client/native_small_body_renderer.cpp)
   target_include_directories(stellar_native_giant_visual_tests PRIVATE app/native_client)
   target_link_libraries(stellar_native_giant_visual_tests PRIVATE stellar_native_platform stellar_core stellar_json)
   add_test(NAME native_giant_visual COMMAND stellar_native_giant_visual_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/giant-test-captures")
-  set_tests_properties(native_giant_visual PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE)
+  set_tests_properties(native_giant_visual PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   add_executable(stellar_scene3d_gpu_tests native-tests/native_scene3d_gpu_tests.cpp)
   target_link_libraries(stellar_scene3d_gpu_tests PRIVATE stellar_native_platform)
   add_test(NAME native_scene3d_gpu COMMAND stellar_scene3d_gpu_tests
     "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf" "${CMAKE_BINARY_DIR}/scene3d-test-captures")
-  set_tests_properties(native_scene3d_gpu PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+  set_tests_properties(native_scene3d_gpu PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   if(MSVC)
     target_compile_options(stellar_scene3d_gpu_tests PRIVATE /WX)
   endif()
@@ -97,7 +100,8 @@ if(BUILD_TESTING)
   target_link_libraries(stellar_native_text_measure_tests PRIVATE stellar_native_platform)
   add_test(NAME native_text_measure COMMAND stellar_native_text_measure_tests
     "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf")
-  set_tests_properties(native_text_measure PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+  set_tests_properties(native_text_measure PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   if(MSVC)
     target_compile_options(stellar_native_text_measure_tests PRIVATE /WX)
   endif()
@@ -117,7 +121,8 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf"
     "${CMAKE_SOURCE_DIR}/assets/visual/sol/earth.jpg"
     "${CMAKE_SOURCE_DIR}/assets/visual/space/campaign-galaxy-four-arm-v1.png")
-  set_tests_properties(native_client_platform PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+  set_tests_properties(native_client_platform PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
     add_executable(stellar_native_voice_tests
     native-tests/native_voice_tests.cpp
     app/native_client/native_voice.cpp
@@ -286,6 +291,8 @@ if(BUILD_TESTING)
  target_include_directories(stellar_native_navigation_visual_tests PRIVATE app/native_client)
  target_link_libraries(stellar_native_navigation_visual_tests PRIVATE stellar_core stellar_native_platform)
  add_test(NAME native_navigation_visual COMMAND stellar_native_navigation_visual_tests "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf" "${CMAKE_BINARY_DIR}/navigation-visual")
+ set_tests_properties(native_navigation_visual PROPERTIES
+   SKIP_REGULAR_EXPRESSION "GPU device creation failed")
 endif()
 
 add_custom_target(stellar_native_starfield_assets ALL
@@ -298,7 +305,8 @@ if(BUILD_TESTING)
  target_include_directories(stellar_system_background_tests PRIVATE app/native_client)
  target_link_libraries(stellar_system_background_tests PRIVATE stellar_native_platform stellar_core stellar_json)
  add_test(NAME system_background COMMAND stellar_system_background_tests "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/sky-test-captures")
- set_tests_properties(system_background PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE)
+ set_tests_properties(system_background PROPERTIES TIMEOUT 240 RUN_SERIAL TRUE
+   SKIP_REGULAR_EXPRESSION "GPU device creation failed")
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/NativeVoiceAssets.cmake")

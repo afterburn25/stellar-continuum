@@ -22,7 +22,8 @@ if(BUILD_TESTING)
   target_link_libraries(stellar_native_video_platform_tests PRIVATE stellar_native_platform SDL3::SDL3)
   add_test(NAME native_video_platform COMMAND stellar_native_video_platform_tests
     "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf")
-  set_tests_properties(native_video_platform PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+  set_tests_properties(native_video_platform PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+    SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   if(MSVC)
     target_compile_options(stellar_native_video_platform_tests PRIVATE /WX)
   endif()
