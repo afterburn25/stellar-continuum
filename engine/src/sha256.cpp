@@ -2,9 +2,12 @@
 
 #include <array>
 #include <bit>
+#include <cerrno>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 #include <fstream>
 #include <algorithm>
@@ -102,8 +105,15 @@ std::string digest_hex(std::span<const std::uint8_t> bytes) {
   return result;
 }
 std::string sha256_file(const std::filesystem::path& path) {
-  std::ifstream input(path,std::ios::binary);
-  if(!input) throw std::runtime_error("Cannot hash: "+path.string());
+  std::ifstream input;
+  // A file another process just published can be transiently locked by
+  // antivirus scans; errno distinguishes that (EACCES) from a missing file.
+  for(int attempt=0;;++attempt) {
+    errno=0;input.open(path,std::ios::binary);
+    if(input)break;
+    if(errno!=EACCES||attempt>=50)throw std::runtime_error("Cannot hash: "+path.string());
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
   std::array<std::uint8_t,65536> buffer{}; Sha256 digest;
   while(input) {
     input.read(reinterpret_cast<char*>(buffer.data()),buffer.size());
