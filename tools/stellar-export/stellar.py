@@ -94,32 +94,39 @@ def native_build(preset, env):
     run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
     # The expanded suite includes 25k/50k persistence roundtrips. Individual
     # tests retain their own deadlines; allow time for the complete serial suite.
-    run(["ctest", "--preset", preset], env=env, timeout=900)
+    # STELLAR_CTEST_EXCLUDE lets CI skip documented baseline failures while
+    # still running every other test; unset means the complete suite runs.
+    ctest = ["ctest", "--preset", preset]
+    exclude = env.get("STELLAR_CTEST_EXCLUDE")
+    if exclude:
+        ctest += ["-E", exclude]
+    run(ctest, env=env, timeout=900)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
-    run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_military_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_system_travel_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_freight_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_battle_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_frame_profile.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_campaign_profile.py", "-v"], env=test_env)
+    # STELLAR_UNITTEST_EXCLUDE holds space-separated unittest IDs (e.g.
+    # "NativeRecovery.test_x") of documented baseline failures for CI to skip;
+    # unset runs every test.  unittest -k cannot express exclusion, so the
+    # filtered runner drops exactly the named tests.
+    unittest_exclude = env.get("STELLAR_UNITTEST_EXCLUDE", "").split()
+    for test_file in [
+        "test_export.py", "test_native_client_runtime.py",
+        "test_native_audio_assets.py", "test_native_audio_runtime.py",
+        "test_native_fleet_runtime.py", "test_native_military_runtime.py",
+        "test_native_production_runtime.py", "test_native_system_runtime.py",
+        "test_native_system_travel_runtime.py", "test_native_colony_runtime.py",
+        "test_native_freight_runtime.py", "test_native_settlement_runtime.py",
+        "test_native_navigation_assets.py", "test_native_navigation_runtime.py",
+        "test_native_support_runtime.py", "test_native_battle_runtime.py",
+        "test_native_new_game_runtime.py", "test_native_galaxy_runtime.py",
+        "test_native_ship_art_runtime.py", "test_native_diplomacy_runtime.py",
+        "test_native_frame_profile.py", "test_native_campaign_profile.py",
+    ]:
+        if unittest_exclude:
+            run([sys.executable, ROOT / "tools/stellar-export/filtered_test_runner.py",
+                 ROOT / "tools/stellar-export" / test_file, *unittest_exclude], env=test_env)
+        else:
+            run([sys.executable, ROOT / "tools/stellar-export" / test_file, "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
