@@ -19,7 +19,8 @@ import shutil
 import subprocess
 import tempfile
 
-from native_diplomacy_runtime import _author_diplomacy_source, _source_row
+from native_diplomacy_runtime import author_diplomacy_fixture
+from native_fleet_runtime import _source_row
 
 
 def _diagnostic(stdout: str) -> dict:
@@ -76,7 +77,7 @@ def validate_native_notification_export(folder: Path, env: dict[str, str],
     systems = source.get("Galaxy", {}).get("Systems", [])
     if source.get("FormatVersion") != 17 or not systems:
         raise RuntimeError("Notification source row is not a Player17 campaign")
-    authored, counterpart = _author_diplomacy_source(source)
+    authored, _proposal_id, counterpart = author_diplomacy_fixture(source)
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean_env = dict(env, PATH=str(system_root / "System32") +
                      os.pathsep + str(system_root))

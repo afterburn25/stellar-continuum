@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import tempfile
 
-from native_diplomacy_runtime import _source_row
+from native_fleet_runtime import _source_row
 
 
 def _diagnostic(stdout: str) -> dict:
