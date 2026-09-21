@@ -2508,7 +2508,10 @@ class NativeCampaign final {
         throw std::runtime_error("Keyboard replay closed the campaign.");
     };
     const auto key=[&](std::uint32_t value){
+      // The input mapper treats a press without a matching release as "held",
+      // so replay realistic press+release pairs like physical input delivers.
       InputEvent event{InputEventType::KeyPressed};event.key=value;send(event);
+      InputEvent release{InputEventType::KeyReleased};release.key=value;send(release);
     };
     const auto playback=[&]{
       auto& clock=session_->frame().clock();
@@ -5419,6 +5422,11 @@ class NativeCampaign final {
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
+    input_mapper_.begin_frame();
+    // Keep the planet material queue draining even when no visible view is
+    // requesting materials (e.g. pause menu over the map); otherwise a pending
+    // decode stalls readiness until the next request.
+    planet_material_cache_.poll();
     if(video_settings_)video_settings_->service(input.focused,input.renderable());
     resize_galaxy_camera(width,height);
     assets_refresh_elapsed_+=std::max(0.,elapsed);
@@ -5744,6 +5752,44 @@ class NativeCampaign final {
           const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
         }gesture_.capture_for_ui();continue;
       }
+      // Key releases always reach the input mapper so held state clears even
+      // when a menu or workspace suppressed the matching press.
+      if(event.type==InputEventType::KeyReleased){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        raw.code=event.key;
+        (void)input_mapper_.feed(raw);
+        continue;
+      }
+      // Reference keyboard shortcuts (Main.cs): resolved through the GALAXY
+      // input context. Suppressed while the menu, surface view, or diplomacy
+      // blocks gameplay input, or a text field owns the keyboard.
+      if(event.type==InputEventType::KeyPressed&&input.focused&&input.renderable()&&
+         !menu_&&!diplomacy_workspace_.visible()&&
+         !colony_workspace_.planetary_modal()&&
+         !settlement_workspace_.visible()&&!wants_text_input()&&
+         !shipyard_workspace_.confirmation_open()&&
+         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        raw.code=event.key;
+        bool handled=input_mapper_.feed(raw);
+        if(handled){
+          const auto action=first_galaxy_action_pressed();
+          if(action.empty())handled=false;
+          else{
+            if(replay_&&replay_->recorder)
+              replay_->recorder->record(replay_tick(),"key_press",
+                                        std::to_string(event.key));
+            dispatch_galaxy_action(action,width,height);
+          }
+        }
+        if(handled){
+          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
+          if(audio_confirm_)audio_confirm_();
+          continue;
+        }
+      }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
           (colony_workspace_.planetary_modal()),
@@ -5867,44 +5913,6 @@ class NativeCampaign final {
         else toggle_menu();
         gesture_.cancel();
         continue;
-      }
-      // Key releases always reach the input mapper so held state clears even
-      // when a menu or workspace suppressed the matching press.
-      if(event.type==InputEventType::KeyReleased){
-        stellar::engine::RawInputEvent raw;
-        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
-        raw.code=event.key;
-        (void)input_mapper_.feed(raw);
-        continue;
-      }
-      // Reference keyboard shortcuts (Main.cs): resolved through the GALAXY
-      // input context. Suppressed while the menu, surface view, or diplomacy
-      // blocks gameplay input, or a text field owns the keyboard.
-      if(event.type==InputEventType::KeyPressed&&input.focused&&input.renderable()&&
-         !menu_&&!diplomacy_workspace_.visible()&&
-         !colony_workspace_.planetary_modal()&&
-         !settlement_workspace_.visible()&&!wants_text_input()&&
-         !shipyard_workspace_.confirmation_open()&&
-         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
-        stellar::engine::RawInputEvent raw;
-        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
-        raw.code=event.key;
-        bool handled=input_mapper_.feed(raw);
-        if(handled){
-          const auto action=first_galaxy_action_pressed();
-          if(action.empty())handled=false;
-          else{
-            if(replay_&&replay_->recorder)
-              replay_->recorder->record(replay_tick(),"key_press",
-                                        std::to_string(event.key));
-            dispatch_galaxy_action(action,width,height);
-          }
-        }
-        if(handled){
-          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
-          if(audio_confirm_)audio_confirm_();
-          continue;
-        }
       }
       if(event.type==InputEventType::PointerCancelled){
         gesture_.cancel();
