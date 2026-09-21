@@ -2426,6 +2426,10 @@ and packaging — and expansion work was kept only where additive.
   from a data-driven context, and `SDL_EVENT_KEY_UP` now emits
   `InputEventType::KeyReleased` (Escape/Backspace excluded) for correct
   pause/release behavior — verified by the galaxy-art smoke `paused:true`.
+  The mapper's `begin_frame()` is called once per `update()` and its feed
+  runs before workspace handlers so releases always clear held state;
+  `--navigation-smoke` verifies speed/pause/save shortcuts in both galaxy
+  and system views plus four blocked contexts.
 - **Developer tools host (req 30):** codex's developer panel/diagnostics/
   empire-monitor subsystem retained; the expansion's parallel development-menu
   machinery was omitted as superseded. `--developer-smoke` runs through the
