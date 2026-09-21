@@ -378,6 +378,27 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 - **Limits/reuse:** only the known v1 ordinal table is accepted. Unknown class IDs
   remain errors rather than being silently assigned a different world type.
 
+## Appearance completion for population-free generation (2026-09-21)
+
+- **Purpose/modules:** Core `planet_appearance.cpp`'s
+  `generate_planet_appearances` previously skipped bodies whose system had no
+  stellar object (population-free generation), leaving the first save capture
+  appearance-less. Restore then synthesized appearances, breaking save/load
+  idempotence for those campaigns.
+- **Interfaces/consumers:** starless-system bodies now receive
+  `planet_appearance_for_existing` during generation, so every generated body
+  carries appearance before the first capture. Player campaign save/load and
+  all galaxy-payload consumers see idempotent round trips.
+- **Save/determinism/performance:** deterministic (`visual_seed` derives from
+  the campaign seed and body id); no schema change — saved payloads simply
+  contain appearance records that restore already produced anyway.
+- **Tests:** `native_research_controller` cancelled-research full-save round
+  trip, `native_fresh_progression`, and the galaxy/player persistence parity
+  suites.
+- **Limits/reuse:** starless bodies use the preserve-existing-environment
+  appearance path (no stellar class eligibility without a star); systems with
+  stellar objects are unaffected.
+
 ## Volumetric eruptions, shared visual spin and navigation (2026-09-19)
 
 - **Purpose/modules:** `SurfaceEffect3D`, closed `surface_emission_volume` proxies,

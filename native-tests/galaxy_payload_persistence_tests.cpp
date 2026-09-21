@@ -2,6 +2,8 @@
 #include <stellar/core/galaxy_payload_persistence.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include "galaxy_payload_test_helpers.hpp"
 
@@ -16,7 +18,9 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace {
 using Json = nlohmann::json;
@@ -494,13 +498,30 @@ void check_payload(const GalaxyPayloadV16Dto &actual, const Json &expected,
             !galaxy.at("PlanetaryBodies").is_null(),
         label + ": body presence");
   if (actual.planetary_bodies.bodies_present) {
-    check(actual.planetary_bodies.bodies.size() ==
-              galaxy.at("PlanetaryBodies").size(),
+    // Frozen oracles predate the canonical Sol expansion: a payload recaptured
+    // from a restored world carries the reviewed Pluto/moon additions. Filter
+    // exactly those entries; anything else still fails element-for-element.
+    std::unordered_set<int> expected_body_ids;
+    for (const auto &body : galaxy.at("PlanetaryBodies"))
+      expected_body_ids.insert(body.at("Id").get<int>());
+    std::vector<const PlanetaryBodyPersistenceDto *> oracle_bodies;
+    oracle_bodies.reserve(actual.planetary_bodies.bodies.size());
+    for (const auto &item : actual.planetary_bodies.bodies) {
+      if (item) {
+        const auto *moon = sol_moon_definition(item->id);
+        const bool canonical_addition =
+            item->system_id == sol_system_id &&
+            ((moon && item->id != moon_body_id) || item->id == pluto_body_id) &&
+            !expected_body_ids.contains(item->id);
+        if (canonical_addition) continue;
+      }
+      oracle_bodies.push_back(item ? &*item : nullptr);
+    }
+    check(oracle_bodies.size() == galaxy.at("PlanetaryBodies").size(),
           label + ": body size");
-    for (std::size_t index = 0;
-         index < actual.planetary_bodies.bodies.size(); ++index) {
-      const auto &item = actual.planetary_bodies.bodies[index];
-      check(item.has_value() == !galaxy.at("PlanetaryBodies")[index].is_null(),
+    for (std::size_t index = 0; index < oracle_bodies.size(); ++index) {
+      const auto *item = oracle_bodies[index];
+      check((item != nullptr) == !galaxy.at("PlanetaryBodies")[index].is_null(),
             label + ": body item presence");
       if (item) {
         const auto normalized =
@@ -617,7 +638,23 @@ void check_raw_world(const FreshCampaignState &actual, const Json &envelope,
             gate087_foundation::system_dto(expected.at("Systems")[i])),
         label, "system");
 
-  const auto bodies = capture_planetary_bodies(actual.bodies, actual.systems);
+  // Frozen oracles predate the canonical Sol expansion: restore now performs
+  // upgrade_saved_sol_catalog (Pluto + major moons). Filter exactly the
+  // reviewed additions absent from the oracle; anything else still fails.
+  std::unordered_set<int> expected_body_ids;
+  for (const auto &body : expected.at("PlanetaryBodies"))
+    expected_body_ids.insert(body.at("Id").get<int>());
+  std::vector<PlanetaryBody> oracle_bodies;
+  oracle_bodies.reserve(actual.bodies.size());
+  for (const auto &body : actual.bodies) {
+    const auto *moon = sol_moon_definition(body.id);
+    const bool canonical_addition =
+        body.system_id == sol_system_id &&
+        ((moon && body.id != moon_body_id) || body.id == pluto_body_id) &&
+        !expected_body_ids.contains(body.id);
+    if (!canonical_addition) oracle_bodies.push_back(body);
+  }
+  const auto bodies = capture_planetary_bodies(oracle_bodies, actual.systems);
   check(bodies.bodies.size() == expected.at("PlanetaryBodies").size(),
         label + ": bodies size");
   for (std::size_t i = 0; i < bodies.bodies.size(); ++i)

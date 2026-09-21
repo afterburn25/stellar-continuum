@@ -91,7 +91,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
              diplomacy_runtime.create_combat_command_runtime()) {
     diplomacy_runtime.reset(current_day, true);
     auto& activity_day=world.campaign().stellar_activity_day;
-    if(!activity_day)activity_day=current_day;
+    // Legacy saves without a clock start activity at the saved epoch; clamp
+    // pathological epochs to the clock domain instead of rejecting the load.
+    if(!activity_day)
+      activity_day=std::isfinite(current_day)?std::clamp(current_day,0.,1e12):1e12;
     validate_stellar_activity_clock(activity_day);
     initialize_stellar_activity(world.campaign().seed,world.campaign().systems,*activity_day);
     stellar_activity.rebuild(world.campaign().systems);

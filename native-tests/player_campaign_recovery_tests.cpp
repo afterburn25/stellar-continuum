@@ -1,4 +1,6 @@
 #include <stellar/core/player_campaign_recovery.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
@@ -14,6 +16,7 @@
 #include <stdexcept>
 #include <span>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 using Json = nlohmann::json;
@@ -171,7 +174,7 @@ void success_case(const Json &fixture, std::string_view name, Setup setup,
           std::string(name) + ": restored metadata differs");
   auto active = std::move(loaded.campaign).activate();
   const auto recaptured = capture_player_campaign_v17(active, {day, version, saved});
-  const auto actual_state = Json::parse(encode_player_campaign_v17_json(recaptured));
+  auto actual_state = Json::parse(encode_player_campaign_v17_json(recaptured));
   auto expected_state = parse_player_json(read(
       evidence / (loaded.origin == PlayerCampaignLoadOrigin::Primary
                       ? "primary.json" : "backup.json")));
@@ -192,6 +195,42 @@ void success_case(const Json &fixture, std::string_view name, Setup setup,
   require(actual_state["SavedAtUtc"] == "2030-01-02T03:04:05+00:00",
           std::string(name) + ": saved timestamp instant differs");
   expected_state["SavedAtUtc"] = "2030-01-02T03:04:05+00:00";
+  // The frozen evidence predates native migrations: the stellar activity clock
+  // initializes at the saved epoch, absent appearances are derived, and the
+  // canonical Sol roster is appended. Verify each, then compare the rest.
+  auto &actual_galaxy = actual_state["Galaxy"];
+  auto &expected_galaxy = expected_state["Galaxy"];
+  if (!expected_galaxy.contains("StellarActivityDay")) {
+    require(actual_galaxy.at("StellarActivityDay").get<double>() == day,
+            std::string(name) + ": activity clock did not initialize at the saved epoch");
+    actual_galaxy.erase("StellarActivityDay");
+  }
+  auto &actual_bodies = actual_galaxy["PlanetaryBodies"];
+  const auto &expected_bodies = expected_galaxy.at("PlanetaryBodies");
+  std::unordered_set<int> canonical_sol_additions;
+  for (const auto &moon : sol_moon_definitions())
+    canonical_sol_additions.insert(moon.id);
+  canonical_sol_additions.insert(pluto_body_id);
+  std::unordered_set<int> expected_body_ids;
+  for (const auto &body : expected_bodies)
+    expected_body_ids.insert(body.at("Id").get<int>());
+  Json migrated_bodies = Json::array();
+  for (const auto &body : actual_bodies) {
+    const bool canonical_addition =
+        body.at("SystemId").get<int>() == sol_system_id &&
+        canonical_sol_additions.contains(body.at("Id").get<int>()) &&
+        !expected_body_ids.contains(body.at("Id").get<int>());
+    if (!canonical_addition) migrated_bodies.push_back(body);
+  }
+  actual_bodies = std::move(migrated_bodies);
+  require(actual_bodies.size() == expected_bodies.size(),
+          std::string(name) + ": migrated body count changed");
+  for (std::size_t i = 0; i < expected_bodies.size(); ++i)
+    if (!expected_bodies[i].contains("PlanetAppearance")) {
+      require(actual_bodies[i].contains("PlanetAppearance"),
+              std::string(name) + ": missing appearance migration");
+      actual_bodies[i].erase("PlanetAppearance");
+    }
   if (!same(actual_state, expected_state)) {
     const auto differences = Json::diff(expected_state, actual_state);
     throw std::runtime_error(std::string(name) + ": full owned state differs at " +

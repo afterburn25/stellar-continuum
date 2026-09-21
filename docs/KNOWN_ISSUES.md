@@ -30,14 +30,33 @@ all save/fixture differences harmless without inspecting their semantics.**
   contracts are among affected consumers; see the exact failed-test receipt.
 - **Reproduction:** `ctest --preset windows-native-preview -R "(player_campaign|native_fresh_progression|native_research_controller)" --output-on-failure`.
 - **Suspected cause:** current appearance/migration enrichment is applied during
-  load to state or fixtures lacking that enrichment. Idempotence, schema boundary
-  and intended semantic changes must be checked; not yet root-caused completely.
+  load to state or fixtures lacking that enrichment — confirmed; see resolution.
 - **Relevant files:** `core/src/player_campaign_json.cpp`,
   `core/src/player_campaign_persistence.cpp`, `core/src/planet_appearance.cpp`,
   `core/src/planetary_catalog.cpp`, corresponding persistence/native tests.
 - **Workaround:** preserve original saves and test copies. Do not certify a release
   solely from a successful graphical launch.
-- **Status:** OPEN; no gameplay or migration change made during documentation task.
+- **Resolution:** three intentional migrations account for the reported
+  differences — `PlanetAppearance` enrichment of appearance-less legacy bodies,
+  the canonical Sol catalog expansion (Pluto + 18 major moons via
+  `upgrade_saved_sol_catalog`), and the serialized `StellarActivityDay` clock.
+  Parity harnesses were updated to tolerate exactly those additions, identified
+  by authoritative canonical-moon IDs (`sol_moon_definition`) and expected-body
+  membership rather than blanket field removal; all other state is still
+  compared exactly. One genuine defect remained behind the noise:
+  `generate_planet_appearances` skipped bodies whose system had no stellar
+  object (population-free generation), so a fresh capture could save
+  appearance-less bodies that restore then synthesized — a non-idempotent
+  round trip. Generation now assigns `planet_appearance_for_existing` to those
+  bodies up front, so the first capture is already complete.
+- **Status:** FIXED on `work/foundation-1-30-codex-integration`. Verified:
+  `player_campaign_json_parity`, `player_campaign_persistence_parity`,
+  `player_campaign_recovery_parity`, `galaxy_payload_persistence_parity`,
+  `galaxy_payload_json_parity`, `legacy_galaxy_payload_persistence_parity`,
+  `fresh_campaign_parity`, `persistable_fresh_campaign_parity`,
+  `civilization_parity`, `sol_catalog`, `galaxy_catalog_parity`,
+  `native_research_controller` and `native_fresh_progression` all pass locally;
+  they were removed from the hosted CI exclusion lists.
 
 ## SYNC-003 — Python packaging fixture omissions
 

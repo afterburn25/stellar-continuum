@@ -1,10 +1,12 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 #include <nlohmann/json.hpp>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <unordered_set>
 using namespace stellar::core;
 using Json=nlohmann::json;
 namespace {
@@ -117,17 +119,49 @@ int main(int argc,char** argv) {
             }
             check(populations==target_stellar_class_counts(count),"Generated class totals violate target");
             const auto sol=create_sol_catalog(systems[0]);
-            for(std::size_t i=0;i<sol.size();++i) body_equal(sol[i],fixture.at("Sol").at(i));
-            const std::vector<PlanetaryBody> legacy(sol.begin(),sol.end()-1);
+            const auto& sol_fixture=fixture.at("Sol");
+            for(std::size_t i=0;i<sol_fixture.size();++i) body_equal(sol[i],sol_fixture.at(i));
+            // The oracle predates the major-moon roster; the appended moons are
+            // checked against the reviewed SolMoonDefinition table (and covered
+            // in depth by the native_moons test).
+            check(sol.size()==sol_fixture.size()+sol_moon_definitions().size()-1,
+                "Sol catalog size diverged from the reviewed moon roster");
+            for(std::size_t i=sol_fixture.size();i<sol.size();++i){
+                const auto* definition=sol_moon_definition(sol[i].id);
+                check(definition&&sol[i].system_id==sol_system_id&&sol[i].name==definition->name&&
+                    sol[i].kind==PlanetaryBodyKind::Moon&&sol[i].parent_body_id==definition->parent,
+                    "Appended Sol moon diverged from the reviewed table");
+            }
+            std::vector<PlanetaryBody> legacy;
+            for(const auto& b:sol)if(b.id<pluto_body_id)legacy.push_back(b);
             const auto upgraded=upgrade_saved_sol_catalog(legacy,systems);
-            for(std::size_t i=0;i<upgraded.size();++i) body_equal(upgraded[i],fixture.at("UpgradedSol").at(i));
+            const auto& upgraded_fixture=fixture.at("UpgradedSol");
+            for(std::size_t i=0;i<upgraded_fixture.size();++i) body_equal(upgraded[i],upgraded_fixture.at(i));
+            check(upgraded.size()==upgraded_fixture.size()+sol_moon_definitions().size()-1,
+                "Upgraded Sol catalog size diverged from the reviewed moon roster");
+            for(std::size_t i=upgraded_fixture.size();i<upgraded.size();++i){
+                const auto* definition=sol_moon_definition(upgraded[i].id);
+                check(definition&&upgraded[i].system_id==sol_system_id&&upgraded[i].name==definition->name&&
+                    upgraded[i].kind==PlanetaryBodyKind::Moon&&upgraded[i].parent_body_id==definition->parent,
+                    "Upgraded Sol moon diverged from the reviewed table");
+            }
         }
         bool rejected=false; try { (void)generate_stellar_catalog(0,100,catalog); } catch(const std::invalid_argument&) {rejected=true;}
         check(rejected,"Unsupported full-galaxy count was accepted");
         std::size_t body_count=0;
         for(const auto& scenario:fixture.at("PlanetCases")) {
             std::vector<StellarSystem> inputs; for(const auto& j:scenario.at("Systems")) inputs.push_back(read_system(j));
-            const auto bodies=generate_planetary_catalog(scenario.at("Seed"),inputs);
+            const auto generated=generate_planetary_catalog(scenario.at("Seed"),inputs);
+            // The oracle predates the canonical Sol expansion; filter exactly
+            // the reviewed moon additions so every other body still aligns.
+            std::unordered_set<int> expected_ids;
+            for(const auto& j:scenario.at("Bodies"))expected_ids.insert(j.at(0).get<int>());
+            std::vector<PlanetaryBody> bodies;
+            for(const auto& b:generated){
+                const auto* moon=sol_moon_definition(b.id);
+                if(b.system_id==sol_system_id&&moon&&b.id!=moon_body_id&&!expected_ids.contains(b.id))continue;
+                bodies.push_back(b);
+            }
             const auto expected_count=scenario.at("Bodies").size();
             for(std::size_t i=0;i<std::min(bodies.size(),expected_count);++i) {
                 try { body_equal(bodies[i],expand_body(scenario.at("Bodies").at(i))); }
