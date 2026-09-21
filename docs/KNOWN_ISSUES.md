@@ -68,7 +68,11 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `test_galaxy_asset_import.py`, `test_export.py`,
   `export/galaxy-asset-edits.json`, `data/stellar/galaxy-visuals-v1.json`.
 - **Workaround:** none for a clean test gate.
-- **Status:** OPEN; both reproduced in this audit.
+- **Status:** OPEN. On `integration/foundation-1-30-into-codex` the edit-map
+  key mismatch is fixed (`galaxy-asset-edits.json` now escapes non-ASCII keys
+  so cp1252 checkouts match the manifest's `\u2014` entries); the test then
+  correctly reports the still-absent `assets/source/galaxies-16x9/*.png`
+  review masters. The Sol-ordering assertion is unchanged.
 
 ## SYNC-005 — missing-file error contract in research tests
 
@@ -96,7 +100,9 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Relevant files:** `app/native_client/main.cpp`, native planet globe/materials.
 - **Workaround:** inspect actual captured image/material identity before altering
   the assertion. Targeted `--eruption-smoke` covers only the zoom/flare path.
-- **Status:** OPEN from the prior investigation; broad smoke not rerun in this audit.
+- **Status:** OPEN. Reproduced on `integration/foundation-1-30-into-codex`
+  (2026-09-20): `--developer-smoke` passes celestial index, empire monitor and
+  live-reveal checks, then stops at the same planet-map assertion.
 
 ## SYNC-007 — CI still references the retired surface workspace
 
@@ -111,8 +117,13 @@ all save/fixture differences harmless without inspecting their semantics.**
   `cmake/StellarNativeClient.cmake`, `tools/stellar-export/stellar.py`.
 - **Workaround:** use the current local build/CTest commands and manual GPU cook
   workflow; do not claim this is equivalent to green hosted CI.
-- **Status:** OPEN. LFS checkout was enabled, but obsolete targets/trigger policy
-  were not silently redesigned during the handoff task.
+- **Status:** RESOLVED on `integration/foundation-1-30-into-codex`
+  (2026-09-20). The workflow now triggers for `cpp/**` and `integration/**`
+  pushes and `cpp/**` pull requests, builds the full `windows-native-preview`
+  preset (no retired explicit target list), and runs the entire CTest suite
+  with only the 21 receipt-documented baseline failures excluded. Hosted CI
+  has not yet run the updated workflow; the `-E` exclusion list must be kept
+  in sync with the receipt until the SYNC items are fixed.
 
 ## SYNC-008 — stale runtime metadata label
 
@@ -180,6 +191,26 @@ all save/fixture differences harmless without inspecting their semantics.**
   changing shader contents or compiled SPIR-V; seven existing PNGs were also
   normalized to LFS pointers. The isolated checkout then configured successfully.
 - These fixes permit the all-target build; they do not resolve the failures above.
+
+## Build defects corrected during the foundation-expansion merge
+
+- **SYNC-R04 / resolved:** merge conflict resolution dropped the
+  `scene_target=next;` assignment in `native_map_platform.cpp`, so the
+  supersampled render target was never bound (`native_video_platform`
+  regression). Assignment restored.
+- **SYNC-R05 / resolved:** history-slot recoveries
+  (`PlayerCampaignLoadOrigin::History`) were not reported as recovered by the
+  session layer. Startup and async loads now publish the recovered notice for
+  every non-primary origin (`native_campaign_session` regression).
+- **SYNC-R06 / resolved:** the planet-disc test fixture root was pointed at
+  `assets/visual` while per-world art lives under `assets/visual/sol`.
+- **SYNC-R07 / resolved:** packaging scripts (`build-cooked-game.ps1`,
+  `build-release-installer.ps1`, `build-update-installer.ps1`) required
+  PowerShell 7 (`Path.GetRelativePath`, `Convert.ToHexString`,
+  `SHA256::HashData`, `utf8NoBOM`, `Measure-Object` on hashtable keys) and
+  emitted `CR CR LF` into `.cmd` files on `core.autocrlf` checkouts. They now
+  run on Windows PowerShell 5.1 with identical output bytes; full release and
+  changed-files update were built and validated with them.
 
 Additional failed assertions in the machine-readable receipt remain open under
 their subsystem owners even if not individually root-caused here. The installed

@@ -18,6 +18,13 @@ old research/editor branch. The default branch does not represent this native
 working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
 [`export/runtime-config.json`](../export/runtime-config.json).
 
+> **`integration/foundation-1-30-into-codex`** merges the
+> `engine/foundation-expansion-1-30` engine work (save history, replay,
+> input mapping, localization, developer tools, engine libraries) onto this
+> line without replacing its renderer/artwork/installer systems. Evidence:
+> [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
+> It awaits PR integration into `cpp/codex-native-architecture-integration`.
+
 ## Read in this order
 
 1. [Project state](PROJECT_STATE.md) and [verification receipt](validation/2026-09-20-development-sync.md).

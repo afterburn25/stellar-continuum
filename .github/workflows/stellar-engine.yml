@@ -1,9 +1,9 @@
 name: Stellar Engine native foundation
 on:
   push:
-    branches: ["engine/**"]
+    branches: ["engine/**", "cpp/**", "integration/**"]
   pull_request:
-    branches: [integration, main, "engine/stellar-engine-migration"]
+    branches: [integration, main, "engine/stellar-engine-migration", "cpp/**"]
     paths:
       - "engine/**"
       - "core/**"
@@ -93,7 +93,7 @@ permissions:
 jobs:
   windows-export:
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -118,17 +118,24 @@ jobs:
           import stellar
           env = stellar.build_environment()
           stellar.run(['cmake', '--preset', 'windows-native-preview'], env=env)
-          stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4',
-                       '--target', 'stellar-continuum-native', 'stellar_native_audio_tests',
-                       'stellar_native_audio_director_tests', 'stellar_native_audio_settings_tests',
-                       'stellar_native_surface_art_tests', 'stellar_territory_tests',
-                       'stellar_galaxy_marker_tests', 'stellar_galaxy_label_tests',
-                       'stellar_native_triangle_mesh_tests', 'stellar_surface_view_tests',
-                       'stellar_surface_visual_tests',
-                       'stellar_native_diplomacy_workspace_tests'],
-                      env=env, timeout=600)
-          stellar.run(['ctest', '--preset', 'windows-native-preview', '-R',
-                       '^(native_audio|native_audio_director|native_audio_settings|native_surface_art|native_territory_projection|native_galaxy_star_markers|native_galaxy_labels|native_diplomacy_workspace|native_surface_workspace|native_triangle_mesh)$', '--output-on-failure'], env=env)
+          # Build the complete graphical preview configuration rather than a
+          # hand-picked target list, so CI covers the actual shipping client.
+          stellar.run(['cmake', '--build', '--preset', 'windows-native-preview', '--parallel', '4'],
+                      env=env, timeout=2400)
+          # Run the full suite, excluding only the documented baseline failures
+          # recorded in docs/validation/2026-09-20-development-sync.json (SYNC items).
+          baseline_failures = (
+            'stellar_objects|developer_qa_host|fresh_campaign_parity|'
+            'persistable_fresh_campaign_parity|sol_catalog|galaxy_catalog_parity|'
+            'civilization_parity|adaptive_research_applicability_parity|'
+            'adaptive_research_policy_parity|adaptive_research_agenda_parity|'
+            'adaptive_research_outcomes_parity|galaxy_payload_persistence_parity|'
+            'galaxy_payload_json_parity|legacy_galaxy_payload_persistence_parity|'
+            'player_campaign_persistence_parity|player_campaign_json_parity|'
+            'player_campaign_recovery_parity|native_research_controller|'
+            'native_fresh_progression|large_galaxy_2500|engine_generation_50000')
+          stellar.run(['ctest', '--preset', 'windows-native-preview', '--parallel', '2',
+                       '-E', '^(' + baseline_failures + ')$', '--output-on-failure'], env=env)
           '@ | python -
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve standalone package and validation report

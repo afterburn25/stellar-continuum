@@ -86,6 +86,21 @@ No independent editor/research branch is declared integrated merely because it
 appears in the branch inventory. No GitHub Release/tag is fabricated for this
 development synchronization.
 
+## Foundation-expansion integration (2026-09-20)
+
+`integration/foundation-1-30-into-codex` merges the older
+`engine/foundation-expansion-1-30` line (save history `.bak.N`, deterministic
+replay capture/playback, data-driven input mapping, engine localization,
+developer-tools host and the 30-item engine-library expansion) onto this
+branch's architecture. Codex systems (renderer, artwork policy, session,
+cooker, installer) remain authoritative; superseded expansion duplicates were
+omitted. The merged tree matches the documented test baseline — 236/257 CTest
+(21 SYNC failures), Python suite at baseline parity with zero new failures —
+and produced a validated changed-files update from `0.1.14.1-dev` to
+`0.1.14.2-dev-5c4003dd3b821af9`. Full evidence:
+[foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
+The branch is awaiting PR integration, not merged yet.
+
 ## Next action
 
 Begin with native validation/release reliability: reconcile the generation

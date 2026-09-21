@@ -2403,6 +2403,64 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 | 29 | Mod architecture | MISSING | **ENGINE-COMPLETE** — `PackageManifest` (semver, deps, provides), `PackageRegistry` (protected namespaces, deterministic topo load order, conflict reporting), `scan_packages` directory discovery. | `engine/…/package.hpp` | `package_platform` |
 | 30 | Stellar Tools | PARTIAL — dev submenu + panel | **EXTENDED** — tabbed tools host: Commands / Diagnostics (live Profiler + MemoryTracker overlays, session stats) / Saves (rolling-chain slots with integrity + preview fields). Profiler `begin/end_frame` wired into the client frame loop. Entity/asset/event-log inspectors remain follow-on. | `native_developer_tools.*`, `main.cpp` | `native_developer_tools` |
 
+## Foundation expansion integration into the codex native line (2026-09-20)
+
+Branch `integration/foundation-1-30-into-codex` merges
+`engine/foundation-expansion-1-30` (`aa90d0e6`, 13 commits over `fbb3165b`)
+onto `cpp/codex-native-architecture-integration` tip `e20e83a9`
+(game `0.1.14.2-dev`, engine `0.1.64`). The codex architecture won every
+overlapping subsystem — renderer, artwork policy, campaign session, installer
+and packaging — and expansion work was kept only where additive.
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Save history and recovery (req 16):** rolling `.bak`, `.bak.2` …
+  `.bak.N` slots rotate on each save and the loader walks the chain.
+  `PlayerCampaignLoadOrigin::History` recoveries now publish a distinct
+  "Recovered campaign from an older autosave" notice in the session layer.
+- **Deterministic replay (req 17):** `ReplayRecorder`/`ReplayPlayer` are wired
+  into `NativeCampaign` (`--record`/`--replay`, fixed-step playback, FNV
+  checkpoints). Verified: recorded checkpoint replayed with
+  `verified_checkpoints:1`, `diverged:false`.
+- **Input actions (req 21):** `InputMapper` drives galaxy keyboard shortcuts
+  from a data-driven context, and `SDL_EVENT_KEY_UP` now emits
+  `InputEventType::KeyReleased` (Escape/Backspace excluded) for correct
+  pause/release behavior — verified by the galaxy-art smoke `paused:true`.
+- **Developer tools host (req 30):** codex's developer panel/diagnostics/
+  empire-monitor subsystem retained; the expansion's parallel development-menu
+  machinery was omitted as superseded. `--developer-smoke` runs through the
+  codex path (SYNC-006 planet-map assertion still open).
+- **Fleet overview:** `native_fleet_workspace` gained the overview/council
+  rows (`OverviewRowKind`, colony navigation) adapted to codex's controller
+  APIs and `selected_changed` lambda.
+- **Localization (req 25):** `LocalizationTable`/`LocalizationService` ship in
+  the engine and back the developer tools chrome strings.
+- **Engine libraries present, verified by unit tests:** World store,
+  SimulationScheduler, JobSystem priorities, RenderGraph policy layer,
+  DrawBatcher, TextureStreamer, ShaderLibrary, VfxSystem, PhysicsWorld,
+  SpatialGrid, ResourceNetwork, EventBus, MissionGraph, CrashReporter
+  (installed at client startup), Profiler, MemoryTracker, FloatCurve/Timeline,
+  UI view models, AccessibilitySettings, PlatformServices facade and
+  PackageManifest/Registry.
+
+### ENGINE LIMITATIONS REMAINING
+
+- Engine libraries that are compiled and unit-tested but not yet consumed by
+  the live game remain library-only per the table above (render graph backend,
+  GPU-driven submission, texture streaming consumption, mission graph runtime,
+  Steam backend). They are not claimed as in-game features.
+- The expansion's duplicate developer-menu, audio-settings and session types
+  were dropped; codex's wired implementations are authoritative.
+- SYNC-001/002/005/010/011 CTest baseline failures are unchanged by the merge
+  (21 tests, see the validation receipt). SYNC-006's developer-smoke planet-map
+  assertion persists on the integrated build.
+- Python exporter suite matches the codex baseline: 36 documented unsuccessful
+  tests (fixture roots without current planet manifests, review-only source
+  images absent from checkout); zero new regressions, one baseline test now
+  passes (`test_galaxy_loads_assets_relative_to_executable`).
+- Packaging scripts previously required PowerShell 7; they now also run on
+  Windows PowerShell 5.1 with identical output bytes.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,
