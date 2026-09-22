@@ -3,6 +3,7 @@
 // Bounded, player-visible recent-event presentation.  Publishers are
 // responsible for observer filtering; this UI never reads simulation state.
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <deque>
@@ -59,7 +60,8 @@ using TextMeasurer = std::function<native_map::TextExtent(const native_map::Text
 
 [[nodiscard]] NotificationLayout notification_layout_for(
     const std::deque<NativePlayerNotification>& items, int width, int height,
-    const TextMeasurer& measure = {}, float scroll = 0.f);
+    const TextMeasurer& measure = {}, float scroll = 0.f,
+    const stellar::engine::LocalizationTable* locale = nullptr);
 
 enum class NotificationViewCommandKind { None, Close, OpenDiplomaticContact };
 struct NotificationViewCommand {
@@ -71,6 +73,10 @@ struct NotificationViewCommand {
 class NativeNotificationView final {
  public:
   void set_text_measurer(TextMeasurer measure) { measure_ = std::move(measure); }
+  void set_localization(
+      const stellar::engine::LocalizationTable* table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   // Every retained event is reachable through the panel's bounded scroll, so
   // opening deliberately acknowledges the full retained feed.
@@ -101,6 +107,7 @@ class NativeNotificationView final {
   std::optional<int> pressed_contact_id_;
   std::optional<native_map::UiRect> pressed_bounds_;
   TextMeasurer measure_;
+  const stellar::engine::LocalizationTable* locale_{};
 };
 
 } // namespace stellar::native_notifications

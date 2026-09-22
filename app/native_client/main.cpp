@@ -899,6 +899,8 @@ class NativeCampaign final {
     colony_workspace_.set_localization(&table);
     system_workspace_.set_localization(&table);
     battle_workspace_.set_localization(&table);
+    shipyard_workspace_.set_localization(&table);
+    notification_view_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -7159,7 +7161,7 @@ class NativeCampaign final {
   void execute_shipyard(const ShipyardWorkspaceCommand &command){
     const auto &view=shipyard_workspace_.view();
     if(!view){
-      shipyard_workspace_.set_notice("Shipyard details are still loading.",false);
+      shipyard_workspace_.set_notice(tr("SHIPYARD_NOTICE_LOADING","Shipyard details are still loading."),false);
       return;
     }
     NativeShipyardCommandOutcome outcome;
@@ -7170,7 +7172,7 @@ class NativeCampaign final {
       refresh_shipyard(true);
       if(!shipyard_workspace_.arm_cancel_confirmation(command.id))
         shipyard_workspace_.set_notice(
-            "The cancellation quote changed; review the refreshed order.",false);
+            tr("SHIPYARD_NOTICE_QUOTE_CHANGED","The cancellation quote changed; review the refreshed order."),false);
       return;
     }
     if(command.kind==ShipyardWorkspaceCommandKind::Start)

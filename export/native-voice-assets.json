@@ -4,7 +4,7 @@
     "events": {
       "source": "data/voice_profiles/events.json",
       "runtimePath": "Data/voice_profiles/events.json",
-      "sha256": "585c6301f7e545d99736b81240c85de9bf7adeb4992b900ac4e22c2af2403a76"
+      "sha256": "092a13ef9d6552d98cec4cffbc5d04d0d5a7d26901541371cdf99661e5b5d4c0"
     },
     "human": {
       "source": "data/voice_profiles/human.json",

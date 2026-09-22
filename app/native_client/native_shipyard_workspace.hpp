@@ -5,8 +5,10 @@
 #include "native_dropdown.hpp"
 #include <filesystem>
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -59,6 +61,10 @@ public:
   void set_view(stellar::native_shipyard::NativeShipyardView view);
   void discard_campaign();
   void set_notice(std::string message, bool accepted);
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] bool arm_cancel_confirmation(std::string_view order_id);
   [[nodiscard]] const std::optional<stellar::native_shipyard::NativeShipyardView> &
   view() const noexcept;
@@ -85,7 +91,13 @@ private:
   [[nodiscard]] const stellar::native_shipyard::NativeShipyardOrder *
   selected_order() const noexcept;
   void reconcile_selection();
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};
   stellar::native_map::Point pointer_{};
   std::optional<stellar::native_shipyard::NativeShipyardView> view_;

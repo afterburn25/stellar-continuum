@@ -83,6 +83,7 @@ endif()
 add_executable(stellar_native_notification_tests
   native-tests/native_notification_tests.cpp app/native_client/native_notifications.cpp)
 target_include_directories(stellar_native_notification_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_notification_tests PRIVATE stellar_engine)
 add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
 add_executable(stellar_native_notification_events_tests
   native-tests/native_notification_events_tests.cpp
