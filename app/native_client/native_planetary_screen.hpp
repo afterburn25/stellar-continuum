@@ -62,7 +62,7 @@ class NativePlanetaryScreen {
   void set_action_art(std::function<Picture(int)> art){action_art_=std::move(art);}
   void set_portrait(Picture p){portrait_=std::move(p);}
   void set_measurer(std::function<TextExtent(const Text&)> value){measure_=std::move(value);}
-  void set_localization(const stellar::engine::LocalizationTable *table)noexcept{locale_=table;}
+  void set_localization(const stellar::engine::LocalizationTable *table)noexcept{locale_=table;globe_.set_localization(table);}
   void reset(){selected_=-1;tab_=2;globe_.reset();fact_scroll_=detail_scroll_=slot_scroll_=queue_scroll_=0;pending_={};notice_.clear();pressed_.reset();hits_.clear();portrait_.reset();}
   void set_view(const NativeColonyView& v){if(identity_!=std::pair{v.campaign_generation,v.body_id}){reset();identity_={v.campaign_generation,v.body_id};}globe_.bind(v);}
   void set_confirmation(std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> value){pending_=std::move(value);pressed_.reset();}
