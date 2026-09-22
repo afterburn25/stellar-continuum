@@ -263,19 +263,20 @@ Archive SHA-256:
 `dc7983b5292eb4b878af3ea64dfd45b627f0cf7cb472610660c0f73f0596a648`.
 
 Integration-line update (`work/foundation-1-30-codex-integration`):
-`0.1.14.2-dev-8afd6d0fd95b9d2a` from the same exact `0.1.14.1` base.
-Thirteen files changed — all seven `Content/*.stpak` packages carry new
-content-hash names because merged assets altered every package — so the ZIP
-is 4,309,665,446 bytes despite the changed-files-only mechanism. Validated
-against an isolated real `0.1.14.1` install (apply, hash check, no-op and
-executable repair, save/mod preservation, uninstall). Download:
-`D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration.zip`.
+`0.1.14.2-dev-b262e12f2598dee5` from the same exact `0.1.14.1` base, built at
+`d79432f1` with the LZMS package codec. Thirteen files changed — all seven
+`Content/*.stpak` packages carry new content-hash names because merged assets
+altered every package — so the ZIP is 3,822,840,179 bytes despite the
+changed-files-only mechanism (LZMS cut ~487 MB from the prior build).
+Validated against an isolated real `0.1.14.1` install (apply, hash check,
+no-op and executable repair, save/mod preservation, uninstall). Download:
+`D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration-lzms.zip`.
 Archive SHA-256:
-`32c28a9057338216197e9bd3274ce05fd6660cfeae22f619b3bc9439dfc1c841`.
+`f30018bc540cd594f0cf51b9d131c46d7c99698e6fbd9c3610a215ec7cc70fb1`.
 The matching offline setup archive is
-`D:/StellarContinuum/Downloads/StellarContinuum-Setup-0.1.14.2-dev-integration.zip`
-(4,310,877,287 bytes, SHA-256
-`501688ebc6944361f27439883925b90e698b9d70fa3a617978b42561ac21f712`).
+`D:/StellarContinuum/Downloads/StellarContinuum-Setup-0.1.14.2-dev-integration-lzms.zip`
+(3,824,052,106 bytes, SHA-256
+`b74142a14e6f74a4d4ee7f28e31e0fb3175e7721e3146fd986592cc0e589dc16`).
 
 ## 26–28. Size, future reuse and remaining limits
 

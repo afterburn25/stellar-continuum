@@ -135,6 +135,30 @@ mismatch inside that test was fixed by escaping non-ASCII keys in
   verification, no-op and damaged-executable repair, unchanged timestamps,
   save/mod preservation) and `--full-package` (install, no-op repair,
   corruption repair, uninstall, user preservation).
+- LZMS-codec rebuild at `d79432f1` (supersedes the XPRESS-only artifacts
+  above): `tools/build-release-installer.ps1` full cook at
+  `D:/stellar-scratch/sc-integration-merge/work/download-release/StellarContinuum-Setup-0.1.14.2-dev-lzms`.
+  Payload: 3,856,364,545 bytes (−489 MB vs the prior build), 3,781 cooked
+  assets, 3,823,757,965 unique stored bytes, 40,751 chunks validated,
+  1,011 lossless fallbacks (BC7 effort escalation rescued two). Target build
+  ID `0.1.14.2-dev-b262e12f2598dee5`; game executable SHA-256
+  `67972bdf48872e8cfebd4feca402b77529370e6366781d3a91dca49a91ca6765`;
+  setup SHA-256
+  `9e64f1915e3e31628b31fc1cbb07026647884d4e1ad7c85a6c447cd59156d51b`.
+  Both maintenance suites passed during the build; the shipping payloads were
+  additionally re-validated via `--update-package` (real `0.1.14.1` baseline
+  install, changed-files apply, hash verification, repairs, save/mod
+  preservation) and `--full-package` — **PASS**.
+  Update download:
+  `D:/StellarContinuum/Downloads/StellarContinuum-Update-0.1.14.2-dev-integration-lzms.zip`
+  — 3,822,840,179 bytes; SHA-256
+  `f30018bc540cd594f0cf51b9d131c46d7c99698e6fbd9c3610a215ec7cc70fb1`;
+  update `StellarContinuumSetup.exe` SHA-256
+  `ccc6e3715c0a3fad4ad914577ab2049033a81d36b5c054105f34898a72397dd9`.
+  Setup download:
+  `D:/StellarContinuum/Downloads/StellarContinuum-Setup-0.1.14.2-dev-integration-lzms.zip`
+  — 3,824,052,106 bytes; SHA-256
+  `b74142a14e6f74a4d4ee7f28e31e0fb3175e7721e3146fd986592cc0e589dc16`.
 
 ## Hosted CI (subsequent runs)
 
