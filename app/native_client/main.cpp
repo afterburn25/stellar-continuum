@@ -892,6 +892,7 @@ class NativeCampaign final {
     research_workspace_.set_localization(&table);
     fleet_workspace_.set_localization(&table);
     construction_workspace_.set_localization(&table);
+    inspection_card_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -7816,7 +7817,7 @@ class NativeCampaign final {
   void refresh_inspection() {
     if(!selected_id_){inspection_card_.clear();return;}
     inspection_card_.set_inspection(stellar::native_inspection::build_system_inspection(
-        session_->frame().runtime().world().campaign(),*selected_id_));
+        session_->frame().runtime().world().campaign(),*selected_id_,locale_));
   }
   void bind_galaxy_backdrop(int width,int height){const auto &world=session_->frame().runtime().world().campaign();GalaxyBackdropCatalog view;view.generated_phenomena=world.generation_metadata&&world.generation_metadata->phenomena.has_value();view.campaign_generation=session_->cache().generation;view.campaign_seed=world.seed;if(world.generation_metadata&&world.generation_metadata->configuration){const auto& config=*world.generation_metadata->configuration;const auto pair=galaxy_visual_pair(config.morphology,config.resolved_population);view.map_asset_path=pair.map_path;const auto frame=galaxy_footprint_frame(config.morphology,config.system_count,config.resolved_population);view.fixed_artwork_frame=GalaxyBackdropFrame{frame.left,frame.top,frame.width,frame.height};if(pair.fallback)stellar::engine::log("galaxy-assets",pair.diagnostic);}if(world.generation_metadata&&world.generation_metadata->stellar_population){const auto m=world.generation_metadata->stellar_population->morphology;view.use_spiral_artwork=m==GalaxyMorphology::Spiral||m==GalaxyMorphology::BarredSpiral;}view.system_positions.reserve(world.systems.size());for(const auto &system:world.systems)view.system_positions.push_back({system.position.x,system.position.y});if(world.core){view.galactic_core=WorldPoint{world.core->position.x,world.core->position.y};view.galactic_core_exclusion_radius=world.core->exclusion_radius;view.galactic_core_discovered=world.knowledge.is_galactic_core_discovered(world.player_civilization_id);}galaxy_backdrop_.bind(std::move(view));system_background_.bind(world);phenomena_.bind(world.generation_metadata&&world.generation_metadata->phenomena?&*world.generation_metadata->phenomena:nullptr);pinned_phenomenon_.reset();camera_=galaxy_overview_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;}
   void cycle_speed(){
