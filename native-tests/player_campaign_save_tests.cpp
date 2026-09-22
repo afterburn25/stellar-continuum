@@ -273,6 +273,7 @@ int main(int argc,char **argv) try {
   blocking_manual_drain(fixture,directory);
   async_manual_admission(fixture,directory);
   async_manual_failure_and_owner(fixture,directory);
+  {std::error_code cleanup;fs::remove_all(directory,cleanup);}// retain run dir only on failure
   std::cout<<"Player17 prepared/async save: detached state, real atomic IO, backup repair, one writer, frame admission, completion-day scheduling, stale identity, manual drain, async manual admission, provenance and thread ownership passed\n";
   return 0;
 }catch(const std::exception &error){std::cerr<<"ExceptionType: "<<typeid(error).name()<<"\nMessage: "<<error.what()<<"\nCurrentDirectory: "<<fs::current_path().string()<<'\n';return 1;}

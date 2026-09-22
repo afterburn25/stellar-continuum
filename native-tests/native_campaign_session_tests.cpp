@@ -803,6 +803,7 @@ int main(int argc, char **argv) try {
   failed_frame_clears_save_readiness(research_root, source, directory);
   wrong_thread_rejected_before_mutation(research_root, source, directory);
   tactical_save_reload_and_continuation(research_root, source, directory);
+  {std::error_code cleanup;fs::remove_all(directory,cleanup);}// retain run dir only on failure
   std::cout << "Native session save/load, ordered pending IO, transactional activation, owner-thread enforcement, cache generations and failed Exit passed\n";
   return 0;
 } catch (const std::exception &error) {

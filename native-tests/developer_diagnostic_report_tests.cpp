@@ -82,5 +82,6 @@ int main(int argc,char **argv)try{
       Json::parse(partial.at("session.json"))["checkpointIncluded"]==false&&
       Json::parse(partial.at("replay.json"))["continuationSupported"]==false,"Failed checkpoint capture discarded evidence or promised replay.");
   monitor.reset();check(monitor.history().records().empty()&&monitor.invariant_checks()==0,"Monitor leaked history across campaigns.");
+  {std::error_code cleanup;fs::remove_all(root,cleanup);}// retain run dir only on failure
   std::cout<<"Developer diagnostic snapshot/checkpoint/archive checks passed\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}
