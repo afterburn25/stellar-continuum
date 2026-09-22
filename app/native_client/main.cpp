@@ -869,6 +869,9 @@ class NativeCampaign final {
           &*voice_resolver_);
       voice_bridge_.emplace(*voice_router_);
       voice_bridge_->reset(session_->frame().runtime());
+      support_.record("voice","Gameplay voice pipeline armed: "+
+          std::to_string(voice_profiles_.size())+" profiles, "+
+          voice_playback_->backend_status());
     }catch(const std::exception& error){
       support_.record("voice",std::string{"Gameplay voice pipeline unavailable: "}+error.what());
       voice_bridge_.reset();voice_router_.reset();voice_playback_.reset();
