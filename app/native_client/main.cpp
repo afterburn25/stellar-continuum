@@ -883,9 +883,11 @@ class NativeCampaign final {
     return voice_playback_?&*voice_playback_:nullptr;
   }
 
-  // Hands the live locale catalog to the voice pipeline so minted
-  // localization_keys resolve when a table ships translated cue text.
-  void set_voice_locale(const stellar::engine::LocalizationTable &table){
+  // Hands the live locale catalog to the campaign surface and the voice
+  // pipeline: menu labels translate directly, minted localization_keys
+  // resolve when a table ships translated cue text.
+  void set_locale(const stellar::engine::LocalizationTable &table){
+    locale_=&table;
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -6659,28 +6661,28 @@ class NativeCampaign final {
     }
     if (menu_) {
       stellar::native_ui_style::menu_panel(out, layout.menu_panel);
-      label(out, layout.menu_heading, session_->new_campaign_pending()?"SAVING CAMPAIGN":"PAUSED", {238, 244, 255, 255},
+      label(out, layout.menu_heading, tr(session_->new_campaign_pending()?"MENU_SAVING":"MENU_PAUSED",session_->new_campaign_pending()?"SAVING CAMPAIGN":"PAUSED"), {238, 244, 255, 255},
             layout.heading_font_pixels, layout.scale, FontFace::Heading);
       const auto draw_button = [&](UiRect bounds, std::string text) {
         panel(out, bounds, bounds.contains(pointer_), false);
         control_label(out, bounds, std::move(text), {238, 244, 255, 255},
               layout.control_font_pixels, layout.scale,text_measurer_);
       };
-      draw_button(layout.continue_button, session_->new_campaign_pending()?"CANCEL NEW GAME":"CONTINUE");
+      draw_button(layout.continue_button, tr(session_->new_campaign_pending()?"MENU_CANCEL_NEW_GAME":"MENU_CONTINUE",session_->new_campaign_pending()?"CANCEL NEW GAME":"CONTINUE"));
       if(!session_->new_campaign_pending()){
-      draw_button(layout.save_button, "SAVE");
-      draw_button(layout.load_button, "LOAD");
-      draw_button(layout.settings_button, "SETTINGS");
-      draw_button(layout.support_button, support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS");
-      draw_button(layout.new_game_button, "NEW GAME");
-      draw_button(layout.exit_button, "EXIT TO WINDOWS");
+      draw_button(layout.save_button, tr("MENU_SAVE","SAVE"));
+      draw_button(layout.load_button, tr("MENU_LOAD","LOAD"));
+      draw_button(layout.settings_button, tr("MENU_SETTINGS","SETTINGS"));
+      draw_button(layout.support_button, tr(support_.busy()?"MENU_EXPORTING":"MENU_EXPORT",support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS"));
+      draw_button(layout.new_game_button, tr("MENU_NEW_GAME","NEW GAME"));
+      draw_button(layout.exit_button, tr("MENU_EXIT","EXIT TO WINDOWS"));
       }
       const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
       const UiRect footer{36.f*layout.scale,footer_y,
           static_cast<float>(width)-72.f*layout.scale,
           std::max(0.f,static_cast<float>(height)-footer_y-12.f*layout.scale)};
       if(footer.height>=32.f*layout.scale){
-        std::string detail=developer_session()?"F12 saves a PNG screenshot. Export diagnostics (F8) includes the current isolated developer checkpoint and diagnostics.":"F12 saves a PNG screenshot. Export diagnostics (F8) includes your last completed save and recent session reports.";
+        std::string detail=tr(developer_session()?"MENU_FOOTER_DEV":"MENU_FOOTER",developer_session()?"F12 saves a PNG screenshot. Export diagnostics (F8) includes the current isolated developer checkpoint and diagnostics.":"F12 saves a PNG screenshot. Export diagnostics (F8) includes your last completed save and recent session reports.");
         if(support_.state()==stellar::native_support::SupportExportState::Succeeded)
           detail="Diagnostics saved: "+utf8_path(support_.result());
         else if(support_.state()==stellar::native_support::SupportExportState::Failed)
@@ -8073,6 +8075,11 @@ class NativeCampaign final {
   std::optional<stellar::native_voice::NativeVoicePlayback> voice_playback_;
   std::optional<stellar::native_voice::NativeVoiceRouter> voice_router_;
   std::optional<stellar::native_voice::NativeGameplayVoiceBridge> voice_bridge_;
+  const stellar::engine::LocalizationTable *locale_{};
+  [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const{
+    if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
+    return std::string(fallback);
+  }
   int voice_ui_sequence_{};
   stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;
   std::chrono::steady_clock::time_point last_event_sound_{};
@@ -8296,7 +8303,7 @@ int main(int argc,char **argv){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
     campaign.attach_replay(&replay);
-    campaign.set_voice_locale(locale_table);
+    campaign.set_locale(locale_table);
     active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';
