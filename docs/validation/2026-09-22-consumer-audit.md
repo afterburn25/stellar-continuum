@@ -42,6 +42,26 @@ Successor to [the foundation-merge receipt](2026-09-20-foundation-merge.md).
 - Documentation corrections: removed stale consumer claims (developer-tools
   `VirtualizedList`, developer-chrome `LocalizationTable`, `CrashReporter`
   install) that predated actual consumers.
+- **Gameplay voice pipeline wired into the client.** `NativeCampaign` now
+  owns the full event-driven stack: `NativeVoiceProfileRegistry` +
+  `NativeCharacterVoiceResolver` + `NativeVoiceCache` +
+  `NativeVoicePlayback` + `NativeVoiceRouter` (from
+  `Data/voice_profiles/{human,roles,events}.json`) +
+  `NativeGameplayVoiceBridge`. The bridge observes each authoritative
+  `CampaignFrameResult` (and fires the once-per-campaign opening when the
+  menu is closed); playback presents through a new
+  `NativeAudioDirector::play_dialogue_pcm` seam onto the existing engine
+  `AudioOutput` voice channel — no parallel mixer. `prerecordedPath` and
+  `subtitleText` cue fields are now honored end-to-end, so the three
+  approved scientist WAVs play recorded while all other events synthesize
+  via SAPI (subtitle-only fallback when unavailable — verified live: the
+  opening line emitted, resolved `human_female_narrator`, and fell back
+  cleanly when `SpAudioFormat` was unavailable in this environment). The
+  caption renderer prefers playback subtitle state; Voice Settings apply /
+  replay / stop now drive both paths. Legacy `VoiceCue` stays as the
+  fallback when voice data is absent. The mixer's `NativeAudioSettings`
+  record was renamed `NativeMixerSettings` to resolve a namespace collision
+  with the UI settings class. `cace76af`; suite 257/257 green.
 
 ## Audit conclusion
 
