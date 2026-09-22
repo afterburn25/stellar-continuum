@@ -1,12 +1,14 @@
 #pragma once
 
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -30,7 +32,9 @@ struct View {
 };
 
 [[nodiscard]] View build(const stellar::core::FreshCampaignState &,
-                         std::uint64_t generation);
+                         std::uint64_t generation,
+                         const stellar::engine::LocalizationTable *locale =
+                             nullptr);
 
 struct RosterLayout {
   stellar::native_map::UiRect panel, list, close, refresh;
@@ -57,6 +61,10 @@ public:
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
   void set_notice(std::string value) { notice_ = std::move(value); }
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] RosterCommand handle(const stellar::native_map::InputEvent &,
                                      int width, int height);
   void render(stellar::native_map::DrawList &, int width, int height) const;
@@ -68,6 +76,9 @@ private:
   void clear_press() noexcept;
   void sync_scroll(const RosterLayout &) const noexcept;
   [[nodiscard]] float maximum_scroll(const RosterLayout &) const noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   View view_;
   bool visible_{};
   mutable stellar::engine::VirtualizedList list_{};

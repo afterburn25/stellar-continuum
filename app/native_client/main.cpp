@@ -895,6 +895,7 @@ class NativeCampaign final {
     inspection_card_.set_localization(&table);
     economy_workspace_.set_localization(&table);
     supply_workspace_.set_localization(&table);
+    colony_roster_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -7749,19 +7750,19 @@ class NativeCampaign final {
     const auto& current=colony_roster_.view();
     const bool changed=current.generation!=generation||current.player_id!=world.player_civilization_id;
     if(!force&&!changed&&(!current.available|| (roster_day_&&(*roster_day_==day||roster_refresh_elapsed_<1.))))return;
-    colony_roster_.set_view(stellar::native_colony_roster::build(world,generation));
+    colony_roster_.set_view(stellar::native_colony_roster::build(world,generation,locale_));
     roster_day_=day;roster_refresh_elapsed_=0.;
   }
   void open_roster_colony(const stellar::native_colony_roster::RosterCommand& command,int width,int height){
     const auto generation=session_->cache().generation;
     const auto& world=session_->frame().runtime().world().campaign();
     if(command.generation!=generation||command.player_id!=world.player_civilization_id){
-      refresh_roster(true);colony_roster_.set_notice("That colony selection changed. Select it again.");return;
+      refresh_roster(true);colony_roster_.set_notice(tr("ROSTER_NOTICE_CHANGED","That colony selection changed. Select it again."));return;
     }
-    const auto live=stellar::native_colony_roster::build(world,generation);
+    const auto live=stellar::native_colony_roster::build(world,generation,locale_);
     const auto row=std::ranges::find(live.rows,*command.open_colony_id,&stellar::native_colony_roster::Row::colony_id);
     if(!live.available||row==live.rows.end()||!row->can_open||row->system_id!=command.system_id||row->body_id!=command.body_id){
-      refresh_roster(true);colony_roster_.set_notice("That colony is no longer available to open.");return;
+      refresh_roster(true);colony_roster_.set_notice(tr("ROSTER_NOTICE_GONE","That colony is no longer available to open."));return;
     }
     auto built=system_controller_.build(session_->frame(),generation,row->system_id);
     if(!built.snapshot){colony_roster_.set_notice(built.denial);return;}
