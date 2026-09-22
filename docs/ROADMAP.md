@@ -24,10 +24,10 @@ preserved as [historical design/status text](history/ROADMAP.pre-native-sync-202
 
 | # | Capability | Current status / existing foundation | Next deliverable and acceptance boundary |
 | --- | --- | --- | --- |
-| 1 | Unified Entity/World System | PARTIALLY IMPLEMENTED — generational `EntityRegistry`; domain containers remain separate | Typed World ownership/handles and adapters with stale-handle and save-identity tests; no blanket rewrite |
-| 2 | Simulation Scheduler + Simulation LOD | PARTIALLY IMPLEMENTED — fixed/strategic/tactical clocks and Core phases | Explicit phase dependency/cadence/LOD policy; deterministic pause/backlog and large-campaign parity |
-| 3 | Full Job/Threading System | PARTIALLY IMPLEMENTED — `JobSystem`, async campaign and bounded image work | Dependency/cancellation/priorities and owner-safe result publication; contention/lifetime tests |
-| 4 | Render Graph | PLANNED — direct scene/UI submission currently | Resource/pass declarations, ordering/barriers and diagnostics before migrating consumers |
+| 1 | Unified Entity/World System | PARTIALLY IMPLEMENTED — generational `EntityRegistry` plus engine `world.cpp` typed store (`engine_world_tests`); domain containers remain separate, library unconsumed | Adapters bridging Core domain containers to the typed store with stale-handle and save-identity tests; no blanket rewrite |
+| 2 | Simulation Scheduler + Simulation LOD | PARTIALLY IMPLEMENTED — fixed/strategic/tactical clocks, Core phases, and engine `simulation_scheduler.cpp` (`simulation_scheduler_tests`) library | Drive Core phases through the scheduler (dependency/cadence/LOD policy); deterministic pause/backlog and large-campaign parity |
+| 3 | Full Job/Threading System | PARTIALLY IMPLEMENTED — `JobSystem` with priorities, cooperative cancellation, `submit_graph` dependency graphs and per-tag stats + `job_system_tests`; consumers: image preparation, audio director, territory overlay, campaign session | Wider consumer adoption and work-stealing/affinity; owner-safe publication audited per consumer |
+| 4 | Render Graph | PARTIALLY IMPLEMENTED — engine `render_graph.cpp` library + `render_pipeline_tests`; direct scene/UI submission remains in the client | Migrate real consumers onto the declared pass graph; measure before/after |
 | 5 | GPU-Driven Rendering | PLANNED — CPU batching/culling and cached GPU resources exist | Measured indirect/instanced path, GPU culling and feature fallback without changing object identity |
 | 6 | Virtual/Streaming Texture System | PARTIALLY IMPLEMENTED — mip selection, async reads, bounded caches | Residency policy and incremental promotion under measured VRAM pressure; fault/budget tests |
 | 7 | Shader Library + Shader Cache | PARTIALLY IMPLEMENTED — source/embedded SPIR-V hash contract | Variant keys, compilation/cache lifecycle and invalidation; offline shipping remains supported |
@@ -38,9 +38,9 @@ preserved as [historical design/status text](history/ROADMAP.pre-native-sync-202
 | 12 | Knowledge/Fog-of-War Engine | PARTIALLY IMPLEMENTED — authoritative Core observation/knowledge | General visibility/provenance queries retaining privacy, persistence and safe Developer boundaries |
 | 13 | Generic Economy/Resource Framework | PARTIALLY IMPLEMENTED — Core credit/resource/industry/biology services | Explicit resource graph/transactions and reusable schedules; preserve current rule authority |
 | 14 | Event Bus | PARTIALLY IMPLEMENTED — owner-thread `EventQueue<T>`, domain events | Typed subscriptions/lifetimes/order and thread boundary; no uncontrolled global callbacks |
-| 15 | Mission/Event Framework | PLANNED — notifications/research events are specialized | Persisted trigger/state/action contracts and observer filtering; no hidden UI-only mission state |
+| 15 | Mission/Event Framework | PARTIALLY IMPLEMENTED — engine `mission_graph.cpp` library + `mission_graph_tests`; no game consumers yet | Persisted trigger/state/action contracts, observer filtering and a real mission consumer; no hidden UI-only mission state |
 | 16 | Advanced Save System | PARTIALLY IMPLEMENTED — Player17 DTO/JSON, atomic backup/recovery | Versioned incremental snapshots/chunks, migration suite and bounded large-save memory |
-| 17 | Deterministic Replay | PARTIALLY IMPLEMENTED — deterministic fixtures/checkpoints and QA metadata | Complete command journal, build/catalog identity, replay divergence localization |
+| 17 | Deterministic Replay | PARTIALLY IMPLEMENTED — engine `replay.cpp` command journal consumed by the native client (`--record`/`--replay`, verified `diverged:false`) plus fixtures/checkpoints/QA metadata | Replay divergence localization and build/catalog identity attestation |
 | 18 | Crash Reporter | PARTIALLY IMPLEMENTED — real local bounded logs, reports and Windows dumps | Symbol-matched diagnosis/bundle UX, better fault coverage; no implicit upload |
 | 19 | Profiler | PARTIALLY IMPLEMENTED — phase timers, QA throughput/memory and counters | CPU/GPU timeline, frame capture and scenario comparison with minimal perturbation |
 | 20 | Memory Tracking | PARTIALLY IMPLEMENTED — queue/cache ledgers and process samples | Tagged allocation/high-water/VRAM attribution with low-cost disabled path |
@@ -48,10 +48,10 @@ preserved as [historical design/status text](history/ROADMAP.pre-native-sync-202
 | 22 | Audio Engine | PARTIALLY IMPLEMENTED — SDL output, decoder, music/SFX/voice settings | Incremental streaming, buses/spatial audio and robust device recovery |
 | 23 | Animation System | PARTIALLY IMPLEMENTED — specialized slow spin, orbit and event-stage interpolation | Generic deterministic/cosmetic clock ownership, tracks and lifecycle/LOD contracts |
 | 24 | Advanced UI Framework | PARTIALLY IMPLEMENTED — shared skin/text/layout and native workspaces | Focus/navigation, reusable widgets/layout/accessibility and view-model boundaries |
-| 25 | Localization | NOT STARTED — hardcoded English UI strings remain | Stable message IDs, plural/format catalogs and layout expansion tests |
-| 26 | Accessibility | PLANNED — some scalable text/settings/input behavior exists | Defined keyboard, contrast, reduced-motion and assistive-technology requirements and tests |
+| 25 | Localization | PARTIALLY IMPLEMENTED — engine `LocalizationTable`/`LocalizationService` (fallback chain, `{n}`/`{name}` formats, plural selection, reload) + `localization_tests`; UI strings still hardcoded English | Extract stable message IDs into catalogs and wire real consumers; layout expansion tests |
+| 26 | Accessibility | PARTIALLY IMPLEMENTED — engine `AccessibilitySettings` (validated JSON round-trip, scales/contrast/color-blind/reduce-motion/subtitles) exists; not yet consumed by client settings or layout | Wire into settings persistence and `effective_text_scale` layout; keyboard/contrast/assistive-technology requirements and tests |
 | 27 | Platform Layer | PARTIALLY IMPLEMENTED — Windows/SDL services, paths/leases and settings | Explicit portable interfaces and platform tests; Linux/macOS support is not yet established |
-| 28 | Steam Integration Layer | NOT STARTED — no current native integration established | Optional isolated adapter for lifecycle/cloud/achievements after offline save/release contracts stabilize |
+| 28 | Steam Integration Layer | PARTIALLY IMPLEMENTED — engine `PlatformServices` facade + null backend + `package_platform_tests`; no Steamworks backend and no app consumer yet | Attach the facade in the client (null backend keeps standalone behavior), then a real backend for lifecycle/cloud/achievements after offline save/release contracts stabilize |
 | 29 | Mod Architecture | PLANNED — versioned data catalogs are not a mod loader | Namespaces/overrides/dependencies/validation and save compatibility; no executable plugin trust assumed |
 | 30 | Engine Editor / Stellar Tools | PARTIALLY IMPLEMENTED — cooker/import CLI and Developer inspectors | Unified editor/tool document lifecycle and reuse of Engine APIs; other editor branches are not integrated evidence |
 
