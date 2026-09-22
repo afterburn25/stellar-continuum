@@ -77,12 +77,28 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   }
   return "Infrastructure";
 }
+[[nodiscard]] const char *category_key(stellar::core::ConstructionCategory c) {
+  using stellar::core::ConstructionCategory;
+  switch (c) {
+  case ConstructionCategory::Science: return "CONSTRUCTION_CATEGORY_SCIENCE";
+  case ConstructionCategory::Industry: return "CONSTRUCTION_CATEGORY_INDUSTRY";
+  case ConstructionCategory::Orbital: return "CONSTRUCTION_CATEGORY_ORBITAL";
+  case ConstructionCategory::Ftl: return "CONSTRUCTION_CATEGORY_FTL";
+  }
+  return "CONSTRUCTION_CATEGORY_INFRA";
+}
 [[nodiscard]] std::string state_name(const NativeConstructionProject &project) {
   if (project.complete) return "COMPLETED";
   if (project.active) return "ACTIVE";
   if (project.queued)
     return "QUEUED " + std::to_string(project.queue_position);
   return "AVAILABLE";
+}
+[[nodiscard]] const char *state_key(const NativeConstructionProject &project) {
+  if (project.complete) return "CONSTRUCTION_STATE_COMPLETED";
+  if (project.active) return "CONSTRUCTION_STATE_ACTIVE";
+  if (project.queued) return "CONSTRUCTION_STATE_QUEUED";
+  return "CONSTRUCTION_STATE_AVAILABLE";
 }
 [[nodiscard]] float progress_width(const NativeConstructionProject &project,
                                    float width) noexcept {
@@ -152,6 +168,43 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
           secondary};
 }
 
+std::string NativeConstructionWorkspace::tr(
+    std::string_view key, std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeConstructionWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
+std::string NativeConstructionWorkspace::state_label(
+    const NativeConstructionProject &project) const {
+  if (project.queued)
+    return trf("CONSTRUCTION_STATE_QUEUED",
+               {std::to_string(project.queue_position)}, "QUEUED {0}");
+  return tr(state_key(project), state_name(project));
+}
+
+std::string NativeConstructionWorkspace::category_label(
+    stellar::core::ConstructionCategory category) const {
+  return tr(category_key(category), category_name(category));
+}
+
 void NativeConstructionWorkspace::open() noexcept { visible_ = true; }
 void NativeConstructionWorkspace::close() noexcept {
   visible_ = false;
@@ -202,8 +255,9 @@ bool NativeConstructionWorkspace::arm_cancel_confirmation(
     return false;
   selected_project_id_ = found->id;
   cancel_confirmation_id_ = found->id;
-  notice_ = "Confirm cancellation to return " +
-            found->formatted_cancellation_refund + ".";
+  notice_ = trf("CONSTRUCTION_CONFIRM_CANCEL_NOTICE",
+                {found->formatted_cancellation_refund},
+                "Confirm cancellation to return {0}.");
   notice_accepted_ = true;
   return true;
 }
@@ -371,7 +425,8 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   if (!visible_) return;
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
   stellar::engine::ui_skin::surface(out,layout.surface,layout.scale);
-  text(out, layout.title, "PLAYER CONSTRUCTION", bright,
+  text(out, layout.title, tr("CONSTRUCTION_TITLE", "PLAYER CONSTRUCTION"),
+       bright,
        layout.title_font_pixels, FontFace::Heading);
   stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
   text(out, {layout.close.x, layout.close.y + 7.f * layout.scale,
@@ -386,9 +441,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          std::move(heading), muted, layout.small_font_pixels,
          FontFace::Heading);
   };
-  section(layout.projects, "KNOWN PROJECTS");
-  section(layout.details, "PROJECT DETAILS");
-  section(layout.orders, "CONSTRUCTION STATUS");
+  section(layout.projects, tr("CONSTRUCTION_KNOWN_PROJECTS", "KNOWN PROJECTS"));
+  section(layout.details, tr("CONSTRUCTION_DETAILS", "PROJECT DETAILS"));
+  section(layout.orders, tr("CONSTRUCTION_STATUS", "CONSTRUCTION STATUS"));
   const UiRect project_rows{layout.projects.x,
                             layout.projects.y + 27.f * layout.scale,
                             layout.projects.width,
@@ -398,8 +453,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                project_rows.y + 8.f * layout.scale,
                project_rows.width - 20.f * layout.scale,
                project_rows.height - 16.f * layout.scale},
-         "No known projects are available. Research prerequisites remain "
-         "locked.",
+         tr("CONSTRUCTION_NO_PROJECTS",
+            "No known projects are available. Research prerequisites remain "
+            "locked."),
          muted, layout.body_font_pixels);
   } else {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
@@ -426,7 +482,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          bounds.width - 16.f * layout.scale,
                          18.f * layout.scale}))
         text(out, *line,
-             category_name(project.category) + "  |  " + state_name(project),
+             category_label(project.category) + "  |  " + state_label(project),
              project.complete || project.active ? good : muted,
              layout.small_font_pixels);
     }
@@ -438,14 +494,16 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                layout.details.y + 34.f * layout.scale,
                layout.details.width - 20.f * layout.scale,
                layout.details.height - 44.f * layout.scale},
-         "Select a known project to review its requirements.", muted,
+         tr("CONSTRUCTION_SELECT_HINT",
+            "Select a known project to review its requirements."),
+         muted,
          layout.body_font_pixels);
   } else {
     std::string details = project->name + "\n" +
-                          category_name(project->category) + "  |  " +
-                          state_name(*project) + "\n\n" + project->description;
+                          category_label(project->category) + "  |  " +
+                          state_label(*project) + "\n\n" + project->description;
     if (!project->requirements.empty()) {
-      details += "\n\nRequirements";
+      details += "\n\n" + tr("CONSTRUCTION_REQUIREMENTS", "Requirements");
       for (const auto &requirement : project->requirements)
         details += "\n" + requirement;
     }
@@ -485,7 +543,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          bounds.y + 28.f * layout.scale,
                          bounds.width - 16.f * layout.scale,
                          17.f * layout.scale}))
-        text(out, *line, state_name(value), good, layout.small_font_pixels);
+        text(out, *line, state_label(value), good, layout.small_font_pixels);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 47.f * layout.scale,
@@ -493,13 +551,16 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          17.f * layout.scale}))
         text(out, *line,
              (std::isfinite(value.progress_fraction)
-                  ? "Progress " +
-                        number(std::clamp(value.progress_fraction, 0., 1.) *
-                                   100.,
-                               1) +
-                        "%"
-                  : "Progress unavailable") +
-                 "  |  Remaining " + number(value.industry_remaining, 1),
+                  ? trf("CONSTRUCTION_PROGRESS",
+                        {number(std::clamp(value.progress_fraction, 0., 1.) *
+                                    100.,
+                                1)},
+                        "Progress {0}%")
+                  : tr("CONSTRUCTION_PROGRESS_UNAVAILABLE",
+                       "Progress unavailable")) +
+                 trf("CONSTRUCTION_REMAINING",
+                     {number(value.industry_remaining, 1)},
+                     "  |  Remaining {0}"),
              muted, layout.small_font_pixels);
       const UiRect track{bounds.x + 8.f * layout.scale,
                          bounds.y + 62.f * layout.scale,
@@ -519,23 +580,27 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                order_rows.y + 8.f * layout.scale,
                order_rows.width - 20.f * layout.scale,
                order_rows.height - 16.f * layout.scale},
-         "No projects are active, queued, or completed.", muted,
+         tr("CONSTRUCTION_NO_ACTIVE",
+            "No projects are active, queued, or completed."),
+         muted,
          layout.body_font_pixels);
 
   if (project && view_) {
-    std::string costs = "COST AND READINESS\nAuthorization " +
-                        project->formatted_credit_cost + "  |  Materials " +
-                        number(project->industry_cost, 1) + "\nUpkeep " +
-                        project->formatted_upkeep_rate + "  |  Treasury " +
-                        view_->formatted_treasury +
-                        "\nAvailable industry " +
-                        number(view_->available_industry, 1) +
-                        "  |  Minimum remaining " +
-                        stellar::native_campaign::format_campaign_duration(project->minimum_days_remaining);
+    std::string costs = trf(
+        "CONSTRUCTION_COSTS",
+        {project->formatted_credit_cost, number(project->industry_cost, 1),
+         project->formatted_upkeep_rate, view_->formatted_treasury,
+         number(view_->available_industry, 1),
+         stellar::native_campaign::format_campaign_duration(
+             project->minimum_days_remaining)},
+        "COST AND READINESS\nAuthorization {0}  |  Materials {1}\nUpkeep "
+        "{2}  |  Treasury {3}\nAvailable industry {4}  |  Minimum remaining "
+        "{5}");
     if (project->active || project->queued)
-      costs += "\nAuthorized " + project->formatted_authorization +
-               "  |  Refund now " +
-               project->formatted_cancellation_refund;
+      costs += trf("CONSTRUCTION_AUTHORIZED_REFUND",
+                   {project->formatted_authorization,
+                    project->formatted_cancellation_refund},
+                   "\nAuthorized {0}  |  Refund now {1}");
     if (project->queue_blocker) costs += "\n" + *project->queue_blocker;
     text(out, layout.costs, std::move(costs), muted,
          layout.small_font_pixels);
@@ -544,8 +609,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   std::string feedback = notice_;
   if (feedback.empty() && project && !project->complete && !project->active &&
       !project->queued) {
-    feedback = "Start: " + project->start.message +
-               "\nQueue: " + project->queue.message;
+    feedback = trf("CONSTRUCTION_START_QUEUE",
+                   {project->start.message, project->queue.message},
+                   "Start: {0}\nQueue: {1}");
   }
   if (!feedback.empty())
     text(out, layout.feedback, visible_message(std::move(feedback)),
@@ -563,20 +629,26 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   };
   if (project) {
     if (project->active || project->queued) {
-      action(layout.primary_action, state_name(*project), false);
+      action(layout.primary_action, state_label(*project), false);
       action(layout.secondary_action,
-             cancel_confirmation_id_ == project->id
-                 ? "CONFIRM CANCEL"
-                 : "CANCEL + REFUND",
+             tr(cancel_confirmation_id_ == project->id
+                    ? "CONSTRUCTION_CONFIRM_CANCEL"
+                    : "CONSTRUCTION_CANCEL_REFUND",
+                cancel_confirmation_id_ == project->id
+                    ? "CONFIRM CANCEL"
+                    : "CANCEL + REFUND"),
              true);
     } else if (!project->complete) {
       action(layout.primary_action,
-             project->start.will_queue ? "START / QUEUE" : "START NOW",
+             tr(project->start.will_queue ? "CONSTRUCTION_START_QUEUE_BTN"
+                                          : "CONSTRUCTION_START_NOW",
+                project->start.will_queue ? "START / QUEUE" : "START NOW"),
              project->start.enabled);
-      action(layout.secondary_action, "QUEUE",
+      action(layout.secondary_action, tr("CONSTRUCTION_QUEUE", "QUEUE"),
              project->queue.enabled);
     } else {
-      action(layout.primary_action, "COMPLETED", false);
+      action(layout.primary_action,
+             tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);
     }
   }
 }
