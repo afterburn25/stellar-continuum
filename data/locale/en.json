@@ -530,6 +530,23 @@
     "SETTINGS_QUALITY_LOW": "Low",
     "SETTINGS_QUALITY_MEDIUM": "Medium",
     "SETTINGS_QUALITY_HIGH": "High",
-    "SETTINGS_QUALITY_ULTRA": "Ultra"
+    "SETTINGS_QUALITY_ULTRA": "Ultra",
+    "ECONOMY_TITLE": "SOVEREIGN TREASURY",
+    "ECONOMY_REFRESH": "REFRESH",
+    "ECONOMY_RETRY": "RETRY",
+    "ECONOMY_HEALTH": "TREASURY HEALTH",
+    "ECONOMY_PRIORITY": "INDUSTRIAL PRIORITY",
+    "ECONOMY_INCOME": "INCOME",
+    "ECONOMY_COSTS": "OPERATING COSTS",
+    "ECONOMY_GUIDANCE_HEADING": "TREASURY GUIDANCE",
+    "ECONOMY_GUIDANCE_TEXT": "Construction and ship orders are capital costs. Active research and operations are daily commitments.",
+    "ECONOMY_UNAVAILABLE_HEADING": "TREASURY DATA UNAVAILABLE",
+    "ECONOMY_UNAVAILABLE_FAILED": "Treasury data could not be refreshed. Retry to request a new snapshot.",
+    "ECONOMY_UNAVAILABLE_EMPTY": "Treasury data is unavailable for the current observer. Retry after a campaign is available.",
+    "ECONOMY_UNAVAILABLE_GUIDANCE": "Treasury information is unavailable. Retry when the campaign is ready.",
+    "ECONOMY_NOTICE": "ECONOMY NOTICE",
+    "ECONOMY_POLICY_BALANCED": "BALANCED",
+    "ECONOMY_POLICY_INFRASTRUCTURE": "INFRASTRUCTURE",
+    "ECONOMY_POLICY_SHIPBUILDING": "SHIPBUILDING"
   }
 }
