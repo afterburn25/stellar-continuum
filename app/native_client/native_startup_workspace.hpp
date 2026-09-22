@@ -60,6 +60,7 @@ public:
   void set_diagnostics(std::string value) { diagnostics_ = std::move(value); }
   void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
     locale_ = table;
+    setup_.set_localization(table);
   }
   void set_return_to_campaign_available(bool available) noexcept;
   void set_continue_save(std::filesystem::path value) {continue_save_=std::move(value);}

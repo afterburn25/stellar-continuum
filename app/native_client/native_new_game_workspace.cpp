@@ -1,6 +1,7 @@
 #include "native_new_game_workspace.hpp"
 #include "native_menu_style.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <array>
@@ -182,6 +183,30 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
           {x+(right-x)*.47f,create.y-32*scale,(right-x)*.46f,26*scale}};
 }
 
+std::string NativeNewGameWorkspace::tr(std::string_view key,
+                                       std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeNewGameWorkspace::trf(std::string_view key,
+                                        std::initializer_list<std::string> args,
+                                        std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
   const bool first_view = !view_;
   view_ = std::move(value);
@@ -314,48 +339,72 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
                                      8.f * layout.scale) +
                  gap;
     };
-    add("HOMEWORLD ENVIRONMENT TOLERANCES", layout.small_font, 6.f * layout.scale);
-    add("Comfortable gravity  " + band(option->gravity_g, "g", 2),
+    add(tr("SETUP_TOLERANCES", "HOMEWORLD ENVIRONMENT TOLERANCES"),
+        layout.small_font, 6.f * layout.scale);
+    add(trf("SETUP_COMFORTABLE_GRAVITY", {band(option->gravity_g, "g", 2)},
+            "Comfortable gravity  {0}"),
         layout.body_font, 4.f * layout.scale);
-    add("Survival gravity  " +
-            band({option->gravity_g.preferred,
-                  option->gravity_g.survivable_deviation,
-                  option->gravity_g.survivable_deviation},
-                 "g", 2),
+    add(trf("SETUP_SURVIVAL_GRAVITY",
+            {band({option->gravity_g.preferred,
+                   option->gravity_g.survivable_deviation,
+                   option->gravity_g.survivable_deviation},
+                  "g", 2)},
+            "Survival gravity  {0}"),
         layout.body_font, 4.f * layout.scale);
-    add("Comfortable temperature  " +
-            band(option->temperature_kelvin, "K", 0),
+    add(trf("SETUP_COMFORTABLE_TEMPERATURE",
+            {band(option->temperature_kelvin, "K", 0)},
+            "Comfortable temperature  {0}"),
         layout.body_font, 4.f * layout.scale);
-    add("Survival temperature  " +
-            band({option->temperature_kelvin.preferred,
-                  option->temperature_kelvin.survivable_deviation,
-                  option->temperature_kelvin.survivable_deviation},
-                 "K", 0),
+    add(trf("SETUP_SURVIVAL_TEMPERATURE",
+            {band({option->temperature_kelvin.preferred,
+                   option->temperature_kelvin.survivable_deviation,
+                   option->temperature_kelvin.survivable_deviation},
+                  "K", 0)},
+            "Survival temperature  {0}"),
         layout.body_font, 4.f * layout.scale);
-    add("Comfortable pressure  " + band(option->pressure_kpa, "kPa", 0),
+    add(trf("SETUP_COMFORTABLE_PRESSURE",
+            {band(option->pressure_kpa, "kPa", 0)},
+            "Comfortable pressure  {0}"),
         layout.body_font, 4.f * layout.scale);
-    add("Survival pressure  " +
-            band({option->pressure_kpa.preferred,
-                  option->pressure_kpa.survivable_deviation,
-                  option->pressure_kpa.survivable_deviation},
-                 "kPa", 0),
+    add(trf("SETUP_SURVIVAL_PRESSURE",
+            {band({option->pressure_kpa.preferred,
+                   option->pressure_kpa.survivable_deviation,
+                   option->pressure_kpa.survivable_deviation},
+                  "kPa", 0)},
+            "Survival pressure  {0}"),
         layout.body_font, 8.f * layout.scale);
-    add("CHEMISTRY AND HABITAT", layout.small_font, 6.f * layout.scale);
+    add(tr("SETUP_CHEMISTRY", "CHEMISTRY AND HABITAT"), layout.small_font,
+        6.f * layout.scale);
     for (const auto &value :
-         {"Biochemistry  " + option->biochemistry_label,
-          "Preferred atmosphere  " + option->preferred_atmosphere_label,
-          "Biological solvent  " + option->biological_solvent_label,
-          "Radiation tolerance  " +
-              number(option->radiation_tolerance * 100., 0) + "/100",
+         {trf("SETUP_BIOCHEMISTRY", {option->biochemistry_label},
+              "Biochemistry  {0}"),
+          trf("SETUP_ATMOSPHERE", {option->preferred_atmosphere_label},
+              "Preferred atmosphere  {0}"),
+          trf("SETUP_SOLVENT", {option->biological_solvent_label},
+              "Biological solvent  {0}"),
+          trf("SETUP_RADIATION",
+              {number(option->radiation_tolerance * 100., 0) + "/100"},
+              "Radiation tolerance  {0}"),
           option->requires_immersion
-              ? std::string{"Requires an immersed workspace."}
+              ? tr("SETUP_IMMERSION", "Requires an immersed workspace.")
               : option->can_operate_in_vacuum_unprotected
-                    ? std::string{"Can operate in vacuum without protection."}
-                    : std::string{"Requires protection in vacuum."}})
+                    ? tr("SETUP_VACUUM_OK",
+                         "Can operate in vacuum without protection.")
+                    : tr("SETUP_VACUUM_PROTECTED",
+                         "Requires protection in vacuum.")})
       add(value, layout.body_font, 4.f * layout.scale);
-    add("PHYSIOLOGY",layout.small_font,6.f*layout.scale);
-    add("Adult mass  "+number(option->adult_mass_kg,0)+" kg · Maturity  "+number(option->maturity_years,0)+" years",layout.body_font,4.f*layout.scale);
-    add("Lifespan  "+number(option->lifespan_years,0)+" years · Metabolic demand  "+number(option->metabolic_demand,2)+"x Terran baseline",layout.body_font,4.f*layout.scale);
+    add(tr("SETUP_PHYSIOLOGY", "PHYSIOLOGY"), layout.small_font,
+        6.f * layout.scale);
+    add(trf("SETUP_MASS_MATURITY",
+            {number(option->adult_mass_kg, 0),
+             number(option->maturity_years, 0)},
+            "Adult mass  {0} kg · Maturity  {1} years"),
+        layout.body_font, 4.f * layout.scale);
+    add(trf("SETUP_LIFESPAN_METABOLIC",
+            {number(option->lifespan_years, 0),
+             number(option->metabolic_demand, 2)},
+            "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"),
+        layout.body_font, 4.f * layout.scale);
     result.details_content_height = content;
   }
   return result;
@@ -573,29 +622,30 @@ void NativeNewGameWorkspace::render(
          background);
   }
   native_menu_style::panel(out,layout.panel,layout.scale);
-  text(out, layout.heading, "CONFIGURE SANDBOX", bright, layout.heading_font,
-       TextAlign::Left, FontFace::Heading);
+  text(out, layout.heading, tr("SETUP_TITLE", "CONFIGURE SANDBOX"), bright,
+       layout.heading_font, TextAlign::Left, FontFace::Heading);
   fill(out, layout.cancel,
        layout.cancel.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.cancel, border);
-  text(out, layout.cancel, "BACK", bright, layout.body_font,
-       TextAlign::Center);
+  text(out, layout.cancel, tr("STARTUP_BACK", "BACK"), bright,
+       layout.body_font, TextAlign::Center);
 
   for(const auto& [rect,label]:std::array<std::pair<UiRect,std::string>,2>{
-      std::pair{layout.morphology,"SHAPE: "+(population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology)))},
-      std::pair{layout.population,"POPULATION: "+std::string(stellar::core::population_selection_label(requested_population_))}}){
+      std::pair{layout.morphology,trf("SETUP_SHAPE",{population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology))},"SHAPE: {0}")},
+      std::pair{layout.population,trf("SETUP_POPULATION",{std::string(stellar::core::population_selection_label(requested_population_))},"POPULATION: {0}")}]){
     fill(out,rect,rect.contains(pointer_)?hover:raised_tint);stroke(out,rect,border);text(out,rect,label,bright,layout.small_font,TextAlign::Center);
   }
-  const auto count_label = [](const auto &choices, const int count) {
+  const auto count_label = [&](const auto &choices, const int count) {
     const auto found = std::ranges::find(choices, count,
                                          &NativeCivilizationCountOption::count);
-    return found == choices.end() ? std::string{"Unavailable"} : found->label;
+    return found == choices.end() ? tr("SETUP_UNAVAILABLE", "Unavailable")
+                                  : found->label;
   };
   fill(out, layout.mode_story, layout.mode_story.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.mode_story, border);
   text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 7 * s,
              layout.mode_story.width - 20 * s, 22 * s},
-       "RIVAL EMPIRES", gold, layout.small_font);
+       tr("SETUP_RIVAL_EMPIRES", "RIVAL EMPIRES"), gold, layout.small_font);
   text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 30 * s,
              layout.mode_story.width - 20 * s, 18 * s},
        count_label(view_->pre_warp_civilization_presets,
@@ -604,7 +654,7 @@ void NativeNewGameWorkspace::render(
   stroke(out, layout.mode_sandbox, border);
   text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 7 * s,
              layout.mode_sandbox.width - 20 * s, 22 * s},
-       "ANCIENT EMPIRES", gold, layout.small_font);
+       tr("SETUP_ANCIENT_EMPIRES", "ANCIENT EMPIRES"), gold, layout.small_font);
   text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 30 * s,
              layout.mode_sandbox.width - 20 * s, 18 * s},
        count_label(view_->ancient_civilization_presets,
@@ -614,7 +664,8 @@ void NativeNewGameWorkspace::render(
   stroke(out, layout.species, border);
   text(out, {layout.species.x + 8 * s, layout.species.y + 8 * s,
              layout.species.width - 16 * s, 22 * s},
-       "PLAYABLE SPECIES", gold, layout.small_font);
+       tr("SETUP_PLAYABLE_SPECIES", "PLAYABLE SPECIES"), gold,
+       layout.small_font);
   for (std::size_t index = 0; index < view_->species.size(); ++index) {
     const auto row = measured.species_rows[index];
     const auto clip = intersection(row, layout.species_rows);
@@ -675,42 +726,61 @@ void NativeNewGameWorkspace::render(
                    std::move(value), color, pixels);
       y += height_line + gap * s;
     };
-    line("HOMEWORLD ENVIRONMENT TOLERANCES", gold, layout.small_font, 6.f);
-    line("Comfortable gravity  " + band(species->gravity_g, "g", 2));
-    line("Survival gravity  " +
-         band({species->gravity_g.preferred,
-               species->gravity_g.survivable_deviation,
-               species->gravity_g.survivable_deviation},
-              "g", 2));
-    line("Comfortable temperature  " +
-         band(species->temperature_kelvin, "K", 0));
-    line("Survival temperature  " +
-         band({species->temperature_kelvin.preferred,
-               species->temperature_kelvin.survivable_deviation,
-               species->temperature_kelvin.survivable_deviation},
-              "K", 0));
-    line("Comfortable pressure  " + band(species->pressure_kpa, "kPa", 0));
-    line("Survival pressure  " +
-             band({species->pressure_kpa.preferred,
-                   species->pressure_kpa.survivable_deviation,
-                   species->pressure_kpa.survivable_deviation},
-                  "kPa", 0),
+    line(tr("SETUP_TOLERANCES", "HOMEWORLD ENVIRONMENT TOLERANCES"), gold,
+         layout.small_font, 6.f);
+    line(trf("SETUP_COMFORTABLE_GRAVITY", {band(species->gravity_g, "g", 2)},
+             "Comfortable gravity  {0}"));
+    line(trf("SETUP_SURVIVAL_GRAVITY",
+             {band({species->gravity_g.preferred,
+                    species->gravity_g.survivable_deviation,
+                    species->gravity_g.survivable_deviation},
+                   "g", 2)},
+             "Survival gravity  {0}"));
+    line(trf("SETUP_COMFORTABLE_TEMPERATURE",
+             {band(species->temperature_kelvin, "K", 0)},
+             "Comfortable temperature  {0}"));
+    line(trf("SETUP_SURVIVAL_TEMPERATURE",
+             {band({species->temperature_kelvin.preferred,
+                    species->temperature_kelvin.survivable_deviation,
+                    species->temperature_kelvin.survivable_deviation},
+                   "K", 0)},
+             "Survival temperature  {0}"));
+    line(trf("SETUP_COMFORTABLE_PRESSURE",
+             {band(species->pressure_kpa, "kPa", 0)},
+             "Comfortable pressure  {0}"));
+    line(trf("SETUP_SURVIVAL_PRESSURE",
+             {band({species->pressure_kpa.preferred,
+                    species->pressure_kpa.survivable_deviation,
+                    species->pressure_kpa.survivable_deviation},
+                   "kPa", 0)},
+             "Survival pressure  {0}"),
          bright, 0, 8.f);
-    line("CHEMISTRY AND HABITAT", gold, layout.small_font, 6.f);
-    line("Biochemistry  " + species->biochemistry_label);
-    line("Preferred atmosphere  " + species->preferred_atmosphere_label);
-    line("Biological solvent  " + species->biological_solvent_label);
-    line("Radiation tolerance  " +
-         number(species->radiation_tolerance * 100., 0) + "/100");
+    line(tr("SETUP_CHEMISTRY", "CHEMISTRY AND HABITAT"), gold,
+         layout.small_font, 6.f);
+    line(trf("SETUP_BIOCHEMISTRY", {species->biochemistry_label},
+             "Biochemistry  {0}"));
+    line(trf("SETUP_ATMOSPHERE", {species->preferred_atmosphere_label},
+             "Preferred atmosphere  {0}"));
+    line(trf("SETUP_SOLVENT", {species->biological_solvent_label},
+             "Biological solvent  {0}"));
+    line(trf("SETUP_RADIATION",
+             {number(species->radiation_tolerance * 100., 0) + "/100"},
+             "Radiation tolerance  {0}"));
     if (species->requires_immersion)
-      line("Requires an immersed workspace.", warning);
+      line(tr("SETUP_IMMERSION", "Requires an immersed workspace."), warning);
     line(species->can_operate_in_vacuum_unprotected
-             ? "Can operate in vacuum without protection."
-             : "Requires protection in vacuum.",
+             ? tr("SETUP_VACUUM_OK", "Can operate in vacuum without protection.")
+             : tr("SETUP_VACUUM_PROTECTED", "Requires protection in vacuum."),
          muted);
-    line("PHYSIOLOGY",gold,layout.small_font,6.f);
-    line("Adult mass  "+number(species->adult_mass_kg,0)+" kg · Maturity  "+number(species->maturity_years,0)+" years");
-    line("Lifespan  "+number(species->lifespan_years,0)+" years · Metabolic demand  "+number(species->metabolic_demand,2)+"x Terran baseline");
+    line(tr("SETUP_PHYSIOLOGY", "PHYSIOLOGY"), gold, layout.small_font, 6.f);
+    line(trf("SETUP_MASS_MATURITY",
+             {number(species->adult_mass_kg, 0),
+              number(species->maturity_years, 0)},
+             "Adult mass  {0} kg · Maturity  {1} years"));
+    line(trf("SETUP_LIFESPAN_METABOLIC",
+             {number(species->lifespan_years, 0),
+              number(species->metabolic_demand, 2)},
+             "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"));
     const float maximum_scroll =
         std::max(0.f, measured.details_content_height - facts_clip.height);
     if (maximum_scroll > 0.f) {
@@ -730,28 +800,32 @@ void NativeNewGameWorkspace::render(
         fill(out, fade, {8, 20, 36, 235});
         text(out, {fade.x, fade.y + 4.f * s, fade.width - 6.f * s,
                    17.f * s},
-             "SCROLL FOR MORE", muted, layout.small_font, TextAlign::Right);
+             tr("SETUP_SCROLL_MORE", "SCROLL FOR MORE"), muted,
+             layout.small_font, TextAlign::Right);
       }
     }
   }
 
-  text(out, layout.seed_label, "GALAXY SEED", gold, layout.small_font);
+  text(out, layout.seed_label, tr("SETUP_SEED_LABEL", "GALAXY SEED"), gold,
+       layout.small_font);
   fill(out, layout.seed_input,
        seed_focused_ ? selected_tint : raised_tint);
   stroke(out, layout.seed_input, seed_focused_ ? accent : border);
   text(out, {layout.seed_input.x + 9 * s, layout.seed_input.y + 8 * s,
              layout.seed_input.width - 18 * s, 22 * s},
-       seed_text_.empty() ? "Enter a numeric seed" : seed_text_,
+       seed_text_.empty() ? tr("SETUP_SEED_PLACEHOLDER", "Enter a numeric seed")
+                          : seed_text_,
        seed_text_.empty() ? muted : bright, layout.body_font);
   fill(out, layout.randomize_seed,
        layout.randomize_seed.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.randomize_seed, border);
-  text(out, layout.randomize_seed, "RANDOMIZE", bright, layout.small_font,
-       TextAlign::Center);
+  text(out, layout.randomize_seed, tr("SETUP_RANDOMIZE", "RANDOMIZE"), bright,
+       layout.small_font, TextAlign::Center);
   fill(out, layout.restore_defaults,
        layout.restore_defaults.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.restore_defaults, border);
-  text(out, layout.restore_defaults, "RESTORE DEFAULTS", bright,
+  text(out, layout.restore_defaults,
+       tr("SETUP_RESTORE_DEFAULTS", "RESTORE DEFAULTS"), bright,
        layout.small_font, TextAlign::Center);
 
   if (!view_->size_presets.empty()) {
@@ -776,9 +850,10 @@ void NativeNewGameWorkspace::render(
     }
     text(out, {layout.size_group.x, layout.size_group.y,
                layout.size_group.width, 18 * s},
-         "GALAXY SIZE · SYSTEMS", gold, layout.small_font);
+         tr("SETUP_GALAXY_SIZE", "GALAXY SIZE · SYSTEMS"), gold,
+         layout.small_font);
   }
-  native_menu_style::button(out,layout.copy_setup,"COPY SETUP",layout.small_font,layout.copy_setup.contains(pointer_),true,s);
+  native_menu_style::button(out,layout.copy_setup,tr("SETUP_COPY","COPY SETUP"),layout.small_font,layout.copy_setup.contains(pointer_),true,s);
   if(view_->developer_mode){
     const auto checkbox=[&](UiRect row,bool checked,std::string caption){
       const UiRect box{row.x,row.y+3*s,20*s,20*s};
@@ -786,29 +861,29 @@ void NativeNewGameWorkspace::render(
       if(checked)text(out,box,"✓",accent,layout.body_font,TextAlign::Center);
       text(out,{row.x+28*s,row.y+3*s,row.width-28*s,row.height},std::move(caption),bright,layout.small_font);
     };
-    checkbox(layout.developer_normal_research,developer_research_.complete_normal_research,"All normal research completed");
-    checkbox(layout.developer_special_research,developer_research_.complete_special_research,"Include special research");
-    checkbox(layout.developer_coverage,developer_coverage_,"Full celestial coverage (QA only)");
-    checkbox(layout.developer_exploration,developer_exploration_,"Entire galaxy explored and surveyed");
+    checkbox(layout.developer_normal_research,developer_research_.complete_normal_research,tr("SETUP_DEV_NORMAL_RESEARCH","All normal research completed"));
+    checkbox(layout.developer_special_research,developer_research_.complete_special_research,tr("SETUP_DEV_SPECIAL_RESEARCH","Include special research"));
+    checkbox(layout.developer_coverage,developer_coverage_,tr("SETUP_DEV_COVERAGE","Full celestial coverage (QA only)"));
+    checkbox(layout.developer_exploration,developer_exploration_,tr("SETUP_DEV_EXPLORATION","Entire galaxy explored and surveyed"));
   }else text(out,{layout.seed_label.x,layout.create.y-32*s,layout.panel.width-28*s,26*s},
-       generation_configuration()?"Resolved population: "+std::string(stellar::core::population_state_name(generation_configuration()->resolved_population))+" · "+std::to_string(selected_system_count_)+" systems":"Enter a valid seed to resolve the population",muted,layout.small_font);
+       generation_configuration()?trf("SETUP_POPULATION_RESOLVED",{std::string(stellar::core::population_state_name(generation_configuration()->resolved_population)),std::to_string(selected_system_count_)},"Resolved population: {0} · {1} systems"):tr("SETUP_POPULATION_UNRESOLVED","Enter a valid seed to resolve the population"),muted,layout.small_font);
   if(!view_->developer_mode)text(out,{layout.seed_label.x,layout.create.y+5*s,layout.create.x-layout.seed_label.x-10*s,25*s},
-       view_->developer_mode?"DEV · Unchecked research follows normal progression":"Reproduction requires the same seed and generation settings.",gold,layout.small_font);
+       tr("SETUP_REPRODUCTION_HINT","Reproduction requires the same seed and generation settings."),gold,layout.small_font);
   const UiRect notice{layout.seed_label.x,layout.create.y+layout.create.height+5*s,layout.create.x-layout.seed_label.x-10*s,18*s};
   text(out, notice,
        message_.empty()
-           ? std::to_string(std::max(0, selected_pre_warp_civilization_count_ - 1)) +
-                 " rival empires · " +
-                 std::to_string(selected_ancient_civilization_count_) +
-                 " ancient empires"
+           ? trf("SETUP_EMPIRE_SUMMARY",
+                 {std::to_string(std::max(0, selected_pre_warp_civilization_count_ - 1)),
+                  std::to_string(selected_ancient_civilization_count_)},
+                 "{0} rival empires · {1} ancient empires")
            : message_,
        message_.empty() ? muted : assessment_accepted_ ? accent : warning,
        layout.small_font);
   fill(out, layout.create,
        layout.create.contains(pointer_) ? hover : selected_tint);
   stroke(out, layout.create, accent);
-  text(out, layout.create, "CREATE CAMPAIGN", bright, layout.body_font,
-       TextAlign::Center);
+  text(out, layout.create, tr("SETUP_CREATE", "CREATE CAMPAIGN"), bright,
+       layout.body_font, TextAlign::Center);
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
