@@ -626,6 +626,43 @@ int main(int argc, char **argv) {
             "prerecorded cue must surface its own subtitle text");
     }
 
+    // A locale catalog containing the minted localization_key overrides the
+    // authored subtitle; absent keys fall back to authored text.
+    {
+      stellar::engine::LocalizationTable locale{"en", "en"};
+      std::string locale_error;
+      check(locale.load_json(
+                R"({"locale":"en","strings":{"voice.opening.0":"Localized opening."}})",
+                &locale_error),
+            "the test locale table must parse");
+      NativeVoicePlayback localized({}, &registry, &resolver, nullptr);
+      auto localized_backend = std::make_unique<FakeBackend>();
+      localized_backend->usable = false;
+      localized.attach_backend(std::move(localized_backend));
+      localized.bind([](const std::filesystem::path &) { return nullptr; },
+                     [](NativeVoicePlayback::Stream, double) {}, [] {});
+      localized.set_localization(&locale);
+      NativeSpeechRequest localized_request;
+      localized_request.text = "Authored opening.";
+      localized_request.subtitle_text = "Authored subtitle.";
+      localized_request.localization_key = "voice.opening.0";
+      localized_request.priority = 40;
+      localized_request.dedupe_key = "localized";
+      localized.speak(localized_request);
+      localized.update(.016);
+      check(localized.active_subtitle() == "Localized opening.",
+            "a catalogued localization_key must override authored text");
+
+      localized_request.dedupe_key = "localized-miss";
+      localized_request.localization_key = "voice.missing.0";
+      localized.speak(localized_request);
+      for (int i = 0;
+           i < 600 && localized.active_subtitle() != "Authored subtitle."; ++i)
+        localized.update(.05);
+      check(localized.active_subtitle() == "Authored subtitle.",
+            "an absent localization_key must keep the authored subtitle");
+    }
+
     if (failures == 0)
       std::cout << "native voice contract tests passed\n";
   }

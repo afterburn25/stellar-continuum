@@ -883,6 +883,12 @@ class NativeCampaign final {
     return voice_playback_?&*voice_playback_:nullptr;
   }
 
+  // Hands the live locale catalog to the voice pipeline so minted
+  // localization_keys resolve when a table ships translated cue text.
+  void set_voice_locale(const stellar::engine::LocalizationTable &table){
+    if(voice_playback_)voice_playback_->set_localization(&table);
+  }
+
   // Deterministic replay (engine ReplayRecorder adoption): --record stores
   // each dispatched GALAXY keypress and a canonical-state hash at every save
   // capture; --replay re-feeds the keypresses under the fixed step that main()
@@ -8286,6 +8292,7 @@ int main(int argc,char **argv){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
     campaign.attach_replay(&replay);
+    campaign.set_voice_locale(locale_table);
     active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';

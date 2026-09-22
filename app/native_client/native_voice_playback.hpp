@@ -3,6 +3,8 @@
 #include "native_audio.hpp"
 #include "native_voice.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -115,6 +117,12 @@ public:
     return settings_;
   }
   void apply_settings(NativeVoiceSettings);
+  // Optional locale catalog: when it contains a line's localization_key the
+  // translated string wins over the authored subtitle text.
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
 private:
   struct Queued {
@@ -126,6 +134,7 @@ private:
   void present_fallback(std::string_view reason);
   void finish_line();
   void stop_current();
+  [[nodiscard]] std::string subtitle_for(const NativeSpeechRequest &) const;
   [[nodiscard]] static double read_seconds(const NativeSpeechRequest &);
 
   NativeVoiceSettings settings_;
@@ -148,6 +157,7 @@ private:
   Play play_;
   Stop stop_play_;
   std::string diagnostics_{"Idle"}, last_source_;
+  const stellar::engine::LocalizationTable *locale_{};
   std::string active_speaker_, active_text_;
   std::optional<std::string> active_portrait_;
 };

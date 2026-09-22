@@ -362,8 +362,7 @@ void NativeVoicePlayback::present_result(NativeVoiceResult result) {
   remaining_ = std::max(seconds + .25, read_seconds(*active_));
   if (active_->speaker_name) active_speaker_ = *active_->speaker_name;
   active_portrait_ = active_->speaker_portrait;
-  active_text_ =
-      active_->subtitle_text ? *active_->subtitle_text : active_->text;
+  active_text_ = subtitle_for(*active_);
   ++played_lines_;
   ++subtitle_lines_;
   speaking_ = true;
@@ -377,9 +376,16 @@ void NativeVoicePlayback::present_fallback(std::string_view reason) {
   remaining_ = read_seconds(*active_);
   if (active_->speaker_name) active_speaker_ = *active_->speaker_name;
   active_portrait_ = active_->speaker_portrait;
-  active_text_ =
-      active_->subtitle_text ? *active_->subtitle_text : active_->text;
+  active_text_ = subtitle_for(*active_);
   ++subtitle_lines_;
+}
+
+std::string
+NativeVoicePlayback::subtitle_for(const NativeSpeechRequest &line) const {
+  if (!line.localization_key.empty() && locale_ &&
+      locale_->contains(line.localization_key))
+    return std::string(locale_->translate(line.localization_key));
+  return line.subtitle_text ? *line.subtitle_text : line.text;
 }
 
 void NativeVoicePlayback::finish_line() {
