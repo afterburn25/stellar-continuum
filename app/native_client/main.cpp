@@ -1,5 +1,6 @@
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
+#include <stellar/engine/spatial_index.hpp>
 #include <stellar/engine/spatial_index3d.hpp>
 #include "native_phenomena_debug.hpp"
 #include "native_background_debug.hpp"
@@ -2760,8 +2761,13 @@ class NativeCampaign final {
           throw std::runtime_error("Fleet smoke hover closed the campaign.");
       }
       if(!fleet_workspace_.preview()||
-         !fleet_workspace_.preview()->command_available||
-         fleet_workspace_.preview()->target_system_id!=target)
+         fleet_workspace_.preview()->target_system_id!=*target||
+         fleet_workspace_.preview()->command_available)
+        throw std::runtime_error("Fleet smoke hover did not produce a display-only preview.");
+      smoke_fleet_hover_preview_=true;
+      click(target_point,InputEventType::RightPressed);
+      if(!fleet_workspace_.preview()||
+         !fleet_workspace_.preview()->command_available)
         throw std::runtime_error("Fleet smoke right-click preview failed.");
       click(center(layout.confirm));
       if(!last_fleet_command_accepted_)
@@ -5357,6 +5363,7 @@ class NativeCampaign final {
     out<<found->id<<":"<<*smoke_fleet_destination_<<":"
        <<found->mission_order_revision<<":"<<std::fixed
        <<std::setprecision(6)<<found->transit_progress
+       <<" hover="<<(smoke_fleet_hover_preview_?1:0)
        <<" civilian_recovery="<<(smoke_civilian_recovery_?1:0)
        <<" fleet_located="<<(smoke_fleet_located_?1:0);
     return out.str();
@@ -6032,7 +6039,7 @@ class NativeCampaign final {
         if(colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
-      if(event.type==InputEventType::PointerMove){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())pan_galaxy_camera(event.delta,width,height);gesture_.move(event.delta);continue;}
+      if(event.type==InputEventType::PointerMove){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.allows_world_drag())pan_galaxy_camera(event.delta,width,height);gesture_.move(event.delta);update_fleet_hover_preview(event.position,width,height);continue;}
       if(event.type==InputEventType::Wheel){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&!gesture_.captured_by_ui())zoom_galaxy_camera(event.wheel_y,event.position,width,height);continue;}
       if(event.type==InputEventType::LeftReleased){if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!colony_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&gesture_.release_as_world_click())select(event.position,width,height);else if(menu_||colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||colony_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible())(void)gesture_.release_as_world_click();}
     }
@@ -7154,13 +7161,39 @@ class NativeCampaign final {
   [[nodiscard]] std::optional<int> system_hit(Point pointer,int width,
                                                int height)const{
     float best=std::max(10.f,galaxy_star_core_radius(camera_.pixels_per_world/fitted_pixels_per_world_,height)*1.8f);
-    std::optional<int> result;
-    for(const auto &system:session_->frame().runtime().world().campaign().systems){
-      const auto point=camera_.project({system.position.x,system.position.y},width,height);
-      const auto distance=std::hypot(point.x-pointer.x,point.y-pointer.y);
-      if(distance<best){best=distance;result=system.id;}
+    if(!(camera_.pixels_per_world>0.))return std::nullopt;
+    ensure_system_hit_grid();
+    if(!system_hit_grid_)return std::nullopt;
+    // The camera transform is a uniform scale, so nearest in world space is
+    // nearest in screen space; convert the pixel pick radius once instead of
+    // projecting every system per query.
+    const auto world=camera_.unproject(pointer,width,height);
+    const auto hit=system_hit_grid_->nearest(static_cast<float>(world.x),
+        static_cast<float>(world.y),
+        static_cast<float>(best/camera_.pixels_per_world));
+    return hit?std::optional<int>{hit->first}:std::nullopt;
+  }
+
+  // Star positions are static within a campaign; the spatial index is rebuilt
+  // lazily when the session cache generation changes (new/load campaign).
+  void ensure_system_hit_grid()const{
+    const auto generation=session_->cache().generation;
+    if(system_hit_grid_&&system_hit_grid_generation_==generation)return;
+    const auto &systems=session_->frame().runtime().world().campaign().systems;
+    system_hit_grid_.reset();
+    system_hit_grid_generation_=generation;
+    if(systems.empty())return;
+    float minx=std::numeric_limits<float>::max(),maxx=std::numeric_limits<float>::lowest(),
+          miny=minx,maxy=maxx;
+    for(const auto &s:systems){
+      minx=std::min(minx,s.position.x);maxx=std::max(maxx,s.position.x);
+      miny=std::min(miny,s.position.y);maxy=std::max(maxy,s.position.y);
     }
-    return result;
+    const float extent=std::max({maxx-minx,maxy-miny,1e-3f});
+    const float cell=std::max(extent/std::sqrt(static_cast<float>(systems.size())),1e-3f);
+    system_hit_grid_.emplace(cell);
+    for(const auto &s:systems)
+      system_hit_grid_->insert(s.id,s.position.x,s.position.y);
   }
 
   [[nodiscard]] std::string system_display_name(int system_id)const{
@@ -7263,6 +7296,7 @@ class NativeCampaign final {
 
   void handle_fleet_command(const FleetWorkspaceCommand &command){
     if(command.kind==FleetWorkspaceCommandKind::None)return;
+    hover_preview_target_.reset();hover_preview_shown_=false;
     if(command.kind==FleetWorkspaceCommandKind::Recovery){
       if(!command.recovery_quote)return;
       auto outcome=fleet_controller_.issue_civilian_recovery(
@@ -7676,6 +7710,8 @@ class NativeCampaign final {
   std::unique_ptr<NativeCampaignSession> session_;
   Window *window_{};
   Camera camera_;
+  mutable std::optional<stellar::engine::SpatialGrid<int>> system_hit_grid_;
+  mutable std::uint64_t system_hit_grid_generation_{std::numeric_limits<std::uint64_t>::max()};
   int galaxy_view_width_{},galaxy_view_height_{};
   NativeGalaxyStarMarkerRenderer galaxy_star_markers_;
   stellar::native_stellar::Artwork stellar_art_;
@@ -7893,6 +7929,7 @@ class NativeCampaign final {
       smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_civilian_recovery_{};
+  bool smoke_fleet_hover_preview_{};
   bool smoke_fleet_located_{};
   std::optional<int> smoke_fleet_destination_;
   bool smoke_system_entered_{},smoke_system_hit_{},smoke_system_panned_{},smoke_system_zoomed_{},smoke_system_reset_{},smoke_system_back_{},smoke_system_pause_retained_{},smoke_system_speed_retained_{},smoke_system_gesture_cleared_{},smoke_system_focused_{};
