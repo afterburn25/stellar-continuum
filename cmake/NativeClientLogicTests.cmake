@@ -640,7 +640,7 @@ add_executable(stellar_native_colony_roster_tests
   native-tests/native_colony_roster_tests.cpp
   app/native_client/native_colony_roster.cpp)
 target_include_directories(stellar_native_colony_roster_tests PRIVATE app/native_client engine/include)
-target_link_libraries(stellar_native_colony_roster_tests PRIVATE stellar_core)
+target_link_libraries(stellar_native_colony_roster_tests PRIVATE stellar_core stellar_engine)
 if(MSVC)
   target_compile_options(stellar_native_colony_roster_tests PRIVATE /W4 /WX /permissive-)
 endif()

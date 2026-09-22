@@ -209,7 +209,7 @@ void RosterWorkspace::set_view(View value) {
       value.available != view_.available || value.rows != view_.rows;
   view_ = std::move(value);
   if (identity_changed) {
-    scroll_ = 0;
+    list_.scroll_offset = 0;
     notice_.clear();
     clear_press();
   } else if (content_changed) {
@@ -218,7 +218,7 @@ void RosterWorkspace::set_view(View value) {
 }
 void RosterWorkspace::open() noexcept {
   visible_ = true;
-  scroll_ = 0;
+  list_.scroll_offset = 0;
   clear_press();
 }
 void RosterWorkspace::close() noexcept {
@@ -229,13 +229,17 @@ void RosterWorkspace::discard_campaign() noexcept {
   close();
   view_ = {};
   notice_.clear();
-  scroll_ = 0;
+  list_.scroll_offset = 0;
+}
+void RosterWorkspace::sync_scroll(const RosterLayout &layout) const noexcept {
+  list_.row_count = view_.rows.size();
+  list_.row_height = layout.row_height + 5.f * layout.scale;
+  list_.viewport_height = layout.list.height;
 }
 float RosterWorkspace::maximum_scroll(
     const RosterLayout &layout) const noexcept {
-  const float content = static_cast<float>(view_.rows.size()) *
-                        (layout.row_height + 5.f * layout.scale);
-  return std::max(0.f, content - layout.list.height);
+  sync_scroll(layout);
+  return list_.max_scroll();
 }
 UiRect RosterWorkspace::row_button(int index, int width,
                                    int height) const noexcept {
@@ -246,7 +250,7 @@ UiRect RosterWorkspace::row_button(int index, int width,
           layout.list.y +
               static_cast<float>(index) *
                   (layout.row_height + 5.f * layout.scale) -
-              scroll_,
+              list_.scroll_offset,
           layout.list.width, layout.row_height};
 }
 RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
@@ -261,7 +265,8 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     clear_press();
   }
   const auto layout = RosterLayout::for_viewport(width, height);
-  scroll_ = std::clamp(scroll_, 0.f, maximum_scroll(layout));
+  sync_scroll(layout);
+  list_.scroll_to(list_.scroll_offset);
   if (event.type == InputEventType::PointerCancelled) {
     clear_press();
     return {true};
@@ -316,8 +321,7 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     return {};
   if (event.type == InputEventType::Wheel) {
     if (layout.list.contains(event.position))
-      scroll_ = std::clamp(scroll_ - event.wheel_y * 48.f * layout.scale, 0.f,
-                           maximum_scroll(layout));
+      list_.scroll_to(list_.scroll_offset - event.wheel_y * 48.f * layout.scale);
     return {true};
   }
   if (event.type == InputEventType::LeftPressed) {
@@ -408,7 +412,7 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
          "POPULATION / ACTION", font - 2, muted, p);
   }
   const float maximum = maximum_scroll(layout);
-  scroll_ = std::clamp(scroll_, 0.f, maximum);
+  list_.scroll_to(list_.scroll_offset);
   for (std::size_t i = 0; i < view_.rows.size(); ++i) {
     const auto box = row_button(static_cast<int>(i), width, height);
     const auto visible = clip_intersection(box, layout.list);
@@ -483,7 +487,7 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
         std::max(24.f * layout.scale, layout.list.height * layout.list.height /
                                           (maximum + layout.list.height));
     const float y =
-        layout.list.y + (layout.list.height - thumb) * scroll_ / maximum;
+        layout.list.y + (layout.list.height - thumb) * list_.scroll_offset / maximum;
     out.overlay.emplace_back(
         FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
                          layout.list.y, 3.f * layout.scale, layout.list.height},

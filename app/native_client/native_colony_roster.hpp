@@ -2,6 +2,7 @@
 
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -54,7 +55,7 @@ public:
   void discard_campaign() noexcept;
   void cancel_pending_input() noexcept { clear_press(); }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
-  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
   void set_notice(std::string value) { notice_ = std::move(value); }
   [[nodiscard]] RosterCommand handle(const stellar::native_map::InputEvent &,
                                      int width, int height);
@@ -65,10 +66,11 @@ public:
 private:
   enum class PressTarget { none, close, refresh, row };
   void clear_press() noexcept;
+  void sync_scroll(const RosterLayout &) const noexcept;
   [[nodiscard]] float maximum_scroll(const RosterLayout &) const noexcept;
   View view_;
   bool visible_{};
-  mutable float scroll_{};
+  mutable stellar::engine::VirtualizedList list_{};
   std::string notice_;
   std::optional<int> pressed_row_;
   PressTarget pressed_target_{PressTarget::none};
