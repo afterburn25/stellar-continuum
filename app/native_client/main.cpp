@@ -5448,6 +5448,9 @@ class NativeCampaign final {
     // requesting materials (e.g. pause menu over the map); otherwise a pending
     // decode stalls readiness until the next request.
     planet_material_cache_.poll();
+    if(planet_material_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+      planet_material_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("planet-materials");
+    stellar::engine::MemoryTracker::instance().report(planet_material_memory_,planet_material_cache_.resident_bytes(),stellar::native_planets::MaterialCache::budget);
     if(video_settings_)video_settings_->service(input.focused,input.renderable());
     resize_galaxy_camera(width,height);
     assets_refresh_elapsed_+=std::max(0.,elapsed);
@@ -7924,6 +7927,7 @@ class NativeCampaign final {
   // Optional distribution services (Steam-style). Standalone runs on the null
   // backend; attach a real backend here when one ships.
   stellar::engine::PlatformServices platform_services_;
+  stellar::engine::MemoryTracker::SubsystemId planet_material_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;
