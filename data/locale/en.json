@@ -595,6 +595,9 @@
     "ROSTER_ERROR_PLAYER": "Colony roster unavailable: the active player identity is invalid.",
     "ROSTER_ERROR_DUPLICATE": "Colony roster unavailable: duplicate canonical colony, body, or system records were found.",
     "ROSTER_ERROR_IDENTITY": "Colony roster unavailable: a canonical record has an invalid identity.",
-    "ROSTER_ERROR_PROJECTION": "Colony roster could not be projected. Refresh when the campaign is ready."
+    "ROSTER_ERROR_PROJECTION": "Colony roster could not be projected. Refresh when the campaign is ready.",
+    "COLONY_FREIGHT_PREVIEW": "Ship: {0}\nDeparture: {1}\nCollection: {2}\nCargo capacity: {3} material units\nStored for pickup: {4} | Extraction: {5} / day\n\nNo upfront dispatch fee. Ongoing ship upkeep still applies.\nThe ship travels, loads cargo over time, then returns to its departure colony. Materials reach your stores only after unloading. Unpause to begin.",
+    "COLONY_FREIGHT_CANCEL": "Cancel",
+    "COLONY_FREIGHT_CONFIRM": "Confirm dispatch"
   }
 }

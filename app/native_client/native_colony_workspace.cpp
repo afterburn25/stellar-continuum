@@ -62,6 +62,30 @@ ColonyWorkspaceLayout ColonyWorkspaceLayout::for_viewport(int width,
   return result;
 }
 
+std::string NativeColonyWorkspace::tr(std::string_view key,
+                                      std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeColonyWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 void NativeColonyWorkspace::open(NativeColonyView view) {
   cancel_freight();
   visible_ = true;
@@ -104,14 +128,11 @@ void NativeColonyWorkspace::set_freight_preview(NativeOutpostFreightPreview prev
       preview.colony_id != view_->colony_id || preview.body_id != view_->body_id ||
       preview.system_id != view_->system_id) return;
   if (preview.accepted) {
-    freight_text_ = "Ship: " + preview.fleet_name + "\nDeparture: " + preview.home_name +
-        "\nCollection: " + preview.outpost_name + "\nCargo capacity: " +
-        number(preview.cargo_capacity, 1) + " material units\nStored for pickup: " +
-        number(preview.stored_materials, 1) + " | Extraction: " +
-        number(preview.extraction_per_day, 2) + " / day\n\n" +
-        "No upfront dispatch fee. Ongoing ship upkeep still applies.\n" +
-        "The ship travels, loads cargo over time, then returns to its departure colony. "
-        "Materials reach your stores only after unloading. Unpause to begin.";
+    freight_text_ = trf("COLONY_FREIGHT_PREVIEW",
+        {preview.fleet_name, preview.home_name, preview.outpost_name,
+         number(preview.cargo_capacity, 1), number(preview.stored_materials, 1),
+         number(preview.extraction_per_day, 2)},
+        "Ship: {0}\nDeparture: {1}\nCollection: {2}\nCargo capacity: {3} material units\nStored for pickup: {4} | Extraction: {5} / day\n\nNo upfront dispatch fee. Ongoing ship upkeep still applies.\nThe ship travels, loads cargo over time, then returns to its departure colony. Materials reach your stores only after unloading. Unpause to begin.");
   } else freight_text_ = preview.message;
   freight_preview_ = std::move(preview);
 }
@@ -176,8 +197,8 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
       const auto l=ColonyWorkspaceLayout::for_viewport(width,height);
       fill(out,l.surface,{0,4,10,185});stellar::native_menu_style::panel(out,l.freight_review,l.scale);
       const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y+freight_scroll_,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
-      stellar::native_menu_style::button(out,l.freight_cancel,"Cancel",l.body_font_pixels,l.freight_cancel.contains(pointer_));
-      stellar::native_menu_style::button(out,l.freight_confirm,"Confirm dispatch",l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
+      stellar::native_menu_style::button(out,l.freight_cancel,tr("COLONY_FREIGHT_CANCEL","Cancel"),l.body_font_pixels,l.freight_cancel.contains(pointer_));
+      stellar::native_menu_style::button(out,l.freight_confirm,tr("COLONY_FREIGHT_CONFIRM","Confirm dispatch"),l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
     }
 }
 

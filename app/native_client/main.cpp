@@ -896,6 +896,7 @@ class NativeCampaign final {
     economy_workspace_.set_localization(&table);
     supply_workspace_.set_localization(&table);
     colony_roster_.set_localization(&table);
+    colony_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
