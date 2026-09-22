@@ -5312,7 +5312,6 @@ class NativeCampaign final {
   [[nodiscard]] bool shortcut_smoke_succeeded()const noexcept{return smoke_shortcut_;}
   // Mid-session setup cancellation hands the (already saved) session back so
   // the campaign can resume, matching the reference mode-select cancel.
-  [[nodiscard]] std::unique_ptr<NativeCampaignSession> release_session(){return std::move(session_);}
   [[nodiscard]] std::size_t system_count()const{return session_->frame().runtime().world().campaign().systems.size();}
   [[nodiscard]] std::string player_species_id()const{
     const auto &world=session_->frame().runtime().world().campaign();
@@ -6188,6 +6187,7 @@ class NativeCampaign final {
       system_workspace_.set_simulation_days(session_->frame().clock().simulation_days());
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.render(out,width,height,false);
+      render_system_environment(out,width,height);
       if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},"Loading system environment…",{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
     }else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
@@ -7705,7 +7705,6 @@ class NativeCampaign final {
       session_->frame().set_developer_speed(next);return;
     }
     auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
-  [[nodiscard]] std::string speed_text(){const auto &clock=session_->frame().clock();switch(clock.speed()==StrategicSpeed::Paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Fast:return "SPEED 2X";case StrategicSpeed::VeryFast:return "SPEED 3X";case StrategicSpeed::Maximum:return "SPEED 8X";default:return "SPEED 1X";}}
   void select(Point pointer,int width,int height){selected_id_=system_hit(pointer,width,height);pinned_phenomenon_=selected_id_?std::nullopt:std::optional{camera_.unproject(pointer,width,height)};refresh_inspection();}
   std::unique_ptr<NativeCampaignSession> session_;
   Window *window_{};
