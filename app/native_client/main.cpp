@@ -7707,7 +7707,6 @@ class NativeCampaign final {
     auto &clock=session_->frame().clock();const bool paused=clock.speed()==StrategicSpeed::Paused;StrategicSpeed next;switch(paused?clock.resume_speed():clock.speed()){case StrategicSpeed::Normal:next=StrategicSpeed::Fast;break;case StrategicSpeed::Fast:next=StrategicSpeed::VeryFast;break;case StrategicSpeed::VeryFast:next=StrategicSpeed::Maximum;break;default:next=StrategicSpeed::Normal;break;}if(paused)clock.select_resume_speed(next);else clock.set_speed(next);}
   void select(Point pointer,int width,int height){selected_id_=system_hit(pointer,width,height);pinned_phenomenon_=selected_id_?std::nullopt:std::optional{camera_.unproject(pointer,width,height)};refresh_inspection();}
   std::unique_ptr<NativeCampaignSession> session_;
-  Window *window_{};
   Camera camera_;
   mutable std::optional<stellar::engine::SpatialGrid<int>> system_hit_grid_;
   mutable std::uint64_t system_hit_grid_generation_{std::numeric_limits<std::uint64_t>::max()};
@@ -7906,26 +7905,6 @@ class NativeCampaign final {
   std::size_t smoke_ship_art_decoded_{};
   std::size_t smoke_ship_art_cached_{};
   std::size_t smoke_ship_art_bytes_{};
-  bool last_diplomacy_command_accepted_{};
-  std::size_t smoke_battle_formations_{},smoke_battle_own_{},
-      smoke_battle_foreign_{},smoke_battle_redacted_{},
-      smoke_battle_vessels_hidden_{},smoke_battle_own_inexact_{},
-      smoke_battle_selected_{},smoke_battle_events_{},smoke_battle_salvos_{};
-  int smoke_battle_tokens_{};
-  std::int64_t smoke_battle_tick_{};
-  std::size_t smoke_diplomacy_contacts_{},smoke_diplomacy_identified_{},
-      smoke_diplomacy_unidentified_{},smoke_diplomacy_redacted_{},
-      smoke_diplomacy_channels_{},smoke_diplomacy_agreements_{},
-      smoke_diplomacy_history_{},smoke_diplomacy_proposals_{},
-      smoke_diplomacy_pending_after_{},smoke_diplomacy_incoming_{};
-  int smoke_diplomacy_selected_civ_{-1},smoke_diplomacy_last_system_{-1};
-  std::int64_t smoke_diplomacy_proposal_id_{-1};
-  bool smoke_diplomacy_portrait_{};
-  bool smoke_notification_panel_{},
-      smoke_logistics_delivered_{},smoke_logistics_shortfall_{};
-  int smoke_notification_items_{},smoke_notification_unread_{},
-      smoke_notification_diplomacy_{},smoke_notification_contact_{-1},
-      smoke_notification_focused_{-1};
   std::optional<int> smoke_fleet_id_;
   bool smoke_civilian_recovery_{};
   bool smoke_fleet_hover_preview_{};
