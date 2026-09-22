@@ -32,7 +32,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh | `native_stellar_eruptions`, scene GPU tests | Image-derived curved surfaces; blurry ray-marched production mode retired; general particle framework absent |
 | Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; Core domain IDs | `foundation`, persistence tests | No unified World/component store or full entity lifecycle across game domains |
 | Clocks/scheduling | PARTIALLY IMPLEMENTED | Engine `FixedClock`; Core strategic/tactical/developer clocks, campaign phases | `foundation`, `strategic_clock_parity`, `campaign_frame_parity` | No reusable dependency scheduler or simulation LOD |
-| Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); image preparation, audio director, territory overlay, campaign session | `job_system`, `foundation`, image preparation, campaign session tests | Bounded specialized consumers; no work-stealing or affinity policy |
+| Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); save writer, image preparation, audio director, territory overlay, campaign session, planet-material decode queue | `job_system`, `foundation`, image preparation, campaign session, planet-material tests | Bounded specialized consumers; no work-stealing or affinity policy |
 | Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>` + `event_bus.cpp` typed subscriptions; Core domain events | `foundation`, `event_bus`, `mission_graph`, notification/activity tests | Event bus library unconsumed by the game; no cross-thread dispatch policy |
 | Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp` | scene/triangle/orbit/scale tests | Kinematics and continuous primitive queries; no general rigid-body/constraint/N-body world |
 | Spatial queries | PARTIALLY IMPLEMENTED | Engine point/region/3D indices, parent chains; Core batch indices | `engine_parent_chain_index`, scale/survey/economy tests | Reusable pieces; no unified query scheduler or stable world-wide index lifetime policy |
@@ -2461,7 +2461,7 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 |---|---|---|---|---|---|
 | 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` only | **ENGINE-COMPLETE** — `World` store: components, hierarchy, queries, binary snapshot/restore, legacy ID map. Game-side adoption pending. | `engine/…/world.hpp`, `engine/src/world.cpp` | `engine_world` |
 | 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE** — `SimulationScheduler`: tier policies (ACTIVE/NEARBY/NORMAL/BACKGROUND/DORMANT), cadence, deterministic ordering, dormant analytic skip. Integration into campaign frame pending. | `engine/…/simulation_scheduler.hpp` | `simulation_scheduler` |
-| 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. Wider adoption pending. | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
+| 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE + LIVE CONSUMERS** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. Live consumers: save-writer (`PlayerCampaignSaveController`), image preparation, audio director, territory overlay, and the planet-material decode queue (`MaterialCache` — persistent tagged worker replacing a fresh `std::async` thread per decode; `job_stats()` exposes per-tag counts). Remaining `std::async` sites (voice playback, support export, campaign load) pending. | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
 | 4 | Render graph | MISSING | **ENGINE-COMPLETE (policy layer)** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. Backend adoption pending (DrawList layer today; SDL_GPU follow-on). | `engine/…/render_graph.hpp` | `render_pipeline` |
 | 5 | GPU-driven rendering | MISSING | **PARTIAL** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. True indirect draw requires the SDL_GPU pipeline follow-on. | `engine/…/draw_batcher.hpp` | `batcher_ui` |
 | 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE (policy layer)** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. Backend consumption pending. | `engine/…/texture_streaming.hpp` | `render_pipeline` |
@@ -2558,7 +2558,8 @@ and packaging — and expansion work was kept only where additive.
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,
   `FixedClock`, `DeterministicRandom`, `EventQueue` are used only by
-  `headless_main` + tests; `JobSystem` is used once (save writer). A major
+  `headless_main` + tests; `JobSystem` now serves the save writer and the
+  planet-material decode queue. A major
   theme of this expansion is adopting/extending rather than duplicating them.
 - Renderer constraint: the GPU path is SDL3's 2D `SDL_GPURenderer` over a
   Vulkan device — no custom pipelines/shaders. Requirements 4–7 are therefore

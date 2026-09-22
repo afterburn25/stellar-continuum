@@ -4,6 +4,7 @@
 #include <stellar/core/planet_appearance.hpp>
 #include <stellar/core/stellar_object.hpp>
 #include <algorithm>
+#include <stellar/engine/foundation.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/spherical_material_preparation.hpp>
 #include <stellar/engine/texture_cook.hpp>
@@ -150,14 +151,21 @@ class MaterialCache {
   struct Entry{std::shared_ptr<const MaterialSet> value;std::uint64_t use{};};
   struct Request{std::string key;PlanetAppearance appearance;int width;};
   std::filesystem::path root_;std::map<std::string,Entry> cache_;std::vector<Request> pending_;
-  std::map<std::string,std::string> failures_;std::optional<Request> active_;std::future<std::shared_ptr<const MaterialSet>> job_;
+  std::map<std::string,std::string> failures_;std::optional<Request> active_;std::future<std::shared_ptr<const MaterialSet>> job_;std::future<void> job_status_;
+  // One persistent tagged worker replaces a fresh std::async thread per decode;
+  // per-tag stats flow to diagnostics through stats().
+  stellar::engine::JobSystem jobs_{1};
   std::uint64_t serial_{};std::size_t bytes_{};
  public:
   static constexpr std::size_t budget=96u*1024u*1024u;
   void set_root(std::filesystem::path root){if(job_.valid())job_.wait();root_=std::move(root);cache_.clear();failures_.clear();pending_.clear();active_.reset();bytes_=0;}
   void poll(){
     if(active_&&job_.wait_for(std::chrono::seconds(0))==std::future_status::ready){try{auto value=job_.get();while(!cache_.empty()&&(bytes_+value->bytes()>budget||cache_.size()>=80)){auto old=std::min_element(cache_.begin(),cache_.end(),[](const auto& a,const auto& b){return a.second.use<b.second.use;});bytes_-=old->second.value->bytes();cache_.erase(old);}bytes_+=value->bytes();cache_[active_->key]={std::move(value),++serial_};}catch(const std::exception& e){failures_[active_->key]=e.what();}active_.reset();}
-    if(!active_&&!pending_.empty()){active_=std::move(pending_.front());pending_.erase(pending_.begin());const auto r=*active_;const auto root=root_;job_=std::async(std::launch::async,[r,root]{return std::make_shared<const MaterialSet>(load_material(root,r.appearance,r.width));});}
+    if(!active_&&!pending_.empty()){active_=std::move(pending_.front());pending_.erase(pending_.begin());const auto r=*active_;const auto root=root_;
+      const auto promise=std::make_shared<std::promise<std::shared_ptr<const MaterialSet>>>();job_=promise->get_future();
+      job_status_=jobs_.submit("planet-material",stellar::engine::JobPriority::Normal,stellar::engine::JobCancelToken{},[r,root,promise]{
+        try{promise->set_value(std::make_shared<const MaterialSet>(load_material(root,r.appearance,r.width)));}catch(...){try{promise->set_exception(std::current_exception());}catch(...){}}
+      });}
   }
   std::shared_ptr<const MaterialSet> request(const PlanetAppearance& a,int width){poll();width=width<=128?128:width<=256?256:width<=1024?1024:2048;const auto key=material_cache_identity(a)+":"+std::to_string(width);
     if(auto it=cache_.find(key);it!=cache_.end()){it->second.use=++serial_;return it->second.value;}
@@ -166,6 +174,7 @@ class MaterialCache {
   bool ready()const{return !active_&&pending_.empty();}
   std::shared_ptr<const RgbaImage> portrait(const PlanetAppearance& a){const auto value=request(a,128);return value?value->portrait:nullptr;}
   const auto& errors()const{return failures_;}std::size_t resident_bytes()const{return bytes_;}
+  stellar::engine::JobStats job_stats()const{return jobs_.stats();}
 };
 inline std::shared_ptr<const Mesh3D> planet_mesh(double flattening,int lod){
   static std::map<std::pair<int,int>,std::shared_ptr<const Mesh3D>> meshes;const int shape=std::clamp(static_cast<int>(std::lround(flattening*100)),0,25),level=lod<=128?0:lod<=256?1:2;
