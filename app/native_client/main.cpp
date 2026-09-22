@@ -8226,7 +8226,7 @@ int main(int argc,char **argv){
       [&]{audio.confirm();},[&]{return audio.assets_ready();},[&]{audio.hover();}};
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
-      config.developer_access=&developer_access;
+      config.developer_access=&developer_access;config.locale=&locale_table;
       config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.caption=[&](DrawList& draw,int w,int h){stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);});};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
