@@ -2,6 +2,7 @@
 
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
+#include <stellar/engine/localization.hpp>
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -27,7 +28,7 @@ inline void hud_text(DrawList& out,UiRect box,std::string value,int font,Color c
 inline void render_context_plate(DrawList& out,const CommandHudLayout& l,
     std::string title,std::string subtitle,bool paused,Point pointer,
     std::shared_ptr<const RgbaImage> crest,std::shared_ptr<const RgbaImage> destination,
-    bool can_enter) {
+    bool can_enter,const stellar::engine::LocalizationTable* locale=nullptr) {
   const auto p=l.context; const float s=l.scale;
   const Color accent=paused?Color{239,173,67,255}:Color{87,188,185,255};
   const Color base=paused?Color{33,25,16,245}:Color{7,25,33,246};
@@ -39,7 +40,9 @@ inline void render_context_plate(DrawList& out,const CommandHudLayout& l,
   out.overlay.emplace_back(Line{{p.x,p.y+p.height},{p.x+p.width,p.y+p.height},accent});
   if(crest)out.overlay.emplace_back(Image{crest,l.crest});
   const UiRect titlebox{p.x+56*s,p.y+(paused?20.f:10.f)*s,p.width-114*s,22*s};
-  if(paused)hud_text(out,{titlebox.x,p.y+3*s,titlebox.width,16*s},"PAUSED",static_cast<int>(12*s),accent,TextAlign::Center);
+  if(paused)hud_text(out,{titlebox.x,p.y+3*s,titlebox.width,16*s},
+      locale&&locale->contains("HUD_PAUSED")?std::string(locale->translate("HUD_PAUSED")):std::string("PAUSED"),
+      static_cast<int>(12*s),accent,TextAlign::Center);
   hud_text(out,titlebox,std::move(title),static_cast<int>(18*s),{236,244,247,255},TextAlign::Center);
   hud_text(out,{titlebox.x,p.y+(paused?41.f:34.f)*s,titlebox.width,16*s},std::move(subtitle),static_cast<int>(11*s),{142,204,198,255},TextAlign::Center);
   stellar::native_ui_style::panel(out,l.switch_view,l.switch_view.contains(pointer),false);

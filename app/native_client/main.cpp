@@ -2707,7 +2707,7 @@ class NativeCampaign final {
       ++smoke_navigation_switches_;
     };
     click(layout.research);
-    verify_only(research_workspace_.visible(),"Research");
+    verify_only(research_workspace_.visible(),tr("NAV_RESEARCH","Research"));
     const auto research_layout=ResearchWorkspaceLayout::for_viewport(
         width,height,research_workspace_.window()->domain_tabs.size());
     click(research_layout.search);
@@ -2724,9 +2724,9 @@ class NativeCampaign final {
     if(!smoke_keyboard_text_)
       throw std::runtime_error("Research text could not be corrected.");
     click(layout.shipyard);
-    verify_only(shipyard_workspace_.visible(),"Shipyard");
+    verify_only(shipyard_workspace_.visible(),tr("NAV_SHIPYARD","Shipyard"));
     click(layout.construction);
-    verify_only(construction_workspace_.visible(),"Construction");
+    verify_only(construction_workspace_.visible(),tr("NAV_CONSTRUCTION","Construction"));
     click(layout.diplomacy);
     verify_only(diplomacy_workspace_.visible(),"Relations");
     blocked_keys();
@@ -5670,7 +5670,7 @@ class NativeCampaign final {
         close_navigation_workspaces();refresh_fleets(true);
         bool selected_scout{};
         if(fleet_workspace_.view())for(const auto &fleet:fleet_workspace_.view()->own_fleets)if(fleet.role==FleetRole::Scout||fleet.role==FleetRole::Science){(void)fleet_controller_.select(session_->frame(),session_->cache().generation,fleet.id);selected_scout=true;break;}
-        if(!selected_scout)fleet_workspace_.set_notice("No scout or science vessel is available. Select a fleet on the map to plan exploration.",false);
+        if(!selected_scout)fleet_workspace_.set_notice(tr("FLEET_NOTICE_NO_SCOUT","No scout or science vessel is available. Select a fleet on the map to plan exploration."),false);
         return;
       }
       if(action==UiAction::Menu){toggle_menu();return;}
@@ -5856,7 +5856,7 @@ class NativeCampaign final {
           research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
           colony_roster_.close();economy_workspace_.close();supply_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);
           if(!diplomacy_workspace_.select_contact_civilization(command.civilization_id))
-            diplomacy_workspace_.set_notice("This contact is no longer identified. Review the contact list.",false);
+            diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
           refresh_diplomacy(true);
         }
         if(command.captured){gesture_.capture_for_ui();continue;}
@@ -6597,20 +6597,20 @@ class NativeCampaign final {
         menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
         (colony_workspace_.planetary_modal()),settings_visible());
     if(navigation_visible){
-      draw_navigation(layout.map,UiAction::Map,!system_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!colony_workspace_.visible()&&!economy_workspace_.visible()&&!diplomacy_workspace_.visible()&&!colony_roster_.visible()&&!supply_workspace_.visible()&&!construction_workspace_.visible(),"Galaxy");
-      draw_navigation(layout.home,UiAction::Home,system_workspace_.visible()&&!colony_workspace_.visible(),"System");
-      draw_navigation(layout.inspect,UiAction::Inspect,inspection_visible(),"Inspect");
-      draw_navigation(layout.zoom_in,UiAction::ZoomIn,false,"Zoom in");
-      draw_navigation(layout.zoom_out,UiAction::ZoomOut,false,"Zoom out");
-      draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),"Economy");
+      draw_navigation(layout.map,UiAction::Map,!system_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&!colony_workspace_.visible()&&!economy_workspace_.visible()&&!diplomacy_workspace_.visible()&&!colony_roster_.visible()&&!supply_workspace_.visible()&&!construction_workspace_.visible() ,tr("NAV_GALAXY","Galaxy"));
+      draw_navigation(layout.home,UiAction::Home,system_workspace_.visible()&&!colony_workspace_.visible(),tr("NAV_SYSTEM","System"));
+      draw_navigation(layout.inspect,UiAction::Inspect,inspection_visible(),tr("NAV_INSPECT","Inspect"));
+      draw_navigation(layout.zoom_in,UiAction::ZoomIn,false,tr("NAV_ZOOM_IN","Zoom in"));
+      draw_navigation(layout.zoom_out,UiAction::ZoomOut,false,tr("NAV_ZOOM_OUT","Zoom out"));
+      draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),tr("NAV_ECONOMY","Economy"));
       draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),"Research");
       draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
       draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Shipyard");
-      draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),"Explore");
-      draw_navigation(layout.colonies,UiAction::Colonies,colony_roster_.visible()||colony_workspace_.visible(),"Planets");
-      draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),"Logistics");
-      draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),"Diplomacy");
-      draw_navigation(layout.menu,UiAction::Menu,false,"Menu");
+      draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),tr("NAV_EXPLORE","Explore"));
+      draw_navigation(layout.colonies,UiAction::Colonies,colony_roster_.visible()||colony_workspace_.visible(),tr("NAV_PLANETS","Planets"));
+      draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),tr("NAV_LOGISTICS","Logistics"));
+      draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),tr("NAV_DIPLOMACY","Diplomacy"));
+      draw_navigation(layout.menu,UiAction::Menu,false,tr("NAV_MENU","Menu"));
     }
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y},
@@ -6621,7 +6621,7 @@ class NativeCampaign final {
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y + 16.f * layout.scale},
         stellar::native_campaign::format_campaign_time(
-            session_->frame().clock().simulation_days()) + "  |  1x = 1 hour/sec",
+            session_->frame().clock().simulation_days()) + tr("HUD_TIME_RATE","  |  1x = 1 hour/sec"),
         {139, 174, 194, 255}, static_cast<int>(10.f * layout.scale),
         layout.day_text.width, layout.day_text});
     if(!system_workspace_.visible()&&!research_workspace_.visible()&&
@@ -7137,7 +7137,7 @@ class NativeCampaign final {
   void execute_research(const WorkspaceCommand &command){
     const auto &view=research_workspace_.window();
     if(!view){
-      research_workspace_.set_notice("Research details are still loading.",false);
+      research_workspace_.set_notice(tr("RESEARCH_NOTICE_LOADING","Research details are still loading."),false);
       return;
     }
     const auto outcome=research_controller_.execute(
@@ -7256,7 +7256,7 @@ class NativeCampaign final {
   void execute_diplomacy(const DiplomacyWorkspaceCommand &command){
     const auto &view=diplomacy_workspace_.view();
     if(!view){
-      diplomacy_workspace_.set_notice("Diplomatic channels are still loading.",false);
+      diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_LOADING","Diplomatic channels are still loading."),false);
       return;
     }
     const auto outcome=diplomacy_controller_.execute(
@@ -7620,7 +7620,7 @@ class NativeCampaign final {
     if(economy!=world.economies.end()){
       const float available=std::max(0.f,static_cast<float>(width)-356*s);
       const float cell=std::min(185*s,available/3.f);
-      const std::array<std::pair<std::string,double>,3> resources{{{"CREDITS",economy->credits},{"INDUSTRY",economy->industry},{"SCIENCE",economy->science}}};
+      const std::array<std::pair<std::string,double>,3> resources{{{tr("HUD_CREDITS","CREDITS"),economy->credits},{tr("HUD_INDUSTRY","INDUSTRY"),economy->industry},{tr("HUD_SCIENCE","SCIENCE"),economy->science}}};
       const std::array<Color,3> colors{{{243,199,110,255},{233,164,124,255},{115,199,239,255}}};
       for(int i=0;i<3;++i){
         const float x=12*s+i*cell;
@@ -7634,10 +7634,10 @@ class NativeCampaign final {
     if(!hud_system_icon_)hud_system_icon_=decode_rgba_image(asset_root_/"assets/visual/hud/system-view.png");
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     const bool in_system=system_workspace_.visible();
-    std::string title=in_system?system_workspace_.snapshot()->catalog_name:player!=world.civilizations.end()?player->name:"Empire";
-    std::string subtitle=in_system?"SYSTEM VIEW":player!=world.civilizations.end()?species_environment_profile(player->species_id).display_name:"";
+    std::string title=in_system?system_workspace_.snapshot()->catalog_name:player!=world.civilizations.end()?player->name:tr("HUD_EMPIRE","Empire");
+    std::string subtitle=in_system?tr("HUD_SYSTEM_VIEW","SYSTEM VIEW"):player!=world.civilizations.end()?species_environment_profile(player->species_id).display_name:"";
     const bool paused=session_->frame().clock().speed()==StrategicSpeed::Paused;
-    render_context_plate(out,l,title,subtitle,paused,pointer_,hud_crest_,in_system?hud_galaxy_icon_:hud_system_icon_,in_system||selected_id_.has_value());
+    render_context_plate(out,l,title,subtitle,paused,pointer_,hud_crest_,in_system?hud_galaxy_icon_:hud_system_icon_,in_system||selected_id_.has_value(),locale_);
     const auto& view=colony_roster_.view();
     sync_asset_selection();
     assets_.render(out,width,height,[&](const stellar::native_assets::Row& asset){
@@ -7666,7 +7666,7 @@ class NativeCampaign final {
     });
     if(l.switch_view.contains(pointer_)){
       const UiRect tip{l.context.x,l.context.y-25*s,l.context.width,22*s};
-      fill(out,tip,{5,18,26,240});hud_text(out,tip,in_system?"Return to star map":selected_id_?"Open focused system":"Select an explored star",static_cast<int>(12*s),{211,235,242,255},TextAlign::Center);
+      fill(out,tip,{5,18,26,240});hud_text(out,tip,in_system?tr("HUD_TIP_RETURN","Return to star map"):selected_id_?tr("HUD_TIP_OPEN","Open focused system"):tr("HUD_TIP_SELECT","Select an explored star"),static_cast<int>(12*s),{211,235,242,255},TextAlign::Center);
     }
   }
   [[nodiscard]] UiRect map_zoom_bounds(int width,int height) const {
@@ -7772,7 +7772,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),generation,row->system_id);
     if(!built.snapshot){colony_roster_.set_notice(built.denial);return;}
     auto colony=colony_controller_.build(session_->frame(),generation,*built.snapshot,row->body_id);
-    if(!colony.view||colony.view->colony_id!=row->colony_id){colony_roster_.set_notice("Colony operations are unavailable. Refresh the list.");return;}
+    if(!colony.view||colony.view->colony_id!=row->colony_id){colony_roster_.set_notice(tr("ROSTER_NOTICE_UNAVAILABLE","Colony operations are unavailable. Refresh the list."));return;}
     if(!enter_system(row->system_id,width,height))return;
     if(!system_workspace_.select_body(row->body_id))return;
     system_workspace_.focus_selected_body(width,height);
