@@ -46,7 +46,7 @@ public:
   void set_freight_preview(stellar::native_colony::NativeOutpostFreightPreview);
   void cancel_freight() noexcept;
   void set_freight_notice(std::string notice) { planetary_.complete(std::move(notice)); }
-  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; }
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; planetary_.set_localization(table); }
   [[nodiscard]] const auto& freight_preview() const noexcept { return freight_preview_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
