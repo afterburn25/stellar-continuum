@@ -5,6 +5,7 @@
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/core/player_campaign_save.hpp>
+#include <stellar/engine/foundation.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -160,6 +161,9 @@ private:
   NativeCampaignSessionDependencies dependencies_;
   std::thread::id owner_{std::this_thread::get_id()};
   std::unique_ptr<PendingLoad> pending_load_;
+  // Persistent tagged worker for campaign load instead of a fresh std::async
+  // thread per request.
+  stellar::engine::JobSystem load_jobs_{1};
   SessionNotice notice_;
   bool save_requested_{};
   bool exit_requested_{};

@@ -457,7 +457,7 @@ add_executable(stellar_startup_tests
   app/native_client/native_startup_session.cpp
   native-tests/native_startup_session_tests.cpp)
 target_include_directories(stellar_startup_tests PRIVATE app/native_client engine/include)
-target_link_libraries(stellar_startup_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
+target_link_libraries(stellar_startup_tests PRIVATE stellar_core stellar_engine stellar_json Shell32 Ole32)
 if(MSVC)
   target_compile_options(stellar_startup_tests PRIVATE /W4 /WX /permissive-)
 endif()

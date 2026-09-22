@@ -65,6 +65,7 @@ struct NativeCampaignSession::LoadProgress final {
 struct NativeCampaignSession::PendingLoad final {
   std::shared_ptr<LoadProgress> progress;
   std::future<LoadedPlayerCampaignV17> result;
+  std::future<void> status;
 };
 
 struct NativeCampaignSession::Live final {
@@ -400,17 +401,26 @@ void NativeCampaignSession::begin_load() {
   auto loader = dependencies_.developer_session?NativeCampaignLoader{load_existing_developer_campaign}:dependencies_.loader;
   auto path = save_path_;
   auto make_runtime = runtime_factory();
-  auto task = std::async(
-      std::launch::async,
+  auto promise =
+      std::make_shared<std::promise<LoadedPlayerCampaignV17>>();
+  auto task = promise->get_future();
+  auto status = load_jobs_.submit(
+      "campaign-load", stellar::engine::JobPriority::Normal,
+      stellar::engine::JobCancelToken{},
       [progress, loader = std::move(loader), path = std::move(path),
-       make_runtime = std::move(make_runtime)]() mutable {
-        return loader(path, make_runtime,
+       make_runtime = std::move(make_runtime), promise]() mutable {
+        try {
+          promise->set_value(loader(path, make_runtime,
                       [progress](const PlayerCampaignRestorationProgress &next) {
                         progress->publish(next);
-                      });
+                      }));
+        } catch (...) {
+          try { promise->set_exception(std::current_exception()); }
+          catch (...) {}
+        }
       });
   pending_load_ = std::make_unique<PendingLoad>(
-      PendingLoad{std::move(progress), std::move(task)});
+      PendingLoad{std::move(progress), std::move(task), std::move(status)});
 }
 
 void NativeCampaignSession::request_load() {

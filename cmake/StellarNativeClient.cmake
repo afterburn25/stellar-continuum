@@ -161,7 +161,7 @@ if(BUILD_TESTING)
     native-tests/native_campaign_session_tests.cpp app/native_client/native_campaign_session.cpp
     app/native_client/native_notifications.cpp)
   target_include_directories(stellar_native_campaign_session_tests PRIVATE app/native_client engine/include)
-  target_link_libraries(stellar_native_campaign_session_tests PRIVATE stellar_core stellar_json Shell32 Ole32)
+  target_link_libraries(stellar_native_campaign_session_tests PRIVATE stellar_core stellar_engine stellar_json Shell32 Ole32)
   add_test(NAME native_campaign_session COMMAND stellar_native_campaign_session_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/player-campaign-json.json"
     "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/native-session-cases")
