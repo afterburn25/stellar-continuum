@@ -2,14 +2,17 @@
 
 #include "native_diplomacy_controller.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_diplomacy_ui {
@@ -77,6 +80,10 @@ public:
 
   void open() noexcept;
   void close() noexcept;
+  void
+  set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] bool visible() const noexcept;
   void set_view(stellar::native_diplomacy::NativeDiplomacyView view);
   void discard_campaign();
@@ -119,7 +126,13 @@ private:
   [[nodiscard]] std::vector<const stellar::native_diplomacy::
                                 NativeDiplomacyContact *>
   filtered_contacts() const;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};
   stellar::native_map::Point pointer_{};
   std::optional<stellar::native_diplomacy::NativeDiplomacyView> view_;
