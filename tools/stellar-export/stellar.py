@@ -104,7 +104,10 @@ def native_build(preset, env):
     exclude = env.get("STELLAR_CTEST_EXCLUDE")
     if exclude:
         ctest += ["-E", exclude]
-    run(ctest, env=env, timeout=900)
+    # The unfiltered suite includes the heavy scale tests (~7 min of
+    # generation/scale work alone on a shared runner); 900 s proved short once
+    # the documented SYNC exclusions were removed.
+    run(ctest, env=env, timeout=1800)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
