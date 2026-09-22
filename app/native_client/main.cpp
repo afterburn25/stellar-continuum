@@ -8191,6 +8191,7 @@ int main(int argc,char **argv){
       [&](const auto& value){audio.set_voice_preferences(value);if(active_voice_playback)active_voice_playback->apply_settings(NativeCampaign::voice_pipeline_settings_for(value));},
       [&]{(void)audio.replay_last_voice();if(active_voice_playback)active_voice_playback->replay_last();},
       [&]{audio.stop_voice();if(active_voice_playback)active_voice_playback->stop();});
+    voice_settings.set_localization(&locale_table);
     stellar::native_settings::NativeSettingsHub settings_hub;
     settings_hub.set_callbacks([&](stellar::native_settings::Category category){
       audio.confirm();
