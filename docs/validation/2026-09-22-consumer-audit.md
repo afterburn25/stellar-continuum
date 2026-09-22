@@ -91,6 +91,28 @@ scratch directory): `gpu_driver=vulkan systems=20 frames=120 save=ok
 hover=1 civilian_recovery=1 fleet_located=1`. System smoke: `hit=1`
 (SpatialGrid path).
 
+## Export validation
+
+`python tools/stellar-export/stellar.py export windows-benchmark` on
+`44acfc58` (clean tree, fresh `build-native/headless` configure+build):
+
+- Internal CTest suite: **232/232 passed** (533 s).
+- NativeRecovery (29), package-integrity and client dependency-policy Python
+  tests: all OK.
+- Package sealed: `Builds/Windows/StellarContinuum-0.1.14.2-dev-
+  windows-benchmark-44acfc58-*.zip` (3.0 MB, 77 manifest files, sha256
+  sidecar, `sourceDirty=false`).
+- Relocation checks green: relocatedLaunch, checkpointRoundtrip,
+  relocatedGalaxyGeneration, founding/colony seeding.
+- Packaged-binary benchmarks deterministic
+  (`repeatFinalStatesDeterministic: true`); legacy sim step p95
+  0.09–0.51 ms across 250–2500 systems.
+
+Note: during this run the system drive reached 0 bytes free; reclaiming
+`build-native/preview/qa-host-tests` seed dumps (~3.5 GB, regenerable test
+artifacts) and linker PDBs (~14 GB, regenerated on next build) restored
+headroom. Disk exhaustion had failed the first attempt's I/O-bound tests.
+
 ## Remaining risks
 
 - `windows-export` CI runs the same CTest suite; the graphical fleet smoke
