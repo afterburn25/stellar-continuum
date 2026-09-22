@@ -901,6 +901,8 @@ class NativeCampaign final {
     battle_workspace_.set_localization(&table);
     shipyard_workspace_.set_localization(&table);
     notification_view_.set_localization(&table);
+    assets_.set_localization(&table);
+    settlement_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -6398,7 +6400,7 @@ class NativeCampaign final {
         const double dy = point.y - static_cast<float>(height) * .5f;
         label_candidates.push_back(
             {NativeGalaxyLabelKind::system, system.id, point, marker_radius,
-             Text{{}, known ? system.name : "Unknown", {205, 222, 245, 235},
+             Text{{}, known ? system.name : tr("SYSTEM_UNKNOWN","Unknown"), {205, 222, 245, 235},
                   15},
              selected_system, -(dx * dx + dy * dy)});
       }
@@ -7705,7 +7707,7 @@ class NativeCampaign final {
     if(!fleet_workspace_.view())return;
     refresh_roster(false);
     auto yard=shipyard_controller_.build(session_->frame(),session_->cache().generation);
-    assets_.set_view(stellar::native_assets::build(session_->frame().runtime().world().campaign(),colony_roster_.view(),*fleet_workspace_.view(),&yard,[this](int id){return id<0?std::string("Unknown"):system_display_name(id);}));
+    assets_.set_view(stellar::native_assets::build(session_->frame().runtime().world().campaign(),colony_roster_.view(),*fleet_workspace_.view(),&yard,[this](int id){return id<0?tr("SYSTEM_UNKNOWN","Unknown"):system_display_name(id);},locale_));
     assets_refresh_elapsed_=0.;
     if(system_workspace_.visible()){
       int body=-1;for(const auto& r:colony_roster_.view().rows)if(r.system_id==yard.home_system_id&&r.can_open){body=r.body_id;break;}
