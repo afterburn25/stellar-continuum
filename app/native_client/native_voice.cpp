@@ -438,6 +438,7 @@ NativeVoiceRouter NativeVoiceRouter::from_file(
               parse_queue_behavior(read_string(node, "queueBehavior")))
         cue.queue_behavior = *behavior;
       cue.prerecorded_path = read_optional(node, "prerecordedPath");
+      cue.subtitle_text = read_optional(node, "subtitleText");
       if (!blank(cue.event)) cues.push_back(std::move(cue));
     }
   }
@@ -607,6 +608,7 @@ bool NativeVoiceRouter::emit_core(
       "voice." + (!blank(cue->dialogue_key) ? cue->dialogue_key : dialogue_key) +
       "." + std::to_string(selected % candidates.size());
   request.prerecorded_path = cue->prerecorded_path;
+  request.subtitle_text = cue->subtitle_text;
   request.dedupe_key = std::to_string(event.source_civilization_id) + ":" +
                        category + ":" + text;
   request.interruptible =

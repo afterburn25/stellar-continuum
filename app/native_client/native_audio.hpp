@@ -27,7 +27,7 @@ struct PcmData {
   std::vector<float> frames; // interleaved
 };
 
-struct NativeAudioSettings {
+struct NativeMixerSettings {
   float master{.78f}, music{.64f}, sfx{.82f};
 };
 
@@ -64,7 +64,7 @@ public:
   // Live mix only; used while a settings slider drags.
   void apply_volumes(float master, float music, float sfx) noexcept;
   void set_volumes(float master, float music, float sfx);
-  [[nodiscard]] NativeAudioSettings settings() const noexcept;
+  [[nodiscard]] NativeMixerSettings settings() const noexcept;
 
   void play(NativeSfx sound);
   void play_hover();
@@ -97,7 +97,7 @@ private:
   std::uint64_t music_cursor_{};
   bool startup_ready_{}, menu_context_{true}, music_playing_{};
   float voice_duck_{1.f}, voice_duck_target_{1.f}, dialogue_volume_{1.f};
-  NativeAudioSettings settings_;
+  NativeMixerSettings settings_;
   std::uint64_t last_hover_ms_{};
   bool has_last_hover_{};
 };

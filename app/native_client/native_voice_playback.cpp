@@ -294,6 +294,13 @@ void NativeVoicePlayback::begin_line(NativeSpeechRequest request) {
                    (resolved ? resolved->profile_id : "subtitles only");
   }
   active_ = last_ = request;
+  // Approved prerecorded cues bypass synthesis entirely and play through the
+  // same decode/present path as backend output.
+  if (settings_.enable_voices && request.prerecorded_path && decode_) {
+    present_result(
+        NativeVoiceResult{true, *request.prerecorded_path, {}, false, {}});
+    return;
+  }
   if (settings_.enable_voices && backend_ && backend_->available()) {
     const auto *profile = profiles_->try_resolve(request.profile_id);
     if (profile) {
@@ -345,7 +352,9 @@ void NativeVoicePlayback::present_result(NativeVoiceResult result) {
     return;
   }
   if (play_) play_(stream, seconds);
-  last_source_ = result.cache_hit ? "cache" : "synthesized";
+  last_source_ = active_->prerecorded_path
+                     ? "recorded"
+                     : (result.cache_hit ? "cache" : "synthesized");
   diagnostics_ = active_->profile_id + " · " +
                  (result.selected_voice.empty() ? "installed voice"
                                                 : result.selected_voice) +

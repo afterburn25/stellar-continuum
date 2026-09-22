@@ -239,7 +239,7 @@ void NativeAudioMixer::set_volumes(const float master, const float music,
   apply_volumes(master, music, sfx);
   persist_settings();
 }
-NativeAudioSettings NativeAudioMixer::settings() const noexcept {
+NativeMixerSettings NativeAudioMixer::settings() const noexcept {
   return settings_;
 }
 void NativeAudioMixer::persist_settings() const noexcept {

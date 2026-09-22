@@ -1,4 +1,5 @@
 #include <stellar/engine/asset_registry.hpp>
+#include "native_audio.hpp"
 #include "native_audio_director.hpp"
 #include "native_voice_filter.hpp"
 
@@ -341,6 +342,26 @@ void NativeAudioDirector::admit_voice(VoiceCue cue,bool replay) {
   if (replay || !voice_preferences_.no_interruptions) stop_voice();
   if (voice_queue_.size()>=3 || std::find(voice_queue_.begin(),voice_queue_.end(),cue)!=voice_queue_.end()) return;
   voice_queue_.push_back(cue);
+}
+
+void NativeAudioDirector::play_dialogue_pcm(
+    std::shared_ptr<const stellar::native_audio::PcmData> pcm) {
+  require_owner();
+  if (!output_ || !pcm ||
+      pcm->sample_rate != stellar::engine::audio::audio_sample_rate ||
+      pcm->channels != stellar::engine::audio::audio_channels ||
+      pcm->frames.empty())
+    return;
+  try {
+    output_->play_voice(stellar::engine::audio::AudioClip::create(
+        std::vector<float>(pcm->frames)));
+    const auto diagnostics = output_->diagnostics();
+    stats_.voice_active = diagnostics.voice_active;
+    stats_.voice_play_count = diagnostics.voice_play_count;
+    stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
+  } catch (const std::exception& error) {
+    fail(std::string{"audio voice playback failed: "} + error.what());
+  }
 }
 
 void NativeAudioDirector::stop_voice() {

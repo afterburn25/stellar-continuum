@@ -154,7 +154,7 @@ struct NativeVoiceCue {
   VoiceSpeakerRole speaker_role{VoiceSpeakerRole::Narrator};
   VoiceFrequency frequency{VoiceFrequency::Normal};
   SpeechQueueBehavior queue_behavior{SpeechQueueBehavior::ReplaceCategory};
-  std::optional<std::string> prerecorded_path;
+  std::optional<std::string> prerecorded_path, subtitle_text;
 };
 
 struct NativeSpeechRequest {

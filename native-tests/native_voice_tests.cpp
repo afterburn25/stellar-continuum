@@ -587,6 +587,45 @@ int main(int argc, char **argv) {
     check(silent.last_source() == "subtitle",
           "the fallback source must be reported");
 
+    // Prerecorded cues bypass synthesis and surface their own subtitle text.
+    {
+      NativeVoicePlayback recorded({}, &registry, &resolver, nullptr);
+      auto recorded_backend = std::make_unique<FakeBackend>();
+      auto *recorded_fake = recorded_backend.get();
+      recorded.attach_backend(std::move(recorded_backend));
+      std::filesystem::path decoded_path;
+      int recorded_plays = 0;
+      recorded.bind(
+          [&](const std::filesystem::path &path) {
+            decoded_path = path;
+            auto stream =
+                std::make_shared<stellar::native_audio::PcmData>();
+            stream->sample_rate = 48000;
+            stream->channels = 2;
+            stream->frames.resize(48000 / 4 * 2, .5f);
+            return stream;
+          },
+          [&](NativeVoicePlayback::Stream, double) { ++recorded_plays; },
+          [] {});
+      NativeSpeechRequest recorded_request;
+      recorded_request.text = "Templated {detail} narration.";
+      recorded_request.subtitle_text = "Recorded line text.";
+      recorded_request.prerecorded_path = "clips/scientist.wav";
+      recorded_request.priority = 40;
+      recorded_request.dedupe_key = "recorded";
+      recorded.speak(recorded_request);
+      recorded.update(.016);
+      check(recorded_fake->synthesized == 0,
+            "prerecorded cue must not dispatch synthesis");
+      check(decoded_path == std::filesystem::path("clips/scientist.wav"),
+            "prerecorded path must reach the decoder");
+      check(recorded_plays == 1, "prerecorded stream must play");
+      check(recorded.last_source() == "recorded",
+            "the recorded source must be reported");
+      check(recorded.active_subtitle() == "Recorded line text.",
+            "prerecorded cue must surface its own subtitle text");
+    }
+
     if (failures == 0)
       std::cout << "native voice contract tests passed\n";
   }

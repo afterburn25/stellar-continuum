@@ -10,6 +10,9 @@
 #include "native_campaign_feedback.hpp"
 #include "native_audio_settings.hpp"
 #include "native_settings_hub.hpp"
+#include "native_voice.hpp"
+#include "native_voice_bridge.hpp"
+#include "native_voice_playback.hpp"
 #include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
 #include "native_video_controller.hpp"
@@ -783,6 +786,7 @@ class NativeCampaign final {
     presentation_audio_=presentation_audio;
     menu_hover_feedback_.set_callback([this]{if(presentation_audio_)presentation_audio_->hover();});
     configure_input_actions();
+    configure_voice_pipeline();
   }
 
   // Reference Main.cs keyboard shortcuts, expressed as a data-driven GALAXY
@@ -810,6 +814,70 @@ class NativeCampaign final {
     if(input_mapper_.load_contexts(kGalaxyContext,&error))
       input_mapper_.push_context("GALAXY");
     else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
+  }
+
+  // Maps the persisted UI voice preferences onto the playback controller's
+  // settings record (stellar::native_voice::NativeVoiceSettings).
+  [[nodiscard]] static stellar::native_voice::NativeVoiceSettings
+  voice_pipeline_settings_for(const stellar::native_audio::VoicePreferences &preferences){
+    stellar::native_voice::NativeVoiceSettings settings;
+    settings.enable_voices=preferences.enabled;
+    settings.volume=preferences.volume;
+    settings.subtitles=preferences.subtitles;
+    settings.subtitle_size=preferences.subtitle_size;
+    settings.opacity=preferences.subtitle_background_opacity;
+    settings.speaker_labels=preferences.speaker_labels;
+    settings.no_interruptions=preferences.no_interruptions;
+    settings.comms_intensity=1.f-preferences.communication_filter;
+    settings.frequency=static_cast<stellar::native_voice::VoiceFrequency>(
+        static_cast<int>(preferences.frequency));
+    return settings.sanitized();
+  }
+
+  [[nodiscard]] stellar::native_voice::NativeVoiceSettings voice_pipeline_settings() const {
+    return voice_pipeline_settings_for(
+        voice_settings_?voice_settings_->saved_values():stellar::native_audio::VoicePreferences{});
+  }
+
+  // Wires the event-driven gameplay voice pipeline (bridge -> router ->
+  // playback -> the director's voice channel). Every stage degrades silently:
+  // missing catalogs or an unavailable speech backend leave the pipeline
+  // subtitle-only or absent rather than failing the client.
+  void configure_voice_pipeline(){
+    namespace voice=stellar::native_voice;
+    if(!presentation_audio_)return;
+    const auto voice_root=asset_root_/"Data/voice_profiles";
+    try{
+      voice_profiles_=voice::NativeVoiceProfileRegistry::load(voice_root/"human.json");
+      if(voice_profiles_.size()==0)return;
+      voice_resolver_=voice::NativeCharacterVoiceResolver::load(&voice_profiles_,voice_root/"roles.json");
+      voice_cache_.emplace(default_native_campaign_save_path().parent_path()/"voice-cache");
+      voice_playback_.emplace(voice_pipeline_settings(),&voice_profiles_,&*voice_resolver_,&*voice_cache_);
+      voice_playback_->attach_backend(voice::create_offline_speech_backend());
+      voice_playback_->bind(
+          [this](const std::filesystem::path& path)->voice::NativeVoicePlayback::Stream{
+            const auto resolved=path.is_absolute()?path:asset_root_/path;
+            auto decoded=stellar::native_audio::decode_audio_file(resolved);
+            if(!decoded)return nullptr;
+            return std::make_shared<const stellar::native_audio::PcmData>(std::move(*decoded));
+          },
+          [this](voice::NativeVoicePlayback::Stream stream,double){
+            if(presentation_audio_)presentation_audio_->play_dialogue_pcm(std::move(stream));},
+          [this]{if(presentation_audio_)presentation_audio_->stop_voice();});
+      voice_router_=voice::NativeVoiceRouter::from_file(voice_root/"events.json",
+          [this](voice::NativeSpeechRequest request){if(voice_playback_)voice_playback_->speak(std::move(request));},
+          &*voice_resolver_);
+      voice_bridge_.emplace(*voice_router_);
+      voice_bridge_->reset(session_->frame().runtime());
+    }catch(const std::exception& error){
+      support_.record("voice",std::string{"Gameplay voice pipeline unavailable: "}+error.what());
+      voice_bridge_.reset();voice_router_.reset();voice_playback_.reset();
+      voice_resolver_.reset();voice_cache_.reset();
+    }
+  }
+
+  [[nodiscard]] stellar::native_voice::NativeVoicePlayback* voice_playback(){
+    return voice_playback_?&*voice_playback_:nullptr;
   }
 
   // Deterministic replay (engine ReplayRecorder adoption): --record stores
@@ -5465,6 +5533,7 @@ class NativeCampaign final {
     session_->frame().set_profiling_enabled(developer_session());
     stellar::engine::Profiler::instance().set_enabled(developer_session());
     feedback_.advance(elapsed);
+    if(voice_playback_)voice_playback_->update(std::max(0.,elapsed));
     pointer_=input.focused&&input.renderable()?input.pointer:Point{-1.f,-1.f};
     const auto timestamp=utc_timestamp();
     if(session_->service(timestamp,menu_)){
@@ -5479,6 +5548,9 @@ class NativeCampaign final {
       seed_notifications();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
+      if(voice_playback_)voice_playback_->reset_campaign();
+      if(voice_router_)voice_router_->reset();
+      if(voice_bridge_)voice_bridge_->reset(session_->frame().runtime());
       selected_id_.reset();
       inspection_card_.clear();
       supply_workspace_.close();supply_controller_.clear();supply_day_.reset();supply_generation_.reset();
@@ -6055,6 +6127,14 @@ class NativeCampaign final {
         respond_to_developer_fault(width,height);
       }
       publish_feedback(frame_result);
+      if(voice_bridge_){
+        const auto frequency=voice_pipeline_settings().frequency;
+        voice_bridge_->observe(frame_result,session_->frame().runtime(),
+            session_->frame().clock().simulation_days(),frequency);
+        if(!menu_)
+          voice_bridge_->observe_opening(session_->frame().runtime(),
+              session_->frame().clock().simulation_days(),frequency);
+      }
       const auto player=session_->frame().runtime().world().campaign().player_civilization_id;
       for(const auto& step:frame_result.strategic_results)
         for(const auto& allocation:step.core.industry_allocations)
@@ -6605,7 +6685,8 @@ class NativeCampaign final {
       }
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
-    stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_);
+    stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
+        voice_playback_?&*voice_playback_:nullptr);
     if(audio_settings_)audio_settings_->render(out,width,height);
     if(general_settings_)general_settings_->render(out,width,height);
     if(video_settings_)video_settings_->render(out,width,height);
@@ -6755,7 +6836,27 @@ class NativeCampaign final {
   }
   void scientist_voice(stellar::native_audio::VoiceCue cue){
     // Human casting must not silently replace another species' advisor.
-    if(presentation_audio_&&player_species_id()=="terran_baseline")presentation_audio_->speak(cue);
+    if(player_species_id()!="terran_baseline")return;
+    if(voice_router_){
+      stellar::native_voice::NativeGameplayVoiceEvent event;
+      event.event_key=cue==stellar::native_audio::VoiceCue::ReconnaissanceRequired
+          ?"exploration.system.reconnaissance_required"
+          :cue==stellar::native_audio::VoiceCue::ResearchReport?"research.completed"
+          :"exploration.survey.completed";
+      const auto& world=session_->frame().runtime().world().campaign();
+      const auto days=session_->frame().clock().simulation_days();
+      event.source_civilization_id=world.player_civilization_id;
+      event.source_species_id=player_species_id();
+      event.simulation_tick=static_cast<std::int64_t>(std::llround(days*1000.));
+      event.simulation_date=stellar::native_campaign::format_campaign_date(days);
+      event.unique_event_id=event.event_key+":ui:"+std::to_string(++voice_ui_sequence_);
+      stellar::native_voice::NativeVoiceRoutingContext context;
+      context.player_civilization_id=world.player_civilization_id;
+      context.frequency=voice_pipeline_settings().frequency;
+      voice_router_->emit(event,context);
+      return;
+    }
+    if(presentation_audio_)presentation_audio_->speak(cue);
   }
   void publish_feedback(const CampaignFrameResult& frame){
     using namespace stellar::native_campaign_feedback;
@@ -6767,8 +6868,13 @@ class NativeCampaign final {
     feedback_.publish(summary);
     stellar::native_notifications::publish_campaign_notifications(
         notifications_,summary,session_->frame().clock().simulation_days());
-    if(summary.count(FeedbackKind::ResearchReport))scientist_voice(VoiceCue::ResearchReport);
-    if(summary.count(FeedbackKind::SurveyComplete))scientist_voice(VoiceCue::SurveyComplete);
+    // Research/survey speech routes through the gameplay voice bridge's
+    // frame-result observation (the legacy VoiceCue path only remains as the
+    // fallback for UI-triggered reconnaissance when the pipeline is absent).
+    if(!voice_router_){
+      if(summary.count(FeedbackKind::ResearchReport))scientist_voice(VoiceCue::ResearchReport);
+      if(summary.count(FeedbackKind::SurveyComplete))scientist_voice(VoiceCue::SurveyComplete);
+    }
     // Coalesce accelerated simulation bursts into a single highest-priority cue.
     // Notices retain all categories/counts; no event history is re-read on load.
     if(!presentation_audio_)return;
@@ -7949,6 +8055,16 @@ class NativeCampaign final {
   int construction_candidate_index_{};
   ReplayState *replay_{};
   stellar::native_audio::NativeAudioDirector* presentation_audio_{};
+  // Event-driven gameplay voice pipeline (bridge -> router -> playback) bound
+  // onto the director's voice channel. Destruction order matters: the bridge
+  // references the router, which references the resolver and profiles.
+  stellar::native_voice::NativeVoiceProfileRegistry voice_profiles_{};
+  std::optional<stellar::native_voice::NativeCharacterVoiceResolver> voice_resolver_;
+  std::optional<stellar::native_voice::NativeVoiceCache> voice_cache_;
+  std::optional<stellar::native_voice::NativeVoicePlayback> voice_playback_;
+  std::optional<stellar::native_voice::NativeVoiceRouter> voice_router_;
+  std::optional<stellar::native_voice::NativeGameplayVoiceBridge> voice_bridge_;
+  int voice_ui_sequence_{};
   stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;
   std::chrono::steady_clock::time_point last_event_sound_{};
   bool settings_visible() const { return (settings_hub_&&settings_hub_->visible()) || (voice_settings_&&voice_settings_->visible()) || (general_settings_&&general_settings_->visible()) || (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
@@ -8061,8 +8177,11 @@ int main(int argc,char **argv){
       video_settings.set_adapter(window.graphics_adapter(),window.has_nvidia_control_panel()?std::function<void()>{[&]{window.open_nvidia_control_panel();}}:std::function<void()>{});
       video_settings.open();
     };
+    stellar::native_voice::NativeVoicePlayback* active_voice_playback{};
     stellar::native_audio::NativeVoiceSettings voice_settings(settings_path.parent_path()/"voice-settings.json",
-      [&](const auto& value){audio.set_voice_preferences(value);},[&]{(void)audio.replay_last_voice();},[&]{audio.stop_voice();});
+      [&](const auto& value){audio.set_voice_preferences(value);if(active_voice_playback)active_voice_playback->apply_settings(NativeCampaign::voice_pipeline_settings_for(value));},
+      [&]{(void)audio.replay_last_voice();if(active_voice_playback)active_voice_playback->replay_last();},
+      [&]{audio.stop_voice();if(active_voice_playback)active_voice_playback->stop();});
     stellar::native_settings::NativeSettingsHub settings_hub;
     settings_hub.set_callbacks([&](stellar::native_settings::Category category){
       audio.confirm();
@@ -8164,6 +8283,7 @@ int main(int argc,char **argv){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
     campaign.attach_replay(&replay);
+    active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';
     if(options.smoke_screenshot){
@@ -8335,7 +8455,7 @@ int main(int argc,char **argv){
       if(campaign.new_game_ready()){
         auto config=startup_config();config.return_to_campaign_available=true;
         if(!campaign.developer_session())config.host.default_save_path=campaign.save_path();
-        audio.stop_voice();window.set_text_input(false);
+        audio.stop_voice();if(active_voice_playback)active_voice_playback->stop();window.set_text_input(false);
         std::optional<StartupEntryAutomation> automation;
         if(options.restart_smoke){
           window.draw(campaign.scene(input.drawable_width,input.drawable_height),sidecar_path(*options.smoke_screenshot,L"-saved"));
@@ -8708,6 +8828,7 @@ int main(int argc,char **argv){
       }
       if(waiting_for_capture)++capture_frame;
     }
+    active_voice_playback=nullptr;
     } // A successful New Game replaces the campaign only after activation.
     return 0;
   }catch(const std::exception &error){diagnostics.fatal(error.what());std::cerr<<"Stellar Continuum native client failed: "<<error.what()<<'\n';return 1;}catch(...){diagnostics.fatal("Unknown fatal error");std::cerr<<"Stellar Continuum native client failed: unknown fatal error\n";return 1;}
