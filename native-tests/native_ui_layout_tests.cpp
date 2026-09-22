@@ -39,8 +39,8 @@ void verify(int width, int height, float expected_scale) {
   const UiRect viewport{0, 0, static_cast<float>(width),
                        static_cast<float>(height)};
   const auto hud=CommandHudLayout::make(width,height);
-  require(contains_rect(viewport,hud.context)&&contains_rect(viewport,hud.planets)&&
-      contains_rect(hud.context,hud.switch_view)&&!overlaps(hud.context,hud.planets),"HUD panels escaped or overlapped");
+  require(contains_rect(viewport,hud.context)&&
+      contains_rect(hud.context,hud.switch_view),"HUD panels escaped or overlapped");
   require(contains_rect(hud.resource_strip,layout.pause)&&contains_rect(hud.resource_strip,layout.speed),"Time controls escaped resource strip");
   const std::array<std::pair<UiRect, UiAction>, 7> menu{{
       {layout.continue_button, UiAction::Continue},

@@ -194,16 +194,12 @@ std::optional<UiRect> NativeFleetWorkspace::panel_bounds(int width, int height) 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
   const auto generation_changed =
       view_ && view_->campaign_generation != view.campaign_generation;
-  const auto selection_changed =
-      !view_ || view_->selected_fleet_id != view.selected_fleet_id;
   if (generation_changed) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
     list_scroll_ = 0.f;
   }
-  if (generation_changed || selection_changed)
-    return_needs_confirmation_ = false;
   const auto selected_changed = [&] {
     if (!view_ || view_->selected_fleet_id != view.selected_fleet_id ||
         view_->player_civilization_id != view.player_civilization_id)

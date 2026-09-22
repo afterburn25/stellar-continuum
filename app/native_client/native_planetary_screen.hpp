@@ -165,7 +165,6 @@ class NativePlanetaryScreen {
     using K=stellar::native_system::NativeSystemBodyVisualClass;
     switch(v.planet.visual_class){case K::oceanic:case K::frozen:case K::hot_rocky:return "Rocky world";case K::gas_giant:return "Gas giant";case K::ice_giant:return "Ice giant";case K::moon:return "Rocky moon";case K::unknown_planet:case K::unknown_moon:return "Unsurveyed world";default:return "Rocky world";}
   }
-  static std::string planet_summary(const NativeColonyView& v){return v.system_name+" system\n"+(v.planet.details?number(v.planet.details->gravity_g*9.80665,2)+" m/s²\n"+number(v.planet.details->temperature_kelvin-273.15,0)+" °C\n":"")+"Stability "+number(v.stability*100,0)+"%";}
   static void label(DrawList& out,UiRect r,std::string value,int size,Color color,std::optional<UiRect> clip={}){out.overlay.emplace_back(Text{{r.x,r.y},std::move(value),color,size,r.width,clip.value_or(r),TextAlign::Left,FontFace::Interface});}
   static UiRect intersection(UiRect a,UiRect b){const float x=std::max(a.x,b.x),y=std::max(a.y,b.y);return {x,y,std::max(0.f,std::min(a.x+a.width,b.x+b.width)-x),std::max(0.f,std::min(a.y+a.height,b.y+b.height)-y)};}
   float wrapped(DrawList& out,UiRect r,UiRect clip,std::string value,int font,Color color)const{

@@ -128,16 +128,6 @@ inline void progress(DrawList &out, UiRect bounds, double ratio,
   stroke(out, bounds, color::keyline);
 }
 
-inline void status_chip(DrawList &out, UiRect bounds, std::string caption,
-                        int pixels, Tone tone) {
-  fill(out, bounds, color::surface_secondary);
-  stroke(out, bounds, accent(tone));
-  fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
-  text(out, {bounds.x + 8.f, bounds.y + (bounds.height - pixels) * .5f - 1.f},
-       std::move(caption), accent(tone), pixels, bounds.width - 16.f,
-       TextAlign::Left, FontFace::Heading);
-}
-
 inline void tooltip(DrawList &out, Point anchor, std::string title,
                     std::string body, int viewport_width, int viewport_height,
                     float scale = 1.f, Tone tone = Tone::Neutral) {

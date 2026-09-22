@@ -1,11 +1,9 @@
 #pragma once
 
-#include "native_colony_roster.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <iomanip>
 #include <sstream>
 
@@ -70,29 +68,4 @@ inline void render_context_plate(DrawList& out,const CommandHudLayout& l,
   }
 }
 
-inline void render_planet_outliner(DrawList& out,const CommandHudLayout& l,
-    const stellar::native_colony_roster::View& view,float scroll,Point pointer,
-    const std::function<std::shared_ptr<const RgbaImage>(int)>& portrait) {
-  const float s=l.scale;const auto p=l.planets,clip=l.planet_list;
-  stellar::native_ui_style::menu_panel(out,p);
-  hud_text(out,{p.x+12*s,p.y+8*s,p.width-24*s,20*s},"PLANETS  /  "+std::to_string(view.rows.size()),static_cast<int>(12*s),{145,219,206,255});
-  if(view.rows.empty())hud_text(out,clip,"No owned worlds",static_cast<int>(12*s),{152,178,193,255});
-  for(std::size_t i=0;i<view.rows.size();++i){
-    const auto r=l.row(i,scroll);if(r.y+r.height<=clip.y||r.y>=clip.y+clip.height)continue;
-    const auto& row=view.rows[i];const bool hover=clip.contains(pointer)&&r.contains(pointer);
-    const UiRect visible{r.x,std::max(r.y,clip.y),r.width,std::min(r.y+r.height,clip.y+clip.height)-std::max(r.y,clip.y)};
-    out.overlay.emplace_back(FilledRectangle{visible,hover?Color{23,59,66,245}:Color{9,25,34,242}});
-    if(auto image=portrait(row.body_id))out.overlay.emplace_back(Image{image,{r.x+4*s,r.y+6*s,34*s,34*s},std::nullopt,{255,255,255,255},clip});
-    const auto label=[&](float y,std::string text,int size,Color color){
-      out.overlay.emplace_back(Text{{r.x+44*s,y},std::move(text),color,size,r.width-50*s,clip});
-    };
-    label(r.y+5*s,row.name,static_cast<int>(14*s),row.can_open?Color{220,240,240,255}:Color{155,169,179,255});
-    label(r.y+25*s,row.system_name+"  ·  "+row.population,static_cast<int>(11*s),{136,174,186,255});
-  }
-  const float content=view.rows.size()*l.row_height;
-  if(content>clip.height){
-    const float thumb=std::max(16*s,clip.height*clip.height/content);
-    out.overlay.emplace_back(FilledRectangle{{p.x+p.width-4*s,clip.y+(clip.height-thumb)*scroll/(content-clip.height),2*s,thumb},{99,199,184,255}});
-  }
-}
 } // namespace stellar::native_map

@@ -5497,7 +5497,7 @@ class NativeCampaign final {
       diplomacy_workspace_.discard_campaign();
       diplomacy_portraits_.clear();
       colony_workspace_.discard_campaign();
-      colony_roster_.discard_campaign();hud_planet_appearances_.clear();hud_pressed_colony_.reset();hud_switch_pressed_=false;planet_outliner_scroll_=0;roster_day_.reset();roster_refresh_elapsed_=0.;
+      colony_roster_.discard_campaign();hud_planet_appearances_.clear();hud_switch_pressed_=false;roster_day_.reset();roster_refresh_elapsed_=0.;
 
       battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();battle_art_plan_.clear();
       settlement_workspace_.discard_campaign();
@@ -5718,7 +5718,7 @@ class NativeCampaign final {
         gesture_.capture_for_ui();
         continue;
       }
-      if(!map_hud_visible()){hud_pressed_colony_.reset();hud_switch_pressed_=false;assets_.cancel_input();}
+      if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();}
       if(map_hud_visible()){
         const auto asset_command=assets_.handle(event,width,height);
         if(asset_command.captured){if(asset_command.key)execute_asset(asset_command,width,height);gesture_.capture_for_ui();continue;}
@@ -7399,7 +7399,7 @@ class NativeCampaign final {
   void resize_galaxy_camera(int width,int height){
     if(width<=0||height<=0||!galaxy_backdrop_.artwork_frame())return;
     if(galaxy_view_width_==width&&galaxy_view_height_==height)return;
-    hud_pressed_colony_.reset();hud_switch_pressed_=false;gesture_.cancel();
+    hud_switch_pressed_=false;gesture_.cancel();
     const auto fit=galaxy_overview_camera(width,height);
     camera_.pixels_per_world*=fit.pixels_per_world/fitted_pixels_per_world_;
     fitted_pixels_per_world_=fit.pixels_per_world;
@@ -7750,8 +7750,6 @@ class NativeCampaign final {
   std::shared_ptr<const RgbaImage> hud_crest_;
   std::shared_ptr<const RgbaImage> hud_galaxy_icon_,hud_system_icon_;
   std::unordered_map<int,SystemBodyAppearance> hud_planet_appearances_;
-  float planet_outliner_scroll_{};
-  std::optional<int> hud_pressed_colony_;
   bool hud_switch_pressed_{};
   std::optional<DrawList> smoke_colony_roster_capture_;
   std::string smoke_colony_roster_evidence_;

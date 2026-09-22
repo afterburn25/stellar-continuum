@@ -106,16 +106,6 @@ public:
   overview() const noexcept {
     return overview_ ? &*overview_ : nullptr;
   }
-  // Reference UiSelectedCivilianReturnNeedsConfirmation: the RETURN TO BASE
-  // button switches to a confirmation prompt while a paid-commitment return
-  // is pending operator confirmation.
-  void set_civilian_return_pending(bool pending) noexcept {
-    return_needs_confirmation_ = pending;
-  }
-  [[nodiscard]] bool civilian_return_pending() const noexcept {
-    return return_needs_confirmation_;
-  }
-
   [[nodiscard]] FleetWorkspaceCommand handle(
       const stellar::native_map::InputEvent &event, int width, int height,
       std::span<const FleetScreenMarker> markers,
@@ -152,7 +142,6 @@ private:
   std::optional<stellar::native_fleet::NativeCivilianRecoveryQuote> pending_return_;
   std::string return_warning_;
   bool notice_accepted_{};
-  bool return_needs_confirmation_{};
   stellar::native_map::Point pointer_{};
   float list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
