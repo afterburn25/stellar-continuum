@@ -8211,6 +8211,7 @@ int main(int argc,char **argv){
     audio_settings.set_hover_callback(menu_hover);video_settings.set_hover_callback(menu_hover);
     general_settings.set_hover_callback(menu_hover);voice_settings.set_hover_callback(menu_hover);
     settings_hub.set_hover_callback(menu_hover);
+    settings_hub.set_localization(&locale_table);
     bool audio_menu_ready{};std::size_t audio_boot_services{};
     const StartupAudioHooks audio_hooks{
       [&]{audio.service();service_general();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
