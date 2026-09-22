@@ -109,6 +109,7 @@
 #include <stellar/engine/crash_reporter.hpp>
 #include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/memory_tracker.hpp>
+#include <stellar/engine/platform_services.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/replay.hpp>
 #include <stellar/engine/save_history.hpp>
@@ -3010,6 +3011,9 @@ class NativeCampaign final {
   void configure_support(std::string backend,std::string presentation){
     support_environment_="GameVersion="+std::string(STELLAR_GAME_VERSION)+
         "\nRuntime=native-c++23\nRendererBackend="+backend+"\nPresentation="+presentation+"\n";
+    {const auto status=platform_services_.status();
+     support_environment_+="PlatformServices="+status.backend_name+
+         (status.available?"(available)":"(unavailable)")+"\n";}
 #ifdef _WIN32
     support_environment_+="Platform=Windows\n";
 #endif
@@ -7909,6 +7913,9 @@ class NativeCampaign final {
   bool smoke_battle_reload_{},smoke_battle_paused_speed_{},smoke_battle_menu_pause_{};
   std::string diagnostic_executable_hash_;
   std::string support_environment_,last_support_notice_;
+  // Optional distribution services (Steam-style). Standalone runs on the null
+  // backend; attach a real backend here when one ships.
+  stellar::engine::PlatformServices platform_services_;
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;

@@ -55,7 +55,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Profiling/memory accounting | PARTIALLY IMPLEMENTED | Engine phase timing, queue/cache ledgers; QA process samples | diagnostics/scale tests | No integrated GPU timeline or allocator-tag census |
 | Versioned Windows maintenance | IMPLEMENTED BUT NEEDS POLISH | Engine product version/lease; `installer/`; update scripts | `engine_windows_maintenance`, `engine_windows_maintenance_os` | Offline unsigned dev, exact-base whole-file updates; no remote updater or rollback after successful cleanup |
 | Localization | PARTIALLY IMPLEMENTED | Engine `LocalizationTable`/`LocalizationService` (fallback chain, format/plural, reload) | `localization` | Library-only: UI strings remain hardcoded English, no catalogs shipped |
-| Steam/platform services | PARTIALLY IMPLEMENTED | Engine `PlatformServices` facade + `NullPlatformBackend` | `package_platform` | No Steamworks backend or app consumer; standalone behavior unchanged |
+| Steam/platform services | PARTIALLY IMPLEMENTED | Engine `PlatformServices` facade + `NullPlatformBackend`; client reports backend status in support bundles | `package_platform` | No Steamworks backend yet; standalone behavior unchanged |
 | Mods/accessibility/editor | PLANNED / PARTIALLY IMPLEMENTED foundations | Data catalogs, input/settings, Developer tools/import CLI | Existing scoped tests only | These pieces do not constitute a complete mod/accessibility/editor product; see the 30-item roadmap |
 
 ## Implementation records (newest first)
