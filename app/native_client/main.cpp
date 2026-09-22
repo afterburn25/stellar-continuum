@@ -148,7 +148,7 @@ namespace native_battle_art=stellar::native_battle_art;
 using namespace stellar::core;
 using namespace stellar::native_map;
 
-// Ends the profiler frame opened at the top of ClientApp::update.
+// Ends the profiler frame opened at the top of ClientApp::scene.
 struct ProfileFrameGuard {
   ~ProfileFrameGuard() {
     (void)stellar::engine::Profiler::instance().end_frame();
@@ -5443,6 +5443,7 @@ class NativeCampaign final {
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     input_mapper_.begin_frame();
+    const auto update_scope=stellar::engine::Profiler::instance().span("update","client");
     // Keep the planet material queue draining even when no visible view is
     // requesting materials (e.g. pause menu over the map); otherwise a pending
     // decode stalls readiness until the next request.
@@ -5455,6 +5456,7 @@ class NativeCampaign final {
     developer_fault_capture_.poll();
     developer_panel_.set_export_busy(support_.busy());
     session_->frame().set_profiling_enabled(developer_session());
+    stellar::engine::Profiler::instance().set_enabled(developer_session());
     feedback_.advance(elapsed);
     pointer_=input.focused&&input.renderable()?input.pointer:Point{-1.f,-1.f};
     const auto timestamp=utc_timestamp();
@@ -6040,7 +6042,7 @@ class NativeCampaign final {
           (!general_settings_||!general_settings_->saved().reduce_motion)&&
           (!tumble_world.active_combat_encounter||tumble_world.active_combat_encounter->reconciled));
       const bool single_step=developer_panel_.take_step_request()&&session_->frame().can_step_developer();
-      const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp,single_step);
+      const auto frame_result=[&]{const auto advance_scope=stellar::engine::Profiler::instance().span("simulation","client");return session_->advance(menu_?0.:elapsed,timestamp,single_step);}();
       if(developer_session()){
         developer_monitor_.observe(session_->frame(),frame_result,timestamp);
         respond_to_developer_fault(width,height);
@@ -6120,6 +6122,11 @@ class NativeCampaign final {
   }
 
   [[nodiscard]] DrawList scene(int width,int height){
+    // One profiler frame per rendered scene: begin_frame drains the update
+    // spans recorded since the last render into this frame's capture.
+    stellar::engine::Profiler::instance().begin_frame();
+    const ProfileFrameGuard profile_guard{};
+    const auto scene_scope=stellar::engine::Profiler::instance().span("scene","client");
     system_background_.poll();
     phenomena_.poll();
     auto out=scene_content(width,height);if(developer_session()){phenomena_debug_.data(phenomena_debug_text());phenomena_debug_.render(out,width,height);if(background_debug_.visible()){const auto id=system_workspace_.system_id().value_or(selected_id_.value_or(session_->frame().runtime().world().campaign().systems.front().id));background_debug_.data(system_background_,id);background_debug_.render(out,width,height,system_background_);}}developer_panel_.render(out,width,height,session_->frame());developer_index_.render(out,width,height,session_->frame());developer_planet_index_.render(out,width,height);giant_test_panel_.render(out,width,height,session_->frame(),[this](const auto& a,int lod){return planet_material_cache_.request(a,lod);});stellar_activity_panel_.render(out,width,height,session_->frame());developer_diagnostics_.render(out,width,height,session_->frame(),developer_monitor_);developer_empires_.render(out,width,height,session_->frame());
