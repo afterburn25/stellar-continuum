@@ -17,6 +17,9 @@ struct GeneralPreferences final {
   bool assets_hidden{};
   int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
   int nebula_density{1}; // Low / Medium / High; presentation only.
+  // Accessibility: pauses decorative motion (system tumble, planet spin,
+  // eruption animation) without touching simulation or authoritative clocks.
+  bool reduce_motion{};
   bool operator==(const GeneralPreferences&) const = default;
 };
 struct GeneralSettingsLayout final {
@@ -25,6 +28,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
+  stellar::native_map::UiRect motion;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {

@@ -6037,6 +6037,7 @@ class NativeCampaign final {
     if(advance_simulation){
       const auto& tumble_world=session_->frame().runtime().world().campaign();
       system_workspace_.advance_tumble(elapsed,!menu_&&session_->frame().clock().speed()!=StrategicSpeed::Paused&&
+          (!general_settings_||!general_settings_->saved().reduce_motion)&&
           (!tumble_world.active_combat_encounter||tumble_world.active_combat_encounter->reconciled));
       const bool single_step=developer_panel_.take_step_request()&&session_->frame().can_step_developer();
       const auto frame_result=session_->advance(menu_?0.:elapsed,timestamp,single_step);
@@ -6163,7 +6164,7 @@ class NativeCampaign final {
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
     stellar_art_.begin_frame();
-    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_,general_settings_?general_settings_->saved().eruption_quality:2);
+    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible()){
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
