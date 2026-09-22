@@ -106,14 +106,11 @@
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/runtime_directory_lease.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
-#include <stellar/engine/crash_reporter.hpp>
 #include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/platform_services.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/replay.hpp>
-#include <stellar/engine/save_history.hpp>
-#include <stellar/engine/save_integrity.hpp>
 #include <nlohmann/json.hpp>
 
 #include <SDL3/SDL.h>
