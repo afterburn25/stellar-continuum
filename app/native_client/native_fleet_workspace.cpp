@@ -76,6 +76,18 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   return "Fleet";
 }
 
+[[nodiscard]] const char *role_key(stellar::core::FleetRole role) {
+  using stellar::core::FleetRole;
+  switch (role) {
+  case FleetRole::Scout: return "FLEET_ROLE_SCOUT";
+  case FleetRole::Science: return "FLEET_ROLE_SCIENCE";
+  case FleetRole::Colony: return "FLEET_ROLE_COLONY";
+  case FleetRole::Military: return "FLEET_ROLE_MILITARY";
+  case FleetRole::Logistics: return "FLEET_ROLE_LOGISTICS";
+  }
+  return "FLEET_ROLE_FLEET";
+}
+
 [[nodiscard]] std::string transit_name(stellar::core::FleetTransitPhase phase) {
   using stellar::core::FleetTransitPhase;
   switch (phase) {
@@ -85,6 +97,17 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   case FleetTransitPhase::LocalArrival: return "Arriving";
   }
   return "Active";
+}
+
+[[nodiscard]] const char *transit_key(stellar::core::FleetTransitPhase phase) {
+  using stellar::core::FleetTransitPhase;
+  switch (phase) {
+  case FleetTransitPhase::None: return "FLEET_TRANSIT_STATIONED";
+  case FleetTransitPhase::LocalDeparture: return "FLEET_TRANSIT_DEPARTING";
+  case FleetTransitPhase::InterstellarWarp: return "FLEET_TRANSIT_WARP";
+  case FleetTransitPhase::LocalArrival: return "FLEET_TRANSIT_ARRIVING";
+  }
+  return "FLEET_TRANSIT_ACTIVE";
 }
 
 [[nodiscard]] std::optional<UiRect> intersection(UiRect left,
@@ -168,6 +191,30 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
           civilian_locate, engage};
 }
 
+std::string NativeFleetWorkspace::tr(std::string_view key,
+                                     std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeFleetWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 FleetWorkspaceLayout NativeFleetWorkspace::layout(int width, int height) const noexcept {
   return FleetWorkspaceLayout::for_viewport(width, height, presentation_);
 }
@@ -189,6 +236,18 @@ std::optional<UiRect> NativeFleetWorkspace::panel_bounds(int width, int height) 
   case MilitaryOrderType::Retreat: return "Retreat";
   }
   return "Hold";
+}
+
+[[nodiscard]] const char *military_order_key(
+    stellar::core::MilitaryOrderType order) {
+  using stellar::core::MilitaryOrderType;
+  switch (order) {
+  case MilitaryOrderType::Hold: return "FLEET_ORDER_HOLD";
+  case MilitaryOrderType::Defend: return "FLEET_ORDER_DEFEND";
+  case MilitaryOrderType::Attack: return "FLEET_ORDER_ATTACK";
+  case MilitaryOrderType::Retreat: return "FLEET_ORDER_RETREAT";
+  }
+  return "FLEET_ORDER_HOLD";
 }
 
 void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
@@ -221,7 +280,8 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
   if (pending_return_ && (selected == view_->own_fleets.end() ||
       selected->recovery != pending_return_)) {
     cancel_recovery();
-    notice_ = "Mission changed. Review Return to Base again before confirming.";
+    notice_ = tr("FLEET_MISSION_CHANGED",
+                 "Mission changed. Review Return to Base again before confirming.");
     notice_accepted_ = false;
   }
   if (preview_ &&
@@ -392,7 +452,9 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       const bool right = layout.recovery_right.contains(event.position);
       if (pending_return_ && right) {
         cancel_recovery();
-        set_notice("Return cancelled. The existing mission is unchanged.", true);
+        set_notice(tr("FLEET_RETURN_CANCELLED",
+                      "Return cancelled. The existing mission is unchanged."),
+                   true);
         return {FleetWorkspaceCommandKind::None, true};
       }
       if (left || (right && !fleet->recovery->return_requested)) {
@@ -485,7 +547,7 @@ void NativeFleetWorkspace::render(
   if (!panel_bounds(width, height)) return;
   stellar::native_menu_style::panel(out, layout.panel, layout.scale);
   const bool outliner = presentation_ == FleetWorkspacePresentation::Outliner;
-  text(out, layout.heading, outliner ? (view_&&view_->developer_inspection?"ALL FLEETS":"PLAYER FLEETS") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET INSPECTION":"FLEET COMMAND"), bright,
+  text(out, layout.heading, tr(outliner ? (view_&&view_->developer_inspection?"FLEET_ALL":"FLEET_PLAYER") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET_INSPECTION":"FLEET_COMMAND"), outliner ? (view_&&view_->developer_inspection?"ALL FLEETS":"PLAYER FLEETS") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET INSPECTION":"FLEET COMMAND")), bright,
        layout.title_font_pixels, FontFace::Heading);
   if (outliner) {
   stellar::engine::ui_skin::surface(out,layout.list,layout.scale);
@@ -495,8 +557,9 @@ void NativeFleetWorkspace::render(
           layout.list.y + 12.f * layout.scale,
           layout.list.width - 20.f * layout.scale,
           layout.list.height - 24.f * layout.scale},
-         "No active player fleets. Complete construction before issuing "
-         "travel orders.",
+         tr("FLEET_NO_FLEETS",
+            "No active player fleets. Complete construction before issuing "
+            "travel orders."),
          muted, layout.body_font_pixels);
   } else {
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
@@ -543,7 +606,11 @@ void NativeFleetWorkspace::render(
                text_width, 17.f * layout.scale}))
         out.overlay.emplace_back(Text{
             {text_left, row.y + 23.f * layout.scale},
-            role_name(fleet.role) + "  |  " + (fleet.foreign_inspection ? fleet.owner_name : transit_name(fleet.transit_phase)),
+            tr(role_key(fleet.role), role_name(fleet.role)) + "  |  " +
+                (fleet.foreign_inspection
+                     ? fleet.owner_name
+                     : tr(transit_key(fleet.transit_phase),
+                          transit_name(fleet.transit_phase))),
             muted, layout.small_font_pixels,
             text_width, *role_clip});
     }
@@ -552,7 +619,7 @@ void NativeFleetWorkspace::render(
   }
   const auto *fleet = selected_fleet();
   if(!view_||view_->own_fleets.empty())return;
-  const auto action_button = [&](UiRect bounds,const char *label) {
+  const auto action_button = [&](UiRect bounds,std::string label) {
     stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,true,layout.scale);
     text(out,{bounds.x,bounds.y+bounds.height*.3f,bounds.width,bounds.height*.7f},
          label,bright,layout.small_font_pixels,FontFace::Interface,TextAlign::Center);
@@ -571,27 +638,42 @@ void NativeFleetWorkspace::render(
           pointer_, portraits);
     } else {
       text(out, layout.details,
-           view_->developer_inspection ? "Select any fleet on the map or in the outliner." : "Select an owned fleet on the map or in the outliner.", muted,
+           view_->developer_inspection
+               ? tr("FLEET_SELECT_ANY",
+                    "Select any fleet on the map or in the outliner.")
+               : tr("FLEET_SELECT_OWNED",
+                    "Select an owned fleet on the map or in the outliner."),
+           muted,
            layout.body_font_pixels);
     }
   } else if (pending_return_) {
     // Use the entire details region: never truncate the paid-mission warning.
     const UiRect warning_bounds{layout.details.x, layout.details.y,
         layout.details.width, layout.feedback.y - layout.details.y - 8.f * layout.scale};
-    text(out, warning_bounds, "ABANDON COLONY MISSION?\n\n" + return_warning_,
+    text(out, warning_bounds,
+         tr("FLEET_ABANDON_MISSION", "ABANDON COLONY MISSION?") + "\n\n" +
+             return_warning_,
          warning, layout.body_font_pixels);
   } else {
-    std::string details =
-        fleet->name + "\n" + role_name(fleet->role) + "  |  " +
-        transit_name(fleet->transit_phase) + "\nStrength " +
-        number(fleet->combat_power) + "\nFuel " +
-        number(fleet->fuel_remaining_light_years, 2) + " / " +
-        number(fleet->fuel_capacity_light_years, 2) + " ly\nRange " +
-        number(fleet->maximum_leg_range_light_years, 2) + " ly\nSpeed " +
-        number(fleet->strategic_speed, 2) + " ly/day";
+    std::string details = trf(
+        "FLEET_DETAILS",
+        {fleet->name, tr(role_key(fleet->role), role_name(fleet->role)),
+         tr(transit_key(fleet->transit_phase),
+            transit_name(fleet->transit_phase)),
+         number(fleet->combat_power),
+         number(fleet->fuel_remaining_light_years, 2),
+         number(fleet->fuel_capacity_light_years, 2),
+         number(fleet->maximum_leg_range_light_years, 2),
+         number(fleet->strategic_speed, 2)},
+        "{0}\n{1}  |  {2}\nStrength {3}\nFuel {4} / {5} ly\nRange {6} "
+        "ly\nSpeed {7} ly/day");
     if (fleet->military_order_quote)
-      details += "\nOrder " +
-          military_order_name(fleet->military_order_quote->current_order);
+      details += trf("FLEET_ORDER_SUFFIX",
+                     {tr(military_order_key(
+                          fleet->military_order_quote->current_order),
+                      military_order_name(
+                          fleet->military_order_quote->current_order))},
+                     "\nOrder {0}");
     const bool armed_order = !preview_ && !pending_return_ &&
         fleet->military_order_quote.has_value();
     const bool recovery_locate = !preview_ && !pending_return_ &&
@@ -618,38 +700,50 @@ void NativeFleetWorkspace::render(
     if (armed_order) {
       // The selected fleet's quote is retained until release, and becomes
       // invalid as soon as selection, observer, campaign, or order changes.
-      action_button(layout.order_hold,"HOLD");
-      action_button(layout.order_defend,"DEFEND");
-      action_button(layout.order_retreat,"RETREAT");
+      action_button(layout.order_hold,tr("FLEET_ORDER_HOLD_BTN","HOLD"));
+      action_button(layout.order_defend,tr("FLEET_ORDER_DEFEND_BTN","DEFEND"));
+      action_button(layout.order_retreat,tr("FLEET_ORDER_RETREAT_BTN","RETREAT"));
     } else if (recovery_locate) {
       // Recovery keeps both paid-mission controls in the confirm rail.
-      action_button(layout.civilian_locate,"LOCATE");
+      action_button(layout.civilian_locate,tr("FLEET_LOCATE","LOCATE"));
     }
     std::string route;
     if (preview_) {
-      route = "ROUTE PREVIEW\nDestination " + target_display_name_ +
-              "\nDistance " +
-              number(preview_->route_distance_light_years, 2) + " ly\n" +
-              (preview_->route_authoritative ? "Confirmed lane route"
-                                             : "Route awaiting confirmation");
+      route = trf("FLEET_ROUTE_PREVIEW",
+                  {target_display_name_,
+                   number(preview_->route_distance_light_years, 2),
+                   preview_->route_authoritative
+                       ? tr("FLEET_ROUTE_CONFIRMED", "Confirmed lane route")
+                       : tr("FLEET_ROUTE_PENDING",
+                            "Route awaiting confirmation")},
+                  "ROUTE PREVIEW\nDestination {0}\nDistance {1} ly\n{2}");
       if (preview_->estimated_transit_days)
-        route += "\nEstimated ETA " +
-                 stellar::native_campaign::format_campaign_duration(*preview_->estimated_transit_days);
+        route += trf("FLEET_ETA_SUFFIX",
+                     {stellar::native_campaign::format_campaign_duration(
+                         *preview_->estimated_transit_days)},
+                     "\nEstimated ETA {0}");
     } else if (fleet->destination_system_id) {
-      route = "TRAVEL STATUS\nTravel order active\nTransit progress " +
-              number(fleet->transit_progress * 100., 1) + "%";
+      route = trf("FLEET_TRAVEL_STATUS",
+                  {number(fleet->transit_progress * 100., 1)},
+                  "TRAVEL STATUS\nTravel order active\nTransit progress {0}%");
     } else if (fleet->reconnaissance) {
       const auto &reconnaissance = *fleet->reconnaissance;
       if (reconnaissance.completed) {
         route = reconnaissance.fully_surveyed
-                    ? "RECONNAISSANCE\nRapid reconnaissance complete\nSystem fully surveyed"
-                    : "RECONNAISSANCE\nRapid reconnaissance complete\nSend a science vessel for a full survey.";
+                    ? tr("FLEET_RECON_SURVEYED",
+                         "RECONNAISSANCE\nRapid reconnaissance complete\n"
+                         "System fully surveyed")
+                    : tr("FLEET_RECON_PARTIAL",
+                         "RECONNAISSANCE\nRapid reconnaissance complete\nSend "
+                         "a science vessel for a full survey.");
       } else {
-        route = "RECONNAISSANCE\n" +
-                std::string(reconnaissance.held ? "Held; work paused\nWork "
-                                                : "Local work\nWork ") +
-                number(reconnaissance.days_completed, 1) + " / " +
-                number(reconnaissance.required_days, 1) + " work-days";
+        route = trf("FLEET_RECON_PROGRESS",
+                    {reconnaissance.held
+                         ? tr("FLEET_RECON_HELD", "Held; work paused")
+                         : tr("FLEET_RECON_LOCAL", "Local work"),
+                     number(reconnaissance.days_completed, 1),
+                     number(reconnaissance.required_days, 1)},
+                    "RECONNAISSANCE\n{0}\nWork {1} / {2} work-days");
         const auto progress = reconnaissance.required_days > 0.
                                   ? std::clamp(reconnaissance.days_completed /
                                                    reconnaissance.required_days,
@@ -667,12 +761,16 @@ void NativeFleetWorkspace::render(
     } else if (fleet->science_survey) {
       const auto &survey = *fleet->science_survey;
       if (survey.completed) {
-        route = "SCIENCE SURVEY\nSystem fully surveyed\nSelect a planet to review findings.";
+        route = tr("FLEET_SURVEY_DONE",
+                   "SCIENCE SURVEY\nSystem fully surveyed\nSelect a planet to "
+                   "review findings.");
       } else {
-        route = "SCIENCE SURVEY\n" +
-                std::string(survey.held ? "Held; work paused\nFull survey "
-                                         : "Detailed local work\nFull survey ") +
-                number(survey.progress * 100., 1) + "%";
+        route = trf("FLEET_SURVEY_PROGRESS",
+                    {survey.held
+                         ? tr("FLEET_SURVEY_HELD", "Held; work paused")
+                         : tr("FLEET_SURVEY_LOCAL", "Detailed local work"),
+                     number(survey.progress * 100., 1)},
+                    "SCIENCE SURVEY\n{0}\nFull survey {1}%");
         const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
                              7.f * layout.scale,
                          layout.route.width, 4.f * layout.scale};
@@ -682,7 +780,12 @@ void NativeFleetWorkspace::render(
         stroke(out, bar, border_color);
       }
     } else {
-      route = fleet->foreign_inspection ? "LIVE INSPECTION\nFleet is stationed locally.\nSelect LOCATE to view its position." : "ROUTE PREVIEW\nRight-click a system to preview travel.";
+      route = fleet->foreign_inspection
+                  ? tr("FLEET_LIVE_INSPECTION",
+                       "LIVE INSPECTION\nFleet is stationed locally.\nSelect "
+                       "LOCATE to view its position.")
+                  : tr("FLEET_ROUTE_HINT",
+                       "ROUTE PREVIEW\nRight-click a system to preview travel.");
     }
     text(out, {layout.route.x + 10.f * layout.scale,
                layout.route.y + 8.f * layout.scale,
@@ -703,21 +806,29 @@ void NativeFleetWorkspace::render(
     if (!selected || !selected->military_order_quote || preview_ || pending_return_)
       return {};
     if (layout.order_hold.contains(pointer_))
-      return "Hold changes combat stance; it does not stop travel. No movement or resource charge now.";
+      return tr("FLEET_HELP_HOLD",
+                "Hold changes combat stance; it does not stop travel. No "
+                "movement or resource charge now.");
     if (layout.order_defend.contains(pointer_))
-      return "Defend protects this system in combat. No movement or resource charge now.";
+      return tr("FLEET_HELP_DEFEND",
+                "Defend protects this system in combat. No movement or "
+                "resource charge now.");
     if (layout.order_retreat.contains(pointer_))
-      return "Retreat requests combat disengagement; it does not route home. No movement or resource charge now.";
+      return tr("FLEET_HELP_RETREAT",
+                "Retreat requests combat disengagement; it does not route "
+                "home. No movement or resource charge now.");
     return {};
   }();
   const auto feedback = !tactical_help.empty() ? tactical_help
-                        : pending_return_ ? "Cancel keeps the existing mission and its progress."
+                        : pending_return_ ? tr("FLEET_CANCEL_KEEP",
+                                               "Cancel keeps the existing mission and its progress.")
                         : !notice_.empty()
                             ? notice_
                             : preview_ && !preview_->command_available
                                   ? preview_->message
                                   : selected && selected->military_order_quote
-                                      ? "Hold changes stance; Defend protects this system; Retreat requests disengagement. No movement or resource charge now."
+                                      ? tr("FLEET_HELP_ALL",
+                                           "Hold changes stance; Defend protects this system; Retreat requests disengagement. No movement or resource charge now.")
                                   : selected ? selected->recovery_message : std::string{};
   if (!feedback.empty())
     text(out, layout.feedback, visible_message(feedback),
@@ -729,9 +840,11 @@ void NativeFleetWorkspace::render(
       const auto bounds = left ? layout.recovery_left : layout.recovery_right;
       const bool enabled = left || pending_return_ || !queued;
       stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),pending_return_&&left,enabled,layout.scale);
-      const auto label = pending_return_ ? (left ? "CONFIRM RETURN" : "CANCEL")
-          : left ? (selected->recovery->hold_requested ? "RESUME" : "HOLD")
-                 : queued ? "RETURN QUEUED" : "RETURN TO BASE";
+      const auto label = pending_return_ ? (left ? tr("FLEET_CONFIRM_RETURN","CONFIRM RETURN") : tr("SETTINGS_CANCEL","CANCEL"))
+          : left ? tr(selected->recovery->hold_requested ? "FLEET_RESUME" : "FLEET_HOLD",
+                      selected->recovery->hold_requested ? "RESUME" : "HOLD")
+                 : tr(queued ? "FLEET_RETURN_QUEUED" : "FLEET_RETURN_BASE",
+                      queued ? "RETURN QUEUED" : "RETURN TO BASE");
       text(out, {bounds.x, bounds.y + 10.f * layout.scale, bounds.width,
                  bounds.height - 10.f * layout.scale}, label,
            enabled ? bright : muted, layout.small_font_pixels, FontFace::Interface,
@@ -749,15 +862,15 @@ void NativeFleetWorkspace::render(
                layout.confirm.y + 9.f * layout.scale,
                layout.confirm.width - 12.f * layout.scale,
                layout.confirm.height - 12.f * layout.scale},
-         "CONFIRM TRAVEL", bright, layout.body_font_pixels,
-         FontFace::Interface, TextAlign::Center);
+         tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL"), bright,
+         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
   } else if (selected && selected->military_order_quote && !preview_ && !pending_return_) {
-    action_button(layout.military_locate,"LOCATE");
-    if (engage) action_button(layout.engage,"ENGAGE HOSTILES");
+    action_button(layout.military_locate,tr("FLEET_LOCATE","LOCATE"));
+    if (engage) action_button(layout.engage,tr("FLEET_ENGAGE","ENGAGE HOSTILES"));
   } else if (locate_on_rail) {
-    action_button(layout.locate,"LOCATE");
+    action_button(layout.locate,tr("FLEET_LOCATE","LOCATE"));
   } else if (engage) {
-    action_button(layout.engage,"ENGAGE HOSTILES");
+    action_button(layout.engage,tr("FLEET_ENGAGE","ENGAGE HOSTILES"));
   }
   if (view_)
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
@@ -769,9 +882,11 @@ void NativeFleetWorkspace::render(
       if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
       native_ui::tooltip(
           out, {layout.panel.x - 330.f * layout.scale, row.y}, candidate.name,
-          role_name(candidate.role) + " · " +
-              transit_name(candidate.transit_phase) +
-              ". Select for readiness, range, fuel and orders.",
+          trf("FLEET_TOOLTIP",
+              {tr(role_key(candidate.role), role_name(candidate.role)),
+               tr(transit_key(candidate.transit_phase),
+                  transit_name(candidate.transit_phase))},
+              "{0} · {1}. Select for readiness, range, fuel and orders."),
           width, height, layout.scale, native_ui::Tone::Military);
       break;
     }

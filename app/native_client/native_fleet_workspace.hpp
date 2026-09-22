@@ -4,11 +4,14 @@
 #include "native_overview.hpp"
 #include "native_ship_art_assets.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_fleet_ui {
@@ -82,6 +85,10 @@ public:
   [[nodiscard]] FleetWorkspaceLayout layout(int width, int height) const noexcept;
   [[nodiscard]] std::optional<stellar::native_map::UiRect> panel_bounds(
       int width, int height) const noexcept;
+  void
+  set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   void set_view(stellar::native_fleet::NativeFleetMapView view);
   void discard_campaign();
   void set_preview(stellar::native_fleet::NativeFleetRoutePreview preview,
@@ -133,7 +140,13 @@ private:
   void clear_pressed_action() noexcept;
   [[nodiscard]] PressTarget pressed_target_at(
       stellar::native_map::Point, const FleetWorkspaceLayout &) const noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   std::optional<stellar::native_fleet::NativeFleetMapView> view_;
   std::optional<stellar::native_overview::NativeEmpireOverview> overview_;
   std::optional<stellar::native_fleet::NativeFleetRoutePreview> preview_;

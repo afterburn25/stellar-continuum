@@ -890,6 +890,7 @@ class NativeCampaign final {
     locale_=&table;
     diplomacy_workspace_.set_localization(&table);
     research_workspace_.set_localization(&table);
+    fleet_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
