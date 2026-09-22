@@ -107,6 +107,7 @@
 #include <stellar/engine/runtime_directory_lease.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/input_actions.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/platform_services.hpp>
 #include <stellar/engine/profiler.hpp>
@@ -7994,7 +7995,16 @@ int main(int argc,char **argv){
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    // English is the built-in baseline; a shipped Data/locale/<locale>.json
+    // table overrides panel text through the engine localization service.
+    stellar::engine::LocalizationTable locale_table{"en","en"};
+    if(auto stream=stellar::engine::resource_stream(asset_root/"Data/locale/en.json")){
+      std::ostringstream contents;contents<<stream.rdbuf();
+      std::string error;
+      if(!locale_table.load_json(contents.str(),&error))std::cerr<<"Locale catalog rejected: "<<error<<'\n';
+    }
     stellar::native_general::NativeGeneralSettings general_settings(general_settings_path);
+    general_settings.set_localization(&locale_table);
     window.set_screenshot_directory(general_settings.saved().screenshot_directory);
     general_settings.set_text_measurer([&](const Text& text){return window.measure_text(text);});
     general_settings.set_apply([&](const auto& value){window.set_screenshot_directory(value.screenshot_directory);});

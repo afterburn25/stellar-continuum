@@ -1,4 +1,5 @@
 #include "native_general_settings.hpp"
+#include <stellar/engine/localization.hpp>
 
 #include <array>
 #include <chrono>
@@ -463,6 +464,21 @@ int main() {
       require(reloaded.saved().reduce_motion,"Cancel changed reduced motion");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduced motion (decorative animation): On").value.size()>0,"Reduced motion state was not rendered");
+    }
+    {
+      // Localization: loaded keys override literals; missing keys fall back.
+      stellar::engine::LocalizationTable locale{"en","en"};
+      std::string lerr;
+      require(locale.load_json(R"({"locale":"en","strings":{"SETTINGS_GENERAL_TITLE":"TEST TITLE","SETTINGS_STATE_OFF":"DISABLED","SETTINGS_REDUCE_MOTION":"Motion: {0}","SETTINGS_NEBULA_DENSITY":"Nebula {0} ▾"}})",&lerr),("Locale JSON rejected: "+lerr).c_str());
+      NativeGeneralSettings localized(temp.path/"localized.json");
+      localized.set_localization(&locale);
+      localized.open();
+      DrawList draw;localized.render(draw,1280,720);
+      require(find_text_label(draw,"TEST TITLE").value=="TEST TITLE","Localized title was not rendered");
+      require(find_text_label(draw,"Motion: DISABLED").value=="Motion: DISABLED","Localized format substitution failed");
+      require(find_text_label(draw,"Nebula Medium ▾").value=="Nebula Medium ▾","Nested localized quality name failed");
+      require(find_text_label(draw,"SAVE").value=="SAVE","Missing key did not fall back to the literal");
+      require(find_text_label(draw,"SCREENSHOT FOLDER").value=="SCREENSHOT FOLDER","Unlisted label did not fall back to the literal");
     }
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);

@@ -86,6 +86,22 @@ bool NativeGeneralSettings::save(GeneralPreferences value) {
   }
   saved_=std::move(value);error_.clear();if(apply_)apply_(saved_);return true;
 }
+std::string NativeGeneralSettings::tr(std::string_view key,std::string_view fallback)const {
+  if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+std::string NativeGeneralSettings::trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const {
+  if(locale_&&locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(),args.end());
+    return locale_->format(key,std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  for(std::size_t i=0;i<args.size();++i) {
+    const auto marker="{"+std::to_string(i)+"}";
+    if(const auto at=out.find(marker);at!=std::string::npos)out.replace(at,marker.size(),*(args.begin()+i));
+  }
+  return out;
+}
 void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
 void NativeGeneralSettings::cancel(){nebula_dropdown_.close();eruption_dropdown_.close();draft_=saved_;pending_request_.reset();visible_=false;}
 Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
@@ -165,22 +181,25 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   const auto l=GeneralSettingsLayout::for_viewport(width,height);const auto s=l.scale;
   draw.overlay.emplace_back(FilledRectangle{{0,0,static_cast<float>(width),static_cast<float>(height)},{3,10,22,48}});
   native_menu_style::panel(draw,l.panel,l.scale);
-  label(draw,{l.panel.x+30*s,l.panel.y+20*s,l.panel.width-60*s,36*s},"GENERAL SETTINGS",l.heading_pixels);
-  button(draw,l.audio,"AUDIO",l.font_pixels,false,browsing());button(draw,l.video,"VIDEO",l.font_pixels,false,browsing());
-  button(draw,l.nebula,"Space phenomena density: "+std::array<std::string,3>{"Low","Medium","High"}.at(draft_.nebula_density)+" ▾",l.font_pixels,false,browsing());
-  button(draw,l.eruptions,"Stellar eruption detail: "+std::array<std::string,4>{"Low","Medium","High","Ultra"}.at(draft_.eruption_quality)+" ▾",l.font_pixels,false,browsing());
-  button(draw,l.motion,std::string("Reduced motion (decorative animation): ")+(draft_.reduce_motion?"On":"Off"),l.font_pixels,false,browsing());
-  label(draw,{l.folder.x,l.panel.y+199*s,l.folder.width,26*s},"SCREENSHOT FOLDER",l.font_pixels);
-  label(draw,{l.folder.x,l.panel.y+229*s,l.folder.width,25*s},"Press F12 to save a PNG of the game.",l.font_pixels);
+  const auto quality_name=[&](std::string_view key,std::string_view fallback){return tr(key,fallback);};
+  const std::array<std::string,3> densities{quality_name("SETTINGS_QUALITY_LOW","Low"),quality_name("SETTINGS_QUALITY_MEDIUM","Medium"),quality_name("SETTINGS_QUALITY_HIGH","High")};
+  const std::array<std::string,4> details{densities[0],densities[1],densities[2],quality_name("SETTINGS_QUALITY_ULTRA","Ultra")};
+  label(draw,{l.panel.x+30*s,l.panel.y+20*s,l.panel.width-60*s,36*s},tr("SETTINGS_GENERAL_TITLE","GENERAL SETTINGS"),l.heading_pixels);
+  button(draw,l.audio,tr("SETTINGS_NAV_AUDIO","AUDIO"),l.font_pixels,false,browsing());button(draw,l.video,tr("SETTINGS_NAV_VIDEO","VIDEO"),l.font_pixels,false,browsing());
+  button(draw,l.nebula,trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0} ▾"),l.font_pixels,false,browsing());
+  button(draw,l.eruptions,trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0} ▾"),l.font_pixels,false,browsing());
+  button(draw,l.motion,trf("SETTINGS_REDUCE_MOTION",{tr(draft_.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),l.font_pixels,false,browsing());
+  label(draw,{l.folder.x,l.panel.y+199*s,l.folder.width,26*s},tr("SETTINGS_SCREENSHOT_FOLDER","SCREENSHOT FOLDER"),l.font_pixels);
+  label(draw,{l.folder.x,l.panel.y+229*s,l.folder.width,25*s},tr("SETTINGS_SCREENSHOT_HINT","Press F12 to save a PNG of the game."),l.font_pixels);
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});
   auto path=path_text(l);
   const auto maximum=measure_?std::max(0.f,static_cast<float>(measure_(path).height)-path.clip->height):0.f;
   path.at.y-=std::min(path_scroll_,maximum);draw.overlay.emplace_back(std::move(path));
   label(draw,l.status,browsing()?"Choose a folder in the Windows browser...":!error_.empty()?error_:
     maximum>0?"Scroll over the path to see the full folder. Save to keep your choice.":draft_.screenshot_directory.empty()?"Using the default Pictures folder. Save to keep this choice.":"Save to use this folder. Cancel keeps your current location.",l.font_pixels);
-  button(draw,l.browse,browsing()?"BROWSING...":"BROWSE",l.font_pixels,false,browsing());
-  button(draw,l.defaults,"USE DEFAULT",l.font_pixels,false,browsing());button(draw,l.cancel,"CANCEL",l.font_pixels);
-  button(draw,l.save,"SAVE",l.font_pixels,true,browsing());
+  button(draw,l.browse,browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),l.font_pixels,false,browsing());
+  button(draw,l.defaults,tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),l.font_pixels,false,browsing());button(draw,l.cancel,tr("SETTINGS_CANCEL","CANCEL"),l.font_pixels);
+  button(draw,l.save,tr("SETTINGS_SAVE","SAVE"),l.font_pixels,true,browsing());
   nebula_dropdown_.render(draw,l.nebula,width,height,l.font_pixels);
   eruption_dropdown_.render(draw,l.eruptions,width,height,l.font_pixels);
 }

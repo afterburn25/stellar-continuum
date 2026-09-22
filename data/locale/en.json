@@ -1,0 +1,25 @@
+{
+  "locale": "en",
+  "fallback": "en",
+  "strings": {
+    "SETTINGS_GENERAL_TITLE": "GENERAL SETTINGS",
+    "SETTINGS_NAV_AUDIO": "AUDIO",
+    "SETTINGS_NAV_VIDEO": "VIDEO",
+    "SETTINGS_NEBULA_DENSITY": "Space phenomena density: {0} ▾",
+    "SETTINGS_ERUPTION_DETAIL": "Stellar eruption detail: {0} ▾",
+    "SETTINGS_REDUCE_MOTION": "Reduced motion (decorative animation): {0}",
+    "SETTINGS_SCREENSHOT_FOLDER": "SCREENSHOT FOLDER",
+    "SETTINGS_SCREENSHOT_HINT": "Press F12 to save a PNG of the game.",
+    "SETTINGS_BROWSE": "BROWSE",
+    "SETTINGS_BROWSING": "BROWSING...",
+    "SETTINGS_USE_DEFAULT": "USE DEFAULT",
+    "SETTINGS_CANCEL": "CANCEL",
+    "SETTINGS_SAVE": "SAVE",
+    "SETTINGS_STATE_ON": "On",
+    "SETTINGS_STATE_OFF": "Off",
+    "SETTINGS_QUALITY_LOW": "Low",
+    "SETTINGS_QUALITY_MEDIUM": "Medium",
+    "SETTINGS_QUALITY_HIGH": "High",
+    "SETTINGS_QUALITY_ULTRA": "Ultra"
+  }
+}

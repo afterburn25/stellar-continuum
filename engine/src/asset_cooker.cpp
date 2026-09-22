@@ -60,6 +60,7 @@ std::map<std::string,Recipe> discover(const AssetCookOptions&o,Json&excluded){
  for(const auto&set:vfx.at("visualSets"))for(const auto&texture:set.at("textures")){const auto name=texture.get<std::string>();const auto alias=eruptions+"1024/"+name;add(alias,alias);auto&r=recipes.at(alias);r.aliases={eruptions+"256/"+name,eruptions+"512/"+name};}
  const auto research=read_json(o.root/"export/research-runtime-files.json");for(const auto&f:research.at("files"))add(research.at("destination").get<std::string>()+"/"+f.get<std::string>(),research.at("root").get<std::string>()+"/"+f.get<std::string>());
  add("Data/astronomy/hyg-nearby-500-v1.json","data/astronomy/hyg-nearby-500-v1.json");
+ if(std::filesystem::is_regular_file(o.root/"data/locale/en.json"))add("Data/locale/en.json","data/locale/en.json");
  // The cooker configuration is an additive reviewed override, never a recursive
  // 'include everything' switch. IDs remain stable while sources can be renamed.
  const auto config_path=o.root/"export/cooker-assets.json";

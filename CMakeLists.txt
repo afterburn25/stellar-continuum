@@ -449,6 +449,8 @@ endif()
 add_custom_target(stellar_runtime_data ALL
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy/hyg-nearby-500-v1.json"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/locale/en.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale/en.json"
   ${STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS}
   COMMENT "Synchronizing runtime stellar catalog" VERBATIM)
 add_dependencies(stellar-continuum stellar_runtime_data)
