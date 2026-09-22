@@ -84,39 +84,41 @@ std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies
 }
 void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int height){
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return;
-  const auto l=layout_for(width,height);button(out,l.launcher,"BELTS & DEBRIS  "+std::to_string(snapshot_->small_body_fields.size()));
-  button(out,l.motion,motion_running_?"Motion ON / Pause":"Paused / Resume");
+  const auto l=layout_for(width,height);button(out,l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(snapshot_->small_body_fields.size())},"BELTS & DEBRIS  {0}"));
+  button(out,l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
   if(!small_body_panel_)return;
   out.overlay.emplace_back(FilledRectangle{l.panel,{5,17,28,252}});out.overlay.emplace_back(StrokedRectangle{l.panel,{77,151,178,255}});
-  label(out,{l.panel.x,l.panel.y+6*l.scale,l.panel.width-76*l.scale,32*l.scale},"SMALL-BODY SURVEY",{164,221,237,255},15);
-  button(out,l.close,"Close");button(out,l.previous,"Previous field");button(out,l.next,"Next field");
+  label(out,{l.panel.x,l.panel.y+6*l.scale,l.panel.width-76*l.scale,32*l.scale},tr("SMALLBODY_TITLE","SMALL-BODY SURVEY"),{164,221,237,255},15);
+  button(out,l.close,tr("SMALLBODY_CLOSE","Close"));button(out,l.previous,tr("SMALLBODY_PREV","Previous field"));button(out,l.next,tr("SMALLBODY_NEXT","Next field"));
   float y=l.panel.y+82*l.scale;
   const auto row=[&](std::string value){label(out,{l.panel.x+3*l.scale,y,l.panel.width-6*l.scale,22*l.scale},std::move(value));y+=22*l.scale;};
-  if(snapshot_->small_body_fields.empty())row("No small-body fields recorded in this system.");
+  if(snapshot_->small_body_fields.empty())row(tr("SMALLBODY_EMPTY","No small-body fields recorded in this system."));
   else {
     small_body_field_%=snapshot_->small_body_fields.size();const auto& f=snapshot_->small_body_fields[small_body_field_];small_body_index_%=f.visible_count;
     const auto body=small_body_instance(f,small_body_index_);
-    row(std::string(small_body_field_name(f.type))+"  #"+std::to_string(f.id));
-    row(number(f.inner_radius_au,f.planet_centered?5:2)+" - "+number(f.outer_radius_au,f.planet_centered?5:2)+" AU"+(f.planet_centered?" from parent":" from star"));
-    row("Body "+std::to_string(body.id)+" / "+small_body_size_name(body)+" / "+std::string(small_body_material_name(body.material)));
+    row(trf("SMALLBODY_FIELD",{std::string(small_body_field_name(f.type)),std::to_string(f.id)},"{0}  #{1}"));
+    row(trf(f.planet_centered?"SMALLBODY_RANGE_PARENT":"SMALLBODY_RANGE_STAR",{number(f.inner_radius_au,f.planet_centered?5:2),number(f.outer_radius_au,f.planet_centered?5:2)},f.planet_centered?"{0} - {1} AU from parent":"{0} - {1} AU from star"));
+    row(trf("SMALLBODY_BODY",{std::to_string(body.id),std::string(small_body_size_name(body)),std::string(small_body_material_name(body.material))},"Body {0} / {1} / {2}"));
     const auto resources=small_body_resources(f,body.id);std::string r;
     for(std::size_t i=0;i<resources.size();++i)if(resources[i]>0){if(!r.empty())r+="  ";r+=std::string(small_body_resource_name(static_cast<SmallBodyResource>(i)))+" "+number(resources[i],0);}
     row(r);
     const auto position=stellar::engine::analytic_orbit_position(body.orbit,snapshot_->simulation_days-f.epoch_days);
     const auto environment=small_body_environment(f,position,snapshot_->simulation_days);
-    row("Hazard "+number(environment.hazard*100,0)+"%   Concealment "+number(environment.concealment*100,0)+"%   Travel x"+number(environment.navigation_multiplier));
-    row("Scan difficulty x"+number(environment.scan_difficulty)+"   Density "+number(f.density,3));
-    row("Variant "+std::to_string(body.asset_variant_id)+" / 4   Slow tumble / fixed visual speed");
+    row(trf("SMALLBODY_ENVIRONMENT",{number(environment.hazard*100,0),number(environment.concealment*100,0),number(environment.navigation_multiplier)},"Hazard {0}%   Concealment {1}%   Travel x{2}"));
+    row(trf("SMALLBODY_SCAN",{number(environment.scan_difficulty),number(f.density,3)},"Scan difficulty x{0}   Density {1}"));
+    row(trf("SMALLBODY_VARIANT",{std::to_string(body.asset_variant_id)},"Variant {0} / 4   Slow tumble / fixed visual speed"));
     const double period_days=2*std::numbers::pi/std::abs(body.orbit.angular_speed);
     const double angle=std::fmod(std::atan2(position[1],position[0])*180/std::numbers::pi+360,360);
-    row("Orbit "+number(period_days>=365.25?period_days/365.25:period_days,1)+(period_days>=365.25?" years":" days")+" / Position "+number(angle,3)+" deg");
-    row(std::to_string(f.body_count)+" bodies / "+std::to_string(f.visible_count)+" visual samples");
-    button(out,l.body,"Next body");button(out,l.large,"Next large");button(out,l.focus,"Focus body");
+    row(trf(period_days>=365.25?"SMALLBODY_ORBIT_YEARS":"SMALLBODY_ORBIT_DAYS",{number(period_days>=365.25?period_days/365.25:period_days,1),number(angle,3)},period_days>=365.25?"Orbit {0} years / Position {1} deg":"Orbit {0} days / Position {1} deg"));
+    row(trf("SMALLBODY_COUNTS",{std::to_string(f.body_count),std::to_string(f.visible_count)},"{0} bodies / {1} visual samples"));
+    button(out,l.body,tr("SMALLBODY_NEXT_BODY","Next body"));button(out,l.large,tr("SMALLBODY_NEXT_LARGE","Next large"));button(out,l.focus,tr("SMALLBODY_FOCUS","Focus body"));
   }
   if(snapshot_->developer){
-    button(out,l.debug,small_body_debug_?"Hide orbital bands / density debug":"Show orbital bands / density debug");
-    for(std::size_t i=0;i<4;++i)button(out,l.spawn[i],std::array<std::string,4>{"+ Asteroid belt","+ Ice belt","+ Debris disk","+ Cracked debris"}[i]);
-    const auto& cfg=small_body_configuration();label(out,{l.panel.x,l.panel.y+429*l.scale,l.panel.width,17*l.scale},"Orbit exponent "+number(cfg.orbit_exponent)+" / planet x"+number(cfg.planet_scale)+" / draws "+std::to_string(small_bodies_.statistics().batches),{137,176,195,255},11);
+    button(out,l.debug,small_body_debug_?tr("SMALLBODY_DEBUG_HIDE","Hide orbital bands / density debug"):tr("SMALLBODY_DEBUG_SHOW","Show orbital bands / density debug"));
+    constexpr std::array spawn_keys{"SMALLBODY_SPAWN_BELT","SMALLBODY_SPAWN_ICE","SMALLBODY_SPAWN_DISK","SMALLBODY_SPAWN_CRACKED"};
+    const std::array<std::string,4> spawn_names{tr(spawn_keys[0],"+ Asteroid belt"),tr(spawn_keys[1],"+ Ice belt"),tr(spawn_keys[2],"+ Debris disk"),tr(spawn_keys[3],"+ Cracked debris")};
+    for(std::size_t i=0;i<4;++i)button(out,l.spawn[i],spawn_names[i]);
+    const auto& cfg=small_body_configuration();label(out,{l.panel.x,l.panel.y+429*l.scale,l.panel.width,17*l.scale},trf("SMALLBODY_CFG",{number(cfg.orbit_exponent),number(cfg.planet_scale),std::to_string(small_bodies_.statistics().batches)},"Orbit exponent {0} / planet x{1} / draws {2}"),{137,176,195,255},11);
   }
 }
 }

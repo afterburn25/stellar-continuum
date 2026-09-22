@@ -903,6 +903,8 @@ class NativeCampaign final {
     notification_view_.set_localization(&table);
     assets_.set_localization(&table);
     settlement_workspace_.set_localization(&table);
+    economy_controller_.set_localization(&table);
+    phenomena_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 

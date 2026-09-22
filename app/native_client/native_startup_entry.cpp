@@ -54,6 +54,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       throw std::runtime_error("Developer smoke requires explicit launch eligibility.");
   }
   NativeStartupHost host(config.host);
+  host.set_localization(config.locale);
   if(config.developer_access&&config.developer_access->active())host.set_developer_mode(true);
   NativeStartupWorkspace workspace;
   workspace.set_localization(config.locale);
@@ -169,6 +170,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     case StartupIntentKind::CopySetup:
       try {
         NativeNewCampaignSetupController controller;
+        controller.set_localization(config.locale);
         const auto prepared=controller.prepare({intent.seed_text,intent.system_count,intent.species_id,
           config.utc_timestamp(),intent.pre_warp_civilization_count,intent.ancient_civilization_count,
           intent.stellar_population,intent.developer_research,intent.developer_full_coverage,intent.requested_population,intent.developer_full_exploration},

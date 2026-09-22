@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
+
 namespace stellar::native_setup {
 [[nodiscard]] inline std::optional<std::int64_t> parse_campaign_seed(std::string_view value) noexcept {
   constexpr std::string_view space=" \t\r\n\f\v";
@@ -110,6 +112,7 @@ struct NativeNewCampaignSetupAssessment {
 
 class NativeNewCampaignSetupController final {
 public:
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {locale_=table;}
   [[nodiscard]] NativeNewCampaignSetupView build(bool developer_mode=false) const;
   [[nodiscard]] NativeNewCampaignSetupAssessment
   prepare(const NativeNewCampaignSetupInput &,bool developer_mode=false) const;
@@ -117,6 +120,8 @@ public:
       const NativePreparedNewCampaign &,
       stellar::core::AdaptiveResearchStrategicRuntime,
       std::span<const stellar::core::CatalogStar>) const;
+private:
+  const stellar::engine::LocalizationTable *locale_{nullptr};
 };
 
 } // namespace stellar::native_setup

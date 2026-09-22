@@ -10,6 +10,8 @@
 #include <thread>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
+
 namespace stellar::native_economy {
 enum class EconomyState { Unavailable, Ready, Failed };
 struct NativeEconomyCard {
@@ -37,7 +39,8 @@ struct NativeEconomyView {
 [[nodiscard]] NativeEconomyView build_economy_view(
     const core::FreshCampaignState& campaign,
     const core::AdaptiveResearchCampaignState* research,
-    const std::optional<core::CivilizationIndustryAllocation>& last_allocation);
+    const std::optional<core::CivilizationIndustryAllocation>& last_allocation,
+    const engine::LocalizationTable* locale = nullptr);
 
 class NativeEconomyController final {
  public:
@@ -53,6 +56,7 @@ class NativeEconomyController final {
       core::CampaignFrame& frame,std::uint64_t generation,
       std::uint64_t view_revision,core::IndustryPriority priority);
   void clear();
+  void set_localization(const engine::LocalizationTable* table) noexcept { locale_ = table; }
   [[nodiscard]] const NativeEconomyView& view() const noexcept { return view_; }
   [[nodiscard]] std::uint64_t attempted_refresh_count() const noexcept { return attempted_refresh_count_; }
   [[nodiscard]] std::uint64_t successful_refresh_count() const noexcept { return successful_refresh_count_; }
@@ -65,5 +69,6 @@ class NativeEconomyController final {
   std::optional<int> observer_;
   bool failure_latched_{};
   std::uint64_t attempted_refresh_count_{},successful_refresh_count_{},next_revision_{1};
+  const engine::LocalizationTable* locale_{nullptr};
 };
 } // namespace stellar::native_economy

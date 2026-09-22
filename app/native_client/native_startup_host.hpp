@@ -31,6 +31,9 @@ public:
   [[nodiscard]] StartupHostResult start_load(const std::filesystem::path &);
   void service();
   void set_developer_mode(bool enabled);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    setup_controller_.set_localization(table);
+  }
   [[nodiscard]] bool developer_mode() const noexcept {return developer_mode_;}
   [[nodiscard]] stellar::native_startup::NativeStartupView poll() const;
   [[nodiscard]] bool cancel();
