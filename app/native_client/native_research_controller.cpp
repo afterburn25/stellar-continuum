@@ -16,9 +16,36 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <stellar/engine/localization.hpp>
+
 namespace stellar::native_research {
 namespace {
 using namespace stellar::core;
+
+[[nodiscard]] std::string tr_at(const stellar::engine::LocalizationTable *table,
+                                std::string_view key, std::string_view fallback) {
+  if (table && table->contains(key))
+    return std::string(table->translate(key));
+  return std::string(fallback);
+}
+
+[[nodiscard]] std::string trf_at(const stellar::engine::LocalizationTable *table,
+                                 std::string_view key,
+                                 std::initializer_list<std::string> args,
+                                 std::string_view fallback) {
+  if (table && table->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return table->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
 
 [[nodiscard]] std::string trim(std::string value) {
   const auto space = [](const unsigned char value) { return std::isspace(value); };
@@ -112,20 +139,22 @@ struct PlayerContext {
 }
 
 [[nodiscard]] std::string positive_amount(
-    const SovereignCurrencyDefinition &currency, const double value) {
+    const SovereignCurrencyDefinition &currency, const double value,
+    const stellar::engine::LocalizationTable *locale) {
   const auto formatted = currency.format(value);
   if (value > 0. && formatted == currency.format(0.)) {
     const auto smallest_visible_budget_unit =
         .01 / currency.local_units_per_budget_unit;
-    return "Under " + currency.format(smallest_visible_budget_unit);
+    return trf_at(locale, "RESEARCH_UNDER", {currency.format(smallest_visible_budget_unit)}, "Under {0}");
   }
   return formatted;
 }
 
 [[nodiscard]] std::string operating_cost_rate(
-    const SovereignCurrencyDefinition &currency, const double value) {
+    const SovereignCurrencyDefinition &currency, const double value,
+    const stellar::engine::LocalizationTable *locale) {
   if (value > 0. && currency.format(value) == currency.format(0.))
-    return positive_amount(currency, value) + "/day";
+    return trf_at(locale, "RESEARCH_PER_DAY", {positive_amount(currency, value, locale)}, "{0}/day");
   return currency.format_rate(-value);
 }
 
@@ -146,7 +175,8 @@ struct PlayerContext {
     const PlayerContext &player, const AdaptiveResearchView &view,
     const AdaptiveResearchNodeView &node,
     const AdaptiveResearchProjectView *project,
-    const SovereignCurrencyDefinition &currency) {
+    const SovereignCurrencyDefinition &currency,
+    const stellar::engine::LocalizationTable *locale) {
   if (!node.minimum_labs || !node.recommended_labs) return std::nullopt;
   if (!project && node.state >= ResearchMaturity::mature) return std::nullopt;
   const auto labs = project ? project->assigned_effective_labs
@@ -168,37 +198,38 @@ struct PlayerContext {
           quote.estimated_years_at_full_funding,
       .credits_needed_to_start = needed,
       .formatted_authorization =
-          positive_amount(currency, quote.authorization_credits),
+          positive_amount(currency, quote.authorization_credits, locale),
       .formatted_milestone_commitment =
-          positive_amount(currency, quote.milestone_commitment_credits),
+          positive_amount(currency, quote.milestone_commitment_credits, locale),
       .formatted_operating_cost_rate =
-          operating_cost_rate(currency, quote.operating_credits_per_day),
+          operating_cost_rate(currency, quote.operating_credits_per_day, locale),
       .formatted_estimated_total =
-          positive_amount(currency, quote.estimated_total_credits),
+          positive_amount(currency, quote.estimated_total_credits, locale),
       .formatted_credits_needed_to_start =
-          positive_amount(currency, needed)};
+          positive_amount(currency, needed, locale)};
 }
 
 [[nodiscard]] NativeResearchAction primary_action(
     const PlayerContext &player, const AdaptiveResearchView &view,
     const AdaptiveResearchNodeView &node,
     const AdaptiveResearchProjectView *project,
-    const std::optional<NativeResearchCost> &cost) {
+    const std::optional<NativeResearchCost> &cost,
+    const stellar::engine::LocalizationTable *locale) {
   if (project) {
     if (!project->paused)
       return {NativeResearchIntent::Pause, true, {}};
     if (project->pause_reason == "hypothesis_resolution_required")
       return {NativeResearchIntent::Resume, false,
-              "This hypothesis must be resolved before the program can resume."};
+              tr_at(locale,"RESEARCH_ERR_HYPOTHESIS","This hypothesis must be resolved before the program can resume.")};
     if (!project->current_blockers.empty())
       return {NativeResearchIntent::Resume, false,
               project->current_blockers.front().message};
     if (!player.economy)
       return {NativeResearchIntent::Resume, false,
-              "The player has no economy available to fund research."};
+              tr_at(locale,"RESEARCH_ERR_NO_ECONOMY","The player has no economy available to fund research.")};
     if (!cost || player.economy->credits + .000001 < cost->operating_credits_per_day)
       return {NativeResearchIntent::Resume, false,
-              "The treasury cannot fund the next operating day."};
+              tr_at(locale,"RESEARCH_ERR_OPERATING","The treasury cannot fund the next operating day.")};
     return {NativeResearchIntent::Resume, true, {}};
   }
   if (node.state < ResearchMaturity::investigable ||
@@ -210,17 +241,17 @@ struct PlayerContext {
   if (!capacity.lab_capacity_only && capacity.maximum_directed_programs &&
       capacity.active_program_count >= *capacity.maximum_directed_programs)
     return {NativeResearchIntent::Start, false,
-            "No directed research program slot is available."};
+            tr_at(locale,"RESEARCH_ERR_NO_SLOT","No directed research program slot is available.")};
   if (!node.minimum_labs ||
       capacity.free_effective_labs + .000001 < *node.minimum_labs)
     return {NativeResearchIntent::Start, false,
-            "Too few effective laboratories are available."};
+            tr_at(locale,"RESEARCH_ERR_FEW_LABS","Too few effective laboratories are available.")};
   if (!player.economy)
     return {NativeResearchIntent::Start, false,
-            "The player has no economy available to fund research."};
+            tr_at(locale,"RESEARCH_ERR_NO_ECONOMY","The player has no economy available to fund research.")};
   if (!cost || player.economy->credits + .000001 < cost->credits_needed_to_start)
     return {NativeResearchIntent::Start, false,
-            "The treasury cannot fund authorization, milestones, and the first operating day."};
+            tr_at(locale,"RESEARCH_ERR_START_FUNDS","The treasury cannot fund authorization, milestones, and the first operating day.")};
   return {NativeResearchIntent::Start, true, {}};
 }
 
@@ -287,7 +318,7 @@ NativeResearchWindow NativeResearchController::build(
     visible_ids.insert(node.node_id);
     ++domain_counts[node.domain_id];
     const auto *project = project_for(view, node.node_id);
-    const auto cost = quote_for(player, view, node, project, currency);
+    const auto cost = quote_for(player, view, node, project, currency, locale_);
     NativeResearchNode projected{
         .id = node.node_id,
         .display_name = node.display_name,
@@ -311,7 +342,7 @@ NativeResearchWindow NativeResearchController::build(
     for (const auto &capability_id : node.known_capabilities) {
       const auto *definition = player.authority.catalog().find_capability(capability_id);
       projected.known_capabilities.push_back(
-          {capability_id, definition ? definition->name : "Known capability"});
+          {capability_id, definition ? definition->name : tr_at(locale_,"RESEARCH_KNOWN_CAPABILITY","Known capability")});
     }
     // Occupied slots and assigned labs are temporary capacity limits, not
     // scientific prerequisites. Keep eligible programs visible for planning.
@@ -325,9 +356,9 @@ NativeResearchWindow NativeResearchController::build(
         default:return true;
       }
     });
-    projected.primary_action = primary_action(player, view, node, project, cost);
-    projected.purpose = research_purpose(node.node_id, projected.domain_label, label(node.solution_family));
-    projected.benefits = research_benefit(node.node_id);
+    projected.primary_action = primary_action(player, view, node, project, cost, locale_);
+    projected.purpose = research_purpose(node.node_id, projected.domain_label, label(node.solution_family), locale_);
+    projected.benefits = research_benefit(node.node_id, locale_);
     projected.research_points = player.authority.catalog().get_node(node.node_id).project_requirements.base_research_points;
     projected.cancelled = player.state.cancelled_project(node.node_id) != nullptr;
     if (const auto *retained = player.state.cancelled_project(node.node_id)) {
@@ -340,8 +371,8 @@ NativeResearchWindow NativeResearchController::build(
             player.campaign, player.world.player_civilization_id, node.node_id)) {
       const bool valid = player.economy && std::isfinite(player.economy->credits + *refund);
       projected.cancel_action = {NativeResearchIntent::Cancel, valid,
-          valid ? "Refund " + currency.format(*refund) + " in unused milestone funds. Scientific progress is retained. Authorization and operating costs are not refunded. Restarting requires new authorization and milestone funding."
-                : "No valid treasury is available to receive the refund."};
+          valid ? trf_at(locale_,"RESEARCH_CANCEL_REFUND",{currency.format(*refund)},"Refund {0} in unused milestone funds. Scientific progress is retained. Authorization and operating costs are not refunded. Restarting requires new authorization and milestone funding.")
+                : tr_at(locale_,"RESEARCH_CANCEL_NO_TREASURY","No valid treasury is available to receive the refund.")};
     }
     projected.special_project = !player.authority.catalog().get_node(node.node_id).public_normal_research;
     if(const auto candidate=std::ranges::find(candidates,node.node_id,&ResearchVisibleProjectCandidate::node_id);candidate!=candidates.end()){
@@ -349,17 +380,17 @@ NativeResearchWindow NativeResearchController::build(
       auto factors=candidate->components;std::ranges::stable_sort(factors,[](const auto& a,const auto& b){return a.score>b.score;});
       for(const auto& factor:factors){if(factor.score<=0||projected.recommendation_reasons.size()>=3)continue;
         const auto& id=factor.id;std::string reason;
-        if(id=="recognized_need")reason="Responds to recognized needs in your civilization.";
-        else if(id=="strategic_alignment")reason="Matches your civilization's current research priorities.";
-        else if(id=="readiness")reason="Builds on your current scientific readiness.";
-        else if(id=="capability_gap_value")reason="Addresses a known gap in your civilization's capabilities.";
-        else if(id=="time_to_effect")reason="Offers a shorter research horizon under current conditions.";
-        else if(id=="lab_opportunity_cost")reason="Fits the laboratory capacity available to your civilization.";
+        if(id=="recognized_need")reason=tr_at(locale_,"RESEARCH_REASON_NEED","Responds to recognized needs in your civilization.");
+        else if(id=="strategic_alignment")reason=tr_at(locale_,"RESEARCH_REASON_ALIGNMENT","Matches your civilization's current research priorities.");
+        else if(id=="readiness")reason=tr_at(locale_,"RESEARCH_REASON_READINESS","Builds on your current scientific readiness.");
+        else if(id=="capability_gap_value")reason=tr_at(locale_,"RESEARCH_REASON_GAP","Addresses a known gap in your civilization's capabilities.");
+        else if(id=="time_to_effect")reason=tr_at(locale_,"RESEARCH_REASON_HORIZON","Offers a shorter research horizon under current conditions.");
+        else if(id=="lab_opportunity_cost")reason=tr_at(locale_,"RESEARCH_REASON_LABS","Fits the laboratory capacity available to your civilization.");
         else if(id=="alternative_coverage")reason=factor.explanation;
-        else if(id=="portfolio_diversity")reason="Broadens the approaches in your research portfolio.";
-        else if(id=="uncertainty_risk")reason="Fits your civilization's tolerance for uncertain research.";
-        else if(id=="long_horizon_value")reason="Supports your civilization's long-term scientific interests.";
-        else if(id=="knowledge_spillover")reason="Strengthens fields where active scientific expertise is limited.";
+        else if(id=="portfolio_diversity")reason=tr_at(locale_,"RESEARCH_REASON_DIVERSITY","Broadens the approaches in your research portfolio.");
+        else if(id=="uncertainty_risk")reason=tr_at(locale_,"RESEARCH_REASON_RISK","Fits your civilization's tolerance for uncertain research.");
+        else if(id=="long_horizon_value")reason=tr_at(locale_,"RESEARCH_REASON_LONG_TERM","Supports your civilization's long-term scientific interests.");
+        else if(id=="knowledge_spillover")reason=tr_at(locale_,"RESEARCH_REASON_SPILLOVER","Strengthens fields where active scientific expertise is limited.");
         if(!reason.empty())projected.recommendation_reasons.push_back(std::move(reason));
       }
     }
@@ -378,19 +409,24 @@ NativeResearchWindow NativeResearchController::build(
   if (player.economy) {
     result.treasury_credits = player.economy->credits;
     result.formatted_treasury =
-        positive_amount(currency, player.economy->credits);
+        positive_amount(currency, player.economy->credits, locale_);
   }
   result.free_effective_labs = view.directed_program_capacity.free_effective_labs;
   result.total_effective_labs = player.state.total_effective_research_labs();
   result.maximum_programs=view.directed_program_capacity.maximum_directed_programs;
   result.active_program_count=view.directed_program_capacity.active_program_count;
   result.lab_capacity_only=view.directed_program_capacity.lab_capacity_only;
-  result.domain_tabs.push_back({{}, "All Research", all_nodes.size()});
+  result.domain_tabs.push_back({{}, tr_at(locale_,"RESEARCH_TAB_ALL","All Research"), all_nodes.size()});
+  constexpr std::array category_keys{"RESEARCH_CAT_PHYSICS","RESEARCH_CAT_ENGINEERING",
+      "RESEARCH_CAT_ENERGY","RESEARCH_CAT_COMPUTING","RESEARCH_CAT_MATERIALS",
+      "RESEARCH_CAT_BIOLOGY","RESEARCH_CAT_SOCIETY","RESEARCH_CAT_XENOSCIENCE"};
+  std::size_t category_index=0;
   for (const auto &[category, title] : research_categories) {
     std::size_t count{};
     for (const auto &[domain, known] : domain_counts)
       if (research_category_matches(category, domain)) count += known;
-    result.domain_tabs.push_back({category, title, count});
+    result.domain_tabs.push_back({category, tr_at(locale_,category_keys[category_index],title), count});
+    ++category_index;
   }
   for (auto &node : all_nodes) {
     if (query.domain_id && !research_category_matches(*query.domain_id, node.domain_id)) continue;
@@ -417,16 +453,16 @@ NativeResearchCommandOutcome NativeResearchController::execute(
     const NativeResearchIntent intent, const std::string_view node_id) {
   require_owner();
   if (!generation_ || *generation_ != campaign_generation)
-    return {false, "The campaign changed; refresh research before issuing a command.", 0};
+    return {false, tr_at(locale_,"RESEARCH_ERR_STALE_CAMPAIGN","The campaign changed; refresh research before issuing a command."), 0};
   auto player = context(frame);
   if (player.state.revision() != expected_research_revision)
-    return {false, "Research changed; refresh before issuing a command.",
+    return {false, tr_at(locale_,"RESEARCH_ERR_STALE","Research changed; refresh before issuing a command."),
             player.state.revision()};
   const auto currency = sovereign_currency_for_civilization(
       player.world.civilizations, player.world.player_civilization_id);
   if (!funding_signature_ || expected_funding_revision != funding_revision_ ||
       *funding_signature_ != funding_signature(player, currency))
-    return {false, "Research funding changed; refresh before issuing a command.",
+    return {false, tr_at(locale_,"RESEARCH_ERR_STALE_FUNDING","Research funding changed; refresh before issuing a command."),
             player.state.revision()};
   const auto target = "species:" + player.civilization.species_id;
   std::optional<ResearchPlanCommand> planning;
@@ -448,7 +484,7 @@ NativeResearchCommandOutcome NativeResearchController::execute(
                                          &AdaptiveResearchNodeView::node_id);
   if (visible == view.visible_nodes.end() ||
       visible->state < ResearchMaturity::investigable)
-    return {false, "That research program is not known to the player.",
+    return {false, tr_at(locale_,"RESEARCH_ERR_UNKNOWN_NODE","That research program is not known to the player."),
             player.state.revision()};
   AdaptiveResearchCommandResult command;
   if (intent == NativeResearchIntent::Start) {
@@ -469,14 +505,14 @@ NativeResearchCommandOutcome NativeResearchController::execute(
     const auto project = std::ranges::find(player.state.active_projects(), node_id,
                                            &ResearchProjectRuntimeState::node_id);
     if (project == player.state.active_projects().end())
-      return {false, "That research project is no longer active.",
+      return {false, tr_at(locale_,"RESEARCH_ERR_INACTIVE","That research project is no longer active."),
               player.state.revision()};
     command = AdaptiveResearchCampaignCommands::resume_directed_research(
         {player.world.civilizations, player.world.economies}, player.campaign,
         player.world.player_civilization_id, node_id,
         project->assigned_effective_labs);
   } else {
-    return {false, "No research command was selected.", player.state.revision()};
+    return {false, tr_at(locale_,"RESEARCH_ERR_NO_COMMAND","No research command was selected."), player.state.revision()};
   }
   return {command.accepted, command.message, player.state.revision()};
 }
