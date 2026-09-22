@@ -9,6 +9,7 @@
 #include "stellar/core/fleet_state.hpp"
 #include "stellar/core/fresh_campaign.hpp"
 #include "stellar/core/galaxy_catalog.hpp"
+#include "stellar/engine/localization.hpp"
 #include "stellar/engine/native_map_platform.hpp"
 
 namespace stellar::native_overview {
@@ -37,13 +38,15 @@ struct NativeEmpireOverview {
 
 [[nodiscard]] NativeEmpireOverview
 build_empire_overview(const core::FreshCampaignState &campaign,
-                      std::optional<int> selected_system_id);
+                      std::optional<int> selected_system_id,
+                      const engine::LocalizationTable *locale = nullptr);
 
 // Reference CivilizationArtworkLibrary leadership council — three fixed
 // office portraits rendered under the empire summary. The roles are static
 // until an authoritative leader system exists (docs/ASSET_MANIFEST.md).
 struct NativeLeaderCard {
   std::string_view role, responsibility, asset_path;
+  std::string_view role_key{}, responsibility_key{};
 };
 [[nodiscard]] std::span<const NativeLeaderCard> leadership_council() noexcept;
 
@@ -74,6 +77,7 @@ void render_empire_overview(native_map::DrawList &out,
                             const NativeEmpireOverview &overview,
                             const OverviewLayout &layout,
                             native_map::Point pointer,
-                            const OverviewImageProvider *portraits = nullptr);
+                            const OverviewImageProvider *portraits = nullptr,
+                            const engine::LocalizationTable *locale = nullptr);
 
 }  // namespace stellar::native_overview

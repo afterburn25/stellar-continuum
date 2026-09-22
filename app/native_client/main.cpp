@@ -7380,7 +7380,7 @@ class NativeCampaign final {
     fleet_marker_offsets_=deterministic_fleet_marker_offsets(view.own_fleets);
     fleet_workspace_.set_view(std::move(view));
     fleet_workspace_.set_overview(native_overview::build_empire_overview(
-        session_->frame().runtime().world().campaign(),selected_id_));
+        session_->frame().runtime().world().campaign(),selected_id_,locale_));
     if(force||assets_refresh_elapsed_>=.25)refresh_assets();
     fleet_refresh_elapsed_=0.;
   }

@@ -1078,6 +1078,25 @@
     "NOTIFY_CATEGORY_FREIGHT": "Freight",
     "NOTIFY_CATEGORY_FLEET": "Fleet",
     "NOTIFY_CATEGORY_DIPLOMACY": "Diplomacy",
-    "NOTIFY_CATEGORY_SYSTEM": "System"
+    "NOTIFY_CATEGORY_SYSTEM": "System",
+    "OVERVIEW_DISTANCE_UNKNOWN": "Distance unconfirmed",
+    "OVERVIEW_DISTANCE_FORMAT": "{0} \u00b7 {1} pc",
+    "OVERVIEW_POPULATION_B": "{0}B people",
+    "OVERVIEW_POPULATION_M": "{0}M people",
+    "OVERVIEW_NO_TARGET": "No target",
+    "OVERVIEW_UNAVAILABLE": "Unavailable",
+    "OVERVIEW_SYSTEM_UNKNOWN": "Unknown",
+    "OVERVIEW_HABITAT": "Orbital habitat",
+    "OVERVIEW_SELECTED": "SELECTED SYSTEM",
+    "OVERVIEW_DISTANCE": "DISTANCE FROM HOMEWORLD",
+    "OVERVIEW_COLONIES": "COLONIES   {0}",
+    "OVERVIEW_POWER": "Combined power  {0}",
+    "OVERVIEW_COUNCIL": "LEADERSHIP COUNCIL",
+    "OVERVIEW_COUNCIL_CIVIL": "Civil Administration",
+    "OVERVIEW_COUNCIL_CIVIL_DETAIL": "Planetary development and public services",
+    "OVERVIEW_COUNCIL_SCIENCE": "Science Directorate",
+    "OVERVIEW_COUNCIL_SCIENCE_DETAIL": "Research institutions and discovery",
+    "OVERVIEW_COUNCIL_FLEET": "Fleet Command",
+    "OVERVIEW_COUNCIL_FLEET_DETAIL": "Exploration, defense and fleet operations"
   }
 }

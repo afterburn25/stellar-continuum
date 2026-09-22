@@ -635,7 +635,7 @@ void NativeFleetWorkspace::render(
       native_overview::render_empire_overview(
           out, *overview_,
           native_overview::overview_layout_for(*overview_, content),
-          pointer_, portraits);
+          pointer_, portraits, locale_);
     } else {
       text(out, layout.details,
            view_->developer_inspection

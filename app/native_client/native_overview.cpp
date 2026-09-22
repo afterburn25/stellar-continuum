@@ -42,31 +42,69 @@ void text(DrawList &out, Point at, std::string value, Color color, int pixels,
       Text{at, std::move(value), color, pixels, wrap, std::nullopt, align});
 }
 
+std::string resolve(const engine::LocalizationTable *locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string resolved(const engine::LocalizationTable *locale,
+                     std::string_view key,
+                     std::initializer_list<std::string> args,
+                     std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return std::string(
+        locale->format(key, std::span<const std::string>(values)));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 // Reference MetricFormat.InterstellarDistance: metric primary + parsec suffix.
-std::string interstellar_distance(const double light_years) {
+std::string interstellar_distance(const double light_years,
+                                  const engine::LocalizationTable *locale) {
   if (!std::isfinite(light_years) || light_years < 0.0)
-    return "Distance unconfirmed";
-  return core::format_interstellar_metric_primary(light_years) + " · " +
-         core::detail::legacy_custom_fixed(light_years / 3.26156, 1, 1) + " pc";
+    return resolve(locale, "OVERVIEW_DISTANCE_UNKNOWN", "Distance unconfirmed");
+  return resolved(locale, "OVERVIEW_DISTANCE_FORMAT",
+                  {core::format_interstellar_metric_primary(light_years),
+                   core::detail::legacy_custom_fixed(light_years / 3.26156, 1,
+                                                     1)},
+                  "{0} · {1} pc");
 }
 
 // Reference: population >= 1000M renders as billions.
-std::string population_label(const double millions) {
+std::string population_label(const double millions,
+                             const engine::LocalizationTable *locale) {
   return millions >= 1000.0
-             ? core::detail::legacy_custom_fixed(millions / 1000.0, 2, 2) +
-                   "B people"
-             : core::detail::legacy_custom_fixed(millions, 1, 1) + "M people";
+             ? resolved(locale, "OVERVIEW_POPULATION_B",
+                        {core::detail::legacy_custom_fixed(millions / 1000.0, 2,
+                                                           2)},
+                        "{0}B people")
+             : resolved(locale, "OVERVIEW_POPULATION_M",
+                        {core::detail::legacy_custom_fixed(millions, 1, 1)},
+                        "{0}M people");
 }
 constexpr std::array<NativeLeaderCard, 3> council{{
     {"Civil Administration",
      "Planetary development and public services",
-     "assets/visual/leaders/planetary-governor.jpg"},
+     "assets/visual/leaders/planetary-governor.jpg",
+     "OVERVIEW_COUNCIL_CIVIL", "OVERVIEW_COUNCIL_CIVIL_DETAIL"},
     {"Science Directorate",
      "Research institutions and discovery",
-     "assets/visual/leaders/chief-scientist.jpg"},
+     "assets/visual/leaders/chief-scientist.jpg",
+     "OVERVIEW_COUNCIL_SCIENCE", "OVERVIEW_COUNCIL_SCIENCE_DETAIL"},
     {"Fleet Command",
      "Exploration, defense and fleet operations",
-     "assets/visual/leaders/fleet-commander.jpg"},
+     "assets/visual/leaders/fleet-commander.jpg",
+     "OVERVIEW_COUNCIL_FLEET", "OVERVIEW_COUNCIL_FLEET_DETAIL"},
 }};
 
 }  // namespace
@@ -77,8 +115,13 @@ std::span<const NativeLeaderCard> leadership_council() noexcept {
 
 NativeEmpireOverview build_empire_overview(
     const core::FreshCampaignState &campaign,
-    const std::optional<int> selected_system_id) {
+    const std::optional<int> selected_system_id,
+    const engine::LocalizationTable *locale) {
   NativeEmpireOverview overview;
+  overview.selected_system_name =
+      resolve(locale, "OVERVIEW_NO_TARGET", "No target");
+  overview.selected_system_distance =
+      resolve(locale, "OVERVIEW_UNAVAILABLE", "Unavailable");
   const auto player_id = campaign.player_civilization_id;
 
   // UiSelectedSystemHomeReference: name is knowledge-gated; distance is not.
@@ -89,7 +132,7 @@ NativeEmpireOverview build_empire_overview(
       overview.selected_system_name =
           campaign.knowledge.is_system_known(player_id, selected->id)
               ? selected->name
-              : "Unknown";
+              : resolve(locale, "OVERVIEW_SYSTEM_UNKNOWN", "Unknown");
       const auto home = std::ranges::find_if(
           campaign.civilizations, [player_id](const auto &civilization) {
             return civilization.id == player_id;
@@ -102,15 +145,17 @@ NativeEmpireOverview build_empire_overview(
       if (home_system != campaign.systems.end())
         overview.selected_system_distance = interstellar_distance(
             core::distance_light_years(home_system->position,
-                                       selected->position));
+                                       selected->position),
+            locale);
     }
   }
 
   for (const auto &colony : campaign.colonies) {
     if (colony.civilization_id != player_id) continue;
-    NativeOverviewColony row{colony.id, colony.system_id,
-                             colony.planetary_body_id, {},
-                             {}, colony.population_millions};
+    NativeOverviewColony row{
+        colony.id, colony.system_id, colony.planetary_body_id,
+        resolve(locale, "OVERVIEW_HABITAT", "Orbital habitat"),
+        {}, colony.population_millions};
     if (colony.planetary_body_id)
       if (const auto body = std::ranges::find(campaign.bodies,
                                               *colony.planetary_body_id,
@@ -183,19 +228,20 @@ OverviewLayout overview_layout_for(const NativeEmpireOverview &overview,
 void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
                             const OverviewLayout &layout,
                             const Point pointer,
-                            const OverviewImageProvider *portraits) {
+                            const OverviewImageProvider *portraits,
+                            const engine::LocalizationTable *locale) {
   const auto scale = layout.scale;
   const auto inner_x = layout.bounds.x;
   const auto inner_w = layout.bounds.width;
   float y = layout.bounds.y;
 
-  text(out, {inner_x, y}, "SELECTED SYSTEM", title_color,
+  text(out, {inner_x, y}, resolve(locale, "OVERVIEW_SELECTED", "SELECTED SYSTEM"), title_color,
        layout.label_font_pixels, inner_w);
   y += 15.f * scale;
   text(out, {inner_x, y}, overview.selected_system_name, message_color,
        layout.body_font_pixels, inner_w);
   y += 22.f * scale;
-  text(out, {inner_x, y}, "DISTANCE FROM HOMEWORLD", muted_color,
+  text(out, {inner_x, y}, resolve(locale, "OVERVIEW_DISTANCE", "DISTANCE FROM HOMEWORLD"), muted_color,
        layout.small_font_pixels, inner_w);
   y += 15.f * scale;
   text(out, {inner_x, y}, overview.selected_system_distance, title_color,
@@ -204,8 +250,9 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
   stroke(out, {inner_x, y, inner_w, 1.f}, {64, 96, 128, 255});
   y += 10.f * scale;
   text(out, {inner_x, y},
-       "COLONIES   " + std::to_string(overview.colonies.size()), title_color,
-       layout.label_font_pixels, inner_w);
+       resolved(locale, "OVERVIEW_COLONIES",
+                {std::to_string(overview.colonies.size())}, "COLONIES   {0}"),
+       title_color, layout.label_font_pixels, inner_w);
   y += 16.f * scale;
 
   for (std::size_t index = 0; index < overview.colonies.size(); ++index) {
@@ -219,7 +266,7 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
     text(out, {row.x + 7.f * scale, row.y + 21.f * scale}, colony.system_name,
          muted_color, layout.small_font_pixels, inner_w - 14.f * scale);
     text(out, {row.x + 7.f * scale, row.y + 34.f * scale},
-         population_label(colony.population_millions), message_color,
+         population_label(colony.population_millions, locale), message_color,
          layout.small_font_pixels, inner_w - 14.f * scale);
   }
 
@@ -230,8 +277,10 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
     stroke(out, {inner_x, y, inner_w, 1.f}, {64, 96, 128, 255});
     y += 10.f * scale;
     text(out, {inner_x, y},
-         "Combined power  " +
-             core::detail::legacy_custom_fixed(overview.combined_power, 0, 0),
+         resolved(locale, "OVERVIEW_POWER",
+                  {core::detail::legacy_custom_fixed(overview.combined_power, 0,
+                                                     0)},
+                  "Combined power  {0}"),
          title_color, layout.small_font_pixels, inner_w);
   }
 
@@ -239,7 +288,8 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
   if (layout.council_heading.height > 0.f) {
     const float council_sep = layout.council_heading.y - 10.f * scale;
     stroke(out, {inner_x, council_sep, inner_w, 1.f}, {64, 96, 128, 255});
-    text(out, {inner_x, layout.council_heading.y}, "LEADERSHIP COUNCIL",
+    text(out, {inner_x, layout.council_heading.y},
+         resolve(locale, "OVERVIEW_COUNCIL", "LEADERSHIP COUNCIL"),
          title_color, layout.label_font_pixels, inner_w);
     for (std::size_t index = 0; index < layout.leader_rows.size(); ++index) {
       const auto row = layout.leader_rows[index];
@@ -265,11 +315,11 @@ void render_empire_overview(DrawList &out, const NativeEmpireOverview &overview,
                                          {255, 255, 255, 255}, row});
         }
       text(out, {row.x + 46.f * scale, row.y + 4.f * scale},
-           std::string{card.role}, message_color, layout.body_font_pixels,
-           inner_w - 50.f * scale);
+           resolve(locale, card.role_key, card.role), message_color,
+           layout.body_font_pixels, inner_w - 50.f * scale);
       text(out, {row.x + 46.f * scale, row.y + 21.f * scale},
-           std::string{card.responsibility}, muted_color,
-           layout.small_font_pixels, inner_w - 50.f * scale);
+           resolve(locale, card.responsibility_key, card.responsibility),
+           muted_color, layout.small_font_pixels, inner_w - 50.f * scale);
     }
   }
 }
