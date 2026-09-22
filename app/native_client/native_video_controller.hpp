@@ -22,6 +22,7 @@ public:
   void set_hover_callback(std::function<void()> callback){view_.set_hover_callback(std::move(callback));}
   void open();
   void set_adapter(std::string value,std::function<void()> open_panel) {view_.set_adapter(std::move(value),std::move(open_panel));}
+  void set_localization(const stellar::engine::LocalizationTable* table) noexcept{view_.set_localization(table);}
   void close();
   void service(bool focused=true,bool renderable=true);
   bool handle(const stellar::native_map::InputEvent&,int width,int height);

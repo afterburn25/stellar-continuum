@@ -8155,6 +8155,7 @@ int main(int argc,char **argv){
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
       [&audio](const stellar::native_audio::AudioPreferences& value){audio.set_volumes(value.muted?0.f:value.master,value.music,value.effects);},
       [&audio]{audio.confirm();});
+    audio_settings.set_localization(&locale_table);
     stellar::native_video_settings::NativeVideoController video_settings(video_settings_path,
       [&](const stellar::native_video_settings::NativeVideoSettings& value){
         using namespace stellar::native_video_settings;
@@ -8170,6 +8171,7 @@ int main(int argc,char **argv){
         else window.set_frame_cap(value.frame_cap==VideoFrameCap::Fps60?60.:value.frame_cap==VideoFrameCap::Fps120?120.:
           value.frame_cap==VideoFrameCap::Fps144?144.:0.);
       },stellar::native_video_settings::NativeVideoController::Clock::now,{},launch_video);
+    video_settings.set_localization(&locale_table);
     const auto open_video=[&]{
       std::vector<stellar::native_video_settings::VideoDisplayChoice> modes;
       try{for(const auto& mode:window.display_modes())modes.push_back({mode.width,mode.height,mode.refresh_hz});}
