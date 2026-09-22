@@ -894,6 +894,7 @@ class NativeCampaign final {
     construction_workspace_.set_localization(&table);
     inspection_card_.set_localization(&table);
     economy_workspace_.set_localization(&table);
+    supply_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
