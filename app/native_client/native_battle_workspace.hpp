@@ -7,13 +7,16 @@
 
 #include <stellar/core/massive_combat_engine.hpp>
 #include <stellar/core/massive_combat_observer.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_battle_ui {
@@ -52,6 +55,7 @@ struct BattleOrderButton {
   std::string label;
   MassiveCombatOrderType type;
   bool needs_target{};
+  std::string_view label_key{};
 };
 [[nodiscard]] const std::vector<BattleOrderButton> &battle_order_buttons();
 
@@ -95,6 +99,10 @@ public:
   void set_snapshot(MassiveCombatSnapshot snapshot, double elapsed_seconds);
   void set_tactical_speed(double current, double resume) noexcept;
   void set_status(std::string message, bool error = false);
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   // Replaces the prior frame's artwork hits. Targets remain valid only while
   // the viewport and camera exactly match the draw that supplied them.
   void set_ship_targets(std::vector<BattleShipTarget> targets, int width,
@@ -142,7 +150,13 @@ private:
   void adopt_viewport(int width, int height) noexcept;
   void invalidate_ship_targets() noexcept;
   [[nodiscard]] bool ship_targets_current(int width, int height) const noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   std::optional<MassiveCombatSnapshot> snapshot_;
   int observer_civilization_id_{-1};
   bool visible_{};

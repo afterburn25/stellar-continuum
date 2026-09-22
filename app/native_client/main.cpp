@@ -898,6 +898,7 @@ class NativeCampaign final {
     colony_roster_.set_localization(&table);
     colony_workspace_.set_localization(&table);
     system_workspace_.set_localization(&table);
+    battle_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
