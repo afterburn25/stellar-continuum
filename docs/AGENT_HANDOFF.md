@@ -24,6 +24,8 @@ working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
 > line without replacing its renderer/artwork/installer systems. Evidence:
 > [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
 > It awaits PR integration into `cpp/codex-native-architecture-integration`.
+> Consumer-audit conclusion and final validation:
+> [consumer-audit receipt](validation/2026-09-22-consumer-audit.md).
 
 ## Read in this order
 
