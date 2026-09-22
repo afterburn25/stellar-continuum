@@ -897,6 +897,7 @@ class NativeCampaign final {
     supply_workspace_.set_localization(&table);
     colony_roster_.set_localization(&table);
     colony_workspace_.set_localization(&table);
+    system_workspace_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -5642,7 +5643,7 @@ class NativeCampaign final {
       }
       if(action==UiAction::Inspect){
         if(system_workspace_.visible()){
-          system_workspace_.set_notice("Select a body in this system to inspect its details.");return;
+          system_workspace_.set_notice(tr("SYSTEM_NOTICE_SELECT","Select a body in this system to inspect its details."));return;
         }
         if(!selected_id_){
           const auto &world=session_->frame().runtime().world().campaign();const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
@@ -6002,11 +6003,11 @@ class NativeCampaign final {
               const auto& fields=system_workspace_.snapshot()->small_body_fields;
               const auto found=std::ranges::find(fields,id,&SmallBodyField::id);
               if(found!=fields.end())system_workspace_.inspect_small_body(static_cast<std::size_t>(found-fields.begin()));
-              system_workspace_.set_notice("Field added to this developer campaign.");
+              system_workspace_.set_notice(tr("SYSTEM_NOTICE_FIELD","Field added to this developer campaign."));
             }catch(const std::exception& error){system_workspace_.set_notice(error.what());}
           }
           else if(command.kind==SystemWorkspaceCommandKind::select_fleet){const auto selected=fleet_controller_.select_next_hit(session_->frame(),session_->cache().generation,command.hit_fleet_ids);system_workspace_.set_notice(selected.message);refresh_fleets(true);refresh_system_travel(true);}
-          else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice("Destination details are not available to this observer.");}
+          else if(command.kind==SystemWorkspaceCommandKind::open_destination){if(!enter_system(command.target_id,width,height))system_workspace_.set_notice(tr("SYSTEM_NOTICE_DESTINATION","Destination details are not available to this observer."));}
           else if(command.kind==SystemWorkspaceCommandKind::reconnaissance_required){scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);}
            else if(command.kind==SystemWorkspaceCommandKind::open_colony){open_colony_from_system(command.target_id);}
            else if(command.kind==SystemWorkspaceCommandKind::settlement_target){preview_settlement(command.target_id,width,height);}
@@ -7046,11 +7047,11 @@ class NativeCampaign final {
 
   void preview_settlement(int body_id,int width,int height){
     if(!system_workspace_.system_id()||!fleet_controller_.selection()){
-      system_workspace_.set_notice("Select an owned colony or outpost vessel before choosing a settlement target.");
+      system_workspace_.set_notice(tr("SYSTEM_NOTICE_VESSEL","Select an owned colony or outpost vessel before choosing a settlement target."));
       return;
     }
     if(!settlement_controller_.live_status(session_->frame(),session_->cache().generation,*fleet_controller_.selection())){
-      system_workspace_.set_notice("The selected fleet is not a populated settlement vessel.");
+      system_workspace_.set_notice(tr("SYSTEM_NOTICE_NOT_VESSEL","The selected fleet is not a populated settlement vessel."));
       return;
     }
     session_->frame().clock().set_speed(StrategicSpeed::Paused);

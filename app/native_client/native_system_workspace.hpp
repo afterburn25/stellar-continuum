@@ -8,9 +8,11 @@
 #include "native_system_travel.hpp"
 #include "native_celestial_appearance.hpp"
 #include "native_settlement_preparation.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -99,6 +101,7 @@ public:
   [[nodiscard]] const auto &settlement_preparation() const noexcept { return preparation_; }
   void set_settlement_status(std::optional<NativeSystemSettlementStatus> value);
   void set_notice(std::string);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; body_inspection_.set_localization(table); }
   void close() noexcept;
   void discard_campaign() noexcept;
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}
@@ -142,6 +145,11 @@ private:
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   StellarArtProvider stellar_art_;
   StellarActivityProvider stellar_activity_;
   stellar::native_planets::MaterialProvider planet_materials_;
