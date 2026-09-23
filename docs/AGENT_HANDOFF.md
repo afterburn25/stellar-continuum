@@ -458,11 +458,16 @@ covered — plus authoritative logistics findings
 (`logistics_strained`/`logistics_critical` per under-covered colony,
 `freight_corridor_gap` when external imports have no represented corridor,
 and `treasury_arrears`/`treasury_depleted` from `assess_treasury`;
-severity stays Warning — Critical is invariant-reserved). The second frontier is an architecture
-decision: authoritative Core adoption of the economy-catalog/colony/logistics/
-population/strategic-AI frameworks — Core consumption today is read-only
-projection adapters (the safe pattern; replacing bespoke Core systems wholesale
-risks dual simulation authority). Do not change the default branch or merge
+severity stays Warning — Critical is invariant-reserved). The second frontier is now a recorded
+decision (DECISION_LOG 2026-09-24): engine-framework adoption runs through
+read-only projections first; per-framework graduation to authority requires
+semantic superset/equivalence, a save migration path, a seeded-campaign
+parity oracle, and preserved determinism/privacy. A 315-test ctest run at
+`550a50d3` records 315/315 green after the app/editor lanes: editor
+multi-file projects (directory form + asset scan/preview), `TableModel`
+sortable colony-roster columns, `TreeModel` system→body hierarchy in the
+editor list, and the `interfaceScale`/`reduceFlashing` accessibility
+preferences. Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
 ## Preserve these contracts
