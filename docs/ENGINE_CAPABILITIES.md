@@ -89,9 +89,9 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   parallax, and runs tile collision against every `collide` map inside the
   same authoritative movement pass as solid/oneway entities — each probe
   uses that map's own tile geometry and cells. `RuntimeHost::tile_at`/
-  `set_tile_at`/`tilemap_entity()` address the FIRST tilemap (the primary
-  grid); layered games reach the rest via `tilemap_entities()` +
-  `world().get<Tilemap>(...)`.
+  `set_tile_at` take an optional document-order map index (default 0 =
+  the primary grid) and `tilemap_count()` reports the layer count;
+  `tilemap_entities()` exposes the carriers for direct component work.
 - **RuntimeHost input actions:** the host now feeds every platform event into
   an `InputMapper` — a built-in "game" context (move_left/right/up/down on
   WASD+arrows+D-pad, `move_x`/`move_y` analog Axis1D on the left stick with a
@@ -173,13 +173,14 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   generated project: a ball lands on the SECOND map's platform (y=160 vs the
   first map's floor at y=672 — each map's own geometry applies) and rests on
   the first map's floor when the platform map is removed.
-- **Limits/reuse:** `tile_at`/`set_tile_at`/`tilemap_entity()` target only
-  the first tilemap — additional maps are reached via `tilemap_entities()`;
-  the editor selects but cannot reorder tilemap layers (edit `layer` for
-  draw order); collision is cell-level solid only (no per-tile
-  slopes/one-way flags); paint strokes fill single cells (no brush size or
-  fill tool). Other RuntimeHost consumers (2D platformers, top-down maps,
-  puzzle boards) reuse the same path.
+- **Limits/reuse:** `tile_at`/`set_tile_at` take a document-order map index
+  (`tilemap_count()` reports the layer count) and `tilemap_entities()`
+  exposes the carriers — but there is no named-map lookup; the editor
+  selects but cannot reorder tilemap layers (edit `layer` for draw order);
+  collision is cell-level solid only (no per-tile slopes/one-way flags);
+  paint strokes fill single cells (no brush size or fill tool). Other
+  RuntimeHost consumers (2D platformers, top-down maps, puzzle boards)
+  reuse the same path.
 
 ## Cooked flare reservations, local crash reports and small updates (2026-09-20)
 
