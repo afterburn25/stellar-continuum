@@ -903,7 +903,12 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     line(out, x, y, "open project",
          shell.project->name + "  (" + shell.project->id + ")", font);
     line(out, x, y, "path", shell.project->root.generic_string(), font);
-    line(out, x, y, "engine", shell.project->engine_version, font);
+    line(out, x, y, "engine",
+         shell.project->engine_version +
+             (shell.project->engine_version == STELLAR_ENGINE_VERSION
+                  ? ""
+                  : "  (this build is " STELLAR_ENGINE_VERSION ")"),
+         font);
     const auto &plan = shell.load_plan;
     line(out, x, y, "load plan",
          std::to_string(plan.order.size()) + " packages, " +
