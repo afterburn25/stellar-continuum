@@ -163,15 +163,16 @@ struct Shell {
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
       hit_project_run{}, hit_project_editor{}, hit_project_package{},
-      hit_project_rename{}, hit_template_toggle{}, hit_import_field{},
+      hit_project_rename{}, hit_project_test{}, hit_template_toggle{},
+      hit_import_field{},
       hit_import_button{}, hit_package_field{}, hit_package_button{};
   UiRect project_rows{};
   // Content cooking, host builds and packaging run on the JobSystem; the
   // UI thread reads their status under the mutex.
-  std::atomic<bool> cooking{}, building{}, packaging{};
+  std::atomic<bool> cooking{}, building{}, packaging{}, testing{};
   std::atomic<std::size_t> cook_done{}, cook_total{};
   std::mutex project_mutex;
-  std::string cook_status, build_status, package_status;
+  std::string cook_status, build_status, package_status, test_status;
   // Content staleness: newest source write vs cooked manifest time,
   // rescanned at most once per second on the UI thread.
   std::string content_status;
@@ -367,6 +368,7 @@ void close_project(Shell &shell) {
     shell.cook_status.clear();
     shell.build_status.clear();
     shell.package_status.clear();
+    shell.test_status.clear();
   }
   shell.status = "project closed - browsing host assets";
 }
@@ -477,6 +479,41 @@ void start_build(Shell &shell, engine::JobSystem &jobs) {
                     });
 }
 
+// Smoke-tests the built host: launches it hidden with `--frames N`, waits up
+// to 30s, and reports pass/fail. Shared by the UI TEST job and the headless
+// --test path.
+std::string test_project_sync(const std::filesystem::path &root,
+                              const std::string &exe_name, int frames) {
+  for (const auto dir : {root / "build" / "host" / "Release",
+                         root / "build" / "host"}) {
+    const auto exe = dir / (exe_name + ".exe");
+    if (std::filesystem::is_regular_file(exe)) {
+      const std::string frames_arg = "--frames " + std::to_string(frames);
+      SHELLEXECUTEINFOA info{};
+      info.cbSize = sizeof(info);
+      info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
+      info.lpVerb = "open";
+      info.lpFile = exe.string().c_str();
+      info.lpParameters = frames_arg.c_str();
+      info.lpDirectory = root.string().c_str();
+      info.nShow = SW_HIDE;
+      if (!ShellExecuteExA(&info) || info.hProcess == nullptr)
+        return "test launch failed: " + exe_name + ".exe";
+      const auto wait = WaitForSingleObject(info.hProcess, 30000);
+      DWORD code = 1;
+      GetExitCodeProcess(info.hProcess, &code);
+      if (wait == WAIT_TIMEOUT) TerminateProcess(info.hProcess, 2);
+      CloseHandle(info.hProcess);
+      if (wait == WAIT_OBJECT_0 && code == 0)
+        return "test ok - " + std::to_string(frames) + " frames";
+      return "test failed - " + exe_name +
+             (wait == WAIT_TIMEOUT ? " timed out" : " exited") + " code " +
+             std::to_string(code);
+    }
+  }
+  return "no built host - run BUILD first";
+}
+
 // Launches the built host executable with the project root as its working
 // directory, so relative content paths resolve.
 void run_project(Shell &shell) {
@@ -512,6 +549,30 @@ void stop_project(Shell &shell) {
   CloseHandle(static_cast<HANDLE>(shell.run_process));
   shell.run_process = nullptr;
   shell.status = "host stopped";
+}
+
+void start_test(Shell &shell, engine::JobSystem &jobs) {
+  if (!shell.project || shell.testing.exchange(true)) return;
+  const auto root = shell.project->root;
+  const auto exe_name = shell.project->id.substr(5);
+  {
+    std::lock_guard lock(shell.project_mutex);
+    shell.test_status = "testing " + exe_name + " (90 frames)...";
+  }
+  (void)jobs.submit("project.test", engine::JobPriority::Normal, {},
+                    [&shell, root, exe_name] {
+                      std::string message;
+                      try {
+                        message = test_project_sync(root, exe_name, 90);
+                      } catch (const std::exception &error) {
+                        message = std::string("test failed: ") + error.what();
+                      }
+                      {
+                        std::lock_guard lock(shell.project_mutex);
+                        shell.test_status = std::move(message);
+                      }
+                      shell.testing = false;
+                    });
 }
 
 // Clears the tracked handle once the launched host exits on its own.
@@ -629,6 +690,9 @@ void open_editor(Shell &shell) {
 void start_package(Shell &shell, engine::JobSystem &) {
   shell.status = "packaging unavailable on this platform";
 }
+void start_test(Shell &shell, engine::JobSystem &) {
+  shell.status = "testing unavailable on this platform";
+}
 #endif
 
 // Copies a file into the open project's base content package
@@ -664,7 +728,7 @@ void import_asset(Shell &shell) {
 // Headless project pipeline — no window is created, so the full loop is
 // scriptable (CI, external tools, testing). Returns a process exit code.
 //   --create <name> [--root <dir>] [--template windowed|blank]
-//   --cook|--build|--package|--run <project-root>
+//   --cook|--build|--package|--run|--test <project-root>
 int run_headless(Shell &shell, const std::vector<std::string> &args) {
   const auto &op = args.front();
   if (op == "--create") {
@@ -758,6 +822,15 @@ int run_headless(Shell &shell, const std::vector<std::string> &args) {
       }
       std::cerr << "no built host - run --build first\n";
       return 1;
+    }
+    if (op == "--test") {
+      // Smoke-test: run the built host for --frames N and check the exit
+      // code. Optional trailing arg overrides the frame count.
+      int frames = 90;
+      if (args.size() > 2) frames = std::atoi(args[2].c_str());
+      const auto message = test_project_sync(project->root, exe_name, frames);
+      std::cout << message << '\n';
+      return message.starts_with("test ok") ? 0 : 1;
     }
   } catch (const std::exception &e) {
     std::cerr << op << " failed: " << e.what() << '\n';
@@ -1367,6 +1440,8 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
       }
       if (!shell.package_status.empty())
         line(out, x, y, "package", shell.package_status, font);
+      if (!shell.test_status.empty())
+        line(out, x, y, "test", shell.test_status, font);
     }
   } else {
     line(out, x, y, "open project", "none - browsing host assets", font);
@@ -1431,6 +1506,11 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_project_rename = {bx2, y2, 104 * s,
                                 shell.hit_project_name.height};
     shell_button(out, shell.hit_project_rename, "RENAME", false, font, s);
+    bx2 += 114 * s;
+    shell.hit_project_test = {bx2, y2, 84 * s,
+                              shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_test,
+                 shell.testing ? "TESTING" : "TEST", shell.testing, font, s);
     y = y2;
   } else {
     shell.hit_project_close = {};
@@ -1440,6 +1520,7 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_project_editor = {};
     shell.hit_project_package = {};
     shell.hit_project_rename = {};
+    shell.hit_project_test = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -1600,7 +1681,7 @@ int main(int argc, char **argv) {
 #endif
       if (args.front() == "--create" || args.front() == "--cook" ||
           args.front() == "--build" || args.front() == "--package" ||
-          args.front() == "--run")
+          args.front() == "--run" || args.front() == "--test")
         return run_headless(shell, args);
     }
     auto arg_str = [&](int i) {
@@ -1797,6 +1878,8 @@ int main(int argc, char **argv) {
               start_package(shell, jobs);
             else if (shell.hit_project_rename.contains(event.position))
               rename_project(shell);
+            else if (shell.hit_project_test.contains(event.position))
+              start_test(shell, jobs);
             else if (shell.hit_template_toggle.contains(event.position))
               shell.blank_template = !shell.blank_template;
             else if (shell.project_rows.contains(event.position)) {
