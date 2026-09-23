@@ -47,6 +47,12 @@ void register_scene_components(World &world);
 // respawn is the caller's policy.
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc);
 
+// The inverse of spawn_scene: every live entity carrying EntityName (or, when
+// unnamed, every entity with a Transform2D) becomes a SceneEntity built from
+// its components. Lets tools export live world state back to an editable,
+// diffable document.
+SceneDocument scene_from_world(const World &world);
+
 // First live entity whose EntityName matches, or nullopt.
 std::optional<EntityId> find_entity_by_name(const World &world,
                                             std::string_view name);

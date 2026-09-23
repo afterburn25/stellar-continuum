@@ -248,6 +248,16 @@ int main() {
         check(world.get<SpriteRef>(*rep)->value == "data/logo.png",
               "restore revives sprite path");
 
+        // scene_from_world exports live state back to an editable document.
+        const auto exported = scene_from_world(world);
+        check(exported.entities.size() == 2, "scene_from_world exports all");
+        const auto *ex_player = &exported.entities[0];
+        if (ex_player->name != "player") ex_player = &exported.entities[1];
+        check(ex_player->name == "player" && ex_player->x == 10.f &&
+                  ex_player->vx == 30.f &&
+                  ex_player->sprite == "data/logo.png",
+              "scene_from_world round-trips fields");
+
         // Failure paths: absent and corrupt files return false, world intact.
         check(!load_world_from_file(
                   world, std::filesystem::temp_directory_path() /

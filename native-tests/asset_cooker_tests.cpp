@@ -1,5 +1,6 @@
 #include <stellar/engine/asset_cooker.hpp>
 #include <stellar/engine/asset_registry.hpp>
+#include <stellar/engine/content_resolver.hpp>
 #include <stellar/engine/sha256.hpp>
 #include <stellar/engine/texture_cook.hpp>
 #include <stellar/engine/spherical_material_preparation.hpp>
@@ -146,6 +147,16 @@ int main(int argc,char**argv){try{
     require(record.chunks.front().package.starts_with("game.demo-"),"Scan-mode package group not applied");
   const auto bytes=gr.read(*doc);const std::string text(bytes.begin(),bytes.end());
   require(text=="hello engine","Scan-mode payload corrupted");
+  // ContentResolver serves the same paths from the dev-layout cooked
+  // manifest (project/build/cooked) and the loose source tree.
+  ContentResolver resolver{"game.demo",project,project/"build/host"};
+  require(resolver.cooked_count()==4,"ContentResolver cooked count wrong");
+  const auto*resolved_rec=resolver.find_cooked("readme.txt");
+  require(resolved_rec&&resolved_rec->id==doc->id,"ContentResolver cooked lookup missed");
+  const auto resolved=resolver.read_bytes("readme.txt");
+  require(resolved&&std::string(resolved->begin(),resolved->end())=="hello engine","ContentResolver cooked bytes wrong");
+  require(resolver.loose_path("readme.txt")==project/"packages/game.demo/content/readme.txt","ContentResolver loose path wrong");
+  require(!resolver.read_bytes("missing.bin").has_value(),"ContentResolver should miss absent assets");
  }
  std::cout<<"Asset cooker, mip loading, deterministic cache and integrity checks passed\n";return 0;
 }catch(const std::exception&e){unmount_asset_registry();std::cerr<<e.what()<<'\n';return 1;}}

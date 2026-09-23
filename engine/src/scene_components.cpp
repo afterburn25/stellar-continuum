@@ -67,6 +67,37 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
   return spawned;
 }
 
+SceneDocument scene_from_world(const World &world) {
+  SceneDocument doc;
+  for (const auto entity : world.entities()) {
+    const auto *name = world.get<EntityName>(entity);
+    const auto *t = world.get<Transform2D>(entity);
+    if (name == nullptr && t == nullptr) continue;
+    SceneEntity s;
+    if (name) s.name = name->value;
+    if (t) {
+      s.x = t->x;
+      s.y = t->y;
+    }
+    if (const auto *v = world.get<Velocity2D>(entity)) {
+      s.vx = v->dx;
+      s.vy = v->dy;
+    }
+    if (const auto *e = world.get<Extent2D>(entity)) {
+      s.w = e->w;
+      s.h = e->h;
+    }
+    if (const auto *tint = world.get<Tint>(entity)) {
+      s.r = tint->r;
+      s.g = tint->g;
+      s.b = tint->b;
+    }
+    if (const auto *sp = world.get<SpriteRef>(entity)) s.sprite = sp->value;
+    doc.entities.push_back(std::move(s));
+  }
+  return doc;
+}
+
 std::optional<EntityId> find_entity_by_name(const World &world,
                                             std::string_view name) {
   for (const auto entity : world.entities()) {
