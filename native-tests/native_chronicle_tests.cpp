@@ -416,6 +416,71 @@ void recency_filtering() {
           "Missing day source should leave the window inert");
 }
 
+void search_filtering() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::string summary) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.category = std::move(category);
+    event.summary = std::move(summary);
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "war.battle", "Fleet action at Proxima");
+  add(410., "colony.founded", "Colony established on Terra");
+  add(420., "war.engagement_started", "Raiders destroyed convoy");
+
+  // Case-insensitive substring over summary OR category id.
+  require(snapshot(history, 1, 4000, {}, 0., 0, {},
+                   -std::numeric_limits<double>::infinity(), "terra")
+                  .total == 1,
+          "Summary substring search missed");
+  require(snapshot(history, 1, 4000, {}, 0., 0, {},
+                   -std::numeric_limits<double>::infinity(), "WAR.")
+                  .total == 2,
+          "Category substring search missed");
+
+  // The header field: click focuses it, text filters live, backspace
+  // pops a codepoint, Escape unfocuses before closing.
+  NativeChronicleView view;
+  native_map::InputEvent press;
+  press.type = native_map::InputEventType::LeftPressed;
+  native_map::InputEvent release = press;
+  release.type = native_map::InputEventType::LeftReleased;
+  view.open(history, 1);
+  require(!view.wants_text_input(), "Unfocused view wants text input");
+  press.position = {600.f, 83.f}; // search box in the header
+  release.position = press.position;
+  require(view.handle(press, 1280, 800), "Search press not captured");
+  require(view.handle(release, 1280, 800),
+          "Search release not captured");
+  require(view.wants_text_input(), "Search field did not focus");
+  native_map::InputEvent text;
+  text.type = native_map::InputEventType::TextEntered;
+  text.text = "colony";
+  require(view.handle(text, 1280, 800), "Text input not consumed");
+  require(view.search() == "colony" &&
+              view.current().entries.size() == 1 &&
+              view.current().entries[0].summary ==
+                  "Colony established on Terra",
+          "Live search did not filter the snapshot");
+  native_map::InputEvent backspace;
+  backspace.type = native_map::InputEventType::BackspacePressed;
+  require(view.handle(backspace, 1280, 800),
+          "Backspace not consumed");
+  require(view.search() == "colon" &&
+              view.current().entries.size() == 1,
+          "Backspace did not edit the query");
+  native_map::InputEvent escape;
+  escape.type = native_map::InputEventType::EscapePressed;
+  require(view.handle(escape, 1280, 800), "Escape not consumed");
+  require(!view.wants_text_input() && view.visible(),
+          "Escape should unfocus search, not close the view");
+  require(view.handle(escape, 1280, 800), "Second Escape lost");
+  require(!view.visible(), "Second Escape did not close the view");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -435,6 +500,7 @@ int main() {
     entry_navigation();
     tag_focus();
     recency_filtering();
+    search_filtering();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

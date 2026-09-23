@@ -61,14 +61,17 @@ struct ChronicleSnapshot {
 // HistoryQuery::tag's semantics — so a tag chip becomes "everything
 // this entity did that we can see". `since_day` (default -inf) is the
 // feed's own recency bound — only events at or after that campaign day
-// appear. `total` reports the filtered visible count.
+// appear. `search` (empty = off) is a case-insensitive substring match
+// on the recorded summary OR category id — free-text lookup over the
+// authorized feed. `total` reports the filtered visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
          std::string_view category_prefix = {},
          double min_significance = 0.0, std::uint64_t actor = 0,
          std::string_view tag = {},
-         double since_day = -std::numeric_limits<double>::infinity());
+         double since_day = -std::numeric_limits<double>::infinity(),
+         std::string_view search = {});
 
 class NativeChronicleView final {
 public:
@@ -136,6 +139,15 @@ public:
   [[nodiscard]] std::string_view tag_filter() const noexcept {
     return tag_filter_;
   }
+  // Free-text search over summary/category (header field; click to
+  // focus, Escape or outside press unfocuses). While focused the view
+  // wants SDL text input — callers gate global shortcuts on this.
+  [[nodiscard]] std::string_view search() const noexcept {
+    return search_;
+  }
+  [[nodiscard]] bool wants_text_input() const noexcept {
+    return visible_ && search_focused_;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -166,7 +178,8 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Actor, Time, Entry, Contact, Tag, FocusClear };
+                           Actor, Time, Search, Entry, Contact, Tag,
+                           FocusClear };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -178,6 +191,8 @@ private:
   std::uint64_t actor_filter_{};
   std::string tag_filter_;
   double recency_window_{};
+  std::string search_;
+  bool search_focused_{};
   std::size_t press_entry_{}, press_tag_{};
   std::optional<std::uint64_t> navigation_{}, contact_navigation_{};
   std::function<std::string(std::uint64_t)> actor_name_resolver_;

@@ -113,9 +113,9 @@ struct CardLayout {
 // Same geometry contract as the notification panel: cards stacked
 // top-down (entries already newest-first), translated by scroll.
 struct ChronicleLayout {
-  UiRect panel, header, close_button, refresh_button, domain_button,
-      significance_button, actor_button, time_button, list_viewport,
-      empty_hint;
+  UiRect panel, header, close_button, refresh_button, search_box,
+      domain_button, significance_button, actor_button, time_button,
+      list_viewport, empty_hint;
   std::optional<UiRect> focus_button; // clears the active tag focus
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
@@ -145,6 +145,13 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                          layout.header.y, 26.f * s, 26.f * s};
   layout.refresh_button = {layout.close_button.x - 86.f * s,
                            layout.header.y, 80.f * s, 26.f * s};
+  // Free-text search sits in the header between the title and REFRESH.
+  layout.search_box = {layout.header.x + 104.f * s,
+                       layout.header.y + 2.f * s,
+                       std::max(24.f * s, layout.refresh_button.x -
+                                             layout.header.x -
+                                             110.f * s),
+                       24.f * s};
   // Domain filter sits in the intro row, right-aligned beside the
   // subtitle — the header row has no room for a third control.
   layout.domain_button = {
@@ -270,11 +277,13 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            std::size_t max_entries,
                            std::string_view category_prefix,
                            double min_significance, std::uint64_t actor,
-                           std::string_view tag, double since_day) {
+                           std::string_view tag, double since_day,
+                           std::string_view search) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   const auto events =
       history.feed(observer, since_day, min_significance);
+  const std::string needle = upper(std::string(search));
   ChronicleSnapshot snap;
   snap.entries.reserve(std::min(max_entries, events.size()));
   for (auto it = events.end(); it != events.begin();) {
@@ -288,6 +297,10 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
       continue;
     if (!tag.empty() && std::ranges::find(event->tags, tag) ==
                             event->tags.end())
+      continue;
+    if (!needle.empty() &&
+        upper(event->summary).find(needle) == std::string::npos &&
+        upper(event->category).find(needle) == std::string::npos)
       continue;
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
@@ -326,6 +339,8 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   actor_filter_ = 0;
   tag_filter_.clear();
   recency_window_ = 0.0;
+  search_.clear();
+  search_focused_ = false;
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -333,6 +348,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
 void NativeChronicleView::close() noexcept {
   visible_ = false;
   scroll_ = 0.f;
+  search_focused_ = false;
   cancel_press();
 }
 
@@ -346,7 +362,7 @@ void NativeChronicleView::refresh() {
           : -std::numeric_limits<double>::infinity();
   snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
                        significance_floor_, actor_filter_, tag_filter_,
-                       since);
+                       since, search_);
   scroll_ = 0.f;
 }
 
@@ -413,7 +429,31 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                            tag_filter_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) {
+    // Escape unfocuses the search field first, then closes the view.
+    if (search_focused_) {
+      search_focused_ = false;
+      return true;
+    }
     close();
+    return true;
+  }
+  if (event.type == native_map::InputEventType::TextEntered ||
+      event.type == native_map::InputEventType::BackspacePressed) {
+    // The overlay is modal — text events never fall through while it
+    // is open; only the focused search field consumes them.
+    if (!search_focused_) return true;
+    if (event.type == native_map::InputEventType::TextEntered) {
+      if (search_.size() + event.text.size() <= 120)
+        search_ += event.text;
+    } else if (!search_.empty()) {
+      // UTF-8-safe pop (same rule as the assets search field).
+      auto n = search_.size() - 1;
+      while (n > 0 &&
+             (static_cast<unsigned char>(search_[n]) & 0xc0) == 0x80)
+        --n;
+      search_.resize(n);
+    }
+    refresh();
     return true;
   }
   if (event.type == native_map::InputEventType::PointerCancelled) {
@@ -429,11 +469,17 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
     return true;
   }
   if (event.type == native_map::InputEventType::LeftPressed) {
-    if (!layout.panel.contains(event.position)) return false;
+    if (!layout.panel.contains(event.position)) {
+      search_focused_ = false;
+      return false;
+    }
     pointer_captured_ = true;
     press_origin_ = event.position;
     press_target_ = PressTarget::None;
-    if (layout.close_button.contains(event.position))
+    search_focused_ = layout.search_box.contains(event.position);
+    if (search_focused_)
+      press_target_ = PressTarget::Search;
+    else if (layout.close_button.contains(event.position))
       press_target_ = PressTarget::Close;
     else if (layout.refresh_button.contains(event.position))
       press_target_ = PressTarget::Refresh;
@@ -551,6 +597,33 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                 layout.header.y +
                     (layout.header.height - title_extent.height) * .5f},
                title_text, title_color, title_pixels, 0.f, layout.header);
+  // Search field — focused state gets the accent border; empty shows a
+  // dim placeholder.
+  fill(out, layout.search_box, {3, 13, 22, 245});
+  out.overlay.emplace_back(native_map::StrokedRectangle{
+      layout.search_box,
+      search_focused_ ? Color{80, 200, 230, 255}
+                      : Color{54, 111, 140, 255}});
+  const int search_pixels =
+      std::max(9, static_cast<int>(std::lround(10.f * s)));
+  const std::string search_text =
+      search_.empty()
+          ? resolve(locale_, "CHRONICLE_SEARCH_HINT", "SEARCH")
+          : upper(search_);
+  const Text search_probe{{}, search_text,
+                          search_.empty() ? muted_color : title_color,
+                          search_pixels,
+                          layout.search_box.width - 8.f * s, std::nullopt,
+                          TextAlign::Left, FontFace::Interface};
+  const auto search_extent = measure(measure_, search_probe);
+  clipped_text(
+      out,
+      {layout.search_box.x + 4.f * s,
+       layout.search_box.y +
+           (layout.search_box.height - search_extent.height) * .5f},
+      search_text, search_.empty() ? muted_color : title_color,
+      search_pixels, layout.search_box.width - 8.f * s,
+      layout.search_box);
   stellar::engine::ui_skin::control(out, layout.refresh_button,
                                     layout.refresh_button.contains(pointer_),
                                     false, true, s);

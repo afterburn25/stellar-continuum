@@ -142,9 +142,14 @@ one-click relations). Recorded reference tags render as clickable
 chips on each card: clicking one sets `snapshot()`'s `tag` filter —
 HistoryQuery::tag's exact-match semantics — so "everything fleet:12
 did that we can see" is one click away; re-clicking the focused chip
-or the X focus button in the intro row clears it. Coverage:
+or the X focus button in the intro row clears it. A search field in
+the header (click to focus — the view's `wants_text_input()` joins the
+client's text-input gate, Escape unfocuses before closing, UTF-8-safe
+backspace) applies `snapshot()`'s case-insensitive `search` match over
+summary or category id. Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
-total, domain, significance, actor, tag and recency filtering, entry
+total, domain, significance, actor, tag, recency and search
+filtering, entry
 and contact navigation, view lifecycle, refresh, render smoke).
 
 The admission seeding in `native_notification_events` applies a fixed
