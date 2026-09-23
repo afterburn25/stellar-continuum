@@ -733,7 +733,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `unknown_species`, surface buildings flag `unknown_building_type`,
   negative colony ids flag `invalid_nonnegative_value`, and fleet
   `strategic_speed` must be finite positive (`invalid_positive_value`
-  — the warfare projection's class definitions reject `<= 0`). Every
+  — the warfare projection's class definitions reject `<= 0`). The
+  remaining state surfaces are covered too: civilization
+  `home_system_id` (`orphaned_home` — the loader already enforces it,
+  the invariant catches hand-built/corrupt in-memory state),
+  research/construction/shipyard rows (duplicate civilization ids,
+  `orphaned_research`/`orphaned_construction`/`orphaned_shipyard`,
+  non-negative progress/authorization/reserved-population fields,
+  `unknown_technology` for uncatalogued completed or active research,
+  `queue_overflow` past `maximum_queued_construction_projects`,
+  shipyard `unknown_species` and `orphaned_colony` reservation refs).
+  Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network

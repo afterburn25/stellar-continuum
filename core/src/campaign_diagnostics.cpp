@@ -11,6 +11,7 @@
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/lane_network.hpp>
+#include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/logistics.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_economy.hpp>
@@ -461,8 +462,12 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   const auto systems=ids(w.systems,&StellarSystem::id,"galaxy");
   const auto bodies=ids(w.bodies,&PlanetaryBody::id,"planet");
   const auto civilizations=ids(w.civilizations,&Civilization::id,"civilization");
-  (void)ids(w.fleets,&FleetState::id,"fleet");(void)ids(w.colonies,&Colony::id,"colony");
+  (void)ids(w.fleets,&FleetState::id,"fleet");
+  const auto colony_ids=ids(w.colonies,&Colony::id,"colony");
   (void)ids(w.economies,&CivilizationEconomy::civilization_id,"economy");
+  (void)ids(w.construction,&ConstructionState::civilization_id,"construction");
+  (void)ids(w.technologies,&TechnologyState::civilization_id,"research");
+  (void)ids(w.shipyards,&ShipyardState::civilization_id,"shipyard");
   const auto positive=[&](double value,std::string_view name,int id,std::string_view subsystem){
     if(!std::isfinite(value)||value< -1e-6)emit(std::string(subsystem),"invalid_nonnegative_value",id,std::string(name)+" is non-finite or negative.");
   };
@@ -474,9 +479,10 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   for(const auto &b:w.bodies)
     body_keys.insert((std::uint64_t{static_cast<std::uint32_t>(b.system_id)}<<32)|
                      static_cast<std::uint32_t>(b.id));
-  std::unordered_set<std::string_view> known_types,known_species;
+  std::unordered_set<std::string_view> known_types,known_species,known_techs;
   for(const auto &d:surface_building_catalog())known_types.insert(d.id);
   for(const auto &p:species_biology_profiles())known_species.insert(p.id);
+  for(const auto &t:legacy_technology_catalog())known_techs.insert(t.id);
   for(const auto &s:w.systems)if(!std::isfinite(s.position.x)||!std::isfinite(s.position.y)||
       (s.position.depth_light_years&&!std::isfinite(*s.position.depth_light_years)))
     emit("galaxy","invalid_position",s.id,"System position is not finite.");
@@ -504,6 +510,34 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       positive(b.stored_power_days,"Building power reserve",b.id,"construction");
       if(!known_types.contains(b.type_id))emit("construction","unknown_building_type",b.id,"Surface building has an uncatalogued type.");
       if(!std::isfinite(b.x)||!std::isfinite(b.z))emit("construction","invalid_position",b.id,"Surface building position is not finite.");}
+  }
+  for(const auto &c:w.civilizations)
+    if(!systems.contains(c.home_system_id))
+      emit("civilization","orphaned_home",c.id,"Civilization references an absent home system.");
+  for(const auto &t:w.technologies){
+    if(!civilizations.contains(t.civilization_id))emit("research","orphaned_research",t.civilization_id,"Research state references an absent civilization.");
+    positive(t.active_research_progress,"Research progress",t.civilization_id,"research");
+    for(const auto &id:t.completed_technology_ids.values())
+      if(!known_techs.contains(id))emit("research","unknown_technology",t.civilization_id,"Completed technology is not in the catalog.");
+    if(t.active_research_id&&!known_techs.contains(*t.active_research_id))
+      emit("research","unknown_technology",t.civilization_id,"Active research is not in the catalog.");
+  }
+  for(const auto &c:w.construction){
+    if(!civilizations.contains(c.civilization_id))emit("construction","orphaned_construction",c.civilization_id,"Construction state references an absent civilization.");
+    positive(c.active_project_progress,"Project progress",c.civilization_id,"construction");
+    positive(c.active_project_authorization_credits,"Authorized credits",c.civilization_id,"construction");
+    if(c.queued_projects.size()>maximum_queued_construction_projects)
+      emit("construction","queue_overflow",c.civilization_id,"Construction queue exceeds the canonical bound.");
+  }
+  for(const auto &y:w.shipyards){
+    if(!civilizations.contains(y.civilization_id))emit("shipyard","orphaned_shipyard",y.civilization_id,"Shipyard state references an absent civilization.");
+    positive(y.active_build_progress,"Build progress",y.civilization_id,"shipyard");
+    positive(y.active_authorization_credits,"Authorized credits",y.civilization_id,"shipyard");
+    positive(y.reserved_population_millions,"Reserved population",y.civilization_id,"shipyard");
+    if(y.reserved_population_species_id&&!known_species.contains(*y.reserved_population_species_id))
+      emit("shipyard","unknown_species",y.civilization_id,"Shipyard reserves an uncatalogued species.");
+    if(y.reserved_population_source_colony_id&&!colony_ids.contains(*y.reserved_population_source_colony_id))
+      emit("shipyard","orphaned_colony",y.civilization_id,"Shipyard reserves population from an absent colony.");
   }
   for(const auto &e:w.economies){
     if(!civilizations.contains(e.civilization_id))emit("economy","orphaned_economy",e.civilization_id,"Economy references an absent civilization.");

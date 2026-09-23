@@ -354,10 +354,31 @@ int main() {
     dup.id = 7;
     dup.name = "Duplicate";
     world.systems.push_back(dup);
+    // Remaining state surfaces: civ home ref, research/construction/
+    // shipyard orphans and catalog references.
+    Civilization homeless;
+    homeless.id = 5;
+    homeless.name = "Lost League";
+    homeless.home_system_id = 999;
+    world.civilizations.push_back(homeless);
+    TechnologyState rogue;
+    rogue.civilization_id = 99;
+    rogue.completed_technology_ids.insert("ftl_drive_mk9");
+    world.technologies.push_back(rogue);
+    ConstructionState overflow;
+    overflow.civilization_id = 99;
+    overflow.queued_projects.resize(
+        maximum_queued_construction_projects + 1);
+    world.construction.push_back(overflow);
+    ShipyardState yard;
+    yard.civilization_id = 99;
+    yard.reserved_population_species_id = "voidborn";
+    yard.reserved_population_source_colony_id = 999;
+    world.shipyards.push_back(yard);
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
-        duplicate = 0;
+        duplicate = 0, orphans = 0, tech = 0, overflow_n = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_positive_value") ++positive;
@@ -365,13 +386,22 @@ int main() {
       else if (finding.event_type == "unknown_building_type") ++type;
       else if (finding.event_type == "orphaned_colony") ++orphan;
       else if (finding.event_type == "duplicate_id") ++duplicate;
+      else if (finding.event_type == "orphaned_home" ||
+               finding.event_type == "orphaned_research" ||
+               finding.event_type == "orphaned_construction" ||
+               finding.event_type == "orphaned_shipyard") ++orphans;
+      else if (finding.event_type == "unknown_technology") ++tech;
+      else if (finding.event_type == "queue_overflow") ++overflow_n;
     }
     check(invalid == 3,
           "stability, condition and arrears each flag invalid values");
-    check(species == 1 && type == 1 && orphan == 1,
-          "uncatalogued species/type and cross-system body are flagged");
+    check(species == 2 && type == 1 && orphan == 2,
+          "uncatalogued species/types and absent refs are flagged");
     check(positive == 1 && duplicate == 1,
           "zero strategic speed and duplicate system are flagged");
+    check(orphans == 4 && tech == 1 && overflow_n == 1,
+          "home/research/construction/shipyard orphans, unknown tech "
+          "and queue overflow are flagged");
     // The ops pass skips the corrupt entities rather than throwing —
     // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);
