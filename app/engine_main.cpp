@@ -32,6 +32,7 @@
 #include <stellar/engine/colony.hpp>
 #include <stellar/engine/economy_catalog.hpp>
 #include <stellar/engine/resource_economy.hpp>
+#include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
 #include <stellar/engine/simulation_executor.hpp>
@@ -74,15 +75,15 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization, Simulation, Colony, Economy };
+                  Localization, Simulation, Colony, Economy, Planet };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
-                            Tool::Colony, Tool::Economy};
-constexpr std::array<const char *, 10> kToolNames{
-    "Projects", "Dashboard", "Scene", "Scene3D",
+                            Tool::Colony, Tool::Economy, Tool::Planet};
+constexpr std::array<const char *, 11> kToolNames{
+    "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
-    "Economy"};
+    "Economy",  "Planet"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -350,6 +351,26 @@ struct Shell {
   } eco;
   UiRect hit_eco_validate{}, hit_eco_break{}, hit_eco_analyze{},
       hit_eco_step{}, hit_eco_run10{}, hit_eco_producer{};
+
+  // Planet tool: habitability + terraforming over the specialization
+  // planetary framework — a PlanetEnvironment with editable
+  // temperature/atmosphere/gravity/water, evaluated live against
+  // selectable HabitabilityProfiles, with real Terraforming projects
+  // (staged linear deltas + discrete tag application) advancing the
+  // environment over days.
+  struct PlanetDemo {
+    bool initialized{false};
+    engine::Terraforming terra;
+    int profile{0};
+    double day{0.0};
+    engine::TerraformAdvance last{};
+  } planet;
+  enum : std::size_t { kPlanTemp, kPlanAtm, kPlanGrav, kPlanWater,
+                       kPlanParamCount };
+  std::array<UiRect, kPlanParamCount * 2> hit_plan_param{};
+  UiRect hit_plan_profile{}, hit_plan_start{}, hit_plan_cancel{},
+      hit_plan_step{}, hit_plan_run30{}, hit_plan_project{};
+  int planet_project{0};
   std::string status{"ready"};
 };
 
@@ -3486,6 +3507,210 @@ void render_economy(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+// ---- Planet tool: habitability evaluation + staged terraforming ------
+
+const std::array<engine::HabitabilityProfile, 3> kPlanetProfiles{{
+    {.id = "terran",
+     .temperature_min_k = 273, .temperature_max_k = 310,
+     .atmosphere_min = 0.5, .atmosphere_max = 2.0,
+     .gravity_min_g = 0.5, .gravity_max_g = 1.5,
+     .water_min = 0.3, .tolerance = 0.25,
+     .forbidden_tags = {"hazard.vacuum", "hazard.high_radiation"}},
+    {.id = "desert_adapted",
+     .temperature_min_k = 300, .temperature_max_k = 345,
+     .atmosphere_min = 0.2, .atmosphere_max = 1.5,
+     .gravity_min_g = 0.3, .gravity_max_g = 2.0,
+     .water_min = 0.0, .tolerance = 0.2,
+     .forbidden_tags = {"hazard.vacuum"}},
+    {.id = "cryo_dweller",
+     .temperature_min_k = 180, .temperature_max_k = 270,
+     .atmosphere_min = 0.0, .atmosphere_max = 1.0,
+     .gravity_min_g = 0.1, .gravity_max_g = 1.0,
+     .water_min = 0.0, .tolerance = 0.25},
+}};
+
+void init_planet(Shell::PlanetDemo &planet) {
+  engine::PlanetEnvironment env;
+  env.temperature_k = 220.0;
+  env.atmosphere_atm = 0.01;
+  env.gravity_g = 0.38;
+  env.water_fraction = 0.0;
+  env.tags = {"hazard.vacuum", "tidal_lock"};
+  planet.terra.set_environment(env);
+
+  engine::TerraformProject warm;
+  warm.id = "terraform.warm";
+  warm.stages = {
+      {.id = "mirrors",
+       .duration_days = 100,
+       .temperature_delta_k = 55,
+       .water_delta = 0.05},
+      {.id = "melt",
+       .duration_days = 100,
+       .temperature_delta_k = 15,
+       .water_delta = 0.35,
+       .add_tags = {"hydrosphere.stable"}},
+  };
+  engine::TerraformProject atmosphere;
+  atmosphere.id = "terraform.atmosphere";
+  atmosphere.stages = {
+      {.id = "seeding",
+       .duration_days = 150,
+       .atmosphere_delta = 0.6},
+      {.id = "processing",
+       .duration_days = 150,
+       .atmosphere_delta = 0.4,
+       .add_tags = {"atmosphere.breathable"},
+       .remove_tags = {"hazard.vacuum"}},
+  };
+  planet.terra.define_project(std::move(warm));
+  planet.terra.define_project(std::move(atmosphere));
+  planet.initialized = true;
+}
+
+void render_planet(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &planet = shell.planet;
+  if (!planet.initialized) init_planet(planet);
+  const auto &env = planet.terra.environment();
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "PLANET");
+
+  shell.hit_plan_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_step, "ADV 1D", false, font, s);
+  shell.hit_plan_run30 = {x + 100 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_run30, "ADV 30D", false, font, s);
+  shell.hit_plan_profile = {x + 200 * s, y, 190 * s, 24 * s};
+  shell_button(out, shell.hit_plan_profile,
+               ("PROFILE: " +
+                std::string(kPlanetProfiles[planet.profile].id))
+                   .c_str(),
+               false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", planet.day);
+  line(out, x, y, "date", buf, font);
+  y += 4 * s;
+
+  // Environment parameters with -/+ adjusters (idle env only — while a
+  // project runs the deltas are driven by Terraforming).
+  struct ParamRow {
+    const char *label;
+    double value;
+    const char *unit;
+    double step;
+  };
+  const std::array<ParamRow, Shell::kPlanParamCount> params{{
+      {"temperature", env.temperature_k, "K", 10.0},
+      {"atmosphere", env.atmosphere_atm, "atm", 0.1},
+      {"gravity", env.gravity_g, "g", 0.1},
+      {"water", env.water_fraction, "frac", 0.05},
+  }};
+  for (std::size_t i = 0; i < params.size(); ++i) {
+    const auto &p = params[i];
+    shell.hit_plan_param[i * 2] = {x, y, 30 * s, 22 * s};
+    shell_button(out, shell.hit_plan_param[i * 2], "-", false, font, s);
+    shell.hit_plan_param[i * 2 + 1] = {x + 34 * s, y, 30 * s, 22 * s};
+    shell_button(out, shell.hit_plan_param[i * 2 + 1], "+", false, font,
+                 s);
+    char vbuf[64];
+    std::snprintf(vbuf, sizeof(vbuf), "%.2f %s", p.value, p.unit);
+    out.overlay.push_back(
+        Text{{x + 76 * s, y + 4 * s}, std::string(p.label), muted, font});
+    out.overlay.push_back(
+        Text{{x + 190 * s, y + 4 * s}, vbuf, ink, font});
+    y += 26 * s;
+  }
+  std::string tagline;
+  for (const auto &tag : env.tags) {
+    if (!tagline.empty()) tagline += " ";
+    tagline += tag;
+  }
+  line(out, x, y, "tags", tagline.empty() ? "none" : tagline, font);
+  y += 6 * s;
+
+  // Habitability for the selected profile.
+  const auto &profile = kPlanetProfiles[planet.profile];
+  const auto report = engine::evaluate_habitability(env, profile);
+  heading(out, x, y, "HABITABILITY");
+  std::snprintf(buf, sizeof(buf), "%.2f  %s", report.suitability,
+                report.habitable ? "HABITABLE" : "uninhabitable");
+  line(out, x, y, profile.id, buf, font);
+  for (const auto &reason : report.unmet) {
+    out.overlay.push_back(Text{{x, y}, "- " + reason,
+                               {255, 140, 100, 255}, font});
+    y += 16 * s;
+  }
+
+  // Terraforming.
+  const float tx = body.x + body.width * 0.5f;
+  float ty = body.y + 60 * s;
+  heading(out, tx, ty, "TERRAFORMING");
+  constexpr std::array<const char *, 2> kProjects{"terraform.warm",
+                                                  "terraform.atmosphere"};
+  shell.hit_plan_project = {tx, ty, 250 * s, 24 * s};
+  shell_button(out, shell.hit_plan_project,
+               ("PROJECT: " +
+                std::string(kProjects[shell.planet_project]))
+                   .c_str(),
+               false, font, s);
+  shell.hit_plan_start = {tx + 258 * s, ty, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_start, "START",
+               !planet.terra.active(), font, s);
+  shell.hit_plan_cancel = {tx + 358 * s, ty, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_cancel, "CANCEL",
+               planet.terra.active(), font, s);
+  ty += 32 * s;
+  if (planet.terra.active()) {
+    std::snprintf(buf, sizeof(buf),
+                  "%s  stage %d (%.0f%%)  project %.0f%%",
+                  planet.terra.active_project().c_str(),
+                  static_cast<int>(planet.terra.stage_index()),
+                  planet.terra.stage_progress() * 100.0,
+                  planet.terra.project_progress() * 100.0);
+    line(out, tx, ty, "active", buf, font);
+  } else {
+    line(out, tx, ty, "active", "none", font);
+  }
+  if (!planet.last.stages_completed.empty() || planet.last.project_completed) {
+    std::string done;
+    for (const auto &stage : planet.last.stages_completed) {
+      if (!done.empty()) done += " ";
+      done += stage;
+    }
+    if (planet.last.project_completed) done += "  [COMPLETE]";
+    line(out, tx, ty, "last step", done, font);
+  }
+  ty += 6 * s;
+  // Stage preview for the selected project.
+  if (const auto *project =
+          planet.terra.project(kProjects[shell.planet_project])) {
+    for (const auto &stage : project->stages) {
+      std::string deltas;
+      auto push = [&deltas](const char *name, double v) {
+        if (v == 0.0) return;
+        char dbuf[40];
+        std::snprintf(dbuf, sizeof(dbuf), "  %s %+.2f", name, v);
+        deltas += dbuf;
+      };
+      push("temp", stage.temperature_delta_k);
+      push("atm", stage.atmosphere_delta);
+      push("water", stage.water_delta);
+      push("grav", stage.gravity_delta);
+      char sbuf[160];
+      std::snprintf(sbuf, sizeof(sbuf), "%s  %.0fd%s%s%s", stage.id.c_str(),
+                    stage.duration_days, deltas.c_str(),
+                    stage.add_tags.empty() ? "" : "  +tags",
+                    stage.remove_tags.empty() ? "" : "  -tags");
+      out.overlay.push_back(Text{{tx, ty}, sbuf, muted, font});
+      ty += 16 * s;
+    }
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -4794,6 +5019,9 @@ int main(int argc, char **argv) {
       case Tool::Economy:
         render_economy(draw, shell, body, s);
         break;
+      case Tool::Planet:
+        render_planet(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -5051,6 +5279,62 @@ int main(int argc, char **argv) {
             if (p != state.producers.end())
               eco.network.set_producer_enabled(eco.smelter_producer,
                                                !p->enabled);
+          }
+        }
+        if (shell.tool == Tool::Planet &&
+            event.type == InputEventType::LeftReleased) {
+          auto &planet = shell.planet;
+          auto advance_days = [&planet](double days) {
+            planet.last = planet.terra.advance(days);
+            planet.day += days;
+          };
+          if (shell.hit_plan_step.contains(event.position)) {
+            advance_days(1.0);
+          } else if (shell.hit_plan_run30.contains(event.position)) {
+            advance_days(30.0);
+          } else if (shell.hit_plan_profile.contains(event.position)) {
+            planet.profile =
+                (planet.profile + 1) %
+                static_cast<int>(kPlanetProfiles.size());
+          } else if (shell.hit_plan_project.contains(event.position)) {
+            shell.planet_project = (shell.planet_project + 1) % 2;
+          } else if (shell.hit_plan_start.contains(event.position)) {
+            constexpr std::array<const char *, 2> kProjects{
+                "terraform.warm", "terraform.atmosphere"};
+            planet.terra.start(kProjects[shell.planet_project]);
+          } else if (shell.hit_plan_cancel.contains(event.position)) {
+            planet.terra.cancel();
+          } else {
+            for (std::size_t i = 0; i < Shell::kPlanParamCount; ++i) {
+              int delta = 0;
+              if (shell.hit_plan_param[i * 2].contains(event.position))
+                delta = -1;
+              else if (shell.hit_plan_param[i * 2 + 1].contains(
+                           event.position))
+                delta = 1;
+              if (delta == 0) continue;
+              auto &env = planet.terra.environment();
+              switch (i) {
+              case Shell::kPlanTemp:
+                env.temperature_k =
+                    std::max(0.0, env.temperature_k + delta * 10.0);
+                break;
+              case Shell::kPlanAtm:
+                env.atmosphere_atm =
+                    std::max(0.0, env.atmosphere_atm + delta * 0.1);
+                break;
+              case Shell::kPlanGrav:
+                env.gravity_g =
+                    std::max(0.0, env.gravity_g + delta * 0.1);
+                break;
+              case Shell::kPlanWater:
+                env.water_fraction =
+                    std::clamp(env.water_fraction + delta * 0.05, 0.0,
+                               1.0);
+                break;
+              default: break;
+              }
+            }
           }
         }
       }
