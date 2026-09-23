@@ -38,17 +38,17 @@ constexpr Color panel_fill{8, 22, 34, 235};
 constexpr Color panel_edge{28, 64, 88, 255};
 constexpr Color bar_fill{24, 90, 120, 255};
 
-std::filesystem::path find_font() {
+std::filesystem::path find_asset(const char *relative) {
   // The shell searches beside the executable first (packaged layout), then
   // walks upward so a build-tree run reaches the shared assets directory.
   auto base = engine::executable_directory();
   for (int depth = 0; depth < 4; ++depth) {
-    const auto candidate = base / "assets/visual/fonts/Rajdhani-SemiBold.ttf";
+    const auto candidate = base / relative;
     if (std::filesystem::is_regular_file(candidate)) return candidate;
     if (!base.has_parent_path() || base == base.parent_path()) break;
     base = base.parent_path();
   }
-  return "assets/visual/fonts/Rajdhani-SemiBold.ttf";
+  return relative;
 }
 
 std::filesystem::path find_locale() {
@@ -115,8 +115,18 @@ int main(int argc, char **argv) {
       }
     }
 
-    Window window("Stellar Engine", 1280, 800, false, find_font());
+    Window window("Stellar Engine", 1280, 800, false,
+                  find_asset("assets/visual/fonts/Rajdhani-SemiBold.ttf"));
     window.set_auto_frame_cap();
+
+    // The provided application icon doubles as the in-window engine emblem.
+    std::shared_ptr<const RgbaImage> emblem;
+    try {
+      emblem = decode_rgba_image(
+          find_asset("assets/visual/branding/stellar-continuum-icon-v1.png"),
+          256);
+    } catch (const std::exception &) {
+    }
 
     std::atomic<int> demo_jobs_done{};
     auto next_job = std::chrono::steady_clock::now();
@@ -173,6 +183,12 @@ int main(int argc, char **argv) {
 
       float x = panel.x + 26 * s;
       float y = panel.y + 22 * s;
+      if (emblem) {
+        const float emblem_size = 72 * s;
+        draw.overlay.push_back(
+            Image{emblem, {panel.x + panel.width - 26 * s - emblem_size,
+                           panel.y + 20 * s, emblem_size, emblem_size}});
+      }
       draw.text.push_back(
           Text{{x, y}, "STELLAR ENGINE", ink, static_cast<int>(30 * s), 0,
                std::nullopt, TextAlign::Left, FontFace::Heading});

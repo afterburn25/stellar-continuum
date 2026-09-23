@@ -23,6 +23,10 @@ target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
 # shipped without the Stellar Continuum game module.
 add_executable(stellar-engine app/engine_main.cpp)
 target_include_directories(stellar-engine PRIVATE "${CMAKE_BINARY_DIR}/generated")
+configure_file(app/engine_version.rc.in generated/engine_version.rc @ONLY)
+if(WIN32)
+  target_sources(stellar-engine PRIVATE "${CMAKE_BINARY_DIR}/generated/engine_version.rc")
+endif()
 target_link_libraries(stellar-engine PRIVATE stellar_native_platform stellar_engine)
 add_custom_command(TARGET stellar-engine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
