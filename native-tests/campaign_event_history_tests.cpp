@@ -1,0 +1,190 @@
+#include <stellar/core/campaign_event_history.hpp>
+
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
+// Campaign event history adapter tests — the Core consumer contract for
+// engine::EventHistory. Covers category vocabulary, actor/visibility
+// mapping, significance ordering and at_day attribution.
+
+namespace {
+
+int failures = 0;
+
+void check(bool condition, const char *message) {
+  if (!condition) {
+    ++failures;
+    std::cerr << "FAIL: " << message << '\n';
+  }
+}
+
+using namespace stellar::core;
+using stellar::engine::HistoryEvent;
+using stellar::engine::HistoryQuery;
+
+const HistoryEvent *only(const std::vector<HistoryEvent> &events,
+                         const std::string &category) {
+  const HistoryEvent *found = nullptr;
+  int count = 0;
+  for (const auto &e : events)
+    if (e.category == category) {
+      found = &e;
+      ++count;
+    }
+  if (count != 1) return nullptr;
+  return found;
+}
+
+bool has_tag(const HistoryEvent &e, const std::string &tag) {
+  return std::find(e.tags.begin(), e.tags.end(), tag) != e.tags.end();
+}
+
+} // namespace
+
+int main() {
+  IntegratedAdaptiveCampaignStepResult step;
+  step.core.construction_events.push_back(
+      {7, "project.shipyard", "Shipyard completed"});
+  step.core.shipbuilding_events.push_back(
+      {7, 42, "design.frigate", "Frigate commissioned"});
+  step.core.research_events.push_back({7, "tech.fusion", "Fusion researched"});
+  step.research_events.push_back({7, "node.drives", "Drive node unlocked", true});
+  step.research_events.push_back(
+      {7, "node.armor", "Armor progress", false});
+
+  ExplorationEvent first_contact;
+  first_contact.type = ExplorationEventType::FirstContact;
+  first_contact.civilization_id = 7;
+  first_contact.fleet_id = 42;
+  first_contact.system_id = 9;
+  first_contact.target_civilization_id = 3;
+  first_contact.planetary_body_id = 55;
+  first_contact.message = "First contact in system 9";
+  step.core.exploration_events.push_back(first_contact);
+
+  ExplorationEvent survey;
+  survey.type = ExplorationEventType::SystemSurveyed;
+  survey.civilization_id = 7;
+  survey.fleet_id = 42;
+  survey.system_id = 4;
+  survey.message = "System 4 surveyed";
+  step.core.exploration_events.push_back(survey);
+
+  CombatEvent destroyed;
+  destroyed.type = CombatEventType::FleetDestroyed;
+  destroyed.system_id = 9;
+  destroyed.actor_civilization_id = 3;
+  destroyed.actor_fleet_id = 8;
+  destroyed.target_civilization_id = 7;
+  destroyed.target_fleet_id = 42;
+  destroyed.message = "Fleet 42 destroyed";
+  step.core.combat_events.push_back(destroyed);
+
+  CombatEvent damage;
+  damage.type = CombatEventType::DamageApplied;
+  damage.system_id = 9;
+  damage.actor_civilization_id = 3;
+  damage.actor_fleet_id = 8;
+  damage.target_civilization_id = 7;
+  damage.message = "Exchange of fire";
+  step.core.combat_events.push_back(damage);
+
+  step.core.colonization_events.push_back(
+      {7, 42, 11, 101, "Colony established on world 101"});
+
+  const double end_day = 152.5;
+  const auto events = history_events_for_step(step, end_day);
+  check(events.size() == 10, "every emitted event mapped");
+
+  // at_day attribution is uniform and correct.
+  for (const auto &e : events)
+    check(e.at_day == end_day, "at_day is the step end day");
+
+  // Category vocabulary and fields.
+  {
+    const auto *e = only(events, "construction.project");
+    check(e && e->actors == std::vector<std::uint64_t>{7},
+          "construction event actor");
+    check(e && has_tag(*e, "project:project.shipyard"),
+          "construction project tag");
+  }
+  {
+    const auto *e = only(events, "shipbuilding.ship");
+    check(e && has_tag(*e, "design:design.frigate") &&
+              has_tag(*e, "fleet:42"),
+          "shipbuilding tags");
+  }
+  {
+    check(only(events, "research.legacy") != nullptr,
+          "legacy research mapped");
+    const auto *outcome = [&] {
+      for (const auto &e : events)
+        if (e.category == "research.adaptive" && e.significance > 0.5)
+          return &e;
+      return static_cast<const HistoryEvent *>(nullptr);
+    }();
+    check(outcome && has_tag(*outcome, "node:node.drives"),
+          "adaptive research outcome has node tag");
+    // Progress events are lower-significance records, not dropped.
+    int adaptive = 0;
+    for (const auto &e : events)
+      if (e.category == "research.adaptive") ++adaptive;
+    check(adaptive == 2, "both adaptive research events recorded");
+  }
+  {
+    const auto *e = only(events, "exploration.first_contact");
+    check(e && e->significance >= 0.9, "first contact is major");
+    check(e && e->actors == std::vector<std::uint64_t>{7, 3},
+          "first contact lists both civilizations");
+    check(e && e->location == 9, "first contact located at system");
+    check(e && has_tag(*e, "body:55"), "first contact keeps body tag");
+  }
+  {
+    const auto *e = only(events, "exploration.system_surveyed");
+    check(e && e->significance < 0.9, "routine survey below major");
+    check(e && e->visible_to == std::vector<std::uint64_t>{7},
+          "survey visible to owner only");
+  }
+  {
+    const auto *e = only(events, "war.fleet_destroyed");
+    check(e && e->significance >= 0.85, "fleet destroyed is major");
+    check(e && e->actors == std::vector<std::uint64_t>{3, 7},
+          "combat lists aggressor then victim");
+    check(e && e->visible_to == std::vector<std::uint64_t>{3, 7},
+          "combat visible to both parties");
+    check(e && has_tag(*e, "fleet:8") && has_tag(*e, "fleet:42"),
+          "combat keeps both fleet tags");
+    const auto *d = only(events, "war.damage_applied");
+    check(d && d->significance < 0.2, "damage ticks stay low-significance");
+  }
+  {
+    const auto *e = only(events, "colony.founded");
+    check(e && e->location == 11 && has_tag(*e, "colony:101"),
+          "colony founding located and tagged");
+  }
+
+  // Privacy: an uninvolved observer sees nothing from this step.
+  {
+    stellar::engine::EventHistory h;
+    const auto ids = record_step_events(h, step, end_day);
+    check(ids.size() == 10, "record assigns ids");
+    check(h.feed(/*observer*/ 5, /*since*/ 0.0).empty(),
+          "uninvolved civ sees no private events");
+    // Civ 7 is involved in every event here (including combat as the
+    // victim); civ 3 only in first contact + the two combat events.
+    check(h.feed(7, 0.0).size() == 10, "actor civ sees all its events");
+    check(h.feed(3, 0.0).size() == 3, "other civ sees only its events");
+    check(h.feed(std::nullopt, 0.0, 0.8).size() == 3,
+          "omniscient major-event feed: first contact + fleet destroyed + "
+          "colony founding");
+  }
+
+  if (failures == 0) {
+    std::cout << "campaign event history adapter tests passed\n";
+    return 0;
+  }
+  std::cerr << failures << " failure(s)\n";
+  return 1;
+}

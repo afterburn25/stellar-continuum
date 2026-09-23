@@ -1,0 +1,219 @@
+#include <stellar/core/campaign_event_history.hpp>
+
+#include <string>
+
+namespace stellar::core {
+
+namespace {
+
+using engine::HistoryEvent;
+
+std::string_view exploration_category(ExplorationEventType type) {
+  switch (type) {
+  case ExplorationEventType::SystemDetected:
+    return "exploration.system_detected";
+  case ExplorationEventType::SystemReconnoitered:
+    return "exploration.system_reconnoitered";
+  case ExplorationEventType::SystemSurveyStarted:
+    return "exploration.system_survey_started";
+  case ExplorationEventType::SystemSurveyed:
+    return "exploration.system_surveyed";
+  case ExplorationEventType::ResourceSignatureDetected:
+    return "exploration.resource_signature";
+  case ExplorationEventType::AnomalySignatureDetected:
+    return "exploration.anomaly_signature";
+  case ExplorationEventType::ActivitySignatureDetected:
+    return "exploration.activity_signature";
+  case ExplorationEventType::ResourceSurveyed:
+    return "exploration.resource_surveyed";
+  case ExplorationEventType::AnomalySurveyed:
+    return "exploration.anomaly_surveyed";
+  case ExplorationEventType::NativeCivilizationSurveyed:
+    return "exploration.native_civilization_surveyed";
+  case ExplorationEventType::SensorContact:
+    return "exploration.sensor_contact";
+  case ExplorationEventType::FirstContact:
+    return "exploration.first_contact";
+  }
+  return "exploration.event";
+}
+
+double exploration_significance(ExplorationEventType type) {
+  switch (type) {
+  case ExplorationEventType::FirstContact:
+    return 0.95;
+  case ExplorationEventType::NativeCivilizationSurveyed:
+    return 0.85;
+  case ExplorationEventType::AnomalySurveyed:
+    return 0.6;
+  case ExplorationEventType::SystemSurveyed:
+    return 0.5;
+  case ExplorationEventType::ResourceSurveyed:
+    return 0.45;
+  case ExplorationEventType::SensorContact:
+    return 0.35;
+  case ExplorationEventType::ResourceSignatureDetected:
+  case ExplorationEventType::AnomalySignatureDetected:
+  case ExplorationEventType::ActivitySignatureDetected:
+    return 0.3;
+  case ExplorationEventType::SystemDetected:
+  case ExplorationEventType::SystemReconnoitered:
+    return 0.25;
+  case ExplorationEventType::SystemSurveyStarted:
+    return 0.2;
+  }
+  return 0.4;
+}
+
+std::string_view combat_category(CombatEventType type) {
+  switch (type) {
+  case CombatEventType::EngagementStarted:
+    return "war.engagement_started";
+  case CombatEventType::DamageApplied:
+    return "war.damage_applied";
+  case CombatEventType::FleetRetreatInitiated:
+    return "war.fleet_retreat";
+  case CombatEventType::FleetEscaped:
+    return "war.fleet_escaped";
+  case CombatEventType::FleetDestroyed:
+    return "war.fleet_destroyed";
+  case CombatEventType::EngagementEnded:
+    return "war.engagement_ended";
+  }
+  return "war.event";
+}
+
+double combat_significance(CombatEventType type) {
+  switch (type) {
+  case CombatEventType::FleetDestroyed:
+    return 0.9;
+  case CombatEventType::EngagementStarted:
+    return 0.7;
+  case CombatEventType::EngagementEnded:
+    return 0.55;
+  case CombatEventType::FleetRetreatInitiated:
+  case CombatEventType::FleetEscaped:
+    return 0.4;
+  case CombatEventType::DamageApplied:
+    return 0.1; // high volume — surface via min_significance queries
+  }
+  return 0.5;
+}
+
+HistoryEvent base(std::string_view category, double at_day,
+                  std::string summary) {
+  HistoryEvent e;
+  e.category = std::string(category);
+  e.at_day = at_day;
+  e.summary = std::move(summary);
+  return e;
+}
+
+void visible_to_involved(HistoryEvent &e) {
+  // Involved parties know their own events; everyone else does not.
+  // Public knowledge is left to the knowledge layer, not assumed here.
+  e.visible_to = e.actors;
+}
+
+} // namespace
+
+std::vector<engine::HistoryEvent>
+history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
+                        double end_day) {
+  std::vector<HistoryEvent> out;
+  const auto civ = [](int id) { return static_cast<std::uint64_t>(id); };
+  const auto tag_i = [](std::string prefix, int id) {
+    return prefix + std::to_string(id);
+  };
+
+  out.reserve(step.core.construction_events.size() +
+              step.core.shipbuilding_events.size() +
+              step.core.research_events.size() + step.research_events.size() +
+              step.core.exploration_events.size() +
+              step.core.combat_events.size() +
+              step.core.colonization_events.size());
+
+  for (const auto &ev : step.core.construction_events) {
+    auto e = base("construction.project", end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    e.significance = 0.35;
+    e.tags = {"project:" + ev.project_id};
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.core.shipbuilding_events) {
+    auto e = base("shipbuilding.ship", end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    e.significance = 0.45;
+    e.tags = {"design:" + ev.design_id, tag_i("fleet:", ev.fleet_id)};
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.core.research_events) {
+    auto e = base("research.legacy", end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    e.significance = 0.55;
+    e.tags = {"tech:" + ev.technology_id};
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.research_events) {
+    auto e = base("research.adaptive", end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    e.significance = ev.is_outcome ? 0.6 : 0.25;
+    e.tags = {"node:" + ev.node_id};
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.core.exploration_events) {
+    auto e = base(exploration_category(ev.type), end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    if (ev.target_civilization_id)
+      e.actors.push_back(civ(*ev.target_civilization_id));
+    e.location = static_cast<std::uint64_t>(ev.system_id);
+    e.significance = exploration_significance(ev.type);
+    e.tags = {tag_i("fleet:", ev.fleet_id)};
+    if (ev.planetary_body_id)
+      e.tags.push_back(tag_i("body:", *ev.planetary_body_id));
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.core.combat_events) {
+    auto e = base(combat_category(ev.type), end_day, ev.message);
+    e.actors = {civ(ev.actor_civilization_id)};
+    if (ev.target_civilization_id)
+      e.actors.push_back(civ(*ev.target_civilization_id));
+    if (ev.system_id)
+      e.location = static_cast<std::uint64_t>(*ev.system_id);
+    e.significance = combat_significance(ev.type);
+    e.tags = {tag_i("fleet:", ev.actor_fleet_id)};
+    if (ev.target_fleet_id)
+      e.tags.push_back(tag_i("fleet:", *ev.target_fleet_id));
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  for (const auto &ev : step.core.colonization_events) {
+    auto e = base("colony.founded", end_day, ev.message);
+    e.actors = {civ(ev.civilization_id)};
+    e.location = static_cast<std::uint64_t>(ev.system_id);
+    e.significance = 0.8;
+    e.tags = {tag_i("fleet:", ev.fleet_id), tag_i("colony:", ev.colony_id)};
+    visible_to_involved(e);
+    out.push_back(std::move(e));
+  }
+  return out;
+}
+
+std::vector<std::uint64_t>
+record_step_events(engine::EventHistory &history,
+                   const IntegratedAdaptiveCampaignStepResult &step,
+                   double end_day) {
+  auto events = history_events_for_step(step, end_day);
+  std::vector<std::uint64_t> ids;
+  ids.reserve(events.size());
+  for (auto &e : events)
+    ids.push_back(history.record(std::move(e)));
+  return ids;
+}
+
+} // namespace stellar::core

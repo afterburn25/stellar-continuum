@@ -146,7 +146,19 @@ ticks, bit-identical checksums across runs. Milestone 14 landed:
 `EventHistory` (history.hpp) — recorded strategic events with
 observer-privacy query projection, significance thresholds, bounded
 store + pruning, and `feed()` as the public-information/news substrate
-— see [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md). Next: Core/game
+— see [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md). Cross-cutting
+persistence landed: versioned `capture_state`/`restore_state` on every
+specialization framework (Population cohorts, Colony instances,
+FlowNetwork topology, LogisticsNetwork routes/shipments, WarfareModel
+fleets/cohorts, StrategicMind incumbents/cooldowns/journal,
+ResourceNetwork inventories/producers/transfers) —
+`framework_persistence` tests prove identical continued evolution and
+negative cases throw on missing definitions. `framework_state_json.hpp`
+adds the byte-level layer: templated `to_json`/`from_json` codecs
+(nlohmann-compatible, `galaxy_phenomena_json.hpp` convention) for all
+State structs, covered by `framework_state_codec` tests — campaign save
+codecs can now embed framework state without hand-written field lists.
+Next: Core/game
 adoption of these frameworks — the engine layer exists; wiring real
 phases through the executor and recording real events is the
 remaining specialization work.

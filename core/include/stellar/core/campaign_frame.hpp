@@ -4,6 +4,7 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 #include <stellar/core/massive_combat_engine.hpp>
 #include <stellar/core/strategic_clock.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <memory>
 #include <vector>
@@ -66,6 +67,12 @@ class CampaignFrame final {
   issue_tactical_order(MassiveCombatOrder order);
   [[nodiscard]] MassiveCombatSnapshot tactical_snapshot();
   [[nodiscard]] CampaignFrameResult advance(double real_delta_seconds);
+  // The campaign chronicle: every completed strategic substep's emitted
+  // events recorded through campaign_event_history. Session-scoped —
+  // capture_state()/restore_state() exist on EventHistory but save
+  // schema integration is not yet wired.
+  [[nodiscard]] engine::EventHistory &history() noexcept;
+  [[nodiscard]] const engine::EventHistory &history() const noexcept;
 
  private:
   struct Storage;

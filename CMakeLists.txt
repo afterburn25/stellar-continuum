@@ -215,6 +215,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/massive_combat_persistence.cpp
   core/src/massive_combat_engine.cpp
   core/src/campaign_massive_combat.cpp
+  core/src/campaign_event_history.cpp
   core/src/campaign_frame.cpp
   core/src/strategic_clock.cpp
   core/src/fleet_persistence.cpp
@@ -654,6 +655,9 @@ if(BUILD_TESTING)
   add_executable(stellar_framework_persistence_tests native-tests/framework_persistence_tests.cpp)
   target_link_libraries(stellar_framework_persistence_tests PRIVATE stellar_engine)
   add_test(NAME framework_persistence COMMAND stellar_framework_persistence_tests)
+  add_executable(stellar_framework_state_codec_tests native-tests/framework_state_codec_tests.cpp)
+  target_link_libraries(stellar_framework_state_codec_tests PRIVATE stellar_engine stellar_json)
+  add_test(NAME framework_state_codec COMMAND stellar_framework_state_codec_tests)
   add_executable(stellar_population_scale_tests native-tests/population_scale_benchmarks.cpp)
   target_link_libraries(stellar_population_scale_tests PRIVATE stellar_engine)
   add_test(NAME population_scale_10k COMMAND stellar_population_scale_tests 1 40 10000 60)
@@ -692,6 +696,9 @@ if(BUILD_TESTING)
   add_executable(stellar_history_tests native-tests/history_tests.cpp)
   target_link_libraries(stellar_history_tests PRIVATE stellar_engine)
   add_test(NAME history COMMAND stellar_history_tests)
+  add_executable(stellar_campaign_event_history_tests native-tests/campaign_event_history_tests.cpp)
+  target_link_libraries(stellar_campaign_event_history_tests PRIVATE stellar_core)
+  add_test(NAME campaign_event_history COMMAND stellar_campaign_event_history_tests)
 
   foreach(scale 250 500 1000 2500 5000)
     add_test(NAME simulation_scale_${scale} COMMAND stellar_simulation_scale_tests ${scale} 120)

@@ -347,12 +347,26 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `total_wakeups`. Persistence: `capture_state`/`restore_state` on both
   layers carry tick, tiers, last-run/dormant bookkeeping, pending
   dirty/event wakeups and pause — taskless snapshot keys are reported
-  unmatched instead of scheduled.
+  unmatched instead of scheduled. The same versioned
+  capture/restore contract covers every specialization framework
+  (`Population`, `Colony`, `FlowNetwork`, `LogisticsNetwork`,
+  `WarfareModel`, `StrategicMind`, `ResourceNetwork`): runtime state
+  round-trips, definitions (profiles/specs/recipes/classes/actions)
+  are re-registered code-side, and unknown references throw.
+  `framework_state_json.hpp` provides the byte-level layer —
+  templated `to_json`/`from_json` codecs (nlohmann-compatible,
+  matching `galaxy_phenomena_json.hpp`) for all of those State
+  structs so campaign save codecs can embed framework state without
+  hand-written field lists.
 - **Consumers/tests:** `simulation_executor` functional tests (cadence,
   elapsed catch-up, dirty/event/dormant wakes, ordering, budgets,
-  pause, promotion, parallel≡serial state) and
-  `stellar_simulation_scale_tests` benchmarks registered as ctest
-  `simulation_scale_250/500/1000/2500/5000` — serial and parallel
+  pause, promotion, parallel≡serial state),
+  `stellar_simulation_persistence_tests` (struct round-trip),
+  `stellar_framework_persistence_tests` (all frameworks),
+  `stellar_framework_state_codec_tests` (JSON round-trip through
+  dump→parse→restore→re-capture equality plus version/enum negative
+  cases) and `stellar_simulation_scale_tests` benchmarks registered as
+  ctest `simulation_scale_250/500/1000/2500/5000` — serial and parallel
   checksums verified identical. Core/game phases are not yet consumers.
 - **Save/performance impact:** tasks are code — re-registered on load,
   never serialized; cadence bookkeeping is derivable. 5000-task

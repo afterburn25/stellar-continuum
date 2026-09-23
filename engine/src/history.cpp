@@ -1,6 +1,7 @@
 #include <stellar/engine/history.hpp>
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace stellar::engine {
 
@@ -97,6 +98,28 @@ std::size_t EventHistory::prune_before(double day, double keep_significance) {
 void EventHistory::clear() {
     events_.clear();
     next_id_ = 1;
+}
+
+EventHistory::State EventHistory::capture_state() const {
+    State state;
+    state.next_id = next_id_;
+    state.events = events_;
+    return state;
+}
+
+void EventHistory::restore_state(const State& state) {
+    std::uint64_t previous = 0;
+    for (const HistoryEvent& e : state.events) {
+        if (e.id == 0 || e.id <= previous)
+            throw std::invalid_argument(
+                "EventHistory snapshot event ids not strictly ascending");
+        previous = e.id;
+    }
+    if (state.next_id <= previous)
+        throw std::invalid_argument(
+            "EventHistory snapshot next_id collides with retained events");
+    events_ = state.events;
+    next_id_ = state.next_id;
 }
 
 } // namespace stellar::engine

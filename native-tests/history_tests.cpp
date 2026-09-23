@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 namespace {
 
@@ -165,6 +166,44 @@ int main() {
                   << " ms; hits=" << hits.size() << "\n";
         check(!hits.empty(), "scale query returns results");
         check(ms < 30000.0, "scale run within budget");
+    }
+
+    // --- Persistence -------------------------------------------------------------
+    {
+        EventHistory a;
+        a.record(ev("colony.founded", 10.0, 0.8));
+        auto secret = ev("espionage.op", 11.0, 0.9);
+        secret.visible_to = {7};
+        a.record(secret);
+        const auto state = a.capture_state();
+
+        EventHistory b;
+        b.restore_state(state);
+        check(b.size() == a.size() && b.next_id() == a.next_id(),
+              "chronicle restored");
+        check(b.feed(7, 0.0).size() == 2 && b.feed(9, 0.0).size() == 1,
+              "observer filtering identical after restore");
+        // Continuity: new ids follow the snapshot, queries stay ordered.
+        const auto id = b.record(ev("war.battle", 20.0));
+        check(id == 3 && b.event(3)->category == "war.battle",
+              "recording continues after restore");
+
+        // Malformed snapshots are rejected, not silently reordered.
+        EventHistory::State bad;
+        bad.events.push_back(ev("e", 1.0));
+        bad.events.back().id = 5;
+        bad.events.push_back(ev("e", 2.0));
+        bad.events.back().id = 3; // non-ascending
+        bad.next_id = 4;          // also collides with retained id 5
+        EventHistory c;
+        bool threw = false;
+        try {
+            c.restore_state(bad);
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "non-ascending ids rejected");
+        check(c.size() == 0, "failed restore leaves history untouched");
     }
 
     if (failures == 0) {

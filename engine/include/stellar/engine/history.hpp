@@ -77,6 +77,20 @@ public:
     std::size_t prune_before(double day, double keep_significance = 1.0);
     void clear();
 
+    // --- persistence -------------------------------------------------
+    // Serializable chronicle: every retained HistoryEvent plus the id
+    // counter. Capacity is constructor policy, not state.
+    struct State {
+        std::uint32_t version{1};
+        std::uint64_t next_id{1};
+        std::deque<HistoryEvent> events; // record order (id ascending)
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces all records. Throws invalid_argument if event ids are not
+    // strictly ascending (record order and binary lookup depend on it)
+    // or next_id does not exceed every retained id.
+    void restore_state(const State& state);
+
 private:
     std::deque<HistoryEvent> events_;   // record order (id ascending)
     std::size_t capacity_;

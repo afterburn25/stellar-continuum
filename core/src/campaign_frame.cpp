@@ -1,4 +1,5 @@
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/campaign_event_history.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/engine/foundation.hpp>
@@ -26,6 +27,7 @@ struct CampaignFrame::Storage {
   stellar::engine::FixedClock developer_tactical_clock{std::chrono::milliseconds(100)};
   bool developer_step{};
   bool profiling_enabled{};
+  engine::EventHistory history{100000};
 
   Storage(IntegratedAdaptiveCampaignRuntime value, StrategicClock strategic,
           CampaignFramePolicy frame_policy)
@@ -53,6 +55,8 @@ CampaignFrame::~CampaignFrame() = default;
 CampaignFrame::CampaignFrame(CampaignFrame &&) noexcept = default;
 CampaignFrame &CampaignFrame::operator=(CampaignFrame &&) noexcept = default;
 IntegratedAdaptiveCampaignRuntime &CampaignFrame::runtime() noexcept { return *storage_->runtime; }
+engine::EventHistory &CampaignFrame::history() noexcept { return storage_->history; }
+const engine::EventHistory &CampaignFrame::history() const noexcept { return storage_->history; }
 StrategicClock &CampaignFrame::clock() noexcept { return storage_->clock; }
 void CampaignFrame::set_profiling_enabled(bool enabled) noexcept {storage_->profiling_enabled=enabled;storage_->runtime->set_profiling_enabled(enabled);}
 void CampaignFrame::set_developer_speed(std::uint32_t multiplier){
@@ -214,7 +218,9 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     for(std::uint64_t index=0;index<count;++index){
       try{
         const auto begun=s.profiling_enabled?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
-        result.strategic_results.push_back(s.runtime->advance(step_days,s.clock.simulation_days()+step_days));
+        const double end_day=s.clock.simulation_days()+step_days;
+        result.strategic_results.push_back(s.runtime->advance(step_days,end_day));
+        record_step_events(s.history,result.strategic_results.back(),end_day);
         if(s.profiling_enabled)result.tick_execution_nanoseconds.push_back(static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-begun).count()));
         s.clock.record_fixed_advance(step_days,count?real_delta_seconds/static_cast<double>(count):0.,static_cast<double>(snapshot.backlog.count())/1e9*s.clock.days_per_second());
@@ -241,6 +247,7 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     end_day += step;
     result.completed_end_days.push_back(end_day);
     result.strategic_results.push_back(s.runtime->advance(step, end_day));
+    record_step_events(s.history, result.strategic_results.back(), end_day);
   }
   result.stellar_weather_launches=s.runtime->advance_stellar_activity(
       std::max(0.,s.clock.simulation_days()-start)*24.);
