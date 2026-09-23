@@ -196,6 +196,7 @@ int main() {
     engine::SceneDocument scene;
     scene.bg_r = 4; scene.bg_g = 8; scene.bg_b = 40;
     scene.gravity = 600.f;
+    scene.music = "audio/level1.ogg";
     scene.entities.push_back(
         engine::SceneEntity{"box", 10.f, 20.f, 64.f, 32.f, 100.f, 50.f,
                             255, 128, 0, "data/logo.png", -2, 0.5f,
@@ -244,7 +245,8 @@ int main() {
               reparsed->tilemap->cells.size() == 8 &&
               reparsed->tilemap->cells[5] == 1 &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
-              reparsed->bg_b == 40 && reparsed->gravity == 600.f,
+              reparsed->bg_b == 40 && reparsed->gravity == 600.f &&
+              reparsed->music == "audio/level1.ogg",
           "scene document round-trips");
     const auto path = root / "editor" / "scene.json";
     scene.save(path);

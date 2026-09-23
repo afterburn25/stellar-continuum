@@ -45,6 +45,7 @@ std::string SceneDocument::to_json() const {
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
+  if (!music.empty()) doc["music"] = music;
   if (tilemap) {
     nlohmann::json tm;
     tm["tileset"] = tilemap->tileset;
@@ -124,6 +125,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
     scene.gravity = doc.value("gravity", 0.0f);
+    scene.music = doc.value("music", std::string{});
     if (doc.contains("tilemap")) {
       const auto &tm = doc.at("tilemap");
       if (!tm.is_object()) return fail("tilemap must be an object");

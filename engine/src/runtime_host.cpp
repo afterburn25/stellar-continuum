@@ -260,11 +260,19 @@ int RuntimeHost::run() {
 
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
+  std::string scene_music;
   auto spawn_entities = [&](const SceneDocument &doc) {
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
     impl.gravity = doc.gravity;
+    // Scene music: a set track swaps in on load; empty keeps whatever is
+    // already playing so levels can share the options/default track.
+    if (!doc.music.empty() && doc.music != scene_music)
+      if (const auto clip = load_clip(doc.music)) {
+        audio.play_music(clip);
+        scene_music = doc.music;
+      }
     for (const auto e : impl.entities) world.destroy(e);
     if (impl.tilemap_e) world.destroy(*impl.tilemap_e);
     impl.entities = spawn_scene(world, doc);

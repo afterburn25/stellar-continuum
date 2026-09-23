@@ -87,6 +87,9 @@ struct SceneDocument {
   // Downward acceleration in px/s² applied to entities' velocity each sim
   // step (scaled per entity by gravityScale). 0 disables gravity.
   float gravity{0.0f};
+  // Content-relative music track played when the scene loads (empty keeps
+  // whatever is playing — lets levels share a track or swap it).
+  std::string music;
 
   static constexpr std::string_view filename{"scene.json"};
 

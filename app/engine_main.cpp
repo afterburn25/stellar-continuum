@@ -206,7 +206,7 @@ struct Shell {
       hit_scene_tilesize{}, hit_scene_tilecols{},
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
-      hit_scene_paint{}, hit_scene_paintcell{},
+      hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
@@ -987,6 +987,18 @@ void commit_scene_field(Shell &shell) {
     shell.scene_buffer.clear();
     return;
   }
+  // Field 38 is the document's scene-load music track.
+  if (shell.scene_field == 38) {
+    shell.scene_history.commit(shell.scene_doc);
+    shell.scene_doc.music = shell.scene_buffer;
+    shell.scene_modified = true;
+    shell.status = shell.scene_buffer.empty()
+                       ? "scene music cleared - SAVE to persist"
+                       : "scene music '" + shell.scene_buffer +
+                             "' - SAVE to persist";
+    shell.scene_buffer.clear();
+    return;
+  }
   // Fields 30+ edit the document tilemap; committing creates it on demand
   // so "tileset" alone is enough to begin a grid.
   if (shell.scene_field >= 30) {
@@ -1244,7 +1256,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_tilesize = shell.hit_scene_tilecols =
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
-                    shell.hit_scene_paint = shell.hit_scene_paintcell = {};
+                    shell.hit_scene_paint = shell.hit_scene_paintcell =
+                        shell.hit_scene_music = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1641,6 +1654,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         std::to_string(shell.scene_paint_cell),
         shell.editing_scene && shell.scene_field == 37,
         "brush tile id, -1 erases");
+  field(shell.hit_scene_music, "music", shell.scene_doc.music,
+        shell.editing_scene && shell.scene_field == 38,
+        "content-relative track played on scene load");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2526,6 +2542,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->data;
               else if (field == 23 && e)
                 shell.scene_buffer = std::to_string(e->opacity);
+              else if (field == 38)
+                shell.scene_buffer = shell.scene_doc.music;
               else if (field >= 30) {
                 const auto *tm = shell.scene_doc.tilemap
                                      ? &*shell.scene_doc.tilemap
@@ -2622,6 +2640,8 @@ int main(int argc, char **argv) {
               edit_field(36);
             else if (shell.hit_scene_paintcell.contains(event.position))
               edit_field(37);
+            else if (shell.hit_scene_music.contains(event.position))
+              edit_field(38);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

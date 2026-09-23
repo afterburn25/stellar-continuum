@@ -109,6 +109,11 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   degrades to defaults on missing/malformed files. Remaining gap: no
   rebinding UI or pad-specific glyphs in the tools; only the first pad is
   used.
+- **Scene music:** `SceneDocument::music` names a content-relative track the
+  host plays when the scene loads — per-level music for `set_scene()`
+  switching and hot reload (a change to the field restarts the new track;
+  empty keeps the current/options track). The Scene tool exposes a doc-level
+  `music` field; covered by `engine_project` round-trip tests.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint
