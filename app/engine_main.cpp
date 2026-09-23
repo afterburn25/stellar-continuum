@@ -187,6 +187,13 @@ struct Shell {
   bool blank_template{};
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
+  // Profiler tool: two capture slots compared via compare_captures —
+  // slots fill in-memory (CAPTURE) or from disk (LOAD/SAVE under
+  // <exe>/profiler_captures/) so builds can diff against saved baselines.
+  std::optional<engine::ProfileCapture> prof_capture_a, prof_capture_b;
+  std::string prof_status;
+  UiRect hit_prof_cap_a{}, hit_prof_cap_b{}, hit_prof_save_a{},
+      hit_prof_save_b{}, hit_prof_load_a{}, hit_prof_load_b{};
   // New-project name field and panel hit regions.
   bool editing_project_name{}, editing_import{}, editing_package{};
   std::string project_name_buffer, import_buffer, package_buffer;
@@ -2823,19 +2830,40 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
-void render_profiler(DrawList &out, UiRect body, float s,
+std::filesystem::path profiler_capture_path(int slot) {
+  return engine::executable_directory() / "profiler_captures" /
+         ("capture_" + std::string(slot == 0 ? "a" : "b") + ".json");
+}
+
+void render_profiler(DrawList &out, Shell &shell, UiRect body, float s,
                      engine::Profiler &profiler) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
   const int font = static_cast<int>(13 * s);
   heading(out, x, y, "PROFILER");
+  const float bw = 92 * s, bh = 24 * s, gap = 8 * s;
+  shell.hit_prof_cap_a = {x, y, bw, bh};
+  shell.hit_prof_cap_b = {x + (bw + gap), y, bw, bh};
+  shell.hit_prof_save_a = {x + (bw + gap) * 2, y, bw, bh};
+  shell.hit_prof_load_a = {x + (bw + gap) * 3, y, bw, bh};
+  shell.hit_prof_save_b = {x + (bw + gap) * 4, y, bw, bh};
+  shell.hit_prof_load_b = {x + (bw + gap) * 5, y, bw, bh};
+  shell_button(out, shell.hit_prof_cap_a, "CAPTURE A", false, font, s);
+  shell_button(out, shell.hit_prof_cap_b, "CAPTURE B", false, font, s);
+  shell_button(out, shell.hit_prof_save_a, "SAVE A", false, font, s);
+  shell_button(out, shell.hit_prof_load_a, "LOAD A", false, font, s);
+  shell_button(out, shell.hit_prof_save_b, "SAVE B", false, font, s);
+  shell_button(out, shell.hit_prof_load_b, "LOAD B", false, font, s);
+  y += bh + 8 * s;
+  if (!shell.prof_status.empty())
+    line(out, x, y, "status", shell.prof_status, font);
   for (const auto &row : profiler.overlay_lines(18)) {
     out.overlay.push_back(Text{{x, y}, row, ink, font});
     y += font + 8.f;
   }
   const auto aggregates = profiler.aggregates();
   heading(out, x, y, "AGGREGATES");
-  const auto count = std::min<std::size_t>(aggregates.size(), 14);
+  const auto count = std::min<std::size_t>(aggregates.size(), 10);
   for (std::size_t i = 0; i < count; ++i) {
     const auto &a = aggregates[i];
     line(out, x, y,
@@ -2843,6 +2871,21 @@ void render_profiler(DrawList &out, UiRect body, float s,
          std::to_string(a.calls) + " calls, " +
              ms(static_cast<double>(a.total_nanoseconds) / 1e6) + " total",
          font);
+  }
+  if (shell.prof_capture_a && shell.prof_capture_b) {
+    heading(out, x, y, "A vs B (largest mean deltas)");
+    const auto rows = engine::compare_captures(*shell.prof_capture_a,
+                                               *shell.prof_capture_b);
+    for (std::size_t i = 0; i < std::min<std::size_t>(rows.size(), 12); ++i) {
+      const auto &r = rows[i];
+      const double delta = (r.mean_ns_b - r.mean_ns_a) / 1e6;
+      char buf[160];
+      std::snprintf(buf, sizeof(buf), "A %.2f ms -> B %.2f ms  (%+.2f ms)",
+                    r.mean_ns_a / 1e6, r.mean_ns_b / 1e6, delta);
+      line(out, x, y,
+           r.category.empty() ? r.name : r.category + "/" + r.name, buf,
+           font);
+    }
   }
 }
 
@@ -6014,7 +6057,7 @@ int main(int argc, char **argv) {
         render_assets(draw, shell, body, s);
         break;
       case Tool::Profiler:
-        render_profiler(draw, body, s, profiler);
+        render_profiler(draw, shell, body, s, profiler);
         break;
       case Tool::Localization:
         render_localization(draw, shell, body, s, locale);
@@ -6089,6 +6132,67 @@ int main(int argc, char **argv) {
           if (list_rect.contains(event.position))
             shell.key_list.scroll_to(shell.key_list.scroll_offset -
                                      event.wheel_y * 44.f);
+        }
+        if (shell.tool == Tool::Profiler &&
+            event.type == InputEventType::LeftReleased) {
+          const auto capture_slot = [&](int slot) {
+            auto parsed =
+                engine::ProfileCapture::parse(profiler.export_json());
+            if (!parsed) {
+              shell.prof_status = "capture failed";
+              return;
+            }
+            (slot == 0 ? shell.prof_capture_a : shell.prof_capture_b) =
+                std::move(*parsed);
+            shell.prof_status = std::string("captured ") +
+                                (slot == 0 ? "A" : "B");
+          };
+          const auto save_slot = [&](int slot) {
+            const auto &capture = slot == 0 ? shell.prof_capture_a
+                                            : shell.prof_capture_b;
+            if (!capture) {
+              shell.prof_status = "nothing captured";
+              return;
+            }
+            const auto path = profiler_capture_path(slot);
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            out << capture->to_json();
+            shell.prof_status = out ? "saved " + path.filename().string()
+                                    : "save failed";
+          };
+          const auto load_slot = [&](int slot) {
+            const auto path = profiler_capture_path(slot);
+            std::ifstream in(path, std::ios::binary);
+            if (!in) {
+              shell.prof_status = "no saved capture";
+              return;
+            }
+            const std::string text{std::istreambuf_iterator<char>(in),
+                                   std::istreambuf_iterator<char>()};
+            auto parsed = engine::ProfileCapture::parse(text);
+            if (!parsed) {
+              shell.prof_status = "capture file corrupt";
+              return;
+            }
+            (slot == 0 ? shell.prof_capture_a : shell.prof_capture_b) =
+                std::move(*parsed);
+            shell.prof_status = std::string("loaded ") +
+                                (slot == 0 ? "A" : "B");
+          };
+          if (shell.hit_prof_cap_a.contains(event.position))
+            capture_slot(0);
+          else if (shell.hit_prof_cap_b.contains(event.position))
+            capture_slot(1);
+          else if (shell.hit_prof_save_a.contains(event.position))
+            save_slot(0);
+          else if (shell.hit_prof_save_b.contains(event.position))
+            save_slot(1);
+          else if (shell.hit_prof_load_a.contains(event.position))
+            load_slot(0);
+          else if (shell.hit_prof_load_b.contains(event.position))
+            load_slot(1);
         }
         if (shell.tool == Tool::Simulation &&
             event.type == InputEventType::LeftReleased) {
