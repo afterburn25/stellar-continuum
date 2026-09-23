@@ -67,6 +67,40 @@ int main(int argc,char **argv)try{
     check(gone!=ops2.end()&&gone->entity_id==919,
         "Nonexistent ordered destination was not reported.");
   }
+  {
+    // The projection-backed findings fire end-to-end: a home colony
+    // pushed into import dependency saturates its freight corridor, and
+    // a distressed colony reports emigration pressure.
+    auto distressed=world;
+    const int civ_id=world.player_civilization_id;
+    const auto civ_it=std::find_if(distressed.civilizations.begin(),distressed.civilizations.end(),
+        [&](const Civilization &c){return c.id==civ_id;});
+    check(civ_it!=distressed.civilizations.end(),"Player civ missing.");
+    const int home_id=civ_it->home_system_id;
+    Colony *home_first=nullptr,*home_second=nullptr;
+    for(auto &c:distressed.colonies)if(c.civilization_id==civ_id&&c.system_id==home_id){
+      if(!home_first)home_first=&c;else if(!home_second)home_second=&c;}
+    check(home_first,"No home colony to distress.");
+    if(!home_second){
+      // Relocate an owned colony into the home system so the network has a corridor.
+      for(auto &c:distressed.colonies)if(c.civilization_id==civ_id&&c.system_id!=home_id){
+        c.system_id=home_id;home_second=&c;break;}
+      check(home_second,"Could not stage a second home colony.");
+    }
+    // Homeworld: large surplus so the corridor — not the supply — binds.
+    home_first->population_millions=500.0;home_first->infrastructure=5.0;home_first->stability=1.0;
+    home_second->kind=SettlementKind::Colony;
+    home_second->population_millions=500.0;home_second->infrastructure=.1;home_second->stability=.3;
+    // Starve cargo handling so the corridor binds at capacity.
+    auto &econ=*std::find_if(distressed.economies.begin(),distressed.economies.end(),
+        [&](const CivilizationEconomy &e){return e.civilization_id==civ_id;});
+    econ.last_industry_per_second=.01;
+    const auto ops=inspect_campaign_operations(distressed,7,3.5);
+    check(std::any_of(ops.begin(),ops.end(),[](const auto &r){return r.event_type=="logistics_link_saturated";}),
+        "Saturated corridor produced no link finding.");
+    check(std::any_of(ops.begin(),ops.end(),[&](const auto &r){return r.event_type=="population_unrest"&&r.entity_id==home_second->id;}),
+        "Distressed colony produced no emigration-pressure finding.");
+  }
   auto corrupt=world;corrupt.systems.push_back(corrupt.systems.front());
   corrupt.colonies.front().civilization_id=99999;
   corrupt.economies.front().credits=std::numeric_limits<double>::quiet_NaN();
