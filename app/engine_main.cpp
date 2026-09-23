@@ -36,6 +36,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -125,11 +126,12 @@ struct Shell {
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
   // New-project name field and panel hit regions.
-  bool editing_project_name{}, editing_import{};
-  std::string project_name_buffer, import_buffer;
+  bool editing_project_name{}, editing_import{}, editing_package{};
+  std::string project_name_buffer, import_buffer, package_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
-      hit_project_run{}, hit_import_field{}, hit_import_button{};
+      hit_project_run{}, hit_import_field{}, hit_import_button{},
+      hit_package_field{}, hit_package_button{};
   UiRect project_rows{};
   // Content cooking and host builds run on the JobSystem; the UI thread
   // reads their status under the mutex.
@@ -187,6 +189,25 @@ void refresh_projects(Shell &shell) {
                                  : shell.projects.size() - 1;
 }
 
+// Rebuilds the package registry for the open project: its own content
+// roots register first, the project namespace is then protected, and
+// mod packages under mods/ scan last so they cannot override the base.
+std::size_t reload_packages(Shell &shell) {
+  shell.package_registry = engine::PackageRegistry{};
+  shell.package_errors.clear();
+  std::size_t count = 0;
+  for (const auto &dir : shell.project->content_dirs)
+    count += engine::scan_packages(shell.package_registry,
+                                   (shell.project->root / dir).string(),
+                                   &shell.package_errors);
+  shell.package_registry.protect_namespace(shell.project->id);
+  count += engine::scan_packages(shell.package_registry,
+                                 (shell.project->root / "mods").string(),
+                                 &shell.package_errors);
+  shell.load_plan = shell.package_registry.resolve();
+  return count;
+}
+
 void open_project(Shell &shell, const std::filesystem::path &root) {
   std::string error;
   auto loaded = engine::EngineProject::load(root, &error);
@@ -195,24 +216,55 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
     return;
   }
   shell.project = std::move(*loaded);
-  shell.package_registry = engine::PackageRegistry{};
-  shell.package_errors.clear();
-  std::size_t count = 0;
-  // The project's own packages register first; the namespace is protected
-  // afterwards so subsequently-scanned mod packages cannot override it.
-  for (const auto &dir : shell.project->content_dirs)
-    count += engine::scan_packages(shell.package_registry,
-                                   (root / dir).string(),
-                                   &shell.package_errors);
-  shell.package_registry.protect_namespace(shell.project->id);
-  count += engine::scan_packages(shell.package_registry,
-                                 (root / "mods").string(),
-                                 &shell.package_errors);
-  shell.load_plan = shell.package_registry.resolve();
+  const auto count = reload_packages(shell);
   scan_assets(shell, root / shell.project->content_dirs.front());
   shell.status = "opened " + shell.project->name + " - " +
                  std::to_string(count) + " package(s), load plan " +
                  (shell.load_plan.ok ? "ok" : "FAILED");
+}
+
+// Scaffolds an additional content package under the open project's
+// namespace (packages/<project>.<name>/) depending on the base package,
+// then rebuilds the registry and load plan.
+void create_package(Shell &shell) {
+  if (!shell.project) {
+    shell.status = "open a project before adding packages";
+    return;
+  }
+  const std::string name =
+      shell.package_buffer.empty() ? "content" : shell.package_buffer;
+  const auto slug = engine::sanitize_project_id(name).substr(5);
+  const auto package_id = shell.project->id + "." + slug;
+  const auto dir = shell.project->root / "packages" / package_id;
+  std::error_code ec;
+  if (std::filesystem::exists(dir / "package.json", ec)) {
+    shell.status = "package already exists: " + package_id;
+    return;
+  }
+  std::filesystem::create_directories(dir / "content", ec);
+  if (ec) {
+    shell.status = "package failed: " + ec.message();
+    return;
+  }
+  const std::string manifest =
+      "{\n  \"id\": \"" + package_id + "\",\n  \"name\": \"" + name +
+      "\",\n  \"version\": \"0.1.0\",\n  \"priority\": 10,\n"
+      "  \"dependencies\": [{\"id\": \"" + shell.project->id + "\"}],\n"
+      "  \"provides\": [\"" + package_id + "\"]\n}\n";
+  {
+    std::ofstream out(dir / "package.json");
+    out << manifest;
+    if (!out) {
+      shell.status = "package manifest write failed";
+      return;
+    }
+  }
+  shell.package_buffer.clear();
+  const auto count = reload_packages(shell);
+  scan_assets(shell,
+              shell.project->root / shell.project->content_dirs.front());
+  shell.status = "added " + package_id + " - " + std::to_string(count) +
+                 " package(s) total";
 }
 
 void close_project(Shell &shell) {
@@ -721,11 +773,33 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
         {ix, iy},
         "into packages/" + shell.project->id + "/content/", muted, font, iw,
         UiRect{ix, iy, iw, 60.f}});
+    iy += 44 * s;
   } else {
     shell.hit_import_field = {};
     shell.hit_import_button = {};
     out.overlay.push_back(Text{{ix, iy}, "open a project to import", muted,
                                font, iw});
+    iy += 44 * s;
+  }
+
+  // Additional content packages under the project's namespace.
+  heading(out, ix, iy, "NEW PACKAGE");
+  if (shell.project) {
+    shell.hit_package_field = {ix, iy, iw, (font + 14) * s};
+    field_box(out, shell.hit_package_field,
+              shell.editing_package ? shell.package_buffer : "",
+              shell.editing_package, "package name...", font, s);
+    iy += shell.hit_package_field.height + 8 * s;
+    shell.hit_package_button = {ix, iy, 96 * s, (font + 14) * s};
+    shell_button(out, shell.hit_package_button, "ADD", false, font, s);
+    iy += shell.hit_package_button.height + 10 * s;
+    out.overlay.push_back(Text{
+        {ix, iy},
+        "creates packages/" + shell.project->id + ".<name>/", muted, font,
+        iw, UiRect{ix, iy, iw, 60.f}});
+  } else {
+    shell.hit_package_field = {};
+    shell.hit_package_button = {};
   }
 }
 
@@ -814,18 +888,22 @@ int main(int argc, char **argv) {
       shell.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
         if (event.type == InputEventType::EscapePressed) {
-          if (shell.editing_project_name || shell.editing_import) {
-            shell.editing_project_name = shell.editing_import = false;
+          if (shell.editing_project_name || shell.editing_import ||
+              shell.editing_package) {
+            shell.editing_project_name = shell.editing_import =
+                shell.editing_package = false;
             window.set_text_input(false);
             continue;
           }
           return 0;
         }
         // Text-field editing takes precedence over tool clicks.
-        if (shell.editing_project_name || shell.editing_import) {
-          std::string &buffer = shell.editing_import
-                                    ? shell.import_buffer
-                                    : shell.project_name_buffer;
+        if (shell.editing_project_name || shell.editing_import ||
+            shell.editing_package) {
+          std::string &buffer =
+              shell.editing_import      ? shell.import_buffer
+              : shell.editing_package   ? shell.package_buffer
+                                        : shell.project_name_buffer;
           if (event.type == InputEventType::TextEntered) {
             if (buffer.size() < 240) buffer += event.text;
             continue;
@@ -837,9 +915,12 @@ int main(int argc, char **argv) {
           if (event.type == InputEventType::KeyPressed &&
               event.key == '\r') {
             const bool was_import = shell.editing_import;
-            shell.editing_project_name = shell.editing_import = false;
+            const bool was_package = shell.editing_package;
+            shell.editing_project_name = shell.editing_import =
+                shell.editing_package = false;
             window.set_text_input(false);
             if (was_import) import_asset(shell);
+            else if (was_package) create_package(shell);
             else create_project_from_field(shell);
             continue;
           }
@@ -855,18 +936,26 @@ int main(int argc, char **argv) {
           if (shell.tool == Tool::Projects) {
             if (shell.hit_project_name.contains(event.position)) {
               shell.editing_project_name = true;
-              shell.editing_import = false;
+              shell.editing_import = shell.editing_package = false;
               window.set_text_input(true);
             } else if (shell.hit_import_field.contains(event.position)) {
               shell.editing_import = true;
-              shell.editing_project_name = false;
+              shell.editing_project_name = shell.editing_package = false;
               window.set_text_input(true);
-            } else if (shell.editing_project_name || shell.editing_import) {
+            } else if (shell.hit_package_field.contains(event.position)) {
+              shell.editing_package = true;
               shell.editing_project_name = shell.editing_import = false;
+              window.set_text_input(true);
+            } else if (shell.editing_project_name || shell.editing_import ||
+                       shell.editing_package) {
+              shell.editing_project_name = shell.editing_import =
+                  shell.editing_package = false;
               window.set_text_input(false);
             }
             if (shell.hit_import_button.contains(event.position))
               import_asset(shell);
+            else if (shell.hit_package_button.contains(event.position))
+              create_package(shell);
             else if (shell.hit_project_create.contains(event.position))
               create_project_from_field(shell);
             else if (shell.hit_project_open.contains(event.position) &&
@@ -887,8 +976,10 @@ int main(int argc, char **argv) {
                                   shell.project_list.row_height)));
               if (row < shell.projects.size()) shell.selected_project = row;
             }
-          } else if (shell.editing_project_name || shell.editing_import) {
-            shell.editing_project_name = shell.editing_import = false;
+          } else if (shell.editing_project_name || shell.editing_import ||
+                     shell.editing_package) {
+            shell.editing_project_name = shell.editing_import =
+                shell.editing_package = false;
             window.set_text_input(false);
           }
           break;
