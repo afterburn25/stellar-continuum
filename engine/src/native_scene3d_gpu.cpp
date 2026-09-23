@@ -1,12 +1,15 @@
 #include <stellar/engine/texture_cook.hpp>
+#include <stellar/engine/draw_batcher.hpp>
 #include "native_scene3d_gpu.hpp"
 #include "generated/scene3d_shaders.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -67,8 +70,9 @@ struct Scene3DRenderer::Storage {
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
   std::shared_ptr<const RgbaImage> white=RgbaImage::create(1,1,{255,255,255,255});
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{};SDL_GPUTextureFormat scene_format{};
+  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);}
+  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -83,12 +87,12 @@ struct Scene3DRenderer::Storage {
     environment_sampler=SDL_CreateGPUSampler(device,&sampling);if(!environment_sampler)throw gpu_error("3D environment sampler creation failed");
     hdr=SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_COLOR_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
     scene_format=hdr?SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT:SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    const auto shader=[&](const auto& code,SDL_GPUShaderStage stage,Uint32 uniforms,Uint32 samplers){
-      SDL_GPUShaderCreateInfo info{};info.code=reinterpret_cast<const Uint8*>(code);info.code_size=sizeof(code);info.entrypoint="main";info.format=SDL_GPU_SHADERFORMAT_SPIRV;info.stage=stage;info.num_uniform_buffers=uniforms;info.num_samplers=samplers;
+    const auto shader=[&](const auto& code,SDL_GPUShaderStage stage,Uint32 uniforms,Uint32 samplers,Uint32 storage=0){
+      SDL_GPUShaderCreateInfo info{};info.code=reinterpret_cast<const Uint8*>(code);info.code_size=sizeof(code);info.entrypoint="main";info.format=SDL_GPU_SHADERFORMAT_SPIRV;info.stage=stage;info.num_uniform_buffers=uniforms;info.num_samplers=samplers;info.num_storage_buffers=storage;
       auto* result=SDL_CreateGPUShader(device,&info);if(!result)throw gpu_error("3D shader creation failed");return result;
     };
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,1,0),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,8),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,8,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
@@ -231,18 +235,30 @@ struct Scene3DRenderer::Storage {
         instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface});
     }
-    std::stable_sort(draws.begin(),draws.end(),[](const Draw& a,const Draw& b){
-      const bool at=a.instance->material.transparent,bt=b.instance->material.transparent;
-      if(at!=bt)return !at;return at?a.transform.camera_depth>b.transform.camera_depth:a.transform.camera_depth<b.transform.camera_depth;
-    });
-    Command command(device);SDL_GPUColorTargetInfo color{};color.texture=target.hdr?target.hdr:target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
-    SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
-    auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
-    for(const auto& draw:draws){
+    // Engine DrawBatcher owns submission ordering/batching: opaque groups by
+    // (material,mesh), transparent stays back-to-front. A material_id interns
+    // everything the binding must share — all eight textures plus the flags
+    // that change sampler/pipeline selection — so equal ids mean one
+    // instanced call can serve the whole run.
+    using MaterialKey=std::tuple<bool,bool,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*>;
+    std::map<MaterialKey,std::uint32_t> material_ids;std::map<const Mesh3D*,std::uint32_t> mesh_ids;
+    engine::DrawBatcher batcher;batcher.begin_frame();
+    for(std::size_t submission=0;submission<draws.size();++submission){
+      const auto& d=draws[submission];
+      const MaterialKey key{d.instance->material.double_sided,d.instance->material.anisotropic_texture,d.image.get(),d.optical.get(),d.environment.get(),d.normal.get(),d.properties.get(),d.cloud.get(),d.shadow.get(),d.next.get()};
+      engine::DrawItem item{};item.material_id=material_ids.try_emplace(key,static_cast<std::uint32_t>(material_ids.size())).first->second;
+      item.mesh_id=mesh_ids.try_emplace(d.mesh->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
+      item.instance_index=static_cast<std::uint32_t>(submission);item.depth=d.transform.camera_depth;item.transparent=d.instance->material.transparent;
+      batcher.submit(item);
+    }
+    batcher.build();const auto& sorted=batcher.sorted_items();
+    std::vector<VertexUniform> vertex_data(sorted.size());std::vector<FragmentUniform> fragment_data(sorted.size());
+    for(std::size_t slot=0;slot<sorted.size();++slot){
+      const auto& draw=draws[sorted[slot].instance_index];
       const auto& material=draw.instance->material;const auto light=material.light_direction.value_or(view.scene->light_direction());
       const auto shadow=material.shadow?prepare_shadow3d(view.scene->camera(),*draw.instance,light):PreparedShadow3D{};
-      const VertexUniform vertex{draw.transform.model_view_projection,draw.transform.model_view,shadow.from_model};
-      FragmentUniform fragment{};fragment.tint={material.tint.r/255.f,material.tint.g/255.f,material.tint.b/255.f,material.tint.a/255.f};
+      VertexUniform& vertex=vertex_data[slot];vertex={draw.transform.model_view_projection,draw.transform.model_view,shadow.from_model};
+      FragmentUniform& fragment=fragment_data[slot];fragment.tint={material.tint.r/255.f,material.tint.g/255.f,material.tint.b/255.f,material.tint.a/255.f};
       fragment.light={light.x,light.y,light.z,0};fragment.parameters={material.ambient,material.diffuse,material.opacity,material.dark_side_strength};
       const auto q=view.scene->camera().orientation;fragment.camera_orientation={q.x,q.y,q.z,q.w};
       fragment.view_options[3]=material.linear_light?1.f:0.f;
@@ -277,13 +293,40 @@ struct Scene3DRenderer::Storage {
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;
         fragment.view_options[2]=d.surface_relief*draw.instance->scale;}
-      SDL_PushGPUVertexUniformData(command.value,0,&vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(command.value,0,&fragment,sizeof(fragment));
-      SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
-      const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
-      SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
-      const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
-      SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
-      SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),1,0,0,0);++stats.draw_calls;
+    }
+    Command command(device);
+    if(!sorted.empty()){
+      const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
+      if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
+        if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);
+        if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);
+        vertex_capacity=std::max<std::size_t>(vertex_data.size(),vertex_capacity*2);fragment_capacity=std::max<std::size_t>(fragment_data.size(),fragment_capacity*2);
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(vertex_capacity*sizeof(VertexUniform));
+        vertex_buffer=SDL_CreateGPUBuffer(device,&info);if(!vertex_buffer)throw gpu_error("3D instance transform buffer creation failed");
+        info.size=static_cast<Uint32>(fragment_capacity*sizeof(FragmentUniform));
+        fragment_buffer=SDL_CreateGPUBuffer(device,&info);if(!fragment_buffer)throw gpu_error("3D instance material buffer creation failed");
+      }
+      Transfer transfer(device,vertex_bytes+fragment_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
+      std::memcpy(memory,vertex_data.data(),vertex_bytes);std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D instance upload copy pass failed");
+      SDL_GPUTransferBufferLocation from{transfer.value,0};SDL_GPUBufferRegion to{vertex_buffer,0,vertex_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
+      from.offset=vertex_bytes;to={fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
+      SDL_EndGPUCopyPass(copy);
+    }
+    SDL_GPUColorTargetInfo color{};color.texture=target.hdr?target.hdr:target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
+    SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+    auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
+    if(!sorted.empty()){
+      SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
+      for(const auto& batch:batcher.batches()){
+        const auto& draw=draws[sorted[batch.first_item].instance_index];const auto& material=draw.instance->material;
+        SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
+        const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
+        SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+        const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
+        SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
+        SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+      }
     }
     SDL_EndGPURenderPass(pass);
     if(target.hdr){
