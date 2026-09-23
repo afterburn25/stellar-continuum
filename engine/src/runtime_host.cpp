@@ -375,8 +375,32 @@ int RuntimeHost::run() {
         const float gscale = impl.gravity != 0.f ? (gs ? gs->value : 1.f)
                                                  : 0.f;
         if (gscale != 0.f) v->dy += impl.gravity * gscale * dt_step;
+        const float prev_right = t->x + ext->w;
         const float prev_bottom = t->y + ext->h;
         t->x += v->dx * dt_step;
+        // Horizontal blocking: a moving gravity-affected entity whose side
+        // crosses a solid's side stops against it (walls).
+        if (gscale != 0.f && v->dx != 0.f) {
+          for (const auto other : impl.entities) {
+            if (other == entity || !world.get<Solid>(other)) continue;
+            const auto *st = world.get<Transform2D>(other);
+            const auto *se = world.get<Extent2D>(other);
+            if (!st || !se) continue;
+            const bool overlap_y =
+                t->y < st->y + se->h && t->y + ext->h > st->y;
+            if (!overlap_y) continue;
+            if (v->dx > 0.f && prev_right <= st->x + 1.f &&
+                t->x + ext->w > st->x) {
+              t->x = st->x - ext->w;
+              v->dx = 0.f;
+            } else if (v->dx < 0.f &&
+                       prev_right - ext->w >= st->x + se->w - 1.f &&
+                       t->x < st->x + se->w) {
+              t->x = st->x + se->w;
+              v->dx = 0.f;
+            }
+          }
+        }
         t->y += v->dy * dt_step;
         // Platform landings: a falling, gravity-affected entity whose
         // bottom crossed a solid's top this step lands on it.
