@@ -119,5 +119,30 @@ int main(int argc,char**argv){try{
  auto badmanifest=o.output/"Content/runtime.stmanifest";corrupt(badmanifest,45);rejects([&]{AssetRegistry r(badmanifest);},"Manifest checksum ignored");
  config["assets"][0]["dependencies"]={"missing"};write(root/"export/cooker-assets.json",config.dump());rejects([&]{cook_asset_repository(o);},"Missing dependency accepted");
  config["assets"][0]["dependencies"]={"assets/visual/moons/test/albedo.png"};write(root/"export/cooker-assets.json",config.dump());rejects([&]{cook_asset_repository(o);},"Dependency cycle accepted");
+ // Generic project scan mode: a content tree with no reviewed export
+ // manifests cooks into a single project-namespaced package.
+ {
+  const auto project=root/"project";
+  write(project/"game.demo/content/readme.txt","hello engine");
+  write(project/"game.demo/package.json","{}");
+  write(project/"game.demo/content/nested/data.json","{\"v\":1}");
+  fs::create_directories(project/"game.demo/content/img");
+  fs::copy_file(root/"source/moon.png",project/"game.demo/content/img/moon.png");
+  AssetCookOptions g;g.scan_content=true;g.package_group="game.demo";g.root=project;
+  g.output=project/"build/cooked";g.cache=project/"build/cache";g.report=project/"build/report.json";g.threads=2;
+  cook_asset_repository(g);
+  const auto gm=g.output/"Content/runtime.stmanifest";
+  require(fs::is_regular_file(gm),"Scan-mode manifest missing");
+  AssetRegistry gr(gm);gr.validate_all();
+  require(gr.records().size()==4,"Scan-mode asset count wrong");
+  const auto*img=gr.find("game.demo/content/img/moon.png");
+  require(img&&img->type=="texture","Scan-mode image not texture-cooked");
+  const auto*doc=gr.find("game.demo/content/readme.txt");
+  require(doc&&!doc->chunks.empty(),"Scan-mode file missing chunks");
+  for(const auto&record:gr.records())
+    require(record.chunks.front().package.starts_with("game.demo-"),"Scan-mode package group not applied");
+  const auto bytes=gr.read(*doc);const std::string text(bytes.begin(),bytes.end());
+  require(text=="hello engine","Scan-mode payload corrupted");
+ }
  std::cout<<"Asset cooker, mip loading, deterministic cache and integrity checks passed\n";return 0;
 }catch(const std::exception&e){unmount_asset_registry();std::cerr<<e.what()<<'\n';return 1;}}

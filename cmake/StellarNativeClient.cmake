@@ -28,6 +28,9 @@ if(WIN32)
   target_sources(stellar-engine PRIVATE "${CMAKE_BINARY_DIR}/generated/engine_version.rc")
 endif()
 target_link_libraries(stellar-engine PRIVATE stellar_native_platform stellar_engine)
+if(WIN32)
+  target_link_libraries(stellar-engine PRIVATE stellar_asset_cooker)
+endif()
 add_custom_command(TARGET stellar-engine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-engine>/SDL3.dll")

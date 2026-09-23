@@ -37,6 +37,21 @@ std::map<std::string,Recipe> discover(const AssetCookOptions&o,Json&excluded){
   const auto it=recipes.find(alias);if(it!=recipes.end()){if(it->second.source!=source||!expected.empty()&&!it->second.expected.empty()&&it->second.expected!=expected)throw std::runtime_error("Conflicting runtime alias: "+alias);return;}
   recipes.emplace(alias,std::move(r));
  };
+ if(o.scan_content){
+  safe_relative(o.package_group);
+  if(o.package_group.find('/')!=o.package_group.npos)throw std::runtime_error("Invalid package group");
+  // Generic project mode: index every regular file under the content root
+  // with a stable alias equal to its relative POSIX path, so a project can
+  // cook its own content tree without reviewed export manifests.
+  for(const auto&entry:std::filesystem::recursive_directory_iterator(o.root)){
+   if(!entry.is_regular_file())continue;
+   const auto alias=asset_path_utf8(std::filesystem::relative(entry.path(),o.root));
+   if(alias.starts_with("build/"))continue;
+   add(alias,alias);
+   if(const auto it=recipes.find(alias);it!=recipes.end())it->second.group=o.package_group;
+  }
+  return recipes;
+ }
  // Import existing reviewed catalogs, preserving their allowlists and SHA pins.
  for(const auto&e:std::filesystem::directory_iterator(o.root/"export")){const auto name=asset_path_utf8(e.path().filename());if(!name.starts_with("native-")||!name.ends_with("-assets.json"))continue;
   const auto j=read_json(e.path());auto visit=[&](auto&&self,const Json&node)->void{

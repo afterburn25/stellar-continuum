@@ -10,6 +10,9 @@
 
 #include "stellar/build_version.hpp"
 
+#if defined(_WIN32)
+#include <stellar/engine/asset_cooker.hpp>
+#endif
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
@@ -30,6 +33,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -120,8 +124,13 @@ struct Shell {
   bool editing_project_name{};
   std::string project_name_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
-      hit_project_close{};
+      hit_project_close{}, hit_project_cook{};
   UiRect project_rows{};
+  // Content cooking runs on the JobSystem; the UI thread reads the state
+  // under the mutex.
+  std::atomic<bool> cooking{};
+  std::mutex cook_mutex;
+  std::string cook_status;
   std::string status{"ready"};
 };
 
@@ -199,8 +208,58 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
 void close_project(Shell &shell) {
   shell.project.reset();
   scan_assets(shell, find_path("assets"));
+  {
+    std::lock_guard lock(shell.cook_mutex);
+    shell.cook_status.clear();
+  }
   shell.status = "project closed - browsing host assets";
 }
+
+#if defined(_WIN32)
+// Cooks the open project's packages directory into build/cooked/ using the
+// generic content scan — the same pipeline Stellar Continuum's assets run
+// through, pointed at the project's own tree.
+void start_cook(Shell &shell, engine::JobSystem &jobs) {
+  if (!shell.project || shell.cooking.exchange(true)) return;
+  engine::AssetCookOptions options;
+  options.root = shell.project->root / "packages";
+  options.output = shell.project->root / "build" / "cooked";
+  options.cache = shell.project->root / "build" / "cache";
+  options.report = shell.project->root / "build" / "cook-report.json";
+  options.scan_content = true;
+  options.package_group = shell.project->id;
+  {
+    std::lock_guard lock(shell.cook_mutex);
+    shell.cook_status = "cooking " + options.root.generic_string();
+  }
+  (void)jobs.submit("project.cook", engine::JobPriority::Normal, {},
+                    [&shell, options] {
+                      std::string message;
+                      try {
+                        engine::cook_asset_repository(options);
+                        std::size_t packages = 0;
+                        std::error_code ec;
+                        const auto dir = options.output / "Content";
+                        for (const auto &entry :
+                             std::filesystem::directory_iterator(dir, ec))
+                          if (entry.path().extension() == ".stpak") ++packages;
+                        message = "cook ok - " + std::to_string(packages) +
+                                  " package(s) in build/cooked";
+                      } catch (const std::exception &error) {
+                        message = std::string("cook failed: ") + error.what();
+                      }
+                      {
+                        std::lock_guard lock(shell.cook_mutex);
+                        shell.cook_status = std::move(message);
+                      }
+                      shell.cooking = false;
+                    });
+}
+#else
+void start_cook(Shell &shell, engine::JobSystem &) {
+  shell.status = "cook unavailable on this platform";
+}
+#endif
 
 void create_project_from_field(Shell &shell) {
   std::string error;
@@ -457,6 +516,11 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
       line(out, x, y, "  error", e, font);
     for (const auto &e : shell.package_errors)
       line(out, x, y, "  scan error", e, font);
+    {
+      std::lock_guard lock(shell.cook_mutex);
+      if (!shell.cook_status.empty())
+        line(out, x, y, "cook", shell.cook_status, font);
+    }
   } else {
     line(out, x, y, "open project", "none - browsing host assets", font);
   }
@@ -483,8 +547,13 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
   if (shell.project) {
     shell.hit_project_close = {bx, y, 96 * s, shell.hit_project_name.height};
     shell_button(out, shell.hit_project_close, "CLOSE", false, font, s);
+    bx += 106 * s;
+    shell.hit_project_cook = {bx, y, 96 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_cook,
+                 shell.cooking ? "COOKING" : "COOK", shell.cooking, font, s);
   } else {
     shell.hit_project_close = {};
+    shell.hit_project_cook = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -650,6 +719,8 @@ int main(int argc, char **argv) {
               open_project(shell, shell.projects[shell.selected_project]);
             else if (shell.hit_project_close.contains(event.position))
               close_project(shell);
+            else if (shell.hit_project_cook.contains(event.position))
+              start_cook(shell, jobs);
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +
