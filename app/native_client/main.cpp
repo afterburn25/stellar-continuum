@@ -8232,8 +8232,13 @@ int main(int argc,char **argv){
     stellar::native_general::NativeGeneralSettings general_settings(general_settings_path);
     general_settings.set_localization(&locale_table);
     window.set_screenshot_directory(general_settings.saved().screenshot_directory);
+    stellar::native_map::NativeUiLayout::set_user_scale(
+      stellar::native_general::interface_scale_multiplier(general_settings.saved().interface_scale));
     general_settings.set_text_measurer([&](const Text& text){return window.measure_text(text);});
-    general_settings.set_apply([&](const auto& value){window.set_screenshot_directory(value.screenshot_directory);});
+    general_settings.set_apply([&](const auto& value){
+      window.set_screenshot_directory(value.screenshot_directory);
+      stellar::native_map::NativeUiLayout::set_user_scale(
+        stellar::native_general::interface_scale_multiplier(value.interface_scale));});
     try{general_settings.set_default_directory(Window::default_screenshot_directory());}
     catch(const std::exception& error){std::cerr<<"Default screenshot folder unavailable: "<<error.what()<<'\n';}
     general_settings.set_browse([&](auto id,const auto& path){return window.request_folder_dialog(id,path);});

@@ -1,4 +1,5 @@
 #include "native_general_settings.hpp"
+#include "native_ui_layout.hpp"
 #include <stellar/engine/localization.hpp>
 
 #include <array>
@@ -86,6 +87,7 @@ void invalid_files_use_default(const TempDirectory& temp) {
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + non_directory + "\"}",
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + nul_path + "\"}",
       R"({"schemaVersion":1,"screenshotDirectory":"","assetCategoriesCollapsed":[false,true,false,true,false],"assetsHidden":false,"nebulaDensity":1,"eruptionQuality":2,"reduceMotion":1})",
+      R"({"schemaVersion":1,"screenshotDirectory":"","interfaceScale":4})",
       std::string(4097, 'x')};
   for (const auto& contents : invalid) {
     write_raw(file, contents);
@@ -464,6 +466,24 @@ int main() {
       require(reloaded.saved().reduce_motion,"Cancel changed reduced motion");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduced motion (decorative animation): On").value.size()>0,"Reduced motion state was not rendered");
+    }
+    {
+      NativeGeneralSettings scale(temp.path/"iscale.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      scale.open();click_button(scale,l.iscale,"interface scale cycle");
+      require(scale.draft().interface_scale==2&&scale.saved().interface_scale==1,"Interface scale click did not stay in draft");
+      click_button(scale,l.save,"save interface scale");
+      NativeGeneralSettings reloaded(temp.path/"iscale.json");
+      require(reloaded.saved().interface_scale==2,"Interface scale preference did not persist");
+      reloaded.open();click_button(reloaded,l.iscale,"interface scale cycle");click_button(reloaded,l.iscale,"interface scale wrap");reloaded.cancel();
+      require(reloaded.saved().interface_scale==2,"Cancel changed interface scale");
+      require(interface_scale_multiplier(0)<1.f&&interface_scale_multiplier(1)==1.f&&interface_scale_multiplier(2)>1.f,"Interface scale multipliers are not ordered");
+      const auto base=NativeUiLayout::for_viewport(1920,1080).scale;
+      NativeUiLayout::set_user_scale(interface_scale_multiplier(2));
+      const auto enlarged=NativeUiLayout::for_viewport(1920,1080).scale;
+      NativeUiLayout::set_user_scale(1.f);
+      require(enlarged>base,"Interface scale preference did not enlarge UI layout");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Interface scale: Large").value.size()>0,"Interface scale state was not rendered");
     }
     {
       // Localization: loaded keys override literals; missing keys fall back.

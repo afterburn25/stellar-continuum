@@ -23,15 +23,28 @@ struct GeneralPreferences final {
   // Accessibility: pauses decorative motion (system tumble, planet spin,
   // eruption animation) without touching simulation or authoritative clocks.
   bool reduce_motion{};
+  // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
+  // Applied as a user multiplier on top of the viewport-derived UI scale.
+  int interface_scale{1};
   bool operator==(const GeneralPreferences&) const = default;
 };
+// Presentation multiplier each interface_scale preset contributes to UI
+// layout scale. Kept inside the engine accessibility clamp (0.75..2.0).
+[[nodiscard]] inline float interface_scale_multiplier(int preset) noexcept {
+  switch(preset) {
+    case 0: return .85f;
+    case 2: return 1.2f;
+    case 3: return 1.45f;
+    default: return 1.f;
+  }
+}
 struct GeneralSettingsLayout final {
   float scale{};
   int font_pixels{}, heading_pixels{};
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
-  stellar::native_map::UiRect motion;
+  stellar::native_map::UiRect motion,iscale;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
