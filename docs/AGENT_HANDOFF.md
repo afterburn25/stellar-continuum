@@ -366,11 +366,17 @@ per-triangle) collision, no rigid-body solver, ground/`bounds` still use
 the world AABB, raycast is O(tris) per entity with no spatial partition,
 editor has no transform gizmos — see the registry record.
 
-**Recommended next workstream: native validation and release reliability.**
-Start from this branch in an isolated checkout; fix the failures recorded in
-the receipt before beginning the 30-item engine expansion. Use a descriptive
-new branch for that work, e.g. `work/native-validation-reliability`, after
-checking whether one already exists. Do not change the default branch or merge
+**Recommended next workstream: the M11 render frontier.**
+The 2026-09-24 validation receipt records 294/294 native tests green on this
+branch — the failures in the 2026-09-20 receipt were resolved through the
+integration merge. Remaining deep work: SDL_GPU instanced rendering (requires
+a texture-array or bindless design before DrawBatcher batches pay off), an
+HDR/tonemap pass (first multi-pass consumer of RenderGraph + ShaderLibrary),
+and TextureStreamer residency wiring. The second frontier is an architecture
+decision: authoritative Core adoption of the economy-catalog/colony/logistics/
+population/strategic-AI frameworks — Core consumption today is read-only
+projection adapters (the safe pattern; replacing bespoke Core systems wholesale
+risks dual simulation authority). Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
 ## Preserve these contracts
