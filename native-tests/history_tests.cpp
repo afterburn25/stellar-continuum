@@ -71,6 +71,46 @@ int main() {
         const auto recent = h.query(q);
         check(recent.size() == 2 && recent.back()->at_day == 30.0,
               "limit returns most recent");
+
+        q = {};
+        q.before_day = 15.0;
+        check(h.query(q).size() == 1 &&
+                  h.query(q).front()->at_day == 10.0,
+              "time ceiling");
+        q.before_day = 10.0;
+        check(h.query(q).size() == 1, "time ceiling is inclusive");
+        q.after_day = 10.0;
+        check(h.query(q).size() == 1,
+              "closed interval keeps only the boundary event");
+    }
+
+    // --- Tag queries -----------------------------------------------------------------
+    {
+        EventHistory h;
+        auto a = ev("war.battle", 10.0, 0.8);
+        a.tags = {"fleet:12", "system:5"};
+        h.record(a);
+        auto b = ev("war.engagement_started", 20.0, 0.6);
+        b.tags = {"fleet:12", "fleet:13", "system:9"};
+        h.record(b);
+        h.record(ev("colony.founded", 30.0, 0.5));
+
+        HistoryQuery q;
+        q.tag = "fleet:12";
+        check(h.query(q).size() == 2, "tag matches any listed tag");
+        q.tag = "fleet:13";
+        check(h.query(q).size() == 1 &&
+                  h.query(q).front()->category == "war.engagement_started",
+              "tag matches a non-first tag");
+        q.tag = "fleet:";
+        check(h.query(q).empty(),
+              "tag is an exact match, not a prefix filter");
+        q.tag = "system:5";
+        check(h.query(q).size() == 1, "tag filters untagged events out");
+        q.category = "war.battle";
+        check(h.query(q).size() == 1 &&
+                  h.query(q).front()->at_day == 10.0,
+              "tag composes with category");
     }
 
     // --- Observer filtering -------------------------------------------------------
