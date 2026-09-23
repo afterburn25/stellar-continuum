@@ -100,6 +100,17 @@ int main(int argc,char **argv)try{
         "Saturated corridor produced no link finding.");
     check(std::any_of(ops.begin(),ops.end(),[&](const auto &r){return r.event_type=="population_unrest"&&r.entity_id==home_second->id;}),
         "Distressed colony produced no emigration-pressure finding.");
+    // The advisor spotlight commits exactly once per civ and names the
+    // highest-severity finding class present (critical logistics at .95
+    // outranks saturation/unrest/shortfall).
+    const auto spotlights=std::count_if(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="advisor_spotlight"&&r.civilization_id==civ_id;});
+    check(spotlights==1,"Advisor did not commit exactly one spotlight.");
+    const auto spotlight=std::find_if(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="advisor_spotlight"&&r.civilization_id==civ_id;});
+    check(spotlight!=ops.end()&&spotlight->subsystem=="advisor"&&
+        std::get<std::string>(spotlight->values.at("sourceEventType"))=="logistics_critical",
+        "Advisor spotlighted the wrong finding class.");
   }
   auto corrupt=world;corrupt.systems.push_back(corrupt.systems.front());
   corrupt.colonies.front().civilization_id=99999;

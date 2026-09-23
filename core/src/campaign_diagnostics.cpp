@@ -13,8 +13,10 @@
 #include <stellar/core/logistics.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_economy.hpp>
+#include <stellar/engine/strategic_ai.hpp>
 #include <cmath>
 #include <cstdio>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace stellar::core {
@@ -335,6 +337,44 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           r.values["overcrowding"]=projected.conditions.overcrowding;
           records.push_back(std::move(r));
         }
+      }
+      // Advisor spotlight: the engine decision machinery picks the civ's
+      // single highest-utility operational finding emitted this pass —
+      // the triage pointer a developer reads first. A fresh mind per
+      // pass keeps the evaluation stateless (hysteresis/cooldowns are
+      // temporal and do not apply to a one-shot ranking); the journal
+      // still records utility and candidate count. The commit emits the
+      // spotlight record — a real effect, not a shadow evaluation.
+      if(records.size()<maximum){
+        static const std::unordered_map<std::string,double> severity_weights{
+            {"logistics_critical",.95},{"treasury_depleted",.95},
+            {"treasury_arrears",.9},{"logistics_link_saturated",.85},
+            {"population_unrest",.8},{"freight_corridor_gap",.75},
+            {"logistics_strained",.7},{"sustenance_shortfall",.65},
+            {"power_shortfall",.6},{"degraded_structures",.4}};
+        StrategicMind mind(8);
+        for(const auto &finding:records){
+          if(finding.civilization_id!=civ.id||finding.subsystem=="advisor")continue;
+          const auto weight=severity_weights.find(finding.event_type);
+          if(weight==severity_weights.end())continue;
+          const std::string action_id=finding.subsystem+"."+finding.event_type+
+              "."+std::to_string(finding.entity_id.value_or(-1));
+          mind.add_action({action_id,"spotlight",
+              [utility=weight->second]{return utility;},
+              [&,finding=finding,utility=weight->second]{
+                if(records.size()>=maximum)return;
+                DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+                r.subsystem="advisor";r.event_type="advisor_spotlight";
+                r.severity=DiagnosticSeverity::Warning;
+                r.entity_id=finding.entity_id;r.civilization_id=civ.id;
+                r.system_id=finding.system_id;
+                r.message="Top priority: "+finding.message;
+                r.values["utility"]=utility;
+                r.values["sourceEventType"]=finding.event_type;
+                records.push_back(std::move(r));
+              }});
+        }
+        (void)mind.decide("spotlight",day,0.0);
       }
     }
   }

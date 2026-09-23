@@ -365,8 +365,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers/tests:** `strategic_ai` tests — argmax, id tie-break,
   hysteresis hold/switch, min-utility gate, cooldowns, domain
   independence, disabled actions, bounded journal, bit-equal
-  determinism, 200-action × 5000-decision scale. Core faction AI
-  adoption pending.
+  determinism, 200-action × 5000-decision scale. **Core consumer:**
+  `inspect_campaign_operations` runs a per-civ advisor spotlight each
+  pass — the pass's own operational findings register as scored
+  candidates (severity-weighted), `decide()` commits the argmax once,
+  and the commit emits an `advisor_spotlight` record naming the top
+  priority. A fresh mind per pass keeps the evaluation stateless —
+  hysteresis/cooldowns are temporal semantics a one-shot ranking does
+  not exercise. Core faction AI adoption still pending the
+  DECISION_LOG graduation criteria.
 - **Save/performance impact:** actions are code (re-register on load);
   persistent state is per-domain incumbent + per-action last-commit
   day. Decide cost is O(actions in domain).
@@ -697,6 +704,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `campaign_logistics_projection` utilization view,
   `population_unrest` for colonies whose projected cohort shows
   ≥10%/year emigration pressure via `campaign_population_projection`,
+  `advisor_spotlight` naming each civ's single top-priority finding
+  (the pass's findings scored through `StrategicMind`'s argmax commit),
   and `treasury_arrears`/`treasury_depleted` from
   the authoritative `assess_treasury` — all previously surfaced only
   in workspace view-models or a player-scoped voice event, never in
