@@ -743,7 +743,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `unknown_technology` for uncatalogued completed or active research,
   `queue_overflow` past `maximum_queued_construction_projects`,
   shipyard `unknown_species` and `orphaned_colony` reservation refs).
-  Every
+  Fleet state is covered end-to-end: transit/settlement/reconnaissance
+  progress, leg range, fuel and cargo capacities, embarked-species
+  catalog refs, destination/settlement body refs, reconnaissance
+  system refs, freight outpost/home-colony refs, and the combat
+  block's shield/armor/hull/cooldown/retreat magnitudes plus
+  `orphaned_target`/`orphaned_defense`/`orphaned_disengagement`
+  order refs. Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network

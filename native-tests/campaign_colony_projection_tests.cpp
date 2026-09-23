@@ -349,6 +349,10 @@ int main() {
     dead_stick.is_active = true;
     dead_stick.current_system_id = 7;
     dead_stick.strategic_speed = 0.0;
+    dead_stick.freight_home_colony_id = 999; // absent colony
+    dead_stick.combat = FleetCombatState{};
+    dead_stick.combat->hull = -5.0;
+    dead_stick.combat->target_fleet_id = 999; // absent fleet
     world.fleets.push_back(dead_stick);
     StellarSystem dup;
     dup.id = 7;
@@ -378,7 +382,8 @@ int main() {
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
-        duplicate = 0, orphans = 0, tech = 0, overflow_n = 0;
+        duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
+        fleet_refs = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_positive_value") ++positive;
@@ -392,9 +397,11 @@ int main() {
                finding.event_type == "orphaned_shipyard") ++orphans;
       else if (finding.event_type == "unknown_technology") ++tech;
       else if (finding.event_type == "queue_overflow") ++overflow_n;
+      else if (finding.event_type == "orphaned_freight" ||
+               finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 3,
-          "stability, condition and arrears each flag invalid values");
+    check(invalid == 4,
+          "stability, condition, arrears and hull flag invalid values");
     check(species == 2 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
     check(positive == 1 && duplicate == 1,
@@ -402,6 +409,8 @@ int main() {
     check(orphans == 4 && tech == 1 && overflow_n == 1,
           "home/research/construction/shipyard orphans, unknown tech "
           "and queue overflow are flagged");
+    check(fleet_refs == 2,
+          "freight and attack orders flag absent colony/fleet refs");
     // The ops pass skips the corrupt entities rather than throwing —
     // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);

@@ -462,7 +462,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   const auto systems=ids(w.systems,&StellarSystem::id,"galaxy");
   const auto bodies=ids(w.bodies,&PlanetaryBody::id,"planet");
   const auto civilizations=ids(w.civilizations,&Civilization::id,"civilization");
-  (void)ids(w.fleets,&FleetState::id,"fleet");
+  const auto fleet_ids=ids(w.fleets,&FleetState::id,"fleet");
   const auto colony_ids=ids(w.colonies,&Colony::id,"colony");
   (void)ids(w.economies,&CivilizationEconomy::civilization_id,"economy");
   (void)ids(w.construction,&ConstructionState::civilization_id,"construction");
@@ -504,6 +504,8 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     positive(c.stored_food_population_days_millions,"Food reserve",c.id,"colony");
     positive(c.stored_water_population_days_millions,"Water reserve",c.id,"colony");
     positive(c.stored_extracted_materials,"Extracted material reserve",c.id,"colony");
+    if(c.remaining_extractable_materials)positive(*c.remaining_extractable_materials,"Remaining extractable materials",c.id,"colony");
+    positive(c.surface_hub_upgrade_days_remaining,"Hub upgrade remaining",c.id,"colony");
     (void)ids(c.surface_buildings,&SurfaceBuilding::id,"construction");
     for(const auto &b:c.surface_buildings){positive(b.industry_progress,"Building progress",b.id,"construction");
       positive(b.condition,"Building condition",b.id,"construction");
@@ -555,6 +557,40 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       emit("fleet","invalid_positive_value",f.id,"Strategic speed is non-finite or non-positive.");
     if(f.is_active&&!f.current_system_id&&f.transit_phase!=FleetTransitPhase::InterstellarWarp)
       emit("fleet","missing_location",f.id,"Active non-warping fleet has no system location.");
+    // Order and cargo state: dangling refs and corrupt magnitudes the
+    // simulation dereferences every tick.
+    positive(f.transit_progress,"Transit progress",f.id,"fleet");
+    positive(f.maximum_leg_range_light_years,"Maximum leg range",f.id,"fleet");
+    positive(f.fuel_capacity_light_years,"Fuel capacity",f.id,"fleet");
+    positive(f.cargo_material_capacity,"Cargo capacity",f.id,"fleet");
+    positive(f.cargo_materials,"Cargo load",f.id,"fleet");
+    positive(f.settlement_days_completed,"Settlement progress",f.id,"fleet");
+    positive(f.reconnaissance_days_completed,"Reconnaissance progress",f.id,"fleet");
+    if(f.destination_planetary_body_id&&!bodies.contains(*f.destination_planetary_body_id))
+      emit("fleet","orphaned_destination_body",f.id,"Fleet destination references an absent body.");
+    if(f.settlement_body_id&&!bodies.contains(*f.settlement_body_id))
+      emit("fleet","orphaned_settlement_body",f.id,"Settlement order references an absent body.");
+    if(f.reconnaissance_system_id&&!systems.contains(*f.reconnaissance_system_id))
+      emit("fleet","orphaned_reconnaissance",f.id,"Reconnaissance order references an absent system.");
+    if(f.freight_target_outpost_id&&!colony_ids.contains(*f.freight_target_outpost_id))
+      emit("fleet","orphaned_freight",f.id,"Freight order references an absent outpost.");
+    if(f.freight_home_colony_id&&!colony_ids.contains(*f.freight_home_colony_id))
+      emit("fleet","orphaned_freight",f.id,"Freight order references an absent home colony.");
+    if(f.embarked_population_species_id&&!known_species.contains(*f.embarked_population_species_id))
+      emit("fleet","unknown_species",f.id,"Fleet embarks an uncatalogued species.");
+    if(f.combat){
+      positive(f.combat->shields,"Shields",f.id,"fleet");
+      positive(f.combat->armor,"Armor",f.id,"fleet");
+      positive(f.combat->hull,"Hull",f.id,"fleet");
+      positive(f.combat->weapon_cooldown_remaining_days,"Weapon cooldown",f.id,"fleet");
+      positive(f.combat->retreat_progress_days,"Retreat progress",f.id,"fleet");
+      if(f.combat->target_fleet_id&&!fleet_ids.contains(*f.combat->target_fleet_id))
+        emit("fleet","orphaned_target",f.id,"Attack order references an absent fleet.");
+      if(f.combat->defend_system_id&&!systems.contains(*f.combat->defend_system_id))
+        emit("fleet","orphaned_defense",f.id,"Defense order references an absent system.");
+      if(f.combat->disengaged_system_id&&!systems.contains(*f.combat->disengaged_system_id))
+        emit("fleet","orphaned_disengagement",f.id,"Disengagement references an absent system.");
+    }
   }
   if(!civilizations.contains(w.player_civilization_id))emit("civilization","missing_player",w.player_civilization_id,"Player empire ID does not exist.");
   return findings;
