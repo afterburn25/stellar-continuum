@@ -1,5 +1,10 @@
 #include <stellar/engine/localization.hpp>
 
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -72,6 +77,72 @@ int main() {
   service.set_locale("en");
   check(service.translate("HELLO") == "Hello", "runtime locale switch");
   check(service.loaded_locales().size() == 2, "loaded locales listed");
+
+#ifdef STELLAR_LOCALE_DIR
+  // Shipped catalogs: every data/locale/<id>.json is a selectable language.
+  // Non-baseline tables must cover every baseline key with the same
+  // placeholders — a deliberately partial locale has to be justified here,
+  // not silently shipped with missing strings.
+  {
+    const std::filesystem::path dir{STELLAR_LOCALE_DIR};
+    LocalizationTable baseline{"en", "en"};
+    check(baseline.load_file((dir / "en.json").string(), &error),
+          "shipped en.json loads");
+    const auto read_text = [](const std::filesystem::path &path) {
+      std::ifstream stream(path, std::ios::binary);
+      return std::string(std::istreambuf_iterator<char>(stream),
+                         std::istreambuf_iterator<char>());
+    };
+    const auto en_doc = nlohmann::json::parse(read_text(dir / "en.json"));
+    const auto &en_strings = en_doc.at("strings");
+    check(en_strings.size() > 1000, "baseline catalog is populated");
+    const auto placeholders = [](const std::string &text) {
+      std::vector<std::string> out;
+      for (std::size_t i = 0; i < text.size(); ++i)
+        if (text[i] == '{') {
+          const auto close = text.find('}', i);
+          if (close != std::string::npos) {
+            out.push_back(text.substr(i, close - i + 1));
+            i = close;
+          }
+        }
+      std::sort(out.begin(), out.end());
+      return out;
+    };
+    for (const auto &entry : std::filesystem::directory_iterator(dir)) {
+      if (!entry.is_regular_file() || entry.path().extension() != ".json")
+        continue;
+      const auto id = entry.path().stem().string();
+      if (id == "en") continue;
+      LocalizationTable table{id, "en"};
+      check(table.load_file(entry.path().string(), &error),
+            (std::string("shipped ") + id + ".json loads: " + error).c_str());
+      check(table.load_file((dir / "en.json").string(), &error),
+            (std::string("baseline loads into ") + id + " fallback").c_str());
+      const auto doc = nlohmann::json::parse(read_text(entry.path()));
+      check(doc.value("locale", std::string{}) == id,
+            (id + " declares its own locale").c_str());
+      const auto &strings = doc.at("strings");
+      for (const auto &item : en_strings.items()) {
+        const auto &key = item.key();
+        check(strings.contains(key) && strings.at(key).is_string(),
+              (id + " covers " + key).c_str());
+        if (!strings.contains(key)) continue;
+        check(placeholders(item.value().get<std::string>()) ==
+                  placeholders(strings.at(key).get<std::string>()),
+              (id + " placeholders match for " + key).c_str());
+        check(std::string(table.translate(key)) != key,
+              (id + " translates " + key).c_str());
+      }
+    }
+    // Spot-check the shipped German surface.
+    LocalizationTable german_ui{"de", "en"};
+    check(german_ui.load_file((dir / "de.json").string(), &error),
+          "de.json present");
+    check(german_ui.translate("MENU_SAVE") == "SPEICHERN",
+          "German menu string translated");
+  }
+#endif
 
   if (failures == 0)
     std::cout << "Localization tests passed\n";

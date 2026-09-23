@@ -557,6 +557,22 @@ int main() {
       require(find_text_label(draw,"SAVE").value=="SAVE","Missing key did not fall back to the literal");
       require(find_text_label(draw,"SCREENSHOT FOLDER").value=="SCREENSHOT FOLDER","Unlisted label did not fall back to the literal");
     }
+    {
+      // Language: the preference persists and cycles the discovered list.
+      NativeGeneralSettings language(temp.path/"language.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      language.set_locales({"en","de"});
+      language.open();click_button(language,l.language,"language cycle to German");
+      require(language.draft().locale=="de"&&language.saved().locale=="en","Language click did not stay in draft");
+      DrawList german_draw;language.render(german_draw,1280,720);
+      require(find_text_label(german_draw,"Language: Deutsch").value=="Language: Deutsch","Language state was not rendered");
+      click_button(language,l.save,"save language");
+      NativeGeneralSettings reloaded(temp.path/"language.json");
+      require(reloaded.saved().locale=="de","Language preference did not persist");
+      reloaded.set_locales({"en","de"});
+      reloaded.open();click_button(reloaded,l.language,"language wrap");
+      require(reloaded.draft().locale=="en","Language cycle did not wrap to English");
+      reloaded.cancel();
+    }
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);
     picker_save_cancel_and_default_flow(temp);

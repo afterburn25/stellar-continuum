@@ -438,9 +438,13 @@ material_id), `RenderGraph` schedules the scene→tonemap pass chain per
 frame, and `TextureStreamer` owns texture residency under a runtime-tunable
 byte budget (`Window::set_scene3d_texture_budget`) with pinned-fallback
 pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`,
-`streamed_evicted_bytes`, `Window::set_scene3d_texture_budget`). Remaining
-render limitations: no indirect draw, no per-mip partial residency (LOD
-clamping), bounded CPU submission. A 315-test ctest run records 315/315
+`streamed_evicted_bytes`, `Window::set_scene3d_texture_budget`), per-mip
+partial residency (denied requests degrade to the coarsest fitting mip
+tail; RGBA tails CPU-box-downsample the base, cooked/BC1 upload level
+ranges), and screen-footprint LOD demand (desired mip from projected
+bounding-sphere footprint; `anisotropic_texture` materials keep full
+chains). Remaining render limitations: no indirect draw, bounded CPU
+submission. A 315-test ctest run records 315/315
 green after the M11 chain, the editor trait-override annotation layer
 (AUTO/YES/NO overrides for anomaly/rare-resource/pre-warp flags on systems
 and bodies, round-tripping through the project codec), and the

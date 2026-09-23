@@ -8228,14 +8228,33 @@ int main(int argc,char **argv){
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
     // English is the built-in baseline; a shipped Data/locale/<locale>.json
-    // table overrides panel text through the engine localization service.
+    // table overrides panel text through the engine localization service and
+    // falls back to English for any key it does not cover.
+    const auto load_locale=[&](stellar::engine::LocalizationTable& table,const std::string& id){
+      if(auto stream=stellar::engine::resource_stream(asset_root/"Data/locale"/(id+".json"))){
+        std::ostringstream contents;contents<<stream.rdbuf();
+        std::string error;
+        if(!table.load_json(contents.str(),&error))std::cerr<<"Locale catalog '"<<id<<"' rejected: "<<error<<'\n';
+      }
+    };
+    std::vector<std::string> locale_ids{"en"};
+    try {
+      for(const auto& entry:std::filesystem::directory_iterator(asset_root/"Data/locale"))
+        if(entry.is_regular_file()&&entry.path().extension()==".json"){
+          const auto id=entry.path().stem().string();
+          if(id!="en"&&std::find(locale_ids.begin(),locale_ids.end(),id)==locale_ids.end())locale_ids.push_back(id);
+        }
+      std::sort(locale_ids.begin()+1,locale_ids.end());
+    } catch(const std::exception& error){std::cerr<<"Locale discovery failed: "<<error.what()<<'\n';}
     stellar::engine::LocalizationTable locale_table{"en","en"};
-    if(auto stream=stellar::engine::resource_stream(asset_root/"Data/locale/en.json")){
-      std::ostringstream contents;contents<<stream.rdbuf();
-      std::string error;
-      if(!locale_table.load_json(contents.str(),&error))std::cerr<<"Locale catalog rejected: "<<error<<'\n';
-    }
+    load_locale(locale_table,"en");
     stellar::native_general::NativeGeneralSettings general_settings(general_settings_path);
+    if(const auto& wanted=general_settings.saved().locale;
+       wanted!="en"&&std::find(locale_ids.begin(),locale_ids.end(),wanted)!=locale_ids.end()){
+      locale_table=stellar::engine::LocalizationTable{wanted,"en"};
+      load_locale(locale_table,wanted);load_locale(locale_table,"en");
+    }
+    general_settings.set_locales(locale_ids);
     general_settings.set_localization(&locale_table);
     window.set_screenshot_directory(general_settings.saved().screenshot_directory);
     stellar::native_map::NativeUiLayout::set_user_scale(
@@ -8244,7 +8263,11 @@ int main(int argc,char **argv){
     general_settings.set_apply([&](const auto& value){
       window.set_screenshot_directory(value.screenshot_directory);
       stellar::native_map::NativeUiLayout::set_user_scale(
-        stellar::native_general::interface_scale_multiplier(value.interface_scale));});
+        stellar::native_general::interface_scale_multiplier(value.interface_scale));
+      if(value.locale!=locale_table.locale()){
+        locale_table=stellar::engine::LocalizationTable{value.locale,"en"};
+        load_locale(locale_table,value.locale);load_locale(locale_table,"en");
+      }});
     try{general_settings.set_default_directory(Window::default_screenshot_directory());}
     catch(const std::exception& error){std::cerr<<"Default screenshot folder unavailable: "<<error.what()<<'\n';}
     general_settings.set_browse([&](auto id,const auto& path){return window.request_folder_dialog(id,path);});

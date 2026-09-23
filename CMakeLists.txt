@@ -454,11 +454,20 @@ if(NOT STELLAR_RESEARCH_RUNTIME_FILES STREQUAL STELLAR_RESEARCH_CANONICAL_FILES)
   message(FATAL_ERROR "Adaptive Research runtime-data declaration differs from canonical JSON inventory")
 endif()
 
+# Shipped locale catalogs: every data/locale/<id>.json is a selectable UI
+# language (client discovery enumerates the directory), so the whole set is
+# staged rather than naming each file.
+file(GLOB STELLAR_LOCALE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/locale/*.json")
+set(STELLAR_LOCALE_COPY_COMMANDS "")
+foreach(locale_file IN LISTS STELLAR_LOCALE_FILES)
+  get_filename_component(locale_name "${locale_file}" NAME)
+  list(APPEND STELLAR_LOCALE_COPY_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy_if_different "${locale_file}" "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale/${locale_name}")
+endforeach()
 add_custom_target(stellar_runtime_data ALL
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy/hyg-nearby-500-v1.json"
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/locale/en.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale/en.json"
+  ${STELLAR_LOCALE_COPY_COMMANDS}
   ${STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS}
   COMMENT "Synchronizing runtime stellar catalog" VERBATIM)
 add_dependencies(stellar-continuum stellar_runtime_data)
@@ -751,6 +760,7 @@ if(BUILD_TESTING)
   add_test(NAME route_policy COMMAND stellar_route_policy_tests)
   add_executable(stellar_localization_tests native-tests/localization_tests.cpp)
   target_link_libraries(stellar_localization_tests PRIVATE stellar_engine)
+  target_compile_definitions(stellar_localization_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
   add_test(NAME localization COMMAND stellar_localization_tests)
   add_executable(stellar_package_platform_tests native-tests/package_platform_tests.cpp)
   target_link_libraries(stellar_package_platform_tests PRIVATE stellar_engine)

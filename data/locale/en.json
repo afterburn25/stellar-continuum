@@ -527,6 +527,7 @@
     "SETTINGS_VOICE_HINT": "Changes preview immediately. Save keeps them; Cancel restores the saved settings.",
     "SETTINGS_STATE_ON": "On",
     "SETTINGS_STATE_OFF": "Off",
+    "SETTINGS_LANGUAGE": "Language: {0}",
     "SETTINGS_QUALITY_LOW": "Low",
     "SETTINGS_QUALITY_MEDIUM": "Medium",
     "SETTINGS_QUALITY_HIGH": "High",

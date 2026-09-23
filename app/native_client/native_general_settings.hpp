@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace stellar::native_general {
 // Application preference only. Empty means the platform Pictures default.
@@ -33,6 +34,9 @@ struct GeneralPreferences final {
   // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
   // Applied as a user multiplier on top of the viewport-derived UI scale.
   int interface_scale{1};
+  // Presentation: active UI locale id (a Data/locale/<id>.json table shipped
+  // with the install). "en" is the baseline; other tables fall back to it.
+  std::string locale{"en"};
   bool operator==(const GeneralPreferences&) const = default;
 };
 // Presentation multiplier each interface_scale preset contributes to UI
@@ -51,7 +55,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
-  stellar::native_map::UiRect motion,iscale,flashing,contrast,colorblind;
+  stellar::native_map::UiRect motion,iscale,flashing,contrast,colorblind,language;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
@@ -72,6 +76,9 @@ class NativeGeneralSettings final {
   void set_default_directory(std::filesystem::path value) { default_directory_=std::move(value); }
   void set_text_measurer(Measure measure) { measure_=std::move(measure); }
   void set_navigation(Navigate audio,Navigate video) { audio_=std::move(audio);video_=std::move(video); }
+  // Ordered locale ids discovered under Data/locale (e.g. {"en","de"}). The
+  // language button cycles this list; empty keeps the saved value.
+  void set_locales(std::vector<std::string> locales){locales_=std::move(locales);}
   // Borrowed; the owner must outlive this view. Null keeps literal English.
   void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
@@ -95,6 +102,7 @@ class NativeGeneralSettings final {
   Apply apply_;
   Navigate audio_,video_;
   Measure measure_;
+  std::vector<std::string> locales_;
   const stellar::engine::LocalizationTable* locale_{};
   mutable std::string cached_path_source_,cached_path_lines_;
   mutable float cached_path_width_{};
