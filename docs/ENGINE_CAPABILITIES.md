@@ -84,7 +84,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   one tick, RUN auto-advances with the frame delta, WAKE exercises the
   event-wakeup path, TIER live-promotes/demotes the selected task; the
   panel shows tick, last-step report (eligible/ran/deferred/wakes/
-  wall), tier counts and per-domain statistics.
+  wall), tier counts and per-domain statistics. The COLONY tab is a
+  working settlement designer over `engine::Colony` — a spec catalog
+  (2 district types, 6 structures) builds against a real `Inventory`
+  stockpile, districts/structures are inspected and toggled/demolished,
+  and ADV 1D/30D reports jobs, housing, completions, outputs, upkeep/
+  input shortfalls and utility balance.
 - **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase
   domains execute through the executor, empty campaigns advance safely,
   and scheduler state survives coordinator moves; the 28-case
