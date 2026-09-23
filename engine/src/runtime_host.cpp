@@ -61,7 +61,10 @@ struct RuntimeHost::Impl {
   // Scene-declared bounds (SceneDocument::world_w/h); argv options win.
   float scene_world_w = 0.f, scene_world_h = 0.f;
   // Entities resting on the floor or a solid — jump requires groundedness.
+  // prev_grounded is last step's set: landing events fire once per
+  // touchdown, not every resting step (gravity keeps dy>0 while settled).
   std::set<std::uint64_t> grounded;
+  std::set<std::uint64_t> prev_grounded;
   // Accumulated simulation seconds — drives sprite-strip animation so
   // playback is deterministic under --fixed-hz.
   double sim_time = 0.0;
@@ -465,6 +468,8 @@ int RuntimeHost::run() {
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
+    impl.grounded.clear();
+    impl.prev_grounded.clear();
     engine::resolve_hierarchy(world);
     impl.tilemap_es = engine::tilemap_entities(world);
     impl.tileset_imgs.clear();
@@ -589,6 +594,8 @@ int RuntimeHost::run() {
     }
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
+    impl.grounded.clear();
+    impl.prev_grounded.clear();
     impl.sprites.assign(impl.entities.size(), {});
     for (std::size_t i = 0; i < impl.entities.size(); ++i) {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
@@ -808,6 +815,7 @@ int RuntimeHost::run() {
       dt_step *= static_cast<float>(impl.time_scale);
       impl.sim_time += dt_step;
       if (on_update) on_update(world, dt_step);
+      impl.prev_grounded = std::move(impl.grounded);
       impl.grounded.clear();
       // One map's cell test — per-map geometry means each layer needs
       // its own grid lookup (not the any-layer solid_cell).
@@ -967,12 +975,15 @@ int RuntimeHost::run() {
                 t->y + ext->h >= st->y) {
               t->y = st->y - ext->h;
               v->dy = 0.f;
+              if (on_land && !impl.prev_grounded.count(entity.value()))
+                on_land(entity, other);
             }
           }
           // Tilemap landing: the bottom edge's cells catch a fall —
           // each colliding layer lands on its own row geometry.
-          for (const auto *land_tm : impl.tilemaps()) {
-            if (!land_tm->collide || land_tm->tile_w <= 0 ||
+          for (std::size_t mi = 0; mi < impl.tilemap_es.size(); ++mi) {
+            const auto *land_tm = world.get<Tilemap>(impl.tilemap_es[mi]);
+            if (!land_tm || !land_tm->collide || land_tm->tile_w <= 0 ||
                 land_tm->tile_h <= 0)
               continue;
             const auto &tm = *land_tm;
@@ -986,6 +997,15 @@ int RuntimeHost::run() {
                 t->y = tm.y + row * static_cast<float>(tm.tile_h) -
                        ext->h;
                 v->dy = 0.f;
+                if (on_tile_land &&
+                    !impl.prev_grounded.count(entity.value())) {
+                  const int cx = static_cast<int>(
+                      std::floor((px - tm.x) / tm.tile_w));
+                  const auto ci =
+                      static_cast<std::size_t>(row * tm.columns + cx);
+                  on_tile_land(entity, mi, cx, row,
+                               ci < tm.cells.size() ? tm.cells[ci] : -1);
+                }
                 break;
               }
             }

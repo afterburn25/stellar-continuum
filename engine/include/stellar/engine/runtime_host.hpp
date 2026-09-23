@@ -243,6 +243,16 @@ public:
   // Fires when an overlapping pair separates or one member is destroyed —
   // the ids may already be stale. Runs inside the sim step.
   std::function<void(EntityId a, EntityId b)> on_collision_exit;
+  // Fires when a falling entity lands on a solid/oneway entity — footsteps,
+  // landing damage. Contact events don't cover this (resting is adjacent,
+  // not overlapping). Runs inside the sim step.
+  std::function<void(EntityId entity, EntityId ground)> on_land;
+  // Fires when a falling entity lands on a colliding tilemap cell —
+  // map/cx/cy/tile identify the exact cell (terrain damage, per-tile
+  // sounds). Runs inside the sim step.
+  std::function<void(EntityId entity, std::size_t map, int cx, int cy,
+                     int tile)>
+      on_tile_land;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
