@@ -67,10 +67,8 @@ class CampaignFrame final {
   issue_tactical_order(MassiveCombatOrder order);
   [[nodiscard]] MassiveCombatSnapshot tactical_snapshot();
   [[nodiscard]] CampaignFrameResult advance(double real_delta_seconds);
-  // The campaign chronicle: every completed strategic substep's emitted
-  // events recorded through campaign_event_history. Session-scoped —
-  // capture_state()/restore_state() exist on EventHistory but save
-  // schema integration is not yet wired.
+  // The campaign chronicle: every completed advance's emitted events,
+  // owned by the runtime and serialized with the save payload.
   [[nodiscard]] engine::EventHistory &history() noexcept;
   [[nodiscard]] const engine::EventHistory &history() const noexcept;
 

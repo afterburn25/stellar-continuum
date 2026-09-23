@@ -1,5 +1,7 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 
+#include <stellar/core/campaign_event_history.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -70,6 +72,7 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   GalaxySimulationStepCoordinator core;
   AdaptiveResearchCampaignSimulation research_simulation;
   StellarActivityScheduler stellar_activity;
+  stellar::engine::EventHistory history{100000};
   bool profiling_enabled{};
   std::array<stellar::engine::PerformanceCounter,4> performance{};
 
@@ -204,6 +207,12 @@ std::span<const FleetPowerObservation>
 IntegratedAdaptiveCampaignRuntime::combat_intelligence() const noexcept {
   return storage_->world.campaign().combat_intelligence;
 }
+stellar::engine::EventHistory &IntegratedAdaptiveCampaignRuntime::history() noexcept {
+  return storage_->history;
+}
+const stellar::engine::EventHistory &IntegratedAdaptiveCampaignRuntime::history() const noexcept {
+  return storage_->history;
+}
 IntegratedAdaptiveCampaignStepResult
 IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
                                             double absolute_end_day,
@@ -252,6 +261,7 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
+  record_step_events(storage_->history, result, absolute_end_day);
   return result;
 }
 

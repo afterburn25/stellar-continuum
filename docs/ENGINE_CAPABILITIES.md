@@ -81,8 +81,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   stable category vocabulary (construction.project, shipbuilding.ship,
   research.legacy/adaptive, exploration.\*, war.\*, colony.founded),
   involved-civilization visibility, entity ids as tags, at_day = step
-  end day. `CampaignFrame` owns an `EventHistory` (`frame().history()`)
-  and records every completed strategic substep automatically.
+  end day. `IntegratedAdaptiveCampaignRuntime` owns an `EventHistory`
+  and records every completed advance automatically — all callers
+  (CampaignFrame, tests, tools) get the chronicle for free; exposed as
+  `runtime().history()` / `frame().history()`. The chronicle serializes
+  into the v17 save payload (`"EventHistory"`, PascalCase, strict
+  ordered decode, absent = empty in older saves) for both player and
+  developer saves.
 - **Consumers/tests:** `history` tests — id assignment/lookup,
   every filter axis, observer privacy (public vs allow-listed),
   news feed, capacity bound, significance-aware pruning, bit-equal
@@ -90,16 +95,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   rejection. `campaign_event_history` tests — category mapping for
   every step event type, actor/visibility/tags/at_day, feed privacy.
   `framework_state_codec` covers the JSON codec.
-- **Save/performance impact:** plain deque + counter, serializes in
-  id order; queries are O(n) scans with sorted output. Recording is
-  O(1) append per emitted event — zero cost when a step emits none.
-- **Limitations:** session-scoped — the `CampaignFrame` chronicle is
-  not yet serialized into campaign saves (State + codec exist; save
-  schema wiring pending). Opaque summary strings (no structured
-  localization binding). Involved-party visibility only — widening to
-  observers that know the location is knowledge-layer work. Aggregate
-  phase counters (sensor-contact recordings, diplomacy maintenance)
-  are not discrete events and are not recorded.
+- **Save/performance impact:** `EventHistory` field on the v17 payload
+  (optional — absent in pre-chronicle saves); strict ordered decode
+  with 1M-event bound and id-ordering validation on restore. Recording
+  is O(1) append per emitted event — zero cost when a step emits none;
+  queries are O(n) scans with sorted output.
+- **Limitations:** opaque summary strings (no structured localization
+  binding). Involved-party visibility only — widening to observers
+  that know the location is knowledge-layer work. Aggregate phase
+  counters (sensor-contact recordings, diplomacy maintenance) are not
+  discrete events and are not recorded. History capacity is fixed at
+  100k records (oldest evicted).
 
 ## Combined simulation scale benchmark (2026-09-23)
 
@@ -383,7 +389,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   dump→parse→restore→re-capture equality plus version/enum negative
   cases) and `stellar_simulation_scale_tests` benchmarks registered as
   ctest `simulation_scale_250/500/1000/2500/5000` — serial and parallel
-  checksums verified identical. Core/game phases are not yet consumers.
+  checksums verified identical. **Core consumer:** the 12
+  `GalaxySimulationStepCoordinator` phases (economy → economy_storage)
+  run as Active-tier executor tasks dependency-chained in the historical
+  order; `campaign_coordinator_parity` (28 step + 8 combat cases)
+  verifies identical behavior. Phase tier demotion is now a data change,
+  not a restructure.
 - **Save/performance impact:** tasks are code — re-registered on load,
   never serialized; cadence bookkeeping is derivable. 5000-task
   registration ≈ 320 KB task-state in the benchmark model; serial
@@ -391,7 +402,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Limitations:** ordering-only dependencies (no cross-tick dataflow);
   wall budget checked between tasks/waves (a single oversized task is
   never preempted); parallel waves wait fully between levels; cadence is
-  owner policy, not adaptive; no game consumer yet.
+  owner policy, not adaptive. The coordinator runs serial at Active
+  tier — parallel waves and tier demotion of Core phases are future
+  tuning, not yet enabled.
 - **Future reuse:** the executor is the intended host for economy,
   population, colony, logistics and civilization-AI cadences in
   milestones 2–9 of the space-strategy specialization.

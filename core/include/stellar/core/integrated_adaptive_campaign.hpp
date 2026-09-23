@@ -5,6 +5,7 @@
 #include <stellar/core/campaign_coordinator.hpp>
 #include <stellar/core/diplomacy_runtime.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <memory>
 #include <optional>
@@ -99,6 +100,12 @@ public:
   [[nodiscard]] IntegratedAdaptiveCampaignStepResult
   advance(double elapsed_days, double absolute_end_day,
           IntegratedAdaptiveCampaignAdvanceTrace *trace = nullptr);
+
+  // The campaign chronicle: every completed advance's emitted events
+  // recorded through campaign_event_history. Serialized as part of the
+  // player/developer save payload.
+  [[nodiscard]] stellar::engine::EventHistory &history() noexcept;
+  [[nodiscard]] const stellar::engine::EventHistory &history() const noexcept;
 
 private:
   struct Storage;

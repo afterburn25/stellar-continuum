@@ -161,12 +161,20 @@ State structs (including `EventHistory`), covered by
 framework state without hand-written field lists. First Core adoption
 landed: `core/campaign_event_history` maps authoritative
 `IntegratedAdaptiveCampaignStepResult` events onto `HistoryEvent`
-records and `CampaignFrame` owns an `EventHistory` recording every
-completed strategic substep (`frame().history()`); session-scoped —
-save-schema wiring pending. Next: further Core/game
-adoption — per-entity executor cadence inside heavy phases, framework
-consumers (population/colony/flow/logistics/AI/warfare) against real
-campaign state, and the history save-schema hookup.
+records; `IntegratedAdaptiveCampaignRuntime` owns an `EventHistory`
+recording every completed advance (`runtime().history()` /
+`frame().history()`), serialized into the v17 save payload as
+`"EventHistory"` for player and developer saves (absent = empty in
+older saves; strict ordered decode).
+`GalaxySimulationStepCoordinator` now runs
+its 12 strategic phases (economy → economy_storage) as Active-tier
+`SimulationExecutor` tasks dependency-chained to the historical order —
+same behavior (`campaign_coordinator_parity` green), but per-phase
+cadence demotion, budgets and wakeups are now configuration instead of
+restructuring. Next: further Core/game
+adoption — per-entity executor cadence inside heavy phases and
+framework consumers (population/colony/flow/logistics/AI/warfare)
+against real campaign state.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

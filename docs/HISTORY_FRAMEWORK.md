@@ -66,16 +66,23 @@ order and binary lookup depend on them. JSON codec in
 - `at_day` = the step's absolute end day
 - visibility = involved civilizations only (fog-of-war safe)
 
-`CampaignFrame` owns an `EventHistory` (`frame().history()`) and
-records every completed strategic substep — the campaign chronicle is
-populated automatically by real advances. Aggregate phase counters
-(sensor-contact recordings, diplomacy maintenance) are not discrete
-happenings and are not recorded.
+`IntegratedAdaptiveCampaignRuntime` owns an `EventHistory` and records
+every completed advance — the chronicle is populated automatically for
+all callers (`runtime().history()` / `frame().history()`). Aggregate
+phase counters (sensor-contact recordings, diplomacy maintenance) are
+not discrete happenings and are not recorded.
+
+## Save integration
+
+The chronicle is authoritative state: it serializes into the v17
+player/developer save payload as `"EventHistory"` (PascalCase fields,
+strict ordered decode, 1M-event bound). Saves written before the
+chronicle existed load with an empty history; corrupt states (non-
+ascending ids, `next_id` collisions, unsupported version) are rejected
+with `PlayerCampaignPersistenceDataError`.
 
 ## Remaining limitations
 
-- Session-scoped: `CampaignFrame`'s history is not yet serialized into
-  campaign saves — State + codec exist; save schema wiring pending.
 - `summary` is an opaque string — localization-key + argument binding
   (structured event text) is a future adapter to LocalizationService.
 - No spatial/body indexing beyond a single `location` id; rich

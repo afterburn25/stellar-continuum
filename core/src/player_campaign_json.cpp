@@ -12,6 +12,8 @@
 #include "player_campaign_json_diplomacy.hpp"
 #include "player_campaign_json_research.hpp"
 
+#include <stellar/engine/history.hpp>
+
 #include <nlohmann/json.hpp>
 
 #include <array>
@@ -29,6 +31,9 @@ namespace {
 using OrderedValue = json_detail::Value;
 using OrderedObject = OrderedValue::Object;
 using Json = nlohmann::ordered_json;
+
+Json encode_event_history(const engine::EventHistory::State &);
+engine::EventHistory::State decode_event_history(const OrderedValue &);
 
 class RestoreProgressCallbackFailure final : public std::exception {
 public:
@@ -936,10 +941,17 @@ static RestoredPlayerCampaignV17 restore_player_campaign_v17_ordered(
          "Format v17 save references unsupported galaxy format " +
              std::to_string(galaxy_format) + ".");
 
+  std::optional<engine::EventHistory::State> event_history;
+  if (const auto *history_member = member(*root, "EventHistory");
+      history_member &&
+      !std::holds_alternative<std::nullptr_t>(history_member->data))
+    event_history = decode_event_history(*history_member);
+
   GalaxyPayloadV16Dto galaxy_payload;
   try {
-    constexpr std::array<std::string_view, 3> excluded{
-        "Diplomacy", "AdaptiveResearch", "GalaxyFormatVersion"};
+    constexpr std::array<std::string_view, 4> excluded{
+        "Diplomacy", "AdaptiveResearch", "GalaxyFormatVersion",
+        "EventHistory"};
     galaxy_payload = detail::decode_galaxy_payload_v16_ordered(
         root_value, {galaxy_format, excluded});
   } catch (const GalaxyPayloadJsonError &error) {
@@ -997,7 +1009,7 @@ static RestoredPlayerCampaignV17 restore_player_campaign_v17_ordered(
                  "Format v17 save is missing Adaptive Research state.");
           return decode_research(*research_member);
         },
-        diplomacy, restore_hooks);
+        diplomacy, std::move(event_history), restore_hooks);
   } catch (const PlayerCampaignJsonError &) {
     throw;
   } catch (const PlayerCampaignPersistenceDataError &error) {
@@ -1066,8 +1078,12 @@ Json encode_player_campaign_tail(const PlayerCampaignPayloadV17Dto& payload){
     } else {
       tail["AdaptiveResearch"] = nullptr;
     }
+    tail["EventHistory"] = payload.event_history
+                               ? encode_event_history(*payload.event_history)
+                               : Json(nullptr);
     json_detail::validate_encoded_text(tail["Diplomacy"]);
     json_detail::validate_encoded_text(tail["AdaptiveResearch"]);
+    json_detail::validate_encoded_text(tail["EventHistory"]);
     return tail;
 }
 Json encode_player_campaign_document(const PlayerCampaignPayloadV17Dto &payload) {
@@ -1165,6 +1181,60 @@ CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &valu
   m.policy={integer_field(d,"ReviewInterval"),integer_field(d,"ContactStaleAfter"),integer_field(d,"ProposalLifetime")};
   return result;
 }
+Json encode_event_history(const engine::EventHistory::State &state){
+  Json events=Json::array();
+  for(const auto &e:state.events){
+    Json actors=Json::array();
+    for(const auto id:e.actors)actors.push_back(id);
+    Json visible=Json::array();
+    for(const auto id:e.visible_to)visible.push_back(id);
+    Json tags=Json::array();
+    for(const auto &tag:e.tags)tags.push_back(tag);
+    events.push_back({{"Id",e.id},{"AtDay",e.at_day},{"Category",e.category},
+      {"Summary",e.summary},{"Actors",std::move(actors)},{"Location",e.location},
+      {"Significance",e.significance},{"VisibleTo",std::move(visible)},
+      {"Tags",std::move(tags)}});
+  }
+  return {{"Version",state.version},{"NextId",state.next_id},{"Events",std::move(events)}};
+}
+engine::EventHistory::State decode_event_history(const OrderedValue &value){
+  const auto &root=typed_object(value,"$.EventHistory");
+  const auto field=[](const OrderedObject &o,const char *name)->const OrderedValue&{
+    if(const auto *v=member(o,name))return *v;
+    throw PlayerCampaignPersistenceDataError(std::string("Incomplete event history: ")+name);
+  };
+  engine::EventHistory::State result;
+  result.version=static_cast<std::uint32_t>(typed_integer<std::int64_t>(field(root,"Version"),"$.EventHistory.Version"));
+  if(result.version!=1)throw PlayerCampaignPersistenceDataError("Unsupported event history version.");
+  result.next_id=static_cast<std::uint64_t>(typed_integer<std::int64_t>(field(root,"NextId"),"$.EventHistory.NextId"));
+  const auto &events=typed_array(field(root,"Events"),"$.EventHistory.Events");
+  if(events.size()>1000000)throw PlayerCampaignPersistenceDataError("Too many history events.");
+  for(const auto &entry:events){
+    const auto &o=typed_object(entry,"$.EventHistory.Events");
+    engine::HistoryEvent e;
+    e.id=static_cast<std::uint64_t>(typed_integer<std::int64_t>(field(o,"Id"),"$.EventHistory.Events.Id"));
+    e.at_day=typed_double(field(o,"AtDay"),"$.EventHistory.Events.AtDay");
+    e.category=typed_string(field(o,"Category"),"$.EventHistory.Events.Category");
+    e.summary=typed_string(field(o,"Summary"),"$.EventHistory.Events.Summary");
+    e.location=static_cast<std::uint64_t>(typed_integer<std::int64_t>(field(o,"Location"),"$.EventHistory.Events.Location"));
+    e.significance=typed_double(field(o,"Significance"),"$.EventHistory.Events.Significance");
+    for(const auto &a:typed_array(field(o,"Actors"),"$.EventHistory.Events.Actors"))
+      e.actors.push_back(static_cast<std::uint64_t>(typed_integer<std::int64_t>(a,"$.EventHistory.Events.Actors")));
+    if(const auto *v=member(o,"VisibleTo"))
+      for(const auto &a:typed_array(*v,"$.EventHistory.Events.VisibleTo"))
+        e.visible_to.push_back(static_cast<std::uint64_t>(typed_integer<std::int64_t>(a,"$.EventHistory.Events.VisibleTo")));
+    if(const auto *t=member(o,"Tags"))
+      for(const auto &tag:typed_array(*t,"$.EventHistory.Events.Tags"))
+        e.tags.push_back(typed_string(tag,"$.EventHistory.Events.Tags"));
+    result.events.push_back(std::move(e));
+  }
+  engine::EventHistory probe;
+  try{probe.restore_state(result);}
+  catch(const std::invalid_argument &error){
+    throw PlayerCampaignPersistenceDataError(std::string("Invalid event history: ")+error.what());
+  }
+  return result;
+}
 }
 
 DeveloperCampaignPayload capture_developer_campaign(
@@ -1181,6 +1251,7 @@ DeveloperCampaignPayload capture_developer_campaign(
   common.galaxy=capture_galaxy_payload_v16(world,{options.simulation_days,options.game_version,options.saved_at_utc,true});
   common.diplomacy=diplomacy;
   common.adaptive_research=AdaptiveResearchCampaignSnapshotCodec(campaign.research_runtime()).capture(campaign.research());
+  common.event_history=campaign.history().capture_state();
   auto continuation=campaign.continuation();
   validate_developer_coverage(world);
   validate_campaign_runtime_continuation(continuation,world,options.simulation_days);
