@@ -428,7 +428,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers/tests:** `logistics` tests — route validation, transit
   timing, capacity queueing, disabled-route hold/resume, cancellation
   bounds, delivery ordering, bit-equal determinism, 20k-shipment scale.
-  Core lane/freight planner adoption pending.
+  **Core consumer:** `campaign_logistics_projection` — the authoritative
+  `HomeSystemLogisticsNetwork` (links, daily-flow allocations) restores
+  into a `LogisticsNetwork` snapshot where route capacity/in-flight are
+  committed tonnage (`per_day × transit_days`), so
+  `route_utilization()` reports per-corridor saturation; campaign
+  diagnostics emits `logistics_link_saturated` findings for links at
+  ≥99.9% committed capacity — per-link bottleneck detail the
+  colony-level snapshots cannot express. `campaign_logistics_projection`
+  tests cover utilization math, over-commit (>1.0), disabled and
+  zero-capacity links, the in-transit manifest, and post-projection
+  `advance` delivery ordering. Direct authority adoption still pending
+  the DECISION_LOG graduation criteria.
 - **Save/performance impact:** routes/queue/transit are plain
   caller-id data; `now()` plus the manifests serialize directly.
   Per-advance cost is O(queue + transit).
@@ -667,7 +678,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   invariants) and `freight_corridor_gap` when a civilization's
   external colonies import support no represented corridor carries
   (skipped for homebound civs — coverage is only meaningful with
-  external systems), and `treasury_arrears`/`treasury_depleted` from
+  external systems), `logistics_link_saturated` for home-system
+  corridors at ≥99.9% committed capacity via the
+  `campaign_logistics_projection` utilization view, and
+  `treasury_arrears`/`treasury_depleted` from
   the authoritative `assess_treasury` — all previously surfaced only
   in workspace view-models or a player-scoped voice event, never in
   developer diagnostics. Corrupt classifier inputs (non-finite/negative

@@ -3,6 +3,7 @@
 #include <stellar/core/campaign_colony_projection.hpp>
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
+#include <stellar/core/campaign_logistics_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_reach.hpp>
@@ -263,6 +264,37 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           r.message=message;
           r.values["unrepresentedSupportPerDay"]=coverage.unrepresented_interstellar_support_per_day;
           r.values["externalSystemCount"]=static_cast<double>(coverage.external_system_count);
+          records.push_back(std::move(r));
+        }
+      }
+      // Corridor saturation: the projected freight network reports
+      // per-link utilization — a link holding its full committed
+      // tonnage is the binding constraint on home-system support, a
+      // signal the colony-level snapshots cannot express. The network
+      // is projected from the same authoritative home_system_logistics
+      // the workspace consumes; nothing is re-derived here.
+      if(records.size()<maximum){
+        const auto home=home_system_logistics(econ,world.colonies,world.economies,civ.id);
+        const auto projected=project_home_logistics_network(home);
+        for(const auto& [route_id,utilization]:projected.route_utilization()){
+          if(records.size()>=maximum)break;
+          if(utilization<0.999)continue;
+          const auto* route=projected.route(route_id);
+          if(!route)continue;
+          DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";
+          r.event_type="logistics_link_saturated";r.severity=DiagnosticSeverity::Warning;
+          r.entity_id=static_cast<int>(route_id);r.civilization_id=civ.id;r.system_id=civ.home_system_id;
+          char message[192];
+          std::snprintf(message,sizeof(message),
+                        "Freight corridor %llu->%llu saturated: %.0f%% of committed capacity in flight.",
+                        static_cast<unsigned long long>(route->path.front()),
+                        static_cast<unsigned long long>(route->path.back()),
+                        utilization*100.0);
+          r.message=message;
+          r.values["linkId"]=static_cast<double>(route_id);
+          r.values["fromNode"]=static_cast<double>(route->path.front());
+          r.values["toNode"]=static_cast<double>(route->path.back());
+          r.values["utilization"]=utilization;
           records.push_back(std::move(r));
         }
       }
