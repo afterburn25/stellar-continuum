@@ -233,13 +233,14 @@ struct Editor {
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
-      hit_view{}, hit_project_name{};
+      hit_view{}, hit_project_name{}, hit_bkmk_filter{};
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path projects_dir, project_path;
   // Project open picker: *.json files under projects_dir, modal overlay.
   std::vector<std::filesystem::path> project_files;
   engine::VirtualizedList picker_list;
   bool picker_open{};
+  bool bookmark_only{}; // systems list filters to bookmarked targets
   UiRect picker_rect{}, picker_rows{};
   float pointer_x{}, pointer_y{};
 
@@ -269,6 +270,20 @@ bool matches(const Editor &ed, const core::StellarSystem &sys) {
     return text;
   };
   const auto needle = lower(ed.search);
+  if (ed.bookmark_only) {
+    // Bookmarked systems match; so do systems containing a bookmarked body.
+    const auto it = ed.edits.find(sys.id);
+    bool bookmarked = it != ed.edits.end() && it->second.bookmarked;
+    if (!bookmarked)
+      if (const auto bodies = ed.bodies_by_system.find(sys.id);
+          bodies != ed.bodies_by_system.end())
+        for (const auto body_index : bodies->second)
+          if (const auto bit =
+                  ed.body_edits.find(ed.bodies[body_index].id);
+              bit != ed.body_edits.end() && bit->second.bookmarked)
+            bookmarked = true;
+    if (!bookmarked) return false;
+  }
   if (lower(sys.name).find(needle) != std::string::npos ||
       lower(display_name(ed, sys)).find(needle) != std::string::npos)
     return true;
@@ -715,9 +730,13 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
                           TextAlign::Left, FontFace::Heading});
   y += (font + 12) * s;
 
-  ed.hit_search = {x, y, r.width - 28 * s, (font + 12) * s};
+  ed.hit_search = {x, y, r.width - 62 * s, (font + 12) * s};
   field_box(out, ed.hit_search, ed.search, ed.editing == Field::Search,
             "search systems...", font);
+  ed.hit_bkmk_filter = {x + ed.hit_search.width + 4 * s, y,
+                        r.width - 28 * s - ed.hit_search.width - 4 * s,
+                        ed.hit_search.height};
+  small_button(out, ed.hit_bkmk_filter, "*", ed.bookmark_only, font);
   y += ed.hit_search.height + 8 * s;
 
   const UiRect list{x, y, r.width - 28 * s, r.y + r.height - y - 10 * s};
@@ -1326,6 +1345,25 @@ int main(int argc, char **argv) {
               ed.system_days = 0;
               continue;
             }
+            // Up/down cycle through the system's bodies for quick inspection.
+            if ((event.key == key_up || event.key == key_down) &&
+                ed.selected < ed.systems.size()) {
+              const auto &sys = ed.systems[ed.selected];
+              if (const auto it = ed.bodies_by_system.find(sys.id);
+                  it != ed.bodies_by_system.end() && !it->second.empty()) {
+                const auto &list = it->second;
+                std::size_t pos = list.size();
+                for (std::size_t i = 0; i < list.size(); ++i)
+                  if (list[i] == ed.selected_body) pos = i;
+                pos = event.key == key_down
+                          ? (pos >= list.size() ? 0 : (pos + 1) % list.size())
+                          : (pos == 0 || pos >= list.size() ? list.size() - 1
+                                                           : pos - 1);
+                ed.selected_body = list[pos];
+                rebuild_detail_rows(ed);
+              }
+              continue;
+            }
           } else if ((event.key == key_up || event.key == key_down) &&
                      !ed.filtered.empty()) {
             std::size_t pos = ed.filtered.size();
@@ -1388,6 +1426,7 @@ int main(int argc, char **argv) {
               map[target->first].bookmarked =
                   !map[target->first].bookmarked;
               rebuild_detail_rows(ed); // row bookmark markers refresh
+              rebuild_filter(ed); // bookmarked-only view membership changes
             }
           } else if (ed.hit_undo.contains(event.position)) {
             apply_undo(ed);
@@ -1415,6 +1454,9 @@ int main(int argc, char **argv) {
             ed.editing = Field::ProjectName;
             ed.edit_buffer = ed.project_name;
             window.set_text_input(true);
+          } else if (ed.hit_bkmk_filter.contains(event.position)) {
+            ed.bookmark_only = !ed.bookmark_only;
+            rebuild_filter(ed);
           } else if (ed.hit_search.contains(event.position)) {
             ed.editing = Field::Search;
             ed.edit_buffer = ed.search;
@@ -1683,7 +1725,8 @@ int main(int argc, char **argv) {
                ed.status +
                    (ed.view == WorkspaceView::System
                         ? "  |  drag pan, wheel zoom, click body, "
-                              "left/right +/-1d, pgup/pgdn +/-30d, home reset, esc galaxy"
+                              "up/down cycle bodies, left/right +/-1d, "
+                              "pgup/pgdn +/-30d, home reset, esc galaxy"
                         : "  |  drag to pan, wheel to zoom, click to select, "
                               "up/down moves selection"),
                muted, static_cast<int>(12 * s), 0, ed.viewport});
