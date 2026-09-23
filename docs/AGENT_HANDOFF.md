@@ -414,7 +414,12 @@ population-habitability bridge tests). Three save/diagnostics failures seen
 in an interim run were stale test expectations, repaired at `23ba3577`: the
 legacy composed-encoding oracle and frozen fixtures predated the v17
 "EventHistory" tail (`afee13f2`), and the diagnostic monitor test assumed a
-finding-free seeded world. Remaining deep work: SDL_GPU instanced rendering (requires
+finding-free seeded world. A later desktop run at `3ea2710a` records
+314/314 tests green after the GalaxyMap framework (engine star-chart model,
+Core projection, GALAXY shell debugger, deterministic lane-graph routing,
+framework codec) and the replay-provenance chain merged — including the
+`stellar_engine PUBLIC stellar_json` fix for the public `replay.hpp`
+nlohmann include. Remaining deep work: SDL_GPU instanced rendering (requires
 a texture-array or bindless design before DrawBatcher batches pay off), an
 HDR/tonemap pass (first multi-pass consumer of RenderGraph + ShaderLibrary),
 and TextureStreamer residency wiring. The second frontier is an architecture
