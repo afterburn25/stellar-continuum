@@ -119,8 +119,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   negligible vs. phase work.
 - **Limitations:** phases remain sequential (dependencies form one
   chain — no intra-step parallelism yet); the Simulation tool scenario
-  is fixed/synthetic, not a save-loaded game; no per-phase wall-time
-  split in the coordinator diagnostics path yet.
+  is fixed/synthetic, not a save-loaded game.
 
 ## Event history framework (2026-09-23)
 
