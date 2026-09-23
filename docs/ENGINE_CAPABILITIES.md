@@ -62,6 +62,32 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Planetary habitability + terraforming (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestones 7–8 — adapter
+  surface for authoritative Core planet state: physical environment
+  description, species-relative habitability queries, staged
+  terraforming projects. See
+  [TERRAFORMING_FRAMEWORK.md](TERRAFORMING_FRAMEWORK.md).
+- **Engine APIs/ownership:** `PlanetEnvironment` (temperature,
+  atmosphere, gravity, water fraction, sorted environment tags);
+  `HabitabilityProfile` (hard ranges + `tolerance` soft margins, water
+  floor, required/forbidden tags); `evaluate_habitability` pure
+  function → suitability/habitable/unmet reasons. `Terraforming` per
+  planet owns the adapted environment; `TerraformProject` stages apply
+  linear deltas over durations and discrete tag changes at completion;
+  cancel preserves applied deltas; multi-stage completion per step.
+- **Consumers/tests:** `planetary` tests — range scoring, soft margins,
+  tag gates, water floor, determinism. `terraforming` tests — staged
+  progression, interpolation, tag mutation, habitability improvement,
+  cancel persistence, step-size invariance, determinism. Core planet
+  adapters pending.
+- **Save/performance impact:** plain data everywhere; per-advance cost
+  is O(stages completed), evaluation O(tags + params).
+- **Limitations:** linear deltas only — no feedback loops, atmosphere
+  composition, or cost/upkeep inside the framework; one active project
+  per planet; tags are unvalidated free-form strings.
+
 ## Strategic logistics framework (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 6 — freight

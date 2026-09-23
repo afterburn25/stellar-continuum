@@ -127,9 +127,13 @@ ascending-id greedy transport and unmet/saturation diagnostics — see
 landed: `LogisticsNetwork` (logistics.hpp) — waypoint nodes, explicit
 multi-leg `FreightRoute`s with transit days and in-flight capacity,
 deterministic dispatch queue and (eta,id) deliveries — see
-[LOGISTICS_FRAMEWORK.md](LOGISTICS_FRAMEWORK.md). Next: Milestone 7
-(planetary development adapters), then terraforming/civ-AI; adopt the
-executor for real Core/game phases when consuming these.
+[LOGISTICS_FRAMEWORK.md](LOGISTICS_FRAMEWORK.md). Milestones 7–8
+landed: `PlanetEnvironment` + `evaluate_habitability` (planetary.hpp)
+adapter surface for Core planet state, and `Terraforming`
+(terraforming.hpp) staged environment mutation — see
+[TERRAFORMING_FRAMEWORK.md](TERRAFORMING_FRAMEWORK.md). Next: Milestone
+9 (civilization AI), then fleet-scale architecture; adopt the executor
+for real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
