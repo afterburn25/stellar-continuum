@@ -79,13 +79,7 @@ struct RuntimeHost::Impl {
       if (const auto *tm = world.get<Tilemap>(e)) out.push_back(tm);
     return out;
   }
-  // The first tilemap — the primary grid for tile_at/set_tile_at.
-  Tilemap *tilemap() {
-    return tilemap_es.empty() ? nullptr : world.get<Tilemap>(tilemap_es[0]);
-  }
-  const Tilemap *tilemap() const {
-    return tilemap_es.empty() ? nullptr : world.get<Tilemap>(tilemap_es[0]);
-  }
+
   // Deterministic particle system stepped inside simulate() and rendered
   // as tinted rects. The host tracks every spawned instance so it can
   // re-anchor attachments, stop emitters whose entity died, and render.
@@ -129,8 +123,16 @@ std::optional<EntityId> RuntimeHost::tilemap_entity() const {
 std::vector<EntityId> RuntimeHost::tilemap_entities() const {
   return impl_->tilemap_es;
 }
+std::size_t RuntimeHost::tilemap_count() const {
+  return impl_->tilemap_es.size();
+}
 int RuntimeHost::tile_at(float world_x, float world_y) const {
-  const auto *tm = impl_->tilemap();
+  return tile_at(0, world_x, world_y);
+}
+int RuntimeHost::tile_at(std::size_t map, float world_x,
+                         float world_y) const {
+  if (map >= impl_->tilemap_es.size()) return -1;
+  const auto *tm = impl_->world.get<Tilemap>(impl_->tilemap_es[map]);
   if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
     return -1;
   const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));
@@ -140,7 +142,12 @@ int RuntimeHost::tile_at(float world_x, float world_y) const {
   return idx < tm->cells.size() ? tm->cells[idx] : -1;
 }
 bool RuntimeHost::set_tile_at(float world_x, float world_y, int value) {
-  auto *tm = impl_->tilemap();
+  return set_tile_at(0, world_x, world_y, value);
+}
+bool RuntimeHost::set_tile_at(std::size_t map, float world_x,
+                              float world_y, int value) {
+  if (map >= impl_->tilemap_es.size()) return false;
+  auto *tm = impl_->world.get<Tilemap>(impl_->tilemap_es[map]);
   if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
     return false;
   const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));

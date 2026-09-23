@@ -114,12 +114,18 @@ public:
   // Every tilemap carrier, in document order — layered grids (background
   // decoration, collision ground, foreground overlay) each get one.
   [[nodiscard]] std::vector<EntityId> tilemap_entities() const;
-  // World-space cell queries on the FIRST tilemap: tile value under a
-  // point (-1 = empty or no tilemap), and write the cell under a point
-  // (false out of bounds). Layered games access the rest through
-  // tilemap_entities()/world().
+  // World-space cell queries: tile value under a point (-1 = empty or no
+  // tilemap), and write the cell under a point (false out of bounds).
+  // The no-index overloads address the FIRST tilemap; the indexed forms
+  // take a document-order map index into tilemap_entities().
   [[nodiscard]] int tile_at(float world_x, float world_y) const;
   bool set_tile_at(float world_x, float world_y, int value);
+  [[nodiscard]] int tile_at(std::size_t map, float world_x,
+                            float world_y) const;
+  bool set_tile_at(std::size_t map, float world_x, float world_y,
+                   int value);
+  // Number of tilemap layers in the loaded scene.
+  [[nodiscard]] std::size_t tilemap_count() const;
   // The deterministic particle system — games define() emitters then
   // spawn_emitter() to run them; the host steps it in sim time and
   // renders particles as tinted rects above the scene.
