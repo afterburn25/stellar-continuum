@@ -55,6 +55,10 @@ struct RuntimeHostOptions {
   // When non-empty, the world snapshot is written here on exit — combine
   // with --fixed-hz/--frames to compare runs byte-for-byte.
   std::filesystem::path snapshot_out;
+  // 'player' entity tuning: held-key velocity and the gravity-mode jump
+  // impulse, both in world units/second.
+  float player_move_speed{320.f};
+  float player_jump_impulse{520.f};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
@@ -131,7 +135,8 @@ public:
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
   // `--scene <path>` / `--width` / `--height` / `--fullscreen` /
-  // `--world-w` / `--world-h` overrides.
+  // `--world-w` / `--world-h` / `--speed` / `--move-speed` / `--jump`
+  // overrides.
   int run();
   int run(int argc, char **argv);
 

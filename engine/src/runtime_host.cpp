@@ -311,7 +311,7 @@ int RuntimeHost::run() {
             (event.key == 'w' || event.key == 0x40000052)) {
           auto *v = world.get<Velocity2D>(*impl.player);
           if (v && impl.grounded.count(impl.player->value()))
-            v->dy = -520.f;
+            v->dy = -options.player_jump_impulse;
         }
       }
       if (event.type == InputEventType::KeyReleased)
@@ -348,13 +348,13 @@ int RuntimeHost::run() {
         };
         const float dx = (held('d') || held(0x4000004f) ? 1.f : 0.f) -
                          (held('a') || held(0x40000050) ? 1.f : 0.f);
-        v->dx = dx * 320.f;
+        v->dx = dx * options.player_move_speed;
         // With scene gravity active the player is a platformer: dy is
         // owned by gravity/jump, not held-key velocity.
         if (impl.gravity == 0.f) {
           const float dy = (held('s') || held(0x40000051) ? 1.f : 0.f) -
                            (held('w') || held(0x40000052) ? 1.f : 0.f);
-          v->dy = dy * 320.f;
+          v->dy = dy * options.player_move_speed;
         }
       }
     }
@@ -697,6 +697,12 @@ int RuntimeHost::run(int argc, char **argv) {
           static_cast<float>(std::atof(argv[++i]));
     else if (arg == "--world-h")
       impl_->options.world_height =
+          static_cast<float>(std::atof(argv[++i]));
+    else if (arg == "--move-speed")
+      impl_->options.player_move_speed =
+          static_cast<float>(std::atof(argv[++i]));
+    else if (arg == "--jump")
+      impl_->options.player_jump_impulse =
           static_cast<float>(std::atof(argv[++i]));
   }
   return run();
