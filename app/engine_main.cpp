@@ -82,6 +82,26 @@ std::string ms(double value) {
   return buffer;
 }
 
+// Last non-empty line of a (possibly still-being-written) log file, bounded
+// to the tail 4 KiB — used to stream subprocess progress into the status.
+std::string last_log_line(const std::filesystem::path &path) {
+  std::ifstream in(path, std::ios::binary | std::ios::ate);
+  if (!in) return {};
+  const auto size = in.tellg();
+  if (size <= 0) return {};
+  const auto span = std::min<std::streamoff>(size, 4096);
+  in.seekg(size - span);
+  std::string buffer(static_cast<std::size_t>(span), '\0');
+  in.read(buffer.data(), span);
+  const auto end = buffer.find_last_not_of("\r\n \t");
+  if (end == std::string::npos) return {};
+  buffer.erase(end + 1);
+  const auto start = buffer.find_last_of("\r\n");
+  if (start != std::string::npos) buffer.erase(0, start + 1);
+  if (buffer.size() > 90) buffer = "..." + buffer.substr(buffer.size() - 87);
+  return buffer;
+}
+
 std::string human_bytes(std::uintmax_t bytes) {
   if (bytes >= 1024ull * 1024ull)
     return std::to_string(bytes / 1048576ull) + " MiB";
@@ -814,8 +834,15 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
                     std::to_string(shell.cook_total.load());
         line(out, x, y, "cook", status, font);
       }
-      if (!shell.build_status.empty())
-        line(out, x, y, "build", shell.build_status, font);
+      if (!shell.build_status.empty()) {
+        std::string status = shell.build_status;
+        if (shell.building) {
+          const auto tail = last_log_line(shell.project->root / "build" /
+                                          "host" / "build.log");
+          if (!tail.empty()) status += "  | " + tail;
+        }
+        line(out, x, y, "build", status, font);
+      }
       if (!shell.package_status.empty())
         line(out, x, y, "package", shell.package_status, font);
     }
