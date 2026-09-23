@@ -42,6 +42,31 @@ int main(int argc,char **argv)try{
   const auto settled=inspect_campaign_operations(stalled,24,6);
   check(std::none_of(settled.begin(),settled.end(),[](const auto &r){return r.event_type=="return_route_unavailable";}),"Inactive historical ship reported as currently stranded.");
   check(rejects([&]{(void)inspect_campaign_operations(world,0,0,0);}),"Invalid operational finding bound accepted.");
+  {
+    // Ordered-but-unreachable: the destination no longer assesses as
+    // reachable with the fleet's actual fuel/range — surfaced through
+    // the same authoritative reach calculator the order path uses.
+    auto stranded=world;
+    FleetState deep;deep.id=918;deep.civilization_id=world.player_civilization_id;
+    deep.current_system_id=world.systems.front().id;
+    deep.destination_system_id=world.systems.back().id;
+    deep.role=FleetRole::Military;deep.is_active=true;
+    deep.fuel_remaining_light_years=1;deep.maximum_leg_range_light_years=1;
+    deep.fuel_capacity_light_years=1;
+    stranded.fleets.push_back(deep);
+    const auto ops=inspect_campaign_operations(stranded,0,0);
+    const auto unreachable=std::find_if(ops.begin(),ops.end(),[](const auto &r){return r.event_type=="route_unreachable";});
+    check(unreachable!=ops.end()&&unreachable->entity_id==918,
+        "Unreachable ordered destination was not reported.");
+    // A fleet whose destination simply does not exist is reported too.
+    auto orphaned=world;
+    FleetState ghost=deep;ghost.id=919;ghost.destination_system_id=999999;
+    orphaned.fleets.push_back(ghost);
+    const auto ops2=inspect_campaign_operations(orphaned,0,0);
+    const auto gone=std::find_if(ops2.begin(),ops2.end(),[](const auto &r){return r.event_type=="route_unreachable";});
+    check(gone!=ops2.end()&&gone->entity_id==919,
+        "Nonexistent ordered destination was not reported.");
+  }
   auto corrupt=world;corrupt.systems.push_back(corrupt.systems.front());
   corrupt.colonies.front().civilization_id=99999;
   corrupt.economies.front().credits=std::numeric_limits<double>::quiet_NaN();

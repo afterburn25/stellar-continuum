@@ -2,6 +2,8 @@
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
+#include <stellar/core/fleet_reach.hpp>
+#include <stellar/core/lane_network.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <cmath>
 #include <cstdio>
@@ -86,6 +88,49 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         r.values["strategicSpeed"]=report.speed;
         records.push_back(std::move(r));
       }
+    }
+  }
+  // Ordered but unreachable: a fleet with an assigned destination whose
+  // route no longer assesses as reachable (fuel service lost, lane
+  // broken, destination gone). Reassessed with the same authoritative
+  // reach calculator orders use — flagged only when the assessment is
+  // authoritative, not provisional.
+  if(records.size()<maximum){
+    InterstellarLaneNetwork lanes(world.systems);
+    std::unordered_map<int,OperationalReachBatch> batches;
+    const auto kind_for=[](FleetRole role){
+      switch(role){
+      case FleetRole::Military:return InterstellarMissionKind::MilitaryDeployment;
+      case FleetRole::Colony:return InterstellarMissionKind::Colony;
+      case FleetRole::Logistics:return InterstellarMissionKind::Logistics;
+      case FleetRole::Science:return InterstellarMissionKind::ScienceSurvey;
+      case FleetRole::Scout:default:return InterstellarMissionKind::ScoutReconnaissance;
+      }
+    };
+    for(const auto &fleet:world.fleets){
+      if(records.size()>=maximum)break;
+      if(!fleet.is_active||!fleet.destination_system_id)continue;
+      if(!world.systems.empty()&&
+         std::none_of(world.systems.begin(),world.systems.end(),
+                      [&](const StellarSystem &s){return s.id==*fleet.destination_system_id;})){
+        DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
+        r.event_type="route_unreachable";r.severity=DiagnosticSeverity::Warning;
+        r.entity_id=fleet.id;r.civilization_id=fleet.civilization_id;r.system_id=fleet.current_system_id;
+        r.message="Ordered destination no longer exists.";
+        r.values["destinationSystemId"]=static_cast<std::int64_t>(*fleet.destination_system_id);
+        records.push_back(std::move(r));continue;
+      }
+      auto [it,_]=batches.try_emplace(fleet.civilization_id,
+          OperationalReachWorldView{world.systems,world.colonies,lanes},fleet.civilization_id);
+      const auto reach=it->second.assess(fleet,*fleet.destination_system_id,kind_for(fleet.role));
+      if(!reach.is_authoritative||reach.is_supported)continue;
+      DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
+      r.event_type="route_unreachable";r.severity=DiagnosticSeverity::Warning;
+      r.entity_id=fleet.id;r.civilization_id=fleet.civilization_id;r.system_id=fleet.current_system_id;
+      r.message=reach.reason;
+      r.values["destinationSystemId"]=static_cast<std::int64_t>(*fleet.destination_system_id);
+      r.values["routeDistanceLightYears"]=reach.route_distance_light_years;
+      records.push_back(std::move(r));
     }
   }
   return records;
