@@ -32,7 +32,6 @@ using OrderedValue = json_detail::Value;
 using OrderedObject = OrderedValue::Object;
 using Json = nlohmann::ordered_json;
 
-Json encode_event_history(const engine::EventHistory::State &);
 engine::EventHistory::State decode_event_history(const OrderedValue &);
 
 class RestoreProgressCallbackFailure final : public std::exception {
@@ -1079,7 +1078,8 @@ Json encode_player_campaign_tail(const PlayerCampaignPayloadV17Dto& payload){
       tail["AdaptiveResearch"] = nullptr;
     }
     tail["EventHistory"] = payload.event_history
-                               ? encode_event_history(*payload.event_history)
+                               ? player_json_detail::encode_event_history(
+                                     *payload.event_history)
                                : Json(nullptr);
     json_detail::validate_encoded_text(tail["Diplomacy"]);
     json_detail::validate_encoded_text(tail["AdaptiveResearch"]);
@@ -1180,22 +1180,6 @@ CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &valu
   m.next_review_tick=integer_field(d,"NextReview");m.last_review_tick=integer_field(d,"LastReview");
   m.policy={integer_field(d,"ReviewInterval"),integer_field(d,"ContactStaleAfter"),integer_field(d,"ProposalLifetime")};
   return result;
-}
-Json encode_event_history(const engine::EventHistory::State &state){
-  Json events=Json::array();
-  for(const auto &e:state.events){
-    Json actors=Json::array();
-    for(const auto id:e.actors)actors.push_back(id);
-    Json visible=Json::array();
-    for(const auto id:e.visible_to)visible.push_back(id);
-    Json tags=Json::array();
-    for(const auto &tag:e.tags)tags.push_back(tag);
-    events.push_back({{"Id",e.id},{"AtDay",e.at_day},{"Category",e.category},
-      {"Summary",e.summary},{"Actors",std::move(actors)},{"Location",e.location},
-      {"Significance",e.significance},{"VisibleTo",std::move(visible)},
-      {"Tags",std::move(tags)}});
-  }
-  return {{"Version",state.version},{"NextId",state.next_id},{"Events",std::move(events)}};
 }
 engine::EventHistory::State decode_event_history(const OrderedValue &value){
   const auto &root=typed_object(value,"$.EventHistory");

@@ -24,8 +24,14 @@ int main(int argc,char **argv)try{
   const auto before=capture_developer_campaign_json(frame.runtime(),{0,"test",stamp});
   CampaignDiagnosticMonitor monitor;
   monitor.observe(frame,{},stamp);
-  check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Native monitor did not initialize with current-state inspection.");
-  monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Paused rendering spammed diagnostics.");
+  // Seeded campaigns can carry genuine operational findings (e.g.
+  // sustenance shortfalls); init is proven by the check counter and the
+  // monitor-start record, not by an empty finding list.
+  check(monitor.invariant_checks()==1&&!monitor.history().records().empty()&&
+        monitor.history().records().front().record.event_type=="native_monitor_started",
+        "Native monitor did not initialize with current-state inspection.");
+  const auto initialized_records=monitor.history().records().size();
+  monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==initialized_records,"Paused rendering spammed diagnostics.");
   const auto memory_id=stellar::engine::MemoryTracker::instance().register_subsystem("test-subsystem");
   stellar::engine::MemoryTracker::instance().report(memory_id,1234,4096);
   const auto entries=capture_developer_report(frame,{"test","engine-test","commit-test",hash},stamp,&monitor.history());
@@ -35,7 +41,7 @@ int main(int argc,char **argv)try{
   const auto files=diagnostic_zip_test::unzip(archive);
   check(files.at("latest.dev17.json")==before&&!files.contains("campaign.player17.json"),"Checkpoint altered or mislabeled.");
   const auto metadata=Json::parse(files.at("session.json"));
-  check(!files.at("native-events.jsonl").empty()&&metadata["nativeHistory"]["retainedRecords"]==1,"Historical native records omitted.");
+  check(!files.at("native-events.jsonl").empty()&&metadata["nativeHistory"]["retainedRecords"]==initialized_records,"Historical native records omitted.");
   check(metadata["seed"]==-42&&metadata["forcedCelestialCoverage"]==true&&metadata["executableSha256"]==hash,"Wrong provenance in report.");
   check(!Json::parse(files.at("replay.json"))["fullCommandReplayAvailable"].get<bool>(),"Report promised unsupported command replay.");
   const auto restored=restore_developer_campaign_json(load_adaptive_research_strategic_runtime(argv[2]),files.at("latest.dev17.json"));
