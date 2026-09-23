@@ -70,7 +70,10 @@ Core/engine projections, never re-derived in UI.
 - Engine persistence + JSON codecs for every specialization framework;
   `PhysicsWorld` capture/restore; `MissionRuntime` serialize/restore
 - Replay divergence localization — per-JSON-section checkpoint hashes
-  name the diverging subsystem (`save:World.Fleets`)
+  name the diverging subsystem (`save:World.Fleets`); on divergence the
+  actual canonical document dumps to `replay-divergence-<tick>.json`;
+  recorded checkpoints a replay never produced are flagged as skipped
+  saves; `--replay` warns on seed/game_version provenance mismatch
 - `route_unreachable`/`power_brownout`/`sustenance_shortfall`/
   `foreign_armed_presence` operational diagnostics over authoritative
   reach/economy/warfare projections
