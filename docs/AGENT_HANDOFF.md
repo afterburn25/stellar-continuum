@@ -156,12 +156,17 @@ ResourceNetwork inventories/producers/transfers) —
 negative cases throw on missing definitions. `framework_state_json.hpp`
 adds the byte-level layer: templated `to_json`/`from_json` codecs
 (nlohmann-compatible, `galaxy_phenomena_json.hpp` convention) for all
-State structs, covered by `framework_state_codec` tests — campaign save
-codecs can now embed framework state without hand-written field lists.
-Next: Core/game
-adoption of these frameworks — the engine layer exists; wiring real
-phases through the executor and recording real events is the
-remaining specialization work.
+State structs (including `EventHistory`), covered by
+`framework_state_codec` tests — campaign save codecs can now embed
+framework state without hand-written field lists. First Core adoption
+landed: `core/campaign_event_history` maps authoritative
+`IntegratedAdaptiveCampaignStepResult` events onto `HistoryEvent`
+records and `CampaignFrame` owns an `EventHistory` recording every
+completed strategic substep (`frame().history()`); session-scoped —
+save-schema wiring pending. Next: further Core/game
+adoption — per-entity executor cadence inside heavy phases, framework
+consumers (population/colony/flow/logistics/AI/warfare) against real
+campaign state, and the history save-schema hookup.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

@@ -215,6 +215,33 @@ void test_economy_codec() {
   check_codec(restored.capture_state(), "restored economy codec");
 }
 
+void test_history_codec() {
+  EventHistory h;
+  HistoryEvent a;
+  a.category = "colony.founded";
+  a.at_day = 10.0;
+  a.significance = 0.8;
+  a.actors = {7};
+  a.location = 11;
+  a.tags = {"colony:101"};
+  h.record(a);
+  HistoryEvent b;
+  b.category = "espionage.op";
+  b.at_day = 11.0;
+  b.significance = 0.9;
+  b.visible_to = {7};
+  h.record(b);
+
+  check_codec(h.capture_state(), "history state codec");
+
+  EventHistory restored;
+  restored.restore_state(
+      parse_state<EventHistory::State>(round_trip(h.capture_state())));
+  check_codec(restored.capture_state(), "restored history codec");
+  require(restored.size() == 2 && restored.next_id() == h.next_id(),
+          "restored history keeps records and id counter");
+}
+
 void test_negative_cases() {
   bool threw = false;
   try {
@@ -254,6 +281,7 @@ int main() {
   test_warfare_codec();
   test_strategic_ai_codec();
   test_economy_codec();
+  test_history_codec();
   test_negative_cases();
 
   if (failures != 0) {
@@ -261,6 +289,7 @@ int main() {
     return 1;
   }
   std::cout << "Framework state JSON codec tests passed "
-               "(scheduler/population/colony/flow/logistics/warfare/ai/economy)\n";
+               "(scheduler/population/colony/flow/logistics/warfare/ai/"
+               "economy/history)\n";
   return 0;
 }

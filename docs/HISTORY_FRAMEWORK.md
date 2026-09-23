@@ -47,16 +47,40 @@ histories asserted. 200k events + full scan query in ~20ms.
 
 ## Persistence
 
-`events_` deque + `next_id_` are plain data — serialize records in id
-order, restore by appending.
+Versioned `State` (`capture_state`/`restore_state`) carries retained
+records plus `next_id`; `capacity` is constructor policy. Restore
+rejects non-ascending event ids and `next_id` collisions — record
+order and binary lookup depend on them. JSON codec in
+`framework_state_json.hpp`.
+
+## Core consumer
+
+`core/campaign_event_history` maps each authoritative
+`IntegratedAdaptiveCampaignStepResult` onto records:
+
+- categories: `construction.project`, `shipbuilding.ship`,
+  `research.legacy`, `research.adaptive`, `exploration.<type>`,
+  `war.<type>`, `colony.founded`
+- actors = involved civilization ids; fleet/system/body/project/design/
+  tech/colony references preserved as tags; `location` = system id
+- `at_day` = the step's absolute end day
+- visibility = involved civilizations only (fog-of-war safe)
+
+`CampaignFrame` owns an `EventHistory` (`frame().history()`) and
+records every completed strategic substep — the campaign chronicle is
+populated automatically by real advances. Aggregate phase counters
+(sensor-contact recordings, diplomacy maintenance) are not discrete
+happenings and are not recorded.
 
 ## Remaining limitations
 
+- Session-scoped: `CampaignFrame`'s history is not yet serialized into
+  campaign saves — State + codec exist; save schema wiring pending.
 - `summary` is an opaque string — localization-key + argument binding
   (structured event text) is a future adapter to LocalizationService.
 - No spatial/body indexing beyond a single `location` id; rich
   per-actor timelines come from `actor` queries, not dedicated indices.
-- No automatic recording — systems must call `record()` (integration
-  points are part of Core adoption).
-- Observer model is allow-list only — no "known after delay" or
-  intelligence-quality degradation yet.
+- Visibility is involved-party allow-list only — widening to observers
+  that know the location (or delayed/degraded intel) is knowledge-layer
+  work, not assumed here.
+- News/voice presentation on top of `feed()` remains app-level work.

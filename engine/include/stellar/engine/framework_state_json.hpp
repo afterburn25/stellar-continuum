@@ -23,6 +23,7 @@
 #include <stellar/engine/warfare.hpp>
 #include <stellar/engine/strategic_ai.hpp>
 #include <stellar/engine/resource_economy.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <stdexcept>
 
@@ -525,6 +526,45 @@ inline void from_json(const Json& j, ResourceNetwork::State& s) {
   j.at("nodes").get_to(s.nodes);
   j.at("producers").get_to(s.producers);
   j.at("transfers").get_to(s.transfers);
+}
+
+// --- EventHistory ----------------------------------------------------------
+
+template<class Json> inline void to_json(Json& j, const HistoryEvent& e) {
+  j = Json{{"id", e.id},
+           {"at_day", e.at_day},
+           {"category", e.category},
+           {"summary", e.summary},
+           {"actors", e.actors},
+           {"location", e.location},
+           {"significance", e.significance},
+           {"visible_to", e.visible_to},
+           {"tags", e.tags}};
+}
+template<class Json> inline void from_json(const Json& j, HistoryEvent& e) {
+  j.at("id").get_to(e.id);
+  j.at("at_day").get_to(e.at_day);
+  j.at("category").get_to(e.category);
+  e.summary = j.value("summary", std::string{});
+  e.actors = j.value("actors", std::vector<std::uint64_t>{});
+  e.location = j.value("location", std::uint64_t{0});
+  e.significance = j.value("significance", 0.5);
+  e.visible_to = j.value("visible_to", std::vector<std::uint64_t>{});
+  e.tags = j.value("tags", std::vector<std::string>{});
+}
+
+template<class Json>
+inline void to_json(Json& j, const EventHistory::State& s) {
+  j = Json{{"version", s.version},
+           {"next_id", s.next_id},
+           {"events", s.events}};
+}
+template<class Json>
+inline void from_json(const Json& j, EventHistory::State& s) {
+  s.version = j.value("version", std::uint32_t{1});
+  detail::check_version(s.version, 1, "EventHistory");
+  s.next_id = j.value("next_id", std::uint64_t{1});
+  j.at("events").get_to(s.events);
 }
 
 } // namespace stellar::engine

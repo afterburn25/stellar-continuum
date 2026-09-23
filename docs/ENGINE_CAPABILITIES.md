@@ -73,17 +73,33 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `EventHistory` bounded store with monotonic ids, `query()`
   (category/tag/actor/time/significance + observer + limit),
   `feed(observer, since, min_significance)`, `prune_before` with a
-  significance floor. Privacy is a query projection — records keep
-  full truth for developer/omniscient views.
+  significance floor, and versioned `capture_state`/`restore_state`
+  (codec in `framework_state_json.hpp`). Privacy is a query projection
+  — records keep full truth for developer/omniscient views.
+- **Core consumer:** `core/campaign_event_history` maps each
+  authoritative `IntegratedAdaptiveCampaignStepResult` onto records —
+  stable category vocabulary (construction.project, shipbuilding.ship,
+  research.legacy/adaptive, exploration.\*, war.\*, colony.founded),
+  involved-civilization visibility, entity ids as tags, at_day = step
+  end day. `CampaignFrame` owns an `EventHistory` (`frame().history()`)
+  and records every completed strategic substep automatically.
 - **Consumers/tests:** `history` tests — id assignment/lookup,
   every filter axis, observer privacy (public vs allow-listed),
   news feed, capacity bound, significance-aware pruning, bit-equal
-  determinism, 200k-event scale. Core recording points pending.
+  determinism, 200k-event scale, persistence round-trip + malformed
+  rejection. `campaign_event_history` tests — category mapping for
+  every step event type, actor/visibility/tags/at_day, feed privacy.
+  `framework_state_codec` covers the JSON codec.
 - **Save/performance impact:** plain deque + counter, serializes in
-  id order; queries are O(n) scans with sorted output.
-- **Limitations:** opaque summary strings (no structured localization
-  binding); allow-list privacy only (no delayed/degraded intel); no
-  automatic recording — Core integration points pending.
+  id order; queries are O(n) scans with sorted output. Recording is
+  O(1) append per emitted event — zero cost when a step emits none.
+- **Limitations:** session-scoped — the `CampaignFrame` chronicle is
+  not yet serialized into campaign saves (State + codec exist; save
+  schema wiring pending). Opaque summary strings (no structured
+  localization binding). Involved-party visibility only — widening to
+  observers that know the location is knowledge-layer work. Aggregate
+  phase counters (sensor-contact recordings, diplomacy maintenance)
+  are not discrete events and are not recorded.
 
 ## Combined simulation scale benchmark (2026-09-23)
 
