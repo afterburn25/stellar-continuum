@@ -11,6 +11,8 @@
 #include "editor_project.hpp"
 
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/planet_appearance.hpp>
+#include <stellar/core/planetary_catalog.hpp>
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/foundation.hpp>
@@ -36,11 +38,14 @@
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <numbers>
 #include <random>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -135,11 +140,51 @@ std::string_view archetype_name(core::StarArchetype value) {
   return "unknown";
 }
 
+std::string_view body_kind_name(core::PlanetaryBodyKind kind) {
+  switch (kind) {
+  case core::PlanetaryBodyKind::Planet: return "planet";
+  case core::PlanetaryBodyKind::Moon: return "moon";
+  case core::PlanetaryBodyKind::DwarfPlanet: return "dwarf planet";
+  }
+  return "body";
+}
+
+std::string_view atmosphere_name(core::PlanetaryAtmosphereRegime regime) {
+  switch (regime) {
+  case core::PlanetaryAtmosphereRegime::Vacuum: return "vacuum";
+  case core::PlanetaryAtmosphereRegime::OxygenNitrogen:
+    return "oxygen-nitrogen";
+  case core::PlanetaryAtmosphereRegime::OxygenRich: return "oxygen-rich";
+  case core::PlanetaryAtmosphereRegime::CarbonDioxideRich:
+    return "co2-rich";
+  case core::PlanetaryAtmosphereRegime::Reducing: return "reducing";
+  case core::PlanetaryAtmosphereRegime::Inert: return "inert";
+  case core::PlanetaryAtmosphereRegime::Other: return "other";
+  }
+  return "unknown";
+}
+
+std::string_view solvent_name(core::PlanetarySolventRegime regime) {
+  switch (regime) {
+  case core::PlanetarySolventRegime::None: return "none";
+  case core::PlanetarySolventRegime::Water: return "water";
+  case core::PlanetarySolventRegime::Ammonia: return "ammonia";
+  case core::PlanetarySolventRegime::Hydrocarbon: return "hydrocarbon";
+  case core::PlanetarySolventRegime::Other: return "other";
+  }
+  return "unknown";
+}
+
+enum class WorkspaceView { Galaxy, System };
+
 enum class Field { None, Name, Note, Search };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
   std::vector<core::StellarSystem> systems;
+  std::vector<core::PlanetaryBody> bodies;
+  // system_id -> indices into `bodies`, rebuilt after each generation.
+  std::unordered_map<int, std::vector<std::size_t>> bodies_by_system;
   std::int64_t seed{8374837};
   int system_count{500};
   double generate_ms{};
@@ -153,6 +198,11 @@ struct Editor {
   bool dragging{};
 
   std::size_t selected{static_cast<std::size_t>(-1)};
+  std::size_t selected_body{static_cast<std::size_t>(-1)}; // index into bodies
+  WorkspaceView view{WorkspaceView::Galaxy};
+  // System-view camera: AU coordinates -> drawable pixels.
+  Point sys_camera{0, 0};
+  float sys_ppa{48.f};
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
 
@@ -170,7 +220,8 @@ struct Editor {
   std::vector<UiRect> hits;
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
-      hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{};
+      hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
+      hit_view{};
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path project_path;
   float pointer_x{}, pointer_y{};
@@ -252,11 +303,66 @@ std::string fspec(const char *format, double value) {
   return buffer;
 }
 
+// Flattens a planetary body's authoritative record into detail rows.
+void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
+  auto row = [&ed](std::string label, std::string value) {
+    ed.detail_rows.emplace_back(std::move(label), std::move(value));
+  };
+  row("name", body.name);
+  row("id", std::to_string(body.id));
+  row("kind", std::string(body_kind_name(body.kind)));
+  row("radius", fspec("%.3f", body.radius_earth) + " Re");
+  row("mass", fspec("%.3f", body.mass_earth) + " Me");
+  row("gravity", fspec("%.3f", body.environment.gravity_g) + " g");
+  row("temperature",
+      fspec("%.0f", body.environment.temperature_kelvin) + " K");
+  row("pressure", fspec("%.1f", body.environment.pressure_kpa) + " kPa");
+  row("atmosphere",
+      std::string(atmosphere_name(body.environment.atmosphere)));
+  row("solvent",
+      std::string(solvent_name(body.environment.available_solvent)));
+  row("radiation", fspec("%.2f", body.environment.radiation_hazard));
+  row("surface", body.environment.has_solid_surface ? "solid" : "none");
+  if (body.environment.is_immersed_environment)
+    row("environment", "immersed");
+  if (body.parent_body_id)
+    row("parent body", std::to_string(*body.parent_body_id));
+  row("orbit index", std::to_string(body.orbit_index));
+  row("eccentricity", fspec("%.3f", body.orbital_eccentricity));
+  row("inclination",
+      fspec("%.1f", body.orbital_inclination_degrees) + " deg");
+  if (body.stellar_exposure) {
+    row("orbit", fspec("%.3f", body.stellar_exposure->orbit_au) + " AU");
+    row("incident flux", fspec("%.3f", body.stellar_exposure->incident_flux));
+    row("habitable zone",
+        body.stellar_exposure->in_habitable_zone ? "inside" : "outside");
+    row("safe approach",
+        fspec("%.3f", body.stellar_exposure->safe_approach_au) + " AU");
+  }
+  if (body.appearance)
+    row("appearance",
+        core::planet_appearance_display_name(*body.appearance));
+  std::string flags;
+  if (body.legacy_colonization_candidate) flags += "colonization-candidate ";
+  if (body.has_anomaly) flags += "anomaly ";
+  if (body.has_rare_resource) flags += "rare-resource ";
+  if (body.has_pre_warp_civilization) flags += "pre-warp-civ ";
+  if (body.cracked_world) flags += "cracked ";
+  row("traits", flags.empty() ? "none" : flags);
+}
+
 // Flattens the selected system's authoritative generated record into
-// label/value rows for the scrollable inspector detail list.
+// label/value rows for the scrollable inspector detail list. In the system
+// workspace with a selected body, shows the body's record instead.
 void rebuild_detail_rows(Editor &ed) {
   ed.detail_rows.clear();
   ed.detail_list.scroll_to(0);
+  if (ed.view == WorkspaceView::System &&
+      ed.selected_body < ed.bodies.size()) {
+    rebuild_body_rows(ed, ed.bodies[ed.selected_body]);
+    ed.detail_list.row_count = ed.detail_rows.size();
+    return;
+  }
   if (ed.selected >= ed.systems.size()) {
     ed.detail_list.row_count = 0;
     return;
@@ -327,6 +433,29 @@ void rebuild_detail_rows(Editor &ed) {
       row("activity " + core::stellar_host_name(static_cast<int>(i)),
           std::string(core::stellar_activity_name(
               (*sys.stellar_activity)[i].profile.level)));
+
+  if (const auto bodies = ed.bodies_by_system.find(sys.id);
+      bodies != ed.bodies_by_system.end()) {
+    row("planetary bodies", std::to_string(bodies->second.size()));
+    for (const auto body_index : bodies->second) {
+      const auto &body = ed.bodies[body_index];
+      std::string value = std::string(body_kind_name(body.kind)) + ", " +
+                          fspec("%.2f", body.radius_earth) + " Re, " +
+                          fspec("%.2f", body.environment.gravity_g) + " g, " +
+                          fspec("%.0f", body.environment.temperature_kelvin) +
+                          " K, " + std::string(atmosphere_name(
+                                       body.environment.atmosphere));
+      if (body.stellar_exposure)
+        value += ", " + fspec("%.2f", body.stellar_exposure->orbit_au) + " AU";
+      if (body.stellar_exposure && body.stellar_exposure->in_habitable_zone)
+        value += " [hz]";
+      if (body.has_anomaly) value += " [anomaly]";
+      if (body.has_rare_resource) value += " [rare]";
+      if (body.has_pre_warp_civilization) value += " [pre-warp]";
+      if (body.cracked_world) value += " [cracked]";
+      row(body.name, value);
+    }
+  }
 
   ed.detail_list.row_count = ed.detail_rows.size();
 }
@@ -592,9 +721,217 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   out.overlay.push_back(StrokedRectangle{v, panel_edge});
 }
 
-std::vector<core::StellarSystem> generate(std::int64_t seed, int count,
-                                          const std::vector<core::CatalogStar> &catalog) {
-  return core::generate_stellar_catalog(seed, count, catalog);
+Point system_to_screen(const Editor &ed, double x, double y) {
+  const auto &v = ed.viewport;
+  return {v.x + v.width * .5f +
+              static_cast<float>((x - ed.sys_camera.x) * ed.sys_ppa),
+          v.y + v.height * .5f +
+              static_cast<float>((y - ed.sys_camera.y) * ed.sys_ppa)};
+}
+
+// Samples the analytic orbit into a screen-space polyline ring centered on
+// `cx,cy` (AU). True ellipse-in-3D projected onto the view plane.
+void orbit_ring(DrawList &out, const Editor &ed,
+                const engine::AnalyticOrbit &orbit, double cx, double cy,
+                Color color) {
+  const double period =
+      2.0 * std::numbers::pi / std::max(1e-9, orbit.angular_speed);
+  Point prev{};
+  for (int k = 0; k <= 72; ++k) {
+    const auto p =
+        engine::analytic_orbit_position(orbit, k * period / 72.0);
+    const auto point = system_to_screen(ed, cx + p[0], cy + p[1]);
+    if (k) out.lines.push_back({prev, point, color});
+    prev = point;
+  }
+}
+
+void fit_system_camera(Editor &ed) {
+  if (ed.selected >= ed.systems.size()) return;
+  const auto &sys = ed.systems[ed.selected];
+  const auto hosts = core::stellar_positions(sys, 0.0);
+  double min_x = 0, max_x = 0, min_y = 0, max_y = 0;
+  auto extend = [&](double x, double y, double r) {
+    min_x = std::min(min_x, x - r);
+    max_x = std::max(max_x, x + r);
+    min_y = std::min(min_y, y - r);
+    max_y = std::max(max_y, y + r);
+  };
+  const int star_count = sys.tertiary ? 3 : (sys.secondary ? 2 : 1);
+  for (int i = 0; i < star_count; ++i)
+    extend(hosts[static_cast<std::size_t>(i)][0],
+           hosts[static_cast<std::size_t>(i)][1], 0.05);
+  if (sys.stellar_orbits)
+    for (std::size_t i = 0; i < sys.stellar_orbits->relative_orbits.size();
+         ++i) {
+      const auto &orbit = sys.stellar_orbits->relative_orbits[i];
+      const double cx = i == 0 ? hosts[3][0] : 0.0;
+      const double cy = i == 0 ? hosts[3][1] : 0.0;
+      extend(cx, cy, orbit.radius * (1 + orbit.eccentricity));
+    }
+  if (const auto bodies = ed.bodies_by_system.find(sys.id);
+      bodies != ed.bodies_by_system.end())
+    for (const auto body_index : bodies->second) {
+      const auto &body = ed.bodies[body_index];
+      if (body.parent_body_id) continue;
+      try {
+        const int host = core::planetary_stellar_host(sys, body.id);
+        const auto orbit = core::planetary_stellar_orbit(sys, body);
+        const auto &hc = hosts[static_cast<std::size_t>(
+            std::clamp(host, 0, 3))];
+        extend(hc[0], hc[1], orbit.radius * (1 + orbit.eccentricity));
+      } catch (const std::exception &) {
+      }
+    }
+  if (sys.small_body_fields)
+    for (const auto &field : *sys.small_body_fields) {
+      if (field.planet_centered) continue;
+      const int host =
+          sys.stellar_orbits ? sys.stellar_orbits->belt_host : 0;
+      const auto &hc =
+          hosts[static_cast<std::size_t>(std::clamp(host, 0, 3))];
+      extend(hc[0], hc[1], field.outer_radius_au);
+    }
+  ed.sys_camera = {static_cast<float>((min_x + max_x) * .5),
+                   static_cast<float>((min_y + max_y) * .5)};
+  const float span_x = std::max(0.1f, static_cast<float>(max_x - min_x));
+  const float span_y = std::max(0.1f, static_cast<float>(max_y - min_y));
+  ed.sys_ppa =
+      std::clamp(std::min(ed.viewport.width / span_x,
+                          ed.viewport.height / span_y) *
+                     .9f,
+                 0.5f, 2000.f);
+}
+
+// The system workspace: authoritative orbit rings, star positions, bodies,
+// and small-body field bands for the selected system, in AU.
+void render_system_view(DrawList &out, Editor &ed, float s) {
+  const auto &v = ed.viewport;
+  out.overlay.push_back(FilledRectangle{v, {4, 10, 18, 255}});
+  if (ed.selected >= ed.systems.size()) {
+    out.text.push_back(
+        Text{{v.x + 20 * s, v.y + 20 * s}, "no system selected", muted,
+             static_cast<int>(14 * s), 0, v});
+    out.overlay.push_back(StrokedRectangle{v, panel_edge});
+    return;
+  }
+  const auto &sys = ed.systems[ed.selected];
+  const auto hosts = core::stellar_positions(sys, 0.0);
+
+  // Companion relative orbits: inner pair around the AB barycentre, outer
+  // around the system barycentre.
+  if (sys.stellar_orbits)
+    for (std::size_t i = 0; i < sys.stellar_orbits->relative_orbits.size();
+         ++i) {
+      const auto &hc = i == 0 ? hosts[3] : core::StellarPosition{0, 0, 0};
+      try {
+        orbit_ring(out, ed, sys.stellar_orbits->relative_orbits[i], hc[0],
+                   hc[1], {70, 110, 135, 160});
+      } catch (const std::exception &) {
+      }
+    }
+
+  // Small-body field bands around their belt host.
+  if (sys.small_body_fields)
+    for (const auto &field : *sys.small_body_fields) {
+      if (field.planet_centered) continue;
+      const int host = sys.stellar_orbits ? sys.stellar_orbits->belt_host : 0;
+      const auto &hc =
+          hosts[static_cast<std::size_t>(std::clamp(host, 0, 3))];
+      try {
+        orbit_ring(out, ed,
+                   engine::AnalyticOrbit{std::max(0.01, field.inner_radius_au),
+                                         0, 0, 0, 0, 0, 1},
+                   hc[0], hc[1], {45, 80, 100, 130});
+        orbit_ring(out, ed,
+                   engine::AnalyticOrbit{std::max(0.02, field.outer_radius_au),
+                                         0, 0, 0, 0, 0, 1},
+                   hc[0], hc[1], {45, 80, 100, 130});
+      } catch (const std::exception &) {
+      }
+    }
+
+  // Planetary orbit rings and body markers.
+  if (const auto bodies = ed.bodies_by_system.find(sys.id);
+      bodies != ed.bodies_by_system.end()) {
+    for (const auto body_index : bodies->second) {
+      const auto &body = ed.bodies[body_index];
+      try {
+        if (!body.parent_body_id) {
+          const int host = core::planetary_stellar_host(sys, body.id);
+          const auto &hc = hosts[static_cast<std::size_t>(
+              std::clamp(host, 0, 3))];
+          orbit_ring(out, ed, core::planetary_stellar_orbit(sys, body), hc[0],
+                     hc[1], {60, 100, 122, 120});
+        }
+        const auto bp = core::stellar_planet_position(sys, body, 0.0);
+        const auto p = system_to_screen(ed, bp[0], bp[1]);
+        if (!v.contains(p)) continue;
+        const bool in_hz =
+            body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
+        if (body_index == ed.selected_body)
+          out.circles.push_back(Circle{p, 9.f, accent});
+        out.circles.push_back(
+            Circle{p, body.parent_body_id ? 2.5f : 4.5f,
+                   in_hz ? Color{110, 220, 140, 255}
+                         : (body.parent_body_id ? muted : ink)});
+        if (ed.sys_ppa > 4.f)
+          out.text.push_back(
+              Text{{p.x + 8, p.y - 7}, body.name,
+                   body_index == ed.selected_body
+                       ? accent
+                       : Color{150, 180, 195, 220},
+                   static_cast<int>(11 * s), 0, v});
+      } catch (const std::exception &) {
+      }
+    }
+  }
+
+  // Stars last so they sit above rings.
+  const int star_count = sys.tertiary ? 3 : (sys.secondary ? 2 : 1);
+  const std::array star_classes{sys.primary, sys.secondary, sys.tertiary};
+  for (int i = 0; i < star_count; ++i) {
+    const auto p = system_to_screen(
+        ed, hosts[static_cast<std::size_t>(i)][0],
+        hosts[static_cast<std::size_t>(i)][1]);
+    const auto stellar_class = star_classes[static_cast<std::size_t>(i)];
+    out.circles.push_back(
+        Circle{p, stellar_class ? class_radius(*stellar_class) * 2.6f : 8.f,
+               stellar_class ? class_color(*stellar_class) : ink});
+    if (v.contains(p))
+      out.text.push_back(
+          Text{{p.x + 12, p.y - 8}, core::stellar_host_name(i), accent,
+               static_cast<int>(12 * s), 0, v});
+  }
+  out.overlay.push_back(StrokedRectangle{v, panel_edge});
+}
+
+// Runs the same world-assembly pipeline as fresh campaign generation —
+// systems, planetary bodies, stellar physics, orbit reconciliation,
+// small-body fields, and stellar orbits — without civilization seeding.
+// The editor inspects exactly what a real generated world contains.
+std::pair<std::vector<core::StellarSystem>, std::vector<core::PlanetaryBody>>
+generate(std::int64_t seed, int count,
+         const std::vector<core::CatalogStar> &catalog) {
+  auto systems = core::generate_stellar_catalog(seed, count, catalog);
+  auto bodies = core::generate_planetary_catalog(seed, systems);
+  const auto removed =
+      core::apply_stellar_planetary_physics(systems, bodies);
+  std::unordered_set<int> habitable_systems;
+  for (const auto &body : bodies)
+    if (body.legacy_colonization_candidate)
+      habitable_systems.insert(body.system_id);
+  for (auto &system : systems) {
+    if (const auto found = removed.find(system.id); found != removed.end())
+      system.engulfed_planets += found->second;
+    system.has_habitable_world = habitable_systems.contains(system.id);
+  }
+  core::reconcile_frozen_planet_orbits(systems, bodies);
+  core::initialize_small_body_fields(seed, systems, bodies, true);
+  core::reconcile_small_body_orbits(systems, bodies);
+  core::initialize_stellar_orbits(seed, systems, bodies, true);
+  core::initialize_stellar_activity(seed, systems);
+  return {std::move(systems), std::move(bodies)};
 }
 
 } // namespace
@@ -638,6 +975,7 @@ int main(int argc, char **argv) {
     std::atomic<int> pending_count{ed.system_count};
     std::mutex result_mutex;
     std::vector<core::StellarSystem> result;
+    std::vector<core::PlanetaryBody> result_bodies;
     std::int64_t result_seed{};
     int result_count{};
     double result_ms{};
@@ -651,13 +989,15 @@ int main(int argc, char **argv) {
       (void)jobs.submit("editor.generate", engine::JobPriority::Normal, {},
                         [&, seed, count, catalog = std::move(catalog)] {
                           const auto begin = std::chrono::steady_clock::now();
-                          auto systems = generate(seed, count, catalog);
+                          auto [systems, bodies] =
+                              generate(seed, count, catalog);
                           const auto elapsed =
                               std::chrono::duration<double, std::milli>(
                                   std::chrono::steady_clock::now() - begin)
                                   .count();
                           std::lock_guard lock(result_mutex);
                           result = std::move(systems);
+                          result_bodies = std::move(bodies);
                           result_seed = seed;
                           result_count = count;
                           result_ms = elapsed;
@@ -675,10 +1015,17 @@ int main(int argc, char **argv) {
         if (!result.empty()) {
           ed.systems = std::move(result);
           result.clear();
+          ed.bodies = std::move(result_bodies);
+          result_bodies.clear();
+          ed.bodies_by_system.clear();
+          for (std::size_t i = 0; i < ed.bodies.size(); ++i)
+            ed.bodies_by_system[ed.bodies[i].system_id].push_back(i);
           ed.seed = result_seed;
           ed.system_count = result_count;
           ed.generate_ms = result_ms;
           ed.selected = static_cast<std::size_t>(-1);
+          ed.selected_body = static_cast<std::size_t>(-1);
+          ed.view = WorkspaceView::Galaxy;
           // Annotations survive regeneration: ids are deterministic for the
           // same seed+count, and a new seed simply orphans old edits.
           rebuild_filter(ed);
@@ -697,6 +1044,10 @@ int main(int argc, char **argv) {
           if (ed.editing != Field::None) {
             ed.editing = Field::None;
             window.set_text_input(false);
+          } else if (ed.view == WorkspaceView::System) {
+            ed.view = WorkspaceView::Galaxy;
+            ed.selected_body = static_cast<std::size_t>(-1);
+            rebuild_detail_rows(ed);
           } else {
             return 0;
           }
@@ -751,6 +1102,17 @@ int main(int argc, char **argv) {
           } else if (ed.hit_seed.contains(event.position)) {
             pending_seed.store(std::random_device{}());
             submit_generate();
+          } else if (ed.hit_view.contains(event.position)) {
+            if (ed.view == WorkspaceView::Galaxy &&
+                ed.selected < ed.systems.size()) {
+              ed.view = WorkspaceView::System;
+              ed.selected_body = static_cast<std::size_t>(-1);
+              fit_system_camera(ed);
+            } else if (ed.view == WorkspaceView::System) {
+              ed.view = WorkspaceView::Galaxy;
+              ed.selected_body = static_cast<std::size_t>(-1);
+              rebuild_detail_rows(ed);
+            }
           } else if (ed.hit_save.contains(event.position)) {
             save_project(ed);
           } else if (ed.hit_load.contains(event.position)) {
@@ -789,7 +1151,9 @@ int main(int argc, char **argv) {
             if (ed.viewport.contains(event.position)) {
               ed.dragging = true;
               ed.drag_origin = event.position;
-              ed.camera_origin = ed.camera;
+              ed.camera_origin = ed.view == WorkspaceView::Galaxy
+                                     ? ed.camera
+                                     : ed.sys_camera;
             }
           }
         }
@@ -799,21 +1163,46 @@ int main(int argc, char **argv) {
               std::abs(event.position.x - ed.drag_origin.x) +
               std::abs(event.position.y - ed.drag_origin.y);
           if (moved < 6.f && ed.viewport.contains(event.position)) {
-            // Click: nearest system within a bounded pick radius.
-            float best = 14.f;
-            std::size_t best_index = ed.systems.size();
-            for (std::size_t i = 0; i < ed.systems.size(); ++i) {
-              const auto p = world_to_screen(ed, ed.systems[i].position.x,
-                                             ed.systems[i].position.y);
-              const float d = std::hypot(p.x - event.position.x,
-                                         p.y - event.position.y);
-              if (d < best) {
-                best = d;
-                best_index = i;
+            if (ed.view == WorkspaceView::Galaxy) {
+              // Click: nearest system within a bounded pick radius.
+              float best = 14.f;
+              std::size_t best_index = ed.systems.size();
+              for (std::size_t i = 0; i < ed.systems.size(); ++i) {
+                const auto p = world_to_screen(ed, ed.systems[i].position.x,
+                                               ed.systems[i].position.y);
+                const float d = std::hypot(p.x - event.position.x,
+                                           p.y - event.position.y);
+                if (d < best) {
+                  best = d;
+                  best_index = i;
+                }
               }
+              ed.selected = best_index;
+              rebuild_detail_rows(ed);
+            } else if (ed.selected < ed.systems.size()) {
+              // System view: nearest body marker within a bounded pick radius.
+              const auto &sys = ed.systems[ed.selected];
+              float best = 12.f;
+              std::size_t best_body = ed.bodies.size();
+              if (const auto it = ed.bodies_by_system.find(sys.id);
+                  it != ed.bodies_by_system.end())
+                for (const auto body_index : it->second) {
+                  try {
+                    const auto bp = core::stellar_planet_position(
+                        sys, ed.bodies[body_index], 0.0);
+                    const auto p = system_to_screen(ed, bp[0], bp[1]);
+                    const float d = std::hypot(p.x - event.position.x,
+                                               p.y - event.position.y);
+                    if (d < best) {
+                      best = d;
+                      best_body = body_index;
+                    }
+                  } catch (const std::exception &) {
+                  }
+                }
+              ed.selected_body = best_body;
+              rebuild_detail_rows(ed);
             }
-            ed.selected = best_index;
-            rebuild_detail_rows(ed);
           }
         }
         // List row clicks select and center; wheel scrolls the list.
@@ -826,6 +1215,8 @@ int main(int argc, char **argv) {
           if (row < ed.filtered.size()) {
             ed.selected = ed.filtered[row];
             ed.system_list.ensure_visible(row);
+            ed.selected_body = static_cast<std::size_t>(-1);
+            if (ed.view == WorkspaceView::System) fit_system_camera(ed);
             rebuild_detail_rows(ed);
           }
         }
@@ -837,32 +1228,47 @@ int main(int argc, char **argv) {
             ed.detail_rect.contains(event.position))
           ed.detail_list.scroll_to(ed.detail_list.scroll_offset -
                                    event.wheel_y * 40.f);
-        if (event.type == InputEventType::PointerMove && ed.dragging)
-          ed.camera = {ed.camera_origin.x -
-                           (event.position.x - ed.drag_origin.x) /
-                               ed.pixels_per_unit,
-                       ed.camera_origin.y -
-                           (event.position.y - ed.drag_origin.y) /
-                               ed.pixels_per_unit};
+        if (event.type == InputEventType::PointerMove && ed.dragging) {
+          const float scale =
+              ed.view == WorkspaceView::Galaxy ? ed.pixels_per_unit : ed.sys_ppa;
+          const Point target{
+              ed.camera_origin.x -
+                  (event.position.x - ed.drag_origin.x) / scale,
+              ed.camera_origin.y -
+                  (event.position.y - ed.drag_origin.y) / scale};
+          if (ed.view == WorkspaceView::Galaxy)
+            ed.camera = target;
+          else
+            ed.sys_camera = target;
+        }
         if (event.type == InputEventType::Wheel &&
             ed.viewport.contains(event.position)) {
+          float &scale =
+              ed.view == WorkspaceView::Galaxy ? ed.pixels_per_unit : ed.sys_ppa;
+          const Point &cam =
+              ed.view == WorkspaceView::Galaxy ? ed.camera : ed.sys_camera;
           const float before_x =
-              ed.camera.x + (event.position.x - ed.viewport.x -
-                             ed.viewport.width * .5f) /
-                                ed.pixels_per_unit;
+              cam.x + (event.position.x - ed.viewport.x -
+                       ed.viewport.width * .5f) /
+                          scale;
           const float before_y =
-              ed.camera.y + (event.position.y - ed.viewport.y -
-                             ed.viewport.height * .5f) /
-                                ed.pixels_per_unit;
-          ed.pixels_per_unit = std::clamp(
-              ed.pixels_per_unit * (event.wheel_y > 0 ? 1.18f : 0.85f), 0.02f,
-              400.f);
-          ed.camera = {before_x - (event.position.x - ed.viewport.x -
-                                   ed.viewport.width * .5f) /
-                                      ed.pixels_per_unit,
-                       before_y - (event.position.y - ed.viewport.y -
-                                   ed.viewport.height * .5f) /
-                                      ed.pixels_per_unit};
+              cam.y + (event.position.y - ed.viewport.y -
+                       ed.viewport.height * .5f) /
+                          scale;
+          scale = std::clamp(
+              scale * (event.wheel_y > 0 ? 1.18f : 0.85f), 0.02f,
+              ed.view == WorkspaceView::Galaxy ? 400.f : 4000.f);
+          const Point next{
+              before_x - (event.position.x - ed.viewport.x -
+                          ed.viewport.width * .5f) /
+                             scale,
+              before_y - (event.position.y - ed.viewport.y -
+                          ed.viewport.height * .5f) /
+                             scale};
+          if (ed.view == WorkspaceView::Galaxy)
+            ed.camera = next;
+          else
+            ed.sys_camera = next;
         }
       }
       if (!snapshot.renderable()) continue;
@@ -920,7 +1326,22 @@ int main(int argc, char **argv) {
           Text{{ed.hit_seed.x, ed.hit_seed.y + 9 * s}, "NEW SEED", ink,
                static_cast<int>(13 * s), ed.hit_seed.width, ed.hit_seed,
                TextAlign::Center});
-      bx += 112 * s;
+      bx += 108 * s;
+      // Workspace view toggle: system orbit view requires a selection.
+      ed.hit_view = {bx, bar.y + 10 * s, 110 * s, 32 * s};
+      const bool view_ready =
+          ed.view == WorkspaceView::System ||
+          ed.selected < ed.systems.size();
+      draw.overlay.push_back(FilledRectangle{
+          ed.hit_view,
+          ed.view == WorkspaceView::System ? row_selected : button_fill});
+      draw.overlay.push_back(StrokedRectangle{ed.hit_view, panel_edge});
+      draw.text.push_back(
+          Text{{ed.hit_view.x, ed.hit_view.y + 9 * s},
+               ed.view == WorkspaceView::System ? "GALAXY VIEW" : "SYSTEM VIEW",
+               view_ready ? ink : muted, static_cast<int>(13 * s),
+               ed.hit_view.width, ed.hit_view, TextAlign::Center});
+      bx += 122 * s;
       draw.text.push_back(
           Text{{bx, bar.y + 18 * s}, "seed " + std::to_string(ed.seed), muted,
                static_cast<int>(13 * s)});
@@ -939,7 +1360,10 @@ int main(int argc, char **argv) {
 
       profiler.begin_frame();
       const auto frame_scope = profiler.span("editor.frame", "frame");
-      render_viewport(draw, ed, s);
+      if (ed.view == WorkspaceView::System)
+        render_system_view(draw, ed, s);
+      else
+        render_viewport(draw, ed, s);
       render_inspector(draw, ed, s);
       render_system_list(draw, ed, s);
       draw.text.push_back(
