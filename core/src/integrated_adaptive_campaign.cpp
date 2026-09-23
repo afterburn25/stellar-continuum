@@ -77,6 +77,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   // journal is shared authoritative state, so the chronicle watermarks
   // against it rather than rescanning every advance.
   std::int64_t chronicle_diplomacy_watermark{};
+  // Set once the retained journal has been backfilled into an empty
+  // chronicle — never again this runtime's lifetime, so a capacity
+  // eviction can't re-record already-chronicled entries.
+  bool chronicle_diplomacy_backfill_done{};
   bool profiling_enabled{};
   std::array<stellar::engine::PerformanceCounter,4> performance{};
 
@@ -272,9 +276,16 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   // Diplomatic journal entries emitted by this step's process() join
   // the chronicle too — the journal is authoritative, the watermark
   // keeps each entry recorded exactly once across advances and loads.
+  // An empty chronicle means none of the journal was ever chronicled
+  // (fresh campaign seeding, or a pre-chronicle save upgraded to v17):
+  // backfill the retained journal from id 0 — once, so a later capacity
+  // eviction can't re-record already-chronicled entries.
+  const bool backfill = !storage_->chronicle_diplomacy_backfill_done &&
+                        storage_->history.size() == 0;
+  storage_->chronicle_diplomacy_backfill_done = true;
   const auto diplomatic_events =
       storage_->diplomacy_runtime.state().history_events_since(
-          storage_->chronicle_diplomacy_watermark);
+          backfill ? 0 : storage_->chronicle_diplomacy_watermark);
   if (!diplomatic_events.empty())
     storage_->chronicle_diplomacy_watermark =
         diplomatic_events.back().event_id;

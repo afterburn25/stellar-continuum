@@ -80,7 +80,12 @@ Discrete *diplomatic* happenings do join the chronicle. After each
 step's diplomacy phase, the runtime pulls the new journal tail via
 `DiplomacyState::history_events_since(watermark)` — a monotonic
 event-id watermark (baselined to `history_latest_event_id()` at
-runtime construction, so restored journals never re-record) — and maps
+runtime construction, so restored journals never re-record). One
+exception: when the chronicle is empty the first advance pulls the
+retained journal from id 0 — generation-seeded entries on a fresh
+campaign and journals in pre-chronicle saves upgraded to v17 were
+never chronicled, so they backfill once (a per-runtime flag prevents
+a capacity eviction from re-recording) — and maps
 each entry to `diplomacy.<kind>` (`diplomacy.war_declared`,
 `diplomacy.agreement_activated`, …). Differences from step events:
 
