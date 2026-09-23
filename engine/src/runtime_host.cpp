@@ -923,10 +923,11 @@ int RuntimeHost::run() {
         const float prev_right = t->x + ext->w;
         const float prev_bottom = t->y + ext->h;
         t->x += v->dx * dt_step;
-        // Horizontal blocking: a moving gravity-affected entity whose side
-        // crosses a solid's side stops against it (walls). One-way
-        // platforms never side-block.
-        if (gscale != 0.f && v->dx != 0.f) {
+        // Horizontal blocking: a moving entity whose side crosses a
+        // solid's side stops against it (walls) — applies in top-down
+        // games (no gravity) as well as platformers. One-way platforms
+        // never side-block.
+        if (v->dx != 0.f) {
           for (const auto other : impl.entities) {
             if (other == entity || !world.get<Solid>(other) ||
                 world.get<Oneway>(other))
@@ -950,9 +951,10 @@ int RuntimeHost::run() {
           }
         }
         // Tilemap side-blocking: the leading edge's corner cells stop
-        // horizontal motion (mirrors the solid-entity rule). Whichever
-        // colliding layer blocks supplies the cell geometry.
-        if (gscale != 0.f && v->dx != 0.f) {
+        // horizontal motion (mirrors the solid-entity rule, in top-down
+        // games too). Whichever colliding layer blocks supplies the cell
+        // geometry.
+        if (v->dx != 0.f) {
           const float lead = v->dx > 0.f ? t->x + ext->w : t->x;
           const Tilemap *blocker = nullptr;
           for (const auto *candidate : impl.tilemaps()) {
@@ -982,12 +984,14 @@ int RuntimeHost::run() {
             v->dx = 0.f;
           }
         }
+        const float prev_top = t->y;
         t->y += v->dy * dt_step;
-        // Platform landings: a falling, gravity-affected entity whose
-        // bottom crossed a solid's top this step lands on it. One-way
-        // platforms land identically (crossing is only detected when
-        // falling, so rising/horizontal motion passes through).
-        if (gscale != 0.f && v->dy > 0.f) {
+        // Platform landings: a downward-moving entity whose bottom
+        // crossed a solid's top this step lands on it — gravity-affected
+        // falls and top-down motion alike. One-way platforms land
+        // identically (crossing is only detected when moving down, so
+        // rising/horizontal motion passes through).
+        if (v->dy > 0.f) {
           for (const auto other : impl.entities) {
             if (other == entity ||
                 (!world.get<Solid>(other) && !world.get<Oneway>(other)))
@@ -1035,6 +1039,54 @@ int RuntimeHost::run() {
                 break;
               }
             }
+          }
+        }
+        // Ceilings: an upward-moving entity whose top crossed a solid's
+        // bottom stops under it (jump head-bump / top-down walls).
+        // One-way platforms never block from below.
+        if (v->dy < 0.f) {
+          for (const auto other : impl.entities) {
+            if (other == entity || !world.get<Solid>(other) ||
+                world.get<Oneway>(other))
+              continue;
+            const auto *st = world.get<Transform2D>(other);
+            const auto *se = world.get<Extent2D>(other);
+            if (!st || !se) continue;
+            if (t->x < st->x + se->w && t->x + ext->w > st->x &&
+                prev_top >= st->y + se->h - 1.f && t->y < st->y + se->h) {
+              t->y = st->y + se->h;
+              v->dy = 0.f;
+            }
+          }
+          // Tilemap ceiling: the top edge's cells stop the rise on the
+          // blocking layer's own row geometry.
+          for (const auto *ceil_tm : impl.tilemaps()) {
+            if (!ceil_tm->collide || ceil_tm->tile_w <= 0 ||
+                ceil_tm->tile_h <= 0)
+              continue;
+            const auto &tm = *ceil_tm;
+            const float step_x = std::max(1.f, tm.tile_w - 1.f);
+            bool blocked = false;
+            for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f && !blocked;
+                 px += step_x) {
+              const int row = static_cast<int>(
+                  std::floor((t->y - tm.y) / tm.tile_h));
+              if (cell_of(tm, px, t->y) &&
+                  prev_top >= tm.y + (row + 1) * tm.tile_h - 1.f) {
+                t->y = tm.y + (row + 1) * static_cast<float>(tm.tile_h);
+                v->dy = 0.f;
+                blocked = true;
+              }
+            }
+            if (!blocked && cell_of(tm, t->x + ext->w - 1.f, t->y)) {
+              const int row = static_cast<int>(
+                  std::floor((t->y - tm.y) / tm.tile_h));
+              if (prev_top >= tm.y + (row + 1) * tm.tile_h - 1.f) {
+                t->y = tm.y + (row + 1) * static_cast<float>(tm.tile_h);
+                v->dy = 0.f;
+              }
+            }
+            if (v->dy == 0.f) break;
           }
         }
         // The Bounce marker opts out of wall rebound — projectiles and

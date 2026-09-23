@@ -144,7 +144,8 @@ P pauses, F12 screenshots to `<root>/screenshots/`.
 tint, sprite path, layer (stable-sorted draw order), parallax
 (0 = screen-pinned), text label, gravityScale + solid (platformer
 physics: doc-level gravity, landing on solid tops, side blocking,
-grounded W/Up jump), sprite-sheet `frames`/`fps`/`fcols` (sim-time
+ceiling bumps, grounded W/Up jump — solid/tilemap blocking applies
+to all movers, so gravity-free scenes get top-down walls), sprite-sheet `frames`/`fps`/`fcols` (sim-time
 indexed; `fcols` slices grid sheets, 0 = strip; `animLoop`
 false holds the last frame),
 `rotation`, `ttl` (sim-time self-destruct),
