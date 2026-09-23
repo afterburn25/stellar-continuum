@@ -139,9 +139,13 @@ see [STRATEGIC_AI.md](STRATEGIC_AI.md). Milestone 10 landed:
 `WarfareModel` (warfare.hpp) — ShipCohort aggregates, Interdict zones
 gating hostile movement, deterministic Lanchester engagement
 resolution, 2000-fleet scale — see [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md).
-Next: combined simulation benchmarks, event/history framework, then
-editor/renderer polish per the milestone map; adopt the executor for
-real Core/game phases when consuming these.
+Milestone 13 partially landed early: `combined_scale` test drives 400
+settlements (population + colony + power grids + freight + fleets +
+faction AI) through one `SimulationExecutor` at mixed tiers — 240
+ticks, bit-identical checksums across runs. Next: event/history
+framework (M14), then Core/game adoption of these frameworks — the
+engine layer exists; wiring real phases through the executor is the
+remaining specialization work.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

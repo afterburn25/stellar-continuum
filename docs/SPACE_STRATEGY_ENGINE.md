@@ -78,7 +78,7 @@ character fidelity.
 | 10 | Strategic fleet/warfare | IMPLEMENTED (engine layer) | `WarfareModel`: ShipCohort aggregates (not per-ship entities), fleet orders incl. Interdict zones that gate hostile warp (presence never blocks), Lanchester-style deterministic resolve; 2000-fleet scale test. Core fleet adoption pending. See [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md). |
 | 11 | Space-specific rendering | PARTIAL | Native scene3d GPU path, planet/ring/star materials exist; render-graph consumption, instancing, HDR pending. |
 | 12 | Specialized editor tools | PARTIAL | stellar-engine.exe shell with Projects/Scene/Scene3D/Assets/Profiler/Localization; genre tools (galaxy/planet/colony/economy/AI debugger) pending. |
-| 13 | Galaxy-scale benchmarks | PARTIAL | simulation_scale_* ctest entries; combined-workload scenarios pending. |
+| 13 | Galaxy-scale benchmarks | IMPLEMENTED (engine layer) | `simulation_scale_250…5000` executor benchmarks + `combined_scale`: 400 settlements driving population+colony+power grids+freight+fleets+AI through one executor across mixed tiers — 240 ticks, bit-identical checksums, ~870µs mean tick. |
 | 14 | Event/history framework | PARTIAL | `event_bus` + `mission_graph` engine libraries exist; strategic-event vocabulary/observer filtering pending. |
 | 15 | GNN/public information hooks | PLANNED | News feed over the event framework using native voice infra. |
 

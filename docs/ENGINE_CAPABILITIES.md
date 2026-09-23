@@ -62,6 +62,24 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Combined simulation scale benchmark (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 13 (partial) —
+  prove the specialization frameworks compose deterministically under
+  one scheduler.
+- **What it exercises:** `combined_scale` ctest — 400 settlements each
+  running `Population` + `Colony`, 8 regional `FlowNetwork` power
+  grids (400 nodes), a `LogisticsNetwork` freight web (400 waypoints,
+  400 routes, 2000 shipments), 200 `WarfareModel` fleets under move
+  orders, 50 `StrategicMind` factions — six task domains at Active/
+  Nearby/Normal/Background tiers through one `SimulationExecutor`.
+- **Result:** 240 ticks, mean ~870µs/p50 ~560µs/p95 ~1.9ms on the dev
+  machine; FNV-1a state checksums bit-identical across two full runs.
+- **Limitations:** synthetic flat workload — real campaigns have
+  heterogeneous settlement sizes and event spikes; parallel
+  (advance_parallel) parity not exercised here (covered by
+  simulation_scale_*); not yet wired to Core game state.
+
 ## Strategic warfare model (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 10 — fleets as
