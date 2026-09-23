@@ -91,10 +91,27 @@ final checksums.
 ## Persistence
 
 Tasks are code — they are re-registered on load, not serialized. The
-scheduler's cadence state is derivable (`last_run` timestamps reset to
-registration tick on `add`); owners persist simulatable state, not
-executor internals. If a game needs durable cadence bookkeeping it can
-record `(key → tier, dormant_since)` — both are queryable.
+executor's authoritative scheduling state is data and round-trips
+through versioned snapshots:
+
+- `SimulationScheduler::capture_state()/restore_state()` — tick plus
+  per-key `(tier, last_run, dormant_since)`. Snapshot items register
+  themselves if absent; local keys missing from the snapshot keep their
+  state (caller decides whether that is a migration case).
+- `SimulationExecutor::capture_state()/restore_state()` — scheduler
+  state plus pending dirty/event wakeup sets and the pause flag.
+  `restore_state` returns the sorted list of snapshot keys that have no
+  registered task: a taskless key is *not* restored into the scheduler,
+  because `plan_tick` would fail on it — the caller decides whether the
+  entity was deleted since save or is a load-order issue.
+- Diagnostic counters (domain stats, tick history, wakeup totals) are
+  deliberately not persisted — they are observability, not authoritative
+  state. `version` fields leave room for additive migration.
+
+Round-trip determinism is covered by `simulation_persistence` (ctest):
+capture → rebuild → restore → both executors produce identical run
+orders and elapsed accumulation for subsequent ticks, pending dirty and
+dormant wakeups survive, and pause state is preserved.
 
 ## Benchmark harness
 

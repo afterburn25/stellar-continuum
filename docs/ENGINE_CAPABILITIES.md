@@ -62,6 +62,33 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Population cohort framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 3 — aggregate
+  demographics for colonies/civilizations without per-citizen entities.
+  See [POPULATION_FRAMEWORK.md](POPULATION_FRAMEWORK.md).
+- **Engine APIs/ownership:** `DemographicProfile` (data-driven
+  species/culture template: fertility/mortality/lifespan, consumption,
+  workforce participation, migration tendency, education rate),
+  `CohortKey`/`PopulationCohort` (species × culture × occupation ×
+  education × wealth aggregate with health/happiness/morale, housing,
+  employment, environment suitability, 8-bucket age distribution),
+  `Population` (cohort set) advancing under `SettlementConditions`:
+  births, attributed deaths (starvation/environmental/overcrowding/
+  insecurity/unhoused, healthcare-relieved), aging, quality drift with
+  a hard food cap on happiness, equal-share employment, education-level
+  cohort migration, explicit `take_emigrants`/`take_immigrants` slices
+  and `migration_pressure` reporting.
+- **Consumers/tests:** `population` tests — growth/decline accounting,
+  starvation and environmental mortality, cohort merge, workforce and
+  unemployment, education progression, aging, migration slices,
+  determinism, 17M-headcount scale run. Colony framework consumption
+  pending.
+- **Save/performance impact:** plain data state, serializes directly;
+  cost scales with cohort count (hundreds), not headcount.
+- **Limitations:** uniform (not per-bucket) mortality draw; equal-share
+  job allocation; culture/wealth mobility beyond education TBD.
+
 ## Generic resource + economy catalog framework (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 2 — a reusable,
@@ -120,7 +147,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `dormant_items()` feeds bulk analytic propagation. Reports/stats:
   `SimulationStepReport` (eligible/ran/deferred/wakeups/wall/jobs),
   per-domain run/ns stats, `tick_history` percentiles, `tier_counts`,
-  `total_wakeups`.
+  `total_wakeups`. Persistence: `capture_state`/`restore_state` on both
+  layers carry tick, tiers, last-run/dormant bookkeeping, pending
+  dirty/event wakeups and pause — taskless snapshot keys are reported
+  unmatched instead of scheduled.
 - **Consumers/tests:** `simulation_executor` functional tests (cadence,
   elapsed catch-up, dirty/event/dormant wakes, ordering, budgets,
   pause, promotion, parallel≡serial state) and

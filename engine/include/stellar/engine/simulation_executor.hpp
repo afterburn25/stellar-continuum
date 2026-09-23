@@ -153,6 +153,28 @@ public:
     [[nodiscard]] std::uint64_t total_wakeups() const noexcept { return total_wakeups_; }
     [[nodiscard]] const SimulationScheduler& scheduler() const noexcept { return scheduler_; }
 
+    // --- persistence -------------------------------------------------
+    // Serializable executor state: scheduler bookkeeping plus pending
+    // dirty/event wakeups and the pause flag. Task callbacks are code —
+    // the owner re-registers tasks after load, then calls restore_state.
+    // Diagnostic counters (domain stats, tick history, wakeup totals)
+    // are intentionally not persisted; they are observability, not
+    // authoritative simulation state.
+    struct State {
+        std::uint32_t version{1};
+        SimulationScheduler::State scheduler;
+        std::vector<Key> dirty; // sorted
+        std::vector<Key> wake;  // sorted
+        bool paused{};
+    };
+    [[nodiscard]] State capture_state() const;
+    // Applies scheduler/wakeup/pause state. Tasks must already be
+    // registered — snapshot keys with no registered task are skipped and
+    // returned (sorted) so the caller can flag migration concerns;
+    // dirty/wake flags for unregistered keys are dropped rather than
+    // parked, because plan_tick would fail on a taskless key.
+    std::vector<Key> restore_state(const State& state);
+
 private:
     // One eligible execution unit for this tick.
     struct WorkItem {

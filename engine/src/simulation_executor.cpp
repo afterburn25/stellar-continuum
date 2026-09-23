@@ -320,6 +320,42 @@ SimulationExecutor::advance_parallel(JobSystem& jobs, SimulationBudget budget) {
     return report;
 }
 
+SimulationExecutor::State SimulationExecutor::capture_state() const {
+    State state;
+    state.scheduler = scheduler_.capture_state();
+    state.dirty.assign(dirty_.begin(), dirty_.end());
+    state.wake.assign(wake_.begin(), wake_.end());
+    std::sort(state.dirty.begin(), state.dirty.end());
+    std::sort(state.wake.begin(), state.wake.end());
+    state.paused = paused_;
+    return state;
+}
+
+std::vector<SimulationExecutor::Key>
+SimulationExecutor::restore_state(const State& state) {
+    // Snapshot keys need a registered task — the scheduler alone cannot
+    // carry a key the executor would fail to plan. Filter them out and
+    // report them to the caller.
+    std::vector<Key> unmatched;
+    SimulationScheduler::State sched = state.scheduler;
+    std::erase_if(sched.items, [&](const SimulationScheduler::ItemState& item) {
+        const bool missing = !tasks_.count(item.key);
+        if (missing) unmatched.push_back(item.key);
+        else tasks_.at(item.key).tier = item.tier;
+        return missing;
+    });
+    std::sort(unmatched.begin(), unmatched.end());
+    scheduler_.restore_state(sched);
+    dirty_.clear();
+    for (const Key key : state.dirty)
+        if (tasks_.count(key)) dirty_.insert(key);
+    wake_.clear();
+    for (const Key key : state.wake)
+        if (tasks_.count(key)) wake_.insert(key);
+    paused_ = state.paused;
+    return unmatched;
+}
+
 const SimulationDomainStats*
 SimulationExecutor::domain_stats(std::string_view domain) const {
     const auto it = domain_stats_.find(std::string(domain));

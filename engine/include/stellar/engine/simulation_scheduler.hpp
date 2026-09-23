@@ -92,6 +92,32 @@ public:
 
     [[nodiscard]] const SimulationTierPolicy& policy() const noexcept { return policy_; }
 
+    // --- persistence -------------------------------------------------
+    // Serializable per-item state: tier plus the tick bookkeeping that
+    // drives elapsed accounting (last run for scheduled tiers, dormant
+    // accumulation start for Dormant). The scheduler holds no callbacks,
+    // so its entire authoritative state is data.
+    struct ItemState {
+        Key key{};
+        SimulationTier tier{};
+        Tick last_run{};         // valid when has_last_run
+        bool has_last_run{};
+        Tick dormant_since{};    // valid when has_dormant_since
+        bool has_dormant_since{};
+    };
+    struct State {
+        std::uint32_t version{1};
+        Tick tick{};
+        std::vector<ItemState> items; // sorted by key
+    };
+    [[nodiscard]] State capture_state() const;
+    // Restores tick and per-item state. Snapshot items are registered if
+    // absent; existing keys are overwritten (timers are restored exactly,
+    // not reset the way set_tier() would). Local keys missing from the
+    // snapshot keep their current state — the caller decides whether that
+    // is a migration case.
+    void restore_state(const State& state);
+
 private:
     SimulationTierPolicy policy_;
     std::unordered_map<Key, SimulationTier> items_;

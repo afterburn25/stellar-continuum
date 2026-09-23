@@ -101,6 +101,43 @@ std::vector<SimulationScheduler::Key> SimulationScheduler::dormant_keys() const 
     return keys;
 }
 
+SimulationScheduler::State SimulationScheduler::capture_state() const {
+    State state;
+    state.tick = tick_;
+    state.items.reserve(items_.size());
+    for (const auto& [key, tier] : items_) {
+        ItemState item;
+        item.key = key;
+        item.tier = tier;
+        if (const auto it = last_run_.find(key); it != last_run_.end()) {
+            item.last_run = it->second;
+            item.has_last_run = true;
+        }
+        if (const auto it = dormant_since_.find(key); it != dormant_since_.end()) {
+            item.dormant_since = it->second;
+            item.has_dormant_since = true;
+        }
+        state.items.push_back(item);
+    }
+    std::sort(state.items.begin(), state.items.end(),
+              [](const ItemState& a, const ItemState& b) { return a.key < b.key; });
+    return state;
+}
+
+void SimulationScheduler::restore_state(const State& state) {
+    tick_ = state.tick;
+    for (const ItemState& item : state.items) {
+        if (item.tier >= SimulationTier::Count)
+            throw std::invalid_argument(
+                "SimulationScheduler snapshot tier out of range");
+        items_[item.key] = item.tier;
+        if (item.has_last_run) last_run_[item.key] = item.last_run;
+        else last_run_.erase(item.key);
+        if (item.has_dormant_since) dormant_since_[item.key] = item.dormant_since;
+        else dormant_since_.erase(item.key);
+    }
+}
+
 std::array<std::size_t, static_cast<std::size_t>(SimulationTier::Count)>
 SimulationScheduler::tier_counts() const {
     std::array<std::size_t, static_cast<std::size_t>(SimulationTier::Count)> counts{};
