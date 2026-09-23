@@ -38,6 +38,13 @@ struct RuntimeHostOptions {
   std::string music_clip_alt{"audio/music.mp3"};
   std::string bounce_clip{"audio/bounce.wav"};
   std::string bounce_clip_alt{"audio/bounce.mp3"};
+  // Simulation step rate: 0 (default) integrates per rendered frame with
+  // wall-clock dt; >0 accumulates real time and steps on_update + movement
+  // at a fixed rate so simulation is deterministic regardless of FPS.
+  double fixed_timestep_hz{0.0};
+  // 0 = run until quit; >0 exits after that many rendered frames — lets CI
+  // and scripts smoke-test that a built game starts and ticks.
+  int frame_limit{0};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
@@ -57,6 +64,9 @@ public:
 
   [[nodiscard]] World &world();
   [[nodiscard]] const ContentResolver &content() const;
+  // Valid only while run() is on the stack (i.e. inside callbacks) — the
+  // output device is scoped to the SDL loop so it tears down before the
+  // window does.
   [[nodiscard]] audio::AudioOutput &audio();
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
@@ -71,8 +81,10 @@ public:
   // Extra overlay primitives each frame, drawn above the scene entities.
   std::function<void(native_map::DrawList &, float w, float h)> on_draw;
 
-  // Owns the SDL loop; returns the process exit code.
+  // Owns the SDL loop; returns the process exit code. The argv overload
+  // applies `--frames N` / `--fixed-hz N` overrides to the options.
   int run();
+  int run(int argc, char **argv);
 
 private:
   struct Impl;

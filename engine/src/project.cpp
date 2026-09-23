@@ -180,7 +180,7 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "// this file only declares the project and your game logic.\n"
        << "#include <stellar/engine/runtime_host.hpp>\n\n"
        << "namespace engine = stellar::engine;\n\n"
-       << "int main() {\n"
+       << "int main(int argc, char **argv) {\n"
        << "  engine::RuntimeHost host{\n"
        << "      {.package_id = \"" << id << "\",\n"
        << "       .window_title = \"" << display << "\"}};\n\n"
@@ -191,7 +191,9 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "  host.on_update = [](engine::World &world, float dt) {\n"
        << "    (void)world; (void)dt;\n"
        << "  };\n\n"
-       << "  return host.run();\n"
+       << "  // '--frames N' renders N frames then exits (CI smoke tests);\n"
+       << "  // '--fixed-hz N' runs deterministic fixed-timestep simulation.\n"
+       << "  return host.run(argc, argv);\n"
        << "}\n";
   } else {
     stub << "// " << display << " - Stellar Engine game host (blank "

@@ -7,6 +7,8 @@
 #include "stellar/engine/texture_cook.hpp"
 
 #include <chrono>
+#include <cstdlib>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -18,7 +20,9 @@ struct RuntimeHost::Impl {
   RuntimeHostOptions options;
   World world;
   std::unique_ptr<ContentResolver> content;
-  audio::AudioOutput audio;
+  // Points at run()'s scoped AudioOutput — the device must shut down before
+  // the Window quits SDL, so it cannot be a member.
+  audio::AudioOutput *audio = nullptr;
   std::vector<EntityId> entities;
   std::vector<std::shared_ptr<const RgbaImage>> sprites;
   std::optional<EntityId> player;
@@ -35,7 +39,7 @@ RuntimeHost &RuntimeHost::operator=(RuntimeHost &&) noexcept = default;
 
 World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
-audio::AudioOutput &RuntimeHost::audio() { return impl_->audio; }
+audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
 
 int RuntimeHost::run() {
@@ -61,6 +65,11 @@ int RuntimeHost::run() {
                 options.fullscreen, exe_dir / "engine-default-font.ttf");
   window.set_auto_frame_cap();
 
+  // Scoped to run() so its SDL audio teardown precedes ~Window's SDL_Quit.
+  audio::AudioOutput audio_output;
+  impl.audio = &audio_output;
+  auto &audio = audio_output;
+
   auto load_clip = [&](const std::string &name)
       -> std::shared_ptr<const audio::AudioClip> {
     if (const auto bytes = impl.content->read_bytes(name)) {
@@ -78,10 +87,10 @@ int RuntimeHost::run() {
     bounce_clip = load_clip(options.bounce_clip_alt);
   if (!options.music_clip.empty()) {
     if (const auto music = load_clip(options.music_clip))
-      impl.audio.play_music(music);
+      audio.play_music(music);
     else if (!options.music_clip_alt.empty())
       if (const auto mp3 = load_clip(options.music_clip_alt))
-        impl.audio.play_music(mp3);
+        audio.play_music(mp3);
   }
 
   // Decodes a content-relative sprite. Prefers the cooked package (BC7 mip
@@ -165,6 +174,8 @@ int RuntimeHost::run() {
   };
 
   std::unordered_set<std::uint32_t> held_keys;
+  float accumulator = 0.f;
+  int rendered = 0;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
   for (;;) {
@@ -210,29 +221,45 @@ int RuntimeHost::run() {
       }
     }
 
-    if (on_update) on_update(world, dt);
-
-    // Movement system: integrate velocity, bounce off the frame.
-    for (const auto entity : impl.entities) {
-      auto *t = world.get<Transform2D>(entity);
-      auto *v = world.get<Velocity2D>(entity);
-      const auto *ext = world.get<Extent2D>(entity);
-      if (!t || !v || !ext) continue;
-      t->x += v->dx * dt;
-      t->y += v->dy * dt;
-      bool bounced = false;
-      if (t->x < 0 || t->x > w - ext->w) {
-        v->dx = -v->dx;
-        bounced = true;
+    // Simulation step: fixed-timestep mode accumulates real time and steps
+    // at a constant rate so gameplay is frame-rate independent.
+    const float step = options.fixed_timestep_hz > 0.0
+                           ? static_cast<float>(1.0 / options.fixed_timestep_hz)
+                           : 0.f;
+    auto simulate = [&](float dt_step) {
+      if (on_update) on_update(world, dt_step);
+      for (const auto entity : impl.entities) {
+        auto *t = world.get<Transform2D>(entity);
+        auto *v = world.get<Velocity2D>(entity);
+        const auto *ext = world.get<Extent2D>(entity);
+        if (!t || !v || !ext) continue;
+        t->x += v->dx * dt_step;
+        t->y += v->dy * dt_step;
+        bool bounced = false;
+        if (t->x < 0 || t->x > w - ext->w) {
+          v->dx = -v->dx;
+          bounced = true;
+        }
+        if (t->y < 0 || t->y > h - ext->h) {
+          v->dy = -v->dy;
+          bounced = true;
+        }
+        if (bounced && impl.player && entity == *impl.player && bounce_clip)
+          audio.play_effect(bounce_clip);
       }
-      if (t->y < 0 || t->y > h - ext->h) {
-        v->dy = -v->dy;
-        bounced = true;
+    };
+    if (step > 0.f) {
+      accumulator += dt;
+      // Cap catch-up work so a suspended frame cannot spiral.
+      for (int n = 0; n < 8 && accumulator >= step; ++n) {
+        simulate(step);
+        accumulator -= step;
       }
-      if (bounced && impl.player && entity == *impl.player && bounce_clip)
-        impl.audio.play_effect(bounce_clip);
+      if (accumulator >= step) accumulator = 0.f;
+    } else {
+      simulate(dt);
     }
-    impl.audio.service();
+    audio.service();
 
     DrawList draw;
     draw.overlay.push_back(FilledRectangle{{0, 0, w, h}, {8, 16, 26, 255}});
@@ -275,8 +302,21 @@ int RuntimeHost::run() {
     }
     if (on_draw) on_draw(draw, w, h);
     window.draw(draw);
+    if (options.frame_limit > 0 && ++rendered >= options.frame_limit)
+      break;
   }
   return plan.ok ? 0 : 1;
+}
+
+int RuntimeHost::run(int argc, char **argv) {
+  for (int i = 1; i + 1 < argc; ++i) {
+    const std::string_view arg{argv[i]};
+    if (arg == "--frames")
+      impl_->options.frame_limit = std::atoi(argv[++i]);
+    else if (arg == "--fixed-hz")
+      impl_->options.fixed_timestep_hz = std::atof(argv[++i]);
+  }
+  return run();
 }
 
 } // namespace stellar::engine

@@ -80,7 +80,7 @@ int main() {
     const std::string text{std::istreambuf_iterator<char>(input),
                            std::istreambuf_iterator<char>()};
     check(text.find("engine::RuntimeHost") != std::string::npos &&
-              text.find("host.run()") != std::string::npos &&
+              text.find("host.run(argc, argv)") != std::string::npos &&
               text.find("on_update") != std::string::npos,
           "windowed starter is a RuntimeHost client");
   }
