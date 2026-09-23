@@ -6342,6 +6342,7 @@ class NativeCampaign final {
     stellar::engine::RuntimeDiagnostics::context(crash_context);
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
+    stellar_art_.set_reduce_flashing(general_settings_&&general_settings_->saved().reduce_flashing);
     stellar_art_.begin_frame();
     eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};

@@ -42,7 +42,7 @@ GeneralSettingsLayout GeneralSettingsLayout::for_viewport(int width,int height) 
   return {s,std::max(12,static_cast<int>(std::lround(17*s))),std::max(16,static_cast<int>(std::lround(26*s))),panel,
     r(30,65,150,32),r(192,65,150,32),r(30,257,620,90),r(30,355,620,48),
     r(30,424,146,40),r(188,424,146,40),r(346,424,146,40),r(504,424,146,40),r(358,65,292,32),r(30,111,620,32),
-    r(30,153,304,32),r(346,153,304,32)};
+    r(30,153,200,32),r(448,153,202,32),r(236,153,206,32)};
 }
 NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(std::move(path)) {
   try {
@@ -57,7 +57,7 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     const auto json=nlohmann::json::parse(std::string(bytes.data(),static_cast<std::size_t>(input.gcount())),
       [&](int depth,nlohmann::json::parse_event_t event,nlohmann::json& value){
         if(depth==1&&event==nlohmann::json::parse_event_t::key){auto key=value.get<std::string>();if(std::find(keys.begin(),keys.end(),key)!=keys.end())duplicate=true;keys.push_back(std::move(key));}return true;});
-    if(duplicate||!json.is_object()||(json.size()!=2&&json.size()<4||json.size()>8)||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
+    if(duplicate||!json.is_object()||(json.size()!=2&&json.size()<4||json.size()>9)||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
        json.at("schemaVersion")!=1||!json.contains("screenshotDirectory")||!json.at("screenshotDirectory").is_string())throw std::runtime_error("unsupported settings schema");
     const auto encoded=json.at("screenshotDirectory").get<std::string>();
     const auto value=std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(encoded.data()),encoded.size()));
@@ -68,6 +68,7 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     if(json.contains("nebulaDensity")){if(!json.at("nebulaDensity").is_number_integer())throw std::runtime_error("Invalid visual density");const auto density=json.at("nebulaDensity").get<int>();if(density<0||density>2)throw std::runtime_error("Invalid visual density");saved_.nebula_density=density;}
     if(json.contains("reduceMotion")){if(!json.at("reduceMotion").is_boolean())throw std::runtime_error("Invalid reduced motion flag");saved_.reduce_motion=json.at("reduceMotion").get<bool>();}
     if(json.contains("interfaceScale")){if(!json.at("interfaceScale").is_number_integer())throw std::runtime_error("Invalid interface scale");const auto scale=json.at("interfaceScale").get<int>();if(scale<0||scale>3)throw std::runtime_error("Invalid interface scale");saved_.interface_scale=scale;}
+    if(json.contains("reduceFlashing")){if(!json.at("reduceFlashing").is_boolean())throw std::runtime_error("Invalid reduced flashing flag");saved_.reduce_flashing=json.at("reduceFlashing").get<bool>();}
   } catch(const std::exception& error) {
     error_="Saved screenshot folder unavailable. The default location is active.";
     std::cerr<<"General settings load failed: "<<error.what()<<'\n';
@@ -79,7 +80,7 @@ bool NativeGeneralSettings::save(GeneralPreferences value) {
   if(value.nebula_density<0||value.nebula_density>2){error_="Choose Low, Medium or High nebula density.";return false;}
   if(!valid_directory(value.screenshot_directory)){error_="Choose an existing absolute folder.";return false;}
   try {
-    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.reduce_motion},{"interfaceScale",value.interface_scale}}.dump();
+    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.reduce_flashing}}.dump();
     if(text.size()>maximum_bytes)throw std::runtime_error("settings are oversized");
     stellar::engine::write_file_atomically(path_,std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
   } catch(const std::exception& error) {
@@ -152,7 +153,7 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   if(nebula_dropdown_.visible()){if(const auto choice=nebula_dropdown_.handle(event,GeneralSettingsLayout::for_viewport(width,height).nebula,width,height))draft_.nebula_density=*choice;return true;}
   if(event.type==InputEventType::EscapePressed){cancel();return true;}
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
-  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.browse,layout.defaults,layout.cancel,layout.save}));
+  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.browse,layout.defaults,layout.cancel,layout.save}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
     const auto max_scroll=std::max(0.f,static_cast<float>(measure_(text).height)-text.clip->height);
@@ -165,6 +166,7 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   if(layout.nebula.contains(event.position)){nebula_dropdown_.open(0,{"Low","Medium","High"},draft_.nebula_density);return true;}
   if(layout.motion.contains(event.position)){draft_.reduce_motion=!draft_.reduce_motion;return true;}
   if(layout.iscale.contains(event.position)){draft_.interface_scale=(draft_.interface_scale+1)%4;return true;}
+  if(layout.flashing.contains(event.position)){draft_.reduce_flashing=!draft_.reduce_flashing;return true;}
   if(layout.audio.contains(event.position)&&audio_){cancel();audio_();}
   else if(layout.video.contains(event.position)&&video_){cancel();video_();}
   else if(layout.browse.contains(event.position)) {
@@ -195,6 +197,7 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   const std::array<std::string,4> scale_names{quality_name("SETTINGS_SCALE_COMPACT","Compact"),quality_name("SETTINGS_SCALE_STANDARD","Standard"),
     quality_name("SETTINGS_SCALE_LARGE","Large"),quality_name("SETTINGS_SCALE_HUGE","Huge")};
   button(draw,l.iscale,trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.flashing,trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),l.font_pixels,false,browsing());
   label(draw,{l.folder.x,l.panel.y+199*s,l.folder.width,26*s},tr("SETTINGS_SCREENSHOT_FOLDER","SCREENSHOT FOLDER"),l.font_pixels);
   label(draw,{l.folder.x,l.panel.y+229*s,l.folder.width,25*s},tr("SETTINGS_SCREENSHOT_HINT","Press F12 to save a PNG of the game."),l.font_pixels);
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});

@@ -486,6 +486,16 @@ int main() {
       require(find_text_label(draw,"Interface scale: Large").value.size()>0,"Interface scale state was not rendered");
     }
     {
+      NativeGeneralSettings flash(temp.path/"flash.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      flash.open();click_button(flash,l.flashing,"reduce flashing toggle");
+      require(flash.draft().reduce_flashing&&!flash.saved().reduce_flashing,"Reduce flashing click did not stay in draft");
+      click_button(flash,l.save,"save reduce flashing");
+      NativeGeneralSettings reloaded(temp.path/"flash.json");
+      require(reloaded.saved().reduce_flashing,"Reduce flashing preference did not persist");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Reduce flashing: On").value.size()>0,"Reduce flashing state was not rendered");
+    }
+    {
       // Localization: loaded keys override literals; missing keys fall back.
       stellar::engine::LocalizationTable locale{"en","en"};
       std::string lerr;

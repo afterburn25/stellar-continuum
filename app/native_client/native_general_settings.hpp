@@ -23,6 +23,8 @@ struct GeneralPreferences final {
   // Accessibility: pauses decorative motion (system tumble, planet spin,
   // eruption animation) without touching simulation or authoritative clocks.
   bool reduce_motion{};
+  // Accessibility: holds pulsing emissive artwork at steady luminance.
+  bool reduce_flashing{};
   // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
   // Applied as a user multiplier on top of the viewport-derived UI scale.
   int interface_scale{1};
@@ -44,7 +46,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
-  stellar::native_map::UiRect motion,iscale;
+  stellar::native_map::UiRect motion,iscale,flashing;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
