@@ -299,6 +299,12 @@ int RuntimeHost::run() {
     const float h = static_cast<float>(snapshot.drawable_height);
     impl.view_w = static_cast<int>(w);
     impl.view_h = static_cast<int>(h);
+    // World bounds default to the viewport (single-screen world); camera
+    // games set world_width/height for larger levels.
+    const float world_w =
+        options.world_width > 0.f ? options.world_width : w;
+    const float world_h =
+        options.world_height > 0.f ? options.world_height : h;
 
     // Input system: WASD/arrow keys drive the entity named "player"
     // (SDL3 keycodes: arrows are 0x4000004f-0x40000052).
@@ -333,15 +339,15 @@ int RuntimeHost::run() {
         t->x += v->dx * dt_step;
         t->y += v->dy * dt_step;
         bool bounced = false;
-        if (t->x < 0 || t->x > w - ext->w) {
+        if (t->x < 0 || t->x > world_w - ext->w) {
           v->dx = -v->dx;
           bounced = true;
-          t->x = std::clamp(t->x, 0.f, w - ext->w);
+          t->x = std::clamp(t->x, 0.f, world_w - ext->w);
         }
-        if (t->y < 0 || t->y > h - ext->h) {
+        if (t->y < 0 || t->y > world_h - ext->h) {
           v->dy = -v->dy;
           bounced = true;
-          t->y = std::clamp(t->y, 0.f, h - ext->h);
+          t->y = std::clamp(t->y, 0.f, world_h - ext->h);
         }
         if (bounced && impl.player && entity == *impl.player && bounce_clip)
           audio.play_effect(bounce_clip);
@@ -483,6 +489,12 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.fullscreen = std::atoi(argv[++i]) != 0;
     else if (arg == "--speed")
       impl_->options.time_scale = std::atof(argv[++i]);
+    else if (arg == "--world-w")
+      impl_->options.world_width =
+          static_cast<float>(std::atof(argv[++i]));
+    else if (arg == "--world-h")
+      impl_->options.world_height =
+          static_cast<float>(std::atof(argv[++i]));
   }
   return run();
 }

@@ -28,6 +28,10 @@ struct RuntimeHostOptions {
   std::string window_title{"Stellar Game"};
   int width{1280}, height{720};
   bool fullscreen{false};
+  // World-space bounds for the built-in wall bounce, independent of the
+  // window size — pair with set_camera for worlds larger than one screen.
+  // 0 (default) uses the viewport size (a single-screen world).
+  float world_width{0.0f}, world_height{0.0f};
   // Working root for packages/, mods/, build/cooked/ and editor/.
   std::filesystem::path project_root{"."};
   // Polled for changes; saving it hot-reloads the running scene.
@@ -126,7 +130,8 @@ public:
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
-  // `--scene <path>` / `--width` / `--height` / `--fullscreen` overrides.
+  // `--scene <path>` / `--width` / `--height` / `--fullscreen` /
+  // `--world-w` / `--world-h` overrides.
   int run();
   int run(int argc, char **argv);
 
