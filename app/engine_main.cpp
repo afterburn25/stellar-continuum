@@ -42,6 +42,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -201,7 +202,11 @@ struct Shell {
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_data{}, hit_scene_opacity{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
-      hit_scene_ttl{}, scene_preview{}, scene_rows{};
+      hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tileset{},
+      hit_scene_tilesize{}, hit_scene_tilecols{},
+      hit_scene_tilecollide{}, hit_scene_tilelayer{},
+      hit_scene_tilepar{}, hit_scene_tilecells{},
+      scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -978,6 +983,73 @@ void commit_scene_field(Shell &shell) {
     shell.scene_buffer.clear();
     return;
   }
+  // Fields 30+ edit the document tilemap; committing creates it on demand
+  // so "tileset" alone is enough to begin a grid.
+  if (shell.scene_field >= 30) {
+    auto tm = shell.scene_doc.tilemap.value_or(engine::SceneTilemap{});
+    bool ok = false;
+    if (shell.scene_field == 30) {
+      tm.tileset = shell.scene_buffer;
+      ok = true;
+    } else if (shell.scene_field == 31) {
+      float w, h;
+      ok = parse_pair(shell.scene_buffer, w, h);
+      if (ok) {
+        tm.tile_w = std::max(1, static_cast<int>(w));
+        tm.tile_h = std::max(1, static_cast<int>(h));
+      }
+    } else if (shell.scene_field == 32) {
+      try {
+        tm.columns = std::max(0, std::stoi(shell.scene_buffer));
+        ok = true;
+      } catch (const std::exception &) {
+      }
+    } else if (shell.scene_field == 33) {
+      const auto b = shell.scene_buffer;
+      if (b == "1" || b == "true" || b == "yes") {
+        tm.collide = true;
+        ok = true;
+      } else if (b == "0" || b == "false" || b == "no") {
+        tm.collide = false;
+        ok = true;
+      }
+    } else if (shell.scene_field == 34) {
+      try {
+        tm.layer = std::stoi(shell.scene_buffer);
+        ok = true;
+      } catch (const std::exception &) {
+      }
+    } else if (shell.scene_field == 35) {
+      try {
+        tm.parallax = std::stof(shell.scene_buffer);
+        ok = true;
+      } catch (const std::exception &) {
+      }
+    } else if (shell.scene_field == 36) {
+      tm.cells.clear();
+      std::stringstream ss(shell.scene_buffer);
+      std::string item;
+      ok = true;
+      while (std::getline(ss, item, ',')) {
+        try {
+          tm.cells.push_back(std::stoi(item));
+        } catch (const std::exception &) {
+          ok = false;
+          break;
+        }
+      }
+    }
+    if (ok) {
+      shell.scene_history.commit(shell.scene_doc);
+      shell.scene_doc.tilemap = std::move(tm);
+      shell.scene_modified = true;
+      shell.status = "tilemap updated - SAVE to persist";
+    } else {
+      shell.status = "invalid value - check the field hint";
+    }
+    shell.scene_buffer.clear();
+    return;
+  }
   auto *entity = selected_scene_entity(shell);
   if (entity == nullptr) {
     shell.scene_buffer.clear();
@@ -1138,6 +1210,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                                             shell.hit_scene_data =
                                                                 shell.hit_scene_opacity =
                                                                     {};
+    shell.hit_scene_tilemap = shell.hit_scene_tileset =
+        shell.hit_scene_tilesize = shell.hit_scene_tilecols =
+            shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
+                shell.hit_scene_tilepar = shell.hit_scene_tilecells = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1179,6 +1255,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_up, "UP", !can_up, font, s);
   shell.hit_scene_down = {x + 786 * s, y, 80 * s, bh};
   shell_button(out, shell.hit_scene_down, "DOWN", !can_down, font, s);
+  shell.hit_scene_tilemap = {x + 876 * s, y, 118 * s, bh};
+  shell_button(out, shell.hit_scene_tilemap,
+               shell.scene_doc.tilemap ? "TILES -" : "TILES +", false, font,
+               s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1223,8 +1303,63 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const auto preview_now = std::chrono::duration<float>(
       std::chrono::steady_clock::now().time_since_epoch())
                                .count();
+  // The tilemap paints at its layer, splitting the entity pass — mirrors
+  // the runtime's draw ordering.
+  bool tilemap_drawn = false;
+  const auto draw_tilemap = [&] {
+    tilemap_drawn = true;
+    if (!shell.scene_doc.tilemap) return;
+    const auto &tm = *shell.scene_doc.tilemap;
+    if (tm.columns <= 0 || tm.tile_w <= 0 || tm.tile_h <= 0) return;
+    std::shared_ptr<const RgbaImage> tiles;
+    if (!tm.tileset.empty()) {
+      const auto full = (shell.project->root / "packages" /
+                         shell.project->id / "content" / tm.tileset)
+                            .lexically_normal();
+      const auto key = full.generic_string();
+      if (const auto it = shell.scene_sprites.find(key);
+          it != shell.scene_sprites.end()) {
+        tiles = it->second;
+      } else {
+        try {
+          tiles = decode_rgba_image(full, 1024);
+        } catch (const std::exception &) {
+        }
+        shell.scene_sprites[key] = tiles;
+      }
+    }
+    const int set_cols =
+        tiles ? tiles->width() / tm.tile_w : 0;
+    const int rows = static_cast<int>(tm.cells.size() / tm.columns);
+    for (int cy = 0; cy < rows; ++cy)
+      for (int cx = 0; cx < tm.columns; ++cx) {
+        const int cell = tm.cells[cy * tm.columns + cx];
+        if (cell < 0) continue;
+        const UiRect rect{pv.x + cx * tm.tile_w * sx,
+                          pv.y + cy * tm.tile_h * sy,
+                          tm.tile_w * sx, tm.tile_h * sy};
+        if (tiles && set_cols > 0) {
+          out.overlay.push_back(Image{
+              tiles, rect,
+              UiRect{static_cast<float>((cell % set_cols) * tm.tile_w),
+                     static_cast<float>((cell / set_cols) * tm.tile_h),
+                     static_cast<float>(tm.tile_w),
+                     static_cast<float>(tm.tile_h)}});
+        } else {
+          // No tileset: checkerboard so the grid remains visible.
+          const std::uint8_t v = static_cast<std::uint8_t>(
+              ((cx + cy) & 1) ? 70 : 110);
+          out.overlay.push_back(FilledRectangle{
+              rect,
+              {v, v, static_cast<std::uint8_t>(v + 30), 200}});
+        }
+      }
+  };
   for (const auto i : scene_draw_order(shell.scene_doc)) {
     const auto &e = shell.scene_doc.entities[i];
+    if (!tilemap_drawn && shell.scene_doc.tilemap &&
+        e.layer >= shell.scene_doc.tilemap->layer)
+      draw_tilemap();
     const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
     std::shared_ptr<const RgbaImage> sprite;
     if (!e.sprite.empty()) {
@@ -1280,21 +1415,29 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     if (i == shell.selected_entity)
       out.overlay.push_back(StrokedRectangle{rect, accent});
   }
+  if (!tilemap_drawn) draw_tilemap();
   out.overlay.push_back(Text{{pv.x + 6 * s, pv.y + pv.height - 16 * s},
                              "click selects - drag moves entities", muted,
                              static_cast<int>(11 * s), 0, pv});
 
-  // Property fields for the selected entity.
+  // Property fields for the selected entity. Column count adapts to the
+  // rows that fit below the preview so tilemap fields stay on-window.
   const auto *entity = selected_scene_entity(shell);
   const float fy0 = pv.y + pv.height + 14 * s;
-  const float col_w = pv.width * .5f - 8 * s;
+  const float row_pitch = (font + 12) * s + 4 * s;
+  const int rows_per_col = std::max(
+      1, static_cast<int>((body.y + body.height - fy0) / row_pitch));
+  const int field_count = 30;
+  const int cols =
+      std::max(2, (field_count + rows_per_col - 1) / rows_per_col);
+  const float col_w = pv.width / cols - 8 * s;
   float fy = fy0, fx = px;
   auto field = [&](UiRect &hit, const char *label, const std::string &value,
                    bool editing, const char *hint) {
-    // Wrap to a second column when the list reaches the window bottom.
-    if (fx == px && fy + (font + 20) * s > body.y + body.height) {
+    // Wrap to the next column when the list reaches the window bottom.
+    if (fy + (font + 20) * s > body.y + body.height) {
       fy = fy0;
-      fx = px + col_w + 16 * s;
+      fx += col_w + 16 * s;
     }
     out.overlay.push_back(Text{{fx, fy}, label, muted, font});
     hit = {fx + 90 * s, fy - 4 * s, col_w - 90 * s, (font + 8) * s};
@@ -1394,6 +1537,45 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->opacity) : "",
         shell.editing_scene && shell.scene_field == 23,
         "0-1 draw alpha");
+  // Tilemap fields (doc-level) — editing creates the tilemap on demand.
+  const auto *tm = shell.scene_doc.tilemap
+                       ? &*shell.scene_doc.tilemap
+                       : nullptr;
+  auto cell_list = [&] {
+    std::string out_s;
+    if (tm)
+      for (const int c : tm->cells) {
+        if (!out_s.empty()) out_s += ',';
+        out_s += std::to_string(c);
+      }
+    return out_s;
+  };
+  field(shell.hit_scene_tileset, "tileset", tm ? tm->tileset : "",
+        shell.editing_scene && shell.scene_field == 30,
+        "content-relative tile sheet");
+  field(shell.hit_scene_tilesize, "tilesize",
+        tm ? fmt_pair(static_cast<float>(tm->tile_w),
+                      static_cast<float>(tm->tile_h))
+           : "",
+        shell.editing_scene && shell.scene_field == 31, "cell w,h in px");
+  field(shell.hit_scene_tilecols, "tilecols",
+        tm ? std::to_string(tm->columns) : "",
+        shell.editing_scene && shell.scene_field == 32, "grid columns");
+  field(shell.hit_scene_tilecollide, "tilecol",
+        tm ? (tm->collide ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 33,
+        "cells block and catch entities");
+  field(shell.hit_scene_tilelayer, "tilelayer",
+        tm ? std::to_string(tm->layer) : "",
+        shell.editing_scene && shell.scene_field == 34,
+        "draw layer vs entities");
+  field(shell.hit_scene_tilepar, "tilepara",
+        tm ? std::to_string(tm->parallax) : "",
+        shell.editing_scene && shell.scene_field == 35,
+        "camera scroll factor");
+  field(shell.hit_scene_tilecells, "tilecells", cell_list(),
+        shell.editing_scene && shell.scene_field == 36,
+        "csv cells, -1 empty");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2265,7 +2447,35 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->data;
               else if (field == 23 && e)
                 shell.scene_buffer = std::to_string(e->opacity);
-              else shell.scene_buffer.clear();
+              else if (field >= 30) {
+                const auto *tm = shell.scene_doc.tilemap
+                                     ? &*shell.scene_doc.tilemap
+                                     : nullptr;
+                const engine::SceneTilemap dflt;
+                if (tm == nullptr) tm = &dflt;
+                if (field == 30)
+                  shell.scene_buffer = tm->tileset;
+                else if (field == 31)
+                  shell.scene_buffer = std::to_string(tm->tile_w) + "," +
+                                       std::to_string(tm->tile_h);
+                else if (field == 32)
+                  shell.scene_buffer = std::to_string(tm->columns);
+                else if (field == 33)
+                  shell.scene_buffer = tm->collide ? "true" : "false";
+                else if (field == 34)
+                  shell.scene_buffer = std::to_string(tm->layer);
+                else if (field == 35)
+                  shell.scene_buffer = std::to_string(tm->parallax);
+                else if (field == 36) {
+                  shell.scene_buffer.clear();
+                  for (const int c : tm->cells) {
+                    if (!shell.scene_buffer.empty())
+                      shell.scene_buffer += ',';
+                    shell.scene_buffer += std::to_string(c);
+                  }
+                } else
+                  shell.scene_buffer.clear();
+              } else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
             if (shell.hit_scene_name.contains(event.position))
@@ -2314,6 +2524,20 @@ int main(int argc, char **argv) {
               edit_field(22);
             else if (shell.hit_scene_opacity.contains(event.position))
               edit_field(23);
+            else if (shell.hit_scene_tileset.contains(event.position))
+              edit_field(30);
+            else if (shell.hit_scene_tilesize.contains(event.position))
+              edit_field(31);
+            else if (shell.hit_scene_tilecols.contains(event.position))
+              edit_field(32);
+            else if (shell.hit_scene_tilecollide.contains(event.position))
+              edit_field(33);
+            else if (shell.hit_scene_tilelayer.contains(event.position))
+              edit_field(34);
+            else if (shell.hit_scene_tilepar.contains(event.position))
+              edit_field(35);
+            else if (shell.hit_scene_tilecells.contains(event.position))
+              edit_field(36);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);
@@ -2380,6 +2604,17 @@ int main(int argc, char **argv) {
                 shell.selected_entity = j;
                 shell.scene_modified = true;
               }
+            } else if (shell.hit_scene_tilemap.contains(event.position)) {
+              shell.scene_history.commit(shell.scene_doc);
+              if (shell.scene_doc.tilemap)
+                shell.scene_doc.tilemap.reset();
+              else {
+                engine::SceneTilemap tm;
+                tm.columns = 16;
+                tm.cells.assign(16 * 6, -1);
+                shell.scene_doc.tilemap = std::move(tm);
+              }
+              shell.scene_modified = true;
             } else if (shell.scene_preview.contains(event.position)) {
               // Press already selected/placed; release ends the drag.
               shell.scene_dragging = false;

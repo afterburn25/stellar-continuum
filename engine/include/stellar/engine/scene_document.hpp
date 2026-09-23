@@ -63,8 +63,25 @@ struct SceneEntity {
   float opacity{1.0f};
 };
 
+// Grid terrain layer: a tileset image sliced into tile_w/tile_h cells
+// (indexed left-to-right, top-to-bottom) painted at grid positions.
+struct SceneTilemap {
+  std::string tileset;      // content-relative image path
+  int tile_w{32}, tile_h{32};
+  int columns{0};           // map cells per row (rows = cells.size()/columns)
+  int layer{-100};          // draw order vs entities (default: behind all)
+  float parallax{1.0f};     // same semantics as entity parallax
+  // When true, every non-empty cell acts as a solid for landing and
+  // side-blocking — platform terrain authored in the document.
+  bool collide{false};
+  // One tileset cell index per grid cell, row-major; <0 = empty.
+  std::vector<int> cells;
+};
+
 struct SceneDocument {
   std::vector<SceneEntity> entities;
+  // Optional grid terrain layer (absent in most scenes).
+  std::optional<SceneTilemap> tilemap;
   // Background clear color; defaults to the engine's dark space blue.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward acceleration in px/s² applied to entities' velocity each sim

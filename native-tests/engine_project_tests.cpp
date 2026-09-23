@@ -210,6 +210,13 @@ int main() {
     scene.entities[0].oneway = true;
     scene.entities[0].data = "checkpoint-7";
     scene.entities[0].opacity = 0.5f;
+    scene.tilemap = engine::SceneTilemap{};
+    scene.tilemap->tileset = "sprites/tiles.png";
+    scene.tilemap->tile_w = 32;
+    scene.tilemap->tile_h = 32;
+    scene.tilemap->columns = 4;
+    scene.tilemap->collide = true;
+    scene.tilemap->cells = {0, -1, -1, 0, 0, 1, 1, 0};
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -231,6 +238,11 @@ int main() {
               reparsed->entities[0].oneway &&
               reparsed->entities[0].data == "checkpoint-7" &&
               reparsed->entities[0].opacity == 0.5f &&
+              reparsed->tilemap &&
+              reparsed->tilemap->tileset == "sprites/tiles.png" &&
+              reparsed->tilemap->columns == 4 && reparsed->tilemap->collide &&
+              reparsed->tilemap->cells.size() == 8 &&
+              reparsed->tilemap->cells[5] == 1 &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f,
           "scene document round-trips");
@@ -246,6 +258,14 @@ int main() {
           "nameless entity rejected");
     check(!engine::SceneDocument::load(root / "nonexistent.json").has_value(),
           "missing scene file rejected");
+    check(!engine::SceneDocument::from_json(
+              R"({"entities":[],"tilemap":{"tileW":32,"tileH":32,"columns":4,"cells":[0,1,2]}})")
+              .has_value(),
+          "tilemap cell count not divisible by columns rejected");
+    check(!engine::SceneDocument::from_json(
+              R"({"entities":[],"tilemap":{"tileW":0,"tileH":32,"columns":4,"cells":[0,1,2,3]}})")
+              .has_value(),
+          "tilemap with non-positive tile size rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

@@ -54,6 +54,9 @@ struct RuntimeHost::Impl {
   // Accumulated simulation seconds — drives sprite-strip animation so
   // playback is deterministic under --fixed-hz.
   double sim_time = 0.0;
+  // Optional document tilemap + its decoded tileset image.
+  std::optional<SceneTilemap> tilemap;
+  std::shared_ptr<const RgbaImage> tileset_img;
   // Deterministic particle system stepped inside simulate() and rendered
   // as tinted rects. The host tracks every spawned instance so it can
   // re-anchor attachments, stop emitters whose entity died, and render.
@@ -219,6 +222,11 @@ int RuntimeHost::run() {
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
+    impl.tilemap = doc.tilemap;
+    impl.tileset_img =
+        impl.tilemap && !impl.tilemap->tileset.empty()
+            ? decode_sprite(impl.tilemap->tileset)
+            : nullptr;
     impl.sprites.assign(impl.entities.size(), {});
     for (std::size_t i = 0; i < impl.entities.size(); ++i) {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
@@ -389,6 +397,18 @@ int RuntimeHost::run() {
       impl.sim_time += dt_step;
       if (on_update) on_update(world, dt_step);
       impl.grounded.clear();
+      // Tilemap lookup: is the world-space point inside a solid cell?
+      const auto solid_cell = [&](float px, float py) {
+        if (!impl.tilemap || !impl.tilemap->collide ||
+            impl.tilemap->tile_w <= 0 || impl.tilemap->tile_h <= 0)
+          return false;
+        const auto &tm = *impl.tilemap;
+        const int cx = static_cast<int>(std::floor(px / tm.tile_w));
+        const int cy = static_cast<int>(std::floor(py / tm.tile_h));
+        if (cx < 0 || cy < 0 || cx >= tm.columns) return false;
+        const auto idx = static_cast<std::size_t>(cy * tm.columns + cx);
+        return idx < tm.cells.size() && tm.cells[idx] >= 0;
+      };
       // Kinematic solids: platforms with velocity integrate (no gravity)
       // and carry riders standing on their tops.
       for (const auto entity : impl.entities) {
@@ -466,6 +486,28 @@ int RuntimeHost::run() {
             }
           }
         }
+        // Tilemap side-blocking: the leading edge's corner cells stop
+        // horizontal motion (mirrors the solid-entity rule).
+        if (gscale != 0.f && v->dx != 0.f && impl.tilemap &&
+            impl.tilemap->collide) {
+          const auto &tm = *impl.tilemap;
+          const float lead = v->dx > 0.f ? t->x + ext->w : t->x;
+          const float step_y = std::max(1.f, tm.tile_h - 1.f);
+          bool blocked = false;
+          for (float cy = t->y + 1.f;
+               cy <= t->y + ext->h - 1.f && !blocked;
+               cy += step_y) {
+            blocked = solid_cell(lead, cy);
+          }
+          blocked = blocked || solid_cell(lead, t->y + ext->h - 1.f);
+          if (blocked) {
+            const int col = static_cast<int>(std::floor(lead / tm.tile_w));
+            t->x = v->dx > 0.f
+                       ? col * tm.tile_w - ext->w
+                       : (col + 1) * static_cast<float>(tm.tile_w);
+            v->dx = 0.f;
+          }
+        }
         t->y += v->dy * dt_step;
         // Platform landings: a falling, gravity-affected entity whose
         // bottom crossed a solid's top this step lands on it. One-way
@@ -485,6 +527,22 @@ int RuntimeHost::run() {
                 t->y + ext->h >= st->y) {
               t->y = st->y - ext->h;
               v->dy = 0.f;
+            }
+          }
+          // Tilemap landing: the bottom edge's cells catch a fall.
+          if (impl.tilemap && impl.tilemap->collide) {
+            const auto &tm = *impl.tilemap;
+            const float step_x = std::max(1.f, tm.tile_w - 1.f);
+            for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f;
+                 px += step_x) {
+              const int row = static_cast<int>(
+                  std::floor((t->y + ext->h) / tm.tile_h));
+              if (solid_cell(px, t->y + ext->h) &&
+                  prev_bottom <= row * tm.tile_h + 1.f) {
+                t->y = row * static_cast<float>(tm.tile_h) - ext->h;
+                v->dy = 0.f;
+                break;
+              }
             }
           }
         }
@@ -517,6 +575,22 @@ int RuntimeHost::run() {
                 std::abs(t->y + ext->h - st->y) <= 1.5f) {
               impl.grounded.insert(entity.value());
               break;
+            }
+          }
+          // Resting on a tile row counts as grounded too.
+          if (!impl.grounded.count(entity.value()) && impl.tilemap &&
+              impl.tilemap->collide) {
+            const auto &tm = *impl.tilemap;
+            const float below = t->y + ext->h + 0.5f;
+            const int row = static_cast<int>(std::floor(below / tm.tile_h));
+            if (std::abs(t->y + ext->h - row * tm.tile_h) <= 1.5f) {
+              const float step_x = std::max(1.f, tm.tile_w - 1.f);
+              for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f;
+                   px += step_x)
+                if (solid_cell(px, below)) {
+                  impl.grounded.insert(entity.value());
+                  break;
+                }
             }
           }
         }
@@ -627,11 +701,49 @@ int RuntimeHost::run() {
       const auto *lb = world.get<Layer>(impl.entities[b]);
       return (la ? la->value : 0) < (lb ? lb->value : 0);
     });
+    // The tilemap paints at its layer, splitting the entity pass.
+    bool tilemap_drawn = false;
+    auto draw_tilemap = [&] {
+      tilemap_drawn = true;
+      if (!impl.tilemap || !impl.tileset_img) return;
+      const auto &tm = *impl.tilemap;
+      if (tm.columns <= 0 || tm.tile_w <= 0 || tm.tile_h <= 0) return;
+      const auto &res = *impl.tileset_img;
+      const int set_cols = res.width() / tm.tile_w;
+      if (set_cols <= 0) return;
+      const float px = impl.cam_x * tm.parallax;
+      const float py = impl.cam_y * tm.parallax;
+      const int rows =
+          static_cast<int>(tm.cells.size() / tm.columns);
+      for (int cy = 0; cy < rows; ++cy)
+        for (int cx = 0; cx < tm.columns; ++cx) {
+          const int cell = tm.cells[cy * tm.columns + cx];
+          if (cell < 0) continue;
+          const UiRect dest{(cx * tm.tile_w - px) * impl.cam_zoom,
+                            (cy * tm.tile_h - py) * impl.cam_zoom,
+                            tm.tile_w * impl.cam_zoom,
+                            tm.tile_h * impl.cam_zoom};
+          if (dest.x + dest.width < 0 || dest.y + dest.height < 0 ||
+              dest.x > w || dest.y > h)
+            continue;
+          const UiRect src{
+              static_cast<float>((cell % set_cols) * tm.tile_w),
+              static_cast<float>((cell / set_cols) * tm.tile_h),
+              static_cast<float>(tm.tile_w),
+              static_cast<float>(tm.tile_h)};
+          draw.overlay.push_back(
+              Image{impl.tileset_img, dest, src});
+        }
+    };
     for (const auto i : order) {
       const auto *t = world.get<Transform2D>(impl.entities[i]);
       const auto *ext = world.get<Extent2D>(impl.entities[i]);
       const auto *tint = world.get<Tint>(impl.entities[i]);
       if (!t || !ext || !tint) continue;
+      const auto *el = world.get<Layer>(impl.entities[i]);
+      if (!tilemap_drawn && impl.tilemap &&
+          (el ? el->value : 0) >= impl.tilemap->layer)
+        draw_tilemap();
       const auto *px = world.get<Parallax>(impl.entities[i]);
       const float parallax = px ? px->value : 1.0f;
       const UiRect rect{(t->x - impl.cam_x * parallax) * impl.cam_zoom,
@@ -692,6 +804,7 @@ int RuntimeHost::run() {
             TextAlign::Center});
       }
     }
+    if (!tilemap_drawn) draw_tilemap();
     // Particles render above scene entities, in world space (camera
     // transform applies; no per-particle parallax — attach emitters to
     // parallax-scaled entities if layered depth is needed).

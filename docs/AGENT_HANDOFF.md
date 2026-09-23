@@ -139,8 +139,16 @@ tint, sprite path, layer (stable-sorted draw order), parallax
 physics: doc-level gravity, landing on solid tops, side blocking,
 grounded W/Up jump), sprite-strip `frames`/`fps` (horizontal cells,
 sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
-`flipX`/`flipY`, `visible`. The Scene tool exposes every field in a
-two-column property list with an animated/flipped/rotated preview.
+`flipX`/`flipY`, `visible`. Scenes also carry an optional
+`tilemap` (`SceneTilemap`: tileset image path, `tileW`/`tileH`,
+`columns`, `layer`, `parallax`, `collide`, row-major `cells` with
+`-1` empty) — RuntimeHost renders cells through the sprite path at
+its layer and runs cell collision (side-blocking, top landing,
+grounded) in the same authoritative pass. The Scene tool exposes
+every field in an adaptive multi-column property list with an
+animated/flipped/rotated preview that also paints the tilemap,
+plus a TILES toggle and tilemap fields (tileset, tile size,
+columns, collide, layer, parallax, cells CSV) under undo.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in

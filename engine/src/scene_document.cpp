@@ -45,6 +45,18 @@ std::string SceneDocument::to_json() const {
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
+  if (tilemap) {
+    nlohmann::json tm;
+    tm["tileset"] = tilemap->tileset;
+    tm["tileW"] = tilemap->tile_w;
+    tm["tileH"] = tilemap->tile_h;
+    tm["columns"] = tilemap->columns;
+    if (tilemap->layer != -100) tm["layer"] = tilemap->layer;
+    if (tilemap->parallax != 1.0f) tm["parallax"] = tilemap->parallax;
+    if (tilemap->collide) tm["collide"] = true;
+    tm["cells"] = tilemap->cells;
+    doc["tilemap"] = std::move(tm);
+  }
   return doc.dump(2) + "\n";
 }
 
@@ -112,6 +124,29 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
     scene.gravity = doc.value("gravity", 0.0f);
+    if (doc.contains("tilemap")) {
+      const auto &tm = doc.at("tilemap");
+      if (!tm.is_object()) return fail("tilemap must be an object");
+      SceneTilemap map;
+      map.tileset = tm.value("tileset", std::string{});
+      map.tile_w = tm.value("tileW", 32);
+      map.tile_h = tm.value("tileH", 32);
+      map.columns = tm.value("columns", 0);
+      map.layer = tm.value("layer", -100);
+      map.parallax = tm.value("parallax", 1.0f);
+      map.collide = tm.value("collide", false);
+      if (tm.contains("cells")) {
+        const auto &cells = tm.at("cells");
+        if (!cells.is_array()) return fail("tilemap cells must be an array");
+        map.cells.reserve(cells.size());
+        for (const auto &c : cells) map.cells.push_back(c.get<int>());
+      }
+      if (map.tile_w <= 0 || map.tile_h <= 0 || map.columns <= 0 ||
+          map.cells.empty() || map.cells.size() % map.columns != 0)
+        return fail("tilemap requires positive tileW/tileH/columns and a "
+                    "cells array divisible by columns");
+      scene.tilemap = std::move(map);
+    }
   } catch (const std::exception &e) {
     return fail(std::string("malformed entity: ") + e.what());
   }
