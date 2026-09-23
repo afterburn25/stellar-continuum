@@ -317,6 +317,6 @@ int main() {
   }
   std::cout << "Framework state JSON codec tests passed "
                "(scheduler/population/colony/flow/logistics/warfare/ai/"
-               "economy/history)\n";
+               "economy/history/physics)\n";
   return 0;
 }
