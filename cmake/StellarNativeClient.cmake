@@ -17,6 +17,20 @@ add_library(stellar_native_platform STATIC engine/src/native_map_platform.cpp en
 target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
   PRIVATE SDL3::SDL3 Gdi32 User32 Shell32)
+
+# Standalone engine shell: a windowed host that links only the engine
+# libraries. It exists so the engine can run, be demonstrated, and be
+# shipped without the Stellar Continuum game module.
+add_executable(stellar-engine app/engine_main.cpp)
+target_include_directories(stellar-engine PRIVATE "${CMAKE_BINARY_DIR}/generated")
+target_link_libraries(stellar-engine PRIVATE stellar_native_platform stellar_engine)
+add_custom_command(TARGET stellar-engine POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-engine>/SDL3.dll")
+if(MSVC)
+  target_compile_options(stellar-engine PRIVATE /W4 /WX /permissive-)
+endif()
+
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_phenomena.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp
