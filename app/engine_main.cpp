@@ -149,6 +149,8 @@ struct Shell {
   std::size_t selected_project{static_cast<std::size_t>(-1)};
   std::optional<engine::EngineProject> project;
   engine::PackageRegistry package_registry;
+  // Tracked handle of the launched host process (Windows HANDLE).
+  void *run_process{};
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
   // New-project name field and panel hit regions.
@@ -444,13 +446,43 @@ void run_project(Shell &shell) {
                          shell.project->root / "build" / "host"}) {
     const auto exe = dir / exe_name;
     if (std::filesystem::is_regular_file(exe)) {
-      ShellExecuteA(nullptr, "open", exe.string().c_str(), nullptr,
-                    shell.project->root.string().c_str(), SW_SHOW);
-      shell.status = "launched " + exe_name;
+      SHELLEXECUTEINFOA info{};
+      info.cbSize = sizeof(info);
+      info.fMask = SEE_MASK_NOCLOSEPROCESS;
+      info.lpVerb = "open";
+      info.lpFile = exe.string().c_str();
+      info.lpDirectory = shell.project->root.string().c_str();
+      info.nShow = SW_SHOW;
+      if (ShellExecuteExA(&info) && info.hProcess != nullptr) {
+        shell.run_process = info.hProcess;
+        shell.status = "launched " + exe_name + " (pid " +
+                       std::to_string(GetProcessId(info.hProcess)) + ")";
+      } else {
+        shell.status = "launch failed: " + exe_name;
+      }
       return;
     }
   }
   shell.status = "no built host - run BUILD first";
+}
+
+void stop_project(Shell &shell) {
+  if (shell.run_process == nullptr) return;
+  TerminateProcess(static_cast<HANDLE>(shell.run_process), 0);
+  CloseHandle(static_cast<HANDLE>(shell.run_process));
+  shell.run_process = nullptr;
+  shell.status = "host stopped";
+}
+
+// Clears the tracked handle once the launched host exits on its own.
+void poll_run_process(Shell &shell) {
+  if (shell.run_process != nullptr &&
+      WaitForSingleObject(static_cast<HANDLE>(shell.run_process), 0) ==
+          WAIT_OBJECT_0) {
+    CloseHandle(static_cast<HANDLE>(shell.run_process));
+    shell.run_process = nullptr;
+    shell.status = "host exited";
+  }
 }
 
 // Assembles a distributable folder: the built host plus its runtime files,
@@ -555,6 +587,8 @@ void start_build(Shell &shell, engine::JobSystem &) {
 void run_project(Shell &shell) {
   shell.status = "run unavailable on this platform";
 }
+void stop_project(Shell &) {}
+void poll_run_process(Shell &) {}
 void open_editor(Shell &shell) {
   shell.status = "editor launch unavailable on this platform";
 }
@@ -854,6 +888,7 @@ void field_box(DrawList &out, const UiRect &rect, const std::string &value,
 }
 
 void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
+  poll_run_process(shell);
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
   const int font = static_cast<int>(13 * s);
@@ -941,7 +976,9 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
                  s);
     bx2 += 106 * s;
     shell.hit_project_run = {bx2, y2, 80 * s, shell.hit_project_name.height};
-    shell_button(out, shell.hit_project_run, "RUN", false, font, s);
+    shell_button(out, shell.hit_project_run,
+                 shell.run_process != nullptr ? "STOP" : "RUN",
+                 shell.run_process != nullptr, font, s);
     bx2 += 90 * s;
     shell.hit_project_editor = {bx2, y2, 104 * s,
                                 shell.hit_project_name.height};
@@ -1242,8 +1279,12 @@ int main(int argc, char **argv) {
               start_cook(shell, jobs);
             else if (shell.hit_project_build.contains(event.position))
               start_build(shell, jobs);
-            else if (shell.hit_project_run.contains(event.position))
-              run_project(shell);
+            else if (shell.hit_project_run.contains(event.position)) {
+              if (shell.run_process != nullptr)
+                stop_project(shell);
+              else
+                run_project(shell);
+            }
             else if (shell.hit_project_editor.contains(event.position))
               open_editor(shell);
             else if (shell.hit_project_package.contains(event.position))
