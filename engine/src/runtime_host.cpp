@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -98,6 +99,20 @@ RuntimeHost::RuntimeHost(RuntimeHostOptions options)
     : impl_(std::make_unique<Impl>()) {
   impl_->options = std::move(options);
   register_scene_components(impl_->world);
+  // The deterministic RNG state is a world component so quicksaves capture
+  // it — DeterministicRandom is a single trivially-copyable uint64 state.
+  impl_->world.register_component<DeterministicRandom>(
+      "rng",
+      [](const DeterministicRandom &r) {
+        std::vector<std::uint8_t> b(sizeof r);
+        std::memcpy(b.data(), &r, sizeof r);
+        return b;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        DeterministicRandom r{0};
+        if (b.size() == sizeof r) std::memcpy(&r, b.data(), sizeof r);
+        return r;
+      });
 }
 RuntimeHost::~RuntimeHost() = default;
 RuntimeHost::RuntimeHost(RuntimeHost &&) noexcept = default;
@@ -106,6 +121,15 @@ RuntimeHost &RuntimeHost::operator=(RuntimeHost &&) noexcept = default;
 World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
+DeterministicRandom &RuntimeHost::rng() {
+  // Resolved lazily each call — restore regenerates entity ids, so the
+  // carrier is found by component rather than a cached handle.
+  for (const auto e : impl_->world.entities())
+    if (auto *r = impl_->world.get<DeterministicRandom>(e)) return *r;
+  const auto e = impl_->world.create();
+  impl_->world.add(e, DeterministicRandom{impl_->options.seed});
+  return *impl_->world.get<DeterministicRandom>(e);
+}
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
 std::optional<EntityId>
 RuntimeHost::find_entity(std::string_view name) const {
@@ -572,6 +596,11 @@ int RuntimeHost::run() {
         impl.sprites[i] = decode_sprite(sp->value);
     }
   };
+
+  // Materialize the RNG carrier and (re)seed it from options — argv
+  // overrides apply by now, and a game that rolled before run() still gets
+  // the configured stream.
+  rng() = DeterministicRandom{options.seed};
 
   // Default input context — the player-control actions. A project input
   // map JSON replaces/extends these via input_mapper.load_contexts.
@@ -1360,6 +1389,8 @@ int RuntimeHost::run(int argc, char **argv) {
           static_cast<float>(std::atof(argv[++i]));
     else if (arg == "--input-map")
       impl_->options.input_map = argv[++i];
+    else if (arg == "--seed")
+      impl_->options.seed = std::strtoull(argv[++i], nullptr, 10);
   }
   return run();
 }

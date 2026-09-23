@@ -68,6 +68,11 @@ struct RuntimeHostOptions {
   // absent/unreadable the built-in defaults apply: move_left/right/up/down
   // on WASD+arrows, jump on Space/W/Up.
   std::string input_map;
+  // Seed for the host-owned deterministic RNG (rng()) — every generated
+  // game defaults to the same stream so runs and replays match; --seed
+  // varies it. The state lives on a world entity, so F5/F9 snapshots
+  // capture it: restoring a save restores the RNG position too.
+  std::uint64_t seed{0x9E3779B97F4A7C15ull};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
@@ -222,6 +227,10 @@ public:
   // Runs each rendered frame after input handling and scene polling, before
   // the built-in velocity integration. The place for game logic.
   std::function<void(World &, float dt)> on_update;
+  // The game's deterministic random stream — loot, spawns, AI rolls. Lives
+  // on a dedicated world entity so the state snapshots and restores with
+  // F5/F9 saves (never use std::rand — it breaks run-to-run determinism).
+  [[nodiscard]] engine::DeterministicRandom &rng();
   // Observed after the host's own handling (Escape/F5/F9/held keys).
   std::function<void(const native_map::InputEvent &)> on_event;
   // Appended under the built-in status line when non-empty.
@@ -239,7 +248,7 @@ public:
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
   // `--scene <path>` / `--width` / `--height` / `--fullscreen` /
   // `--world-w` / `--world-h` / `--speed` / `--move-speed` / `--jump` /
-  // `--save <path>` / `--input-map <path>` overrides.
+  // `--save <path>` / `--input-map <path>` / `--seed` overrides.
   int run();
   int run(int argc, char **argv);
 
