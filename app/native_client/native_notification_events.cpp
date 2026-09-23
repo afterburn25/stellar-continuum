@@ -1,5 +1,6 @@
 #include "native_notification_events.hpp"
 #include "native_campaign_calendar.hpp"
+#include "native_chronicle.hpp"
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -7,15 +8,6 @@
 
 namespace stellar::native_notifications {
 namespace {
-const char* chronicle_category_label(std::string_view category){
-  if(category.starts_with("construction."))return "Construction";
-  if(category.starts_with("shipbuilding."))return "Ships";
-  if(category.starts_with("research."))return "Research";
-  if(category.starts_with("exploration."))return "Exploration";
-  if(category.starts_with("colony."))return "Colony";
-  if(category.starts_with("war."))return "Combat";
-  return nullptr;
-}
 const char* diplomatic_message(core::DiplomaticEventKind kind){
   using enum core::DiplomaticEventKind;
   switch(kind){
@@ -59,7 +51,7 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
                                            :events.begin();
   for(auto it=begin;it!=events.end();++it){
     const auto* event=*it;
-    const char* label=chronicle_category_label(event->category);
+    const char* label=native_chronicle::category_label(event->category);
     feed.publish(label?std::string(label):event->category,
         native_campaign::format_campaign_date(event->at_day),event->summary);
   }

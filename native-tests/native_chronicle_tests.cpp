@@ -1,0 +1,118 @@
+#include "native_chronicle.hpp"
+
+#include <iostream>
+#include <stdexcept>
+#include <vector>
+
+using namespace stellar;
+using namespace stellar::native_chronicle;
+
+namespace {
+void require(bool value, const char *message) {
+  if (!value) throw std::runtime_error(message);
+}
+
+engine::EventHistory make_history() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category, std::string summary,
+                       std::vector<std::uint64_t> visible = {}) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.category = std::move(category);
+    event.summary = std::move(summary);
+    event.visible_to = std::move(visible);
+    history.record(std::move(event));
+  };
+  add(400., "exploration.system_surveyed", "System survey completed");
+  add(410., "war.battle", "FOREIGN BATTLE REPORT", {7});
+  add(420., "colony.founded", "Colony established", {1});
+  add(430., "custom.record", "Uncategorized record", {1});
+  return history;
+}
+
+void snapshot_projection() {
+  const auto history = make_history();
+  const auto snap = snapshot(history, 1);
+  require(snap.total == 3, "Observer-invisible chronicle entry leaked");
+  require(snap.entries.size() == 3, "Visible entries lost");
+  // Newest first.
+  require(snap.entries.front().summary == "Uncategorized record" &&
+              snap.entries.back().summary == "System survey completed",
+          "Chronicle order broken");
+  require(snap.entries.front().category == "custom.record",
+          "Unmapped category lost its stable id");
+  require(snap.entries[1].category == "Colony", "Category label not mapped");
+  require(!snap.entries.front().date.empty() &&
+              snap.entries.front().date != snap.entries.back().date,
+          "Recorded event dates not preserved");
+
+  const auto foreign = snapshot(history, 7);
+  require(foreign.total == 2 &&
+              foreign.entries.front().summary == "FOREIGN BATTLE REPORT",
+          "Foreign observer saw wrong audience");
+
+  const auto bounded = snapshot(history, 1, 2);
+  require(bounded.total == 3 && bounded.entries.size() == 2 &&
+              bounded.entries.back().summary == "Colony established",
+          "Snapshot cap kept wrong entries");
+}
+
+void view_lifecycle() {
+  auto history = make_history();
+  NativeChronicleView view;
+  require(!view.visible(), "View visible before open");
+  view.open(history, 1);
+  require(view.visible() && view.current().entries.size() == 3,
+          "Open did not materialize snapshot");
+
+  // New records do not appear until refresh.
+  engine::HistoryEvent extra;
+  extra.at_day = 440.;
+  extra.category = "research.legacy";
+  extra.summary = "Research completed";
+  extra.visible_to = {1};
+  history.record(std::move(extra));
+  require(view.current().entries.size() == 3,
+          "Live history mutated an open snapshot");
+  view.refresh();
+  require(view.current().entries.size() == 4 &&
+              view.current().entries.front().summary == "Research completed",
+          "Refresh did not re-pull the chronicle");
+
+  native_map::InputEvent escape;
+  escape.type = native_map::InputEventType::EscapePressed;
+  require(view.handle(escape, 1280, 800) && !view.visible(),
+          "Escape did not close the view");
+
+  // Outside click is not consumed; inside press is.
+  view.open(history, 1);
+  native_map::InputEvent press;
+  press.type = native_map::InputEventType::LeftPressed;
+  press.position = {5.f, 5.f};
+  require(!view.handle(press, 1280, 800), "Outside press captured");
+  press.position = {640.f, 400.f};
+  require(view.handle(press, 1280, 800), "Panel press not captured");
+  view.close();
+}
+
+void render_smoke() {
+  auto history = make_history();
+  NativeChronicleView view;
+  view.open(history, 1);
+  native_map::DrawList out;
+  view.render(out, 1280, 800);
+  require(!out.overlay.empty(), "Render produced no draw commands");
+}
+} // namespace
+
+int main() {
+  try {
+    snapshot_projection();
+    view_lifecycle();
+    render_smoke();
+  } catch (const std::exception &error) {
+    std::cerr << error.what() << '\n';
+    return 1;
+  }
+  return 0;
+}

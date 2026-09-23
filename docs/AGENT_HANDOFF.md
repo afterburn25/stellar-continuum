@@ -190,8 +190,13 @@ Milestone 15 partially landed: `seed_chronicle_notifications`
 from `runtime().history().feed(player)` at campaign admission — the
 persisted chronicle now surfaces in-game after load with recorded dates
 and summaries; `native_notification_events` tests cover ordering,
-observer privacy, bounds and category labels. A scrollable chronicle
-browser and voice presentation remain.
+observer privacy, bounds and category labels. The scrollable chronicle
+browser landed with it: `native_chronicle` (`snapshot()` newest-first
+projection, 4000-entry cap with true total, `NativeChronicleView`
+overlay with refresh) opened via a CHRONICLE button in the notification
+panel header; `native_chronicle` tests cover projection, observer
+privacy, lifecycle and render smoke. Category/significance filtering
+in the browser and voice presentation remain.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

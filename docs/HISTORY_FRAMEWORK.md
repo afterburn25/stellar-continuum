@@ -100,6 +100,16 @@ chronicle's own projection — the publisher never re-derives visibility.
 Coverage: `native_notification_events` tests (chronicle ordering,
 observer filtering, bound, category labels, empty history).
 
+For history beyond the transient window, `native_chronicle` adds the
+scrollable chronicle browser: `snapshot()` projects
+`feed(observer, -inf)` into display entries (newest first, capped at
+4000 with the true total reported) and `NativeChronicleView` renders
+them as a scrollable overlay — opened from a CHRONICLE button in the
+notification panel header, refreshed on demand while open, closed on
+every session/modal transition alongside the notification view.
+Coverage: `native_chronicle` tests (snapshot ordering, observer
+privacy, cap + total, view lifecycle, refresh, render smoke).
+
 ## Remaining limitations
 
 - `summary` is an opaque string — localization-key + argument binding
@@ -109,7 +119,7 @@ observer filtering, bound, category labels, empty history).
 - Visibility widens at known-system granularity — a civ that merely
   detected a system sees its major events; delayed intel, survey-level
   gating and sensor-quality degradation are future refinements.
-- The notification panel shows only the newest 16 chronicle entries at
-  admission — a dedicated scrollable chronicle/history browser over
-  `feed()` and `query()` remains app-level work, as does voice
-  presentation.
+- The chronicle browser snapshots the newest 4000 visible entries and
+  offers no category/significance filtering yet — `query()`'s filter
+  axes are unused at the presentation layer. Voice presentation
+  remains.

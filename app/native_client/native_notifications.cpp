@@ -125,6 +125,8 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
   const float pad = 12.f * s;
   layout.header = {layout.panel.x + pad, layout.panel.y + pad, layout.panel.width - 2.f * pad, 28.f * s};
   layout.close_button = {layout.header.x + layout.header.width - 26.f * s, layout.header.y, 26.f * s, 26.f * s};
+  layout.chronicle_button = {layout.close_button.x - 88.f * s, layout.header.y,
+                             82.f * s, 26.f * s};
   const float intro_height = 32.f * s;
   layout.list_viewport = {layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
                           layout.panel.width - 2.f * pad,
@@ -227,6 +229,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     if (!layout.panel.contains(event.position)) return command;
     pointer_captured_ = true; press_origin_ = event.position; press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_bounds_.reset();
     if (layout.close_button.contains(event.position)) press_target_ = PressTarget::Close;
+    else if (layout.chronicle_button.contains(event.position)) press_target_ = PressTarget::Chronicle;
     else for (std::size_t i = 0; i < layout.entries.size(); ++i) {
       const auto& entry = layout.entries[i];
       if (!entry.contact_button || !entry.contact_button->contains(event.position) ||
@@ -259,6 +262,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   const auto pressed_bounds = pressed_bounds_;
   cancel_press();
   if (target == PressTarget::Close && layout.close_button.contains(event.position)) { close(); command.kind = NotificationViewCommandKind::Close; }
+  else if (target == PressTarget::Chronicle && layout.chronicle_button.contains(event.position)) command.kind = NotificationViewCommandKind::OpenChronicle;
   else if (target == PressTarget::Contact && contact && pressed_bounds &&
            pressed_bounds->contains(event.position)) {
     for (const auto& entry : layout.entries) {
@@ -290,6 +294,16 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
   clipped_text(out, {layout.header.x,
                      layout.header.y + (layout.header.height - title_extent.height) * .5f},
                title_text, title_color, title_pixels, 0.f, layout.header);
+  stellar::engine::ui_skin::control(out,layout.chronicle_button,layout.chronicle_button.contains(pointer_),false,true,s);
+  const auto chronicle_text=resolve(locale_,"NOTIFY_OPEN_CHRONICLE","CHRONICLE");
+  const int chronicle_pixels=std::max(9,static_cast<int>(std::lround(10.f*s)));
+  const Text chronicle_probe{{},chronicle_text,muted_color,chronicle_pixels,
+      layout.chronicle_button.width-4.f*s,std::nullopt,TextAlign::Center,FontFace::Interface};
+  const auto chronicle_extent=measure(measure_,chronicle_probe);
+  clipped_text(out,{layout.chronicle_button.x+layout.chronicle_button.width*.5f,
+                    layout.chronicle_button.y+(layout.chronicle_button.height-chronicle_extent.height)*.5f},
+      chronicle_text,muted_color,chronicle_pixels,layout.chronicle_button.width-4.f*s,
+      layout.chronicle_button,TextAlign::Center);
   stellar::engine::ui_skin::control(out,layout.close_button,layout.close_button.contains(pointer_),false,true,s);
   const int close_pixels = std::max(10, static_cast<int>(std::lround(12.f * s)));
   const Text close_probe{{}, "X", muted_color, close_pixels, 0.f,

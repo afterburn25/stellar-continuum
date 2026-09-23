@@ -44,6 +44,7 @@
 #include "native_developer_celestial_index.hpp"
 #include "native_developer_planet_index.hpp"
 #include "native_giant_test_panel.hpp"
+#include "native_chronicle.hpp"
 #include "native_notification_events.hpp"
 #include "native_support_service.hpp"
 #include "../developer_diagnostic_report.hpp"
@@ -743,6 +744,7 @@ class NativeCampaign final {
     supply_workspace_.set_text_measurer(text_measurer_);
     economy_workspace_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
+    chronicle_view_.set_text_measurer(text_measurer_);
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     phenomena_.use_queue(image_preparation_);
@@ -901,6 +903,7 @@ class NativeCampaign final {
     battle_workspace_.set_localization(&table);
     shipyard_workspace_.set_localization(&table);
     notification_view_.set_localization(&table);
+    chronicle_view_.set_localization(&table);
     assets_.set_localization(&table);
     settlement_workspace_.set_localization(&table);
     economy_controller_.set_localization(&table);
@@ -5573,7 +5576,7 @@ class NativeCampaign final {
       territory_refresh_elapsed_=.5;
       feedback_.reset();
       notifications_.clear();
-      notification_view_.close();
+      notification_view_.close();chronicle_view_.close();
       seed_notifications();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
@@ -5640,7 +5643,7 @@ class NativeCampaign final {
         research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
         diplomacy_workspace_.close();colony_roster_.close();economy_workspace_.close();
         supply_workspace_.close();system_workspace_.close();colony_workspace_.close();
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
       };
       if(action==UiAction::Map){
         close_navigation_workspaces();selected_id_.reset();refresh_inspection();return;
@@ -5683,7 +5686,7 @@ class NativeCampaign final {
       if(action!=UiAction::Colonies)colony_roster_.close();
       if(action!=UiAction::Economy)economy_workspace_.close();
       fleet_workspace_.cancel_recovery();
-      notification_view_.close();
+      notification_view_.close();chronicle_view_.close();
       system_workspace_.close();
       colony_workspace_.close();
 
@@ -5802,19 +5805,19 @@ class NativeCampaign final {
       if(voice_settings_&&voice_settings_->visible()){(void)voice_settings_->handle(event,width,height);gesture_.capture_for_ui();continue;}
       if(settings_hub_&&settings_hub_->handle(event,width,height)){gesture_.capture_for_ui();continue;}
       if(general_settings_&&general_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
         (void)general_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
       }
       if(video_settings_&&video_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
         (void)video_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
       }
       if(audio_settings_&&audio_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
@@ -5853,7 +5856,7 @@ class NativeCampaign final {
         continue;
       }
       const bool can_notify=notifications_available();
-      if(!can_notify)notification_view_.close();
+      if(!can_notify){notification_view_.close();chronicle_view_.close();}
       if(can_notify&&notification_view_.visible()){
         const auto command=notification_view_.handle(event,notifications_.items(),width,height);
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
@@ -5864,7 +5867,17 @@ class NativeCampaign final {
             diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
           refresh_diplomacy(true);
         }
+        if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenChronicle){
+          notification_view_.close();
+          chronicle_view_.open(session_->frame().runtime().history(),
+              session_->frame().runtime().world().campaign().player_civilization_id);
+          if(audio_confirm_)audio_confirm_();
+          gesture_.capture_for_ui();continue;
+        }
         if(command.captured){gesture_.capture_for_ui();continue;}
+      }
+      if(can_notify&&chronicle_view_.visible()){
+        if(chronicle_view_.handle(event,width,height)){gesture_.capture_for_ui();continue;}
       }
       if(can_notify&&event.type==InputEventType::LeftPressed&&
          layout.notifications.contains(event.position)){
@@ -6714,6 +6727,7 @@ class NativeCampaign final {
       }
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
+    if(notifications_available())chronicle_view_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
         voice_playback_?&*voice_playback_:nullptr);
     if(audio_settings_)audio_settings_->render(out,width,height);
@@ -6731,7 +6745,7 @@ class NativeCampaign final {
     if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();return;}
     bool observed_changed=false;
     if(!battle_workspace_.visible()){
-      colony_roster_.close();economy_workspace_.close();supply_workspace_.close();notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
+      colony_roster_.close();economy_workspace_.close();supply_workspace_.close();notification_view_.close();chronicle_view_.close();research_workspace_.close();shipyard_workspace_.close();
       construction_workspace_.close();diplomacy_workspace_.close();system_workspace_.close();
       colony_workspace_.close();
       battle_workspace_.open(frame.tactical_snapshot(),world.player_civilization_id,width,height);
@@ -7355,7 +7369,7 @@ class NativeCampaign final {
     const auto colony=std::ranges::find(campaign.colonies,colony_id,
                                         &Colony::id);
     if(colony==campaign.colonies.end()||!colony->planetary_body_id)return;
-    notification_view_.close();
+    notification_view_.close();chronicle_view_.close();
     if(!enter_system(colony->system_id,width,height)||
        !system_workspace_.select_body(*colony->planetary_body_id)){
       session_->publish_status(
@@ -7405,6 +7419,7 @@ class NativeCampaign final {
         colony_workspace_.visible()||research_workspace_.visible()||
         shipyard_workspace_.visible()||construction_workspace_.visible()||
         diplomacy_workspace_.visible()||notification_view_.visible()||
+        chronicle_view_.visible()||
         gesture_.captured_by_ui()||gesture_.allows_world_drag()||
         !fleet_workspace_.selected_fleet_id();
     const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
@@ -7567,7 +7582,7 @@ class NativeCampaign final {
     constrain_galaxy_camera(width,height);
   }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_overview_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
     std::unordered_set<int> owned;
@@ -7609,14 +7624,16 @@ class NativeCampaign final {
         !settlement_workspace_.visible()&&!research_workspace_.visible()&&
         !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
         !diplomacy_workspace_.visible()&&!battle_workspace_.visible()&&
-        !notification_view_.visible()&&!settings_visible();
+        !notification_view_.visible()&&!chronicle_view_.visible()&&
+        !settings_visible();
   }
   [[nodiscard]] bool map_hud_visible() const {
     return !menu_&&!settings_visible()&&!battle_workspace_.visible()&&!settlement_workspace_.visible()&&
         !colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&
         !research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
         !diplomacy_workspace_.visible()&&!colony_workspace_.visible()&&
-        !notification_view_.visible()&&!fleet_workspace_.preview();
+        !notification_view_.visible()&&!chronicle_view_.visible()&&
+        !fleet_workspace_.preview();
   }
   void render_command_hud(DrawList& out,int width,int height){
     const auto l=CommandHudLayout::make(width,height);const float s=l.scale;
@@ -8080,6 +8097,7 @@ class NativeCampaign final {
   double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;
   stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
+  stellar::native_chronicle::NativeChronicleView chronicle_view_;
   double notification_refresh_elapsed_{};
   stellar::engine::InputMapper input_mapper_;
   int research_candidate_index_{};

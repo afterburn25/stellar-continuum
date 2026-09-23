@@ -46,7 +46,8 @@ struct NotificationCardLayout {
 };
 
 struct NotificationLayout {
-  native_map::UiRect panel, header, close_button, empty_hint, list_viewport;
+  native_map::UiRect panel, header, close_button, chronicle_button,
+      empty_hint, list_viewport;
   std::vector<native_map::UiRect> cards;
   std::vector<std::optional<native_map::UiRect>> contact_buttons;
   std::vector<NotificationCardLayout> entries;
@@ -63,7 +64,12 @@ using TextMeasurer = std::function<native_map::TextExtent(const native_map::Text
     const TextMeasurer& measure = {}, float scroll = 0.f,
     const stellar::engine::LocalizationTable* locale = nullptr);
 
-enum class NotificationViewCommandKind { None, Close, OpenDiplomaticContact };
+enum class NotificationViewCommandKind {
+  None,
+  Close,
+  OpenDiplomaticContact,
+  OpenChronicle
+};
 struct NotificationViewCommand {
   NotificationViewCommandKind kind{NotificationViewCommandKind::None};
   bool captured{};
@@ -94,7 +100,7 @@ class NativeNotificationView final {
               int height) const;
 
  private:
-  enum class PressTarget { None, Close, Contact };
+  enum class PressTarget { None, Close, Contact, Chronicle };
   void cancel_press() noexcept;
 
   bool visible_{};

@@ -138,6 +138,7 @@ target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stel
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
+  app/native_client/native_chronicle.cpp
   app/native_client/native_support.cpp app/native_client/native_support_service.cpp
   app/native_client/native_battle_workspace.cpp
   app/native_client/native_battle_art.cpp
