@@ -17,6 +17,7 @@ namespace stellar::native_colony_roster {
 struct Row {
   int colony_id{}, body_id{}, system_id{};
   std::string name, body_name, system_name, kind_label, population;
+  double population_millions{};
   bool can_open{};
   std::string reason;
   bool operator==(const Row &) const = default;
@@ -78,10 +79,17 @@ private:
   [[nodiscard]] float maximum_scroll(const RosterLayout &) const noexcept;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
+  void rebuild_table();
+  void apply_display_order();
+  // 0=colony,1=world,2=population; -1 when the point misses the headers.
+  [[nodiscard]] int header_column(stellar::native_map::Point,
+                                  const RosterLayout &) const noexcept;
   const stellar::engine::LocalizationTable *locale_{};
   View view_;
   bool visible_{};
   mutable stellar::engine::VirtualizedList list_{};
+  stellar::engine::TableModel table_{};
+  std::vector<int> display_order_{}; // display position -> view_.rows index
   std::string notice_;
   std::optional<int> pressed_row_;
   PressTarget pressed_target_{PressTarget::none};

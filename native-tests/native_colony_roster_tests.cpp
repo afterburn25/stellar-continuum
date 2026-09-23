@@ -291,6 +291,54 @@ void cancellation_and_compact_hover_are_bounded() {
   require(population_heading && hover_outline,
           "compact roster did not expose population or row hover feedback");
 }
+
+void column_sort_orders_rows() {
+  constexpr int width = 1920, height = 1080;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(40), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto open_row = [&](std::size_t index) {
+    const auto box = workspace.row_button(static_cast<int>(index), width, height);
+    (void)workspace.handle({InputEventType::LeftPressed, center(box)}, width,
+                           height);
+    return workspace
+        .handle({InputEventType::LeftReleased, center(box)}, width, height)
+        .open_colony_id;
+  };
+  require(open_row(0) && *open_row(0) == 1,
+          "default roster order did not start at the first colony");
+  const auto click_header = [&](Point position) {
+    (void)workspace.handle({InputEventType::LeftPressed, position}, width,
+                           height);
+    (void)workspace.handle({InputEventType::LeftReleased, position}, width,
+                           height);
+  };
+  const Point name_header{layout.list.x + 8.f * layout.scale + 4.f,
+                          layout.list.y - 14.f * layout.scale};
+  click_header(name_header);
+  const auto ascending_first = open_row(0);
+  click_header(name_header);
+  const auto descending_first = open_row(0);
+  require(ascending_first && descending_first &&
+              *ascending_first != *descending_first,
+          "column sort did not reorder roster rows");
+  const Point population_header{
+      layout.list.x + layout.list.width * .79f + 4.f,
+      layout.list.y - 14.f * layout.scale};
+  click_header(population_header);
+  click_header(population_header); // second click: descending
+  const auto largest = open_row(0);
+  require(largest && *largest == 40,
+          "descending population sort did not lead with the largest colony");
+  DrawList draw;
+  workspace.render(draw, width, height);
+  const bool sorted_marker = std::ranges::any_of(draw.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "POPULATION / ACTION v";
+  });
+  require(sorted_marker, "sorted column header did not show direction");
+}
 } // namespace
 
 int main() {
@@ -301,6 +349,7 @@ int main() {
     press_lifecycle_and_clipping_are_strict();
     live_refresh_preserves_scroll_but_invalidates_press();
     cancellation_and_compact_hover_are_bounded();
+    column_sort_orders_rows();
     std::cout << "native colony roster tests passed\n";
     return 0;
   } catch (const std::exception &error) {

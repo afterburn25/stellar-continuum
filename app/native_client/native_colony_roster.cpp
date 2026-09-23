@@ -144,6 +144,7 @@ View build(const stellar::core::FreshCampaignState &campaign,
         if (owner != campaign.civilizations.end()) row.kind_label += " · " + owner->name;
       }
       row.population = population(colony.population_millions, locale);
+      row.population_millions = colony.population_millions;
       if (!colony.planetary_body_id) {
         row.body_name = row.system_name =
             translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
@@ -240,6 +241,7 @@ void RosterWorkspace::set_view(View value) {
   const bool content_changed =
       value.available != view_.available || value.rows != view_.rows;
   view_ = std::move(value);
+  rebuild_table();
   if (identity_changed) {
     list_.scroll_offset = 0;
     notice_.clear();
@@ -247,6 +249,58 @@ void RosterWorkspace::set_view(View value) {
   } else if (content_changed) {
     clear_press();
   }
+}
+void RosterWorkspace::rebuild_table() {
+  if (table_.columns().empty())
+    table_.set_columns({{"name", "ROSTER_COL_COLONY"},
+                        {"world", "ROSTER_COL_WORLD"},
+                        {"population", "ROSTER_COL_POPULATION"}});
+  std::vector<stellar::engine::TableModel::Row> rows;
+  rows.reserve(view_.rows.size());
+  for (std::size_t i = 0; i < view_.rows.size(); ++i) {
+    const auto &r = view_.rows[i];
+    const bool numeric =
+        std::isfinite(r.population_millions) && r.population_millions >= 0.;
+    rows.push_back(
+        {std::to_string(i),
+         {{r.name + " " + r.kind_label, 0., false},
+          {r.body_name + " " + r.system_name, 0., false},
+          {r.population, numeric ? r.population_millions : 0., numeric}}});
+  }
+  table_.set_rows(std::move(rows));
+  apply_display_order();
+}
+void RosterWorkspace::apply_display_order() {
+  display_order_.clear();
+  display_order_.reserve(table_.display_rows().size());
+  for (const auto *row : table_.display_rows())
+    display_order_.push_back(std::stoi(row->first));
+}
+int RosterWorkspace::header_column(Point point,
+                                   const RosterLayout &layout) const noexcept {
+  const float s = layout.scale;
+  const bool compact =
+      viewport_height_ <= 800 || layout.list.width < 650.f * s;
+  if (compact)
+    return UiRect{layout.list.x + layout.list.width * .70f,
+                  layout.list.y - 20.f * s, layout.list.width * .28f,
+                  20.f * s}
+                   .contains(point)
+               ? 2
+               : -1;
+  if (UiRect{layout.list.x + 8.f * s, layout.list.y - 26.f * s,
+             layout.list.width * .37f, 24.f * s}
+          .contains(point))
+    return 0;
+  if (UiRect{layout.list.x + layout.list.width * .39f,
+             layout.list.y - 26.f * s, layout.list.width * .38f, 24.f * s}
+          .contains(point))
+    return 1;
+  if (UiRect{layout.list.x + layout.list.width * .79f,
+             layout.list.y - 26.f * s, layout.list.width * .18f, 24.f * s}
+          .contains(point))
+    return 2;
+  return -1;
 }
 void RosterWorkspace::open() noexcept {
   visible_ = true;
@@ -262,9 +316,10 @@ void RosterWorkspace::discard_campaign() noexcept {
   view_ = {};
   notice_.clear();
   list_.scroll_offset = 0;
+  display_order_.clear();
 }
 void RosterWorkspace::sync_scroll(const RosterLayout &layout) const noexcept {
-  list_.row_count = view_.rows.size();
+  list_.row_count = display_order_.size();
   list_.row_height = layout.row_height + 5.f * layout.scale;
   list_.viewport_height = layout.list.height;
 }
@@ -276,7 +331,7 @@ float RosterWorkspace::maximum_scroll(
 UiRect RosterWorkspace::row_button(int index, int width,
                                    int height) const noexcept {
   const auto layout = RosterLayout::for_viewport(width, height);
-  if (index < 0 || static_cast<std::size_t>(index) >= view_.rows.size())
+  if (index < 0 || static_cast<std::size_t>(index) >= display_order_.size())
     return {};
   return {layout.list.x,
           layout.list.y +
@@ -331,9 +386,11 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
         pressed_target_ == PressTarget::row && pressed_row_ &&
         pressed_generation_ == view_.generation &&
         pressed_player_id_ == view_.player_id &&
+        static_cast<std::size_t>(*pressed_row_) < display_order_.size() &&
         layout.list.contains(event.position) &&
         row_button(*pressed_row_, width, height).contains(event.position)) {
-      const auto &row = view_.rows[static_cast<std::size_t>(*pressed_row_)];
+      const auto &row =
+          view_.rows[static_cast<std::size_t>(display_order_[static_cast<std::size_t>(*pressed_row_)])];
       if (row.can_open) {
         command.open_colony_id = row.colony_id;
         command.generation = view_.generation;
@@ -367,8 +424,19 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
       pressed_target_ = PressTarget::refresh;
       return {true};
     }
+    if (const int column = header_column(event.position, layout); column >= 0) {
+      static constexpr std::string_view ids[]{"name", "world", "population"};
+      const auto &state = table_.sort_state();
+      const bool ascending =
+          !(state && state->first == ids[static_cast<std::size_t>(column)] &&
+            state->second);
+      table_.sort_by(ids[static_cast<std::size_t>(column)], ascending);
+      apply_display_order();
+      list_.scroll_offset = 0;
+      return {true};
+    }
     if (layout.list.contains(event.position))
-      for (std::size_t i = 0; i < view_.rows.size(); ++i)
+      for (std::size_t i = 0; i < display_order_.size(); ++i)
         if (row_button(static_cast<int>(i), width, height)
                 .contains(event.position)) {
           pressed_target_ = PressTarget::row;
@@ -424,37 +492,49 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
          notice_, font - 1, amber, p);
   const bool compact =
       height <= 800 || layout.list.width < 650.f * layout.scale;
+  const auto sort_mark = [&](std::string_view column) {
+    const auto &state = table_.sort_state();
+    return state && state->first == column ? (state->second ? " ^" : " v")
+                                           : "";
+  };
   if (compact) {
     text(out,
          {layout.list.x + layout.list.width * .70f,
           layout.list.y - 20.f * layout.scale, layout.list.width * .28f,
           17.f * layout.scale},
-         tr("ROSTER_COL_POPULATION", "POPULATION"), font - 2, muted, p);
+         tr("ROSTER_COL_POPULATION", "POPULATION") +
+             sort_mark("population"),
+         font - 2, muted, p);
   } else {
     text(out,
          {layout.list.x + 8.f * layout.scale,
           layout.list.y - 24.f * layout.scale, layout.list.width * .37f,
           20.f * layout.scale},
-         tr("ROSTER_COL_COLONY", "COLONY / KIND"), font - 2, muted, p);
+         tr("ROSTER_COL_COLONY", "COLONY / KIND") + sort_mark("name"),
+         font - 2, muted, p);
     text(out,
          {layout.list.x + layout.list.width * .39f,
           layout.list.y - 24.f * layout.scale, layout.list.width * .38f,
           20.f * layout.scale},
-         tr("ROSTER_COL_WORLD", "WORLD / SYSTEM"), font - 2, muted, p);
+         tr("ROSTER_COL_WORLD", "WORLD / SYSTEM") + sort_mark("world"),
+         font - 2, muted, p);
     text(out,
          {layout.list.x + layout.list.width * .79f,
           layout.list.y - 24.f * layout.scale, layout.list.width * .18f,
           20.f * layout.scale},
-         tr("ROSTER_COL_ACTION", "POPULATION / ACTION"), font - 2, muted, p);
+         tr("ROSTER_COL_ACTION", "POPULATION / ACTION") +
+             sort_mark("population"),
+         font - 2, muted, p);
   }
   const float maximum = maximum_scroll(layout);
   list_.scroll_to(list_.scroll_offset);
-  for (std::size_t i = 0; i < view_.rows.size(); ++i) {
+  for (std::size_t i = 0; i < display_order_.size(); ++i) {
     const auto box = row_button(static_cast<int>(i), width, height);
     const auto visible = clip_intersection(box, layout.list);
     if (visible.height <= 0)
       continue;
-    const auto &row = view_.rows[i];
+    const auto &row =
+        view_.rows[static_cast<std::size_t>(display_order_[i])];
     const bool hover = layout.list.contains(pointer_) && box.contains(pointer_);
     out.overlay.emplace_back(FilledRectangle{
         visible, hover ? Color{16, 57, 76, 248} : Color{11, 29, 46, 246}});

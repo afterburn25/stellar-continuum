@@ -219,6 +219,11 @@ struct Editor {
   double system_days{};
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
+  // Hierarchy view: filtered systems are roots, their bodies children.
+  // `flat_rows` caches the visible (expanded-aware) row order.
+  engine::TreeModel system_tree;
+  std::vector<std::pair<const engine::TreeModel::Node *, int>> flat_rows;
+  std::unordered_set<std::size_t> expanded_systems; // systems vector indices
 
   // Scrollable authoritative detail rows for the selected system.
   engine::VirtualizedList detail_list;
@@ -323,11 +328,38 @@ bool matches(const Editor &ed, const core::StellarSystem &sys) {
   return false;
 }
 
+void rebuild_tree(Editor &ed) {
+  ed.system_tree = engine::TreeModel{};
+  for (const auto sys_index : ed.filtered) {
+    auto &node =
+        ed.system_tree.add("s" + std::to_string(sys_index), std::string{});
+    // Searching surfaces matching bodies automatically; otherwise expansion
+    // follows the user's toggles.
+    node.expanded =
+        !ed.search.empty() || ed.expanded_systems.contains(sys_index);
+    if (const auto it =
+            ed.bodies_by_system.find(ed.systems[sys_index].id);
+        it != ed.bodies_by_system.end())
+      for (const auto body_index : it->second)
+        ed.system_tree.add("b" + std::to_string(body_index), std::string{},
+                           node.id);
+  }
+  ed.flat_rows = ed.system_tree.flattened();
+  ed.system_list.row_count = ed.flat_rows.size();
+}
+
+std::size_t flat_pos_of_system(const Editor &ed, std::size_t sys_index) {
+  const auto id = "s" + std::to_string(sys_index);
+  for (std::size_t i = 0; i < ed.flat_rows.size(); ++i)
+    if (ed.flat_rows[i].first->id == id) return i;
+  return 0;
+}
+
 void rebuild_filter(Editor &ed) {
   ed.filtered.clear();
   for (std::size_t i = 0; i < ed.systems.size(); ++i)
     if (matches(ed, ed.systems[i])) ed.filtered.push_back(i);
-  ed.system_list.row_count = ed.filtered.size();
+  rebuild_tree(ed);
 }
 
 void rebuild_detail_rows(Editor &ed);
@@ -873,23 +905,47 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
              range.first * ed.system_list.row_height;
   for (std::size_t i = range.first; i < range.last;
        ++i, ry += ed.system_list.row_height) {
-    const auto sys_index = ed.filtered[i];
-    const auto &sys = ed.systems[sys_index];
+    if (i >= ed.flat_rows.size()) break;
+    const auto [node, depth] = ed.flat_rows[i];
     const UiRect row{list.x, ry, list.width, ed.system_list.row_height};
-    if (sys_index == ed.selected)
-      out.overlay.push_back(FilledRectangle{row, row_selected});
-    else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
-      out.overlay.push_back(FilledRectangle{row, row_hover});
-    const auto marker =
-        ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
-    out.overlay.push_back(
-        Text{{row.x + 8 * s, row.y + 3 * s},
-             marker + display_name(ed, sys), ink, font, 0, list});
-    if (sys.primary)
+    if (depth == 0) {
+      const auto sys_index =
+          static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+      const auto &sys = ed.systems[sys_index];
+      if (sys_index == ed.selected)
+        out.overlay.push_back(FilledRectangle{row, row_selected});
+      else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+        out.overlay.push_back(FilledRectangle{row, row_hover});
+      if (!node->children.empty())
+        out.overlay.push_back(
+            Text{{row.x + 4 * s, row.y + 3 * s},
+                 node->expanded ? "▾" : "›", muted, font, 0, list});
+      const auto marker =
+          ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
       out.overlay.push_back(
-          Text{{row.x + row.width - 86 * s, row.y + 3 * s},
-               std::string(class_name(*sys.primary)), muted, font, 84 * s,
-               list});
+          Text{{row.x + 18 * s, row.y + 3 * s},
+               marker + display_name(ed, sys), ink, font, 0, list});
+      if (sys.primary)
+        out.overlay.push_back(
+            Text{{row.x + row.width - 86 * s, row.y + 3 * s},
+                 std::string(class_name(*sys.primary)), muted, font, 84 * s,
+                 list});
+    } else {
+      const auto body_index =
+          static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+      const auto &body = ed.bodies[body_index];
+      if (body_index == ed.selected_body)
+        out.overlay.push_back(FilledRectangle{row, row_selected});
+      else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+        out.overlay.push_back(FilledRectangle{row, row_hover});
+      const auto marker = ed.body_edits.contains(body.id) &&
+                                  ed.body_edits[body.id].bookmarked
+                              ? "* "
+                              : "";
+      out.overlay.push_back(
+          Text{{row.x + 30 * s, row.y + 3 * s},
+               marker + display_name(ed, body), muted, font, 0, list});
+    }
   }
   if (ed.system_list.max_scroll() > 0) {
     const float track = list.height;
@@ -1654,6 +1710,7 @@ int main(int argc, char **argv) {
           ed.selected = static_cast<std::size_t>(-1);
           ed.selected_body = static_cast<std::size_t>(-1);
           ed.focus_body = static_cast<std::size_t>(-1);
+          ed.expanded_systems.clear();
           ed.view = WorkspaceView::Galaxy;
           // Annotations survive regeneration: ids are deterministic for the
           // same seed+count, and a new seed simply orphans old edits.
@@ -1798,7 +1855,8 @@ int main(int argc, char **argv) {
                         : pos - 1;
             ed.selected = ed.filtered[pos];
             ed.selected_body = static_cast<std::size_t>(-1);
-            ed.system_list.ensure_visible(pos);
+            ed.system_list.ensure_visible(
+                flat_pos_of_system(ed, ed.selected));
             rebuild_detail_rows(ed);
             continue;
           }
@@ -2031,12 +2089,35 @@ int main(int argc, char **argv) {
                               ed.system_list.scroll_offset;
           const auto row = static_cast<std::size_t>(std::max(
               0.f, std::floor(local / ed.system_list.row_height)));
-          if (row < ed.filtered.size()) {
-            ed.selected = ed.filtered[row];
-            ed.system_list.ensure_visible(row);
-            ed.selected_body = static_cast<std::size_t>(-1);
-            if (ed.view == WorkspaceView::System) fit_system_camera(ed);
-            rebuild_detail_rows(ed);
+          if (row < ed.flat_rows.size()) {
+            const auto [node, depth] = ed.flat_rows[row];
+            const auto index =
+                static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+            if (depth == 0) {
+              // The leading edge of a system row toggles body expansion when
+              // the system has bodies; the rest selects it.
+              if (!node->children.empty() &&
+                  event.position.x - ed.rows_rect.x < 18.f) {
+                if (ed.expanded_systems.erase(index) == 0)
+                  ed.expanded_systems.insert(index);
+                rebuild_tree(ed);
+                ed.system_list.ensure_visible(row);
+              } else {
+                ed.selected = index;
+                ed.system_list.ensure_visible(row);
+                ed.selected_body = static_cast<std::size_t>(-1);
+                if (ed.view == WorkspaceView::System) fit_system_camera(ed);
+                rebuild_detail_rows(ed);
+              }
+            } else {
+              // Body rows jump to that body's system context, matching the
+              // inspector's body-row behavior.
+              ed.selected = static_cast<std::size_t>(
+                  std::stoul(node->parent_id.substr(1)));
+              ed.selected_body = index;
+              ed.view = WorkspaceView::System;
+              rebuild_detail_rows(ed);
+            }
           }
         }
         // Picker rows load the chosen project file.
