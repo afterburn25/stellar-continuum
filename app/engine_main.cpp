@@ -106,13 +106,13 @@ struct Shell {
 
 void line(DrawList &out, float x, float &y, std::string label,
           std::string value, int font = 14) {
-  out.text.push_back(Text{{x, y}, std::move(label), muted, font});
-  out.text.push_back(Text{{x + 210.f, y}, std::move(value), ink, font});
+  out.overlay.push_back(Text{{x, y}, std::move(label), muted, font});
+  out.overlay.push_back(Text{{x + 210.f, y}, std::move(value), ink, font});
   y += font + 8.f;
 }
 
 void heading(DrawList &out, float x, float &y, const std::string &title) {
-  out.text.push_back(Text{{x, y}, title, accent, 15, 0, std::nullopt,
+  out.overlay.push_back(Text{{x, y}, title, accent, 15, 0, std::nullopt,
                           TextAlign::Left, FontFace::Heading});
   y += 26.f;
 }
@@ -227,7 +227,7 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
     else if (row.contains(
                  Point{shell.pointer_x, shell.pointer_y}))
       out.overlay.push_back(FilledRectangle{row, row_hover});
-    out.text.push_back(Text{{row.x + 8 * s, row.y + 4 * s},
+    out.overlay.push_back(Text{{row.x + 8 * s, row.y + 4 * s},
                             shell.asset_files[i].generic_string(), ink, font, 0,
                             list_rect});
   }
@@ -261,11 +261,11 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
         Image{shell.preview,
               {preview_rect.x + (preview_rect.width - pw) * .5f,
                preview_rect.y + 12 * s, pw, ph}});
-    out.text.push_back(Text{{preview_rect.x + 10 * s,
+    out.overlay.push_back(Text{{preview_rect.x + 10 * s,
                              preview_rect.y + preview_rect.height - 36 * s},
                             shell.preview_label, muted, font, 0, preview_rect});
   } else {
-    out.text.push_back(
+    out.overlay.push_back(
         Text{{preview_rect.x + 10 * s, preview_rect.y + 10 * s},
              shell.selected_asset == static_cast<std::size_t>(-1)
                  ? "Select a file"
@@ -281,7 +281,7 @@ void render_profiler(DrawList &out, UiRect body, float s,
   const int font = static_cast<int>(13 * s);
   heading(out, x, y, "PROFILER");
   for (const auto &row : profiler.overlay_lines(18)) {
-    out.text.push_back(Text{{x, y}, row, ink, font});
+    out.overlay.push_back(Text{{x, y}, row, ink, font});
     y += font + 8.f;
   }
   const auto aggregates = profiler.aggregates();
@@ -321,7 +321,7 @@ void render_localization(DrawList &out, Shell &shell, UiRect body, float s,
        ++i, ry += shell.key_list.row_height) {
     const auto &key = shell.sample_keys[i];
     const auto value = locale.translate(key);
-    out.text.push_back(Text{{list_rect.x + 8 * s, ry + 4 * s},
+    out.overlay.push_back(Text{{list_rect.x + 8 * s, ry + 4 * s},
                             key + "  =  " + std::string(value), ink, font, 0,
                             list_rect});
   }
@@ -452,11 +452,11 @@ int main(int argc, char **argv) {
       draw.overlay.push_back(StrokedRectangle{panel, panel_edge});
 
       // Header.
-      draw.text.push_back(
+      draw.overlay.push_back(
           Text{{panel.x + 22 * s, panel.y + 16 * s}, "STELLAR ENGINE", ink,
                static_cast<int>(26 * s), 0, std::nullopt, TextAlign::Left,
                FontFace::Heading});
-      draw.text.push_back(
+      draw.overlay.push_back(
           Text{{panel.x + 22 * s, panel.y + 50 * s},
                "standalone engine tools host - no game module linked", muted,
                static_cast<int>(13 * s)});
@@ -483,7 +483,7 @@ int main(int argc, char **argv) {
           draw.overlay.push_back(FilledRectangle{item, row_selected});
         else if (item.contains(snapshot.pointer))
           draw.overlay.push_back(FilledRectangle{item, row_hover});
-        draw.text.push_back(
+        draw.overlay.push_back(
             Text{{item.x + 12 * s, item.y + 9 * s}, kToolNames[i],
                  kTools[i] == shell.tool ? ink : muted,
                  static_cast<int>(14 * s)});
@@ -516,7 +516,7 @@ int main(int argc, char **argv) {
         break;
       }
 
-      draw.text.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
+      draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
                                "ESC to quit - F12 screenshots", muted,
                                static_cast<int>(11 * s)});
 

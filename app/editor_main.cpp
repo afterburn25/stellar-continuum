@@ -585,7 +585,7 @@ void field_box(DrawList &out, UiRect r, const std::string &value, bool active,
   out.overlay.push_back(
       FilledRectangle{r, active ? row_selected : Color{10, 24, 36, 255}});
   out.overlay.push_back(StrokedRectangle{r, active ? accent : panel_edge});
-  out.text.push_back(Text{{r.x + 8, r.y + (r.height - font) * .5f - 2},
+  out.overlay.push_back(Text{{r.x + 8, r.y + (r.height - font) * .5f - 2},
                           value.empty() ? hint : value,
                           value.empty() ? muted : ink, font, 0, r});
 }
@@ -595,8 +595,9 @@ void small_button(DrawList &out, UiRect r, const std::string &label, bool active
   out.overlay.push_back(
       FilledRectangle{r, active ? row_selected : button_fill});
   out.overlay.push_back(StrokedRectangle{r, panel_edge});
-  out.text.push_back(Text{{r.x, r.y + (r.height - font) * .5f - 2}, label, ink,
-                          font, r.width, r, TextAlign::Center});
+  out.overlay.push_back(
+      Text{{r.x + r.width * .5f, r.y + (r.height - font) * .5f - 2}, label,
+           ink, font, r.width, r, TextAlign::Center});
 }
 
 void render_inspector(DrawList &out, Editor &ed, float s) {
@@ -609,7 +610,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
       ed.view == WorkspaceView::System &&
       ed.selected_body < ed.bodies.size() &&
       ed.selected < ed.systems.size();
-  out.text.push_back(Text{{x, y}, inspecting_body ? "BODY" : "SYSTEM", accent,
+  out.overlay.push_back(Text{{x, y}, inspecting_body ? "BODY" : "SYSTEM", accent,
                           font + 2, 0, std::nullopt, TextAlign::Left,
                           FontFace::Heading});
   y += (font + 14) * s;
@@ -627,7 +628,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   small_button(out, ed.hit_redo, "REDO", ed.history.can_redo(), font);
 
   if (ed.selected >= ed.systems.size()) {
-    out.text.push_back(Text{{x, y}, "No system selected", muted, font});
+    out.overlay.push_back(Text{{x, y}, "No system selected", muted, font});
     y += font + 10 * s;
     ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
     return;
@@ -646,7 +647,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
       edit_it != map.end() ? edit_it->second : empty_edit;
 
   // Editable display name.
-  out.text.push_back(Text{{x, y},
+  out.overlay.push_back(Text{{x, y},
                           body_context ? "body display name" : "display name",
                           muted, font - 1});
   y += font + 4;
@@ -661,7 +662,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   y += ed.hit_name.height + 8 * s;
 
   // Editable note.
-  out.text.push_back(Text{{x, y}, "note", muted, font - 1});
+  out.overlay.push_back(Text{{x, y}, "note", muted, font - 1});
   y += font + 4;
   ed.hit_note = {x, y, r.width - 28 * s, (font + 12) * s};
   const auto note_value =
@@ -702,9 +703,9 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
       else if (rowrect.contains(Point{ed.pointer_x, ed.pointer_y}))
         out.overlay.push_back(FilledRectangle{rowrect, row_hover});
     }
-    out.text.push_back(Text{{detail.x + 8 * s, ry + 2}, row.label, muted,
+    out.overlay.push_back(Text{{detail.x + 8 * s, ry + 2}, row.label, muted,
                             font - 1, 100 * s, detail});
-    out.text.push_back(Text{{detail.x + 112 * s, ry + 2}, row.value, ink,
+    out.overlay.push_back(Text{{detail.x + 112 * s, ry + 2}, row.value, ink,
                             font - 1, 0, detail});
   }
   if (ed.detail_list.max_scroll() > 0) {
@@ -726,7 +727,7 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
   float x = r.x + 14 * s;
   float y = r.y + 10 * s;
   const int font = static_cast<int>(12 * s);
-  out.text.push_back(Text{{x, y}, "SYSTEMS", accent, font + 1, 0, std::nullopt,
+  out.overlay.push_back(Text{{x, y}, "SYSTEMS", accent, font + 1, 0, std::nullopt,
                           TextAlign::Left, FontFace::Heading});
   y += (font + 12) * s;
 
@@ -759,11 +760,11 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
       out.overlay.push_back(FilledRectangle{row, row_hover});
     const auto marker =
         ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
-    out.text.push_back(
+    out.overlay.push_back(
         Text{{row.x + 8 * s, row.y + 3 * s},
              marker + display_name(ed, sys), ink, font, 0, list});
     if (sys.primary)
-      out.text.push_back(
+      out.overlay.push_back(
           Text{{row.x + row.width - 86 * s, row.y + 3 * s},
                std::string(class_name(*sys.primary)), muted, font, 84 * s,
                list});
@@ -793,10 +794,10 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
   ed.picker_rect = r;
   out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
   out.overlay.push_back(StrokedRectangle{r, accent});
-  out.text.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "OPEN PROJECT", accent,
+  out.overlay.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "OPEN PROJECT", accent,
                           font + 1, 0, std::nullopt, TextAlign::Left,
                           FontFace::Heading});
-  out.text.push_back(
+  out.overlay.push_back(
       Text{{r.x + 14 * s, r.y + 12 * s + font},
            "esc or click outside to close", muted, font - 2});
   const UiRect rows{r.x + 10 * s, r.y + 18 * s + font * 2, r.width - 20 * s,
@@ -815,15 +816,15 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
     const UiRect row{rows.x, ry, rows.width, ed.picker_list.row_height};
     if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
       out.overlay.push_back(FilledRectangle{row, row_hover});
-    out.text.push_back(
+    out.overlay.push_back(
         Text{{row.x + 8 * s, ry + 4 * s},
              ed.project_files[i].filename().string(), ink, font, 0, rows});
     if (ed.project_files[i] == ed.project_path)
-      out.text.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
+      out.overlay.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
                               "current", accent, font - 2, 0, rows});
   }
   if (ed.project_files.empty())
-    out.text.push_back(Text{{rows.x + 8 * s, rows.y + 8 * s},
+    out.overlay.push_back(Text{{rows.x + 8 * s, rows.y + 8 * s},
                             "no saved projects yet", muted, font});
   if (ed.picker_list.max_scroll() > 0) {
     const float track = rows.height;
@@ -921,7 +922,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
     const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
     out.overlay.push_back(StrokedRectangle{
         {p.x - 10, p.y - 10, 20, 20}, accent});
-    out.text.push_back(
+    out.world.push_back(
         Text{{p.x + 14, p.y - 8}, display_name(ed, sys), accent,
              static_cast<int>(13 * s), 0, v});
   }
@@ -929,9 +930,9 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
     for (const auto &sys : ed.systems) {
       const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
       if (!v.contains(p)) continue;
-      out.text.push_back(Text{{p.x + 7, p.y - 6}, display_name(ed, sys),
-                              {150, 180, 195, 220}, static_cast<int>(11 * s), 0,
-                              v});
+      out.world.push_back(Text{{p.x + 7, p.y - 6}, display_name(ed, sys),
+                               {150, 180, 195, 220}, static_cast<int>(11 * s),
+                               0, v});
     }
   out.overlay.push_back(StrokedRectangle{v, panel_edge});
 }
@@ -956,7 +957,7 @@ void orbit_ring(DrawList &out, const Editor &ed,
     const auto p =
         engine::analytic_orbit_position(orbit, k * period / 72.0);
     const auto point = system_to_screen(ed, cx + p[0], cy + p[1]);
-    if (k) out.lines.push_back({prev, point, color});
+    if (k) out.world.push_back(Line{prev, point, color});
     prev = point;
   }
 }
@@ -1022,9 +1023,11 @@ void fit_system_camera(Editor &ed) {
 // and small-body field bands for the selected system, in AU.
 void render_system_view(DrawList &out, Editor &ed, float s) {
   const auto &v = ed.viewport;
-  out.overlay.push_back(FilledRectangle{v, {4, 10, 18, 255}});
+  // All view content lives in the world layer (above the legacy clear —
+  // the dark window fill doubles as the background — and below the
+  // chrome overlay) so panels never cover it.
   if (ed.selected >= ed.systems.size()) {
-    out.text.push_back(
+    out.world.push_back(
         Text{{v.x + 20 * s, v.y + 20 * s}, "no system selected", muted,
              static_cast<int>(14 * s), 0, v});
     out.overlay.push_back(StrokedRectangle{v, panel_edge});
@@ -1086,16 +1089,16 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
         const bool in_hz =
             body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
         if (body_index == ed.selected_body)
-          out.circles.push_back(Circle{p, 9.f, accent});
+          out.world.push_back(Circle{p, 9.f, accent});
         if (const auto it = ed.body_edits.find(body.id);
             it != ed.body_edits.end() && it->second.bookmarked)
-          out.circles.push_back(Circle{p, 8.f, {240, 200, 90, 255}});
-        out.circles.push_back(
+          out.world.push_back(Circle{p, 8.f, {240, 200, 90, 255}});
+        out.world.push_back(
             Circle{p, body.parent_body_id ? 2.5f : 4.5f,
                    in_hz ? Color{110, 220, 140, 255}
                          : (body.parent_body_id ? muted : ink)});
         if (ed.sys_ppa > 4.f)
-          out.text.push_back(
+          out.world.push_back(
               Text{{p.x + 8, p.y - 7}, display_name(ed, body),
                    body_index == ed.selected_body
                        ? accent
@@ -1114,16 +1117,16 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
         ed, hosts[static_cast<std::size_t>(i)][0],
         hosts[static_cast<std::size_t>(i)][1]);
     const auto stellar_class = star_classes[static_cast<std::size_t>(i)];
-    out.circles.push_back(
+    out.world.push_back(
         Circle{p, stellar_class ? class_radius(*stellar_class) * 2.6f : 8.f,
                stellar_class ? class_color(*stellar_class) : ink});
     if (v.contains(p))
-      out.text.push_back(
+      out.world.push_back(
           Text{{p.x + 12, p.y - 8}, core::stellar_host_name(i), accent,
                static_cast<int>(12 * s), 0, v});
   }
   out.overlay.push_back(StrokedRectangle{v, panel_edge});
-  out.text.push_back(
+  out.world.push_back(
       Text{{v.x + 10 * s, v.y + 8 * s},
            "day " + fspec("%.0f", ed.system_days), accent,
            static_cast<int>(13 * s), 0, v});
@@ -1631,7 +1634,7 @@ int main(int argc, char **argv) {
       const UiRect bar{16 * s, 14 * s, w - 32 * s, 52 * s};
       draw.overlay.push_back(FilledRectangle{bar, panel_fill});
       draw.overlay.push_back(StrokedRectangle{bar, panel_edge});
-      draw.text.push_back(
+      draw.overlay.push_back(
           Text{{bar.x + 14 * s, bar.y + 14 * s}, "STELLAR ENGINE EDITOR", ink,
                static_cast<int>(20 * s), 0, std::nullopt, TextAlign::Left,
                FontFace::Heading});
@@ -1651,27 +1654,30 @@ int main(int argc, char **argv) {
         draw.overlay.push_back(FilledRectangle{
             button, active ? row_selected : button_fill});
         draw.overlay.push_back(StrokedRectangle{button, panel_edge});
-        draw.text.push_back(
-            Text{{button.x + 0.f, button.y + 9 * s}, std::to_string(count),
-                 active ? ink : muted, static_cast<int>(13 * s), button.width,
-                 button, TextAlign::Center});
+        draw.overlay.push_back(
+            Text{{button.x + button.width * .5f, button.y + 9 * s},
+                 std::to_string(count), active ? ink : muted,
+                 static_cast<int>(13 * s), button.width, button,
+                 TextAlign::Center});
         bx += 84 * s;
       }
       ed.hit_regen = {bx, bar.y + 10 * s, 110 * s, 32 * s};
       draw.overlay.push_back(FilledRectangle{ed.hit_regen, button_fill});
       draw.overlay.push_back(StrokedRectangle{ed.hit_regen, panel_edge});
-      draw.text.push_back(
-          Text{{ed.hit_regen.x, ed.hit_regen.y + 9 * s}, "REGENERATE", ink,
-               static_cast<int>(13 * s), ed.hit_regen.width, ed.hit_regen,
-               TextAlign::Center});
+      draw.overlay.push_back(
+          Text{{ed.hit_regen.x + ed.hit_regen.width * .5f,
+                ed.hit_regen.y + 9 * s},
+               "REGENERATE", ink, static_cast<int>(13 * s),
+               ed.hit_regen.width, ed.hit_regen, TextAlign::Center});
       bx += 118 * s;
       ed.hit_seed = {bx, bar.y + 10 * s, 100 * s, 32 * s};
       draw.overlay.push_back(FilledRectangle{ed.hit_seed, button_fill});
       draw.overlay.push_back(StrokedRectangle{ed.hit_seed, panel_edge});
-      draw.text.push_back(
-          Text{{ed.hit_seed.x, ed.hit_seed.y + 9 * s}, "NEW SEED", ink,
-               static_cast<int>(13 * s), ed.hit_seed.width, ed.hit_seed,
-               TextAlign::Center});
+      draw.overlay.push_back(
+          Text{{ed.hit_seed.x + ed.hit_seed.width * .5f,
+                ed.hit_seed.y + 9 * s},
+               "NEW SEED", ink, static_cast<int>(13 * s), ed.hit_seed.width,
+               ed.hit_seed, TextAlign::Center});
       bx += 108 * s;
       // Workspace view toggle: system orbit view requires a selection.
       ed.hit_view = {bx, bar.y + 10 * s, 110 * s, 32 * s};
@@ -1682,13 +1688,14 @@ int main(int argc, char **argv) {
           ed.hit_view,
           ed.view == WorkspaceView::System ? row_selected : button_fill});
       draw.overlay.push_back(StrokedRectangle{ed.hit_view, panel_edge});
-      draw.text.push_back(
-          Text{{ed.hit_view.x, ed.hit_view.y + 9 * s},
+      draw.overlay.push_back(
+          Text{{ed.hit_view.x + ed.hit_view.width * .5f,
+                ed.hit_view.y + 9 * s},
                ed.view == WorkspaceView::System ? "GALAXY VIEW" : "SYSTEM VIEW",
                view_ready ? ink : muted, static_cast<int>(13 * s),
                ed.hit_view.width, ed.hit_view, TextAlign::Center});
       bx += 122 * s;
-      draw.text.push_back(
+      draw.overlay.push_back(
           Text{{bx, bar.y + 18 * s}, "seed " + std::to_string(ed.seed), muted,
                static_cast<int>(13 * s)});
       bx += 90 * s;
@@ -1719,8 +1726,7 @@ int main(int argc, char **argv) {
         render_viewport(draw, ed, s);
       render_inspector(draw, ed, s);
       render_system_list(draw, ed, s);
-      render_picker(draw, ed, s, w, h); // topmost modal
-      draw.text.push_back(
+      draw.overlay.push_back(
           Text{{ed.viewport.x + 6 * s, ed.viewport.y + ed.viewport.height - 22 * s},
                ed.status +
                    (ed.view == WorkspaceView::System
@@ -1741,6 +1747,7 @@ int main(int argc, char **argv) {
                  "GENERATING...", accent, static_cast<int>(18 * s)});
       }
 
+      render_picker(draw, ed, s, w, h); // topmost modal
       window.draw(draw);
       // Swap the seed shown in the toolbar only once generation committed.
       ed.seed = pending_seed.load();
