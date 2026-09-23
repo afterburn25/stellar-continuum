@@ -130,8 +130,8 @@ struct Shell {
   std::string project_name_buffer, import_buffer, package_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
-      hit_project_run{}, hit_import_field{}, hit_import_button{},
-      hit_package_field{}, hit_package_button{};
+      hit_project_run{}, hit_project_editor{}, hit_import_field{},
+      hit_import_button{}, hit_package_field{}, hit_package_button{};
   UiRect project_rows{};
   // Content cooking and host builds run on the JobSystem; the UI thread
   // reads their status under the mutex.
@@ -389,12 +389,33 @@ void run_project(Shell &shell) {
   }
   shell.status = "no built host - run BUILD first";
 }
+
+// Launches the native editor on the open project: the editor stores its
+// annotation documents under <project>/editor/ and seeds the name from
+// the project manifest.
+void open_editor(Shell &shell) {
+  if (!shell.project) return;
+  const auto editor =
+      engine::executable_directory() / "stellar-editor.exe";
+  if (!std::filesystem::is_regular_file(editor)) {
+    shell.status = "stellar-editor.exe not found beside the shell";
+    return;
+  }
+  const std::string args =
+      "--project \"" + shell.project->root.string() + "\"";
+  ShellExecuteA(nullptr, "open", editor.string().c_str(), args.c_str(),
+                engine::executable_directory().string().c_str(), SW_SHOW);
+  shell.status = "editor launched for " + shell.project->name;
+}
 #else
 void start_build(Shell &shell, engine::JobSystem &) {
   shell.status = "build unavailable on this platform";
 }
 void run_project(Shell &shell) {
   shell.status = "run unavailable on this platform";
+}
+void open_editor(Shell &shell) {
+  shell.status = "editor launch unavailable on this platform";
 }
 #endif
 
@@ -733,11 +754,15 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     bx += 106 * s;
     shell.hit_project_run = {bx, y, 80 * s, shell.hit_project_name.height};
     shell_button(out, shell.hit_project_run, "RUN", false, font, s);
+    bx += 90 * s;
+    shell.hit_project_editor = {bx, y, 104 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_editor, "EDITOR", false, font, s);
   } else {
     shell.hit_project_close = {};
     shell.hit_project_cook = {};
     shell.hit_project_build = {};
     shell.hit_project_run = {};
+    shell.hit_project_editor = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -981,6 +1006,8 @@ int main(int argc, char **argv) {
               start_build(shell, jobs);
             else if (shell.hit_project_run.contains(event.position))
               run_project(shell);
+            else if (shell.hit_project_editor.contains(event.position))
+              open_editor(shell);
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +

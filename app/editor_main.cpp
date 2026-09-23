@@ -18,6 +18,7 @@
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/project.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
@@ -1379,8 +1380,11 @@ int wmain(int argc, wchar_t **argv) {
 #else
 int main(int argc, char **argv) {
 #endif
-  (void)argc;
-  (void)argv;
+  std::filesystem::path project_arg;
+  for (int i = 1; i + 1 < argc; ++i)
+    if (std::filesystem::path(argv[i]) == std::filesystem::path("--project"))
+      project_arg = argv[++i];
+
   engine::RuntimeDiagnostics diagnostics("engine-editor",
                                          STELLAR_ENGINE_VERSION);
   try {
@@ -1390,8 +1394,22 @@ int main(int argc, char **argv) {
     profiler.set_enabled(true);
 
     Editor ed;
-    ed.projects_dir = engine::executable_directory() / "projects";
-    ed.project_path = ed.projects_dir / "editor-project.json";
+    if (!project_arg.empty()) {
+      // Launched on an engine project (from the engine shell): documents
+      // live under <project>/editor/ and the manifest seeds the name.
+      ed.projects_dir = project_arg / "editor";
+      std::error_code ec;
+      std::filesystem::create_directories(ed.projects_dir, ec);
+      if (const auto manifest = engine::EngineProject::load(project_arg))
+        ed.project_name = manifest->name;
+      const auto slug = edproj::sanitize_project_name(ed.project_name);
+      ed.project_path = ed.projects_dir /
+                        ((slug.empty() ? "editor-project" : slug) + ".json");
+      ed.status = "editing project " + ed.project_name;
+    } else {
+      ed.projects_dir = engine::executable_directory() / "projects";
+      ed.project_path = ed.projects_dir / "editor-project.json";
+    }
     const auto catalog_path = find_path(
         {"Data/astronomy/hyg-nearby-500-v1.json",
          "data/astronomy/hyg-nearby-500-v1.json"});

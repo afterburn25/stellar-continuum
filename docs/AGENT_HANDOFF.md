@@ -91,6 +91,19 @@ lookup/image-memory optimizations. [Progress](DEVELOPMENT_PROGRESS.md) links the
 owners and evidence. Do not infer that a historical report describes the latest
 behavior when a newer correction supersedes it.
 
+**Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
+host (no game module). Its Projects tool drives the full game-project loop:
+`engine::EngineProject` manifests (`project.stellar.json`), `create_project`
+scaffolding (base package, content dirs, `mods/`, generated consumer
+`CMakeLists.txt`, windowed ECS starter `src/main.cpp`), asset import,
+generic `scan_content` cooking into project-namespaced packages, and
+BUILD/RUN against the exported `engine-sdk/` beside the shell (headers,
+prebuilt libs, SDL3 runtime + default font, `stellar::engine`/`stellar::cooker`/
+`stellar::platform` consumer targets). `stellar-editor.exe` is the separate
+authoritative-world editor (galaxy/system/body workspaces, annotations,
+undo, atomic project documents). Both are registry rows in
+[ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md).
+
 **Recommended next workstream: native validation and release reliability.**
 Start from this branch in an isolated checkout; fix the failures recorded in
 the receipt before beginning the 30-item engine expansion. Use a descriptive
