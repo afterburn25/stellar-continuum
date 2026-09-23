@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cctype>
 #include <stdexcept>
 
 namespace stellar::editor {
@@ -65,6 +66,23 @@ EditorProject parse_project(std::string_view text) {
   } catch (const nlohmann::json::exception &error) {
     throw std::runtime_error(std::string("malformed project: ") + error.what());
   }
+}
+
+std::string sanitize_project_name(std::string_view name) {
+  std::string out;
+  out.reserve(name.size());
+  bool dash = true; // suppress leading dashes
+  for (const unsigned char c : name) {
+    if (std::isalnum(c)) {
+      out += static_cast<char>(std::tolower(c));
+      dash = false;
+    } else if (!dash) {
+      out += '-';
+      dash = true;
+    }
+  }
+  while (!out.empty() && out.back() == '-') out.pop_back();
+  return out;
 }
 
 } // namespace stellar::editor

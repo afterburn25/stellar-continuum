@@ -95,6 +95,16 @@ int main() {
         serialize_project(EditorProject{.seed = 1, .system_count = 250}));
     require(empty.edits.empty(), "empty project parsed with edits");
 
+    // Project names slug into filesystem-safe Save-As filenames.
+    require(sanitize_project_name("Survey Run \"Kestrel\"") ==
+                "survey-run-kestrel",
+            "project name did not slug correctly");
+    require(sanitize_project_name("  ---  ") == "",
+            "unusable name must produce an empty slug");
+    require(sanitize_project_name("Alpha  Centauri   Prime!") ==
+                "alpha-centauri-prime",
+            "whitespace runs must collapse to single dashes");
+
     std::cout << "Editor project document checks passed.\n";
     return 0;
   } catch (const std::exception &error) {

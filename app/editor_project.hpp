@@ -36,4 +36,9 @@ std::string serialize_project(const EditorProject &project);
 // schemaVersion, or a structurally invalid edits array.
 EditorProject parse_project(std::string_view text);
 
+// Lowercases a project name into a filesystem-safe slug: alnum runs stay,
+// anything else collapses to single dashes, edges are trimmed. Returns ""
+// when nothing usable remains (caller falls back to a default filename).
+std::string sanitize_project_name(std::string_view name);
+
 } // namespace stellar::editor

@@ -235,7 +235,12 @@ struct Editor {
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{};
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
-  std::filesystem::path project_path;
+  std::filesystem::path projects_dir, project_path;
+  // Project open picker: *.json files under projects_dir, modal overlay.
+  std::vector<std::filesystem::path> project_files;
+  engine::VirtualizedList picker_list;
+  bool picker_open{};
+  UiRect picker_rect{}, picker_rows{};
   float pointer_x{}, pointer_y{};
 
   std::shared_ptr<const RgbaImage> emblem;
@@ -756,14 +761,76 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
   }
 }
 
+// Modal project picker overlay listing every *.json under projects_dir.
+void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
+  if (!ed.picker_open) {
+    ed.picker_rect = ed.picker_rows = {};
+    return;
+  }
+  const int font = static_cast<int>(13 * s);
+  const float pw = std::min(430 * s, w - 60 * s);
+  const float ph = std::min(380 * s, h - 120 * s);
+  const UiRect r{(w - pw) * .5f, (h - ph) * .5f, pw, ph};
+  ed.picker_rect = r;
+  out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
+  out.overlay.push_back(StrokedRectangle{r, accent});
+  out.text.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "OPEN PROJECT", accent,
+                          font + 1, 0, std::nullopt, TextAlign::Left,
+                          FontFace::Heading});
+  out.text.push_back(
+      Text{{r.x + 14 * s, r.y + 12 * s + font},
+           "esc or click outside to close", muted, font - 2});
+  const UiRect rows{r.x + 10 * s, r.y + 18 * s + font * 2, r.width - 20 * s,
+                    r.height - 30 * s - font * 2};
+  out.overlay.push_back(FilledRectangle{rows, {5, 13, 22, 255}});
+  out.overlay.push_back(StrokedRectangle{rows, panel_edge});
+  ed.picker_list.viewport_height = rows.height;
+  ed.picker_list.row_height = font + 10.f;
+  // Hit geometry starts at the first row top (below the 4*s inset).
+  ed.picker_rows = {rows.x, rows.y + 4 * s, rows.width, rows.height - 4 * s};
+  const auto range = ed.picker_list.visible_range();
+  float ry = ed.picker_rows.y - ed.picker_list.scroll_offset +
+             range.first * ed.picker_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += ed.picker_list.row_height) {
+    const UiRect row{rows.x, ry, rows.width, ed.picker_list.row_height};
+    if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    out.text.push_back(
+        Text{{row.x + 8 * s, ry + 4 * s},
+             ed.project_files[i].filename().string(), ink, font, 0, rows});
+    if (ed.project_files[i] == ed.project_path)
+      out.text.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
+                              "current", accent, font - 2, 0, rows});
+  }
+  if (ed.project_files.empty())
+    out.text.push_back(Text{{rows.x + 8 * s, rows.y + 8 * s},
+                            "no saved projects yet", muted, font});
+  if (ed.picker_list.max_scroll() > 0) {
+    const float track = rows.height;
+    const float thumb = std::max(
+        20.f, track * track / (track + ed.picker_list.max_scroll()));
+    const float t = ed.picker_list.scroll_offset / ed.picker_list.max_scroll();
+    out.overlay.push_back(
+        FilledRectangle{{rows.x + rows.width - 5.f,
+                         rows.y + t * (track - thumb), 4.f, thumb},
+                        accent});
+  }
+}
+
 void save_project(Editor &ed) {
   try {
+    // Save-As by name: the document name drives the filename inside the
+    // projects directory, so renaming a project never clobbers another.
+    const auto slug = edproj::sanitize_project_name(ed.project_name);
+    ed.project_path = ed.projects_dir /
+                      ((slug.empty() ? "editor-project" : slug) + ".json");
     const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits,
                                         ed.body_edits, ed.project_name};
     const auto text = edproj::serialize_project(project);
     engine::write_file_atomically(ed.project_path,
                                   std::as_bytes(std::span(text)));
-    ed.status = "project saved - " +
+    ed.status = "saved " + ed.project_path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
                 " annotations";
   } catch (const std::exception &error) {
@@ -771,11 +838,11 @@ void save_project(Editor &ed) {
   }
 }
 
-void load_project(Editor &ed) {
+void load_project(Editor &ed, const std::filesystem::path &path) {
   try {
-    std::ifstream in(ed.project_path, std::ios::binary);
+    std::ifstream in(path, std::ios::binary);
     if (!in) {
-      ed.status = "no project file at " + ed.project_path.filename().string();
+      ed.status = "no project file at " + path.filename().string();
       return;
     }
     const std::string text{std::istreambuf_iterator<char>(in),
@@ -786,15 +853,33 @@ void load_project(Editor &ed) {
                        ed.project_name});
     ed.edits = std::move(project.edits);
     ed.body_edits = std::move(project.body_edits);
+    ed.project_path = path;
     if (!project.name.empty()) ed.project_name = std::move(project.name);
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
-    ed.status = "project loaded - " +
+    ed.status = "loaded " + path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
                 " annotations";
   } catch (const std::exception &error) {
     ed.status = std::string("load failed: ") + error.what();
   }
+}
+
+// Refreshes and opens the project picker over the projects directory.
+void open_picker(Editor &ed) {
+  ed.project_files.clear();
+  std::error_code ec;
+  if (std::filesystem::exists(ed.projects_dir, ec))
+    for (const auto &entry :
+         std::filesystem::directory_iterator(ed.projects_dir, ec))
+      if (entry.is_regular_file() && entry.path().extension() == ".json")
+        ed.project_files.push_back(entry.path());
+  std::sort(ed.project_files.begin(), ed.project_files.end());
+  ed.picker_list.row_count = ed.project_files.size();
+  ed.picker_list.scroll_to(0);
+  ed.picker_open = true;
+  if (ed.project_files.empty())
+    ed.status = "no saved projects in " + ed.projects_dir.filename().string();
 }
 
 void render_viewport(DrawList &out, const Editor &ed, float s) {
@@ -1071,8 +1156,8 @@ int main(int argc, char **argv) {
     profiler.set_enabled(true);
 
     Editor ed;
-    ed.project_path =
-        engine::executable_directory() / "projects" / "editor-project.json";
+    ed.projects_dir = engine::executable_directory() / "projects";
+    ed.project_path = ed.projects_dir / "editor-project.json";
     const auto catalog_path = find_path(
         {"Data/astronomy/hyg-nearby-500-v1.json",
          "data/astronomy/hyg-nearby-500-v1.json"});
@@ -1160,7 +1245,9 @@ int main(int argc, char **argv) {
       ed.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
         if (event.type == InputEventType::EscapePressed) {
-          if (ed.editing != Field::None) {
+          if (ed.picker_open) {
+            ed.picker_open = false;
+          } else if (ed.editing != Field::None) {
             ed.editing = Field::None;
             window.set_text_input(false);
           } else if (ed.view == WorkspaceView::System) {
@@ -1266,6 +1353,12 @@ int main(int argc, char **argv) {
             commit_active_field(ed);
             window.set_text_input(false);
           }
+          if (ed.picker_open) {
+            // The picker owns input while open; a click outside dismisses it.
+            if (!ed.picker_rect.contains(event.position))
+              ed.picker_open = false;
+            continue;
+          }
           if (ed.hit_regen.contains(event.position)) {
             submit_generate();
           } else if (ed.hit_seed.contains(event.position)) {
@@ -1285,7 +1378,7 @@ int main(int argc, char **argv) {
           } else if (ed.hit_save.contains(event.position)) {
             save_project(ed);
           } else if (ed.hit_load.contains(event.position)) {
-            load_project(ed);
+            open_picker(ed);
           } else if (ed.hit_bookmark.contains(event.position)) {
             if (const auto target = annotation_target(ed)) {
               ed.history.commit(
@@ -1404,6 +1497,20 @@ int main(int argc, char **argv) {
             rebuild_detail_rows(ed);
           }
         }
+        // Picker rows load the chosen project file.
+        if (event.type == InputEventType::LeftReleased && ed.picker_open) {
+          if (ed.picker_rows.contains(event.position)) {
+            const float local = event.position.y - ed.picker_rows.y +
+                                ed.picker_list.scroll_offset;
+            const auto idx = static_cast<std::size_t>(
+                std::max(0.f, std::floor(local / ed.picker_list.row_height)));
+            if (idx < ed.project_files.size()) {
+              load_project(ed, ed.project_files[idx]);
+              ed.picker_open = false;
+            }
+          }
+          continue; // swallow other release handling while the picker is up
+        }
         // Detail-list body rows jump to that body's context.
         if (event.type == InputEventType::LeftReleased)
           for (const auto &[rect, body_index] : ed.detail_body_hits)
@@ -1413,6 +1520,10 @@ int main(int argc, char **argv) {
               rebuild_detail_rows(ed);
               break;
             }
+        if (event.type == InputEventType::Wheel && ed.picker_open &&
+            ed.picker_rect.contains(event.position))
+          ed.picker_list.scroll_to(ed.picker_list.scroll_offset -
+                                   event.wheel_y * 40.f);
         if (event.type == InputEventType::Wheel &&
             ed.list_rect.contains(event.position))
           ed.system_list.scroll_to(ed.system_list.scroll_offset -
@@ -1566,6 +1677,7 @@ int main(int argc, char **argv) {
         render_viewport(draw, ed, s);
       render_inspector(draw, ed, s);
       render_system_list(draw, ed, s);
+      render_picker(draw, ed, s, w, h); // topmost modal
       draw.text.push_back(
           Text{{ed.viewport.x + 6 * s, ed.viewport.y + ed.viewport.height - 22 * s},
                ed.status +
