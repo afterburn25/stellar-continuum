@@ -41,8 +41,13 @@ int main() {
     project.edits[300].note = "note only";
     project.edits[301].bookmarked = true;
     project.edits[400]; // Fully empty row must not serialize.
+    project.body_edits[3].name = "Earth";
+    project.body_edits[3].bookmarked = true;
+    project.body_edits[9].note = "moon survey";
+    project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
     const auto restored = parse_project(text);
+    require(restored.name == project.name, "project name did not round-trip");
     require(restored.seed == project.seed, "seed did not round-trip");
     require(restored.system_count == project.system_count,
             "system count did not round-trip");
@@ -55,6 +60,19 @@ int main() {
     require(restored.edits.at(77).name == project.edits.at(77).name,
             "unicode name did not round-trip");
     require(!restored.edits.contains(400), "empty edit row serialized");
+    require(restored.body_edits.size() == 2, "body edits did not round-trip");
+    require(restored.body_edits.at(3).name == "Earth" &&
+                restored.body_edits.at(3).bookmarked,
+            "body name/bookmark did not round-trip");
+    require(restored.body_edits.at(9).note == "moon survey",
+            "body note did not round-trip");
+
+    // Documents without the additive bodyEdits array still parse.
+    const auto legacy = parse_project(
+        R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[{"id":7,"name":"x","note":"","bookmarked":false}]})");
+    require(legacy.edits.at(7).name == "x", "v1 document lost system edits");
+    require(legacy.body_edits.empty(), "missing bodyEdits must parse empty");
+    require(legacy.name.empty(), "missing name must parse empty");
 
     // Malformed and unsupported inputs reject wholesale.
     rejects("not json at all", "non-JSON input was accepted");

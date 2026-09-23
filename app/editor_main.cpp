@@ -39,6 +39,7 @@
 #include <memory>
 #include <mutex>
 #include <numbers>
+#include <optional>
 #include <random>
 #include <span>
 #include <stdexcept>
@@ -177,7 +178,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System };
 
-enum class Field { None, Name, Note, Search };
+enum class Field { None, Name, Note, Search, ProjectName };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -210,20 +211,29 @@ struct Editor {
 
   // Scrollable authoritative detail rows for the selected system.
   engine::VirtualizedList detail_list;
-  std::vector<std::pair<std::string, std::string>> detail_rows;
+  // A scrollable inspector row; `body_index` tags rows that select a body.
+  struct DetailRow {
+    std::string label;
+    std::string value;
+    std::size_t body_index = static_cast<std::size_t>(-1);
+  };
+  std::vector<DetailRow> detail_rows;
+  std::vector<std::pair<UiRect, std::size_t>> detail_body_hits;
 
-  // Annotation layer + text editing state.
+  // Annotation layer + text editing state. `edits` keys system ids,
+  // `body_edits` keys body ids; history snapshots the whole project shape.
   std::unordered_map<int, edproj::SystemEdit> edits;
-  engine::UndoHistory<std::unordered_map<int, edproj::SystemEdit>> history{64};
+  std::unordered_map<int, edproj::SystemEdit> body_edits;
+  engine::UndoHistory<edproj::EditorProject> history{64};
   Field editing{Field::None};
-  std::string edit_buffer, search;
+  std::string edit_buffer, search, project_name{"untitled"};
 
   // Toolbar + panel hit regions, rebuilt each frame.
   std::vector<UiRect> hits;
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
-      hit_view{};
+      hit_view{}, hit_project_name{};
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path project_path;
   float pointer_x{}, pointer_y{};
@@ -238,6 +248,13 @@ std::string display_name(const Editor &ed, const core::StellarSystem &sys) {
   return sys.name;
 }
 
+std::string display_name(const Editor &ed, const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && !it->second.name.empty())
+    return it->second.name;
+  return body.name;
+}
+
 bool matches(const Editor &ed, const core::StellarSystem &sys) {
   if (ed.search.empty()) return true;
   const auto lower = [](std::string text) {
@@ -247,8 +264,20 @@ bool matches(const Editor &ed, const core::StellarSystem &sys) {
     return text;
   };
   const auto needle = lower(ed.search);
-  return lower(sys.name).find(needle) != std::string::npos ||
-         lower(display_name(ed, sys)).find(needle) != std::string::npos;
+  if (lower(sys.name).find(needle) != std::string::npos ||
+      lower(display_name(ed, sys)).find(needle) != std::string::npos)
+    return true;
+  // A system also matches when one of its bodies does — searching "Earth"
+  // finds Sol.
+  if (const auto bodies = ed.bodies_by_system.find(sys.id);
+      bodies != ed.bodies_by_system.end())
+    for (const auto body_index : bodies->second) {
+      const auto &body = ed.bodies[body_index];
+      if (lower(body.name).find(needle) != std::string::npos ||
+          lower(display_name(ed, body)).find(needle) != std::string::npos)
+        return true;
+    }
+  return false;
 }
 
 void rebuild_filter(Editor &ed) {
@@ -258,8 +287,28 @@ void rebuild_filter(Editor &ed) {
   ed.system_list.row_count = ed.filtered.size();
 }
 
+void rebuild_detail_rows(Editor &ed);
+
+// The annotation target for the current selection: (id, is_body). In the
+// system workspace a selected body annotates its own record; otherwise the
+// selected system does.
+std::optional<std::pair<int, bool>> annotation_target(const Editor &ed) {
+  if (ed.view == WorkspaceView::System &&
+      ed.selected_body < ed.bodies.size())
+    return std::pair{ed.bodies[ed.selected_body].id, true};
+  if (ed.selected < ed.systems.size())
+    return std::pair{ed.systems[ed.selected].id, false};
+  return std::nullopt;
+}
+
+std::unordered_map<int, edproj::SystemEdit> &annotation_map(Editor &ed,
+                                                          bool body) {
+  return body ? ed.body_edits : ed.edits;
+}
+
 // Commits the in-progress field buffer into the annotation layer, recording
-// an undo snapshot only when the value actually changes.
+// an undo snapshot only when the value actually changes. In the system
+// workspace with a body selected, fields bind to that body's record.
 void commit_active_field(Editor &ed) {
   if (ed.editing == Field::None) return;
   if (ed.editing == Field::Search) {
@@ -267,34 +316,56 @@ void commit_active_field(Editor &ed) {
       ed.search = ed.edit_buffer;
       rebuild_filter(ed);
     }
-  } else if (ed.selected < ed.systems.size()) {
-    const auto id = ed.systems[ed.selected].id;
-    const auto it = ed.edits.find(id);
+  } else if (ed.editing == Field::ProjectName) {
+    if (ed.project_name != ed.edit_buffer) {
+      ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                         ed.project_name});
+      ed.project_name = ed.edit_buffer;
+    }
+  } else if (const auto target = annotation_target(ed)) {
+    auto &map = annotation_map(ed, target->second);
+    const auto it = map.find(target->first);
     const std::string current_value =
-        it == ed.edits.end()
-            ? std::string{}
-            : (ed.editing == Field::Name ? it->second.name : it->second.note);
+        it == map.end() ? std::string{}
+                        : (ed.editing == Field::Name ? it->second.name
+                                                     : it->second.note);
     if (current_value != ed.edit_buffer) {
-      ed.history.commit(ed.edits);
-      auto &stored = ed.edits[id];
-      (ed.editing == Field::Name ? stored.name : stored.note) = ed.edit_buffer;
+      ed.history.commit(
+          {ed.seed, ed.system_count, ed.edits, ed.body_edits,
+           ed.project_name});
+      auto &stored = map[target->first];
+      (ed.editing == Field::Name ? stored.name : stored.note) =
+          ed.edit_buffer;
+      rebuild_filter(ed); // overrides are searchable text
+      if (target->second && ed.editing == Field::Name)
+        rebuild_detail_rows(ed); // body row labels show overrides
     }
   }
   ed.editing = Field::None;
 }
 
 void apply_undo(Editor &ed) {
-  if (auto state = ed.history.undo(ed.edits)) {
-    ed.edits = std::move(*state);
+  if (auto state =
+          ed.history.undo({ed.seed, ed.system_count, ed.edits,
+                           ed.body_edits, ed.project_name})) {
+    ed.edits = std::move(state->edits);
+    ed.body_edits = std::move(state->body_edits);
+    ed.project_name = std::move(state->name);
     rebuild_filter(ed);
+    rebuild_detail_rows(ed);
     ed.status = "undo";
   }
 }
 
 void apply_redo(Editor &ed) {
-  if (auto state = ed.history.redo(ed.edits)) {
-    ed.edits = std::move(*state);
+  if (auto state =
+          ed.history.redo({ed.seed, ed.system_count, ed.edits,
+                           ed.body_edits, ed.project_name})) {
+    ed.edits = std::move(state->edits);
+    ed.body_edits = std::move(state->body_edits);
+    ed.project_name = std::move(state->name);
     rebuild_filter(ed);
+    rebuild_detail_rows(ed);
     ed.status = "redo";
   }
 }
@@ -455,7 +526,11 @@ void rebuild_detail_rows(Editor &ed) {
       if (body.has_rare_resource) value += " [rare]";
       if (body.has_pre_warp_civilization) value += " [pre-warp]";
       if (body.cracked_world) value += " [cracked]";
-      row(body.name, value);
+      const auto bit = ed.body_edits.find(body.id);
+      const auto marker =
+          bit != ed.body_edits.end() && bit->second.bookmarked ? "* " : "";
+      ed.detail_rows.push_back(
+          {marker + display_name(ed, body), value, body_index});
     }
   }
 
@@ -510,8 +585,13 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   out.overlay.push_back(StrokedRectangle{r, panel_edge});
   float x = r.x + 14 * s, y = r.y + 12 * s;
   const int font = static_cast<int>(13 * s);
-  out.text.push_back(Text{{x, y}, "SYSTEM", accent, font + 2, 0, std::nullopt,
-                          TextAlign::Left, FontFace::Heading});
+  const bool inspecting_body =
+      ed.view == WorkspaceView::System &&
+      ed.selected_body < ed.bodies.size() &&
+      ed.selected < ed.systems.size();
+  out.text.push_back(Text{{x, y}, inspecting_body ? "BODY" : "SYSTEM", accent,
+                          font + 2, 0, std::nullopt, TextAlign::Left,
+                          FontFace::Heading});
   y += (font + 14) * s;
 
   // Project actions + history docked at the inspector bottom (drawn
@@ -533,25 +613,37 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     return;
   }
   const auto &sys = ed.systems[ed.selected];
+  // The authoring target: the selected body in the system workspace, else
+  // the system itself.
+  const bool body_context = ed.view == WorkspaceView::System &&
+                            ed.selected_body < ed.bodies.size();
+  const int target_id =
+      body_context ? ed.bodies[ed.selected_body].id : sys.id;
+  const auto &map = body_context ? ed.body_edits : ed.edits;
+  const auto edit_it = map.find(target_id);
+  const edproj::SystemEdit empty_edit{};
+  const auto &stored =
+      edit_it != map.end() ? edit_it->second : empty_edit;
 
   // Editable display name.
-  out.text.push_back(Text{{x, y}, "display name", muted, font - 1});
+  out.text.push_back(Text{{x, y},
+                          body_context ? "body display name" : "display name",
+                          muted, font - 1});
   y += font + 4;
   ed.hit_name = {x, y, r.width - 28 * s, (font + 12) * s};
   const auto name_value =
-      ed.editing == Field::Name ? ed.edit_buffer : display_name(ed, sys);
+      ed.editing == Field::Name
+          ? ed.edit_buffer
+          : (body_context ? display_name(ed, ed.bodies[ed.selected_body])
+                          : display_name(ed, sys));
   field_box(out, ed.hit_name, name_value, ed.editing == Field::Name,
-            sys.name, font);
+            body_context ? ed.bodies[ed.selected_body].name : sys.name, font);
   y += ed.hit_name.height + 8 * s;
 
   // Editable note.
   out.text.push_back(Text{{x, y}, "note", muted, font - 1});
   y += font + 4;
   ed.hit_note = {x, y, r.width - 28 * s, (font + 12) * s};
-  const auto edit_it = ed.edits.find(sys.id);
-  const edproj::SystemEdit empty_edit{};
-  const auto &stored =
-      edit_it != ed.edits.end() ? edit_it->second : empty_edit;
   const auto note_value =
       ed.editing == Field::Note ? ed.edit_buffer : stored.note;
   field_box(out, ed.hit_note, note_value, ed.editing == Field::Note,
@@ -577,12 +669,22 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   const auto range = ed.detail_list.visible_range();
   float ry = detail.y + 4 * s - ed.detail_list.scroll_offset +
              range.first * ed.detail_list.row_height;
+  ed.detail_body_hits.clear();
   for (std::size_t i = range.first; i < range.last;
        ++i, ry += ed.detail_list.row_height) {
-    const auto &[label, value] = ed.detail_rows[i];
-    out.text.push_back(Text{{detail.x + 8 * s, ry + 2}, label, muted,
+    const auto &row = ed.detail_rows[i];
+    if (row.body_index != static_cast<std::size_t>(-1)) {
+      const UiRect rowrect{detail.x, ry, detail.width - 8 * s,
+                           ed.detail_list.row_height};
+      ed.detail_body_hits.emplace_back(rowrect, row.body_index);
+      if (row.body_index == ed.selected_body)
+        out.overlay.push_back(FilledRectangle{rowrect, row_selected});
+      else if (rowrect.contains(Point{ed.pointer_x, ed.pointer_y}))
+        out.overlay.push_back(FilledRectangle{rowrect, row_hover});
+    }
+    out.text.push_back(Text{{detail.x + 8 * s, ry + 2}, row.label, muted,
                             font - 1, 100 * s, detail});
-    out.text.push_back(Text{{detail.x + 112 * s, ry + 2}, value, ink,
+    out.text.push_back(Text{{detail.x + 112 * s, ry + 2}, row.value, ink,
                             font - 1, 0, detail});
   }
   if (ed.detail_list.max_scroll() > 0) {
@@ -656,12 +758,14 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
 
 void save_project(Editor &ed) {
   try {
-    const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits};
+    const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits,
+                                        ed.body_edits, ed.project_name};
     const auto text = edproj::serialize_project(project);
     engine::write_file_atomically(ed.project_path,
                                   std::as_bytes(std::span(text)));
     ed.status = "project saved - " +
-                std::to_string(ed.edits.size()) + " annotations";
+                std::to_string(ed.edits.size() + ed.body_edits.size()) +
+                " annotations";
   } catch (const std::exception &error) {
     ed.status = std::string("save failed: ") + error.what();
   }
@@ -678,10 +782,15 @@ void load_project(Editor &ed) {
                            std::istreambuf_iterator<char>()};
     auto project = edproj::parse_project(text);
     // Swap only on full success: a malformed file leaves existing work intact.
-    ed.history.commit(ed.edits);
+    ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                       ed.project_name});
     ed.edits = std::move(project.edits);
+    ed.body_edits = std::move(project.body_edits);
+    if (!project.name.empty()) ed.project_name = std::move(project.name);
     rebuild_filter(ed);
-    ed.status = "project loaded - " + std::to_string(ed.edits.size()) +
+    rebuild_detail_rows(ed);
+    ed.status = "project loaded - " +
+                std::to_string(ed.edits.size() + ed.body_edits.size()) +
                 " annotations";
   } catch (const std::exception &error) {
     ed.status = std::string("load failed: ") + error.what();
@@ -874,13 +983,16 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
             body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
         if (body_index == ed.selected_body)
           out.circles.push_back(Circle{p, 9.f, accent});
+        if (const auto it = ed.body_edits.find(body.id);
+            it != ed.body_edits.end() && it->second.bookmarked)
+          out.circles.push_back(Circle{p, 8.f, {240, 200, 90, 255}});
         out.circles.push_back(
             Circle{p, body.parent_body_id ? 2.5f : 4.5f,
                    in_hz ? Color{110, 220, 140, 255}
                          : (body.parent_body_id ? muted : ink)});
         if (ed.sys_ppa > 4.f)
           out.text.push_back(
-              Text{{p.x + 8, p.y - 7}, body.name,
+              Text{{p.x + 8, p.y - 7}, display_name(ed, body),
                    body_index == ed.selected_body
                        ? accent
                        : Color{150, 180, 195, 220},
@@ -1174,26 +1286,41 @@ int main(int argc, char **argv) {
             save_project(ed);
           } else if (ed.hit_load.contains(event.position)) {
             load_project(ed);
-          } else if (ed.hit_bookmark.contains(event.position) &&
-                     ed.selected < ed.systems.size()) {
-            ed.history.commit(ed.edits);
-            auto &edit = ed.edits[ed.systems[ed.selected].id];
-            edit.bookmarked = !edit.bookmarked;
+          } else if (ed.hit_bookmark.contains(event.position)) {
+            if (const auto target = annotation_target(ed)) {
+              ed.history.commit(
+                  {ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                   ed.project_name});
+              auto &map = annotation_map(ed, target->second);
+              map[target->first].bookmarked =
+                  !map[target->first].bookmarked;
+              rebuild_detail_rows(ed); // row bookmark markers refresh
+            }
           } else if (ed.hit_undo.contains(event.position)) {
             apply_undo(ed);
           } else if (ed.hit_redo.contains(event.position)) {
             apply_redo(ed);
-          } else if (ed.hit_name.contains(event.position) &&
-                     ed.selected < ed.systems.size()) {
-            ed.editing = Field::Name;
-            ed.edit_buffer =
-                ed.edits[ed.systems[ed.selected].id].name;
-            window.set_text_input(true);
-          } else if (ed.hit_note.contains(event.position) &&
-                     ed.selected < ed.systems.size()) {
-            ed.editing = Field::Note;
-            ed.edit_buffer =
-                ed.edits[ed.systems[ed.selected].id].note;
+          } else if (ed.hit_name.contains(event.position)) {
+            if (const auto target = annotation_target(ed)) {
+              ed.editing = Field::Name;
+              const auto &map = annotation_map(ed, target->second);
+              const auto it = map.find(target->first);
+              ed.edit_buffer =
+                  it != map.end() ? it->second.name : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_note.contains(event.position)) {
+            if (const auto target = annotation_target(ed)) {
+              ed.editing = Field::Note;
+              const auto &map = annotation_map(ed, target->second);
+              const auto it = map.find(target->first);
+              ed.edit_buffer =
+                  it != map.end() ? it->second.note : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_project_name.contains(event.position)) {
+            ed.editing = Field::ProjectName;
+            ed.edit_buffer = ed.project_name;
             window.set_text_input(true);
           } else if (ed.hit_search.contains(event.position)) {
             ed.editing = Field::Search;
@@ -1277,6 +1404,15 @@ int main(int argc, char **argv) {
             rebuild_detail_rows(ed);
           }
         }
+        // Detail-list body rows jump to that body's context.
+        if (event.type == InputEventType::LeftReleased)
+          for (const auto &[rect, body_index] : ed.detail_body_hits)
+            if (rect.contains(event.position)) {
+              ed.view = WorkspaceView::System;
+              ed.selected_body = body_index;
+              rebuild_detail_rows(ed);
+              break;
+            }
         if (event.type == InputEventType::Wheel &&
             ed.list_rect.contains(event.position))
           ed.system_list.scroll_to(ed.system_list.scroll_offset -
@@ -1402,6 +1538,13 @@ int main(int argc, char **argv) {
       draw.text.push_back(
           Text{{bx, bar.y + 18 * s}, "seed " + std::to_string(ed.seed), muted,
                static_cast<int>(13 * s)});
+      bx += 90 * s;
+      ed.hit_project_name = {bx, bar.y + 10 * s, 170 * s, 32 * s};
+      field_box(draw, ed.hit_project_name,
+                ed.editing == Field::ProjectName ? ed.edit_buffer
+                                                 : ed.project_name,
+                ed.editing == Field::ProjectName, "project name",
+                static_cast<int>(13 * s));
 
       // Workspace: viewport + right column split into inspector and the
       // searchable systems list.

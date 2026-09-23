@@ -7,18 +7,24 @@
 namespace stellar::editor {
 
 std::string serialize_project(const EditorProject &project) {
-  auto edits = nlohmann::json::array();
-  for (const auto &[id, edit] : project.edits) {
-    if (edit.name.empty() && edit.note.empty() && !edit.bookmarked) continue;
-    edits.push_back({{"id", id},
-                     {"name", edit.name},
-                     {"note", edit.note},
-                     {"bookmarked", edit.bookmarked}});
-  }
+  auto serialize_map = [](const std::unordered_map<int, SystemEdit> &map) {
+    auto rows = nlohmann::json::array();
+    for (const auto &[id, edit] : map) {
+      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked)
+        continue;
+      rows.push_back({{"id", id},
+                      {"name", edit.name},
+                      {"note", edit.note},
+                      {"bookmarked", edit.bookmarked}});
+    }
+    return rows;
+  };
   const nlohmann::json document{{"schemaVersion", 1},
                                 {"seed", project.seed},
                                 {"systems", project.system_count},
-                                {"edits", std::move(edits)}};
+                                {"name", project.name},
+                                {"edits", serialize_map(project.edits)},
+                                {"bodyEdits", serialize_map(project.body_edits)}};
   return document.dump(2);
 }
 
@@ -35,14 +41,26 @@ EditorProject parse_project(std::string_view text) {
     EditorProject project;
     project.seed = document.at("seed").get<std::int64_t>();
     project.system_count = document.at("systems").get<int>();
-    for (const auto &row : document.at("edits")) {
-      SystemEdit edit;
-      edit.name = row.value("name", std::string{});
-      edit.note = row.value("note", std::string{});
-      edit.bookmarked = row.value("bookmarked", false);
-      if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked)
-        project.edits[row.at("id").get<int>()] = std::move(edit);
-    }
+    auto parse_map = [](const nlohmann::json &rows,
+                        std::unordered_map<int, SystemEdit> &out) {
+      for (const auto &row : rows) {
+        SystemEdit edit;
+        edit.name = row.value("name", std::string{});
+        edit.note = row.value("note", std::string{});
+        edit.bookmarked = row.value("bookmarked", false);
+        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked)
+          out[row.at("id").get<int>()] = std::move(edit);
+      }
+    };
+    parse_map(document.at("edits"), project.edits);
+    // bodyEdits/name are additive within schemaVersion 1: older documents
+    // omit them and older readers ignore unknown keys.
+    if (const auto it = document.find("bodyEdits");
+        it != document.end() && it->is_array())
+      parse_map(*it, project.body_edits);
+    if (const auto it = document.find("name");
+        it != document.end() && it->is_string())
+      project.name = it->get<std::string>();
     return project;
   } catch (const nlohmann::json::exception &error) {
     throw std::runtime_error(std::string("malformed project: ") + error.what());

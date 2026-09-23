@@ -20,7 +20,13 @@ struct SystemEdit {
 struct EditorProject {
   std::int64_t seed{};
   int system_count{};
+  // Keyed by stable catalog ids: system edits by StellarSystem::id, body
+  // edits by PlanetaryBody::id. Generated properties never enter here.
   std::unordered_map<int, SystemEdit> edits;
+  std::unordered_map<int, SystemEdit> body_edits;
+  // Free-form document name shown in the toolbar and used by Save-As /
+  // recent-projects workflows. Last so aggregate inits stay stable.
+  std::string name;
 };
 
 // JSON document with schemaVersion. Rows with no annotation are omitted.
