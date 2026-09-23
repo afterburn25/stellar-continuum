@@ -402,6 +402,31 @@ void start_cook(Shell &shell, engine::JobSystem &) {
 
 #if defined(_WIN32)
 // Configures and builds the open project's host executable (src/main.cpp via
+// Configures + compiles a project's host against the exported engine SDK;
+// output goes to build/host/build.log. Shared by the UI job and the
+// headless --build path.
+std::string build_project_sync(const std::filesystem::path &root,
+                               const std::string &exe_name) {
+  const auto sdk = find_path("engine-sdk");
+  const auto host = root / "build" / "host";
+  const auto log = (host / "build.log").string();
+  std::filesystem::create_directories(host);
+  // The whole command gets an outer quote pair so cmd /c doesn't strip the
+  // quoted exe path (quote-preservation requires exactly two quotes).
+  const std::string cmake = "\"" STELLAR_CMAKE_COMMAND "\"";
+  auto run = [&](const std::string &command) {
+    return std::system(
+        ("\"" + command + " >\"" + log + "\" 2>&1\"").c_str());
+  };
+  if (run(cmake + " -S \"" + root.string() + "\" -B \"" + host.string() +
+          "\" -DCMAKE_BUILD_TYPE=Release -DSTELLAR_ENGINE_SDK=\"" +
+          sdk.generic_string() + "\"") != 0)
+    return "configure failed - see build/host/build.log";
+  if (run(cmake + " --build \"" + host.string() + "\" --config Release") != 0)
+    return "build failed - see build/host/build.log";
+  return "build ok - " + exe_name + ".exe ready";
+}
+
 // its generated CMakeLists.txt) against the exported engine SDK. Runs on the
 // JobSystem; output goes to build/host/build.log inside the project.
 void start_build(Shell &shell, engine::JobSystem &jobs) {
@@ -414,26 +439,12 @@ void start_build(Shell &shell, engine::JobSystem &jobs) {
   }
   (void)jobs.submit("project.build", engine::JobPriority::Normal, {},
                     [&shell, root, exe_name] {
-                      const auto sdk = find_path("engine-sdk");
-                      const auto host = root / "build" / "host";
-                      const auto log = (host / "build.log").string();
-                      std::filesystem::create_directories(host);
-                      const std::string cmake = "\"" STELLAR_CMAKE_COMMAND "\"";
-                      auto run = [&](const std::string &command) {
-                        return std::system((command + " >\"" + log + "\" 2>&1")
-                                               .c_str());
-                      };
                       std::string message;
-                      if (run(cmake + " -S \"" + root.string() + "\" -B \"" +
-                              host.string() + "\" -DCMAKE_BUILD_TYPE=Release "
-                              "-DSTELLAR_ENGINE_SDK=\"" +
-                              sdk.generic_string() + "\"") != 0)
-                        message = "configure failed - see build/host/build.log";
-                      else if (run(cmake + " --build \"" + host.string() +
-                                   "\" --config Release") != 0)
-                        message = "build failed - see build/host/build.log";
-                      else
-                        message = "build ok - " + exe_name + ".exe ready";
+                      try {
+                        message = build_project_sync(root, exe_name);
+                      } catch (const std::exception &error) {
+                        message = std::string("build failed: ") + error.what();
+                      }
                       {
                         std::lock_guard lock(shell.project_mutex);
                         shell.build_status = std::move(message);
@@ -492,7 +503,51 @@ void poll_run_process(Shell &shell) {
 
 // Assembles a distributable folder: the built host plus its runtime files,
 // the cooked Content/ tree, and the source packages the host scans at
-// startup — everything a player needs in dist/<name>/.
+// startup — everything a player needs in dist/<name>/. Shared by the UI job
+// and the headless --package path.
+std::string package_project_sync(const std::filesystem::path &root,
+                                 const std::string &exe_name) {
+  std::filesystem::path exe;
+  for (const auto dir :
+       {root / "build" / "host" / "Release", root / "build" / "host"})
+    if (std::filesystem::is_regular_file(dir / (exe_name + ".exe"))) {
+      exe = dir / (exe_name + ".exe");
+      break;
+    }
+  if (exe.empty()) return "no built host - run BUILD first";
+  const auto dist = root / "dist" / exe_name;
+  std::error_code ec;
+  std::filesystem::remove_all(dist, ec);
+  std::filesystem::create_directories(dist, ec);
+  std::size_t files = 0;
+  std::uintmax_t bytes = 0;
+  auto copy_tree = [&](const std::filesystem::path &src,
+                       const std::filesystem::path &dst) {
+    if (!std::filesystem::is_directory(src)) return;
+    for (const auto &entry :
+         std::filesystem::recursive_directory_iterator(src)) {
+      if (!entry.is_regular_file()) continue;
+      const auto target = dst / std::filesystem::relative(entry.path(), src);
+      std::filesystem::create_directories(target.parent_path(), ec);
+      std::filesystem::copy_file(entry.path(), target,
+                                 std::filesystem::copy_options::
+                                     overwrite_existing,
+                                 ec);
+      if (ec) throw std::runtime_error("copy failed: " + ec.message());
+      ++files;
+      bytes += entry.file_size();
+    }
+  };
+  copy_tree(exe.parent_path(), dist);
+  // The cooker writes <output>/Content/; copying the cooked root yields
+  // Content/ beside the exe, which is where the starter probes in packaged
+  // layout.
+  copy_tree(root / "build" / "cooked", dist);
+  copy_tree(root / "packages", dist / "packages");
+  return "packaged " + std::to_string(files) + " files, " +
+         human_bytes(bytes) + " - dist/" + exe_name;
+}
+
 void start_package(Shell &shell, engine::JobSystem &jobs) {
   if (!shell.project || shell.packaging.exchange(true)) return;
   const auto root = shell.project->root;
@@ -505,57 +560,7 @@ void start_package(Shell &shell, engine::JobSystem &jobs) {
                     [&shell, root, exe_name] {
                       std::string message;
                       try {
-                        std::filesystem::path exe;
-                        for (const auto dir :
-                             {root / "build" / "host" / "Release",
-                              root / "build" / "host"})
-                          if (std::filesystem::is_regular_file(
-                                  dir / (exe_name + ".exe"))) {
-                            exe = dir / (exe_name + ".exe");
-                            break;
-                          }
-                        if (exe.empty())
-                          throw std::runtime_error(
-                              "no built host - run BUILD first");
-                        const auto dist = root / "dist" / exe_name;
-                        std::error_code ec;
-                        std::filesystem::remove_all(dist, ec);
-                        std::filesystem::create_directories(dist, ec);
-                        std::size_t files = 0;
-                        std::uintmax_t bytes = 0;
-                        auto copy_tree = [&](const std::filesystem::path &src,
-                                             const std::filesystem::path &dst) {
-                          if (!std::filesystem::is_directory(src)) return;
-                          for (const auto &entry :
-                               std::filesystem::recursive_directory_iterator(
-                                   src)) {
-                            if (!entry.is_regular_file()) continue;
-                            const auto target =
-                                dst /
-                                std::filesystem::relative(entry.path(), src);
-                            std::filesystem::create_directories(
-                                target.parent_path(), ec);
-                            std::filesystem::copy_file(
-                                entry.path(), target,
-                                std::filesystem::copy_options::
-                                    overwrite_existing,
-                                ec);
-                            if (ec)
-                              throw std::runtime_error("copy failed: " +
-                                                       ec.message());
-                            ++files;
-                            bytes += entry.file_size();
-                          }
-                        };
-                        copy_tree(exe.parent_path(), dist);
-                        // The cooker writes <output>/Content/; copying the
-                        // cooked root yields Content/ beside the exe, which
-                        // is where the starter probes in packaged layout.
-                        copy_tree(root / "build" / "cooked", dist);
-                        copy_tree(root / "packages", dist / "packages");
-                        message = "packaged " + std::to_string(files) +
-                                  " files, " + human_bytes(bytes) +
-                                  " - dist/" + exe_name;
+                        message = package_project_sync(root, exe_name);
                       } catch (const std::exception &error) {
                         message =
                             std::string("package failed: ") + error.what();
@@ -630,6 +635,88 @@ void import_asset(Shell &shell) {
   } else {
     shell.status = "import failed: " + ec.message();
   }
+}
+
+// Headless project pipeline — no window is created, so the full loop is
+// scriptable (CI, external tools, testing). Returns a process exit code.
+//   --create <name> [--root <dir>] [--template windowed|blank]
+//   --cook|--build|--package <project-root>
+int run_headless(Shell &shell, const std::vector<std::string> &args) {
+  const auto &op = args.front();
+  if (op == "--create") {
+    if (args.size() < 2) {
+      std::cerr << "usage: --create <name> [--root <dir>] "
+                   "[--template windowed|blank]\n";
+      return 2;
+    }
+    std::filesystem::path root;
+    std::string templ{engine::kTemplateWindowed};
+    for (std::size_t i = 2; i + 1 < args.size(); i += 2) {
+      if (args[i] == "--root") root = args[i + 1];
+      else if (args[i] == "--template") templ = args[i + 1];
+    }
+    if (root.empty())
+      root = shell.projects_root /
+             engine::sanitize_project_id(args[1]).substr(5);
+    std::string error;
+    if (!engine::create_project(root, args[1], STELLAR_ENGINE_VERSION,
+                                &error, templ)) {
+      std::cerr << "create failed: " << error << '\n';
+      return 1;
+    }
+    std::cout << "created " << root.generic_string() << '\n';
+    return 0;
+  }
+  if (args.size() < 2) {
+    std::cerr << "usage: " << op << " <project-root>\n";
+    return 2;
+  }
+  std::string error;
+  const auto project = engine::EngineProject::load(args[1], &error);
+  if (!project) {
+    std::cerr << "open failed: " << error << '\n';
+    return 1;
+  }
+  const auto exe_name = project->id.substr(5);
+#if defined(_WIN32)
+  try {
+    if (op == "--cook") {
+      engine::AssetCookOptions options;
+      options.root = project->root / "packages";
+      options.output = project->root / "build" / "cooked";
+      options.cache = project->root / "build" / "cache";
+      options.report = project->root / "build" / "cook-report.json";
+      options.scan_content = true;
+      options.package_group = project->id;
+      options.progress = [](std::size_t done, std::size_t total) {
+        std::cout << "  cooked " << done << "/" << total << '\n';
+      };
+      engine::cook_asset_repository(options);
+      std::size_t packages = 0;
+      std::error_code ec;
+      for (const auto &entry : std::filesystem::directory_iterator(
+               options.output / "Content", ec))
+        if (entry.path().extension() == ".stpak") ++packages;
+      std::cout << "cook ok - " << packages << " package(s)\n";
+      return 0;
+    }
+    if (op == "--build") {
+      const auto message = build_project_sync(project->root, exe_name);
+      std::cout << message << '\n';
+      return message.starts_with("build ok") ? 0 : 1;
+    }
+    if (op == "--package") {
+      const auto message = package_project_sync(project->root, exe_name);
+      std::cout << message << '\n';
+      return message.starts_with("packaged") ? 0 : 1;
+    }
+  } catch (const std::exception &e) {
+    std::cerr << op << " failed: " << e.what() << '\n';
+    return 1;
+  }
+#endif
+  std::cerr << "unknown or unsupported op: " << op << '\n';
+  return 2;
 }
 
 void create_project_from_field(Shell &shell) {
@@ -1207,6 +1294,19 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories(shell.projects_root);
     refresh_projects(shell);
     scan_assets(shell, find_path("assets"));
+    // Headless pipeline ops run without creating the window.
+    if (argc > 1) {
+      std::vector<std::string> args;
+      for (int i = 1; i < argc; ++i)
+#ifdef _WIN32
+        args.push_back(std::filesystem::path(argv[i]).generic_string());
+#else
+        args.emplace_back(argv[i]);
+#endif
+      if (args.front() == "--create" || args.front() == "--cook" ||
+          args.front() == "--build" || args.front() == "--package")
+        return run_headless(shell, args);
+    }
     // --project <root> opens a game project directly (e.g. launched on a
     // project directory, or from a project's own toolchain).
     for (int i = 1; i + 1 < argc; ++i) {
