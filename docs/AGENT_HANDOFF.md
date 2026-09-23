@@ -104,10 +104,18 @@ in `<project>/editor/`), PACKAGE (distributable `dist/<name>/` = host +
 runtime + `Content/` + `packages/`), and RENAME via the name field.
 BUILD/RUN consume the exported `engine-sdk/` beside the shell (headers,
 prebuilt libs, SDL3 runtime + default font, `stellar::engine`/
-`stellar::cooker`/`stellar::platform` consumer targets); the shell itself
-accepts `--project <root>`. The Assets tool re-roots to project content
-and can toggle between SOURCE files and COOKED `runtime.stmanifest`
-records. `stellar-editor.exe` is the separate authoritative-world editor
+`stellar::cooker`/`stellar::platform`/`stellar::audio` consumer targets);
+the shell itself accepts `--project <root>` and `--tool <name>`, and the
+whole loop is scriptable headlessly via `--create/--cook/--build/
+--package`. The Assets tool re-roots to project content and can toggle
+between SOURCE files and COOKED `runtime.stmanifest` records. The Scene
+tool authors `editor/scene.json` (`engine::SceneDocument` — named
+entities with position/extent/velocity/tint/optional sprite); the
+windowed starter spawns them into `World`, polls the file for hot
+reload, decodes `sprite` images from the base package content, drives an
+entity named `player` with WASD/arrow keys, and plays
+`audio/bounce.wav|mp3` on player bounce via `engine::audio`.
+`stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in
 [ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md).
