@@ -380,7 +380,15 @@ int RuntimeHost::run() {
 
     DrawList draw;
     draw.overlay.push_back(FilledRectangle{{0, 0, w, h}, {8, 16, 26, 255}});
-    for (std::size_t i = 0; i < impl.entities.size(); ++i) {
+    // Draw in layer order (stable — same-layer entities keep spawn order).
+    std::vector<std::size_t> order(impl.entities.size());
+    for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
+      const auto *la = world.get<Layer>(impl.entities[a]);
+      const auto *lb = world.get<Layer>(impl.entities[b]);
+      return (la ? la->value : 0) < (lb ? lb->value : 0);
+    });
+    for (const auto i : order) {
       const auto *t = world.get<Transform2D>(impl.entities[i]);
       const auto *ext = world.get<Extent2D>(impl.entities[i]);
       const auto *tint = world.get<Tint>(impl.entities[i]);

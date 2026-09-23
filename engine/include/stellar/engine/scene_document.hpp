@@ -22,6 +22,9 @@ struct SceneEntity {
   // Optional content-relative image (e.g. "data/logo.png") rendered instead
   // of the tinted rect; resolved under the project's content roots.
   std::string sprite;
+  // Draw order — higher layers render above lower ones; equal layers keep
+  // document order.
+  int layer{};
 };
 
 struct SceneDocument {

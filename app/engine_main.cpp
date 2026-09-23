@@ -194,7 +194,8 @@ struct Shell {
   UiRect hit_scene_undo{}, hit_scene_redo{}, hit_scene_dup{};
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
-      hit_scene_size{}, hit_scene_color{}, scene_preview{}, scene_rows{};
+      hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
+      scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -964,6 +965,12 @@ void commit_scene_field(Shell &shell) {
     ok = parse_pair(shell.scene_buffer, next.w, next.h);
   } else if (shell.scene_field == 6) {
     ok = parse_color(shell.scene_buffer, next.r, next.g, next.b);
+  } else if (shell.scene_field == 7) {
+    try {
+      next.layer = std::stoi(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -978,6 +985,17 @@ void commit_scene_field(Shell &shell) {
   shell.scene_buffer.clear();
 }
 
+// Entity indices sorted by draw order: layer ascending, stable within a
+// layer — the last index is the topmost entity for hit-testing.
+std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
+  std::vector<std::size_t> order(doc.entities.size());
+  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+  std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
+    return doc.entities[a].layer < doc.entities[b].layer;
+  });
+  return order;
+}
+
 void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
@@ -989,7 +1007,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_undo = shell.hit_scene_redo = shell.hit_scene_dup = {};
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
-            shell.hit_scene_color = {};
+            shell.hit_scene_color = shell.hit_scene_layer = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1061,7 +1079,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(FilledRectangle{pv, {8, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   const float sx = pv.width / 1280.f, sy = pv.height / 720.f;
-  for (std::size_t i = 0; i < shell.scene_doc.entities.size(); ++i) {
+  for (const auto i : scene_draw_order(shell.scene_doc)) {
     const auto &e = shell.scene_doc.entities[i];
     const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
     std::shared_ptr<const RgbaImage> sprite;
@@ -1127,6 +1145,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                      "," + std::to_string(entity->b)
                : "",
         shell.editing_scene && shell.scene_field == 6, "e.g. 255,200,60");
+  field(shell.hit_scene_layer, "layer",
+        entity ? std::to_string(entity->layer) : "",
+        shell.editing_scene && shell.scene_field == 7,
+        "draw order - higher draws on top");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -1859,7 +1881,9 @@ int main(int argc, char **argv) {
                 (event.position.x - pv.x) / pv.width * 1280.f;
             const float wy =
                 (event.position.y - pv.y) / pv.height * 720.f;
-            for (std::size_t i = shell.scene_doc.entities.size(); i-- > 0;) {
+            const auto order = scene_draw_order(shell.scene_doc);
+            for (std::size_t n = order.size(); n-- > 0;) {
+              const auto i = order[n];
               const auto &e = shell.scene_doc.entities[i];
               if (wx >= e.x && wx <= e.x + e.w && wy >= e.y &&
                   wy <= e.y + e.h) {
@@ -1958,6 +1982,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string((int)e->r) + "," +
                                      std::to_string((int)e->g) + "," +
                                      std::to_string((int)e->b);
+              else if (field == 7 && e)
+                shell.scene_buffer = std::to_string(e->layer);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -1973,6 +1999,8 @@ int main(int argc, char **argv) {
               edit_field(5);
             else if (shell.hit_scene_color.contains(event.position))
               edit_field(6);
+            else if (shell.hit_scene_layer.contains(event.position))
+              edit_field(7);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

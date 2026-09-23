@@ -36,6 +36,10 @@ struct SpriteRef {
   // against their content roots or cooked packages.
   std::string value;
 };
+struct Layer {
+  // Draw order — higher layers render above lower ones.
+  int value{};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

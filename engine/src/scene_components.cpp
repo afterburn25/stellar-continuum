@@ -50,6 +50,8 @@ void register_scene_components(World &world) {
   world.register_component<Tint>("tint", encode_pod<Tint>, decode_pod<Tint>);
   world.register_component<EntityName>("name", encode_name, decode_name);
   world.register_component<SpriteRef>("sprite", encode_sprite, decode_sprite);
+  world.register_component<Layer>("layer", encode_pod<Layer>,
+                                  decode_pod<Layer>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -62,6 +64,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     world.add(entity, Extent2D{s.w, s.h});
     world.add(entity, Tint{s.r, s.g, s.b});
     world.add(entity, EntityName{s.name});
+    world.add(entity, Layer{s.layer});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -94,6 +97,7 @@ SceneDocument scene_from_world(const World &world) {
       s.b = tint->b;
     }
     if (const auto *sp = world.get<SpriteRef>(entity)) s.sprite = sp->value;
+    if (const auto *l = world.get<Layer>(entity)) s.layer = l->value;
     doc.entities.push_back(std::move(s));
   }
   return doc;

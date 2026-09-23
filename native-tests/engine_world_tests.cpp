@@ -215,7 +215,7 @@ int main() {
     {
         SceneDocument doc{{SceneEntity{"player", 10.f, 20.f, 64.f, 64.f,
                                        30.f, -15.f, 255, 220, 60,
-                                       "data/logo.png"},
+                                       "data/logo.png", -1},
                            SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
@@ -228,6 +228,9 @@ int main() {
               "spawn_scene transform");
         check(world.get<SpriteRef>(spawned[0])->value == "data/logo.png",
               "spawn_scene sprite ref");
+        check(world.get<Layer>(spawned[0]) &&
+                  world.get<Layer>(spawned[0])->value == -1,
+              "spawn_scene layer");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -255,7 +258,8 @@ int main() {
         if (ex_player->name != "player") ex_player = &exported.entities[1];
         check(ex_player->name == "player" && ex_player->x == 10.f &&
                   ex_player->vx == 30.f &&
-                  ex_player->sprite == "data/logo.png",
+                  ex_player->sprite == "data/logo.png" &&
+                  ex_player->layer == -1,
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.
