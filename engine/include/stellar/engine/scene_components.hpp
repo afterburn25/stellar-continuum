@@ -88,21 +88,39 @@ struct Opacity {
   // Draw alpha multiplier 0-1.
   float value{1.0f};
 };
+// Grid terrain state, carried on one dedicated world entity (absent from
+// spawn_scene's return list — locate via tilemap_entity). Holding it as a
+// component makes runtime cell edits (destructible terrain) part of the
+// authoritative world snapshot.
+struct Tilemap {
+  std::string tileset;    // content-relative tile sheet image
+  int tile_w{32}, tile_h{32};
+  int columns{0};         // cells per row; rows = cells.size()/columns
+  int layer{-100};        // draw order vs entities
+  float parallax{1.0f};
+  bool collide{false};    // non-empty cells block/catch entities
+  std::vector<int> cells; // row-major; <0 = empty
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.
 void register_scene_components(World &world);
 
 // Spawns every entity in `doc` into `world` with the full component set
-// (name/sprite only when non-empty) and returns the created ids. The caller
-// owns the ids' lifecycle — destroying previously spawned entities before a
-// respawn is the caller's policy.
+// (name/sprite only when non-empty) and returns the created ids. When the
+// document carries a tilemap it is spawned on a separate dedicated entity
+// (Tilemap component only) that is NOT part of the returned list — find it
+// with tilemap_entity(). The caller owns the ids' lifecycle — destroying
+// previously spawned entities before a respawn is the caller's policy.
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc);
+
+// The live entity carrying the scene's Tilemap component, or nullopt.
+std::optional<EntityId> tilemap_entity(const World &world);
 
 // The inverse of spawn_scene: every live entity carrying EntityName (or, when
 // unnamed, every entity with a Transform2D) becomes a SceneEntity built from
-// its components. Lets tools export live world state back to an editable,
-// diffable document.
+// its components, and a Tilemap component exports back to doc.tilemap. Lets
+// tools export live world state back to an editable, diffable document.
 SceneDocument scene_from_world(const World &world);
 
 // First live entity whose EntityName matches, or nullopt.

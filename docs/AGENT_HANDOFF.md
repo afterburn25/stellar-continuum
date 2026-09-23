@@ -142,9 +142,13 @@ sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
 `flipX`/`flipY`, `visible`. Scenes also carry an optional
 `tilemap` (`SceneTilemap`: tileset image path, `tileW`/`tileH`,
 `columns`, `layer`, `parallax`, `collide`, row-major `cells` with
-`-1` empty) — RuntimeHost renders cells through the sprite path at
-its layer and runs cell collision (side-blocking, top landing,
-grounded) in the same authoritative pass. The Scene tool exposes
+`-1` empty) — the tilemap lives in the world as a `Tilemap`
+component on a dedicated entity (`host.tilemap_entity()`), so cell
+state is authoritative: runtime edits (destructible terrain) snapshot
+with F5/F9 saves and `scene_from_world` re-exports them. RuntimeHost
+renders cells through the sprite path at its layer and runs cell
+collision (side-blocking, top landing, grounded) in the same
+authoritative pass. The Scene tool exposes
 every field in an adaptive multi-column property list with an
 animated/flipped/rotated preview that also paints the tilemap,
 plus a TILES toggle, tilemap fields (tileset, tile size,

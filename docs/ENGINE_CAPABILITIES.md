@@ -76,10 +76,16 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   path, `tileW`/`tileH` cell size, `columns`, `layer`, `parallax`, `collide`,
   `cells` with `-1` empty) serializes inside `SceneDocument` JSON with strict
   validation (positive dimensions, cell count divisible by columns).
-  `RuntimeHost` resolves the tileset through `ContentResolver`, renders cells
-  via the existing `Image` source-rectangle path, honors camera transform and
-  per-tilemap parallax, and runs tile collision inside the same authoritative
-  movement pass as solid/oneway entities — not a parallel approximation.
+  `spawn_scene` carries it into the world as a `Tilemap` component on a
+  dedicated entity (found via `tilemap_entity()`, exported back by
+  `scene_from_world`), so cell state is authoritative and snapshots with
+  F5/F9 quicksaves — runtime cell edits (destructible terrain) persist.
+  `RuntimeHost::tilemap_entity()` exposes the carrier; games mutate cells
+  through `world().get<Tilemap>(...)`. The host resolves the tileset through
+  `ContentResolver`, renders cells via the existing `Image` source-rectangle
+  path, honors camera transform and per-tilemap parallax, and runs tile
+  collision inside the same authoritative movement pass as solid/oneway
+  entities — not a parallel approximation.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint
@@ -87,22 +93,25 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   checkerboard fallback when no tileset is set, PAINT mode that writes cells
   by click/drag in the preview with a grid overlay and one undo step per
   stroke).
-- **Save/determinism/performance:** tilemaps are scene-level authored state —
-  `World::snapshot()` saves remain entity-only, so existing saves are
-  unaffected; hot reload rebuilds tilemap state with the document. Cell scans
+- **Save/determinism/performance:** the tilemap is a `Tilemap` component on a
+  dedicated world entity, so quicksaves snapshot cell edits and
+  `scene_from_world` re-exports them; pre-tilemap saves simply lack the
+  component (scene reload restores it). Hot reload respawns the carrier with
+  the document. Cell scans
   are O(columns x rows) with viewport culling; collision probes sample a few
   cell points per moving entity per fixed step. Grid order is row-major and
   draw order is deterministic.
 - **Tests:** `engine_project` tests cover JSON round-trip of the full tilemap
   (tileset, dims, columns, collide, cell values) and reject malformed maps
-  (cell count not divisible by columns, non-positive tile size); live capture
-  verified rendering and landing/grounded behavior on a generated project.
+  (cell count not divisible by columns, non-positive tile size);
+  `engine_world` tests cover the dedicated-entity spawn, component codec
+  round-trip through `snapshot()`/`restore()` including a runtime cell edit,
+  and `scene_from_world` export; live capture verified rendering and
+  landing/grounded behavior on a generated project.
 - **Limits/reuse:** single tilemap per scene document (one grid); collision is
   cell-level solid only (no per-tile slopes/one-way flags); paint strokes fill
-  single cells (no brush size or fill tool); `scene_from_world` exports
-  entities only, so world-derived documents drop doc-level state including
-  the tilemap. Other RuntimeHost consumers (2D platformers, top-down maps,
-  puzzle boards) reuse the same path.
+  single cells (no brush size or fill tool). Other RuntimeHost consumers (2D
+  platformers, top-down maps, puzzle boards) reuse the same path.
 
 ## Cooked flare reservations, local crash reports and small updates (2026-09-20)
 

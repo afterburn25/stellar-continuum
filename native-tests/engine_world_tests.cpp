@@ -227,10 +227,27 @@ int main() {
         hero.data = "checkpoint-7";
         hero.opacity = 0.5f;
         SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
+        doc.tilemap = SceneTilemap{};
+        doc.tilemap->tileset = "sprites/tiles.png";
+        doc.tilemap->tile_w = 32;
+        doc.tilemap->tile_h = 32;
+        doc.tilemap->columns = 4;
+        doc.tilemap->collide = true;
+        doc.tilemap->cells = {0, -1, -1, 0, 0, 1, 1, 0};
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
         check(spawned.size() == 2, "spawn_scene creates all entities");
+        const auto tile_e = tilemap_entity(world);
+        check(tile_e.has_value() &&
+                  std::find(spawned.begin(), spawned.end(), *tile_e) ==
+                      spawned.end(),
+              "tilemap spawns on its own entity");
+        check(world.get<Tilemap>(*tile_e)->tileset == "sprites/tiles.png" &&
+                  world.get<Tilemap>(*tile_e)->columns == 4 &&
+                  world.get<Tilemap>(*tile_e)->cells.size() == 8 &&
+                  world.get<Tilemap>(*tile_e)->collide,
+              "spawn_scene tilemap component");
         const auto player = find_entity_by_name(world, "player");
         check(player.has_value() && *player == spawned[0],
               "find_entity_by_name resolves");
@@ -302,6 +319,17 @@ int main() {
               "restore revives destroyed entity");
         check(world.get<SpriteRef>(*rep)->value == "data/logo.png",
               "restore revives sprite path");
+        // Destructible terrain: a runtime cell edit survives restore.
+        // (Entity ids regenerate on restore — re-resolve the carrier.)
+        const auto tile_e2 = tilemap_entity(world);
+        check(tile_e2.has_value(), "restore revives tilemap entity");
+        world.get<Tilemap>(*tile_e2)->cells[1] = 7;
+        save_world_to_file(world, path);
+        world.get<Tilemap>(*tile_e2)->cells[1] = -1;
+        check(load_world_from_file(world, path), "tilemap save reload");
+        check(tilemap_entity(world).has_value() &&
+                  world.get<Tilemap>(*tilemap_entity(world))->cells[1] == 7,
+              "tilemap cell edits snapshot with the world");
 
         // scene_from_world exports live state back to an editable document.
         const auto exported = scene_from_world(world);
@@ -321,6 +349,10 @@ int main() {
                   ex_player->data == "checkpoint-7" &&
                   ex_player->opacity == 0.5f,
               "scene_from_world round-trips fields");
+        check(exported.tilemap && exported.tilemap->columns == 4 &&
+                  exported.tilemap->cells[1] == 7 &&
+                  exported.tilemap->tileset == "sprites/tiles.png",
+              "scene_from_world exports tilemap");
 
         // Failure paths: absent and corrupt files return false, world intact.
         check(!load_world_from_file(

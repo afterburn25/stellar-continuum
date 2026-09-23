@@ -85,6 +85,11 @@ public:
   [[nodiscard]] audio::AudioOutput &audio();
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
+  // The entity carrying the scene's Tilemap component (grid terrain), if
+  // the document has one. Cell state is authoritative: mutate it through
+  // world().get<Tilemap>(...) for destructible terrain — it snapshots with
+  // F5/F9 quicksaves and hot-reloads with the scene document.
+  [[nodiscard]] std::optional<EntityId> tilemap_entity() const;
   // The deterministic particle system — games define() emitters then
   // spawn_emitter() to run them; the host steps it in sim time and
   // renders particles as tinted rects above the scene.

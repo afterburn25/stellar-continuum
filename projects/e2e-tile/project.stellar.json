@@ -1,0 +1,9 @@
+{
+  "content": [
+    "packages"
+  ],
+  "engine": "0.1.64",
+  "id": "game.e2e-tile",
+  "name": "e2e-tile",
+  "schemaVersion": 1
+}

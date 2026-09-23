@@ -54,6 +54,67 @@ UserData decode_user_data(const std::vector<std::uint8_t> &b) {
   return UserData{{b.begin(), b.end()}};
 }
 
+// Tilemap codec: tileset string, fixed dims/flags, then the cell array —
+// the snapshot format is byte-stable for determinism checks.
+void put_u32(std::vector<std::uint8_t> &out, std::uint32_t v) {
+  for (int i = 0; i < 4; ++i)
+    out.push_back(static_cast<std::uint8_t>((v >> (i * 8)) & 0xff));
+}
+
+void put_i32(std::vector<std::uint8_t> &out, std::int32_t v) {
+  put_u32(out, static_cast<std::uint32_t>(v));
+}
+
+void put_f32(std::vector<std::uint8_t> &out, float v) {
+  std::uint32_t bits;
+  std::memcpy(&bits, &v, 4);
+  put_u32(out, bits);
+}
+
+std::uint32_t get_u32(const std::vector<std::uint8_t> &b,
+                      std::size_t &at) {
+  std::uint32_t v = 0;
+  for (int i = 0; i < 4 && at < b.size(); ++i)
+    v |= static_cast<std::uint32_t>(b[at++]) << (i * 8);
+  return v;
+}
+
+std::vector<std::uint8_t> encode_tilemap(const Tilemap &t) {
+  std::vector<std::uint8_t> out;
+  put_u32(out, static_cast<std::uint32_t>(t.tileset.size()));
+  out.insert(out.end(), t.tileset.begin(), t.tileset.end());
+  put_i32(out, t.tile_w);
+  put_i32(out, t.tile_h);
+  put_i32(out, t.columns);
+  put_i32(out, t.layer);
+  put_f32(out, t.parallax);
+  out.push_back(t.collide ? 1 : 0);
+  put_u32(out, static_cast<std::uint32_t>(t.cells.size()));
+  for (const int c : t.cells) put_i32(out, c);
+  return out;
+}
+
+Tilemap decode_tilemap(const std::vector<std::uint8_t> &b) {
+  Tilemap t;
+  std::size_t at = 0;
+  const std::uint32_t len = get_u32(b, at);
+  if (len <= b.size() - at)
+    t.tileset.assign(reinterpret_cast<const char *>(b.data() + at), len);
+  at += len;
+  t.tile_w = static_cast<int>(get_u32(b, at));
+  t.tile_h = static_cast<int>(get_u32(b, at));
+  t.columns = static_cast<int>(get_u32(b, at));
+  t.layer = static_cast<int>(get_u32(b, at));
+  const std::uint32_t pbits = get_u32(b, at);
+  std::memcpy(&t.parallax, &pbits, 4);
+  t.collide = at < b.size() && b[at++] != 0;
+  const std::uint32_t count = get_u32(b, at);
+  t.cells.reserve(count);
+  for (std::uint32_t i = 0; i < count; ++i)
+    t.cells.push_back(static_cast<int>(get_u32(b, at)));
+  return t;
+}
+
 } // namespace
 
 void register_scene_components(World &world) {
@@ -97,6 +158,8 @@ void register_scene_components(World &world) {
                                      decode_user_data);
   world.register_component<Opacity>("opacity", encode_pod<Opacity>,
                                     decode_pod<Opacity>);
+  world.register_component<Tilemap>("tilemap", encode_tilemap,
+                                    decode_tilemap);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -126,12 +189,32 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
+  // The tilemap lives on its own entity (not returned) so runtime cell
+  // edits snapshot with the world.
+  if (doc.tilemap) {
+    const auto &s = *doc.tilemap;
+    world.add(world.create(),
+              Tilemap{s.tileset, s.tile_w, s.tile_h, s.columns, s.layer,
+                      s.parallax, s.collide, s.cells});
+  }
   return spawned;
+}
+
+std::optional<EntityId> tilemap_entity(const World &world) {
+  for (const auto entity : world.entities())
+    if (world.get<Tilemap>(entity) != nullptr) return entity;
+  return std::nullopt;
 }
 
 SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
+    if (const auto *tm = world.get<Tilemap>(entity)) {
+      doc.tilemap = SceneTilemap{tm->tileset, tm->tile_w, tm->tile_h,
+                                 tm->columns, tm->layer, tm->parallax,
+                                 tm->collide, tm->cells};
+      continue;
+    }
     const auto *name = world.get<EntityName>(entity);
     const auto *t = world.get<Transform2D>(entity);
     if (name == nullptr && t == nullptr) continue;

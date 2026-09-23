@@ -54,9 +54,17 @@ struct RuntimeHost::Impl {
   // Accumulated simulation seconds — drives sprite-strip animation so
   // playback is deterministic under --fixed-hz.
   double sim_time = 0.0;
-  // Optional document tilemap + its decoded tileset image.
-  std::optional<SceneTilemap> tilemap;
+  // The entity carrying the scene's Tilemap component (cell state is
+  // authoritative world data — runtime edits snapshot with quicksaves)
+  // plus its decoded tileset image.
+  std::optional<EntityId> tilemap_e;
   std::shared_ptr<const RgbaImage> tileset_img;
+  Tilemap *tilemap() {
+    return tilemap_e ? world.get<Tilemap>(*tilemap_e) : nullptr;
+  }
+  const Tilemap *tilemap() const {
+    return tilemap_e ? world.get<Tilemap>(*tilemap_e) : nullptr;
+  }
   // Deterministic particle system stepped inside simulate() and rendered
   // as tinted rects. The host tracks every spawned instance so it can
   // re-anchor attachments, stop emitters whose entity died, and render.
@@ -82,6 +90,9 @@ World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
+std::optional<EntityId> RuntimeHost::tilemap_entity() const {
+  return impl_->tilemap_e;
+}
 VfxSystem &RuntimeHost::vfx() { return impl_->vfx; }
 VfxInstanceId RuntimeHost::spawn_emitter(std::string_view definition_id,
                                        float x, float y,
@@ -219,14 +230,14 @@ int RuntimeHost::run() {
     impl.bg_b = doc.bg_b;
     impl.gravity = doc.gravity;
     for (const auto e : impl.entities) world.destroy(e);
+    if (impl.tilemap_e) world.destroy(*impl.tilemap_e);
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
-    impl.tilemap = doc.tilemap;
+    impl.tilemap_e = engine::tilemap_entity(world);
+    const auto *tm = impl.tilemap();
     impl.tileset_img =
-        impl.tilemap && !impl.tilemap->tileset.empty()
-            ? decode_sprite(impl.tilemap->tileset)
-            : nullptr;
+        tm && !tm->tileset.empty() ? decode_sprite(tm->tileset) : nullptr;
     impl.sprites.assign(impl.entities.size(), {});
     for (std::size_t i = 0; i < impl.entities.size(); ++i) {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
@@ -299,6 +310,18 @@ int RuntimeHost::run() {
   auto load_world = [&] {
     if (!load_world_from_file(world, save_path)) return;
     impl.entities = world.entities();
+    // The tilemap entity restores with the snapshot — pull it out of the
+    // tracked set and re-resolve its tileset image.
+    impl.tilemap_e = engine::tilemap_entity(world);
+    impl.entities.erase(std::remove(impl.entities.begin(),
+                                    impl.entities.end(),
+                                    impl.tilemap_e.value_or(EntityId{})),
+                        impl.entities.end());
+    {
+      const auto *tm = impl.tilemap();
+      impl.tileset_img =
+          tm && !tm->tileset.empty() ? decode_sprite(tm->tileset) : nullptr;
+    }
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
     impl.sprites.assign(impl.entities.size(), {});
@@ -399,10 +422,11 @@ int RuntimeHost::run() {
       impl.grounded.clear();
       // Tilemap lookup: is the world-space point inside a solid cell?
       const auto solid_cell = [&](float px, float py) {
-        if (!impl.tilemap || !impl.tilemap->collide ||
-            impl.tilemap->tile_w <= 0 || impl.tilemap->tile_h <= 0)
+        const auto *tmap = impl.tilemap();
+        if (!tmap || !tmap->collide || tmap->tile_w <= 0 ||
+            tmap->tile_h <= 0)
           return false;
-        const auto &tm = *impl.tilemap;
+        const auto &tm = *tmap;
         const int cx = static_cast<int>(std::floor(px / tm.tile_w));
         const int cy = static_cast<int>(std::floor(py / tm.tile_h));
         if (cx < 0 || cy < 0 || cx >= tm.columns) return false;
@@ -488,9 +512,9 @@ int RuntimeHost::run() {
         }
         // Tilemap side-blocking: the leading edge's corner cells stop
         // horizontal motion (mirrors the solid-entity rule).
-        if (gscale != 0.f && v->dx != 0.f && impl.tilemap &&
-            impl.tilemap->collide) {
-          const auto &tm = *impl.tilemap;
+        const auto *side_tm = impl.tilemap();
+        if (gscale != 0.f && v->dx != 0.f && side_tm && side_tm->collide) {
+          const auto &tm = *side_tm;
           const float lead = v->dx > 0.f ? t->x + ext->w : t->x;
           const float step_y = std::max(1.f, tm.tile_h - 1.f);
           bool blocked = false;
@@ -530,8 +554,9 @@ int RuntimeHost::run() {
             }
           }
           // Tilemap landing: the bottom edge's cells catch a fall.
-          if (impl.tilemap && impl.tilemap->collide) {
-            const auto &tm = *impl.tilemap;
+          if (const auto *land_tm = impl.tilemap();
+              land_tm && land_tm->collide) {
+            const auto &tm = *land_tm;
             const float step_x = std::max(1.f, tm.tile_w - 1.f);
             for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f;
                  px += step_x) {
@@ -578,9 +603,10 @@ int RuntimeHost::run() {
             }
           }
           // Resting on a tile row counts as grounded too.
-          if (!impl.grounded.count(entity.value()) && impl.tilemap &&
-              impl.tilemap->collide) {
-            const auto &tm = *impl.tilemap;
+          const auto *ground_tm = impl.tilemap();
+          if (!impl.grounded.count(entity.value()) && ground_tm &&
+              ground_tm->collide) {
+            const auto &tm = *ground_tm;
             const float below = t->y + ext->h + 0.5f;
             const int row = static_cast<int>(std::floor(below / tm.tile_h));
             if (std::abs(t->y + ext->h - row * tm.tile_h) <= 1.5f) {
@@ -705,8 +731,9 @@ int RuntimeHost::run() {
     bool tilemap_drawn = false;
     auto draw_tilemap = [&] {
       tilemap_drawn = true;
-      if (!impl.tilemap || !impl.tileset_img) return;
-      const auto &tm = *impl.tilemap;
+      const auto *tmap = impl.tilemap();
+      if (!tmap || !impl.tileset_img) return;
+      const auto &tm = *tmap;
       if (tm.columns <= 0 || tm.tile_w <= 0 || tm.tile_h <= 0) return;
       const auto &res = *impl.tileset_img;
       const int set_cols = res.width() / tm.tile_w;
@@ -741,8 +768,9 @@ int RuntimeHost::run() {
       const auto *tint = world.get<Tint>(impl.entities[i]);
       if (!t || !ext || !tint) continue;
       const auto *el = world.get<Layer>(impl.entities[i]);
-      if (!tilemap_drawn && impl.tilemap &&
-          (el ? el->value : 0) >= impl.tilemap->layer)
+      const auto *tm_layer = impl.tilemap();
+      if (!tilemap_drawn && tm_layer &&
+          (el ? el->value : 0) >= tm_layer->layer)
         draw_tilemap();
       const auto *px = world.get<Parallax>(impl.entities[i]);
       const float parallax = px ? px->value : 1.0f;
