@@ -254,9 +254,12 @@ struct Shell {
       scene3_textures;
   std::unique_ptr<engine::ContentResolver> scene3_content;
   bool scene3_looking{};  // right-drag orbit is active in the preview
-  bool scene3_dragging{}; // left-drag moves the picked entity on its
-                          // current-Y plane
+  bool scene3_dragging{}; // left-drag applies the transform mode below
+                          // to the picked entity
+  int scene3_drag_mode{0}; // 0 move (Y-plane), 1 rotate (yaw/pitch),
+                           // 2 scale (uniform)
   UiRect scene3_preview{}, scene3_rows{};
+  UiRect hit3_mode_move{}, hit3_mode_rot{}, hit3_mode_scale{};
   UiRect hit3_add{}, hit3_del{}, hit3_save{}, hit3_undo{}, hit3_redo{},
       hit3_dup{}, hit3_name{}, hit3_mesh{}, hit3_pos{}, hit3_rot{},
       hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
@@ -1610,6 +1613,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                             shell.hit3_bg =
                                                                 shell.hit3_music =
                                                                     {};
+    shell.hit3_mode_move = shell.hit3_mode_rot =
+        shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
     return;
   }
@@ -1640,6 +1645,17 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit3_dup = {x + 568 * s, y, 128 * s, bh};
   shell_button(out, shell.hit3_dup, "DUPLICATE",
                shell.scene3_sel < doc.entities.size(), font, s);
+  // LMB drag transform mode — what a left-drag does to the picked
+  // entity in the preview below.
+  shell.hit3_mode_move = {x + 716 * s, y, 86 * s, bh};
+  shell_button(out, shell.hit3_mode_move, "MOVE",
+               shell.scene3_drag_mode == 0, font, s);
+  shell.hit3_mode_rot = {x + 810 * s, y, 100 * s, bh};
+  shell_button(out, shell.hit3_mode_rot, "ROTATE",
+               shell.scene3_drag_mode == 1, font, s);
+  shell.hit3_mode_scale = {x + 918 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit3_mode_scale, "SCALE",
+               shell.scene3_drag_mode == 2, font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + live 3D preview (right).
@@ -1731,7 +1747,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   out.overlay.push_back(
       Text{{pv.x + 8 * s, pv.y + 6 * s},
-           "click/drag: pick + move | RMB drag: orbit | wheel: fov",
+           "click: pick | LMB drag: move/rotate/scale (mode above) | "
+           "RMB drag: orbit | wheel: fov",
            muted, font - 2});
 
   // Fields under the list: entity props, then document-level props.
@@ -3137,18 +3154,34 @@ int main(int argc, char **argv) {
             shell.scene3_modified = true;
           } else if (shell.scene3_dragging &&
                      shell.scene3_preview.contains(event.position)) {
-            // Drag along the entity's current-Y plane: unproject the
-            // cursor ray onto y = e.y and write back x,z.
             auto &d = shell.scene3_doc;
             if (auto *e = selected_scene3_entity(shell)) {
-              const Vec3 dir =
-                  scene3_ray(d, shell.scene3_preview, event.position);
-              if (std::abs(dir.y) > 1e-5f) {
-                const float t = (e->y - d.cam_y) / dir.y;
-                if (t > 0.f) {
-                  e->x = d.cam_x + dir.x * t;
-                  e->z = d.cam_z + dir.z * t;
-                  shell.scene3_modified = true;
+              if (shell.scene3_drag_mode == 1) {
+                // Rotate: horizontal drag yaws, vertical pitches (roll
+                // stays field-authored — two axes fit a 2D drag).
+                e->yaw_deg = std::fmod(e->yaw_deg + event.delta.x * .5f,
+                                       360.f);
+                e->pitch_deg =
+                    std::fmod(e->pitch_deg - event.delta.y * .5f, 360.f);
+                shell.scene3_modified = true;
+              } else if (shell.scene3_drag_mode == 2) {
+                // Scale: horizontal drag multiplies the uniform scale.
+                e->scale = std::clamp(
+                    e->scale * (1.f + event.delta.x * .005f), .01f,
+                    1000.f);
+                shell.scene3_modified = true;
+              } else {
+                // Move: unproject the cursor ray onto the entity's
+                // current-Y plane and write back x,z.
+                const Vec3 dir =
+                    scene3_ray(d, shell.scene3_preview, event.position);
+                if (std::abs(dir.y) > 1e-5f) {
+                  const float t = (e->y - d.cam_y) / dir.y;
+                  if (t > 0.f) {
+                    e->x = d.cam_x + dir.x * t;
+                    e->z = d.cam_z + dir.z * t;
+                    shell.scene3_modified = true;
+                  }
                 }
               }
             }
@@ -3695,6 +3728,12 @@ int main(int argc, char **argv) {
                 doc = std::move(*d);
                 shell.scene3_modified = true;
               }
+            } else if (shell.hit3_mode_move.contains(event.position)) {
+              shell.scene3_drag_mode = 0;
+            } else if (shell.hit3_mode_rot.contains(event.position)) {
+              shell.scene3_drag_mode = 1;
+            } else if (shell.hit3_mode_scale.contains(event.position)) {
+              shell.scene3_drag_mode = 2;
             } else if (shell.hit3_name.contains(event.position) && se)
               edit3(1, se->name);
             else if (shell.hit3_pos.contains(event.position) && se)
