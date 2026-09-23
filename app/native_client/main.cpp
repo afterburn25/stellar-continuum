@@ -951,32 +951,23 @@ class NativeCampaign final {
           if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
             if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
               meta->erase("CreatedAtUtc");
-          const auto hash=stellar::engine::fnv1a64(document.dump());
+          // Per-section checkpoints: a divergence names the subsystem
+          // ("save:World.Fleets"), not just "state differs at tick N".
+          const auto actual=stellar::engine::document_section_checkpoints(
+              tick,document,"save");
           if(replay_->recorder){
-            replay_->recorder->checkpoint(tick,hash,"save");
+            for(const auto &checkpoint:actual)
+              replay_->recorder->checkpoint(checkpoint.tick,checkpoint.hash,
+                                            checkpoint.label);
             return;
           }
-          const auto &expected=replay_->recording->checkpoints();
-          if(replay_->checkpoint_cursor>=expected.size()){
-            replay_->divergence=
-                "replay produced an unrecorded save checkpoint at tick "+
-                std::to_string(tick);
-            return;
-          }
-          const auto &want=expected[replay_->checkpoint_cursor];
-          if(want.tick!=tick){
-            replay_->divergence=
-                "replay checkpoint tick diverged: expected "+
-                std::to_string(want.tick)+", captured "+std::to_string(tick);
-            return;
-          }
-          if(want.hash!=hash){
-            replay_->divergence=
-                "replay state hash diverged at tick "+std::to_string(tick);
-            return;
-          }
-          ++replay_->checkpoint_cursor;
-          ++replay_->verified_checkpoints;
+          auto cursor=replay_->checkpoint_cursor;
+          const auto result=stellar::engine::verify_checkpoint_sequence(
+              replay_->recording->checkpoints(),cursor,actual);
+          replay_->checkpoint_cursor=cursor;
+          replay_->verified_checkpoints+=result.verified;
+          if(!result.divergence.empty())
+            replay_->divergence=result.divergence;
         });
   }
 

@@ -50,7 +50,7 @@ if(NOT STELLAR_SOURCE_COMMIT)
   set(STELLAR_SOURCE_COMMIT "unknown")
 endif()
 configure_file(app/build_version.hpp.in generated/stellar/build_version.hpp @ONLY)
-add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/diagnostic_log.cpp engine/src/sha256.cpp engine/src/diagnostic_bundle.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/simulation_executor.cpp engine/src/economy_catalog.cpp engine/src/population.cpp engine/src/colony.cpp engine/src/flow_network.cpp engine/src/logistics.cpp engine/src/planetary.cpp engine/src/terraforming.cpp engine/src/strategic_ai.cpp engine/src/warfare.cpp engine/src/history.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/project.cpp engine/src/scene_document.cpp engine/src/scene_components.cpp engine/src/content_resolver.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/save_history.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp)
+add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/diagnostic_log.cpp engine/src/sha256.cpp engine/src/diagnostic_bundle.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/simulation_executor.cpp engine/src/economy_catalog.cpp engine/src/population.cpp engine/src/colony.cpp engine/src/flow_network.cpp engine/src/logistics.cpp engine/src/planetary.cpp engine/src/terraforming.cpp engine/src/strategic_ai.cpp engine/src/warfare.cpp engine/src/history.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/project.cpp engine/src/scene_document.cpp engine/src/scene_components.cpp engine/src/content_resolver.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/save_history.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp engine/src/galaxy_map.cpp)
 target_include_directories(stellar_engine PUBLIC engine/include)
 target_sources(stellar_engine PRIVATE engine/src/native_scene3d.cpp engine/src/json_document.cpp engine/src/product_version.cpp engine/src/runtime_directory_lease.cpp engine/src/runtime_diagnostics.cpp engine/src/mesh3d_loader.cpp)
 target_link_libraries(stellar_engine PUBLIC Threads::Threads)
@@ -219,6 +219,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/planetary_adapter.cpp
   core/src/campaign_economy_projection.cpp
   core/src/campaign_warfare_projection.cpp
+  core/src/galaxy_projection.cpp
   core/src/campaign_frame.cpp
   core/src/strategic_clock.cpp
   core/src/fleet_persistence.cpp
@@ -717,6 +718,12 @@ if(BUILD_TESTING)
   add_executable(stellar_campaign_warfare_projection_tests native-tests/campaign_warfare_projection_tests.cpp)
   target_link_libraries(stellar_campaign_warfare_projection_tests PRIVATE stellar_core)
   add_test(NAME campaign_warfare_projection COMMAND stellar_campaign_warfare_projection_tests)
+  add_executable(stellar_galaxy_map_tests native-tests/galaxy_map_tests.cpp)
+  target_link_libraries(stellar_galaxy_map_tests PRIVATE stellar_engine)
+  add_test(NAME galaxy_map COMMAND stellar_galaxy_map_tests)
+  add_executable(stellar_galaxy_projection_tests native-tests/galaxy_projection_tests.cpp)
+  target_link_libraries(stellar_galaxy_projection_tests PRIVATE stellar_core)
+  add_test(NAME galaxy_projection COMMAND stellar_galaxy_projection_tests)
 
   foreach(scale 250 500 1000 2500 5000)
     add_test(NAME simulation_scale_${scale} COMMAND stellar_simulation_scale_tests ${scale} 120)
@@ -754,6 +761,9 @@ if(BUILD_TESTING)
   add_executable(stellar_undo_history_tests native-tests/undo_history_tests.cpp)
   target_link_libraries(stellar_undo_history_tests PRIVATE stellar_engine)
   add_test(NAME undo_history COMMAND stellar_undo_history_tests)
+  add_executable(stellar_replay_tests native-tests/replay_tests.cpp)
+  target_link_libraries(stellar_replay_tests PRIVATE stellar_engine stellar_json)
+  add_test(NAME replay COMMAND stellar_replay_tests)
   add_executable(stellar_engine_project_tests native-tests/engine_project_tests.cpp)
   target_link_libraries(stellar_engine_project_tests PRIVATE stellar_engine)
   add_test(NAME engine_project COMMAND stellar_engine_project_tests)

@@ -1,7 +1,10 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -60,6 +63,29 @@ private:
   std::vector<ReplayCommand> commands_;
   std::vector<ReplayCheckpoint> checkpoints_;
 };
+
+// Divergence localization helpers. A single whole-document checkpoint
+// hash only reports "state differs at tick N"; document_section_checkpoints
+// emits one labeled checkpoint per top-level member ("<prefix>:<key>")
+// plus one per member of an object member ("<prefix>:<key>.<sub>"), so a
+// mismatch names the subsystem ("save:Fleets"). Emission order follows
+// the document's member order — deterministic for ordered_json encoders.
+[[nodiscard]] std::vector<ReplayCheckpoint>
+document_section_checkpoints(std::uint64_t tick,
+                             const nlohmann::ordered_json &document,
+                             std::string_view label_prefix);
+
+struct CheckpointVerification {
+  std::size_t verified{};
+  std::string divergence; // empty = all entries verified
+};
+
+// Compares freshly computed checkpoints against the recording's expected
+// sequence starting at `cursor`, advancing it past verified entries.
+// Stops at the first mismatch; messages name the checkpoint label.
+[[nodiscard]] CheckpointVerification verify_checkpoint_sequence(
+    std::span<const ReplayCheckpoint> expected, std::size_t &cursor,
+    std::span<const ReplayCheckpoint> actual);
 
 // Streams a recorded command stream back in tick order. Callers pull
 // commands_for(tick) inside their fixed-step loop and verify checkpoints.

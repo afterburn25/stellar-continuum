@@ -77,6 +77,62 @@ std::optional<ReplayRecorder> ReplayRecorder::parse(std::string_view document,
   return recorder;
 }
 
+std::vector<ReplayCheckpoint>
+document_section_checkpoints(std::uint64_t tick,
+                             const nlohmann::ordered_json &document,
+                             std::string_view label_prefix) {
+  std::vector<ReplayCheckpoint> out;
+  const auto push = [&](std::string label,
+                        const nlohmann::ordered_json &value) {
+    out.push_back(
+        ReplayCheckpoint{tick, fnv1a64(value.dump()), std::move(label)});
+  };
+  for (const auto &[key, value] : document.items()) {
+    const std::string label = std::string(label_prefix) + ":" + key;
+    push(label, value);
+    // One level deeper for object members — "save:World.Fleets" is far
+    // more actionable than "save:World"; arrays stay whole.
+    if (value.is_object())
+      for (const auto &[sub, subval] : value.items())
+        push(label + "." + sub, subval);
+  }
+  return out;
+}
+
+CheckpointVerification verify_checkpoint_sequence(
+    std::span<const ReplayCheckpoint> expected, std::size_t &cursor,
+    std::span<const ReplayCheckpoint> actual) {
+  CheckpointVerification result;
+  for (const auto &checkpoint : actual) {
+    if (cursor >= expected.size()) {
+      result.divergence =
+          "replay produced an unrecorded checkpoint at tick " +
+          std::to_string(checkpoint.tick) + " (" + checkpoint.label + ")";
+      break;
+    }
+    const auto &want = expected[cursor];
+    if (want.tick != checkpoint.tick) {
+      result.divergence = "replay checkpoint tick diverged: expected " +
+                          std::to_string(want.tick) + ", captured " +
+                          std::to_string(checkpoint.tick) +
+                          (want.label.empty() ? "" : " (" + want.label + ")");
+      break;
+    }
+    if (want.hash != checkpoint.hash) {
+      const auto &label =
+          want.label.empty() ? checkpoint.label : want.label;
+      result.divergence =
+          "replay state hash diverged at tick " +
+          std::to_string(checkpoint.tick) +
+          (label.empty() ? "" : " (" + label + ")");
+      break;
+    }
+    ++cursor;
+    ++result.verified;
+  }
+  return result;
+}
+
 ReplayPlayer::ReplayPlayer(const ReplayRecorder *recording)
     : recording_(recording) {}
 

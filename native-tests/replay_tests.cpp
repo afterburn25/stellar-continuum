@@ -1,0 +1,119 @@
+// Replay helpers: recorder/player round-trip, per-section checkpoint
+// emission for divergence localization, and the expected-sequence
+// verifier that names the diverging subsystem.
+
+#include <stellar/engine/replay.hpp>
+
+#include <nlohmann/json.hpp>
+
+#include <iostream>
+#include <vector>
+
+namespace {
+
+int failures = 0;
+void check(bool condition, const char *message) {
+  if (!condition) {
+    ++failures;
+    std::cerr << "FAIL: " << message << '\n';
+  }
+}
+
+using namespace stellar::engine;
+
+} // namespace
+
+int main() {
+  // Recorder/player round-trip preserves commands, checkpoints, labels.
+  {
+    ReplayRecorder recorder{ReplayHeader{42, "build", "1.0"}};
+    recorder.record(10, "order", "{\"fleet\":7}");
+    recorder.checkpoint(10, 1234, "save:World");
+    const auto parsed = ReplayRecorder::parse(recorder.serialize());
+    check(parsed.has_value(), "recording parses");
+    check(parsed && parsed->commands().size() == 1 &&
+              parsed->checkpoints().size() == 1 &&
+              parsed->checkpoints()[0].label == "save:World" &&
+              parsed->header().seed == 42,
+          "round-trip keeps labels and header");
+    ReplayPlayer player{&*parsed};
+    check(player.commands_for(10).size() == 1 &&
+              player.expected_checkpoint(10).value_or(0) == 1234,
+          "player streams recorded entries");
+  }
+
+  // Section checkpoints emit top-level members plus object members one
+  // level deep, in document order, with per-section hashes.
+  nlohmann::ordered_json document{
+      {"World", {{"Fleets", {1, 2}}, {"Colonies", {3}}}},
+      {"Diplomacy", {{"Contacts", nlohmann::ordered_json::object()}}},
+      {"EventHistory", nullptr},
+      {"FormatVersion", 17}};
+  {
+    const auto sections =
+        document_section_checkpoints(500, document, "save");
+    const std::vector<std::string> want{
+        "save:World",       "save:World.Fleets", "save:World.Colonies",
+        "save:Diplomacy",   "save:Diplomacy.Contacts",
+        "save:EventHistory", "save:FormatVersion"};
+    check(sections.size() == want.size(), "section count");
+    bool labels_ok = true, hashes_ok = true, ticks_ok = true;
+    for (std::size_t i = 0; i < sections.size() && i < want.size(); ++i) {
+      labels_ok &= sections[i].label == want[i];
+      ticks_ok &= sections[i].tick == 500;
+    }
+    // Hashes equal the section's own document dump.
+    hashes_ok &=
+        sections[0].hash == fnv1a64(document.at("World").dump()) &&
+        sections[1].hash ==
+            fnv1a64(document.at("World").at("Fleets").dump()) &&
+        sections[5].hash == fnv1a64(std::string("null"));
+    check(labels_ok, "section labels in document order");
+    check(ticks_ok, "section ticks");
+    check(hashes_ok, "per-section hashes");
+  }
+
+  // Verification: matching sequence advances the cursor; a section
+  // mismatch names the label.
+  const auto expected = document_section_checkpoints(500, document, "save");
+  {
+    auto same = document_section_checkpoints(500, document, "save");
+    std::size_t cursor = 0;
+    const auto result = verify_checkpoint_sequence(expected, cursor, same);
+    check(result.divergence.empty() && result.verified == same.size() &&
+              cursor == same.size(),
+          "matching sequence verifies fully");
+  }
+  {
+    auto changed = document_section_checkpoints(500, document, "save");
+    changed[1].hash ^= 1; // Fleets diverges
+    std::size_t cursor = 0;
+    const auto result =
+        verify_checkpoint_sequence(expected, cursor, changed);
+    check(result.verified == 1 && cursor == 1 &&
+              result.divergence.find("save:World.Fleets") !=
+                  std::string::npos,
+          "divergence names the subsystem");
+  }
+  {
+    auto late = document_section_checkpoints(600, document, "save");
+    std::size_t cursor = 0;
+    const auto result = verify_checkpoint_sequence(expected, cursor, late);
+    check(result.divergence.find("tick diverged") != std::string::npos,
+          "tick mismatch reported");
+  }
+  {
+    std::size_t cursor = expected.size();
+    const auto result =
+        verify_checkpoint_sequence(expected, cursor, expected);
+    check(result.divergence.find("unrecorded") != std::string::npos,
+          "overrun reported as unrecorded checkpoint");
+  }
+
+  if (failures != 0) {
+    std::cerr << failures << " replay checks failed\n";
+    return 1;
+  }
+  std::cout << "replay tests passed\n";
+  return 0;
+}
