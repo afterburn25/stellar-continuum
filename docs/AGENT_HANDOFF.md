@@ -135,10 +135,13 @@ adapter surface for Core planet state, and `Terraforming`
 landed: `StrategicMind` (strategic_ai.hpp) deterministic utility
 decision machinery — domain-partitioned actions, hysteresis, cooldowns,
 bounded decision journal; cadence is caller-owned via executor tiers —
-see [STRATEGIC_AI.md](STRATEGIC_AI.md). Next: Milestone 10
-(fleet/warfare scale), then combined benchmarks and the event/history
-framework; adopt the executor for real Core/game phases when consuming
-these.
+see [STRATEGIC_AI.md](STRATEGIC_AI.md). Milestone 10 landed:
+`WarfareModel` (warfare.hpp) — ShipCohort aggregates, Interdict zones
+gating hostile movement, deterministic Lanchester engagement
+resolution, 2000-fleet scale — see [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md).
+Next: combined simulation benchmarks, event/history framework, then
+editor/renderer polish per the milestone map; adopt the executor for
+real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

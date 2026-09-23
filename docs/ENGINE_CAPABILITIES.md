@@ -62,6 +62,31 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Strategic warfare model (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 10 — fleets as
+  cohort aggregates for thousands-of-fleets scale, with explicit
+  deterministic engagement resolution and interdiction zones. See
+  [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md).
+- **Engine APIs/ownership:** `ShipClass` templates, `ShipCohort`
+  (class × count × condition × experience aggregates with weighted
+  merge), `FleetState` (owner/position/order: Hold/Move/Interdict/
+  Retreat). `report()` aggregates strength/speed/supply. `advance`
+  moves fleets at slowest-cohort speed with arrival clamping.
+  `interdicted()` gates hostile movement inside Interdict-order zones
+  only — presence never blocks. `resolve()` is Lanchester-style
+  attrition: aggregate attack distributed by hull share, net of
+  per-ship defense; symmetric pre-resolution strengths.
+- **Consumers/tests:** `warfare` tests — validation, cohort merge,
+  movement/clamp, interdiction ownership and order gating, engagement
+  attrition/destruction, defense absorption, bit-equal determinism,
+  2000-fleet scale. Core fleet/battle adoption pending.
+- **Save/performance impact:** plain data with caller ids; O(fleets +
+  cohorts) advance, O(cohorts²-free) aggregate resolve.
+- **Limitations:** 2D plane, aggregate dps without range/arcs, no
+  morale/retreat policy or supply settlement inside the model, no
+  reinforcement semantics during engagement.
+
 ## Strategic AI decision machinery (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 9 — deterministic
