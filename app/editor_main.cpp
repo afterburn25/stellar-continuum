@@ -13,6 +13,8 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/planet_appearance.hpp>
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
+#include <stellar/core/stellar_orbits.hpp>
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/foundation.hpp>
@@ -176,7 +178,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
   return "unknown";
 }
 
-enum class WorkspaceView { Galaxy, System };
+enum class WorkspaceView { Galaxy, System, Body };
 
 enum class Field { None, Name, Note, Search, ProjectName };
 
@@ -205,6 +207,12 @@ struct Editor {
   // drives analytic positions deterministically.
   Point sys_camera{0, 0};
   float sys_ppa{48.f};
+  // Body-view camera: kilometres relative to the focus body -> pixels.
+  // `focus_body` is the body whose satellite system the view shows — a
+  // moon's parent, or the selected body itself when it is not a moon.
+  Point body_camera{0, 0};
+  float body_ppa{0.002f};
+  std::size_t focus_body{static_cast<std::size_t>(-1)};
   double system_days{};
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
@@ -314,10 +322,10 @@ void rebuild_filter(Editor &ed) {
 void rebuild_detail_rows(Editor &ed);
 
 // The annotation target for the current selection: (id, is_body). In the
-// system workspace a selected body annotates its own record; otherwise the
-// selected system does.
+// system and body workspaces a selected body annotates its own record;
+// otherwise the selected system does.
 std::optional<std::pair<int, bool>> annotation_target(const Editor &ed) {
-  if (ed.view == WorkspaceView::System &&
+  if (ed.view != WorkspaceView::Galaxy &&
       ed.selected_body < ed.bodies.size())
     return std::pair{ed.bodies[ed.selected_body].id, true};
   if (ed.selected < ed.systems.size())
@@ -454,7 +462,7 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
 void rebuild_detail_rows(Editor &ed) {
   ed.detail_rows.clear();
   ed.detail_list.scroll_to(0);
-  if (ed.view == WorkspaceView::System &&
+  if (ed.view != WorkspaceView::Galaxy &&
       ed.selected_body < ed.bodies.size()) {
     rebuild_body_rows(ed, ed.bodies[ed.selected_body]);
     ed.detail_list.row_count = ed.detail_rows.size();
@@ -611,7 +619,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   float x = r.x + 14 * s, y = r.y + 12 * s;
   const int font = static_cast<int>(13 * s);
   const bool inspecting_body =
-      ed.view == WorkspaceView::System &&
+      ed.view != WorkspaceView::Galaxy &&
       ed.selected_body < ed.bodies.size() &&
       ed.selected < ed.systems.size();
   out.overlay.push_back(Text{{x, y}, inspecting_body ? "BODY" : "SYSTEM", accent,
@@ -640,7 +648,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   const auto &sys = ed.systems[ed.selected];
   // The authoring target: the selected body in the system workspace, else
   // the system itself.
-  const bool body_context = ed.view == WorkspaceView::System &&
+  const bool body_context = ed.view != WorkspaceView::Galaxy &&
                             ed.selected_body < ed.bodies.size();
   const int target_id =
       body_context ? ed.bodies[ed.selected_body].id : sys.id;
@@ -1009,20 +1017,31 @@ Point system_to_screen(const Editor &ed, double x, double y) {
 }
 
 // Samples the analytic orbit into a screen-space polyline ring centered on
-// `cx,cy` (AU). True ellipse-in-3D projected onto the view plane.
-void orbit_ring(DrawList &out, const Editor &ed,
-                const engine::AnalyticOrbit &orbit, double cx, double cy,
-                Color color) {
+// `cx,cy` in the caller's world units. True ellipse-in-3D projected onto
+// the view plane.
+template <typename ToScreen>
+void orbit_ring_mapped(DrawList &out, const engine::AnalyticOrbit &orbit,
+                       double cx, double cy, Color color,
+                       ToScreen &&to_screen) {
   const double period =
       2.0 * std::numbers::pi / std::max(1e-9, orbit.angular_speed);
   Point prev{};
   for (int k = 0; k <= 72; ++k) {
     const auto p =
         engine::analytic_orbit_position(orbit, k * period / 72.0);
-    const auto point = system_to_screen(ed, cx + p[0], cy + p[1]);
+    const auto point = to_screen(cx + p[0], cy + p[1]);
     if (k) out.world.push_back(Line{prev, point, color});
     prev = point;
   }
+}
+
+void orbit_ring(DrawList &out, const Editor &ed,
+                const engine::AnalyticOrbit &orbit, double cx, double cy,
+                Color color) {
+  orbit_ring_mapped(out, orbit, cx, cy, color,
+                    [&](double x, double y) {
+                      return system_to_screen(ed, x, y);
+                    });
 }
 
 void fit_system_camera(Editor &ed) {
@@ -1195,6 +1214,136 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
            static_cast<int>(13 * s), 0, v});
 }
 
+// Indices into `bodies` for satellites of `body_index`, catalog order.
+std::vector<std::size_t> moon_indices(const Editor &ed,
+                                      std::size_t body_index) {
+  std::vector<std::size_t> out;
+  if (body_index >= ed.bodies.size()) return out;
+  const auto &body = ed.bodies[body_index];
+  if (const auto it = ed.bodies_by_system.find(body.system_id);
+      it != ed.bodies_by_system.end())
+    for (const auto i : it->second)
+      if (ed.bodies[i].parent_body_id == body.id) out.push_back(i);
+  return out;
+}
+
+// Body-view space is kilometres relative to the focus body (its origin).
+Point body_to_screen(const Editor &ed, double x_km, double y_km) {
+  const auto &v = ed.viewport;
+  return {v.x + v.width * .5f +
+              static_cast<float>((x_km - ed.body_camera.x) * ed.body_ppa),
+          v.y + v.height * .5f +
+              static_cast<float>((y_km - ed.body_camera.y) * ed.body_ppa)};
+}
+
+// Centres the body view on the focus body and fits its outermost satellite
+// orbit (or a fixed-radius fallback for bodies with no moons).
+void fit_body_camera(Editor &ed) {
+  if (ed.focus_body >= ed.bodies.size()) return;
+  const auto &body = ed.bodies[ed.focus_body];
+  const double radius_km = std::max(50.0, body.radius_earth * 6371.0);
+  double extent = radius_km * 30.0;
+  for (const auto mi : moon_indices(ed, ed.focus_body))
+    try {
+      const auto orbit =
+          core::planetary_satellite_orbit(body, ed.bodies[mi]);
+      extent = std::max(extent,
+                        orbit.relative.radius * (1.0 + orbit.relative.eccentricity) * 1.05);
+    } catch (const std::exception &) {
+    }
+  ed.body_camera = {0, 0};
+  ed.body_ppa =
+      std::clamp(std::min(ed.viewport.width, ed.viewport.height) * .42f /
+                     static_cast<float>(extent),
+                 1e-7f, 100.f);
+}
+
+// The body workspace: the focus body's satellite system in kilometres.
+// Parent disc at the origin, moon orbit rings from the authoritative
+// planetary_satellite_orbit, moon markers at satellite_relative_position
+// for the current analytic day.
+void render_body_view(DrawList &out, Editor &ed, float s) {
+  const auto &v = ed.viewport;
+  if (ed.focus_body >= ed.bodies.size() ||
+      ed.selected >= ed.systems.size()) {
+    out.world.push_back(
+        Text{{v.x + 20 * s, v.y + 20 * s}, "no body selected", muted,
+             static_cast<int>(14 * s), 0, v});
+    out.overlay.push_back(StrokedRectangle{v, panel_edge});
+    return;
+  }
+  const auto &body = ed.bodies[ed.focus_body];
+  const auto to_screen = [&ed](double x, double y) {
+    return body_to_screen(ed, x, y);
+  };
+  const auto moons = moon_indices(ed, ed.focus_body);
+
+  // Moon orbit rings centred on the parent.
+  for (const auto mi : moons)
+    try {
+      orbit_ring_mapped(out,
+                        core::planetary_satellite_orbit(body, ed.bodies[mi])
+                            .relative,
+                        0, 0, {60, 100, 122, 120}, to_screen);
+    } catch (const std::exception &) {
+    }
+
+  // Parent disc at its true angular size, floored for legibility.
+  const auto pc = to_screen(0.0, 0.0);
+  const float parent_px = std::max(
+      5.f, static_cast<float>(body.radius_earth * 6371.0 * ed.body_ppa));
+  const bool in_hz =
+      body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
+  if (ed.focus_body == ed.selected_body)
+    out.world.push_back(Circle{pc, parent_px + 6.f, accent});
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.bookmarked)
+    out.world.push_back(Circle{pc, parent_px + 4.f, {240, 200, 90, 255}});
+  out.world.push_back(
+      Circle{pc, parent_px, in_hz ? Color{110, 220, 140, 255} : ink});
+  if (v.contains(pc))
+    out.world.push_back(
+        Text{{pc.x + parent_px + 8, pc.y - 8}, display_name(ed, body),
+             accent, static_cast<int>(12 * s), 0, v});
+
+  // Moon markers at their authoritative relative positions.
+  for (const auto mi : moons) {
+    const auto &moon = ed.bodies[mi];
+    try {
+      const auto orbit = core::planetary_satellite_orbit(body, moon);
+      const auto rel =
+          core::satellite_relative_position(orbit, ed.system_days);
+      const auto p = to_screen(rel[0], rel[1]);
+      const float moon_px = std::clamp(
+          static_cast<float>(moon.radius_earth * 6371.0 * ed.body_ppa),
+          2.5f, 10.f);
+      if (mi == ed.selected_body)
+        out.world.push_back(Circle{p, moon_px + 5.f, accent});
+      if (const auto it = ed.body_edits.find(moon.id);
+          it != ed.body_edits.end() && it->second.bookmarked)
+        out.world.push_back(Circle{p, moon_px + 4.f, {240, 200, 90, 255}});
+      const bool moon_hz =
+          moon.stellar_exposure && moon.stellar_exposure->in_habitable_zone;
+      out.world.push_back(
+          Circle{p, moon_px,
+                 moon_hz ? Color{110, 220, 140, 255} : muted});
+      if (v.contains(p))
+        out.world.push_back(
+            Text{{p.x + moon_px + 6, p.y - 6}, display_name(ed, moon),
+                 mi == ed.selected_body ? accent
+                                        : Color{150, 180, 195, 220},
+                 static_cast<int>(11 * s), 0, v});
+    } catch (const std::exception &) {
+    }
+  }
+  out.overlay.push_back(StrokedRectangle{v, panel_edge});
+  out.world.push_back(
+      Text{{v.x + 10 * s, v.y + 8 * s},
+           display_name(ed, body) + "  |  day " +
+               fspec("%.0f", ed.system_days),
+           accent, static_cast<int>(13 * s), 0, v});
+}
+
 // Runs the same world-assembly pipeline as fresh campaign generation —
 // systems, planetary bodies, stellar physics, orbit reconciliation,
 // small-body fields, and stellar orbits — without civilization seeding.
@@ -1314,6 +1463,7 @@ int main(int argc, char **argv) {
           ed.generate_ms = result_ms;
           ed.selected = static_cast<std::size_t>(-1);
           ed.selected_body = static_cast<std::size_t>(-1);
+          ed.focus_body = static_cast<std::size_t>(-1);
           ed.view = WorkspaceView::Galaxy;
           // Annotations survive regeneration: ids are deterministic for the
           // same seed+count, and a new seed simply orphans old edits.
@@ -1337,6 +1487,8 @@ int main(int argc, char **argv) {
           } else if (ed.editing != Field::None) {
             ed.editing = Field::None;
             window.set_text_input(false);
+          } else if (ed.view == WorkspaceView::Body) {
+            ed.view = WorkspaceView::System;
           } else if (ed.view == WorkspaceView::System) {
             ed.view = WorkspaceView::Galaxy;
             ed.selected_body = static_cast<std::size_t>(-1);
@@ -1403,7 +1555,7 @@ int main(int argc, char **argv) {
                                   key_pageup = 0x4000004b,
                                   key_pagedown = 0x4000004e,
                                   key_home = 0x4000004a;
-          if (ed.view == WorkspaceView::System) {
+          if (ed.view != WorkspaceView::Galaxy) {
             if (event.key == key_left || event.key == key_right) {
               ed.system_days =
                   std::max(0.0, ed.system_days +
@@ -1498,6 +1650,21 @@ int main(int argc, char **argv) {
               ed.selected_body = static_cast<std::size_t>(-1);
               fit_system_camera(ed);
             } else if (ed.view == WorkspaceView::System) {
+              if (ed.selected_body < ed.bodies.size()) {
+                // Descend into the selected body's satellite system; a
+                // moon focuses the view on its parent.
+                ed.view = WorkspaceView::Body;
+                ed.focus_body = ed.selected_body;
+                if (const auto pid =
+                        ed.bodies[ed.focus_body].parent_body_id)
+                  for (std::size_t i = 0; i < ed.bodies.size(); ++i)
+                    if (ed.bodies[i].id == *pid) ed.focus_body = i;
+                fit_body_camera(ed);
+              } else {
+                ed.view = WorkspaceView::Galaxy;
+                rebuild_detail_rows(ed);
+              }
+            } else if (ed.view == WorkspaceView::Body) {
               ed.view = WorkspaceView::Galaxy;
               ed.selected_body = static_cast<std::size_t>(-1);
               rebuild_detail_rows(ed);
@@ -1559,9 +1726,10 @@ int main(int argc, char **argv) {
             if (ed.viewport.contains(event.position)) {
               ed.dragging = true;
               ed.drag_origin = event.position;
-              ed.camera_origin = ed.view == WorkspaceView::Galaxy
-                                     ? ed.camera
-                                     : ed.sys_camera;
+              ed.camera_origin =
+                  ed.view == WorkspaceView::Galaxy   ? ed.camera
+                  : ed.view == WorkspaceView::System ? ed.sys_camera
+                                                     : ed.body_camera;
             }
           }
         }
@@ -1587,6 +1755,39 @@ int main(int argc, char **argv) {
               }
               ed.selected = best_index;
               rebuild_detail_rows(ed);
+            } else if (ed.view == WorkspaceView::Body &&
+                       ed.focus_body < ed.bodies.size()) {
+              // Body view: nearest moon marker or the focus body itself,
+              // at the same analytic positions the renderer draws.
+              const auto &parent = ed.bodies[ed.focus_body];
+              float best = 14.f;
+              std::size_t best_body = ed.bodies.size();
+              const auto pc = body_to_screen(ed, 0.0, 0.0);
+              if (const float d = std::hypot(pc.x - event.position.x,
+                                             pc.y - event.position.y);
+                  d < best) {
+                best = d;
+                best_body = ed.focus_body;
+              }
+              for (const auto mi : moon_indices(ed, ed.focus_body))
+                try {
+                  const auto rel = core::satellite_relative_position(
+                      core::planetary_satellite_orbit(parent,
+                                                      ed.bodies[mi]),
+                      ed.system_days);
+                  const auto p = body_to_screen(ed, rel[0], rel[1]);
+                  const float d = std::hypot(p.x - event.position.x,
+                                             p.y - event.position.y);
+                  if (d < best) {
+                    best = d;
+                    best_body = mi;
+                  }
+                } catch (const std::exception &) {
+                }
+              if (best_body < ed.bodies.size()) {
+                ed.selected_body = best_body;
+                rebuild_detail_rows(ed);
+              }
             } else if (ed.selected < ed.systems.size()) {
               // System view: nearest body marker within a bounded pick radius.
               const auto &sys = ed.systems[ed.selected];
@@ -1665,7 +1866,9 @@ int main(int argc, char **argv) {
                                    event.wheel_y * 40.f);
         if (event.type == InputEventType::PointerMove && ed.dragging) {
           const float scale =
-              ed.view == WorkspaceView::Galaxy ? ed.pixels_per_unit : ed.sys_ppa;
+              ed.view == WorkspaceView::Galaxy   ? ed.pixels_per_unit
+              : ed.view == WorkspaceView::System ? ed.sys_ppa
+                                                 : ed.body_ppa;
           const Point target{
               ed.camera_origin.x -
                   (event.position.x - ed.drag_origin.x) / scale,
@@ -1673,15 +1876,21 @@ int main(int argc, char **argv) {
                   (event.position.y - ed.drag_origin.y) / scale};
           if (ed.view == WorkspaceView::Galaxy)
             ed.camera = target;
-          else
+          else if (ed.view == WorkspaceView::System)
             ed.sys_camera = target;
+          else
+            ed.body_camera = target;
         }
         if (event.type == InputEventType::Wheel &&
             ed.viewport.contains(event.position)) {
           float &scale =
-              ed.view == WorkspaceView::Galaxy ? ed.pixels_per_unit : ed.sys_ppa;
+              ed.view == WorkspaceView::Galaxy   ? ed.pixels_per_unit
+              : ed.view == WorkspaceView::System ? ed.sys_ppa
+                                                 : ed.body_ppa;
           const Point &cam =
-              ed.view == WorkspaceView::Galaxy ? ed.camera : ed.sys_camera;
+              ed.view == WorkspaceView::Galaxy   ? ed.camera
+              : ed.view == WorkspaceView::System ? ed.sys_camera
+                                                 : ed.body_camera;
           const float before_x =
               cam.x + (event.position.x - ed.viewport.x -
                        ed.viewport.width * .5f) /
@@ -1691,8 +1900,11 @@ int main(int argc, char **argv) {
                        ed.viewport.height * .5f) /
                           scale;
           scale = std::clamp(
-              scale * (event.wheel_y > 0 ? 1.18f : 0.85f), 0.02f,
-              ed.view == WorkspaceView::Galaxy ? 400.f : 4000.f);
+              scale * (event.wheel_y > 0 ? 1.18f : 0.85f),
+              ed.view == WorkspaceView::Body ? 1e-7f : 0.02f,
+              ed.view == WorkspaceView::Galaxy   ? 400.f
+              : ed.view == WorkspaceView::System ? 4000.f
+                                                 : 100.f);
           const Point next{
               before_x - (event.position.x - ed.viewport.x -
                           ed.viewport.width * .5f) /
@@ -1702,8 +1914,10 @@ int main(int argc, char **argv) {
                              scale};
           if (ed.view == WorkspaceView::Galaxy)
             ed.camera = next;
-          else
+          else if (ed.view == WorkspaceView::System)
             ed.sys_camera = next;
+          else
+            ed.body_camera = next;
         }
       }
       if (!snapshot.renderable()) continue;
@@ -1778,16 +1992,22 @@ int main(int argc, char **argv) {
       // Workspace view toggle: system orbit view requires a selection.
       ed.hit_view = {bx, bar.y + 10 * s, 110 * s, 32 * s};
       const bool view_ready =
-          ed.view == WorkspaceView::System ||
+          ed.view != WorkspaceView::Galaxy ||
           ed.selected < ed.systems.size();
       draw.overlay.push_back(FilledRectangle{
           ed.hit_view,
-          ed.view == WorkspaceView::System ? row_selected : button_fill});
+          ed.view != WorkspaceView::Galaxy ? row_selected : button_fill});
       draw.overlay.push_back(StrokedRectangle{ed.hit_view, panel_edge});
+      const char *view_label =
+          ed.view == WorkspaceView::Galaxy   ? "SYSTEM VIEW"
+          : ed.view == WorkspaceView::System
+              ? (ed.selected_body < ed.bodies.size() ? "BODY VIEW"
+                                                     : "GALAXY VIEW")
+              : "GALAXY VIEW";
       draw.overlay.push_back(
           Text{{ed.hit_view.x + ed.hit_view.width * .5f,
                 ed.hit_view.y + 9 * s},
-               ed.view == WorkspaceView::System ? "GALAXY VIEW" : "SYSTEM VIEW",
+               view_label,
                view_ready ? ink : muted, static_cast<int>(13 * s),
                ed.hit_view.width, ed.hit_view, TextAlign::Center});
       bx += 122 * s;
@@ -1818,6 +2038,8 @@ int main(int argc, char **argv) {
       const auto frame_scope = profiler.span("editor.frame", "frame");
       if (ed.view == WorkspaceView::System)
         render_system_view(draw, ed, s);
+      else if (ed.view == WorkspaceView::Body)
+        render_body_view(draw, ed, s);
       else
         render_viewport(draw, ed, s);
       render_inspector(draw, ed, s);
@@ -1829,6 +2051,10 @@ int main(int argc, char **argv) {
                         ? "  |  drag pan, wheel zoom, click body, "
                               "up/down cycle bodies, left/right +/-1d, "
                               "pgup/pgdn +/-30d, home reset, esc galaxy"
+                    : ed.view == WorkspaceView::Body
+                        ? "  |  drag pan, wheel zoom, click moon, "
+                              "left/right +/-1d, pgup/pgdn +/-30d, "
+                              "home reset, esc system"
                         : "  |  drag to pan, wheel to zoom, click to select, "
                               "up/down moves selection"),
                muted, static_cast<int>(12 * s), 0, ed.viewport});
