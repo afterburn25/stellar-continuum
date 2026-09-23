@@ -68,24 +68,30 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 
-- **Purpose:** reusable grid terrain for generated projects — an authored
-  tilemap renders a tileset image across a cell grid, draws at its own layer
-  between entities, and optionally participates in authoritative collision
-  (side-blocking, top landing, grounded detection for jump).
-- **Engine APIs/ownership:** `SceneTilemap` in `scene_document.hpp` (tileset
-  path, `tileW`/`tileH` cell size, `columns`, `layer`, `parallax`, `collide`,
-  `cells` with `-1` empty) serializes inside `SceneDocument` JSON with strict
-  validation (positive dimensions, cell count divisible by columns).
-  `spawn_scene` carries it into the world as a `Tilemap` component on a
-  dedicated entity (found via `tilemap_entity()`, exported back by
-  `scene_from_world`), so cell state is authoritative and snapshots with
-  F5/F9 quicksaves — runtime cell edits (destructible terrain) persist.
-  `RuntimeHost::tilemap_entity()` exposes the carrier; games mutate cells
-  through `world().get<Tilemap>(...)`. The host resolves the tileset through
-  `ContentResolver`, renders cells via the existing `Image` source-rectangle
-  path, honors camera transform and per-tilemap parallax, and runs tile
-  collision inside the same authoritative movement pass as solid/oneway
-  entities — not a parallel approximation.
+- **Purpose:** reusable grid terrain for generated projects — authored
+  tilemaps render tileset images across cell grids, each drawing at its own
+  layer between entities, and optionally participating in authoritative
+  collision (side-blocking, top landing, grounded detection for jump).
+- **Engine APIs/ownership:** `SceneDocument::tilemaps` is a vector of
+  `SceneTilemap` (tileset path, `tileW`/`tileH` cell size, `columns`,
+  `layer`, `parallax`, `collide`, `cells` with `-1` empty) serialized as a
+  `"tilemaps"` JSON array with strict per-entry validation (positive
+  dimensions, cell count divisible by columns); legacy single-`"tilemap"`
+  documents still parse as a one-element array. `spawn_scene` carries each
+  tilemap into the world as a `Tilemap` component on its own dedicated
+  entity in document order (`tilemap_entities()` lists them,
+  `tilemap_entity()` returns the first, `scene_from_world` re-exports all),
+  so cell state is authoritative and snapshots with F5/F9 quicksaves —
+  runtime cell edits (destructible terrain) persist. The host resolves each
+  map's tileset through `ContentResolver` (per-map image cache), renders
+  cells via the `Image` source-rectangle path in layer-sorted order that
+  interleaves with the entity pass, honors camera transform and per-map
+  parallax, and runs tile collision against every `collide` map inside the
+  same authoritative movement pass as solid/oneway entities — each probe
+  uses that map's own tile geometry and cells. `RuntimeHost::tile_at`/
+  `set_tile_at`/`tilemap_entity()` address the FIRST tilemap (the primary
+  grid); layered games reach the rest via `tilemap_entities()` +
+  `world().get<Tilemap>(...)`.
 - **RuntimeHost input actions:** the host now feeds every platform event into
   an `InputMapper` — a built-in "game" context (move_left/right/up/down on
   WASD+arrows+D-pad, `move_x`/`move_y` analog Axis1D on the left stick with a
@@ -139,32 +145,41 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   history chain as world snapshots, newest-first recovery on a corrupt
   primary, `[A-Za-z0-9._-]` key whitelist. Verified live: a generated host
   writes and reloads a blob across runs.
-- **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
-  wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
-  toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint
-  fields with undo, preview rendering with the same layer interleave and a
+- **Consumers:** `RuntimeHost` generated hosts (multi-map rendering, gravity
+  landing, wall blocking, grounded jumps, hot reload); the shell Scene tool
+  (TILES + adds a grid layer, MAP k/n cycles which tilemap the fields and
+  PAINT edit, TILES - removes the selected layer — all under the document
+  undo history; tileset/tilesize/columns/collide/layer/parallax/cells/paint
+  fields, preview rendering with the same layer-sorted interleave and a
   checkerboard fallback when no tileset is set, PAINT mode that writes cells
-  by click/drag in the preview with a grid overlay and one undo step per
-  stroke).
-- **Save/determinism/performance:** the tilemap is a `Tilemap` component on a
-  dedicated world entity, so quicksaves snapshot cell edits and
-  `scene_from_world` re-exports them; pre-tilemap saves simply lack the
-  component (scene reload restores it). Hot reload respawns the carrier with
-  the document. Cell scans
-  are O(columns x rows) with viewport culling; collision probes sample a few
-  cell points per moving entity per fixed step. Grid order is row-major and
-  draw order is deterministic.
-- **Tests:** `engine_project` tests cover JSON round-trip of the full tilemap
-  (tileset, dims, columns, collide, cell values) and reject malformed maps
-  (cell count not divisible by columns, non-positive tile size);
-  `engine_world` tests cover the dedicated-entity spawn, component codec
-  round-trip through `snapshot()`/`restore()` including a runtime cell edit,
-  and `scene_from_world` export; live capture verified rendering and
-  landing/grounded behavior on a generated project.
-- **Limits/reuse:** single tilemap per scene document (one grid); collision is
-  cell-level solid only (no per-tile slopes/one-way flags); paint strokes fill
-  single cells (no brush size or fill tool). Other RuntimeHost consumers (2D
-  platformers, top-down maps, puzzle boards) reuse the same path.
+  into the selected map by click/drag with a grid overlay and one undo step
+  per stroke).
+- **Save/determinism/performance:** every tilemap is a `Tilemap` component on
+  its own world entity, so quicksaves snapshot all maps' cell edits and
+  `scene_from_world` re-exports them in spawn order; pre-tilemap saves simply
+  lack the components (scene reload restores them). Hot reload respawns all
+  carriers with the document. Cell scans are O(columns x rows) per map with
+  viewport culling; collision probes sample a few cell points per moving
+  entity per colliding map per fixed step. Grid order is row-major and both
+  spawn and draw order are deterministic (stable layer sort, doc order within
+  a layer).
+- **Tests:** `engine_project` tests cover JSON round-trip of a two-tilemap
+  document (independent tilesets, dims, layer, parallax, collide, cells),
+  legacy single-`"tilemap"` parsing, and rejection of malformed maps in both
+  forms; `engine_world` tests cover per-map dedicated-entity spawn, both
+  carriers staying out of the gameplay list, codec round-trips through
+  `snapshot()`/`restore()` including independent runtime cell edits on each
+  map, and `scene_from_world` exporting both; live verification on a
+  generated project: a ball lands on the SECOND map's platform (y=160 vs the
+  first map's floor at y=672 — each map's own geometry applies) and rests on
+  the first map's floor when the platform map is removed.
+- **Limits/reuse:** `tile_at`/`set_tile_at`/`tilemap_entity()` target only
+  the first tilemap — additional maps are reached via `tilemap_entities()`;
+  the editor selects but cannot reorder tilemap layers (edit `layer` for
+  draw order); collision is cell-level solid only (no per-tile
+  slopes/one-way flags); paint strokes fill single cells (no brush size or
+  fill tool). Other RuntimeHost consumers (2D platformers, top-down maps,
+  puzzle boards) reuse the same path.
 
 ## Cooked flare reservations, local crash reports and small updates (2026-09-20)
 

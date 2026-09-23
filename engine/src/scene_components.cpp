@@ -195,30 +195,36 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
-  // The tilemap lives on its own entity (not returned) so runtime cell
-  // edits snapshot with the world.
-  if (doc.tilemap) {
-    const auto &s = *doc.tilemap;
+  // Each tilemap lives on its own entity (not returned) so runtime cell
+  // edits snapshot with the world; order matches the document so layer
+  // semantics stay stable.
+  for (const auto &s : doc.tilemaps)
     world.add(world.create(),
               Tilemap{s.tileset, s.tile_w, s.tile_h, s.columns, s.layer,
                       s.parallax, s.collide, s.cells});
-  }
   return spawned;
 }
 
-std::optional<EntityId> tilemap_entity(const World &world) {
+std::vector<EntityId> tilemap_entities(const World &world) {
+  std::vector<EntityId> out;
   for (const auto entity : world.entities())
-    if (world.get<Tilemap>(entity) != nullptr) return entity;
-  return std::nullopt;
+    if (world.get<Tilemap>(entity) != nullptr) out.push_back(entity);
+  return out;
+}
+
+std::optional<EntityId> tilemap_entity(const World &world) {
+  const auto all = tilemap_entities(world);
+  return all.empty() ? std::nullopt : std::optional<EntityId>{all.front()};
 }
 
 SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
     if (const auto *tm = world.get<Tilemap>(entity)) {
-      doc.tilemap = SceneTilemap{tm->tileset, tm->tile_w, tm->tile_h,
-                                 tm->columns, tm->layer, tm->parallax,
-                                 tm->collide, tm->cells};
+      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->tile_w,
+                                          tm->tile_h, tm->columns,
+                                          tm->layer, tm->parallax,
+                                          tm->collide, tm->cells});
       continue;
     }
     const auto *name = world.get<EntityName>(entity);

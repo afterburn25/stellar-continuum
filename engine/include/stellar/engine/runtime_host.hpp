@@ -105,13 +105,19 @@ public:
   // their own contexts or load a map file (RuntimeHostOptions::input_map).
   // Action state updates from the same events the callbacks observe.
   [[nodiscard]] InputMapper &input();
-  // The entity carrying the scene's Tilemap component (grid terrain), if
-  // the document has one. Cell state is authoritative: mutate it through
-  // world().get<Tilemap>(...) for destructible terrain — it snapshots with
-  // F5/F9 quicksaves and hot-reloads with the scene document.
+  // The entity carrying the scene's first Tilemap component (grid
+  // terrain), if the document has one. Cell state is authoritative:
+  // mutate it through world().get<Tilemap>(...) for destructible
+  // terrain — it snapshots with F5/F9 quicksaves and hot-reloads with
+  // the scene document.
   [[nodiscard]] std::optional<EntityId> tilemap_entity() const;
-  // World-space cell queries: tile value under a point (-1 = empty or no
-  // tilemap), and write the cell under a point (false out of bounds).
+  // Every tilemap carrier, in document order — layered grids (background
+  // decoration, collision ground, foreground overlay) each get one.
+  [[nodiscard]] std::vector<EntityId> tilemap_entities() const;
+  // World-space cell queries on the FIRST tilemap: tile value under a
+  // point (-1 = empty or no tilemap), and write the cell under a point
+  // (false out of bounds). Layered games access the rest through
+  // tilemap_entities()/world().
   [[nodiscard]] int tile_at(float world_x, float world_y) const;
   bool set_tile_at(float world_x, float world_y, int value);
   // The deterministic particle system — games define() emitters then

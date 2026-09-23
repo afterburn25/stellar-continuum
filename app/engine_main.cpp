@@ -202,7 +202,8 @@ struct Shell {
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_data{}, hit_scene_opacity{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
-      hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tileset{},
+      hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tilesel{},
+      hit_scene_tiledel{}, hit_scene_tileset{},
       hit_scene_tilesize{}, hit_scene_tilecols{},
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
@@ -217,6 +218,9 @@ struct Shell {
   bool scene_paint{};    // PAINT mode: clicks write cells, not select
   bool scene_painting{}; // pointer is mid paint stroke
   int scene_paint_cell{}; // brush value written into tilemap cells
+  // Which document tilemap the tile fields/paint mode edit — scenes can
+  // stack several grids (decor, collision, foreground) on own layers.
+  std::size_t scene_tile_index{};
   std::string status{"ready"};
 };
 
@@ -895,6 +899,7 @@ std::filesystem::path scene_path(const Shell &shell) {
 void load_scene(Shell &shell) {
   shell.scene_doc = engine::SceneDocument{};
   shell.selected_entity = static_cast<std::size_t>(-1);
+  shell.scene_tile_index = 0;
   shell.scene_modified = false;
   shell.scene_history.clear();
   shell.scene_sprites.clear();
@@ -921,6 +926,20 @@ engine::SceneEntity *selected_scene_entity(Shell &shell) {
   if (shell.selected_entity >= shell.scene_doc.entities.size())
     return nullptr;
   return &shell.scene_doc.entities[shell.selected_entity];
+}
+
+// The tilemap the tile fields and paint mode currently edit.
+engine::SceneTilemap *scene_tile(Shell &shell) {
+  auto &tms = shell.scene_doc.tilemaps;
+  if (tms.empty()) return nullptr;
+  if (shell.scene_tile_index >= tms.size())
+    shell.scene_tile_index = tms.size() - 1;
+  return &tms[shell.scene_tile_index];
+}
+const engine::SceneTilemap *scene_tile(const Shell &shell) {
+  const auto &tms = shell.scene_doc.tilemaps;
+  if (tms.empty()) return nullptr;
+  return &tms[std::min(shell.scene_tile_index, tms.size() - 1)];
 }
 
 // Parses "x,y" or "vx,vy" pairs; returns false on malformed input.
@@ -1015,10 +1034,11 @@ void commit_scene_field(Shell &shell) {
     shell.scene_buffer.clear();
     return;
   }
-  // Fields 30+ edit the document tilemap; committing creates it on demand
-  // so "tileset" alone is enough to begin a grid.
+  // Fields 30+ edit the selected document tilemap; committing creates it
+  // on demand so "tileset" alone is enough to begin a grid.
   if (shell.scene_field >= 30) {
-    auto tm = shell.scene_doc.tilemap.value_or(engine::SceneTilemap{});
+    auto tm = scene_tile(shell) ? *scene_tile(shell)
+                                : engine::SceneTilemap{};
     bool ok = false;
     if (shell.scene_field == 30) {
       tm.tileset = shell.scene_buffer;
@@ -1083,7 +1103,12 @@ void commit_scene_field(Shell &shell) {
     }
     if (ok) {
       shell.scene_history.commit(shell.scene_doc);
-      shell.scene_doc.tilemap = std::move(tm);
+      if (auto *sel = scene_tile(shell)) {
+        *sel = std::move(tm);
+      } else {
+        shell.scene_doc.tilemaps.push_back(std::move(tm));
+        shell.scene_tile_index = shell.scene_doc.tilemaps.size() - 1;
+      }
       shell.scene_modified = true;
       shell.status = "tilemap updated - SAVE to persist";
     } else {
@@ -1235,10 +1260,12 @@ std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
   return order;
 }
 
-// Writes the brush value into the tilemap cell under a scene-space
-// point; painting below existing rows grows the grid.
+// Writes the brush value into the selected tilemap's cell under a
+// scene-space point; painting below existing rows grows the grid.
 void paint_tile_at(Shell &shell, float wx, float wy) {
-  auto &tm = *shell.scene_doc.tilemap;
+  auto *tmap = scene_tile(shell);
+  if (tmap == nullptr) return;
+  auto &tm = *tmap;
   if (tm.tile_w <= 0 || tm.tile_h <= 0 || tm.columns <= 0) return;
   const int cx = static_cast<int>(std::floor(wx / tm.tile_w));
   const int cy = static_cast<int>(std::floor(wy / tm.tile_h));
@@ -1277,7 +1304,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                                             shell.hit_scene_data =
                                                                 shell.hit_scene_opacity =
                                                                     {};
-    shell.hit_scene_tilemap = shell.hit_scene_tileset =
+    shell.hit_scene_tilemap = shell.hit_scene_tilesel =
+        shell.hit_scene_tiledel = shell.hit_scene_tileset =
         shell.hit_scene_tilesize = shell.hit_scene_tilecols =
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
@@ -1326,13 +1354,27 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_up, "UP", !can_up, font, s);
   shell.hit_scene_down = {x + 786 * s, y, 80 * s, bh};
   shell_button(out, shell.hit_scene_down, "DOWN", !can_down, font, s);
-  shell.hit_scene_tilemap = {x + 876 * s, y, 118 * s, bh};
-  shell_button(out, shell.hit_scene_tilemap,
-               shell.scene_doc.tilemap ? "TILES -" : "TILES +", false, font,
+  // Tilemap stack controls: TILES + adds a layer, MAP cycles which one
+  // the fields/PAINT edit, TILES - removes the selected layer.
+  const auto ntiles = shell.scene_doc.tilemaps.size();
+  shell.hit_scene_tilemap = {x + 876 * s, y, 86 * s, bh};
+  shell_button(out, shell.hit_scene_tilemap, "TILES +", false, font, s);
+  shell.hit_scene_tilesel = {x + 970 * s, y, 104 * s, bh};
+  const std::string map_label =
+      ntiles ? "MAP " +
+                   std::to_string(
+                       std::min(shell.scene_tile_index, ntiles - 1) + 1) +
+                   "/" + std::to_string(ntiles)
+             : "MAP -";
+  shell_button(out, shell.hit_scene_tilesel, map_label.c_str(),
+               ntiles == 0, font, s);
+  shell.hit_scene_tiledel = {x + 1082 * s, y, 86 * s, bh};
+  shell_button(out, shell.hit_scene_tiledel, "TILES -", ntiles == 0, font,
                s);
-  shell.hit_scene_paint = {x + 1004 * s, y, 100 * s, bh};
+  shell.hit_scene_paint = {x + 1176 * s, y, 100 * s, bh};
   shell_button(out, shell.hit_scene_paint,
-               shell.scene_paint ? "PAINT *" : "PAINT", false, font, s);
+               shell.scene_paint ? "PAINT *" : "PAINT", ntiles == 0, font,
+               s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1377,13 +1419,17 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const auto preview_now = std::chrono::duration<float>(
       std::chrono::steady_clock::now().time_since_epoch())
                                .count();
-  // The tilemap paints at its layer, splitting the entity pass — mirrors
-  // the runtime's draw ordering.
-  bool tilemap_drawn = false;
-  const auto draw_tilemap = [&] {
-    tilemap_drawn = true;
-    if (!shell.scene_doc.tilemap) return;
-    const auto &tm = *shell.scene_doc.tilemap;
+  // Tilemaps paint at their layers, splitting the entity pass — mirrors
+  // the runtime's draw ordering (stable doc order within a layer).
+  std::vector<std::size_t> tm_order(shell.scene_doc.tilemaps.size());
+  for (std::size_t i = 0; i < tm_order.size(); ++i) tm_order[i] = i;
+  std::stable_sort(tm_order.begin(), tm_order.end(), [&](auto a, auto b) {
+    return shell.scene_doc.tilemaps[a].layer <
+           shell.scene_doc.tilemaps[b].layer;
+  });
+  std::size_t next_tm = 0;
+  const auto draw_tilemap = [&](std::size_t which) {
+    const auto &tm = shell.scene_doc.tilemaps[which];
     if (tm.columns <= 0 || tm.tile_w <= 0 || tm.tile_h <= 0) return;
     std::shared_ptr<const RgbaImage> tiles;
     if (!tm.tileset.empty()) {
@@ -1429,11 +1475,15 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         }
       }
   };
+  // Every tilemap at or below this entity layer draws before it.
+  const auto draw_tilemaps_below = [&](int layer) {
+    while (next_tm < tm_order.size() &&
+           shell.scene_doc.tilemaps[tm_order[next_tm]].layer <= layer)
+      draw_tilemap(tm_order[next_tm++]);
+  };
   for (const auto i : scene_draw_order(shell.scene_doc)) {
     const auto &e = shell.scene_doc.entities[i];
-    if (!tilemap_drawn && shell.scene_doc.tilemap &&
-        e.layer >= shell.scene_doc.tilemap->layer)
-      draw_tilemap();
+    draw_tilemaps_below(e.layer);
     const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
     std::shared_ptr<const RgbaImage> sprite;
     if (!e.sprite.empty()) {
@@ -1489,10 +1539,12 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     if (i == shell.selected_entity)
       out.overlay.push_back(StrokedRectangle{rect, accent});
   }
-  if (!tilemap_drawn) draw_tilemap();
-  // Paint mode overlays the cell grid and highlights the hovered cell.
-  if (shell.scene_paint && shell.scene_doc.tilemap) {
-    const auto &tm = *shell.scene_doc.tilemap;
+  // Tilemaps layered above every entity draw last (foreground grids).
+  while (next_tm < tm_order.size()) draw_tilemap(tm_order[next_tm++]);
+  // Paint mode overlays the selected tilemap's cell grid and highlights
+  // the hovered cell.
+  if (shell.scene_paint && scene_tile(shell) != nullptr) {
+    const auto &tm = *scene_tile(shell);
     if (tm.tile_w > 0 && tm.tile_h > 0 && tm.columns > 0) {
       const Color grid{120, 140, 160, 60};
       for (int cx = 0; cx <= tm.columns; ++cx)
@@ -1646,10 +1698,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->bounce ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 25,
         "false stops dead at level edges");
-  // Tilemap fields (doc-level) — editing creates the tilemap on demand.
-  const auto *tm = shell.scene_doc.tilemap
-                       ? &*shell.scene_doc.tilemap
-                       : nullptr;
+  // Tilemap fields (doc-level, selected layer) — editing creates the
+  // tilemap on demand.
+  const auto *tm = scene_tile(shell);
   auto cell_list = [&] {
     std::string out_s;
     if (tm)
@@ -2408,7 +2459,7 @@ int main(int argc, char **argv) {
         switch (event.type) {
         case InputEventType::PointerMove:
           last_input = "pointer move";
-          if (shell.scene_painting && shell.scene_doc.tilemap &&
+          if (shell.scene_painting && scene_tile(shell) != nullptr &&
               shell.scene_preview.contains(event.position)) {
             const auto &pv = shell.scene_preview;
             paint_tile_at(shell,
@@ -2437,7 +2488,7 @@ int main(int argc, char **argv) {
                 (event.position.x - pv.x) / pv.width * 1280.f;
             const float wy =
                 (event.position.y - pv.y) / pv.height * 720.f;
-            if (shell.scene_paint && shell.scene_doc.tilemap) {
+            if (shell.scene_paint && scene_tile(shell) != nullptr) {
               // One undo step per stroke.
               shell.scene_history.commit(shell.scene_doc);
               shell.scene_painting = true;
@@ -2595,9 +2646,7 @@ int main(int argc, char **argv) {
                     std::to_string((int)shell.scene_doc.world_w) + "," +
                     std::to_string((int)shell.scene_doc.world_h);
               else if (field >= 30) {
-                const auto *tm = shell.scene_doc.tilemap
-                                     ? &*shell.scene_doc.tilemap
-                                     : nullptr;
+                const auto *tm = scene_tile(shell);
                 const engine::SceneTilemap dflt;
                 if (tm == nullptr) tm = &dflt;
                 if (field == 30)
@@ -2765,16 +2814,36 @@ int main(int argc, char **argv) {
                 shell.scene_modified = true;
               }
             } else if (shell.hit_scene_tilemap.contains(event.position)) {
+              // TILES +: append a new grid layer and select it.
               shell.scene_history.commit(shell.scene_doc);
-              if (shell.scene_doc.tilemap)
-                shell.scene_doc.tilemap.reset();
-              else {
-                engine::SceneTilemap tm;
-                tm.columns = 16;
-                tm.cells.assign(16 * 6, -1);
-                shell.scene_doc.tilemap = std::move(tm);
-              }
+              engine::SceneTilemap tm;
+              tm.columns = 16;
+              tm.cells.assign(16 * 6, -1);
+              shell.scene_doc.tilemaps.push_back(std::move(tm));
+              shell.scene_tile_index =
+                  shell.scene_doc.tilemaps.size() - 1;
               shell.scene_modified = true;
+            } else if (shell.hit_scene_tilesel.contains(event.position)) {
+              // MAP k/n: cycle which tilemap the fields and PAINT edit.
+              const auto n = shell.scene_doc.tilemaps.size();
+              if (n > 0)
+                shell.scene_tile_index =
+                    (shell.scene_tile_index + 1) % n;
+            } else if (shell.hit_scene_tiledel.contains(event.position)) {
+              // TILES -: remove the selected grid layer.
+              if (auto *sel = scene_tile(shell); sel != nullptr) {
+                shell.scene_history.commit(shell.scene_doc);
+                shell.scene_doc.tilemaps.erase(
+                    shell.scene_doc.tilemaps.begin() +
+                    static_cast<std::ptrdiff_t>(shell.scene_tile_index));
+                if (shell.scene_tile_index >=
+                    shell.scene_doc.tilemaps.size())
+                  shell.scene_tile_index =
+                      shell.scene_doc.tilemaps.empty()
+                          ? 0
+                          : shell.scene_doc.tilemaps.size() - 1;
+                shell.scene_modified = true;
+              }
             } else if (shell.hit_scene_paint.contains(event.position)) {
               shell.scene_paint = !shell.scene_paint;
             } else if (shell.scene_preview.contains(event.position)) {

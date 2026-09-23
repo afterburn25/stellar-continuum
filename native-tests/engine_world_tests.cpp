@@ -227,27 +227,51 @@ int main() {
         hero.data = "checkpoint-7";
         hero.opacity = 0.5f;
         SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
-        doc.tilemap = SceneTilemap{};
-        doc.tilemap->tileset = "sprites/tiles.png";
-        doc.tilemap->tile_w = 32;
-        doc.tilemap->tile_h = 32;
-        doc.tilemap->columns = 4;
-        doc.tilemap->collide = true;
-        doc.tilemap->cells = {0, -1, -1, 0, 0, 1, 1, 0};
+        doc.tilemaps.push_back(SceneTilemap{});
+        auto &ground = doc.tilemaps.back();
+        ground.tileset = "sprites/tiles.png";
+        ground.tile_w = 32;
+        ground.tile_h = 32;
+        ground.columns = 4;
+        ground.collide = true;
+        ground.cells = {0, -1, -1, 0, 0, 1, 1, 0};
+        // A second parallaxed decor grid — layered tilemaps each spawn
+        // their own carrier entity.
+        doc.tilemaps.push_back(SceneTilemap{});
+        auto &deco = doc.tilemaps.back();
+        deco.tileset = "sprites/deco.png";
+        deco.tile_w = 16;
+        deco.tile_h = 16;
+        deco.columns = 8;
+        deco.layer = -3;
+        deco.parallax = 0.5f;
+        deco.cells.assign(16, 1);
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
         check(spawned.size() == 2, "spawn_scene creates all entities");
-        const auto tile_e = tilemap_entity(world);
-        check(tile_e.has_value() &&
-                  std::find(spawned.begin(), spawned.end(), *tile_e) ==
+        const auto tile_es = tilemap_entities(world);
+        check(tile_es.size() == 2, "each tilemap spawns its own entity");
+        check(std::find(spawned.begin(), spawned.end(), tile_es[0]) ==
+                      spawned.end() &&
+                  std::find(spawned.begin(), spawned.end(), tile_es[1]) ==
                       spawned.end(),
-              "tilemap spawns on its own entity");
-        check(world.get<Tilemap>(*tile_e)->tileset == "sprites/tiles.png" &&
-                  world.get<Tilemap>(*tile_e)->columns == 4 &&
-                  world.get<Tilemap>(*tile_e)->cells.size() == 8 &&
-                  world.get<Tilemap>(*tile_e)->collide,
+              "tilemap entities stay out of the gameplay list");
+        check(tilemap_entity(world).has_value() &&
+                  *tilemap_entity(world) == tile_es[0],
+              "tilemap_entity resolves the first map");
+        check(world.get<Tilemap>(tile_es[0])->tileset ==
+                      "sprites/tiles.png" &&
+                  world.get<Tilemap>(tile_es[0])->columns == 4 &&
+                  world.get<Tilemap>(tile_es[0])->cells.size() == 8 &&
+                  world.get<Tilemap>(tile_es[0])->collide,
               "spawn_scene tilemap component");
+        check(world.get<Tilemap>(tile_es[1])->tileset ==
+                      "sprites/deco.png" &&
+                  world.get<Tilemap>(tile_es[1])->tile_w == 16 &&
+                  world.get<Tilemap>(tile_es[1])->layer == -3 &&
+                  world.get<Tilemap>(tile_es[1])->cells.size() == 16,
+              "spawn_scene second tilemap component");
         const auto player = find_entity_by_name(world, "player");
         check(player.has_value() && *player == spawned[0],
               "find_entity_by_name resolves");
@@ -319,17 +343,21 @@ int main() {
               "restore revives destroyed entity");
         check(world.get<SpriteRef>(*rep)->value == "data/logo.png",
               "restore revives sprite path");
-        // Destructible terrain: a runtime cell edit survives restore.
-        // (Entity ids regenerate on restore — re-resolve the carrier.)
-        const auto tile_e2 = tilemap_entity(world);
-        check(tile_e2.has_value(), "restore revives tilemap entity");
-        world.get<Tilemap>(*tile_e2)->cells[1] = 7;
+        // Destructible terrain: runtime cell edits survive restore.
+        // (Entity ids regenerate on restore — re-resolve the carriers.)
+        const auto tile_es2 = tilemap_entities(world);
+        check(tile_es2.size() == 2, "restore revives every tilemap entity");
+        world.get<Tilemap>(tile_es2[0])->cells[1] = 7;
+        world.get<Tilemap>(tile_es2[1])->cells[0] = 9;
         save_world_to_file(world, path);
-        world.get<Tilemap>(*tile_e2)->cells[1] = -1;
+        world.get<Tilemap>(tile_es2[0])->cells[1] = -1;
+        world.get<Tilemap>(tile_es2[1])->cells[0] = 4;
         check(load_world_from_file(world, path), "tilemap save reload");
-        check(tilemap_entity(world).has_value() &&
-                  world.get<Tilemap>(*tilemap_entity(world))->cells[1] == 7,
-              "tilemap cell edits snapshot with the world");
+        const auto tile_es3 = tilemap_entities(world);
+        check(tile_es3.size() == 2 &&
+                  world.get<Tilemap>(tile_es3[0])->cells[1] == 7 &&
+                  world.get<Tilemap>(tile_es3[1])->cells[0] == 9,
+              "every tilemap's cell edits snapshot with the world");
 
         // scene_from_world exports live state back to an editable document.
         const auto exported = scene_from_world(world);
@@ -349,10 +377,14 @@ int main() {
                   ex_player->data == "checkpoint-7" &&
                   ex_player->opacity == 0.5f,
               "scene_from_world round-trips fields");
-        check(exported.tilemap && exported.tilemap->columns == 4 &&
-                  exported.tilemap->cells[1] == 7 &&
-                  exported.tilemap->tileset == "sprites/tiles.png",
-              "scene_from_world exports tilemap");
+        check(exported.tilemaps.size() == 2 &&
+                  exported.tilemaps[0].columns == 4 &&
+                  exported.tilemaps[0].cells[1] == 7 &&
+                  exported.tilemaps[0].tileset == "sprites/tiles.png" &&
+                  exported.tilemaps[1].tileset == "sprites/deco.png" &&
+                  exported.tilemaps[1].tile_w == 16 &&
+                  exported.tilemaps[1].cells[0] == 9,
+              "scene_from_world exports every tilemap");
 
         // Failure paths: absent and corrupt files return false, world intact.
         check(!load_world_from_file(

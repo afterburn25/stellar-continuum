@@ -146,22 +146,27 @@ tint, sprite path, layer (stable-sorted draw order), parallax
 physics: doc-level gravity, landing on solid tops, side blocking,
 grounded W/Up jump), sprite-strip `frames`/`fps` (horizontal cells,
 sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
-`flipX`/`flipY`, `visible`. Scenes also carry an optional
-`tilemap` (`SceneTilemap`: tileset image path, `tileW`/`tileH`,
+`flipX`/`flipY`, `visible`. Scenes also carry a `tilemaps`
+array (`SceneTilemap`: tileset image path, `tileW`/`tileH`,
 `columns`, `layer`, `parallax`, `collide`, row-major `cells` with
-`-1` empty) — the tilemap lives in the world as a `Tilemap`
-component on a dedicated entity (`host.tilemap_entity()`), so cell
-state is authoritative: runtime edits (destructible terrain) snapshot
-with F5/F9 saves and `scene_from_world` re-exports them. RuntimeHost
-renders cells through the sprite path at its layer and runs cell
-collision (side-blocking, top landing, grounded) in the same
-authoritative pass. The Scene tool exposes
-every field in an adaptive multi-column property list with an
-animated/flipped/rotated preview that also paints the tilemap,
-plus a TILES toggle, tilemap fields (tileset, tile size,
-columns, collide, layer, parallax, cells CSV, brush id), and a
-PAINT mode that click/drag-writes cells in the preview with a
-grid overlay and one undo step per stroke.
+`-1` empty; legacy single-`"tilemap"` documents still parse) —
+each tilemap lives in the world as a `Tilemap` component on its own
+dedicated entity in document order (`host.tilemap_entities()`,
+`tilemap_entity()` returns the first), so cell state is authoritative:
+runtime edits (destructible terrain) snapshot with F5/F9 saves and
+`scene_from_world` re-exports every map. RuntimeHost renders each map
+through the sprite path at its own layer/parallax (stable layer sort
+interleaved with entities) and runs cell collision against every
+`collide` map using that map's geometry (side-blocking, top landing,
+grounded) in the same authoritative pass. `tile_at`/`set_tile_at`
+address the first map; layered games use `tilemap_entities()`. The
+Scene tool exposes every field in an adaptive multi-column property
+list with an animated/flipped/rotated preview that paints all maps,
+plus TILES + / MAP k/n / TILES - layer-stack controls, tilemap fields
+(tileset, tile size, columns, collide, layer, parallax, cells CSV,
+brush id) that edit the selected map, and a PAINT mode that
+click/drag-writes cells in the preview with a grid overlay and one
+undo step per stroke.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in

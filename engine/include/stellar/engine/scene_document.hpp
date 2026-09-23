@@ -84,8 +84,10 @@ struct SceneTilemap {
 
 struct SceneDocument {
   std::vector<SceneEntity> entities;
-  // Optional grid terrain layer (absent in most scenes).
-  std::optional<SceneTilemap> tilemap;
+  // Grid terrain layers — empty in most scenes; each draws at its own
+  // layer between entities (background grids, collision ground,
+  // foreground overlays). Parses legacy single-"tilemap" documents too.
+  std::vector<SceneTilemap> tilemaps;
   // Background clear color; defaults to the engine's dark space blue.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward acceleration in px/s² applied to entities' velocity each sim

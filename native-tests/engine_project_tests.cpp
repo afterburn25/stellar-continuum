@@ -215,13 +215,24 @@ int main() {
     scene.entities[0].opacity = 0.5f;
     scene.entities[0].spin = 90.f;
     scene.entities[0].bounce = false;
-    scene.tilemap = engine::SceneTilemap{};
-    scene.tilemap->tileset = "sprites/tiles.png";
-    scene.tilemap->tile_w = 32;
-    scene.tilemap->tile_h = 32;
-    scene.tilemap->columns = 4;
-    scene.tilemap->collide = true;
-    scene.tilemap->cells = {0, -1, -1, 0, 0, 1, 1, 0};
+    scene.tilemaps.push_back(engine::SceneTilemap{});
+    auto &tm0 = scene.tilemaps.back();
+    tm0.tileset = "sprites/tiles.png";
+    tm0.tile_w = 32;
+    tm0.tile_h = 32;
+    tm0.columns = 4;
+    tm0.collide = true;
+    tm0.cells = {0, -1, -1, 0, 0, 1, 1, 0};
+    // A second grid layer — parallaxed decor above the collision map.
+    scene.tilemaps.push_back(engine::SceneTilemap{});
+    auto &tm1 = scene.tilemaps.back();
+    tm1.tileset = "sprites/deco.png";
+    tm1.tile_w = 16;
+    tm1.tile_h = 16;
+    tm1.columns = 8;
+    tm1.layer = 5;
+    tm1.parallax = 0.5f;
+    tm1.cells.assign(16, 2);
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -245,11 +256,18 @@ int main() {
               reparsed->entities[0].opacity == 0.5f &&
               reparsed->entities[0].spin == 90.f &&
               !reparsed->entities[0].bounce &&
-              reparsed->tilemap &&
-              reparsed->tilemap->tileset == "sprites/tiles.png" &&
-              reparsed->tilemap->columns == 4 && reparsed->tilemap->collide &&
-              reparsed->tilemap->cells.size() == 8 &&
-              reparsed->tilemap->cells[5] == 1 &&
+              reparsed->tilemaps.size() == 2 &&
+              reparsed->tilemaps[0].tileset == "sprites/tiles.png" &&
+              reparsed->tilemaps[0].columns == 4 &&
+              reparsed->tilemaps[0].collide &&
+              reparsed->tilemaps[0].cells.size() == 8 &&
+              reparsed->tilemaps[0].cells[5] == 1 &&
+              reparsed->tilemaps[1].tileset == "sprites/deco.png" &&
+              reparsed->tilemaps[1].tile_w == 16 &&
+              reparsed->tilemaps[1].layer == 5 &&
+              reparsed->tilemaps[1].parallax == 0.5f &&
+              reparsed->tilemaps[1].cells.size() == 16 &&
+              reparsed->tilemaps[1].cells[0] == 2 &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f &&
               reparsed->music == "audio/level1.ogg" &&
@@ -275,6 +293,20 @@ int main() {
               R"({"entities":[],"tilemap":{"tileW":0,"tileH":32,"columns":4,"cells":[0,1,2,3]}})")
               .has_value(),
           "tilemap with non-positive tile size rejected");
+    // Legacy single-"tilemap" documents still parse, becoming a
+    // one-element tilemaps array.
+    const auto legacy_doc = engine::SceneDocument::from_json(
+        R"({"entities":[],"tilemap":{"tileset":"sprites/tiles.png","tileW":32,"tileH":32,"columns":4,"collide":true,"cells":[0,-1,-1,0,0,1,1,0]}})");
+    check(legacy_doc && legacy_doc->tilemaps.size() == 1 &&
+              legacy_doc->tilemaps[0].tileset == "sprites/tiles.png" &&
+              legacy_doc->tilemaps[0].columns == 4 &&
+              legacy_doc->tilemaps[0].cells.size() == 8,
+          "legacy singular tilemap parses into tilemaps");
+    // A malformed entry inside the new tilemaps array rejects too.
+    check(!engine::SceneDocument::from_json(
+              R"({"entities":[],"tilemaps":[{"tileW":32,"tileH":32,"columns":4,"cells":[0,1,2]}]})")
+              .has_value(),
+          "bad tilemaps-array entry rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

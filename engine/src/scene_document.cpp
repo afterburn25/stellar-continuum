@@ -49,17 +49,21 @@ std::string SceneDocument::to_json() const {
   if (gravity != 0.0f) doc["gravity"] = gravity;
   if (!music.empty()) doc["music"] = music;
   if (world_w > 0.f || world_h > 0.f) doc["worldSize"] = {world_w, world_h};
-  if (tilemap) {
-    nlohmann::json tm;
-    tm["tileset"] = tilemap->tileset;
-    tm["tileW"] = tilemap->tile_w;
-    tm["tileH"] = tilemap->tile_h;
-    tm["columns"] = tilemap->columns;
-    if (tilemap->layer != -100) tm["layer"] = tilemap->layer;
-    if (tilemap->parallax != 1.0f) tm["parallax"] = tilemap->parallax;
-    if (tilemap->collide) tm["collide"] = true;
-    tm["cells"] = tilemap->cells;
-    doc["tilemap"] = std::move(tm);
+  if (!tilemaps.empty()) {
+    nlohmann::json list = nlohmann::json::array();
+    for (const auto &tilemap : tilemaps) {
+      nlohmann::json tm;
+      tm["tileset"] = tilemap.tileset;
+      tm["tileW"] = tilemap.tile_w;
+      tm["tileH"] = tilemap.tile_h;
+      tm["columns"] = tilemap.columns;
+      if (tilemap.layer != -100) tm["layer"] = tilemap.layer;
+      if (tilemap.parallax != 1.0f) tm["parallax"] = tilemap.parallax;
+      if (tilemap.collide) tm["collide"] = true;
+      tm["cells"] = tilemap.cells;
+      list.push_back(std::move(tm));
+    }
+    doc["tilemaps"] = std::move(list);
   }
   return doc.dump(2) + "\n";
 }
@@ -138,10 +142,12 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       scene.world_w = ws[0].get<float>();
       scene.world_h = ws[1].get<float>();
     }
-    if (doc.contains("tilemap")) {
-      const auto &tm = doc.at("tilemap");
-      if (!tm.is_object()) return fail("tilemap must be an object");
-      SceneTilemap map;
+    const auto parse_tilemap = [&fail](const nlohmann::json &tm,
+                                       SceneTilemap &map) -> bool {
+      if (!tm.is_object()) {
+        fail("tilemap must be an object");
+        return false;
+      }
       map.tileset = tm.value("tileset", std::string{});
       map.tile_w = tm.value("tileW", 32);
       map.tile_h = tm.value("tileH", 32);
@@ -151,15 +157,35 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       map.collide = tm.value("collide", false);
       if (tm.contains("cells")) {
         const auto &cells = tm.at("cells");
-        if (!cells.is_array()) return fail("tilemap cells must be an array");
+        if (!cells.is_array()) {
+          fail("tilemap cells must be an array");
+          return false;
+        }
         map.cells.reserve(cells.size());
         for (const auto &c : cells) map.cells.push_back(c.get<int>());
       }
       if (map.tile_w <= 0 || map.tile_h <= 0 || map.columns <= 0 ||
-          map.cells.empty() || map.cells.size() % map.columns != 0)
-        return fail("tilemap requires positive tileW/tileH/columns and a "
-                    "cells array divisible by columns");
-      scene.tilemap = std::move(map);
+          map.cells.empty() || map.cells.size() % map.columns != 0) {
+        fail("tilemap requires positive tileW/tileH/columns and a "
+             "cells array divisible by columns");
+        return false;
+      }
+      return true;
+    };
+    // "tilemaps" is the layered form; legacy "tilemap" objects still load.
+    if (doc.contains("tilemaps")) {
+      const auto &list = doc.at("tilemaps");
+      if (!list.is_array()) return fail("tilemaps must be an array");
+      for (const auto &tm : list) {
+        SceneTilemap map;
+        if (!parse_tilemap(tm, map)) return std::nullopt;
+        scene.tilemaps.push_back(std::move(map));
+      }
+    }
+    if (doc.contains("tilemap")) {
+      SceneTilemap map;
+      if (!parse_tilemap(doc.at("tilemap"), map)) return std::nullopt;
+      scene.tilemaps.push_back(std::move(map));
     }
   } catch (const std::exception &e) {
     return fail(std::string("malformed entity: ") + e.what());
