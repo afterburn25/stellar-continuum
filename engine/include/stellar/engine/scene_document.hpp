@@ -56,6 +56,9 @@ struct SceneEntity {
   // One-way platform: entities land on its top but pass through the
   // sides and bottom. Independent of `solid` (which also side-blocks).
   bool oneway{false};
+  // Freeform game data — spawn tags, patrol notes, door ids. The engine
+  // carries it verbatim; games interpret it via the UserData component.
+  std::string data;
 };
 
 struct SceneDocument {

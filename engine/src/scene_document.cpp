@@ -38,6 +38,7 @@ std::string SceneDocument::to_json() const {
     if (e.flip_y) item["flipY"] = true;
     if (!e.visible) item["visible"] = false;
     if (e.oneway) item["oneway"] = true;
+    if (!e.data.empty()) item["data"] = e.data;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -97,6 +98,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.flip_y = item.value("flipY", false);
       entity.visible = item.value("visible", true);
       entity.oneway = item.value("oneway", false);
+      entity.data = item.value("data", std::string{});
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {

@@ -80,6 +80,10 @@ struct Hidden {
 struct Oneway {
   // Marker: landable from above, pass-through from sides and below.
 };
+struct UserData {
+  // Freeform per-entity payload authored in the scene ("data" field).
+  std::string value;
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

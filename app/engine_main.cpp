@@ -199,6 +199,7 @@ struct Shell {
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
+      hit_scene_data{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1077,6 +1078,9 @@ void commit_scene_field(Shell &shell) {
       else
         next.oneway = value;
     }
+  } else if (shell.scene_field == 22) {
+    next.data = shell.scene_buffer;
+    ok = true;
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1125,7 +1129,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                                 shell.hit_scene_oneway =
                                                     shell.hit_scene_up =
                                                         shell.hit_scene_down =
-                                                            {};
+                                                            shell.hit_scene_data =
+                                                                {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1369,6 +1374,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->oneway ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 21,
         "land on top, pass through");
+  field(shell.hit_scene_data, "data",
+        entity ? entity->data : "",
+        shell.editing_scene && shell.scene_field == 22,
+        "freeform game payload");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2236,6 +2245,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->visible ? "true" : "false";
               else if (field == 21 && e)
                 shell.scene_buffer = e->oneway ? "true" : "false";
+              else if (field == 22 && e)
+                shell.scene_buffer = e->data;
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2281,6 +2292,8 @@ int main(int argc, char **argv) {
               edit_field(20);
             else if (shell.hit_scene_oneway.contains(event.position))
               edit_field(21);
+            else if (shell.hit_scene_data.contains(event.position))
+              edit_field(22);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

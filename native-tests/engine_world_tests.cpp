@@ -224,6 +224,7 @@ int main() {
         hero.flip_x = true;
         hero.visible = false;
         hero.oneway = true;
+        hero.data = "checkpoint-7";
         SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
@@ -273,6 +274,10 @@ int main() {
         check(world.get<Oneway>(spawned[0]) != nullptr &&
                   world.get<Oneway>(spawned[1]) == nullptr,
               "spawn_scene oneway flag");
+        check(world.get<UserData>(spawned[0]) &&
+                  world.get<UserData>(spawned[0])->value == "checkpoint-7" &&
+                  world.get<UserData>(spawned[1]) == nullptr,
+              "spawn_scene user data");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -307,7 +312,8 @@ int main() {
                   ex_player->frames == 4 && ex_player->fps == 6.f &&
                   ex_player->rotation == 45.f && ex_player->ttl == 2.5f &&
                   ex_player->flip_x && !ex_player->flip_y &&
-                  !ex_player->visible && ex_player->oneway,
+                  !ex_player->visible && ex_player->oneway &&
+                  ex_player->data == "checkpoint-7",
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.

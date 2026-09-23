@@ -46,6 +46,14 @@ Label decode_label(const std::vector<std::uint8_t> &b) {
   return Label{{b.begin(), b.end()}};
 }
 
+std::vector<std::uint8_t> encode_user_data(const UserData &d) {
+  return {d.value.begin(), d.value.end()};
+}
+
+UserData decode_user_data(const std::vector<std::uint8_t> &b) {
+  return UserData{{b.begin(), b.end()}};
+}
+
 } // namespace
 
 void register_scene_components(World &world) {
@@ -85,6 +93,8 @@ void register_scene_components(World &world) {
                                    decode_pod<Hidden>);
   world.register_component<Oneway>("oneway", encode_pod<Oneway>,
                                    decode_pod<Oneway>);
+  world.register_component<UserData>("userdata", encode_user_data,
+                                     decode_user_data);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -109,6 +119,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (s.flip_x || s.flip_y) world.add(entity, Flip{s.flip_x, s.flip_y});
     if (!s.visible) world.add(entity, Hidden{});
     if (s.oneway) world.add(entity, Oneway{});
+    if (!s.data.empty()) world.add(entity, UserData{s.data});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -160,6 +171,7 @@ SceneDocument scene_from_world(const World &world) {
     }
     s.visible = world.get<Hidden>(entity) == nullptr;
     s.oneway = world.get<Oneway>(entity) != nullptr;
+    if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     doc.entities.push_back(std::move(s));
   }
   return doc;
