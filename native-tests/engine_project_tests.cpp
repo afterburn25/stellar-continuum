@@ -3,6 +3,7 @@
 
 #include <stellar/engine/package.hpp>
 #include <stellar/engine/project.hpp>
+#include <stellar/engine/scene_document.hpp>
 
 #include <cstdlib>
 #include <filesystem>
@@ -180,6 +181,32 @@ int main() {
   const auto found = engine::find_projects(parents);
   check(found.size() == 1 && found[0].filename() == "alpha",
         "find_projects filters on manifest presence");
+
+  // SceneDocument: round-trip, malformed rejection, atomic save/load.
+  {
+    engine::SceneDocument scene;
+    scene.entities.push_back(
+        engine::SceneEntity{"box", 10.f, 20.f, 64.f, 32.f, 100.f, 50.f,
+                            255, 128, 0});
+    const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
+    check(reparsed && reparsed->entities.size() == 1 &&
+              reparsed->entities[0].name == "box" &&
+              reparsed->entities[0].vx == 100.f &&
+              reparsed->entities[0].r == 255 && reparsed->entities[0].g == 128,
+          "scene document round-trips");
+    const auto path = root / "editor" / "scene.json";
+    scene.save(path);
+    const auto loaded_scene = engine::SceneDocument::load(path);
+    check(loaded_scene && loaded_scene->entities.size() == 1,
+          "scene save/load round-trips");
+    check(!engine::SceneDocument::from_json("{not json").has_value(),
+          "malformed scene rejected");
+    check(!engine::SceneDocument::from_json(R"({"entities":[{"x":1,"y":2}]})")
+              .has_value(),
+          "nameless entity rejected");
+    check(!engine::SceneDocument::load(root / "nonexistent.json").has_value(),
+          "missing scene file rejected");
+  }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";
   return failures == 0 ? 0 : 1;

@@ -18,6 +18,7 @@
 #endif
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/scene_document.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/package.hpp>
@@ -57,11 +58,11 @@ constexpr Color bar_fill{24, 90, 120, 255};
 constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
-enum class Tool { Projects, Dashboard, Assets, Profiler, Localization };
-constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Assets,
-                            Tool::Profiler, Tool::Localization};
-constexpr std::array<const char *, 5> kToolNames{"Projects", "Dashboard",
-                                                 "Assets", "Profiler",
+enum class Tool { Projects, Dashboard, Scene, Assets, Profiler, Localization };
+constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
+                            Tool::Assets, Tool::Profiler, Tool::Localization};
+constexpr std::array<const char *, 6> kToolNames{"Projects", "Dashboard",
+                                                 "Scene", "Assets", "Profiler",
                                                  "Localization"};
 
 std::filesystem::path find_path(const char *relative) {
@@ -174,6 +175,20 @@ struct Shell {
   // rescanned at most once per second on the UI thread.
   std::string content_status;
   std::chrono::steady_clock::time_point content_scan_at{};
+
+  // Scene tool: authors <project>/editor/scene.json — the starter host
+  // spawns these entities into its World at launch.
+  engine::SceneDocument scene_doc;
+  std::atomic<bool> scene_dirty{true};
+  std::size_t selected_entity{static_cast<std::size_t>(-1)};
+  engine::VirtualizedList entity_list;
+  bool scene_modified{};
+  bool editing_scene{};
+  int scene_field{}; // 1=name, 2=pos "x,y", 3=vel "vx,vy"
+  std::string scene_buffer;
+  UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
+      hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, scene_preview{},
+      scene_rows{};
   std::string status{"ready"};
 };
 
@@ -268,6 +283,7 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
   }
   shell.project = std::move(*loaded);
   shell.cooked_dirty = true;
+  shell.scene_dirty = true;
   const auto count = reload_packages(shell);
   scan_assets(shell, root / shell.project->content_dirs.front());
   shell.status = "opened " + shell.project->name + " - " +
@@ -337,6 +353,8 @@ void rename_project(Shell &shell) {
 
 void close_project(Shell &shell) {
   shell.project.reset();
+  shell.scene_doc = engine::SceneDocument{};
+  shell.selected_entity = static_cast<std::size_t>(-1);
   scan_assets(shell, find_path("assets"));
   {
     std::lock_guard lock(shell.project_mutex);
@@ -737,6 +755,193 @@ void create_project_from_field(Shell &shell) {
   }
 }
 
+void shell_button(DrawList &out, const UiRect &rect, const char *label,
+                  bool active, int font, float s);
+void field_box(DrawList &out, const UiRect &rect, const std::string &value,
+               bool editing, const char *hint, int font, float s);
+
+// ---- Scene tool: authors <project>/editor/scene.json ----------------
+
+std::filesystem::path scene_path(const Shell &shell) {
+  return shell.project->root / "editor" /
+         std::string(engine::SceneDocument::filename);
+}
+
+void load_scene(Shell &shell) {
+  shell.scene_doc = engine::SceneDocument{};
+  shell.selected_entity = static_cast<std::size_t>(-1);
+  shell.scene_modified = false;
+  if (!shell.project) return;
+  std::string error;
+  if (auto doc = engine::SceneDocument::load(scene_path(shell), &error))
+    shell.scene_doc = *doc;
+  else if (std::filesystem::is_regular_file(scene_path(shell)))
+    shell.status = "scene load failed: " + error;
+}
+
+void save_scene(Shell &shell) {
+  if (!shell.project) return;
+  try {
+    shell.scene_doc.save(scene_path(shell));
+    shell.scene_modified = false;
+    shell.status = "scene saved - editor/scene.json";
+  } catch (const std::exception &error) {
+    shell.status = std::string("scene save failed: ") + error.what();
+  }
+}
+
+engine::SceneEntity *selected_scene_entity(Shell &shell) {
+  if (shell.selected_entity >= shell.scene_doc.entities.size())
+    return nullptr;
+  return &shell.scene_doc.entities[shell.selected_entity];
+}
+
+// Parses "x,y" or "vx,vy" pairs; returns false on malformed input.
+bool parse_pair(std::string_view text, float &a, float &b) {
+  const auto comma = text.find(',');
+  if (comma == std::string_view::npos) return false;
+  try {
+    a = std::stof(std::string(text.substr(0, comma)));
+    b = std::stof(std::string(text.substr(comma + 1)));
+  } catch (const std::exception &) {
+    return false;
+  }
+  return true;
+}
+
+void commit_scene_field(Shell &shell) {
+  auto *entity = selected_scene_entity(shell);
+  if (entity == nullptr) {
+    shell.scene_buffer.clear();
+    return;
+  }
+  bool ok = false;
+  if (shell.scene_field == 1 && !shell.scene_buffer.empty()) {
+    entity->name = shell.scene_buffer;
+    ok = true;
+  } else if (shell.scene_field == 2) {
+    ok = parse_pair(shell.scene_buffer, entity->x, entity->y);
+  } else if (shell.scene_field == 3) {
+    ok = parse_pair(shell.scene_buffer, entity->vx, entity->vy);
+  }
+  if (ok) {
+    shell.scene_modified = true;
+    shell.status = "entity " + entity->name + " updated - SAVE to persist";
+  } else {
+    shell.status = "invalid value - use \"x,y\" or \"vx,vy\"";
+  }
+  shell.scene_buffer.clear();
+}
+
+void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "SCENE AUTHORING");
+  if (!shell.project) {
+    line(out, x, y, "open project", "none - open one in Projects", font);
+    shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save = {};
+    shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel = {};
+    shell.scene_preview = shell.scene_rows = {};
+    return;
+  }
+  if (shell.scene_dirty.exchange(false)) load_scene(shell);
+  line(out, x, y, "project", shell.project->name, font);
+  line(out, x, y, "document", "editor/scene.json", font);
+  line(out, x, y, "entities",
+       std::to_string(shell.scene_doc.entities.size()), font);
+  y += 4 * s;
+
+  // Action row.
+  const float bh = (font + 14) * s;
+  shell.hit_scene_add = {x, y, 148 * s, bh};
+  shell_button(out, shell.hit_scene_add, "ADD ENTITY", false, font, s);
+  shell.hit_scene_del = {x + 158 * s, y, 100 * s, bh};
+  shell_button(out, shell.hit_scene_del, "DELETE",
+               shell.selected_entity < shell.scene_doc.entities.size(), font,
+               s);
+  shell.hit_scene_save = {x + 268 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit_scene_save,
+               shell.scene_modified ? "SAVE *" : "SAVE", shell.scene_modified,
+               font, s);
+  y += bh + 14 * s;
+
+  // Entity list (left) + scene preview (right).
+  const UiRect list_rect{x, y, body.width * 0.34f, body.height * 0.5f};
+  out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
+  shell.scene_rows = list_rect;
+  shell.entity_list.viewport_height = list_rect.height;
+  shell.entity_list.row_height = 22 * s;
+  shell.entity_list.row_count = shell.scene_doc.entities.size();
+  const auto range = shell.entity_list.visible_range();
+  float ry = list_rect.y - shell.entity_list.scroll_offset +
+             range.first * shell.entity_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += shell.entity_list.row_height) {
+    const auto &e = shell.scene_doc.entities[i];
+    const UiRect row{list_rect.x, ry, list_rect.width,
+                     shell.entity_list.row_height};
+    if (i == shell.selected_entity)
+      out.overlay.push_back(FilledRectangle{row, row_selected});
+    else if (row.contains(Point{shell.pointer_x, shell.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    out.overlay.push_back(
+        Text{{row.x + 8 * s, row.y + 4 * s},
+             e.name + "  (" + std::to_string(static_cast<int>(e.x)) + "," +
+                 std::to_string(static_cast<int>(e.y)) + ")",
+             ink, font, 0, list_rect});
+  }
+
+  // Preview: a 1280x720 scene area scaled into the pane; click to place the
+  // selected entity.
+  const float px = list_rect.x + list_rect.width + 16 * s;
+  const float pw = body.x + body.width - px - 22 * s;
+  const float ph = pw * 720.f / 1280.f;
+  shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.55f)};
+  const auto &pv = shell.scene_preview;
+  out.overlay.push_back(FilledRectangle{pv, {8, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{pv, panel_edge});
+  const float sx = pv.width / 1280.f, sy = pv.height / 720.f;
+  for (std::size_t i = 0; i < shell.scene_doc.entities.size(); ++i) {
+    const auto &e = shell.scene_doc.entities[i];
+    const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
+    out.overlay.push_back(FilledRectangle{rect, {e.r, e.g, e.b, 200}});
+    if (i == shell.selected_entity)
+      out.overlay.push_back(StrokedRectangle{rect, accent});
+  }
+  out.overlay.push_back(Text{{pv.x + 6 * s, pv.y + pv.height - 16 * s},
+                             "click to place selected entity", muted,
+                             static_cast<int>(11 * s), 0, pv});
+
+  // Property fields for the selected entity.
+  const auto *entity = selected_scene_entity(shell);
+  float fy = pv.y + pv.height + 14 * s;
+  const float fw = pv.width;
+  auto field = [&](UiRect &hit, const char *label, const std::string &value,
+                   bool editing, const char *hint) {
+    out.overlay.push_back(Text{{px, fy}, label, muted, font});
+    hit = {px + 90 * s, fy - 4 * s, fw - 90 * s, (font + 12) * s};
+    field_box(out, hit, editing ? shell.scene_buffer : value, editing, hint,
+              font, s);
+    fy += hit.height + 8 * s;
+  };
+  const auto fmt_pair = [](float a, float b) {
+    return std::to_string(static_cast<int>(a)) + "," +
+           std::to_string(static_cast<int>(b));
+  };
+  field(shell.hit_scene_name, "name", entity ? entity->name : "",
+        shell.editing_scene && shell.scene_field == 1, "entity name");
+  field(shell.hit_scene_pos, "x,y",
+        entity ? fmt_pair(entity->x, entity->y) : "",
+        shell.editing_scene && shell.scene_field == 2, "e.g. 320,240");
+  field(shell.hit_scene_vel, "vx,vy",
+        entity ? fmt_pair(entity->vx, entity->vy) : "",
+        shell.editing_scene && shell.scene_field == 3, "e.g. 240,150");
+  if (entity == nullptr)
+    line(out, px, fy, "", "select or add an entity", font);
+}
+
 void render_dashboard(DrawList &out, const Shell &shell, UiRect body, float s,
                       const engine::JobStats &stats, int demo_jobs,
                       std::size_t locale_keys, const std::string &locale_status,
@@ -803,9 +1008,6 @@ UiRect tool_list_rect(UiRect body, float s, float width_fraction) {
           body.width * width_fraction - 22 * s,
           body.height - header - 16 * s};
 }
-
-void shell_button(DrawList &out, const UiRect &rect, const char *label,
-                  bool active, int font, float s);
 
 void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   float x = body.x + 22 * s;
@@ -1307,24 +1509,38 @@ int main(int argc, char **argv) {
           args.front() == "--build" || args.front() == "--package")
         return run_headless(shell, args);
     }
+    auto arg_str = [&](int i) {
+#ifdef _WIN32
+      return std::filesystem::path(argv[i]).generic_string();
+#else
+      return std::string(argv[i]);
+#endif
+    };
     // --project <root> opens a game project directly (e.g. launched on a
     // project directory, or from a project's own toolchain).
     for (int i = 1; i + 1 < argc; ++i) {
-#ifdef _WIN32
-      const std::wstring arg(argv[i]);
-      if (arg == L"--project") {
-        open_project(shell, argv[i + 1]);
+      if (arg_str(i) == "--project") {
+        open_project(shell, arg_str(i + 1));
         shell.tool = Tool::Projects;
         break;
       }
-#else
-      if (std::string_view(argv[i]) == "--project") {
-        open_project(shell, argv[i + 1]);
-        shell.tool = Tool::Projects;
-        break;
-      }
-#endif
     }
+    // --tool <name> deep-links a tool tab (case-insensitive); applied after
+    // --project so it wins.
+    auto ieq = [](std::string_view a, std::string_view b) {
+      return a.size() == b.size() &&
+             std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
+               return std::tolower(static_cast<unsigned char>(x)) ==
+                      std::tolower(static_cast<unsigned char>(y));
+             });
+    };
+    for (int i = 1; i + 1 < argc; ++i)
+      if (arg_str(i) == "--tool")
+        for (std::size_t t = 0; t < kToolNames.size(); ++t)
+          if (ieq(arg_str(i + 1), kToolNames[t])) {
+            shell.tool = kTools[t];
+            break;
+          }
     for (const char *probe :
          {"GENERAL_TITLE", "STARTUP_TITLE", "MENU_RESUME", "ECONOMY_TITLE",
           "RESEARCH_TITLE", "FLEET_TITLE", "SYSTEM_BACK",
@@ -1357,9 +1573,9 @@ int main(int argc, char **argv) {
       for (const auto &event : snapshot.events) {
         if (event.type == InputEventType::EscapePressed) {
           if (shell.editing_project_name || shell.editing_import ||
-              shell.editing_package) {
+              shell.editing_package || shell.editing_scene) {
             shell.editing_project_name = shell.editing_import =
-                shell.editing_package = false;
+                shell.editing_package = shell.editing_scene = false;
             window.set_text_input(false);
             continue;
           }
@@ -1367,10 +1583,11 @@ int main(int argc, char **argv) {
         }
         // Text-field editing takes precedence over tool clicks.
         if (shell.editing_project_name || shell.editing_import ||
-            shell.editing_package) {
+            shell.editing_package || shell.editing_scene) {
           std::string &buffer =
               shell.editing_import      ? shell.import_buffer
               : shell.editing_package   ? shell.package_buffer
+              : shell.editing_scene     ? shell.scene_buffer
                                         : shell.project_name_buffer;
           if (event.type == InputEventType::TextEntered) {
             if (buffer.size() < 240) buffer += event.text;
@@ -1384,11 +1601,13 @@ int main(int argc, char **argv) {
               event.key == '\r') {
             const bool was_import = shell.editing_import;
             const bool was_package = shell.editing_package;
+            const bool was_scene = shell.editing_scene;
             shell.editing_project_name = shell.editing_import =
-                shell.editing_package = false;
+                shell.editing_package = shell.editing_scene = false;
             window.set_text_input(false);
             if (was_import) import_asset(shell);
             else if (was_package) create_package(shell);
+            else if (was_scene) commit_scene_field(shell);
             else create_project_from_field(shell);
             continue;
           }
@@ -1456,10 +1675,72 @@ int main(int argc, char **argv) {
                                   shell.project_list.row_height)));
               if (row < shell.projects.size()) shell.selected_project = row;
             }
+          } else if (shell.tool == Tool::Scene) {
+            auto edit_field = [&](int field) {
+              shell.editing_scene = true;
+              shell.scene_field = field;
+              const auto *e = selected_scene_entity(shell);
+              if (field == 1 && e) shell.scene_buffer = e->name;
+              else if (field == 2 && e)
+                shell.scene_buffer = std::to_string((int)e->x) + "," +
+                                     std::to_string((int)e->y);
+              else if (field == 3 && e)
+                shell.scene_buffer = std::to_string((int)e->vx) + "," +
+                                     std::to_string((int)e->vy);
+              else shell.scene_buffer.clear();
+              window.set_text_input(true);
+            };
+            if (shell.hit_scene_name.contains(event.position))
+              edit_field(1);
+            else if (shell.hit_scene_pos.contains(event.position))
+              edit_field(2);
+            else if (shell.hit_scene_vel.contains(event.position))
+              edit_field(3);
+            else if (shell.editing_scene) {
+              shell.editing_scene = false;
+              window.set_text_input(false);
+            }
+            if (shell.hit_scene_add.contains(event.position)) {
+              engine::SceneEntity e;
+              e.name = "entity" +
+                       std::to_string(shell.scene_doc.entities.size() + 1);
+              e.x = 200.f; e.y = 200.f; e.vx = 120.f; e.vy = 90.f;
+              shell.scene_doc.entities.push_back(e);
+              shell.selected_entity = shell.scene_doc.entities.size() - 1;
+              shell.scene_modified = true;
+            } else if (shell.hit_scene_del.contains(event.position)) {
+              if (auto *e = selected_scene_entity(shell); e != nullptr) {
+                shell.scene_doc.entities.erase(
+                    shell.scene_doc.entities.begin() +
+                    static_cast<std::ptrdiff_t>(shell.selected_entity));
+                shell.selected_entity = static_cast<std::size_t>(-1);
+                shell.scene_modified = true;
+              }
+            } else if (shell.hit_scene_save.contains(event.position)) {
+              save_scene(shell);
+            } else if (shell.scene_preview.contains(event.position)) {
+              if (auto *e = selected_scene_entity(shell); e != nullptr) {
+                const auto &pv = shell.scene_preview;
+                e->x = std::clamp(
+                    (event.position.x - pv.x) / pv.width * 1280.f, 0.f,
+                    1280.f - e->w);
+                e->y = std::clamp(
+                    (event.position.y - pv.y) / pv.height * 720.f, 0.f,
+                    720.f - e->h);
+                shell.scene_modified = true;
+              }
+            } else if (shell.scene_rows.contains(event.position)) {
+              const auto row = static_cast<std::size_t>(std::max(
+                  0.f, std::floor((event.position.y - shell.scene_rows.y +
+                                   shell.entity_list.scroll_offset) /
+                                  shell.entity_list.row_height)));
+              if (row < shell.scene_doc.entities.size())
+                shell.selected_entity = row;
+            }
           } else if (shell.editing_project_name || shell.editing_import ||
-                     shell.editing_package) {
+                     shell.editing_package || shell.editing_scene) {
             shell.editing_project_name = shell.editing_import =
-                shell.editing_package = false;
+                shell.editing_package = shell.editing_scene = false;
             window.set_text_input(false);
           }
           break;
@@ -1470,6 +1751,10 @@ int main(int argc, char **argv) {
               shell.project_rows.contains(event.position))
             shell.project_list.scroll_to(shell.project_list.scroll_offset -
                                          event.wheel_y * 40.f);
+          if (shell.tool == Tool::Scene &&
+              shell.scene_rows.contains(event.position))
+            shell.entity_list.scroll_to(shell.entity_list.scroll_offset -
+                                        event.wheel_y * 40.f);
           break;
         case InputEventType::KeyPressed:
         case InputEventType::KeyReleased: last_input = "key"; break;
@@ -1556,6 +1841,9 @@ int main(int argc, char **argv) {
         render_dashboard(draw, shell, body, s, stats, demo_jobs_done.load(),
                          locale.size(), locale_status, window,
                          snapshot, fps, last_input);
+        break;
+      case Tool::Scene:
+        render_scene(draw, shell, body, s);
         break;
       case Tool::Assets:
         render_assets(draw, shell, body, s);

@@ -1,0 +1,95 @@
+#include <stellar/engine/scene_document.hpp>
+
+#include <stellar/engine/atomic_file_write.hpp>
+
+#include <nlohmann/json.hpp>
+
+#include <fstream>
+#include <iterator>
+#include <span>
+
+namespace stellar::engine {
+
+std::string SceneDocument::to_json() const {
+  nlohmann::json doc;
+  doc["schemaVersion"] = 1;
+  auto &items = doc["entities"] = nlohmann::json::array();
+  for (const auto &e : entities) {
+    nlohmann::json item;
+    item["name"] = e.name;
+    item["x"] = e.x;
+    item["y"] = e.y;
+    item["w"] = e.w;
+    item["h"] = e.h;
+    item["vx"] = e.vx;
+    item["vy"] = e.vy;
+    item["color"] = {e.r, e.g, e.b};
+    items.push_back(std::move(item));
+  }
+  return doc.dump(2) + "\n";
+}
+
+std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
+                                                    std::string *error) {
+  auto fail = [&](const std::string &message)
+      -> std::optional<SceneDocument> {
+    if (error != nullptr) *error = message;
+    return std::nullopt;
+  };
+  nlohmann::json doc;
+  try {
+    doc = nlohmann::json::parse(text);
+  } catch (const std::exception &e) {
+    return fail(std::string("malformed scene json: ") + e.what());
+  }
+  if (!doc.is_object() || !doc.contains("entities") ||
+      !doc["entities"].is_array())
+    return fail("scene document requires an entities array");
+  SceneDocument scene;
+  try {
+    for (const auto &item : doc["entities"]) {
+      if (!item.is_object()) return fail("entity entry is not an object");
+      SceneEntity entity;
+      entity.name = item.value("name", std::string{});
+      if (entity.name.empty()) return fail("entity requires a name");
+      entity.x = item.at("x").get<float>();
+      entity.y = item.at("y").get<float>();
+      entity.w = item.value("w", 32.f);
+      entity.h = item.value("h", 32.f);
+      entity.vx = item.value("vx", 0.f);
+      entity.vy = item.value("vy", 0.f);
+      if (item.contains("color")) {
+        const auto &color = item.at("color");
+        if (!color.is_array() || color.size() != 3)
+          return fail("entity color must be [r,g,b]");
+        entity.r = color[0].get<std::uint8_t>();
+        entity.g = color[1].get<std::uint8_t>();
+        entity.b = color[2].get<std::uint8_t>();
+      }
+      scene.entities.push_back(std::move(entity));
+    }
+  } catch (const std::exception &e) {
+    return fail(std::string("malformed entity: ") + e.what());
+  }
+  return scene;
+}
+
+void SceneDocument::save(const std::filesystem::path &path) const {
+  const std::string text = to_json();
+  std::filesystem::create_directories(path.parent_path());
+  write_file_atomically(path, std::as_bytes(std::span(text)));
+}
+
+std::optional<SceneDocument>
+SceneDocument::load(const std::filesystem::path &path, std::string *error) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    if (error != nullptr) *error = "cannot open " + path.string();
+    return std::nullopt;
+  }
+  const std::string text{std::istreambuf_iterator<char>(input),
+                         std::istreambuf_iterator<char>()};
+  return from_json(text, error);
+}
+
+} // namespace stellar::engine
