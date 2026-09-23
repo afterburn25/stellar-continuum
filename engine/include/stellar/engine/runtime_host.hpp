@@ -92,6 +92,13 @@ public:
   // entities — level switching. Before run() it sets the initial scene.
   void set_scene(std::string scene_file);
 
+  // Spawns one entity at runtime (bullets, pickups, effects) — it joins the
+  // tracked set: velocity integration, wall bounce, rendering, collisions.
+  // Returns a default (null) id when called outside run().
+  EntityId spawn_entity(const SceneEntity &entity);
+  // Destroys a tracked entity; false for untracked/stale ids.
+  bool destroy_entity(EntityId id);
+
   // Runs each rendered frame after input handling and scene polling, before
   // the built-in velocity integration. The place for game logic.
   std::function<void(World &, float dt)> on_update;
@@ -101,6 +108,9 @@ public:
   std::function<std::string()> on_status;
   // Extra overlay primitives each frame, drawn above the scene entities.
   std::function<void(native_map::DrawList &, float w, float h)> on_draw;
+  // Fires when two tracked entities' AABBs begin overlapping — once per
+  // pair per contact, not every frame. Runs inside the sim step.
+  std::function<void(EntityId a, EntityId b)> on_collision;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /

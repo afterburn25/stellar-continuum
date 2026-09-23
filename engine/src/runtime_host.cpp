@@ -3,11 +3,14 @@
 #include "stellar/engine/native_audio.hpp"
 #include "stellar/engine/native_map_platform.hpp"
 #include "stellar/engine/package.hpp"
+#include "stellar/engine/runtime_diagnostics.hpp"
 #include "stellar/engine/runtime_paths.hpp"
 #include "stellar/engine/texture_cook.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <set>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -31,6 +34,12 @@ struct RuntimeHost::Impl {
   double time_scale = 1.0;
   // Assigned inside run(); applies a scene switch immediately.
   std::function<void(const std::string &)> switch_scene;
+  // Assigned inside run(); runtime entity spawn/destroy entry points.
+  std::function<EntityId(const SceneEntity &)> spawn_fn;
+  std::function<bool(EntityId)> destroy_fn;
+  // AABB pairs currently overlapping — collision-enter events only fire
+  // on the transition into this set.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -59,8 +68,15 @@ void RuntimeHost::set_scene(std::string scene_file) {
   else
     impl_->options.scene_file = std::move(scene_file);
 }
+EntityId RuntimeHost::spawn_entity(const SceneEntity &entity) {
+  return impl_->spawn_fn ? impl_->spawn_fn(entity) : EntityId{};
+}
+bool RuntimeHost::destroy_entity(EntityId id) {
+  return impl_->destroy_fn && impl_->destroy_fn(id);
+}
 
 int RuntimeHost::run() {
+  RuntimeDiagnostics::context("runtime:package-scan");
   auto &impl = *impl_;
   const auto &options = impl.options;
   auto &world = impl.world;
@@ -80,12 +96,16 @@ int RuntimeHost::run() {
       options.package_id, options.project_root, exe_dir);
   const std::size_t cooked_assets = impl.content->cooked_count();
 
+  RuntimeDiagnostics::context("runtime:window-ctor");
   Window window(options.window_title, options.width, options.height,
                 options.fullscreen, exe_dir / "engine-default-font.ttf");
+  RuntimeDiagnostics::context("runtime:window-init");
   window.set_auto_frame_cap();
   // F12/PrintScreen captures land in the project's screenshots/ dir.
-  window.set_screenshot_directory(options.project_root / "screenshots");
+  window.set_screenshot_directory(
+      std::filesystem::absolute(options.project_root / "screenshots"));
 
+  RuntimeDiagnostics::context("runtime:audio-init");
   // Scoped to run() so its SDL audio teardown precedes ~Window's SDL_Quit.
   audio::AudioOutput audio_output;
   impl.audio = &audio_output;
@@ -146,6 +166,7 @@ int RuntimeHost::run() {
     for (const auto e : impl.entities) world.destroy(e);
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
+    impl.overlapping.clear();
     impl.sprites.assign(impl.entities.size(), {});
     for (std::size_t i = 0; i < impl.entities.size(); ++i) {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
@@ -173,6 +194,34 @@ int RuntimeHost::run() {
     scene_stamp = {};
     reload_scene();
   };
+
+  // Runtime spawn/destroy: joins the tracked set so the entity integrates,
+  // bounces, renders and collides like a scene-spawned one.
+  impl.spawn_fn = [&](const SceneEntity &entity) -> EntityId {
+    const auto ids = spawn_scene(world, SceneDocument{{entity}});
+    if (ids.empty()) return {};
+    impl.entities.push_back(ids.front());
+    impl.sprites.push_back(
+        entity.sprite.empty() ? nullptr : decode_sprite(entity.sprite));
+    return ids.front();
+  };
+  impl.destroy_fn = [&](EntityId id) -> bool {
+    const auto it =
+        std::find(impl.entities.begin(), impl.entities.end(), id);
+    if (it == impl.entities.end()) return false;
+    impl.sprites.erase(
+        impl.sprites.begin() + (it - impl.entities.begin()));
+    impl.entities.erase(it);
+    if (impl.player && *impl.player == id) impl.player.reset();
+    for (auto p = impl.overlapping.begin(); p != impl.overlapping.end();)
+      if (p->first == id.value() || p->second == id.value())
+        p = impl.overlapping.erase(p);
+      else
+        ++p;
+    world.destroy(id);
+    return true;
+  };
+  RuntimeDiagnostics::context("runtime:scene-init");
   reload_scene();
   if (impl.entities.empty())
     spawn_entities(SceneDocument{{SceneEntity{"demo", 120.f, 160.f, 96.f,
@@ -191,6 +240,7 @@ int RuntimeHost::run() {
     if (!load_world_from_file(world, save_path)) return;
     impl.entities = world.entities();
     impl.player = find_entity_by_name(world, "player");
+    impl.overlapping.clear();
     impl.sprites.assign(impl.entities.size(), {});
     for (std::size_t i = 0; i < impl.entities.size(); ++i) {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
@@ -204,6 +254,7 @@ int RuntimeHost::run() {
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
+  RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
     const auto snapshot = window.poll();
     if (snapshot.quit_requested || impl.quit_requested) break;
@@ -277,6 +328,33 @@ int RuntimeHost::run() {
         if (bounced && impl.player && entity == *impl.player && bounce_clip)
           audio.play_effect(bounce_clip);
       }
+      // AABB contact events: collect overlaps during the scan, then fire
+      // callbacks afterwards so handlers may spawn/destroy entities safely.
+      if (on_collision) {
+        std::set<std::pair<std::uint64_t, std::uint64_t>> now;
+        std::vector<std::pair<EntityId, EntityId>> entered;
+        for (std::size_t i = 0; i < impl.entities.size(); ++i) {
+          const auto *ta = world.get<Transform2D>(impl.entities[i]);
+          const auto *ea = world.get<Extent2D>(impl.entities[i]);
+          if (!ta || !ea) continue;
+          for (std::size_t j = i + 1; j < impl.entities.size(); ++j) {
+            const auto *tb = world.get<Transform2D>(impl.entities[j]);
+            const auto *eb = world.get<Extent2D>(impl.entities[j]);
+            if (!tb || !eb) continue;
+            if (ta->x < tb->x + eb->w && tb->x < ta->x + ea->w &&
+                ta->y < tb->y + eb->h && tb->y < ta->y + ea->h) {
+              const auto a = impl.entities[i].value();
+              const auto b = impl.entities[j].value();
+              const auto key = std::minmax(a, b);
+              now.insert(key);
+              if (!impl.overlapping.count(key))
+                entered.emplace_back(impl.entities[i], impl.entities[j]);
+            }
+          }
+        }
+        impl.overlapping = std::move(now);
+        for (const auto &[a, b] : entered) on_collision(a, b);
+      }
     };
     if (impl.paused) {
       // Rendering continues; the sim does not advance.
@@ -344,6 +422,7 @@ int RuntimeHost::run() {
     if (options.frame_limit > 0 && ++rendered >= options.frame_limit)
       break;
   }
+  RuntimeDiagnostics::context("runtime:teardown");
   if (!options.snapshot_out.empty()) {
     try {
       save_world_to_file(world, options.snapshot_out);
