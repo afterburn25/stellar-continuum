@@ -164,7 +164,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   involved-civilization visibility widened to observers that know the
   event's system (`widen_history_visibility` over
   `CivilizationKnowledgeState`), entity ids as tags, at_day = step
-  end day. `IntegratedAdaptiveCampaignRuntime` owns an `EventHistory`
+  end day. Discrete diplomatic journal entries join the same record
+  path: after each step's diplomacy phase the runtime pulls the new
+  journal tail via `DiplomacyState::history_events_since(watermark)`
+  (monotonic event-id watermark baselined at runtime construction —
+  restored journals never re-record), mapped to `diplomacy.<kind>`
+  categories with the entry's own journal timestamp
+  (campaign-milli-days → day), per-kind significance (war 0.95,
+  agreements 0.8, routine 0.3–0.5), `civ:`/`system:` tags and the
+  journal's authoritative `known_to_civilization_ids` audience —
+  exempt from knowledge widening so excluded observers never learn
+  identities; summaries are generic kind text (the journal's raw
+  phrasing is internal). `IntegratedAdaptiveCampaignRuntime` owns an
+  `EventHistory`
   and records every completed advance automatically — all callers
   (CampaignFrame, tests, tools) get the chronicle for free; exposed as
   `runtime().history()` / `frame().history()`. The chronicle serializes
@@ -176,7 +188,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   news feed, capacity bound, significance-aware pruning, bit-equal
   determinism, 200k-event scale, persistence round-trip + malformed
   rejection. `campaign_event_history` tests — category mapping for
-  every step event type, actor/visibility/tags/at_day, feed privacy.
+  every step event type plus diplomatic journal kinds,
+  actor/visibility/tags/at_day, journal-watermark accessors,
+  widening-exempt diplomacy audience, feed privacy.
   `framework_state_codec` covers the JSON codec.
   **Presentation consumers (M15):** `seed_chronicle_notifications` in
   `native_notification_events` seeds the player notification feed from

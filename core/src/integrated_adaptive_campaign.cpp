@@ -73,6 +73,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   AdaptiveResearchCampaignSimulation research_simulation;
   StellarActivityScheduler stellar_activity;
   stellar::engine::EventHistory history{100000};
+  // Newest diplomatic journal id already copied into `history` — the
+  // journal is shared authoritative state, so the chronicle watermarks
+  // against it rather than rescanning every advance.
+  std::int64_t chronicle_diplomacy_watermark{};
   bool profiling_enabled{};
   std::array<stellar::engine::PerformanceCounter,4> performance{};
 
@@ -101,6 +105,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
     validate_stellar_activity_clock(activity_day);
     initialize_stellar_activity(world.campaign().seed,world.campaign().systems,*activity_day);
     stellar_activity.rebuild(world.campaign().systems);
+    // Chronicle baseline: journal entries recorded before this runtime
+    // existed were already chronicled (or predate the chronicle) —
+    // only entries emitted by later advances get recorded.
+    chronicle_diplomacy_watermark=diplomacy.history_latest_event_id();
   }
 };
 
@@ -261,8 +269,17 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
+  // Diplomatic journal entries emitted by this step's process() join
+  // the chronicle too — the journal is authoritative, the watermark
+  // keeps each entry recorded exactly once across advances and loads.
+  const auto diplomatic_events =
+      storage_->diplomacy_runtime.state().history_events_since(
+          storage_->chronicle_diplomacy_watermark);
+  if (!diplomatic_events.empty())
+    storage_->chronicle_diplomacy_watermark =
+        diplomatic_events.back().event_id;
   record_step_events(storage_->history, result, absolute_end_day,
-                     storage_->world.campaign());
+                     storage_->world.campaign(), diplomatic_events);
   maintain_chronicle(storage_->history, absolute_end_day);
   return result;
 }

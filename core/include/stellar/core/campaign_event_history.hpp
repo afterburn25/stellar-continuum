@@ -1,10 +1,12 @@
 #pragma once
 
+#include <stellar/core/diplomacy_state.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 #include <stellar/engine/history.hpp>
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace stellar::core {
@@ -29,6 +31,8 @@ namespace stellar::core {
 //   "war.<type>"                — e.g. war.engagement_started,
 //                                 war.fleet_destroyed
 //   "colony.founded"            — colony/outpost establishment
+//   "diplomacy.<kind>"          — e.g. diplomacy.war_declared,
+//                                 diplomacy.agreement_activated
 //
 // Actors carry involved civilization ids (u64). Fleet/system/body/entity
 // references are preserved as tags ("fleet:12", "system:5", "body:3",
@@ -38,17 +42,26 @@ namespace stellar::core {
 // Visibility: involved civilizations always see their events; events
 // located at a system are additionally visible to civilizations that
 // know that system (see widen_history_visibility). Locationless events
-// stay involved-party-only.
+// stay involved-party-only. Diplomatic journal entries carry their own
+// authoritative audience (known_to_civilization_ids) which is used
+// verbatim — diplomacy already decided who knows.
 //
-// Every record gets at_day = the step's absolute end day — the campaign
-// clock, never wall time. Mapping is pure and deterministic: the same
-// step result produces the same records.
+// Step events get at_day = the step's absolute end day — the campaign
+// clock, never wall time; diplomatic entries keep their own journal
+// timestamp (ticks are campaign-milli-days). Mapping is pure and
+// deterministic: the same step result produces the same records.
+//
+// The runtime watermarks the diplomatic journal
+// (DiplomacyState::history_events_since) so each entry is recorded
+// exactly once across advances and save/load.
 
 // Converts one step's events into records (not yet appended; ids are
 // assigned by EventHistory::record).
 [[nodiscard]] std::vector<engine::HistoryEvent>
 history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
-                        double end_day);
+                        double end_day,
+                        std::span<const DiplomaticHistoryEventSnapshot>
+                            diplomacy_events = {});
 
 // Widens `visible_to` on located events: every civilization that knows
 // the event's system (CivilizationKnowledgeState::is_system_known) may
@@ -67,11 +80,15 @@ record_step_events(engine::EventHistory &history,
                    double end_day);
 
 // Same, with knowledge-based visibility widening applied — the
-// authoritative path used by the campaign runtime.
+// authoritative path used by the campaign runtime. `diplomacy_events`
+// is the step's new diplomatic journal slice (the runtime watermarks
+// it against the authoritative journal).
 std::vector<std::uint64_t>
 record_step_events(engine::EventHistory &history,
                    const IntegratedAdaptiveCampaignStepResult &step,
-                   double end_day, const FreshCampaignState &campaign);
+                   double end_day, const FreshCampaignState &campaign,
+                   std::span<const DiplomaticHistoryEventSnapshot>
+                       diplomacy_events = {});
 
 // Chronicle retention policy, applied after each recorded step. When
 // the chronicle nears capacity (>= 90%), routine records older than

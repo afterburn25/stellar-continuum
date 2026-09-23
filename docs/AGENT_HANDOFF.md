@@ -227,7 +227,16 @@ retention landed too: `maintain_chronicle` (in
 reaches 90% of capacity it prunes routine records (<0.35 significance)
 older than 365 days so the bounded oldest-first eviction cannot
 discard majors; `campaign_event_history` tests cover trigger, content
-and determinism. All HistoryQuery axes (category, significance,
+and determinism. The chronicle now records diplomatic happenings too:
+after each step's diplomacy phase the runtime pulls the new journal
+tail via `DiplomacyState::history_events_since` (a monotonic event-id
+watermark baselined at construction — restored journals never
+re-record) and maps each entry to `diplomacy.<kind>` with its own
+journal timestamp, per-kind significance, `civ:`/`system:` tags and
+the journal's authoritative `known_to_civilization_ids` audience —
+exempt from knowledge widening, with generic kind summaries (the raw
+journal phrasing is internal). All HistoryQuery axes (category,
+significance,
 actor, tag, since_day) plus free-text search now have browser
 surfaces; remaining
 presentation gaps are `before_day` (no upper-bound UI) and

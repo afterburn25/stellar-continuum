@@ -60,7 +60,7 @@ order and binary lookup depend on them. JSON codec in
 
 - categories: `construction.project`, `shipbuilding.ship`,
   `research.legacy`, `research.adaptive`, `exploration.<type>`,
-  `war.<type>`, `colony.founded`
+  `war.<type>`, `colony.founded`, `diplomacy.<kind>`
 - actors = involved civilization ids; fleet/system/body/project/design/
   tech/colony references preserved as tags; `location` = system id
 - `at_day` = the step's absolute end day
@@ -75,6 +75,28 @@ every completed advance — the chronicle is populated automatically for
 all callers (`runtime().history()` / `frame().history()`). Aggregate
 phase counters (sensor-contact recordings, diplomacy maintenance) are
 not discrete happenings and are not recorded.
+
+Discrete *diplomatic* happenings do join the chronicle. After each
+step's diplomacy phase, the runtime pulls the new journal tail via
+`DiplomacyState::history_events_since(watermark)` — a monotonic
+event-id watermark (baselined to `history_latest_event_id()` at
+runtime construction, so restored journals never re-record) — and maps
+each entry to `diplomacy.<kind>` (`diplomacy.war_declared`,
+`diplomacy.agreement_activated`, …). Differences from step events:
+
+- `at_day` keeps the entry's own journal timestamp (journal ticks are
+  campaign-milli-days via `DiplomacyCampaignClock`), not the step end
+- `visible_to` is the entry's authoritative audience
+  (`known_to_civilization_ids`) verbatim — diplomacy already decided
+  who knows, and knowledge widening is deliberately *not* applied to
+  `diplomacy.` records (a civ that merely knows the system must not
+  learn excluded belligerents' identities)
+- the record's summary is generic kind text; the journal's raw summary
+  is internal phrasing (the notification feed substitutes it for the
+  same reason) and actors/location/tags carry the detail
+- significance is per-kind (war 0.95, agreements 0.8, resolutions
+  0.6–0.7, routine observations 0.3–0.5) — deterministic and
+  documented in `campaign_event_history.cpp`
 
 The runtime also applies the chronicle retention policy
 (`maintain_chronicle` in the adapter): once the history reaches 90% of

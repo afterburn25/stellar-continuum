@@ -165,6 +165,74 @@ int main() {
           "colony founding located and tagged");
   }
 
+  // Diplomatic journal entries join the chronicle with their own
+  // timestamp, actors, location, significance and journal audience —
+  // and generic kind text, never the internal journal summary.
+  std::vector<DiplomaticHistoryEventSnapshot> diplomacy_events;
+  {
+    DiplomaticHistoryEventSnapshot war;
+    war.event_id = 12;
+    war.tick = 152400; // milli-days → at_day 152.4
+    war.kind = DiplomaticEventKind::war_declared;
+    war.primary_civilization_id = 3;
+    war.secondary_civilization_id = 7;
+    war.system_id = 9;
+    war.summary = "Observer 3 internal phrasing";
+    war.known_to_civilization_ids = {3, 7};
+    diplomacy_events.push_back(war);
+    DiplomaticHistoryEventSnapshot treaty;
+    treaty.event_id = 13;
+    treaty.tick = 152450;
+    treaty.kind = DiplomaticEventKind::agreement_activated;
+    treaty.primary_civilization_id = 5;
+    treaty.secondary_civilization_id = 7;
+    treaty.summary = "internal";
+    treaty.known_to_civilization_ids = {5, 7, 11};
+    diplomacy_events.push_back(treaty);
+  }
+  const auto dip_mapped =
+      history_events_for_step(step, end_day, diplomacy_events);
+  check(dip_mapped.size() == 12, "diplomatic entries mapped too");
+  {
+    const auto *e = only(dip_mapped, "diplomacy.war_declared");
+    check(e && e->at_day == 152.4,
+          "diplomatic entry keeps its journal timestamp");
+    check(e && e->summary == "A declaration of war has been recorded.",
+          "generic kind text replaces internal journal summary");
+    check(e && e->actors == std::vector<std::uint64_t>{3, 7} &&
+              e->location == 9 && e->significance >= 0.9,
+          "war declaration fields");
+    check(e && e->visible_to == std::vector<std::uint64_t>{3, 7},
+          "journal audience is the visibility set");
+    check(e && has_tag(*e, "civ:3") && has_tag(*e, "civ:7") &&
+              has_tag(*e, "system:9"),
+          "diplomatic entity tags");
+    const auto *t = only(dip_mapped, "diplomacy.agreement_activated");
+    check(t && t->visible_to ==
+                   std::vector<std::uint64_t>{5, 7, 11},
+          "agreement audience includes observers");
+  }
+
+  // The journal watermark accessors feed exactly-once recording.
+  {
+    DiplomacyStateSnapshot snap;
+    DiplomaticHistoryEventSnapshot e1;
+    e1.event_id = 11; e1.tick = 1000; e1.summary = "older";
+    e1.primary_civilization_id = 1;
+    DiplomaticHistoryEventSnapshot e2 = e1;
+    e2.event_id = 13; e2.tick = 2000;
+    DiplomaticHistoryEventSnapshot e3 = e1;
+    e3.event_id = 14; e3.tick = 3000;
+    snap.recent_history = {e1, e2, e3};
+    auto state = DiplomacyState::restore(snap);
+    check(state.history_latest_event_id() == 14,
+          "latest journal id reported");
+    const auto tail = state.history_events_since(11);
+    check(tail.size() == 2 && tail.front().event_id == 13 &&
+              tail.back().event_id == 14,
+          "journal tail returns only newer entries in order");
+  }
+
   // Privacy: an uninvolved observer sees nothing from this step.
   {
     stellar::engine::EventHistory h;
@@ -192,7 +260,7 @@ int main() {
     campaign.knowledge.reveal_system(3, 9);   // aggressor knows it too
     campaign.knowledge.reveal_system(11, 4);  // civ 11 knows only system 4
 
-    auto widened = history_events_for_step(step, end_day);
+    auto widened = history_events_for_step(step, end_day, diplomacy_events);
     widen_history_visibility(widened, campaign);
 
     const auto *battle = only(widened, "war.fleet_destroyed");
@@ -214,6 +282,14 @@ int main() {
                                 surveyed->visible_to.end(), 11ULL) !=
                           surveyed->visible_to.end(),
           "civ knowing system 4 sees the survey there");
+
+    // Diplomatic entries are exempt from knowledge widening — their
+    // journal audience is authoritative; a civ that merely knows the
+    // war's system must not learn the belligerents' identities.
+    const auto *declaration = only(widened, "diplomacy.war_declared");
+    check(declaration && declaration->visible_to ==
+                             std::vector<std::uint64_t>{3, 7},
+          "located diplomacy keeps its journal audience");
 
     stellar::engine::EventHistory h;
     record_step_events(h, step, end_day, campaign);

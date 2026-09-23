@@ -269,6 +269,7 @@ const char *category_label(std::string_view category) noexcept {
   if (category.starts_with("exploration.")) return "Exploration";
   if (category.starts_with("colony.")) return "Colony";
   if (category.starts_with("war.")) return "Combat";
+  if (category.starts_with("diplomacy.")) return "Diplomacy";
   return nullptr;
 }
 
@@ -411,9 +412,9 @@ void NativeChronicleView::cycle_significance() {
 }
 
 void NativeChronicleView::cycle_domain() {
-  static constexpr std::array<std::string_view, 6> domains{
-      "construction.", "shipbuilding.", "research.",
-      "exploration.",   "colony.",       "war."};
+  static constexpr std::array<std::string_view, 7> domains{
+      "construction.", "shipbuilding.", "research.",   "exploration.",
+      "colony.",       "war.",          "diplomacy."};
   if (domain_filter_.empty()) {
     domain_filter_ = std::string(domains.front());
   } else {

@@ -300,6 +300,18 @@ DiplomacyStateSnapshot DiplomacyState::snapshot() const {
   return result;
 }
 
+std::int64_t DiplomacyState::history_latest_event_id() const noexcept {
+  return storage_->history.empty() ? 0 : storage_->history.back().event_id;
+}
+
+std::vector<DiplomaticHistoryEventSnapshot>
+DiplomacyState::history_events_since(std::int64_t event_id) const {
+  std::vector<DiplomaticHistoryEventSnapshot> out;
+  for (const auto &event : storage_->history)
+    if (event.event_id > event_id) out.push_back(event);
+  return out;
+}
+
 DiplomaticStateView DiplomacyState::build_view_for(int observer) const {
   DiplomaticStateView result;
   result.observer_civilization_id = observer;
