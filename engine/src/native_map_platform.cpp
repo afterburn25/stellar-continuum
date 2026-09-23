@@ -647,5 +647,6 @@ int Window::drawable_width()const noexcept{return storage_->width;}int Window::d
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
 std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
 Scene3DStatistics Window::scene3d_statistics()const noexcept{return storage_->scene3d?storage_->scene3d->statistics():Scene3DStatistics{};}
+void Window::set_scene3d_texture_budget(std::uint64_t bytes){if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
 } // namespace stellar::native_map
 

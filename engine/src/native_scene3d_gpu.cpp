@@ -1,6 +1,7 @@
 #include <stellar/engine/texture_cook.hpp>
 #include <stellar/engine/draw_batcher.hpp>
 #include <stellar/engine/render_graph.hpp>
+#include <stellar/engine/texture_streaming.hpp>
 #include "native_scene3d_gpu.hpp"
 #include "generated/scene3d_shaders.hpp"
 #include <SDL3/SDL.h>
@@ -70,6 +71,13 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<const RgbaImage*,std::shared_ptr<Texture>> textures;
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
   std::shared_ptr<const RgbaImage> white=RgbaImage::create(1,1,{255,255,255,255});
+  // Engine TextureStreamer owns the byte-budget residency decision; this
+  // backend registers real per-mip sizes, declares each frame's demand with
+  // a camera-distance priority, and executes the streamer's load/evict list.
+  engine::TextureStreamer streamer{maximum_scene3d_texture_cache_bytes};
+  std::unordered_map<const RgbaImage*,engine::TextureId> stream_ids;
+  std::unordered_map<engine::TextureId,const RgbaImage*> stream_owners;
+  std::uint64_t stream_frame{};
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{};SDL_GPUTextureFormat scene_format{};
   SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
@@ -121,6 +129,7 @@ struct Scene3DRenderer::Storage {
       info.target_info.color_target_descriptions=&color;info.target_info.num_color_targets=1;
       tonemap_pipeline=SDL_CreateGPUGraphicsPipeline(device,&info);if(!tonemap_pipeline)throw gpu_error("3D tonemap pipeline creation failed");
     }
+    streamer.set_pinned(stream_id_for(*white),true);
   }
   std::shared_ptr<Geometry> geometry(std::shared_ptr<const Mesh3D> resource){
     if(auto it=meshes.find(resource.get());it!=meshes.end()){it->second->use=++serial;return it->second;}
@@ -135,9 +144,45 @@ struct Scene3DRenderer::Storage {
     from.offset=vb;to={result->indices,0,ib};SDL_UploadToGPUBuffer(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);command.submit();
     meshes.emplace(result->owner.get(),result);stats.mesh_cache_bytes+=result->bytes();++stats.mesh_uploads;return result;
   }
+  engine::TextureId stream_id_for(const RgbaImage& image){
+    if(const auto it=stream_ids.find(&image);it!=stream_ids.end())return it->second;
+    engine::TextureDesc desc{};desc.name="scene3d-texture";
+    if(!image.cooked_mips().empty()){
+      SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+      switch(image.cooked_format()){
+        case TextureFormat::Bc7:format=SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM;break;
+        case TextureFormat::Bc5:format=SDL_GPU_TEXTUREFORMAT_BC5_RG_UNORM;break;
+        case TextureFormat::Bc4:format=SDL_GPU_TEXTUREFORMAT_BC4_R_UNORM;break;
+        default:break;
+      }
+      if(SDL_GPUTextureSupportsFormat(device,format,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
+        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(m.blocks.size());
+      else
+        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(static_cast<std::uint64_t>(m.width)*m.height*4);
+    }else if(!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
+      for(const auto& m:image.bc1_mips())desc.mip_bytes.push_back(m.blocks.size());
+    else{
+      const auto levels=texture_mip_layout3d(&image).levels;
+      for(std::uint32_t i=0;i<levels;++i)desc.mip_bytes.push_back(static_cast<std::uint64_t>(std::max(1,image.width()>>i))*std::max(1,image.height()>>i)*4);
+    }
+    const auto id=streamer.register_texture(std::move(desc));stream_ids.emplace(&image,id);stream_owners.emplace(id,&image);return id;
+  }
+  // advance_frame() yields the frame's residency changes: evictions apply
+  // whole-texture (backend granularity); loads stay lazy — the first bind
+  // uploads. Unadmitted requests bind the pinned fallback, keeping GPU
+  // residency under the streamer's byte budget.
+  void apply_streaming(){
+    for(const auto& change:streamer.advance_frame(++stream_frame)){
+      if(change.load||change.mip!=0)continue;
+      const auto owner=stream_owners.find(change.id);
+      if(owner==stream_owners.end())continue;
+      if(const auto it=textures.find(owner->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();textures.erase(it);}
+    }
+  }
   std::shared_ptr<Texture> texture(std::shared_ptr<const RgbaImage> resource){
     if(!resource)resource=white;
     if(auto it=textures.find(resource.get());it!=textures.end()){it->second->use=++serial;return it->second;}
+    if(resource.get()!=white.get())if(const auto sid=stream_ids.find(resource.get());sid!=stream_ids.end()&&!streamer.finest_resident_mip(sid->second)){++stats.streamed_fallbacks;return texture(white);}
     auto result=std::make_shared<Texture>(device);result->owner=std::move(resource);result->use=++serial;
     const auto& image=*result->owner;const auto layout=texture_mip_layout3d(&image);
     result->gpu_bytes=layout.gpu_bytes;
@@ -155,7 +200,7 @@ struct Scene3DRenderer::Storage {
       const auto& levels=supported?image.cooked_mips():fallback_mips;
       const bool block=format!=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
       result->gpu_bytes=0;for(const auto&m:levels)result->gpu_bytes+=m.blocks.size();
-      evict(textures,stats.texture_cache_bytes,result->bytes(),maximum_scene3d_texture_cache_bytes);
+      if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
       result->texture=make_texture(device,image.width(),image.height(),format,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(levels.size()));
       // Every transfer offset is aligned, including the tiny 1x1 RGBA tail.
       std::size_t transfer_bytes=0;for(const auto&m:levels)transfer_bytes+=((m.blocks.size()+15)/16)*16;
@@ -168,7 +213,7 @@ struct Scene3DRenderer::Storage {
     }
     const bool compressed=!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER);
     if(compressed){result->gpu_bytes=0;for(const auto& m:image.bc1_mips())result->gpu_bytes+=m.blocks.size();}
-    evict(textures,stats.texture_cache_bytes,result->bytes(),maximum_scene3d_texture_cache_bytes);
+    if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
     if(compressed){
       result->texture=make_texture(device,image.width(),image.height(),SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,layout.levels);
       Transfer transfer(device,static_cast<Uint32>(result->gpu_bytes));auto* data=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
@@ -305,7 +350,7 @@ struct Scene3DRenderer::Storage {
     graph.add_pass({"scene3d",{},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
-    if(!graph.compile(&order,&diagnostics))throw gpu_error("3D render graph compile failed: "+(diagnostics.empty()?"unknown":diagnostics.front().message));
+    if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
     Command command(device);
     if(!sorted.empty()){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
@@ -365,26 +410,36 @@ void Scene3DRenderer::prepare(const DrawList& list){
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
   std::size_t total=0;
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
+  std::unordered_map<engine::TextureId,float> stream_priority;
+  const auto stream_request=[&](const std::shared_ptr<const RgbaImage>& image,float priority){
+    const auto id=s.stream_id_for(image?*image:*s.white);auto& p=stream_priority[id];if(priority>p)p=priority;};
   std::size_t geometry_bytes=0,texture_bytes=0;
   for(const auto* view:s.views){const auto r=view->destination;
     if(!view->scene||!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>65536||std::abs(r.y)>65536||
        !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192)
       throw std::invalid_argument("3D viewport requires a scene and finite bounded dimensions.");
     total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*(s.hdr?16u:8u);
+    const auto& camera=view->scene->camera().position;
     for(const auto& instance:view->scene->instances()){
       if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
+      // Nearer instances win texture-budget contention.
+      const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
+      const float priority=1.f/(1.f+static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz)));
       const auto& image=instance.material.texture;
       if(textures.insert(image.get()).second)texture_bytes+=texture_mip_layout3d(image.get()).resident_bytes;
+      stream_request(image,priority);
       if(instance.material.dielectric)for(const auto& optical:{instance.material.dielectric->environment,instance.material.dielectric->surface})
-        if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;
+        {if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;stream_request(optical,priority);}
       if(instance.material.surface_response)for(const auto& response_image:{instance.material.surface_response->normal,instance.material.surface_response->properties,instance.material.surface_response->cloud_shadow})
-        if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;
+        {if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;stream_request(response_image,priority);}
       if(instance.material.surface_effect){const auto& image_next=instance.material.surface_effect->next_texture;
-        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;}
+        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;stream_request(image_next,priority);}
       if(instance.material.shadow&&instance.material.shadow->opacity_map){const auto& shadow_image=instance.material.shadow->opacity_map;
-        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;}
+        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;stream_request(shadow_image,priority);}
     }
   }
+  for(const auto& [id,priority]:stream_priority)s.streamer.request(id,0,priority);
+  s.apply_streaming();
   if(total>maximum_scene3d_target_bytes)throw std::length_error("3D viewports exceed their 128 MiB target budget.");
   if(meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries||geometry_bytes>maximum_mesh3d_cache_bytes||texture_bytes>maximum_scene3d_texture_cache_bytes)
     throw std::length_error("Combined 3D views exceed their resident resource budget.");
@@ -403,6 +458,7 @@ void Scene3DRenderer::composite(const Scene3DView& view){
   const auto r=view.destination;const SDL_FRect destination{r.x,r.y,r.width,r.height};
   checked(SDL_RenderTexture(s.renderer,s.targets[s.next_view++]->composite,nullptr,&destination),"3D viewport composition failed");
 }
+void Scene3DRenderer::set_texture_budget(std::uint64_t bytes){auto& s=*storage_;s.require_owner();s.streamer.set_budget(bytes);}
 Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
 } // namespace stellar::native_map
 

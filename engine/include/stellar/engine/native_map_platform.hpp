@@ -195,6 +195,8 @@ class Window final {
   [[nodiscard]] std::size_t image_cache_resident_bytes() const noexcept;
   [[nodiscard]] std::uint64_t image_upload_count() const noexcept;
   [[nodiscard]] Scene3DStatistics scene3d_statistics() const noexcept;
+  // Retunes the 3D texture-streaming byte budget; takes effect next frame.
+  void set_scene3d_texture_budget(std::uint64_t bytes);
  private:
   struct Storage; Storage *storage_{};
 };

@@ -174,6 +174,9 @@ struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 struct Scene3DStatistics {
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
+  // Binds served by the pinned fallback because the TextureStreamer denied
+  // residency under the frame's byte budget (budget-pressure pop-in count).
+  std::uint64_t streamed_fallbacks{};
   // True when the device supports floating-point color targets: scenes render
   // into RGBA16F and resolve through the tonemap pass. False = direct UNORM.
   bool hdr{};

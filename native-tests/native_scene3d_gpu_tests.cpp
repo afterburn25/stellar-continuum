@@ -127,9 +127,42 @@ int main(int argc,char** argv)try{
   // Near-plane rejection and correct perspective size/depth are exercised on GPU.
   camera.projection=Projection3D::Perspective;auto behind=a;behind.position.z=6;
   (void)capture({behind},"behind.png");check(window.scene3d_statistics().draw_calls==0,"Behind-camera object was drawn");
+  {
+    // Identical mesh+material draws merge into a single instanced call whose
+    // per-instance state comes from the storage buffers.
+    camera.projection=Projection3D::Orthographic;
+    auto left=a,right=a;left.position.x=-.55f;right.position.x=.55f;
+    const auto instanced=capture({left,right},"instanced.png");
+    check(window.scene3d_statistics().draw_calls==1,"Identical 3D objects were not batched into one instanced draw");
+    check(channel(*instanced,40,160,0)>200&&channel(*instanced,280,160,0)>200,"Instanced copies did not each apply their own transform");
+  }
   auto textured=b;textured.material.tint={255,255,255,255};textured.material.texture=RgbaImage::create(2,2,{255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255});
   camera.projection=Projection3D::Orthographic;const auto uv=capture({textured},"uv.png");
   check(channel(*uv,40,80,0)>200&&channel(*uv,280,80,1)>200&&channel(*uv,40,280,2)>200,"3D texture coordinates are flipped or ignored");
+  {
+    // Texture streaming under a tight byte budget: each ~5.6MB mip chain
+    // cannot coexist, so the streamer evicts the unrequested texture and a
+    // denied bind falls back to the pinned white texture (visible pop-in).
+    window.set_scene3d_texture_budget(8u*1024u*1024u);
+    const auto big=[&](std::uint8_t shade){
+      std::vector<std::uint8_t> pixels(1024u*1024u*4u);
+      for(std::size_t i=0;i<pixels.size();i+=4){pixels[i]=pixels[i+1]=pixels[i+2]=shade;pixels[i+3]=255;}
+      return RgbaImage::create(1024,1024,std::move(pixels));};
+    Material3D dark_material=green;dark_material.tint={255,255,255,255};dark_material.texture=big(0);
+    Material3D light_material=dark_material;light_material.texture=big(220);
+    MeshInstance3D dark{quad(0,0),{-.55f,0,0},{},.3f,dark_material},light{quad(0,0),{.55f,0,0},{},.3f,light_material};
+    const auto stream_base=window.scene3d_statistics().streamed_fallbacks;
+    (void)capture({dark},"stream-dark.png");(void)capture({light},"stream-light.png");
+    check(window.scene3d_statistics().texture_cache_entries==1,"Texture streamer did not evict the unrequested texture under budget");
+    const auto uploads=window.scene3d_statistics().texture_uploads;
+    const auto both=capture({dark,light},"stream-both.png");
+    // Equal distances tie; the earlier-registered texture wins admission and
+    // the denied bind serves the pinned fallback (white, not its 220 texels).
+    check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Denied texture did not fall back under streamer budget pressure");
+    check(window.scene3d_statistics().texture_uploads>uploads,"Evicted texture was not re-uploaded on re-admission");
+    check(channel(*both,72,160,0)<30&&channel(*both,248,160,0)>240,"Streaming fallback/admission pixels are wrong");
+    window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+  }
   {
     std::vector<std::uint8_t> checks(1024u*1024u*4u,255);
     for(int y=0;y<1024;++y)for(int x=0;x<1024;++x)for(int c=0;c<3;++c)
