@@ -146,6 +146,8 @@ void register_scene_components(World &world) {
                                  decode_pod<Anim>);
   world.register_component<Rotation>("rotation", encode_pod<Rotation>,
                                      decode_pod<Rotation>);
+  world.register_component<Spin>("spin", encode_pod<Spin>,
+                                 decode_pod<Spin>);
   world.register_component<Lifetime>("lifetime", encode_pod<Lifetime>,
                                      decode_pod<Lifetime>);
   world.register_component<Flip>("flip", encode_pod<Flip>,
@@ -180,6 +182,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (s.frames != 1 || s.fps != 0.f)
       world.add(entity, Anim{s.frames, s.fps});
     if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
+    if (s.spin != 0.f) world.add(entity, Spin{s.spin});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
     if (s.flip_x || s.flip_y) world.add(entity, Flip{s.flip_x, s.flip_y});
     if (!s.visible) world.add(entity, Hidden{});
@@ -250,6 +253,7 @@ SceneDocument scene_from_world(const World &world) {
     }
     if (const auto *rot = world.get<Rotation>(entity))
       s.rotation = rot->value;
+    if (const auto *sp = world.get<Spin>(entity)) s.spin = sp->value;
     if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
     if (const auto *fl = world.get<Flip>(entity)) {
       s.flip_x = fl->x;

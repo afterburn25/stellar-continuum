@@ -197,6 +197,8 @@ int main() {
     scene.bg_r = 4; scene.bg_g = 8; scene.bg_b = 40;
     scene.gravity = 600.f;
     scene.music = "audio/level1.ogg";
+    scene.world_w = 2560.f;
+    scene.world_h = 1440.f;
     scene.entities.push_back(
         engine::SceneEntity{"box", 10.f, 20.f, 64.f, 32.f, 100.f, 50.f,
                             255, 128, 0, "data/logo.png", -2, 0.5f,
@@ -211,6 +213,7 @@ int main() {
     scene.entities[0].oneway = true;
     scene.entities[0].data = "checkpoint-7";
     scene.entities[0].opacity = 0.5f;
+    scene.entities[0].spin = 90.f;
     scene.tilemap = engine::SceneTilemap{};
     scene.tilemap->tileset = "sprites/tiles.png";
     scene.tilemap->tile_w = 32;
@@ -239,6 +242,7 @@ int main() {
               reparsed->entities[0].oneway &&
               reparsed->entities[0].data == "checkpoint-7" &&
               reparsed->entities[0].opacity == 0.5f &&
+              reparsed->entities[0].spin == 90.f &&
               reparsed->tilemap &&
               reparsed->tilemap->tileset == "sprites/tiles.png" &&
               reparsed->tilemap->columns == 4 && reparsed->tilemap->collide &&
@@ -246,7 +250,8 @@ int main() {
               reparsed->tilemap->cells[5] == 1 &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f &&
-              reparsed->music == "audio/level1.ogg",
+              reparsed->music == "audio/level1.ogg" &&
+              reparsed->world_w == 2560.f && reparsed->world_h == 1440.f,
           "scene document round-trips");
     const auto path = root / "editor" / "scene.json";
     scene.save(path);

@@ -114,6 +114,16 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   switching and hot reload (a change to the field restarts the new track;
   empty keeps the current/options track). The Scene tool exposes a doc-level
   `music` field; covered by `engine_project` round-trip tests.
+- **Scene world bounds:** `SceneDocument::worldSize [w,h]` lets each level
+  declare its playable extent — the runtime resolves bounce/camera bounds as
+  `--world-w/--world-h` argv > scene `worldSize` > viewport. The Scene tool
+  exposes a doc-level `worldsize` field; verified by snapshot runs (an entity
+  clamps at 400 vs 4000-wide bounds).
+- **Entity spin:** `SceneEntity::spin` (deg/s) becomes a `Spin` component that
+  integrates into `Rotation` each sim step — rotating hazards/props without
+  per-frame game code. Snapshot-verified (spin advances the serialized
+  rotation); the Scene tool exposes a `spin` field and the preview shows
+  live rotation.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint

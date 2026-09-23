@@ -207,6 +207,7 @@ struct Shell {
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
       hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
+      hit_scene_spin{}, hit_scene_worldsize{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
@@ -999,6 +1000,21 @@ void commit_scene_field(Shell &shell) {
     shell.scene_buffer.clear();
     return;
   }
+  // Field 39: per-scene world bounds (0,0 reverts to viewport/argv).
+  if (shell.scene_field == 39) {
+    float w, h;
+    if (parse_pair(shell.scene_buffer, w, h)) {
+      shell.scene_history.commit(shell.scene_doc);
+      shell.scene_doc.world_w = std::max(0.f, w);
+      shell.scene_doc.world_h = std::max(0.f, h);
+      shell.scene_modified = true;
+      shell.status = "scene world bounds updated - SAVE to persist";
+    } else {
+      shell.status = "invalid value - use \"w,h\" like 2560,1440";
+    }
+    shell.scene_buffer.clear();
+    return;
+  }
   // Fields 30+ edit the document tilemap; committing creates it on demand
   // so "tileset" alone is enough to begin a grid.
   if (shell.scene_field >= 30) {
@@ -1185,6 +1201,12 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 24) {
+    try {
+      next.spin = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1257,7 +1279,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
-                        shell.hit_scene_music = {};
+                        shell.hit_scene_music = shell.hit_scene_spin =
+                            shell.hit_scene_worldsize = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1437,7 +1460,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         img.source = UiRect{frame * cell_w, 0.f, cell_w,
                             static_cast<float>(sprite->height())};
       }
-      img.rotation_degrees = e.rotation;
+      img.rotation_degrees = e.rotation + e.spin * preview_now;
       img.flip_horizontal = e.flip_x;
       img.flip_vertical = e.flip_y;
       const auto a = static_cast<std::uint8_t>(
@@ -1611,6 +1634,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->opacity) : "",
         shell.editing_scene && shell.scene_field == 23,
         "0-1 draw alpha");
+  field(shell.hit_scene_spin, "spin",
+        entity ? std::to_string(entity->spin) : "",
+        shell.editing_scene && shell.scene_field == 24,
+        "deg/s rotation velocity");
   // Tilemap fields (doc-level) — editing creates the tilemap on demand.
   const auto *tm = shell.scene_doc.tilemap
                        ? &*shell.scene_doc.tilemap
@@ -1657,6 +1684,13 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit_scene_music, "music", shell.scene_doc.music,
         shell.editing_scene && shell.scene_field == 38,
         "content-relative track played on scene load");
+  field(shell.hit_scene_worldsize, "worldsize",
+        shell.scene_doc.world_w > 0.f || shell.scene_doc.world_h > 0.f
+            ? std::to_string((int)shell.scene_doc.world_w) + "," +
+                  std::to_string((int)shell.scene_doc.world_h)
+            : "",
+        shell.editing_scene && shell.scene_field == 39,
+        "level bounds w,h - 0 uses viewport");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2542,8 +2576,14 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->data;
               else if (field == 23 && e)
                 shell.scene_buffer = std::to_string(e->opacity);
+              else if (field == 24 && e)
+                shell.scene_buffer = std::to_string(e->spin);
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
+              else if (field == 39)
+                shell.scene_buffer =
+                    std::to_string((int)shell.scene_doc.world_w) + "," +
+                    std::to_string((int)shell.scene_doc.world_h);
               else if (field >= 30) {
                 const auto *tm = shell.scene_doc.tilemap
                                      ? &*shell.scene_doc.tilemap
@@ -2642,6 +2682,10 @@ int main(int argc, char **argv) {
               edit_field(37);
             else if (shell.hit_scene_music.contains(event.position))
               edit_field(38);
+            else if (shell.hit_scene_spin.contains(event.position))
+              edit_field(24);
+            else if (shell.hit_scene_worldsize.contains(event.position))
+              edit_field(39);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

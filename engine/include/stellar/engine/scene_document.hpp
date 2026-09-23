@@ -61,6 +61,8 @@ struct SceneEntity {
   std::string data;
   // Draw opacity 0-1 — sprites tint-modulate, rects use it directly.
   float opacity{1.0f};
+  // Angular velocity in deg/s — integrates `rotation` each sim step.
+  float spin{0.0f};
 };
 
 // Grid terrain layer: a tileset image sliced into tile_w/tile_h cells
@@ -90,6 +92,9 @@ struct SceneDocument {
   // Content-relative music track played when the scene loads (empty keeps
   // whatever is playing — lets levels share a track or swap it).
   std::string music;
+  // Level world bounds in px — 0 inherits the runtime's --world-w/--world-h
+  // option or the viewport. Lets each scene own its playable extent.
+  float world_w{0.0f}, world_h{0.0f};
 
   static constexpr std::string_view filename{"scene.json"};
 

@@ -53,6 +53,8 @@ struct RuntimeHost::Impl {
   float gravity = 0.f;
   // Resolved bounce bounds — viewport-sized unless world_width/height set.
   float world_w = 0.f, world_h = 0.f;
+  // Scene-declared bounds (SceneDocument::world_w/h); argv options win.
+  float scene_world_w = 0.f, scene_world_h = 0.f;
   // Entities resting on the floor or a solid — jump requires groundedness.
   std::set<std::uint64_t> grounded;
   // Accumulated simulation seconds — drives sprite-strip animation so
@@ -266,6 +268,8 @@ int RuntimeHost::run() {
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
     impl.gravity = doc.gravity;
+    impl.scene_world_w = doc.world_w;
+    impl.scene_world_h = doc.world_h;
     // Scene music: a set track swaps in on load; empty keeps whatever is
     // already playing so levels can share the options/default track.
     if (!doc.music.empty() && doc.music != scene_music)
@@ -438,12 +442,13 @@ int RuntimeHost::run() {
   auto scene_poll = last;
   // Resolve world bounds up front too so the jump handler works before the
   // first rendered frame.
-  impl.world_w = options.world_width > 0.f
-                     ? options.world_width
-                     : static_cast<float>(options.width);
-  impl.world_h = options.world_height > 0.f
-                     ? options.world_height
-                     : static_cast<float>(options.height);
+  // Bound priority: --world-w/--world-h > scene worldSize > viewport.
+  impl.world_w = options.world_width > 0.f   ? options.world_width
+                 : impl.scene_world_w > 0.f  ? impl.scene_world_w
+                                             : static_cast<float>(options.width);
+  impl.world_h = options.world_height > 0.f  ? options.world_height
+                 : impl.scene_world_h > 0.f  ? impl.scene_world_h
+                                             : static_cast<float>(options.height);
   RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
     const auto snapshot = window.poll();
@@ -542,8 +547,10 @@ int RuntimeHost::run() {
     impl.view_h = static_cast<int>(h);
     // World bounds default to the viewport (single-screen world); camera
     // games set world_width/height for larger levels.
-    impl.world_w = options.world_width > 0.f ? options.world_width : w;
-    impl.world_h = options.world_height > 0.f ? options.world_height : h;
+    impl.world_w = options.world_width > 0.f  ? options.world_width
+                   : impl.scene_world_w > 0.f ? impl.scene_world_w : w;
+    impl.world_h = options.world_height > 0.f ? options.world_height
+                   : impl.scene_world_h > 0.f ? impl.scene_world_h : h;
     const float world_w = impl.world_w;
     const float world_h = impl.world_h;
 
@@ -787,10 +794,19 @@ int RuntimeHost::run() {
       // (collected first so destruction doesn't disturb the scan).
       {
         std::vector<EntityId> expired;
-        for (const auto entity : impl.entities)
+        for (const auto entity : impl.entities) {
           if (auto *lt = world.get<Lifetime>(entity);
               lt != nullptr && (lt->remaining -= dt_step) <= 0.f)
             expired.push_back(entity);
+          // Angular velocity: Spin integrates into Rotation each step.
+          if (const auto *sp = world.get<Spin>(entity)) {
+            auto *rot = world.get<Rotation>(entity);
+            if (rot == nullptr)
+              world.add(entity, Rotation{sp->value * dt_step});
+            else
+              rot->value += sp->value * dt_step;
+          }
+        }
         for (const auto id : expired) impl.destroy_fn(id);
       }
       // AABB contact events: collect overlaps during the scan, then fire

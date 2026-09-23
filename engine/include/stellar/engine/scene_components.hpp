@@ -64,6 +64,10 @@ struct Rotation {
   // Degrees clockwise about the entity rect's center (sprites only).
   float value{0.0f};
 };
+struct Spin {
+  // Angular velocity in deg/s — integrated into Rotation each sim step.
+  float value{0.0f};
+};
 struct Lifetime {
   // Remaining sim seconds before the host destroys the entity; counts down
   // each sim step. Absent component = immortal.
