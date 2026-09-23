@@ -28,6 +28,9 @@ struct SceneEntity {
   // Camera scroll factor: 1.0 (default) moves with the world, 0.0 pins the
   // entity to the screen (HUD/backdrop), 0.5 drifts at half speed.
   float parallax{1.0f};
+  // Optional centered text label drawn inside the entity's rect (after any
+  // sprite) — turns a tinted rect into a button or caption.
+  std::string text;
 };
 
 struct SceneDocument {

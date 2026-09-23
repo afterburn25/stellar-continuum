@@ -437,6 +437,20 @@ int RuntimeHost::run() {
       else
         draw.overlay.push_back(
             FilledRectangle{rect, {tint->r, tint->g, tint->b, 255}});
+      if (const auto *label = world.get<Label>(impl.entities[i]);
+          label != nullptr && !label->value.empty()) {
+        const int font_px =
+            std::max(8, static_cast<int>(rect.height * .5f));
+        draw.overlay.push_back(Text{
+            {rect.x + rect.width * .5f,
+             rect.y + (rect.height - font_px) * .5f},
+            label->value,
+            {255, 255, 255, 255},
+            font_px,
+            rect.width,
+            std::nullopt,
+            TextAlign::Center});
+      }
     }
     draw.overlay.push_back(Text{{w * .5f, h * .5f - 80.f},
                                 options.window_title, {86, 196, 255, 255}, 42,

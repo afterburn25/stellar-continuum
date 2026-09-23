@@ -195,7 +195,8 @@ struct Shell {
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
-      hit_scene_parallax{}, scene_preview{}, scene_rows{};
+      hit_scene_parallax{}, hit_scene_text{},
+      scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -977,6 +978,9 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 9) {
+    next.text = shell.scene_buffer;
+    ok = true;
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1014,7 +1018,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
             shell.hit_scene_color = shell.hit_scene_layer =
-                shell.hit_scene_parallax = {};
+                shell.hit_scene_parallax = shell.hit_scene_text = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1112,6 +1116,14 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       out.overlay.push_back(Image{sprite, rect});
     else
       out.overlay.push_back(FilledRectangle{rect, {e.r, e.g, e.b, 200}});
+    if (!e.text.empty()) {
+      const int font_px = std::max(8, (int)(rect.height * .5f));
+      out.overlay.push_back(Text{
+          {rect.x + rect.width * .5f,
+           rect.y + (rect.height - font_px) * .5f},
+          e.text, {255, 255, 255, 255}, font_px, rect.width, std::nullopt,
+          TextAlign::Center});
+    }
     if (i == shell.selected_entity)
       out.overlay.push_back(StrokedRectangle{rect, accent});
   }
@@ -1162,6 +1174,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->parallax) : "",
         shell.editing_scene && shell.scene_field == 8,
         "camera scroll factor - 0 pins to screen");
+  field(shell.hit_scene_text, "text", entity ? entity->text : "",
+        shell.editing_scene && shell.scene_field == 9,
+        "centered label drawn in the rect");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -1999,6 +2014,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->layer);
               else if (field == 8 && e)
                 shell.scene_buffer = std::to_string(e->parallax);
+              else if (field == 9 && e)
+                shell.scene_buffer = e->text;
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2018,6 +2035,8 @@ int main(int argc, char **argv) {
               edit_field(7);
             else if (shell.hit_scene_parallax.contains(event.position))
               edit_field(8);
+            else if (shell.hit_scene_text.contains(event.position))
+              edit_field(9);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

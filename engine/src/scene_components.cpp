@@ -38,6 +38,14 @@ SpriteRef decode_sprite(const std::vector<std::uint8_t> &b) {
   return SpriteRef{{b.begin(), b.end()}};
 }
 
+std::vector<std::uint8_t> encode_label(const Label &l) {
+  return {l.value.begin(), l.value.end()};
+}
+
+Label decode_label(const std::vector<std::uint8_t> &b) {
+  return Label{{b.begin(), b.end()}};
+}
+
 } // namespace
 
 void register_scene_components(World &world) {
@@ -54,6 +62,7 @@ void register_scene_components(World &world) {
                                   decode_pod<Layer>);
   world.register_component<Parallax>("parallax", encode_pod<Parallax>,
                                      decode_pod<Parallax>);
+  world.register_component<Label>("label", encode_label, decode_label);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -68,6 +77,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     world.add(entity, EntityName{s.name});
     world.add(entity, Layer{s.layer});
     world.add(entity, Parallax{s.parallax});
+    if (!s.text.empty()) world.add(entity, Label{s.text});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -102,6 +112,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *sp = world.get<SpriteRef>(entity)) s.sprite = sp->value;
     if (const auto *l = world.get<Layer>(entity)) s.layer = l->value;
     if (const auto *p = world.get<Parallax>(entity)) s.parallax = p->value;
+    if (const auto *l = world.get<Label>(entity)) s.text = l->value;
     doc.entities.push_back(std::move(s));
   }
   return doc;

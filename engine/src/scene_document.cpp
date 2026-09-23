@@ -27,6 +27,7 @@ std::string SceneDocument::to_json() const {
     if (!e.sprite.empty()) item["sprite"] = e.sprite;
     if (e.layer != 0) item["layer"] = e.layer;
     if (e.parallax != 1.0f) item["parallax"] = e.parallax;
+    if (!e.text.empty()) item["text"] = e.text;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -74,6 +75,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.sprite = item.value("sprite", std::string{});
       entity.layer = item.value("layer", 0);
       entity.parallax = item.value("parallax", 1.0f);
+      entity.text = item.value("text", std::string{});
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {
