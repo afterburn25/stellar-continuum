@@ -107,22 +107,30 @@ prebuilt libs, SDL3 runtime + default font, `stellar::engine`/
 `stellar::cooker`/`stellar::platform`/`stellar::audio` consumer targets);
 the shell itself accepts `--project <root>` and `--tool <name>`, and the
 whole loop is scriptable headlessly via `--create/--cook/--build/
---package`. The Assets tool re-roots to project content and can toggle
+--package/--run/--test` (verbs dispatch before the asset-browser scan
+and may follow `--project <root>`). The Assets tool re-roots to project content and can toggle
 between SOURCE files and COOKED `runtime.stmanifest` records. The Scene
 tool authors `editor/scene.json` (`engine::SceneDocument` — named
-entities with position/extent/velocity/tint/optional sprite); the
+entities with position/extent/velocity/tint/optional sprite) with
+bounded undo/redo (`engine::UndoHistory`, Ctrl+Z/Y + buttons),
+DUPLICATE, and preview click-select/drag; the
 windowed starter is now a ~20-line `RuntimeHost` client: the engine's
 `stellar_engine_runtime` lib (`engine::RuntimeHost`, exported as
 `stellar::runtime`) owns the SDL loop, package scan, `ContentResolver`
 (cooked `Content/` or `build/cooked/` first, loose
-`packages/<id>/content/` fallback), `scene_components` ECS set
+`packages/<id>/content/` fallback, `pkg:path` qualified lookups
+for mod packages), `scene_components` ECS set
 (Transform2D/Velocity2D/Extent2D/Tint/EntityName/SpriteRef with
 registered codecs), `spawn_scene`/`scene_from_world`,
 scene-file hot reload, WASD player input, bounce+music audio, and
 F5/F9 `save_world_to_file`/`load_world_from_file` quicksave through
-`saves/quicksave.stw` (atomic write; corrupt files fail safely; the
-player handle re-resolves by name). Game code hooks in via
-`on_update`/`on_event`/`on_status`/`on_draw` callbacks.
+`saves/quicksave.stw` (atomic write plus a rotated `.bak` history
+chain — load recovers through the slots; the player handle
+re-resolves by name). Game code hooks in via
+`on_update`/`on_event`/`on_status`/`on_draw` callbacks and drives
+the loop with `request_quit()`/`set_paused()`/`set_scene()`
+(level switching); `--scene <path>` overrides the scene at launch,
+P pauses the sim.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in
