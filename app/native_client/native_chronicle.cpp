@@ -117,6 +117,9 @@ struct ChronicleLayout {
       domain_button, significance_button, actor_button, time_button,
       list_viewport, empty_hint;
   std::optional<UiRect> focus_button; // clears the active tag focus
+  // Window paging — only exist while a bounded recency window is
+  // active (paging "all history" is meaningless).
+  std::optional<UiRect> page_older_button, page_newer_button;
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
 };
@@ -125,7 +128,8 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                                      int width, int height,
                                      const TextMeasurer &measurer,
                                      float requested_scroll,
-                                     std::string_view tag_filter) {
+                                     std::string_view tag_filter,
+                                     bool paged_window) {
   ChronicleLayout layout;
   if (width <= 0 || height <= 0) return layout;
   const float sw = static_cast<float>(width), sh = static_cast<float>(height);
@@ -167,6 +171,14 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
   layout.time_button = {layout.actor_button.x - 70.f * s,
                         layout.domain_button.y, 64.f * s,
                         layout.domain_button.height};
+  if (paged_window) {
+    layout.page_newer_button = {layout.time_button.x - 24.f * s,
+                                layout.time_button.y, 20.f * s,
+                                layout.time_button.height};
+    layout.page_older_button = {layout.page_newer_button->x - 24.f * s,
+                                layout.time_button.y, 20.f * s,
+                                layout.time_button.height};
+  }
   if (!tag_filter.empty())
     layout.focus_button = {layout.panel.x + pad, layout.domain_button.y,
                            104.f * s, layout.domain_button.height};
@@ -279,8 +291,14 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            std::size_t max_entries) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
-  const auto events =
-      history.feed(observer, filter.since_day, filter.min_significance);
+  // feed() == query() with these three fields — query() is the same
+  // observer-safe projection plus the before_day axis feed() lacks.
+  engine::HistoryQuery q;
+  q.observer = observer;
+  q.after_day = filter.since_day;
+  q.min_significance = filter.min_significance;
+  q.before_day = filter.before_day;
+  const auto events = history.query(q);
   const std::string needle = upper(std::string(filter.search));
   ChronicleSnapshot snap;
   snap.entries.reserve(std::min(max_entries, events.size()));
@@ -341,6 +359,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   actor_filter_ = 0;
   tag_filter_.clear();
   recency_window_ = 0.0;
+  window_page_ = 0;
   search_.clear();
   search_focused_ = false;
   snapshot_ = snapshot(history, observer_civilization_id);
@@ -363,10 +382,15 @@ void NativeChronicleView::refresh() {
   filter.min_significance = significance_floor_;
   filter.actor = actor_filter_;
   filter.tag = tag_filter_;
-  filter.since_day =
-      (recency_window_ > 0.0 && campaign_day_source_)
-          ? campaign_day_source_() - recency_window_
-          : -std::numeric_limits<double>::infinity();
+  if (recency_window_ > 0.0 && campaign_day_source_) {
+    // Closed window: [now - (page+1)*width, now - page*width].
+    const double end =
+        campaign_day_source_() - recency_window_ * window_page_;
+    filter.since_day = end - recency_window_;
+    filter.before_day = end;
+  } else {
+    filter.since_day = -std::numeric_limits<double>::infinity();
+  }
   filter.search = search_;
   snapshot_ = snapshot(*history_, observer_, filter);
   scroll_ = 0.f;
@@ -377,6 +401,19 @@ void NativeChronicleView::cycle_recency() {
   const auto it = std::ranges::find_if(
       windows, [&](double w) { return recency_window_ < w - 1e-9; });
   recency_window_ = it == windows.end() ? 0.0 : *it;
+  window_page_ = 0; // a changed window restarts at the present edge
+  refresh();
+}
+
+void NativeChronicleView::page_older() {
+  if (recency_window_ <= 0.0) return;
+  ++window_page_;
+  refresh();
+}
+
+void NativeChronicleView::page_newer() {
+  if (window_page_ == 0) return;
+  --window_page_;
   refresh();
 }
 
@@ -430,9 +467,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {
   if (!visible_) return false;
   pointer_ = event.position;
-  const auto layout = chronicle_layout_for(snapshot_, width, height,
-                                           measure_, scroll_,
-                                           tag_filter_);
+  const auto layout = chronicle_layout_for(
+      snapshot_, width, height, measure_, scroll_, tag_filter_,
+      recency_window_ > 0.0);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) {
     // Escape unfocuses the search field first, then closes the view.
@@ -497,6 +534,12 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Actor;
     else if (layout.time_button.contains(event.position))
       press_target_ = PressTarget::Time;
+    else if (layout.page_older_button &&
+             layout.page_older_button->contains(event.position))
+      press_target_ = PressTarget::PageOlder;
+    else if (layout.page_newer_button &&
+             layout.page_newer_button->contains(event.position))
+      press_target_ = PressTarget::PageNewer;
     else if (layout.focus_button &&
              layout.focus_button->contains(event.position))
       press_target_ = PressTarget::FocusClear;
@@ -556,6 +599,15 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Time &&
            layout.time_button.contains(event.position))
     cycle_recency();
+  else if (target == PressTarget::PageOlder &&
+           layout.page_older_button &&
+           layout.page_older_button->contains(event.position))
+    page_older();
+  else if (target == PressTarget::PageNewer &&
+           layout.page_newer_button &&
+           layout.page_newer_button->contains(event.position) &&
+           window_page_ > 0)
+    page_newer();
   else if (target == PressTarget::Entry &&
            press_entry_ < layout.entries.size() &&
            layout.entries[press_entry_].bounds.contains(event.position) &&
@@ -588,9 +640,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
 
 void NativeChronicleView::render(DrawList &out, int width, int height) const {
   if (!visible_) return;
-  const auto layout = chronicle_layout_for(snapshot_, width, height,
-                                           measure_, scroll_,
-                                           tag_filter_);
+  const auto layout = chronicle_layout_for(
+      snapshot_, width, height, measure_, scroll_, tag_filter_,
+      recency_window_ > 0.0);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out, layout.panel, s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
@@ -758,6 +810,31 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
       time_text, muted_color, domain_pixels,
       layout.time_button.width - 4.f * s, layout.time_button,
       TextAlign::Center);
+  if (layout.page_older_button) {
+    stellar::engine::ui_skin::control(
+        out, *layout.page_older_button,
+        layout.page_older_button->contains(pointer_), false, true, s);
+    clipped_text(out,
+                 {layout.page_older_button->x +
+                      layout.page_older_button->width * .5f - 3.f * s,
+                  layout.page_older_button->y + 4.f * s},
+                 "<", muted_color, domain_pixels,
+                 layout.page_older_button->width - 4.f * s,
+                 *layout.page_older_button, TextAlign::Center);
+  }
+  if (layout.page_newer_button) {
+    stellar::engine::ui_skin::control(
+        out, *layout.page_newer_button,
+        layout.page_newer_button->contains(pointer_), false,
+        window_page_ > 0, s);
+    clipped_text(out,
+                 {layout.page_newer_button->x +
+                      layout.page_newer_button->width * .5f - 3.f * s,
+                  layout.page_newer_button->y + 4.f * s},
+                 ">", muted_color, domain_pixels,
+                 layout.page_newer_button->width - 4.f * s,
+                 *layout.page_newer_button, TextAlign::Center);
+  }
   if (layout.focus_button) {
     stellar::engine::ui_skin::control(
         out, *layout.focus_button,
@@ -796,13 +873,18 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
       layout.focus_button ? layout.focus_button->x +
                                 layout.focus_button->width + 8.f * s
                           : layout.list_viewport.x;
+  // Clamp to the leftmost occupied button so the subtitle never
+  // underlays controls (time button sits left of the actor button,
+  // and page arrows left of time when a window is bounded).
+  const float first_button_x =
+      layout.page_older_button ? layout.page_older_button->x
+                               : layout.time_button.x;
   clipped_text(out,
                {subtitle_x,
                 layout.header.y + layout.header.height + 13.f * s},
                subtitle, muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))),
-               std::max(1.f, layout.actor_button.x - subtitle_x -
-                                 8.f * s),
+               std::max(1.f, first_button_x - subtitle_x - 8.f * s),
                layout.panel);
   if (snapshot_.entries.empty()) {
     clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y},

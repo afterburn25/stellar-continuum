@@ -137,8 +137,9 @@ observer filtering, bound, category labels, system propagation, empty
 history).
 
 For history beyond the transient window, `native_chronicle` adds the
-scrollable chronicle browser: `snapshot()` projects
-`feed(observer, since_day, min_significance)` into display entries (newest
+scrollable chronicle browser: `snapshot()` projects the observer-safe
+`query()` (the same projection `feed()` wraps, plus the `before_day`
+axis) into display entries (newest
 first, capped at 4000 with the true total reported) under a
 `ChronicleFilter` bundle and
 `NativeChronicleView` renders them as a scrollable overlay — opened
@@ -152,7 +153,11 @@ feed (`actors` exact-match; civ names resolve through an injected
 resolver, falling back to "CIV <id>"), and a recency window cycling
 all → last 30d → last year → last decade (the feed's own `since_day`
 bound, driven by a live campaign-day source so it stays correct while
-the browser stays open) — all filters apply
+the browser stays open); while a window is bounded, ◀ ▶ page buttons
+shift it backward/forward by its own width — `since_day` +
+`before_day` form a closed campaign-day window, so the full timeline
+is pageable (cycling the window resets to the present edge, paging
+is inert on "all") — all filters apply
 before the cap, so a filtered view still reaches deep history. Entries with a `location` are clickable:
 the view returns the system id through `navigation()` (same drain
 contract as the debug background), the client closes the overlay and
@@ -172,7 +177,7 @@ backspace) applies `snapshot()`'s case-insensitive `search` match over
 summary, category id or reference tags (typing "fleet:12" finds the
 same records the tag chip focuses). Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
-total, domain, significance, actor, tag, recency and search
+total, domain, significance, actor, tag, recency, paging and search
 filtering, entry
 and contact navigation, view lifecycle, refresh, render smoke).
 

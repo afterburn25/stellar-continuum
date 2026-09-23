@@ -200,14 +200,21 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   VIEW SYSTEM action navigating via `enter_system`
   (`native_notification_events`/`native_notification` tests).
   `native_chronicle` adds the scrollable chronicle browser —
-  `snapshot()` projects `feed()` newest-first (4000-entry cap applied
-  after optional category-domain, significance-floor and
-  involved-actor filters, true filtered total reported) and
+  `snapshot()` projects the observer-safe `query()` (feed()'s
+  projection plus before_day) newest-first (4000-entry cap applied
+  after optional category-domain, significance-floor,
+  involved-actor, tag, time-window and search filters, true filtered
+  total reported) and
   `NativeChronicleView` renders it as an overlay opened from the
   notification panel's CHRONICLE button with on-demand refresh, domain
-  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7) and an actor
+  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7), an actor
   cycle (all intel → MINE → each civ appearing in the visible feed,
-  names resolved from campaign state); clicking a located entry
+  names resolved from campaign state), a recency window (all → 30d →
+  1y → 10y off a live campaign-day source) with ◀ ▶ window paging
+  (`since_day` + `before_day` as a closed range — the whole timeline
+  is pageable) and a header search field (case-insensitive substring
+  over summary/category/tags, gated by `wants_text_input()`);
+  clicking a located entry
   navigates the map to its system
   via `navigation()` → `enter_system` (the workspace re-applies the
   observation check) and single-foreign-actor entries expose a DIP

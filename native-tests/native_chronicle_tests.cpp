@@ -414,6 +414,49 @@ void recency_filtering() {
   view.cycle_recency();
   require(view.current().entries.size() == 4,
           "Missing day source should leave the window inert");
+
+  // Time paging: a bounded window shifts backward/forward by its own
+  // width — since_day + before_day form the closed range.
+  snap = snapshot(history, 1, {.since_day = 700., .before_day = 790.});
+  require(snap.total == 2,
+          "before_day did not bound the window (inclusive)");
+  snap = snapshot(history, 1, {.before_day = 700.});
+  require(snap.total == 2 && snap.entries.front().category ==
+                                "Colony",
+          "upper-bound-only window kept wrong entries");
+
+  // The view sat at a (sourceless) 30d window — one cycle lands on
+  // the 1y window [435, 800] at page 0.
+  view.set_campaign_day_source([] { return 800.; });
+  view.cycle_recency(); // 1y
+  require(view.recency_window() == 365.0 && view.window_page() == 0 &&
+              view.current().entries.size() == 3,
+          "Window did not restart at the present edge");
+  view.page_newer(); // clamped at page 0
+  require(view.window_page() == 0, "page_newer escaped page 0");
+  view.page_older(); // [70, 435] — the battle at day 400 only
+  require(view.window_page() == 1 &&
+              view.current().entries.size() == 1 &&
+              view.current().entries.front().category == "Combat",
+          "First page back kept wrong entries");
+  view.page_older(); // [-295, 70] — empty
+  require(view.window_page() == 2 &&
+              view.current().entries.empty(),
+          "Deep page kept phantom entries");
+  view.page_newer();
+  require(view.window_page() == 1 &&
+              view.current().entries.size() == 1,
+          "page_newer did not step forward");
+  view.cycle_recency(); // 10y — page resets to 0
+  require(view.window_page() == 0 &&
+              view.current().entries.size() == 4,
+          "Window cycle did not reset the page");
+  // Paging is inert without a bounded window.
+  view.cycle_recency(); // all
+  view.page_older();
+  require(view.window_page() == 0 &&
+              view.current().entries.size() == 4,
+          "Paging the all-history window did anything");
 }
 
 void search_filtering() {

@@ -67,6 +67,9 @@ struct ChronicleFilter {
   // The feed's own recency bound — only events at or after this
   // campaign day appear.
   double since_day{-std::numeric_limits<double>::infinity()};
+  // HistoryQuery::before_day — inclusive upper bound; combined with
+  // since_day it forms a closed campaign-day window (time paging).
+  std::optional<double> before_day{};
   // Case-insensitive substring over the recorded summary, category id
   // or reference tags — free-text lookup over the authorized feed
   // (typing "fleet:12" finds the same records the tag chip focuses).
@@ -143,6 +146,13 @@ public:
   [[nodiscard]] double recency_window() const noexcept {
     return recency_window_;
   }
+  // Time paging: while a bounded recency window is active, shifts it
+  // backward/forward by its own width — "the 30 days before these".
+  // since_day + before_day together form the closed window; inert
+  // when the window is ALL. Cycling the window resets to page 0.
+  void page_older();
+  void page_newer();
+  [[nodiscard]] int window_page() const noexcept { return window_page_; }
   // Active entity-focus tag (set by clicking a card's tag chip, or
   // cleared via the focus button / re-clicking the focused chip).
   [[nodiscard]] std::string_view tag_filter() const noexcept {
@@ -188,7 +198,7 @@ public:
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
                            Actor, Time, Search, Entry, Contact, Tag,
-                           FocusClear };
+                           FocusClear, PageOlder, PageNewer };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -200,6 +210,7 @@ private:
   std::uint64_t actor_filter_{};
   std::string tag_filter_;
   double recency_window_{};
+  int window_page_{};
   std::string search_;
   bool search_focused_{};
   std::size_t press_entry_{}, press_tag_{};

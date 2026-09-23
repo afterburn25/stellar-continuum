@@ -215,7 +215,10 @@ exactly one foreign actor get a DIP action opening the diplomacy
 workspace on that contact, and recorded reference tags render as
 clickable chips applying `HistoryQuery::tag`'s exact-match focus, and
 a TIME button cycles the feed's `since_day` bound (all → 30d → 1y →
-10y) driven by a live campaign-day source, and a header search field
+10y) driven by a live campaign-day source — and while a window is
+bounded, ◀ ▶ page buttons shift it by its own width (`since_day` +
+`before_day` as a closed window, so the whole timeline is pageable) —
+and a header search field
 (case-insensitive substring over summary/category) joins the client's
 `wants_text_input()` gate. The
 transient
@@ -235,12 +238,12 @@ re-record) and maps each entry to `diplomacy.<kind>` with its own
 journal timestamp, per-kind significance, `civ:`/`system:` tags and
 the journal's authoritative `known_to_civilization_ids` audience —
 exempt from knowledge widening, with generic kind summaries (the raw
-journal phrasing is internal). All HistoryQuery axes (category,
-significance,
-actor, tag, since_day) plus free-text search now have browser
-surfaces; remaining
-presentation gaps are `before_day` (no upper-bound UI) and
-multi-select filter composition.
+journal phrasing is internal). Every HistoryQuery axis (category,
+significance, actor, tag, after_day, before_day) plus free-text
+search now has a browser surface — `snapshot()` moved from `feed()`
+to `query()` (the same observer projection plus the upper bound);
+the remaining
+presentation gap is multi-select filter composition.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
