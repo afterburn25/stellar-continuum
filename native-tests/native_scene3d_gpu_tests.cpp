@@ -155,12 +155,12 @@ int main(int argc,char** argv)try{
     (void)capture({dark},"stream-dark.png");(void)capture({light},"stream-light.png");
     check(window.scene3d_statistics().texture_cache_entries==1,"Texture streamer did not evict the unrequested texture under budget");
     const auto uploads=window.scene3d_statistics().texture_uploads;
-    const auto both=capture({dark,light},"stream-both.png");
+    const auto pair=capture({dark,light},"stream-both.png");
     // Equal distances tie; the earlier-registered texture wins admission and
     // the denied bind serves the pinned fallback (white, not its 220 texels).
     check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Denied texture did not fall back under streamer budget pressure");
     check(window.scene3d_statistics().texture_uploads>uploads,"Evicted texture was not re-uploaded on re-admission");
-    check(channel(*both,72,160,0)<30&&channel(*both,248,160,0)>240,"Streaming fallback/admission pixels are wrong");
+    check(channel(*pair,72,160,0)<30&&channel(*pair,248,160,0)>240,"Streaming fallback/admission pixels are wrong");
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
   }
   {

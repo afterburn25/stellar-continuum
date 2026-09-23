@@ -174,9 +174,9 @@ struct Scene3DRenderer::Storage {
   void apply_streaming(){
     for(const auto& change:streamer.advance_frame(++stream_frame)){
       if(change.load||change.mip!=0)continue;
-      const auto owner=stream_owners.find(change.id);
-      if(owner==stream_owners.end())continue;
-      if(const auto it=textures.find(owner->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();textures.erase(it);}
+      const auto owner_it=stream_owners.find(change.id);
+      if(owner_it==stream_owners.end())continue;
+      if(const auto it=textures.find(owner_it->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();textures.erase(it);}
     }
   }
   std::shared_ptr<Texture> texture(std::shared_ptr<const RgbaImage> resource){
@@ -344,9 +344,10 @@ struct Scene3DRenderer::Storage {
     // dependencies are declared per frame, compile() validates the DAG and
     // emits the execution order, and the backend binds routines by tag.
     engine::RenderGraph graph;
-    const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",view.destination.width,view.destination.height,"rgba16f",true});
-    const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",view.destination.width,view.destination.height,"rgba8",true});
-    const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",view.destination.width,view.destination.height,"d32",true});
+    const auto res_w=static_cast<std::uint32_t>(view.destination.width),res_h=static_cast<std::uint32_t>(view.destination.height);
+    const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",res_w,res_h,"rgba16f",true});
+    const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
+    const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
     graph.add_pass({"scene3d",{},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
