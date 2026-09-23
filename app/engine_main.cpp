@@ -16,6 +16,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #endif
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
@@ -130,6 +131,11 @@ struct Shell {
   std::shared_ptr<const RgbaImage> preview;
   std::string preview_label;
   std::filesystem::path previewed_path;
+  // Cooked view: lists the open project's runtime.stmanifest records.
+  bool show_cooked{};
+  std::vector<engine::AssetRecord> cooked_records;
+  std::atomic<bool> cooked_dirty{true};
+  UiRect hit_cooked_toggle{};
 
   // Localization inspector.
   engine::VirtualizedList key_list;
@@ -175,6 +181,21 @@ void heading(DrawList &out, float x, float &y, const std::string &title) {
   out.overlay.push_back(Text{{x, y}, title, accent, 15, 0, std::nullopt,
                           TextAlign::Left, FontFace::Heading});
   y += 26.f;
+}
+
+// Loads the open project's cooked manifest (build/cooked/Content/
+// runtime.stmanifest) into cooked_records for the Assets tool's cooked view.
+void load_cooked(Shell &shell) {
+  shell.cooked_records.clear();
+  if (!shell.project) return;
+  const auto manifest = shell.project->root / "build" / "cooked" / "Content" /
+                        "runtime.stmanifest";
+  if (!std::filesystem::is_regular_file(manifest)) return;
+  try {
+    const engine::AssetRegistry registry(manifest);
+    shell.cooked_records = registry.records();
+  } catch (const std::exception &) {
+  }
 }
 
 void scan_assets(Shell &shell, std::filesystem::path root) {
@@ -239,6 +260,7 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
     return;
   }
   shell.project = std::move(*loaded);
+  shell.cooked_dirty = true;
   const auto count = reload_packages(shell);
   scan_assets(shell, root / shell.project->content_dirs.front());
   shell.status = "opened " + shell.project->name + " - " +
@@ -362,6 +384,7 @@ void start_cook(Shell &shell, engine::JobSystem &jobs) {
                         shell.cook_status = std::move(message);
                       }
                       shell.cooking = false;
+                      shell.cooked_dirty = true;
                     });
 }
 #else
@@ -652,6 +675,9 @@ UiRect tool_list_rect(UiRect body, float s, float width_fraction) {
           body.height - header - 16 * s};
 }
 
+void shell_button(DrawList &out, const UiRect &rect, const char *label,
+                  bool active, int font, float s);
+
 void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
@@ -659,8 +685,26 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
 
   heading(out, x, y, "ASSET LIBRARY");
   line(out, x, y, "root", shell.asset_root.string(), font);
-  line(out, x, y, "files", std::to_string(shell.asset_files.size()), font);
+  const std::size_t row_count =
+      shell.show_cooked ? shell.cooked_records.size()
+                        : shell.asset_files.size();
+  line(out, x, y, shell.show_cooked ? "records" : "files",
+       std::to_string(row_count), font);
   y += 6 * s;
+
+  // Source/cooked toggle while a project is open.
+  if (shell.project) {
+    shell.hit_cooked_toggle = {body.x + body.width - 22 * s - 150 * s,
+                               body.y + 14 * s, 150 * s, (font + 10) * s};
+    shell_button(out, shell.hit_cooked_toggle,
+                 shell.show_cooked ? "VIEW: COOKED" : "VIEW: SOURCE",
+                 shell.show_cooked, font, s);
+  } else {
+    shell.hit_cooked_toggle = {};
+  }
+  if (shell.show_cooked && shell.cooked_dirty.exchange(false))
+    load_cooked(shell);
+  shell.asset_list.row_count = row_count;
 
   const UiRect list_rect = tool_list_rect(body, s, 0.48f);
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
@@ -678,9 +722,19 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
     else if (row.contains(
                  Point{shell.pointer_x, shell.pointer_y}))
       out.overlay.push_back(FilledRectangle{row, row_hover});
-    out.overlay.push_back(Text{{row.x + 8 * s, row.y + 4 * s},
-                            shell.asset_files[i].generic_string(), ink, font, 0,
-                            list_rect});
+    if (shell.show_cooked) {
+      const auto &record = shell.cooked_records[i];
+      out.overlay.push_back(
+          Text{{row.x + 8 * s, row.y + 4 * s},
+               record.id + "  " + record.format + "  " +
+                   human_bytes(record.source_bytes),
+               ink, font, 0, list_rect});
+    } else {
+      out.overlay.push_back(
+          Text{{row.x + 8 * s, row.y + 4 * s},
+               shell.asset_files[i].generic_string(), ink, font, 0,
+               list_rect});
+    }
   }
 
   // Scrollbar thumb.
@@ -990,6 +1044,24 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
 
 void select_asset(Shell &shell, std::size_t index) {
   shell.selected_asset = index;
+  shell.preview.reset();
+  if (shell.show_cooked) {
+    // Cooked records aren't loose files — show manifest metadata instead.
+    const auto &record = shell.cooked_records[index];
+    std::string info = record.id + "  —  " + record.type + "/" +
+                       record.format + ", " +
+                       human_bytes(record.source_bytes);
+    if (record.width > 0)
+      info += ", " + std::to_string(record.width) + "x" +
+              std::to_string(record.height);
+    if (!record.aliases.empty())
+      info += "  |  alias: " + record.aliases.front();
+    std::uint64_t stored = 0;
+    for (const auto &chunk : record.chunks) stored += chunk.stored_bytes;
+    info += "  |  packaged " + human_bytes(stored);
+    shell.preview_label = info;
+    return;
+  }
   const auto &path = shell.asset_files[index];
   const auto full = shell.asset_root / path;
   shell.preview.reset();
@@ -1042,6 +1114,24 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories(shell.projects_root);
     refresh_projects(shell);
     scan_assets(shell, find_path("assets"));
+    // --project <root> opens a game project directly (e.g. launched on a
+    // project directory, or from a project's own toolchain).
+    for (int i = 1; i + 1 < argc; ++i) {
+#ifdef _WIN32
+      const std::wstring arg(argv[i]);
+      if (arg == L"--project") {
+        open_project(shell, argv[i + 1]);
+        shell.tool = Tool::Projects;
+        break;
+      }
+#else
+      if (std::string_view(argv[i]) == "--project") {
+        open_project(shell, argv[i + 1]);
+        shell.tool = Tool::Projects;
+        break;
+      }
+#endif
+    }
     for (const char *probe :
          {"GENERAL_TITLE", "STARTUP_TITLE", "MENU_RESUME", "ECONOMY_TITLE",
           "RESEARCH_TITLE", "FLEET_TITLE", "SYSTEM_BACK",
@@ -1285,19 +1375,33 @@ int main(int argc, char **argv) {
 
       // Deferred input handling that needs this frame's list geometry.
       for (const auto &event : snapshot.events) {
-        if (shell.tool == Tool::Assets && !shell.asset_files.empty()) {
-          const UiRect list_rect = tool_list_rect(body, s, 0.48f);
-          if (event.type == InputEventType::Wheel &&
-              list_rect.contains(event.position))
-            shell.asset_list.scroll_to(shell.asset_list.scroll_offset -
-                                       event.wheel_y * 44.f);
+        if (shell.tool == Tool::Assets) {
           if (event.type == InputEventType::LeftReleased &&
-              list_rect.contains(event.position)) {
-            const float local = event.position.y - list_rect.y +
-                                shell.asset_list.scroll_offset;
-            const auto row = static_cast<std::size_t>(
-                std::max(0.f, std::floor(local / shell.asset_list.row_height)));
-            if (row < shell.asset_files.size()) select_asset(shell, row);
+              shell.hit_cooked_toggle.contains(event.position)) {
+            shell.show_cooked = !shell.show_cooked;
+            shell.asset_list.scroll_offset = 0;
+            shell.selected_asset = static_cast<std::size_t>(-1);
+            shell.preview.reset();
+            shell.preview_label.clear();
+            if (shell.show_cooked) shell.cooked_dirty = true;
+          }
+          const std::size_t rows =
+              shell.show_cooked ? shell.cooked_records.size()
+                                : shell.asset_files.size();
+          if (rows > 0) {
+            const UiRect list_rect = tool_list_rect(body, s, 0.48f);
+            if (event.type == InputEventType::Wheel &&
+                list_rect.contains(event.position))
+              shell.asset_list.scroll_to(shell.asset_list.scroll_offset -
+                                         event.wheel_y * 44.f);
+            if (event.type == InputEventType::LeftReleased &&
+                list_rect.contains(event.position)) {
+              const float local = event.position.y - list_rect.y +
+                                  shell.asset_list.scroll_offset;
+              const auto row = static_cast<std::size_t>(std::max(
+                  0.f, std::floor(local / shell.asset_list.row_height)));
+              if (row < rows) select_asset(shell, row);
+            }
           }
         }
         if (shell.tool == Tool::Localization &&
