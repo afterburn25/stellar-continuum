@@ -285,6 +285,8 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "  // '--frames N' renders N frames then exits (CI smoke tests);\n"
        << "  // '--fixed-hz N' runs deterministic fixed-timestep simulation;\n"
        << "  // '--scene <path>' picks a different editor scene document.\n"
+       << "  // '--scene3d' runs editor/scene3d.json as a 3D world instead\n"
+       << "  // (WASD flies the camera, right-drag looks, wheel zooms).\n"
        << "  try {\n"
        << "    return host.run(argc, argv);\n"
        << "  } catch (const std::exception &error) {\n"
@@ -366,6 +368,28 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
           << id.substr(5) << ">\")\n";
   if (!write_text(root / "CMakeLists.txt", cmake.str(), error))
     return false;
+
+  // 3D starter scene: `--scene3d` runs this world — a floor slab, a
+  // gravity ball that lands on the ground plane, and a solid crate.
+  if (windowed) {
+    std::filesystem::create_directories(root / "editor", ec);
+    const std::string scene3d = R"({
+  "schemaVersion": 1,
+  "entities": [
+    {"name": "floor", "mesh": "box:20,0.5,20", "pos": [0, -0.25, 0], "color": [60, 90, 60], "solid": true, "gravityScale": 0},
+    {"name": "ball", "mesh": "sphere:16,8", "pos": [0, 5, 0], "color": [230, 140, 60]},
+    {"name": "crate", "mesh": "box", "pos": [3, 0.5, 0], "color": [120, 90, 200], "solid": true, "gravityScale": 0}
+  ],
+  "camera": {"pos": [0, 3, 10], "yaw": 0, "pitch": -15, "fov": 60},
+  "light": {"dir": [-0.3, -0.8, -0.5], "intensity": 1.2},
+  "gravity": 9.8,
+  "groundY": 0,
+  "bounds": 30
+}
+)";
+    if (!write_text(root / "editor" / "scene3d.json", scene3d, error))
+      return false;
+  }
   return true;
 }
 

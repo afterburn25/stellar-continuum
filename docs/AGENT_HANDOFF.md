@@ -202,9 +202,12 @@ integrates gravity/velocity at the fixed timestep, fires
 `on_collision`/`on_land`/`on_spawn3d`, and renders through
 `Scene3DView` under the 2D pass (2D entities remain HUD). Helpers:
 `entities3d()`, `entities3d_in_radius`, `spawn_entity3d`,
-`set_camera3d` + getters. Limitations: unrotated-AABB collision, no
-rigid-body solver, camera state is not snapshot, no editor 3D tool —
-see the registry record.
+`set_camera3d` + getters. Collision uses each entity's rotated+scaled
+world AABB; the camera snapshots via a `Camera3DState` carrier;
+`lights` adds up to two directional fills; windowed projects ship a
+starter `editor/scene3d.json`. Limitations: AABB (not OBB/triangle)
+collision, no rigid-body solver, no editor 3D tool — see the registry
+record.
 
 **Recommended next workstream: native validation and release reliability.**
 Start from this branch in an isolated checkout; fix the failures recorded in

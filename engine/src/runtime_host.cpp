@@ -116,6 +116,8 @@ struct RuntimeHost::Impl {
   float cam3_fov = 60.f, cam3_near = .01f, cam3_far = 1000.f;
   native_map::Vec3 light3{.42f, .2f, .87f};
   float light3_intensity = 1.f;
+  // Up to two extra world-space directional lights from the document.
+  std::vector<Scene3dLight> lights3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // 3D contact/ground tracking — separate sets: a pair can be in contact
@@ -762,6 +764,7 @@ int RuntimeHost::run() {
     impl.cam3_far = doc.far_plane;
     impl.light3 = {doc.light_x, doc.light_y, doc.light_z};
     impl.light3_intensity = doc.light_intensity;
+    impl.lights3 = doc.lights;
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -814,6 +817,23 @@ int RuntimeHost::run() {
   const auto save_path = options.project_root / options.save_file;
   auto save_world = [&] {
     try {
+      // Persist the fly camera with the world — carried on a lazily
+      // resolved entity so restores recover it like the RNG stream.
+      if (options.scene3d) {
+        EntityId carrier{};
+        for (const auto e : world.entities())
+          if (world.get<Camera3DState>(e)) {
+            carrier = e;
+            break;
+          }
+        if (carrier == EntityId{}) {
+          carrier = world.create();
+          world.add(carrier, Camera3DState{});
+        }
+        *world.get<Camera3DState>(carrier) =
+            Camera3DState{impl.cam3_x, impl.cam3_y, impl.cam3_z,
+                          impl.cam3_yaw, impl.cam3_pitch, impl.cam3_fov};
+      }
       save_world_to_file(world, save_path);
     } catch (const std::exception &) {
     }
@@ -835,6 +855,16 @@ int RuntimeHost::run() {
     impl.overlapping3d.clear();
     impl.grounded3d.clear();
     impl.prev_grounded3d.clear();
+    for (const auto e : world.entities())
+      if (const auto *cam = world.get<Camera3DState>(e)) {
+        impl.cam3_x = cam->x;
+        impl.cam3_y = cam->y;
+        impl.cam3_z = cam->z;
+        impl.cam3_yaw = cam->yaw_deg;
+        impl.cam3_pitch = cam->pitch_deg;
+        impl.cam3_fov = cam->fov_deg;
+        break;
+      }
     // Tilemap entities restore with the snapshot — pull them out of the
     // tracked set and re-resolve each tileset image.
     impl.tilemap_es = engine::tilemap_entities(world);
@@ -1455,9 +1485,57 @@ int RuntimeHost::run() {
         impl.cam3_y += (fwd.y * mz + my) * spd;
         impl.cam3_z += (fwd.z * mz + right.z * mx) * spd;
 
+        // World-space AABB of an entity's rotated + scaled local bounds:
+        // center = pos + R*(local_center*s), half-extents = |R|*(half*s).
+        // Rotation follows the mesh — a tipped box collides on its corner.
+        const auto world_box3d = [&](EntityId e, float &cx, float &cy,
+                                     float &cz, float &hx, float &hy,
+                                     float &hz) {
+          const auto *t = world.get<Transform3D>(e);
+          const auto *m = world.get<MeshRef>(e);
+          const auto mesh = m ? mesh_of(m->spec) : nullptr;
+          const float s = t ? t->scale : 1.f;
+          const Vec3 lo = mesh ? mesh->bounds_min()
+                               : Vec3{-.5f, -.5f, -.5f};
+          const Vec3 hi = mesh ? mesh->bounds_max()
+                               : Vec3{.5f, .5f, .5f};
+          const float lx = (hi.x - lo.x) * .5f * s,
+                      ly = (hi.y - lo.y) * .5f * s,
+                      lz = (hi.z - lo.z) * .5f * s;
+          const Vec3 lc{(lo.x + hi.x) * .5f * s, (lo.y + hi.y) * .5f * s,
+                        (lo.z + hi.z) * .5f * s};
+          cx = t ? t->x : 0.f;
+          cy = t ? t->y : 0.f;
+          cz = t ? t->z : 0.f;
+          if (!t) {
+            hx = lx; hy = ly; hz = lz;
+            return;
+          }
+          // Unit-quaternion rotation matrix rows (same convention as
+          // native_scene3d.cpp's column-major rotation_matrix).
+          const float qx = t->qx, qy = t->qy, qz = t->qz, qw = t->qw;
+          const float r00 = 1.f - 2.f * (qy * qy + qz * qz),
+                      r01 = 2.f * (qx * qy - qz * qw),
+                      r02 = 2.f * (qx * qz + qy * qw);
+          const float r10 = 2.f * (qx * qy + qz * qw),
+                      r11 = 1.f - 2.f * (qx * qx + qz * qz),
+                      r12 = 2.f * (qy * qz - qx * qw);
+          const float r20 = 2.f * (qx * qz - qy * qw),
+                      r21 = 2.f * (qy * qz + qx * qw),
+                      r22 = 1.f - 2.f * (qx * qx + qy * qy);
+          cx += r00 * lc.x + r01 * lc.y + r02 * lc.z;
+          cy += r10 * lc.x + r11 * lc.y + r12 * lc.z;
+          cz += r20 * lc.x + r21 * lc.y + r22 * lc.z;
+          hx = std::abs(r00) * lx + std::abs(r01) * ly +
+               std::abs(r02) * lz;
+          hy = std::abs(r10) * lx + std::abs(r11) * ly +
+               std::abs(r12) * lz;
+          hz = std::abs(r20) * lx + std::abs(r21) * ly +
+               std::abs(r22) * lz;
+        };
+
         // Entity integration: gravity pulls -Y; the ground plane rests
-        // at ground_y + the mesh's local AABB bottom * scale (boxes sit
-        // on their face, spheres on their bottom).
+        // at ground_y under the entity's world-AABB bottom.
         impl.prev_grounded3d = std::move(impl.grounded3d);
         impl.grounded3d.clear();
         std::vector<EntityId> expired3d;
@@ -1467,51 +1545,43 @@ int RuntimeHost::run() {
           auto *v = world.get<Velocity3D>(e);
           const auto *gs = world.get<GravityScale>(e);
           const float gscale = gs ? gs->value : 1.f;
-          const auto *mr = world.get<MeshRef>(e);
-          const auto mesh = mr ? mesh_of(mr->spec) : nullptr;
-          // Scaled half-extents (local AABB); rotation is ignored for
-          // collision in this mode.
-          const float hx =
-              (mesh ? std::max(-mesh->bounds_min().x,
-                               mesh->bounds_max().x)
-                    : .5f) * t->scale;
-          const float hz =
-              (mesh ? std::max(-mesh->bounds_min().z,
-                               mesh->bounds_max().z)
-                    : .5f) * t->scale;
-          const float bottom =
-              (mesh ? -mesh->bounds_min().y : .5f) * t->scale;
+          float bcx, bcy, bcz, hx, hy, hz;
+          world_box3d(e, bcx, bcy, bcz, hx, hy, hz);
+          // Origin-relative AABB offsets (constant for a fixed
+          // rotation/scale): entity-origin y that puts the world-AABB
+          // bottom on ground_y, and the center's horizontal offset.
+          const float rest_y = impl.ground_y3 + hy - (bcy - t->y);
+          const float cx_off = bcx - t->x, cz_off = bcz - t->z;
           if (v && gscale != 0.f) v->dy -= impl.gravity3 * gscale * dt_step;
           if (v && (v->dx != 0.f || v->dy != 0.f || v->dz != 0.f)) {
             t->x += v->dx * dt_step;
             t->y += v->dy * dt_step;
             t->z += v->dz * dt_step;
-            // Ground plane: rest with the mesh's bottom on ground_y,
+            // Ground plane: rest with the world-AABB bottom on ground_y,
             // fire on_land on the touchdown transition like the 2D path.
-            if (const float rest = impl.ground_y3 + bottom;
-                t->y <= rest && v->dy <= 0.f) {
-              t->y = rest;
+            if (t->y <= rest_y && v->dy <= 0.f) {
+              t->y = rest_y;
               v->dy = 0.f;
               impl.grounded3d.insert(e.value());
               if (on_land &&
                   !impl.prev_grounded3d.count(e.value()))
                 on_land(e, EntityId{});
             }
-            // XZ bounds: bounce unless NoBounce.
+            // XZ bounds: bounce the world-AABB edges unless NoBounce.
             if (impl.bounds3 > 0.f) {
               const bool nb = world.get<NoBounce>(e) != nullptr;
               const float rx = std::min(hx, impl.bounds3),
                           rz = std::min(hz, impl.bounds3);
-              if (t->x < -impl.bounds3 + rx ||
-                  t->x > impl.bounds3 - rx) {
-                t->x = std::clamp(t->x, -impl.bounds3 + rx,
-                                  impl.bounds3 - rx);
+              if (t->x + cx_off < -impl.bounds3 + rx ||
+                  t->x + cx_off > impl.bounds3 - rx) {
+                t->x = std::clamp(t->x + cx_off, -impl.bounds3 + rx,
+                                  impl.bounds3 - rx) - cx_off;
                 v->dx = nb ? 0.f : -v->dx;
               }
-              if (t->z < -impl.bounds3 + rz ||
-                  t->z > impl.bounds3 - rz) {
-                t->z = std::clamp(t->z, -impl.bounds3 + rz,
-                                  impl.bounds3 - rz);
+              if (t->z + cz_off < -impl.bounds3 + rz ||
+                  t->z + cz_off > impl.bounds3 - rz) {
+                t->z = std::clamp(t->z + cz_off, -impl.bounds3 + rz,
+                                  impl.bounds3 - rz) - cz_off;
                 v->dz = nb ? 0.f : -v->dz;
               }
             }
@@ -1528,42 +1598,28 @@ int RuntimeHost::run() {
           world.destroy(id);
         }
         engine::resolve_hierarchy3d(world);
-        // AABB contacts on the 3D set (mesh local bounds * scale; unrotated).
-        // Solids push movers out along the least-penetrated axis. The scan
-        // always runs — solid resolution is needed even when no callbacks
-        // are registered.
+        // AABB contacts on the 3D set using each entity's rotated world
+        // box (world_box3d). Solids push movers out along the least-
+        // penetrated axis. The scan always runs — solid resolution is
+        // needed even when no callbacks are registered.
         {
-          const auto extents = [&](EntityId e, float &hx, float &hy,
-                                   float &hz) {
-            const auto *t = world.get<Transform3D>(e);
-            const auto *m = world.get<MeshRef>(e);
-            const auto mesh = m ? mesh_of(m->spec) : nullptr;
-            const float s = t ? t->scale : 1.f;
-            hx = (mesh ? std::max(-mesh->bounds_min().x,
-                                  mesh->bounds_max().x)
-                       : .5f) * s;
-            hy = (mesh ? std::max(-mesh->bounds_min().y,
-                                  mesh->bounds_max().y)
-                       : .5f) * s;
-            hz = (mesh ? std::max(-mesh->bounds_min().z,
-                                  mesh->bounds_max().z)
-                       : .5f) * s;
-          };
           std::set<std::pair<std::uint64_t, std::uint64_t>> now;
           std::vector<std::pair<EntityId, EntityId>> entered;
           for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
             auto *ta = world.get<Transform3D>(impl.entities3d[i]);
             if (!ta) continue;
-            float hax, hay, haz;
-            extents(impl.entities3d[i], hax, hay, haz);
+            float acx, acy, acz, hax, hay, haz;
+            world_box3d(impl.entities3d[i], acx, acy, acz, hax, hay,
+                        haz);
             for (std::size_t j = i + 1; j < impl.entities3d.size(); ++j) {
               const auto *tb = world.get<Transform3D>(impl.entities3d[j]);
               if (!tb) continue;
-              float hbx, hby, hbz;
-              extents(impl.entities3d[j], hbx, hby, hbz);
-              const float ox = hax + hbx - std::abs(ta->x - tb->x);
-              const float oy = hay + hby - std::abs(ta->y - tb->y);
-              const float oz = haz + hbz - std::abs(ta->z - tb->z);
+              float bcx, bcy, bcz, hbx, hby, hbz;
+              world_box3d(impl.entities3d[j], bcx, bcy, bcz, hbx, hby,
+                          hbz);
+              const float ox = hax + hbx - std::abs(acx - bcx);
+              const float oy = hay + hby - std::abs(acy - bcy);
+              const float oz = haz + hbz - std::abs(acz - bcz);
               if (ox <= 0.f || oy <= 0.f || oz <= 0.f) continue;
               const auto a = impl.entities3d[i].value(),
                          b = impl.entities3d[j].value();
@@ -1583,14 +1639,16 @@ int RuntimeHost::run() {
                                       : impl.entities3d[i];
                 auto *tm = world.get<Transform3D>(mover);
                 auto *vm = world.get<Velocity3D>(mover);
-                const auto *ts = sa ? ta : tb;
-                // Sign: push the mover away from the solid's center.
+                // Mover/solid world-center positions for the push sign.
+                const float mcx = sa ? bcx : acx, scx = sa ? acx : bcx;
+                const float mcy = sa ? bcy : acy, scy = sa ? acy : bcy;
+                const float mcz = sa ? bcz : acz, scz = sa ? acz : bcz;
                 if (ox <= oy && ox <= oz) {
-                  const float sgn = tm->x >= ts->x ? 1.f : -1.f;
+                  const float sgn = mcx >= scx ? 1.f : -1.f;
                   tm->x += sgn * ox;
                   if (vm && vm->dx * sgn < 0.f) vm->dx = 0.f;
                 } else if (oy <= oz) {
-                  const float sgn = tm->y >= ts->y ? 1.f : -1.f;
+                  const float sgn = mcy >= scy ? 1.f : -1.f;
                   tm->y += sgn * oy;
                   if (vm && vm->dy * sgn < 0.f) vm->dy = 0.f;
                   if (sgn > 0.f) {
@@ -1601,7 +1659,7 @@ int RuntimeHost::run() {
                                         : impl.entities3d[j]);
                   }
                 } else {
-                  const float sgn = tm->z >= ts->z ? 1.f : -1.f;
+                  const float sgn = mcz >= scz ? 1.f : -1.f;
                   tm->z += sgn * oz;
                   if (vm && vm->dz * sgn < 0.f) vm->dz = 0.f;
                 }
@@ -1772,6 +1830,16 @@ int RuntimeHost::run() {
                     v.z + q.w * tz + q.x * ty - q.y * tx};
       };
       const Vec3 light_cam = rot(inv, impl.light3);
+      // Extra directional lights — same world→camera rotation; the
+      // material pipeline evaluates at most two per instance.
+      for (auto &inst : instances)
+        for (std::size_t li = 0; li < impl.lights3.size() && li < 2;
+             ++li) {
+          const auto &l = impl.lights3[li];
+          inst.material.additional_lights[li] = DirectionalLight3D{
+              rot(inv, {l.dir_x, l.dir_y, l.dir_z}), {l.r, l.g, l.b},
+              l.intensity};
+        }
       if (auto scene =
               Scene3D::create(cam, std::move(instances), light_cam))
         draw.overlay.insert(

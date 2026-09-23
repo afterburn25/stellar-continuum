@@ -358,6 +358,13 @@ std::string Scene3dDocument::to_json() const {
                    {"far", far_plane}};
   doc["light"] = {{"dir", {light_x, light_y, light_z}},
                   {"intensity", light_intensity}};
+  if (!lights.empty()) {
+    auto &ls = doc["lights"] = nlohmann::json::array();
+    for (const auto &l : lights)
+      ls.push_back({{"dir", {l.dir_x, l.dir_y, l.dir_z}},
+                    {"color", {l.r, l.g, l.b}},
+                    {"intensity", l.intensity}});
+  }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
@@ -457,6 +464,23 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           !vec3_of(li, "dir", scene.light_x, scene.light_y, scene.light_z))
         return std::nullopt;
       scene.light_intensity = li.value("intensity", 1.0f);
+    }
+    if (doc.contains("lights")) {
+      const auto &ls = doc.at("lights");
+      if (!ls.is_array()) return fail("lights must be an array");
+      if (ls.size() > 2) return fail("at most two extra lights");
+      for (const auto &li : ls) {
+        if (!li.is_object()) return fail("light entry is not an object");
+        Scene3dLight l;
+        if (li.contains("dir") &&
+            !vec3_of(li, "dir", l.dir_x, l.dir_y, l.dir_z))
+          return std::nullopt;
+        if (li.contains("color") &&
+            !vec3_of(li, "color", l.r, l.g, l.b))
+          return std::nullopt;
+        l.intensity = li.value("intensity", 0.5f);
+        scene.lights.push_back(l);
+      }
     }
     if (doc.contains("background")) {
       const auto &bg = doc.at("background");

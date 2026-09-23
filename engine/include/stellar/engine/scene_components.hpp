@@ -142,6 +142,13 @@ struct TextureRef {
 struct DoubleSided {
   // Marker: render the mesh's back faces too (foliage, paper, debug).
 };
+// Host-owned fly-camera state for 3D scene mode, carried on a lazily
+// resolved world entity so F5/F9 snapshots restore the camera too (the
+// document seeds it only on scene load).
+struct Camera3DState {
+  double x{}, y{}, z{3.0};
+  float yaw_deg{}, pitch_deg{}, fov_deg{60.f};
+};
 // 3D positional attachment — same contract as Parent, with a z offset.
 struct Parent3D {
   std::string name;

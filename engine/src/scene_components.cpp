@@ -241,6 +241,9 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &b) {
         return VfxRef{{b.begin(), b.end()}};
       });
+  world.register_component<Camera3DState>("camera3d",
+                                          encode_pod<Camera3DState>,
+                                          decode_pod<Camera3DState>);
   world.register_component<Transform3D>("transform3",
                                         encode_pod<Transform3D>,
                                         decode_pod<Transform3D>);

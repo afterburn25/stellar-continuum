@@ -147,6 +147,14 @@ struct Scene3dEntity {
   std::string parent;
 };
 
+// An extra directional light — the material pipeline evaluates at most
+// two of these in addition to the scene's key light.
+struct Scene3dLight {
+  float dir_x{0.f}, dir_y{0.f}, dir_z{1.f};
+  float r{1.f}, g{1.f}, b{1.f};
+  float intensity{0.5f};
+};
+
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of
 // SceneDocument, authored by tools and consumed by RuntimeHost's --scene3d
 // mode. Same contract: diffable JSON, all-or-nothing parse.
@@ -162,6 +170,8 @@ struct Scene3dDocument {
   // space at render time) + intensity multiplier.
   float light_x{0.42f}, light_y{0.2f}, light_z{0.87f};
   float light_intensity{1.0f};
+  // Up to two additional world-space directional lights (fill/rim).
+  std::vector<Scene3dLight> lights;
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.
