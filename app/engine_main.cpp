@@ -198,7 +198,7 @@ struct Shell {
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
-      hit_scene_oneway{},
+      hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1122,7 +1122,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                     shell.hit_scene_flipx =
                                         shell.hit_scene_flipy =
                                             shell.hit_scene_visible =
-                                                shell.hit_scene_oneway = {};
+                                                shell.hit_scene_oneway =
+                                                    shell.hit_scene_up =
+                                                        shell.hit_scene_down =
+                                                            {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1155,6 +1158,15 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_dup, "DUPLICATE",
                shell.selected_entity < shell.scene_doc.entities.size(), font,
                s);
+  // Doc order is the same-layer draw order; these nudge the selection.
+  const bool can_up = shell.selected_entity > 0 &&
+                      shell.selected_entity < shell.scene_doc.entities.size();
+  const bool can_down =
+      shell.selected_entity + 1 < shell.scene_doc.entities.size();
+  shell.hit_scene_up = {x + 706 * s, y, 70 * s, bh};
+  shell_button(out, shell.hit_scene_up, "UP", !can_up, font, s);
+  shell.hit_scene_down = {x + 786 * s, y, 80 * s, bh};
+  shell_button(out, shell.hit_scene_down, "DOWN", !can_down, font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1189,7 +1201,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float px = list_rect.x + list_rect.width + 16 * s;
   const float pw = body.x + body.width - px - 22 * s;
   const float ph = pw * 720.f / 1280.f;
-  shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.5f)};
+  shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.44f)};
   const auto &pv = shell.scene_preview;
   out.overlay.push_back(FilledRectangle{
       pv, {shell.scene_doc.bg_r, shell.scene_doc.bg_g, shell.scene_doc.bg_b,
@@ -1268,10 +1280,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       fx = px + col_w + 16 * s;
     }
     out.overlay.push_back(Text{{fx, fy}, label, muted, font});
-    hit = {fx + 90 * s, fy - 4 * s, col_w - 90 * s, (font + 10) * s};
+    hit = {fx + 90 * s, fy - 4 * s, col_w - 90 * s, (font + 8) * s};
     field_box(out, hit, editing ? shell.scene_buffer : value, editing, hint,
               font, s);
-    fy += hit.height + 5 * s;
+    fy += hit.height + 4 * s;
   };
   const auto fmt_pair = [](float a, float b) {
     return std::to_string(static_cast<int>(a)) + "," +
@@ -2318,6 +2330,21 @@ int main(int argc, char **argv) {
                 copy.y += 24.f;
                 shell.scene_doc.entities.push_back(std::move(copy));
                 shell.selected_entity = shell.scene_doc.entities.size() - 1;
+                shell.scene_modified = true;
+              }
+            } else if (shell.hit_scene_up.contains(event.position) ||
+                       shell.hit_scene_down.contains(event.position)) {
+              // Doc order is the same-layer draw order.
+              const bool up = shell.hit_scene_up.contains(event.position);
+              const auto i = shell.selected_entity;
+              const auto j = up ? i - 1 : i + 1;
+              if (i < shell.scene_doc.entities.size() &&
+                  j < shell.scene_doc.entities.size() &&
+                  (up ? i > 0 : true)) {
+                shell.scene_history.commit(shell.scene_doc);
+                std::swap(shell.scene_doc.entities[i],
+                          shell.scene_doc.entities[j]);
+                shell.selected_entity = j;
                 shell.scene_modified = true;
               }
             } else if (shell.scene_preview.contains(event.position)) {
