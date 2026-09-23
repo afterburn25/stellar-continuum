@@ -385,7 +385,13 @@ integration merge. A 2026-09-23 supplement
 (`validation/2026-09-23-chronicle-suite.md`) records 295/295 runnable
 tests green at `d68c98af` after the chronicle/history increments; the
 15 `engine_shell_tool_*` smoke tests registered there need a desktop
-run (no display in that environment). Remaining deep work: SDL_GPU instanced rendering (requires
+run (no display in that environment). A desktop run at `23ba3577` records
+310/310 tests green (suite now includes the 15 tool smoke tests and the
+population-habitability bridge tests). Three save/diagnostics failures seen
+in an interim run were stale test expectations, repaired at `23ba3577`: the
+legacy composed-encoding oracle and frozen fixtures predated the v17
+"EventHistory" tail (`afee13f2`), and the diagnostic monitor test assumed a
+finding-free seeded world. Remaining deep work: SDL_GPU instanced rendering (requires
 a texture-array or bindless design before DrawBatcher batches pay off), an
 HDR/tonemap pass (first multi-pass consumer of RenderGraph + ShaderLibrary),
 and TextureStreamer residency wiring. The second frontier is an architecture
