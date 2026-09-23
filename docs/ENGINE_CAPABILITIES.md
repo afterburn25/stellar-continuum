@@ -472,6 +472,40 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   findings describe shortfalls, they do not prescribe fixes; engine-side
   economy framework adoption into Core authority remains future work.
 
+## Core campaign warfare projection + presence diagnostics (2026-09-24)
+
+- **Purpose:** make the engine strategic-warfare framework reachable
+  over authoritative campaign fleets without a second combat authority.
+  Core combat resolution, military orders and transit stay
+  authoritative; `core/campaign_warfare_projection.*` projects fleets +
+  `CombatProfileDefinition`s into a `WarfareModel` theater so
+  `FleetReport` aggregates and `resolve()` Lanchester previews serve
+  diagnostics and tooling on copies — never mutating campaign state.
+- **Core adapter:** `project_warfare_theater(fleets, systems)` — one
+  fleet → one engine fleet with a single-ship cohort; ShipClass per
+  combat profile (attack = `sustained_damage_per_day`, hull =
+  shields+armor+hull, defense/interdiction = 0 — no Core analog;
+  interdiction is tactical-only). Order mapping: retreating → Retreat,
+  transit/destination → Move at the destination system, Attack +
+  resolvable target → Move at the target fleet, else Hold. Cohort
+  condition = live hull fraction; experience = 0.15/battle fought
+  (documented display scale).
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `foreign_armed_presence` findings when an armed fleet is stationed in
+  a system whose colonies it does not own (projected attack/hull/speed
+  in `values`); consumed by the diagnostic monitor, developer report
+  and QA host. `campaign_warfare_projection` tests — stat fidelity,
+  order mapping precedence, unarmed/inactive handling, deterministic
+  `resolve` previews that leave campaign state untouched, and the
+  consumer path (only stationed armed foreign fleets flagged).
+- **Save/performance impact:** read-only projection — zero persistent
+  state; theater build is O(fleets + systems) once per daily
+  diagnostics pass.
+- **Limitations:** one ship per cohort (Core fleets are single
+  vessels — no squadron scale); class speed binds per profile id;
+  engagement previews are what-if math, not committed combat outcomes;
+  no strategic interdiction radius exists in Core to project.
+
 ## Massive simulation scheduler + simulation LOD executor (2026-09-23)
 
 - **Purpose:** the space-strategy specialization's foundation — drive

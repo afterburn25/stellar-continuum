@@ -1,6 +1,7 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
+#include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <cmath>
 #include <cstdio>
@@ -47,6 +48,41 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         r.values["demandPerDay"]=d.demand_per_day;
         r.values["supplyPerDay"]=d.supply_per_day;
         r.values["reserveDays"]=d.reserve_days;
+        records.push_back(std::move(r));
+      }
+    }
+  }
+  // Armed foreign presence: an armed fleet stationed in a system that
+  // holds another civilization's colonies. Strength values come from
+  // the warfare theater projection (WarfareModel reports over real
+  // combat profiles), not a recomputed approximation.
+  if(records.size()<maximum){
+    std::unordered_map<int,std::unordered_set<int>> system_owners;
+    for(const auto &colony:world.colonies){
+      if(colony.kind!=SettlementKind::Colony)continue;
+      system_owners[colony.system_id].insert(colony.civilization_id);
+    }
+    if(!system_owners.empty()){
+      const auto theater=project_warfare_theater(world.fleets,world.systems);
+      for(const auto &fleet:world.fleets){
+        if(records.size()>=maximum)break;
+        if(!fleet.is_active||!fleet.current_system_id||
+           fleet.transit_phase!=FleetTransitPhase::None)continue;
+        const auto owners=system_owners.find(*fleet.current_system_id);
+        if(owners==system_owners.end()||owners->second.contains(fleet.civilization_id))continue;
+        const auto report=theater.report(static_cast<std::uint64_t>(fleet.id));
+        if(report.attack<=0.0)continue;
+        DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
+        r.event_type="foreign_armed_presence";r.severity=DiagnosticSeverity::Warning;
+        r.entity_id=fleet.id;r.civilization_id=fleet.civilization_id;r.system_id=*fleet.current_system_id;
+        char message[192];
+        std::snprintf(message,sizeof(message),
+                      "Armed foreign fleet stationed in a system held by civilization %d (projected %.0f damage/day).",
+                      *owners->second.begin(),report.attack);
+        r.message=message;
+        r.values["projectedAttackPerDay"]=report.attack;
+        r.values["projectedHullPool"]=report.hull;
+        r.values["strategicSpeed"]=report.speed;
         records.push_back(std::move(r));
       }
     }
