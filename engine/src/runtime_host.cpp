@@ -515,7 +515,7 @@ int RuntimeHost::run() {
       }
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
-      if (on_collision) {
+      if (on_collision || on_collision_exit) {
         std::set<std::pair<std::uint64_t, std::uint64_t>> now;
         std::vector<std::pair<EntityId, EntityId>> entered;
         for (std::size_t i = 0; i < impl.entities.size(); ++i) {
@@ -537,8 +537,20 @@ int RuntimeHost::run() {
             }
           }
         }
+        if (on_collision_exit) {
+          // Pairs present last step but absent now ended their contact —
+          // entity destruction also ends it (the id is simply stale).
+          const auto unpack = [](std::uint64_t v) {
+            return EntityId{static_cast<std::uint32_t>(v & 0xffffffffu),
+                            static_cast<std::uint32_t>(v >> 32)};
+          };
+          for (const auto &key : impl.overlapping)
+            if (!now.count(key))
+              on_collision_exit(unpack(key.first), unpack(key.second));
+        }
         impl.overlapping = std::move(now);
-        for (const auto &[a, b] : entered) on_collision(a, b);
+        if (on_collision)
+          for (const auto &[a, b] : entered) on_collision(a, b);
       }
     };
     if (impl.paused) {

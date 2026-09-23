@@ -131,6 +131,9 @@ public:
   // Fires when two tracked entities' AABBs begin overlapping — once per
   // pair per contact, not every frame. Runs inside the sim step.
   std::function<void(EntityId a, EntityId b)> on_collision;
+  // Fires when an overlapping pair separates or one member is destroyed —
+  // the ids may already be stale. Runs inside the sim step.
+  std::function<void(EntityId a, EntityId b)> on_collision_exit;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
