@@ -106,9 +106,19 @@ scrollable chronicle browser: `snapshot()` projects
 4000 with the true total reported) and `NativeChronicleView` renders
 them as a scrollable overlay — opened from a CHRONICLE button in the
 notification panel header, refreshed on demand while open, closed on
-every session/modal transition alongside the notification view.
-Coverage: `native_chronicle` tests (snapshot ordering, observer
-privacy, cap + total, view lifecycle, refresh, render smoke).
+every session/modal transition alongside the notification view, and
+filterable by category domain via `snapshot()`'s `category_prefix`
+(the cap applies after filtering, so a domain view still reaches deep
+history). Coverage: `native_chronicle` tests (snapshot ordering,
+observer privacy, cap + total, domain filtering, view lifecycle,
+refresh, render smoke).
+
+Voice presentation is the pre-existing `NativeGameplayVoiceBridge`:
+`route_events` announces every significant chronicle category per
+advance (research, construction, shipbuilding, exploration including
+first contact, colonization, combat) with authoritative names,
+observer-safe payloads and first-occurrence tracking — chronicle
+recording and voice announce the same authoritative step events.
 
 ## Remaining limitations
 
@@ -120,6 +130,6 @@ privacy, cap + total, view lifecycle, refresh, render smoke).
   detected a system sees its major events; delayed intel, survey-level
   gating and sensor-quality degradation are future refinements.
 - The chronicle browser snapshots the newest 4000 visible entries and
-  offers no category/significance filtering yet — `query()`'s filter
-  axes are unused at the presentation layer. Voice presentation
-  remains.
+  filters by whole category domains — per-significance, per-actor and
+  tag filtering (`query()`'s other axes) remain unused at the
+  presentation layer.

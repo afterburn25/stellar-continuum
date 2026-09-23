@@ -195,8 +195,14 @@ browser landed with it: `native_chronicle` (`snapshot()` newest-first
 projection, 4000-entry cap with true total, `NativeChronicleView`
 overlay with refresh) opened via a CHRONICLE button in the notification
 panel header; `native_chronicle` tests cover projection, observer
-privacy, lifecycle and render smoke. Category/significance filtering
-in the browser and voice presentation remain.
+privacy, lifecycle and render smoke. Category-domain filtering landed
+(`snapshot()` `category_prefix`, cap applied after filtering, FILTER
+button cycling All → six domains). Voice presentation was already
+implemented — `NativeGameplayVoiceBridge::route_events` announces
+every significant category per advance with authoritative names and
+first-occurrence tracking; an earlier note listing it as pending was
+wrong and has been corrected. Remaining: per-significance/actor/tag
+filtering in the browser.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

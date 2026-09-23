@@ -57,6 +57,38 @@ void snapshot_projection() {
           "Snapshot cap kept wrong entries");
 }
 
+void domain_filtering() {
+  auto history = make_history();
+  engine::HistoryEvent war;
+  war.at_day = 440.;
+  war.category = "war.engagement_started";
+  war.summary = "Fleet engaged";
+  war.visible_to = {1};
+  history.record(std::move(war));
+  const auto wars = snapshot(history, 1, 4000, "war.");
+  require(wars.total == 1 && wars.entries.size() == 1 &&
+              wars.entries.front().summary == "Fleet engaged",
+          "Domain filter kept foreign categories");
+  const auto colonies = snapshot(history, 1, 4000, "colony.");
+  require(colonies.total == 1 &&
+              colonies.entries.front().summary == "Colony established",
+          "Colony filter missed its domain");
+  const auto empty = snapshot(history, 1, 4000, "research.");
+  require(empty.total == 0 && empty.entries.empty(),
+          "Empty domain reported entries");
+
+  NativeChronicleView view;
+  view.open(history, 1);
+  require(view.domain_filter().empty(), "Open did not reset domain");
+  view.cycle_domain();
+  require(view.domain_filter() == "construction." &&
+              view.current().entries.empty(),
+          "Cycle did not apply first domain");
+  while (!view.domain_filter().empty()) view.cycle_domain();
+  require(view.current().entries.size() == 4,
+          "Full cycle did not restore unfiltered view");
+}
+
 void view_lifecycle() {
   auto history = make_history();
   NativeChronicleView view;
@@ -108,6 +140,7 @@ void render_smoke() {
 int main() {
   try {
     snapshot_projection();
+    domain_filtering();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

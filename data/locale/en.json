@@ -1073,6 +1073,7 @@
     "CHRONICLE_SUBTITLE": "Recorded history — {0} events.",
     "CHRONICLE_SUBTITLE_CAPPED": "Recorded history — newest {0} of {1} events.",
     "CHRONICLE_EMPTY": "No recorded events yet.",
+    "CHRONICLE_FILTER_ALL": "ALL",
     "NOTIFY_CATEGORY_RESEARCH": "Research",
     "NOTIFY_CATEGORY_INDUSTRY": "Industry",
     "NOTIFY_CATEGORY_CONSTRUCTION": "Construction",

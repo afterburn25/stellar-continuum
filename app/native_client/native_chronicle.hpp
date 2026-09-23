@@ -44,10 +44,14 @@ struct ChronicleSnapshot {
 // Projects the observer-filtered chronicle into display entries,
 // newest first, capped at `max_entries` (the tail end of history —
 // a chronicle can hold 100k records; the view shows the newest slice
-// and reports the true total).
+// and reports the true total). `category_prefix` restricts to one
+// domain ("war.", "exploration.", ...) — the cap applies after the
+// filter so a filtered view still reaches deep history. `total`
+// reports the filtered visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
-         std::size_t max_entries = 4000);
+         std::size_t max_entries = 4000,
+         std::string_view category_prefix = {});
 
 class NativeChronicleView final {
 public:
@@ -72,6 +76,12 @@ public:
   }
   // Re-pulls the snapshot (history may have grown while open).
   void refresh();
+  // Cycles the category-domain filter (All → construction → ships →
+  // research → exploration → colony → combat → All) and re-pulls.
+  void cycle_domain();
+  [[nodiscard]] std::string_view domain_filter() const noexcept {
+    return domain_filter_;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -84,13 +94,14 @@ public:
   void render(native_map::DrawList &out, int width, int height) const;
 
 private:
-  enum class PressTarget { None, Close, Refresh };
+  enum class PressTarget { None, Close, Refresh, Domain };
   void cancel_press() noexcept;
 
   bool visible_{};
   float scroll_{};
   const engine::EventHistory *history_{};
   int observer_{-1};
+  std::string domain_filter_;
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

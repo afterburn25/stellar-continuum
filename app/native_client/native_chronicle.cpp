@@ -105,8 +105,8 @@ struct CardLayout {
 // Same geometry contract as the notification panel: cards stacked
 // top-down (entries already newest-first), translated by scroll.
 struct ChronicleLayout {
-  UiRect panel, header, close_button, refresh_button, list_viewport,
-      empty_hint;
+  UiRect panel, header, close_button, refresh_button, domain_button,
+      list_viewport, empty_hint;
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
 };
@@ -134,6 +134,12 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                          layout.header.y, 26.f * s, 26.f * s};
   layout.refresh_button = {layout.close_button.x - 86.f * s,
                            layout.header.y, 80.f * s, 26.f * s};
+  // Domain filter sits in the intro row, right-aligned beside the
+  // subtitle — the header row has no room for a third control.
+  layout.domain_button = {
+      layout.panel.x + layout.panel.width - pad - 120.f * s,
+      layout.header.y + layout.header.height + 4.f * s, 120.f * s,
+      24.f * s};
   const float intro_height = 32.f * s;
   layout.list_viewport = {
       layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
@@ -204,18 +210,21 @@ const char *category_label(std::string_view category) noexcept {
 
 ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
-                           std::size_t max_entries) {
+                           std::size_t max_entries,
+                           std::string_view category_prefix) {
   const auto events = history.feed(
       static_cast<std::uint64_t>(observer_civilization_id),
       -std::numeric_limits<double>::infinity());
   ChronicleSnapshot snap;
-  snap.total = events.size();
-  const auto begin = events.size() > max_entries ? events.end() - max_entries
-                                                 : events.begin();
-  snap.entries.reserve(static_cast<std::size_t>(events.end() - begin));
-  for (auto it = events.end(); it != begin;) {
+  snap.entries.reserve(std::min(max_entries, events.size()));
+  for (auto it = events.end(); it != events.begin();) {
     --it;
     const auto *event = *it;
+    if (!category_prefix.empty() &&
+        !event->category.starts_with(category_prefix))
+      continue;
+    ++snap.total;
+    if (snap.entries.size() >= max_entries) continue;
     const char *label = category_label(event->category);
     snap.entries.push_back({event->id,
                             label ? std::string(label) : event->category,
@@ -237,6 +246,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   scroll_ = 0.f;
   history_ = &history;
   observer_ = observer_civilization_id;
+  domain_filter_.clear();
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -249,8 +259,23 @@ void NativeChronicleView::close() noexcept {
 
 void NativeChronicleView::refresh() {
   if (!history_) return;
-  snapshot_ = snapshot(*history_, observer_);
+  snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_);
   scroll_ = 0.f;
+}
+
+void NativeChronicleView::cycle_domain() {
+  static constexpr std::array<std::string_view, 6> domains{
+      "construction.", "shipbuilding.", "research.",
+      "exploration.",   "colony.",       "war."};
+  if (domain_filter_.empty()) {
+    domain_filter_ = std::string(domains.front());
+  } else {
+    const auto it = std::ranges::find(domains, domain_filter_);
+    domain_filter_ = (it == domains.end() || it + 1 == domains.end())
+                         ? std::string{}
+                         : std::string(*(it + 1));
+  }
+  refresh();
 }
 
 bool NativeChronicleView::handle(const native_map::InputEvent &event,
@@ -285,6 +310,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Close;
     else if (layout.refresh_button.contains(event.position))
       press_target_ = PressTarget::Refresh;
+    else if (layout.domain_button.contains(event.position))
+      press_target_ = PressTarget::Domain;
     return true;
   }
   if (event.type == native_map::InputEventType::PointerMove &&
@@ -309,6 +336,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Refresh &&
            layout.refresh_button.contains(event.position))
     refresh();
+  else if (target == PressTarget::Domain &&
+           layout.domain_button.contains(event.position))
+    cycle_domain();
   return true;
 }
 
@@ -356,6 +386,25 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                 layout.close_button.y +
                     (layout.close_button.height - close_extent.height) * .5f},
                "X", muted_color, close_pixels, 0.f, layout.close_button,
+               TextAlign::Center);
+  stellar::engine::ui_skin::control(out, layout.domain_button,
+                                    layout.domain_button.contains(pointer_),
+                                    !domain_filter_.empty(), true, s);
+  const std::string domain_text =
+      domain_filter_.empty()
+          ? resolve(locale_, "CHRONICLE_FILTER_ALL", "ALL")
+          : upper(std::string(category_label(domain_filter_)));
+  const int domain_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));
+  const Text domain_probe{{}, domain_text, muted_color, domain_pixels,
+                          layout.domain_button.width - 4.f * s, std::nullopt,
+                          TextAlign::Center, FontFace::Interface};
+  const auto domain_extent = measure(measure_, domain_probe);
+  clipped_text(out,
+               {layout.domain_button.x + layout.domain_button.width * .5f,
+                layout.domain_button.y +
+                    (layout.domain_button.height - domain_extent.height) * .5f},
+               domain_text, muted_color, domain_pixels,
+               layout.domain_button.width - 4.f * s, layout.domain_button,
                TextAlign::Center);
   const std::array<std::string, 2> args{
       std::to_string(snapshot_.entries.size()),
