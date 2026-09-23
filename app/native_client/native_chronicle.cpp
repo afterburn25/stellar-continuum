@@ -114,7 +114,8 @@ struct CardLayout {
 // top-down (entries already newest-first), translated by scroll.
 struct ChronicleLayout {
   UiRect panel, header, close_button, refresh_button, domain_button,
-      significance_button, actor_button, list_viewport, empty_hint;
+      significance_button, actor_button, time_button, list_viewport,
+      empty_hint;
   std::optional<UiRect> focus_button; // clears the active tag focus
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
@@ -156,6 +157,9 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
   layout.actor_button = {layout.significance_button.x - 76.f * s,
                          layout.domain_button.y, 70.f * s,
                          layout.domain_button.height};
+  layout.time_button = {layout.actor_button.x - 70.f * s,
+                        layout.domain_button.y, 64.f * s,
+                        layout.domain_button.height};
   if (!tag_filter.empty())
     layout.focus_button = {layout.panel.x + pad, layout.domain_button.y,
                            104.f * s, layout.domain_button.height};
@@ -266,12 +270,11 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            std::size_t max_entries,
                            std::string_view category_prefix,
                            double min_significance, std::uint64_t actor,
-                           std::string_view tag) {
+                           std::string_view tag, double since_day) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
-  const auto events = history.feed(
-      observer, -std::numeric_limits<double>::infinity(),
-      min_significance);
+  const auto events =
+      history.feed(observer, since_day, min_significance);
   ChronicleSnapshot snap;
   snap.entries.reserve(std::min(max_entries, events.size()));
   for (auto it = events.end(); it != events.begin();) {
@@ -322,6 +325,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   significance_floor_ = 0.0;
   actor_filter_ = 0;
   tag_filter_.clear();
+  recency_window_ = 0.0;
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -334,9 +338,24 @@ void NativeChronicleView::close() noexcept {
 
 void NativeChronicleView::refresh() {
   if (!history_) return;
+  // Recency window rides the feed's own since_day bound; without a
+  // campaign-day source the filter is inert (all history).
+  const double since =
+      (recency_window_ > 0.0 && campaign_day_source_)
+          ? campaign_day_source_() - recency_window_
+          : -std::numeric_limits<double>::infinity();
   snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
-                       significance_floor_, actor_filter_, tag_filter_);
+                       significance_floor_, actor_filter_, tag_filter_,
+                       since);
   scroll_ = 0.f;
+}
+
+void NativeChronicleView::cycle_recency() {
+  static constexpr std::array<double, 3> windows{30.0, 365.0, 3650.0};
+  const auto it = std::ranges::find_if(
+      windows, [&](double w) { return recency_window_ < w - 1e-9; });
+  recency_window_ = it == windows.end() ? 0.0 : *it;
+  refresh();
 }
 
 void NativeChronicleView::cycle_actor() {
@@ -424,6 +443,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Significance;
     else if (layout.actor_button.contains(event.position))
       press_target_ = PressTarget::Actor;
+    else if (layout.time_button.contains(event.position))
+      press_target_ = PressTarget::Time;
     else if (layout.focus_button &&
              layout.focus_button->contains(event.position))
       press_target_ = PressTarget::FocusClear;
@@ -480,6 +501,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Actor &&
            layout.actor_button.contains(event.position))
     cycle_actor();
+  else if (target == PressTarget::Time &&
+           layout.time_button.contains(event.position))
+    cycle_recency();
   else if (target == PressTarget::Entry &&
            press_entry_ < layout.entries.size() &&
            layout.entries[press_entry_].bounds.contains(event.position) &&
@@ -629,6 +653,31 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
            (layout.actor_button.height - actor_extent.height) * .5f},
       actor_text, muted_color, domain_pixels,
       layout.actor_button.width - 4.f * s, layout.actor_button,
+      TextAlign::Center);
+  stellar::engine::ui_skin::control(out, layout.time_button,
+                                    layout.time_button.contains(pointer_),
+                                    recency_window_ > 0.0, true, s);
+  std::string time_text;
+  if (recency_window_ <= 0.0) {
+    time_text = resolve(locale_, "CHRONICLE_FILTER_ALL", "ALL");
+  } else if (recency_window_ < 365.0) {
+    time_text = resolve(locale_, "CHRONICLE_TIME_30D", "30D");
+  } else if (recency_window_ < 3650.0) {
+    time_text = resolve(locale_, "CHRONICLE_TIME_1Y", "1Y");
+  } else {
+    time_text = resolve(locale_, "CHRONICLE_TIME_10Y", "10Y");
+  }
+  const Text time_probe{{}, time_text, muted_color, domain_pixels,
+                        layout.time_button.width - 4.f * s, std::nullopt,
+                        TextAlign::Center, FontFace::Interface};
+  const auto time_extent = measure(measure_, time_probe);
+  clipped_text(
+      out,
+      {layout.time_button.x + layout.time_button.width * .5f,
+       layout.time_button.y +
+           (layout.time_button.height - time_extent.height) * .5f},
+      time_text, muted_color, domain_pixels,
+      layout.time_button.width - 4.f * s, layout.time_button,
       TextAlign::Center);
   if (layout.focus_button) {
     stellar::engine::ui_skin::control(

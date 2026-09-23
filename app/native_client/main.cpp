@@ -751,6 +751,9 @@ class NativeCampaign final {
       const auto it=std::ranges::find(world.civilizations,static_cast<int>(id),&Civilization::id);
       return it==world.civilizations.end()?std::string{}:it->name;
     });
+    chronicle_view_.set_campaign_day_source([this]{
+      return session_?session_->frame().clock().simulation_days():0.;
+    });
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     phenomena_.use_queue(image_preparation_);

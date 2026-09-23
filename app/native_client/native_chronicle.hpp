@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -58,14 +59,16 @@ struct ChronicleSnapshot {
 // "what a given empire actually did". `tag` (empty = off) restricts to
 // events carrying that exact reference tag ("fleet:12", "system:5") —
 // HistoryQuery::tag's semantics — so a tag chip becomes "everything
-// this entity did that we can see". `total` reports the filtered
-// visible count.
+// this entity did that we can see". `since_day` (default -inf) is the
+// feed's own recency bound — only events at or after that campaign day
+// appear. `total` reports the filtered visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
          std::string_view category_prefix = {},
          double min_significance = 0.0, std::uint64_t actor = 0,
-         std::string_view tag = {});
+         std::string_view tag = {},
+         double since_day = -std::numeric_limits<double>::infinity());
 
 class NativeChronicleView final {
 public:
@@ -115,6 +118,19 @@ public:
       std::function<std::string(std::uint64_t)> resolver) {
     actor_name_resolver_ = std::move(resolver);
   }
+  // Live campaign-day source for the recency filter — the day advances
+  // while the browser stays open, so it is queried per refresh rather
+  // than captured at open.
+  void set_campaign_day_source(std::function<double()> source) {
+    campaign_day_source_ = std::move(source);
+  }
+  // Cycles the recency window (all → last 30d → last year → last
+  // decade → all) and re-pulls — the feed's own `since_day` axis, so a
+  // bounded window still reaches deep history before the cap.
+  void cycle_recency();
+  [[nodiscard]] double recency_window() const noexcept {
+    return recency_window_;
+  }
   // Active entity-focus tag (set by clicking a card's tag chip, or
   // cleared via the focus button / re-clicking the focused chip).
   [[nodiscard]] std::string_view tag_filter() const noexcept {
@@ -150,7 +166,7 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Actor, Entry, Contact, Tag, FocusClear };
+                           Actor, Time, Entry, Contact, Tag, FocusClear };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -161,9 +177,11 @@ private:
   double significance_floor_{};
   std::uint64_t actor_filter_{};
   std::string tag_filter_;
+  double recency_window_{};
   std::size_t press_entry_{}, press_tag_{};
   std::optional<std::uint64_t> navigation_{}, contact_navigation_{};
   std::function<std::string(std::uint64_t)> actor_name_resolver_;
+  std::function<double()> campaign_day_source_;
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

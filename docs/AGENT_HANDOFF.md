@@ -213,7 +213,9 @@ through `navigation()` and the client enters that system (the
 workspace's observation check still gates visibility); entries with
 exactly one foreign actor get a DIP action opening the diplomacy
 workspace on that contact, and recorded reference tags render as
-clickable chips applying `HistoryQuery::tag`'s exact-match focus. The
+clickable chips applying `HistoryQuery::tag`'s exact-match focus, and
+a TIME button cycles the feed's `since_day` bound (all → 30d → 1y →
+10y) driven by a live campaign-day source. The
 transient
 feed mirrors it: chronicle-seeded reports carry `system_id` and render
 a VIEW SYSTEM action; the coalesced feedback path stays id-free.
@@ -223,7 +225,10 @@ retention landed too: `maintain_chronicle` (in
 reaches 90% of capacity it prunes routine records (<0.35 significance)
 older than 365 days so the bounded oldest-first eviction cannot
 discard majors; `campaign_event_history` tests cover trigger, content
-and determinism. Remaining: tag filtering in the browser.
+and determinism. All HistoryQuery axes (category, significance,
+actor, tag, since_day) now have browser surfaces; remaining
+presentation gaps are `before_day` (no upper-bound UI) and
+multi-select filter composition.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

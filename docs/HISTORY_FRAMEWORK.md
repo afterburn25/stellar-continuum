@@ -126,7 +126,10 @@ the notification view, and filterable by category domain via
 0.0 → 0.3 → 0.5 → 0.7, and an actor filter cycling all intel → the
 observer (MINE) → each other civilization appearing in the visible
 feed (`actors` exact-match; civ names resolve through an injected
-resolver, falling back to "CIV <id>") — all three filters apply
+resolver, falling back to "CIV <id>"), and a recency window cycling
+all → last 30d → last year → last decade (the feed's own `since_day`
+bound, driven by a live campaign-day source so it stays correct while
+the browser stays open) — all filters apply
 before the cap, so a filtered view still reaches deep history. Entries with a `location` are clickable:
 the view returns the system id through `navigation()` (same drain
 contract as the debug background), the client closes the overlay and
@@ -141,8 +144,8 @@ HistoryQuery::tag's exact-match semantics — so "everything fleet:12
 did that we can see" is one click away; re-clicking the focused chip
 or the X focus button in the intro row clears it. Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
-total, domain, significance, actor and tag filtering, entry and
-contact navigation, view lifecycle, refresh, render smoke).
+total, domain, significance, actor, tag and recency filtering, entry
+and contact navigation, view lifecycle, refresh, render smoke).
 
 The admission seeding in `native_notification_events` applies a fixed
 0.35 report floor via `feed()`'s `min_significance` — the category

@@ -362,6 +362,60 @@ void tag_focus() {
           "Focus button did not clear the tag focus");
 }
 
+void recency_filtering() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.summary = category;
+    event.category = std::move(category);
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "war.battle");
+  add(700., "colony.founded");
+  add(790., "exploration.system_surveyed");
+  add(799., "war.engagement_started"); // newest; campaign day is 800
+
+  // The snapshot's since_day rides feed()'s own bound.
+  auto snap =
+      snapshot(history, 1, 4000, {}, 0., 0, {}, 770.);
+  require(snap.total == 2 && snap.entries.size() == 2,
+          "since_day did not bound the snapshot");
+  snap = snapshot(history, 1, 4000, {}, 0., 0, {}, 435.);
+  require(snap.total == 3, "since_day missed mid-window events");
+
+  // The view's TIME cycle composes with the live day source.
+  NativeChronicleView view;
+  view.set_campaign_day_source([] { return 800.; });
+  view.open(history, 1);
+  require(view.current().entries.size() == 4 &&
+              view.recency_window() == 0.0,
+          "Open should start with all history");
+  view.cycle_recency(); // 30d
+  require(view.recency_window() == 30.0 &&
+              view.current().entries.size() == 2,
+          "30-day window kept wrong entries");
+  view.cycle_recency(); // 1y
+  require(view.recency_window() == 365.0 &&
+              view.current().entries.size() == 3,
+          "1-year window kept wrong entries");
+  view.cycle_recency(); // 10y
+  require(view.recency_window() == 3650.0 &&
+              view.current().entries.size() == 4,
+          "10-year window dropped entries");
+  view.cycle_recency(); // wrap to all
+  require(view.recency_window() == 0.0 &&
+              view.current().entries.size() == 4,
+          "Recency cycle did not wrap to all");
+
+  // Without a day source the window is inert — full history stays.
+  view.set_campaign_day_source(nullptr);
+  view.cycle_recency();
+  require(view.current().entries.size() == 4,
+          "Missing day source should leave the window inert");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -380,6 +434,7 @@ int main() {
     actor_filtering();
     entry_navigation();
     tag_focus();
+    recency_filtering();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {
