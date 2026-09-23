@@ -407,7 +407,7 @@ per-triangle) collision, no rigid-body solver, ground/`bounds` still use
 the world AABB, raycast is O(tris) per entity with no spatial partition,
 editor has no transform gizmos — see the registry record.
 
-**Recommended next workstream: the M11 render frontier.**
+**Recommended next workstream: the Core-adoption architecture decision.**
 The 2026-09-24 validation receipt records 294/294 native tests green on this
 branch — the failures in the 2026-09-20 receipt were resolved through the
 integration merge. A 2026-09-23 supplement
@@ -437,9 +437,14 @@ owns submission ordering/batching (full GPU binding key interned into
 material_id), `RenderGraph` schedules the scene→tonemap pass chain per
 frame, and `TextureStreamer` owns texture residency under a runtime-tunable
 byte budget (`Window::set_scene3d_texture_budget`) with pinned-fallback
-pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`). Remaining
+pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`,
+`streamed_evicted_bytes`, `Window::set_scene3d_texture_budget`). Remaining
 render limitations: no indirect draw, no per-mip partial residency (LOD
-clamping), bounded CPU submission. A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
+clamping), bounded CPU submission. A 315-test ctest run records 315/315
+green after the M11 chain, the editor trait-override annotation layer
+(AUTO/YES/NO overrides for anomaly/rare-resource/pre-warp flags on systems
+and bodies, round-tripping through the project codec), and the
+`campaign_colony_projection` adapter landed. A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
 Dijkstra relaxes each lane independently, so the edge a route uses is the
 cheapest connecting lane — the length helper now sums the minimum rather
 than the first lane id (test: parallel lanes of 9/2 ly report 2). The
