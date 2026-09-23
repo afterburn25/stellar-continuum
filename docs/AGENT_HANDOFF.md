@@ -111,13 +111,18 @@ whole loop is scriptable headlessly via `--create/--cook/--build/
 between SOURCE files and COOKED `runtime.stmanifest` records. The Scene
 tool authors `editor/scene.json` (`engine::SceneDocument` — named
 entities with position/extent/velocity/tint/optional sprite); the
-windowed starter spawns them into `World`, polls the file for hot
-reload, decodes `sprite` images from the base package content, drives an
-entity named `player` with WASD/arrow keys, and plays
-`audio/bounce.wav|mp3` on player bounce via `engine::audio`. The
-starter registers codecs for all its components and binds F5/F9 to
-`World::snapshot()`/`World::restore()` through `saves/quicksave.stw`
-(corrupt files fail safely; the player handle re-resolves by name).
+windowed starter is now a ~20-line `RuntimeHost` client: the engine's
+`stellar_engine_runtime` lib (`engine::RuntimeHost`, exported as
+`stellar::runtime`) owns the SDL loop, package scan, `ContentResolver`
+(cooked `Content/` or `build/cooked/` first, loose
+`packages/<id>/content/` fallback), `scene_components` ECS set
+(Transform2D/Velocity2D/Extent2D/Tint/EntityName/SpriteRef with
+registered codecs), `spawn_scene`/`scene_from_world`,
+scene-file hot reload, WASD player input, bounce+music audio, and
+F5/F9 `save_world_to_file`/`load_world_from_file` quicksave through
+`saves/quicksave.stw` (atomic write; corrupt files fail safely; the
+player handle re-resolves by name). Game code hooks in via
+`on_update`/`on_event`/`on_status`/`on_draw` callbacks.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in

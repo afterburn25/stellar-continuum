@@ -70,8 +70,8 @@ int main() {
     const std::string text{std::istreambuf_iterator<char>(input),
                            std::istreambuf_iterator<char>()};
     check(text.find("StellarEngineSdk.cmake") != std::string::npos &&
-              text.find("stellar::platform") != std::string::npos,
-          "CMakeLists consumes the engine SDK");
+              text.find("stellar::runtime") != std::string::npos,
+          "CMakeLists consumes the engine SDK runtime");
   }
   check(std::filesystem::exists(root / ".gitignore"),
         "scaffold writes .gitignore");
@@ -79,12 +79,10 @@ int main() {
     std::ifstream input(root / "src" / "main.cpp");
     const std::string text{std::istreambuf_iterator<char>(input),
                            std::istreambuf_iterator<char>()};
-    check(text.find("engine::save_world_to_file") != std::string::npos &&
-              text.find("engine::load_world_from_file") != std::string::npos &&
-              text.find("engine::register_scene_components") !=
-                  std::string::npos &&
-              text.find("engine::spawn_scene") != std::string::npos,
-          "windowed starter wires engine scene components and quicksave");
+    check(text.find("engine::RuntimeHost") != std::string::npos &&
+              text.find("host.run()") != std::string::npos &&
+              text.find("on_update") != std::string::npos,
+          "windowed starter is a RuntimeHost client");
   }
 
   // The blank template emits a console host linking stellar::engine only.

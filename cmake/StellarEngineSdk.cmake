@@ -8,6 +8,7 @@
 #   stellar::cooker    asset cooking + cooked-package runtime registry
 #   stellar::platform  windowed SDL3 host (Window, input, renderer)
 #   stellar::audio     AudioOutput + Media Foundation clip decode
+#   stellar::runtime   RuntimeHost windowed game loop (scene, ECS, save/load)
 #
 # Windows-only SDK; libraries are prebuilt and pinned to the engine build that
 # produced this export.
@@ -41,3 +42,8 @@ add_library(stellar::audio INTERFACE IMPORTED)
 set_target_properties(stellar::audio PROPERTIES
   INTERFACE_LINK_LIBRARIES
     "${STELLAR_ENGINE_SDK_ROOT}/lib/stellar_native_audio.lib;${STELLAR_ENGINE_SDK_ROOT}/lib/SDL3.lib;Mfplat;Mfreadwrite;Mfuuid;stellar::engine")
+
+add_library(stellar::runtime INTERFACE IMPORTED)
+set_target_properties(stellar::runtime PROPERTIES
+  INTERFACE_LINK_LIBRARIES
+    "${STELLAR_ENGINE_SDK_ROOT}/lib/stellar_engine_runtime.lib;stellar::platform;stellar::audio")

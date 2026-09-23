@@ -18,6 +18,17 @@ target_include_directories(stellar_native_platform PUBLIC engine/include)
 target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
   PRIVATE SDL3::SDL3 Gdi32 User32 Shell32)
 
+# Ready-made windowed 2D game host: owns the SDL loop, ECS world, scene
+# documents, content resolution, audio and quicksave so game projects get a
+# running loop from the engine instead of generated glue code.
+add_library(stellar_engine_runtime STATIC engine/src/runtime_host.cpp)
+target_include_directories(stellar_engine_runtime PUBLIC engine/include)
+target_link_libraries(stellar_engine_runtime PUBLIC stellar_engine
+  stellar_native_platform stellar_native_audio)
+if(MSVC)
+  target_compile_options(stellar_engine_runtime PRIVATE /WX)
+endif()
+
 # Standalone engine shell: a windowed host that links only the engine
 # libraries. It exists so the engine can run, be demonstrated, and be
 # shipped without the Stellar Continuum game module.
@@ -59,7 +70,7 @@ if(WIN32 AND TARGET stellar_asset_cooker)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:stellar_engine>"
       "$<TARGET_FILE:stellar_native_platform>" "$<TARGET_FILE:stellar_native_image>"
       "$<TARGET_FILE:stellar_texture_codecs>" "$<TARGET_FILE:stellar_asset_cooker>"
-      "$<TARGET_FILE:stellar_native_audio>"
+      "$<TARGET_FILE:stellar_native_audio>" "$<TARGET_FILE:stellar_engine_runtime>"
       "${STELLAR_ENGINE_SDK_DIR}/lib/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_importLibrary}"
       "${STELLAR_ENGINE_SDK_DIR}/lib/SDL3.lib"
@@ -76,6 +87,7 @@ if(WIN32 AND TARGET stellar_asset_cooker)
       "${STELLAR_ENGINE_SDK_DIR}/cmake/StellarEngineSdk.cmake"
     DEPENDS stellar_engine stellar_native_platform stellar_native_image
       stellar_texture_codecs stellar_asset_cooker stellar_native_audio
+      stellar_engine_runtime
     COMMENT "Exporting engine SDK to engine-sdk/")
   add_dependencies(stellar-engine stellar-engine-sdk)
 endif()
