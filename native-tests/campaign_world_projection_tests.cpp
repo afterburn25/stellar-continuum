@@ -291,6 +291,68 @@ int main() {
           "cyclic parent is a Critical invariant finding");
   }
 
+  // Incremental sync: surviving rows keep their EntityId, removed
+  // rows retire the handle and the legacy binding, new rows create
+  // fresh entities, moved parents re-resolve.
+  {
+    auto world = project_campaign_world(state);
+    const auto fleet_handle = *world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Fleet, 3));
+    const auto outpost_handle = *world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Colony, 7));
+
+    // No-op sync: every row updates in place, nothing drifts.
+    const auto noop = sync_campaign_world(world, state);
+    check(noop.created == 0 && noop.destroyed == 0 &&
+              noop.reparented == 0 && noop.updated == 13,
+          "unchanged state syncs without drift");
+    check(world.alive(fleet_handle) && world.alive(outpost_handle),
+          "surviving rows keep their handles");
+
+    auto drift = state;
+    drift.colonies.erase(drift.colonies.begin() + 1); // outpost 7 gone
+    drift.fleets[0].current_system_id = 5;            // fleet moves home
+    Colony fresh_colony;
+    fresh_colony.id = 8;
+    fresh_colony.civilization_id = 5;
+    fresh_colony.system_id = 9;
+    fresh_colony.kind = SettlementKind::ResourceOutpost;
+    drift.colonies.push_back(fresh_colony);
+
+    const auto delta = sync_campaign_world(world, drift);
+    check(delta.created == 1 && delta.destroyed == 1 &&
+              delta.updated == 12,
+          "sync counts created/destroyed/updated rows");
+    // The moved fleet and the newly attached colony both reparent.
+    check(delta.reparented == 2, "sync counts reparented entities");
+    check(world.alive(fleet_handle),
+          "moved fleet keeps its handle across the sync");
+    const auto home_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::System, 5));
+    check(home_entity && world.parent(fleet_handle) == home_entity,
+          "moved fleet reparents to its new system");
+    check(!world.alive(outpost_handle),
+          "removed row's handle goes stale");
+    check(!world.entity_for_legacy(
+              campaign_legacy_id(CampaignDomain::Colony, 7)),
+          "removed row clears the legacy binding");
+    const auto fresh_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Colony, 8));
+    check(fresh_entity && world.alive(*fresh_entity),
+          "new row creates a live entity");
+    check(fresh_entity && *fresh_entity != outpost_handle,
+          "reused index gets a fresh generation");
+
+    // Consumer-owned entities survive the sweep: an unbound entity
+    // and one bound outside the campaign namespaces are untouched.
+    const auto unbound = world.create();
+    const auto foreign = world.create();
+    world.bind_legacy(foreign, 0x7FFFFFFFFFFFFFFF);
+    (void)sync_campaign_world(world, drift);
+    check(world.alive(unbound) && world.alive(foreign),
+          "consumer-owned entities survive the reconcile sweep");
+  }
+
   // Census mirrors the projection contract on real-shaped state.
   {
     const auto census = campaign_world_projection_census(state);

@@ -98,6 +98,26 @@ void register_campaign_world_components(engine::World &world);
 [[nodiscard]] engine::World
 project_campaign_world(const FreshCampaignState &state);
 
+// Incremental refresh of a previously projected world: rows are
+// matched by namespaced legacy id, so surviving entities keep their
+// `EntityId` across syncs — a consumer can hold stable handles
+// between simulation days instead of rebuilding (and invalidating)
+// the whole store. New rows create entities, rows absent from the
+// state destroy their entity (stale handles retire per generational
+// id rules), tags refresh in place, and parents re-resolve under the
+// same rules as the initial projection.
+//
+// Only entities bound under `CampaignDomain` namespaces are
+// reconciled; entities a consumer added with other (or no) legacy
+// bindings are left alone. Returns the reconcile counts so callers
+// can measure drift between refreshes.
+struct CampaignWorldProjectionSync {
+  int created{}, updated{}, destroyed{}, reparented{};
+};
+
+CampaignWorldProjectionSync
+sync_campaign_world(engine::World &world, const FreshCampaignState &state);
+
 // Fidelity census over a projected store: per-domain tag counts, the
 // alive/legacy-bound entity totals, and how many entities carry a
 // resolved parent. Counts reflect the projection contract above —
