@@ -670,12 +670,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   external systems), and `treasury_arrears`/`treasury_depleted` from
   the authoritative `assess_treasury` — all previously surfaced only
   in workspace view-models or a player-scoped voice event, never in
-  developer diagnostics. `campaign_colony_projection`
+  developer diagnostics. Corrupt classifier inputs (non-finite/negative
+  credits or arrears) are skipped rather than thrown; `inspect_campaign_invariants`
+  now also covers colony `stability`/`stored_extracted_materials`,
+  building `condition`/`stored_power_days`, and economy
+  `operating_arrears` so such corruption is caught as a Critical
+  invariant finding instead of escaping the operations pass.
+  `campaign_colony_projection`
   tests — spec synthesis, flag fidelity, remaining-industry accounting,
   powered-set operating flags, unknown-type fallback, hub-less capacity
   floor, and the consumer paths (only worn/under-covered colonies
   flagged; civs missing economy/construction rows are skipped, not
-  thrown).
+  thrown; corrupt stability/condition/arrears flag invariants).
 - **Save/performance impact:** read-only projection — zero persistent
   state; settlement build is O(buildings) once per colony per daily
   diagnostics pass.

@@ -217,7 +217,10 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       if(records.size()<maximum){
         const auto eit=std::find_if(world.economies.begin(),world.economies.end(),
             [&](const auto &e){return e.civilization_id==civ.id;});
-        if(eit!=world.economies.end()&&std::isfinite(eit->credits)&&eit->credits>=0.0){
+        // assess_treasury rejects non-finite/negative inputs — corrupt
+        // values are invariant findings, not a reason to fail the pass.
+        if(eit!=world.economies.end()&&std::isfinite(eit->credits)&&eit->credits>=0.0&&
+           std::isfinite(eit->operating_arrears)&&eit->operating_arrears>=0.0){
           const auto flow=economy_credit_flow(econ,world.colonies,world.economies,civ.id);
           const auto health=assess_treasury(eit->credits,flow.net_credits_per_day,eit->operating_arrears);
           if(health.state==TreasuryHealthState::Arrears||health.state==TreasuryHealthState::Depleted){
@@ -325,15 +328,20 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     if(!systems.contains(c.system_id)||!civilizations.contains(c.civilization_id)||
         (c.planetary_body_id&&!bodies.contains(*c.planetary_body_id)))emit("colony","orphaned_colony",c.id,"Colony has an absent owner, system or body.");
     positive(c.population_millions,"Population",c.id,"colony");positive(c.infrastructure,"Infrastructure",c.id,"colony");
+    positive(c.stability,"Stability",c.id,"colony");
     positive(c.stored_food_population_days_millions,"Food reserve",c.id,"colony");
     positive(c.stored_water_population_days_millions,"Water reserve",c.id,"colony");
+    positive(c.stored_extracted_materials,"Extracted material reserve",c.id,"colony");
     (void)ids(c.surface_buildings,&SurfaceBuilding::id,"construction");
     for(const auto &b:c.surface_buildings){positive(b.industry_progress,"Building progress",b.id,"construction");
+      positive(b.condition,"Building condition",b.id,"construction");
+      positive(b.stored_power_days,"Building power reserve",b.id,"construction");
       if(!std::isfinite(b.x)||!std::isfinite(b.z))emit("construction","invalid_position",b.id,"Surface building position is not finite.");}
   }
   for(const auto &e:w.economies){
     if(!civilizations.contains(e.civilization_id))emit("economy","orphaned_economy",e.civilization_id,"Economy references an absent civilization.");
     positive(e.credits,"Credits",e.civilization_id,"economy");positive(e.industry,"Industry",e.civilization_id,"economy");positive(e.science,"Science",e.civilization_id,"economy");
+    positive(e.operating_arrears,"Operating arrears",e.civilization_id,"economy");
   }
   for(const auto &f:w.fleets){
     if(!civilizations.contains(f.civilization_id))emit("fleet","orphaned_fleet",f.id,"Fleet references an absent civilization.");

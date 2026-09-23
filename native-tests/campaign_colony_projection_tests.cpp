@@ -303,6 +303,42 @@ int main() {
           "logistics conditions, corridor gap and arrears each fire once");
   }
 
+  // Invariants: corrupt stability/condition/arrears surface as
+  // invalid_nonnegative_value findings (the ops pass skips those
+  // inputs rather than throwing).
+  {
+    FreshCampaignState world;
+    StellarSystem system;
+    system.id = 7;
+    system.name = "Test";
+    system.position = {0.0f, 0.0f};
+    world.systems.push_back(system);
+    Civilization civ;
+    civ.id = 1;
+    civ.name = "Corrupt Holdings";
+    civ.home_system_id = 7;
+    world.civilizations.push_back(civ);
+
+    auto bad = make_colony(30, 1);
+    bad.stability = -1.0;
+    bad.surface_buildings = {
+        building(1, "power_generator", true, true, /*condition=*/-0.5)};
+    world.colonies.push_back(bad);
+    CivilizationEconomy broken;
+    broken.civilization_id = 1;
+    broken.operating_arrears = -3.0;
+    world.economies.push_back(broken);
+
+    const auto findings = inspect_campaign_invariants(world, 0, 100.0);
+    int invalid = 0;
+    for (const auto &finding : findings)
+      if (finding.event_type == "invalid_nonnegative_value") ++invalid;
+    check(invalid == 3,
+          "stability, condition and arrears each flag invalid values");
+    // The ops pass skips the corrupt economy rather than throwing.
+    (void)inspect_campaign_operations(world, 0, 100.0);
+  }
+
   if (failures == 0)
     std::cout << "campaign colony projection tests passed\n";
   return failures;
