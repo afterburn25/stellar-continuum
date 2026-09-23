@@ -233,7 +233,11 @@ struct Editor {
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
-      hit_view{}, hit_project_name{}, hit_bkmk_filter{};
+      hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{};
+  // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
+  bool menu_open{};
+  UiRect menu_rect{};
+  std::vector<UiRect> menu_item_rects;
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path projects_dir, project_path;
   // Project open picker: *.json files under projects_dir, modal overlay.
@@ -902,6 +906,65 @@ void open_picker(Editor &ed) {
     ed.status = "no saved projects in " + ed.projects_dir.filename().string();
 }
 
+// FILE menu entries, in row order.
+constexpr std::array<const char *, 4> menu_labels{
+    "NEW PROJECT", "SAVE   ctrl+s", "RENAME / SAVE AS", "OPEN PROJECT...   ctrl+o"};
+
+// Executes a FILE menu item by row index.
+void run_menu_item(Editor &ed, Window &window, std::size_t item) {
+  switch (item) {
+  case 0: // New Project: clear the annotation document, keep the galaxy.
+    ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                       ed.project_name});
+    ed.edits.clear();
+    ed.body_edits.clear();
+    ed.project_name = "untitled";
+    ed.project_path = ed.projects_dir / "editor-project.json";
+    rebuild_filter(ed);
+    rebuild_detail_rows(ed);
+    ed.status = "new project";
+    break;
+  case 1:
+    save_project(ed);
+    break;
+  case 2: // Rename/Save-As: focus the name field; next SAVE writes <name>.json.
+    ed.editing = Field::ProjectName;
+    ed.edit_buffer = ed.project_name;
+    window.set_text_input(true);
+    ed.status = "rename the project - SAVE writes <name>.json";
+    break;
+  case 3:
+    open_picker(ed);
+    break;
+  }
+}
+
+// FILE dropdown panel under the toolbar button.
+void render_menu(DrawList &out, Editor &ed, float s) {
+  ed.menu_item_rects.clear();
+  if (!ed.menu_open) {
+    ed.menu_rect = {};
+    return;
+  }
+  const int font = static_cast<int>(13 * s);
+  const float rh = font + 12.f;
+  const float mw = 240 * s;
+  const UiRect r{ed.hit_file.x, ed.hit_file.y + ed.hit_file.height + 4 * s, mw,
+                 menu_labels.size() * rh + 12 * s};
+  ed.menu_rect = r;
+  out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
+  out.overlay.push_back(StrokedRectangle{r, accent});
+  float ry = r.y + 6 * s;
+  for (std::size_t i = 0; i < menu_labels.size(); ++i, ry += rh) {
+    const UiRect row{r.x + 4 * s, ry, r.width - 8 * s, rh};
+    ed.menu_item_rects.push_back(row);
+    if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    out.overlay.push_back(Text{{row.x + 10 * s, ry + (rh - font) * .5f - 1},
+                               menu_labels[i], ink, font, 0, row});
+  }
+}
+
 void render_viewport(DrawList &out, const Editor &ed, float s) {
   const auto &v = ed.viewport;
   // Circles draw in the legacy layer under the overlay panels, so the dark
@@ -1269,6 +1332,8 @@ int main(int argc, char **argv) {
         if (event.type == InputEventType::EscapePressed) {
           if (ed.picker_open) {
             ed.picker_open = false;
+          } else if (ed.menu_open) {
+            ed.menu_open = false;
           } else if (ed.editing != Field::None) {
             ed.editing = Field::None;
             window.set_text_input(false);
@@ -1292,6 +1357,15 @@ int main(int argc, char **argv) {
             apply_redo(ed);
           else
             apply_undo(ed);
+          continue;
+        }
+        // File shortcuts mirror the FILE menu.
+        if (event.type == InputEventType::KeyPressed && event.control &&
+            (event.key == 's' || event.key == 'o' || event.key == 'n')) {
+          commit_active_field(ed);
+          window.set_text_input(false);
+          run_menu_item(ed, window,
+                        event.key == 's' ? 1 : (event.key == 'o' ? 3 : 0));
           continue;
         }
         // Text editing takes precedence while a field has focus.
@@ -1398,6 +1472,18 @@ int main(int argc, char **argv) {
             // The picker owns input while open; a click outside dismisses it.
             if (!ed.picker_rect.contains(event.position))
               ed.picker_open = false;
+            continue;
+          }
+          if (ed.hit_file.contains(event.position)) {
+            ed.menu_open = !ed.menu_open;
+            continue;
+          }
+          if (ed.menu_open) {
+            // The menu owns input while open; clicks run items or dismiss.
+            for (std::size_t i = 0; i < ed.menu_item_rects.size(); ++i)
+              if (ed.menu_item_rects[i].contains(event.position))
+                run_menu_item(ed, window, i);
+            ed.menu_open = false;
             continue;
           }
           if (ed.hit_regen.contains(event.position)) {
@@ -1643,6 +1729,16 @@ int main(int argc, char **argv) {
             Image{ed.emblem, {bar.x + bar.width - 12 * s - 38 * s,
                               bar.y + 7 * s, 38 * s, 38 * s}});
 
+      ed.hit_file = {bar.x + 235 * s, bar.y + 10 * s, 56 * s, 32 * s};
+      draw.overlay.push_back(FilledRectangle{
+          ed.hit_file, ed.menu_open ? row_selected : button_fill});
+      draw.overlay.push_back(StrokedRectangle{ed.hit_file, panel_edge});
+      draw.overlay.push_back(
+          Text{{ed.hit_file.x + ed.hit_file.width * .5f,
+                ed.hit_file.y + 9 * s},
+               "FILE", ink, static_cast<int>(13 * s), ed.hit_file.width,
+               ed.hit_file, TextAlign::Center});
+
       float bx = bar.x + 300 * s;
       ed.hits.clear();
       ed.hit_sizes.clear();
@@ -1747,6 +1843,7 @@ int main(int argc, char **argv) {
                  "GENERATING...", accent, static_cast<int>(18 * s)});
       }
 
+      render_menu(draw, ed, s);
       render_picker(draw, ed, s, w, h); // topmost modal
       window.draw(draw);
       // Swap the seed shown in the toolbar only once generation committed.
