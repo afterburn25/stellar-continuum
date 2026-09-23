@@ -32,6 +32,7 @@
 #include <stellar/engine/colony.hpp>
 #include <stellar/engine/economy_catalog.hpp>
 #include <stellar/engine/resource_economy.hpp>
+#include <stellar/engine/strategic_ai.hpp>
 #include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
@@ -75,15 +76,17 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization, Simulation, Colony, Economy, Planet };
+                  Localization, Simulation, Colony, Economy, Planet,
+                  Ai };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
-                            Tool::Colony, Tool::Economy, Tool::Planet};
-constexpr std::array<const char *, 11> kToolNames{
+                            Tool::Colony, Tool::Economy, Tool::Planet,
+                            Tool::Ai};
+constexpr std::array<const char *, 12> kToolNames{
     "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
-    "Economy",  "Planet"};
+    "Economy",  "Planet",    "AI"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -371,6 +374,29 @@ struct Shell {
   UiRect hit_plan_profile{}, hit_plan_start{}, hit_plan_cancel{},
       hit_plan_step{}, hit_plan_run30{}, hit_plan_project{};
   int planet_project{0};
+
+  // AI tool: a StrategicMind debugger — a small deterministic world
+  // (minerals/mines/fleets/threat drift per day) with four registered
+  // UtilityActions across economy and military domains. DECIDE runs
+  // decide() at the campaign clock, RUN auto-advances, action rows
+  // toggle enabled live, and the bounded decision journal renders WHY
+  // the AI acted (utility, candidates, incumbent switches).
+  struct AiDemo {
+    bool initialized{false};
+    engine::StrategicMind mind{64};
+    double day{0.0};
+    double minerals{80.0};
+    double mines{1.0};
+    double tech{0.0};
+    double fleets{1.0};
+    double forts{0.0};
+    double threat{25.0};
+    bool running{false};
+    double run_accum{0.0};
+  } ai;
+  UiRect hit_ai_decide{}, hit_ai_run{}, hit_ai_threat_dn{},
+      hit_ai_threat_up{}, hit_ai_reset{};
+  std::vector<UiRect> hit_ai_actions;
   std::string status{"ready"};
 };
 
@@ -3711,6 +3737,126 @@ void render_planet(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+// ---- AI tool: StrategicMind utility decision debugger -----------------
+
+constexpr std::array<const char *, 4> kAiActions{
+    "expand.mining", "research.push", "build.fleet", "fortify"};
+
+void init_ai(Shell::AiDemo &ai) {
+  namespace eng = engine;
+  auto reg = [&ai](const char *id, const char *domain,
+                   std::function<double()> score,
+                   std::function<void()> commit, double cooldown,
+                   double weight = 1.0) {
+    ai.mind.add_action({.id = id, .domain = domain,
+                        .score = std::move(score),
+                        .commit = std::move(commit),
+                        .cooldown_days = cooldown,
+                        .weight = weight});
+  };
+  reg("expand.mining", "economy",
+      [&ai] { return ai.minerals < 100.0 ? 0.8 : 0.3; },
+      [&ai] { ai.mines += 1.0; }, 15.0);
+  reg("research.push", "economy",
+      [&ai] { return ai.minerals >= 100.0 ? 0.7 : 0.2; },
+      [&ai] { ai.tech += 1.0; ai.minerals -= 50.0; }, 20.0);
+  reg("build.fleet", "military",
+      [&ai] { return std::min(1.0, ai.threat / 50.0 + 0.1); },
+      [&ai] { ai.fleets += 1.0; ai.minerals -= 40.0; ai.threat -= 15.0; },
+      30.0);
+  reg("fortify", "military",
+      [&ai] { return ai.threat < 20.0 ? 0.4 : 0.1; },
+      [&ai] { ai.forts += 1.0; ai.minerals -= 15.0; }, 15.0);
+  ai.initialized = true;
+}
+
+void render_ai(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &ai = shell.ai;
+  if (!ai.initialized) init_ai(ai);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "AI DEBUGGER");
+
+  shell.hit_ai_decide = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_ai_decide, "DECIDE", !ai.running, font, s);
+  shell.hit_ai_run = {x + 100 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_ai_run, ai.running ? "PAUSE" : "RUN",
+               ai.running, font, s);
+  shell.hit_ai_threat_dn = {x + 190 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_ai_threat_dn, "-", false, font, s);
+  shell.hit_ai_threat_up = {x + 224 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_ai_threat_up, "+", false, font, s);
+  out.overlay.push_back(Text{{x + 262 * s, y + 4 * s}, "threat", muted,
+                             font});
+  shell.hit_ai_reset = {x + 340 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_ai_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", ai.day);
+  line(out, x, y, "date", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f (+%.1f/d)", ai.minerals,
+                ai.mines * 2.0 - ai.fleets * 0.5);
+  line(out, x, y, "minerals", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f mines  %.0f fleets  %.0f forts",
+                ai.mines, ai.fleets, ai.forts);
+  line(out, x, y, "assets", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f  (tech %.0f)", ai.threat, ai.tech);
+  line(out, x, y, "threat", buf, font);
+  for (const char *domain : {"economy", "military"}) {
+    const auto inc = ai.mind.incumbent(domain);
+    line(out, x, y, domain,
+         inc ? *inc + "  (day " +
+                   std::to_string(static_cast<int>(
+                       ai.mind.last_commit_day(domain))) +
+                   ")"
+             : "none committed", font);
+  }
+  y += 6 * s;
+
+  // Action table — live utility scores, click toggles enabled.
+  heading(out, x, y, "ACTIONS");
+  const float row_h = 22 * s;
+  shell.hit_ai_actions.resize(kAiActions.size());
+  for (std::size_t i = 0; i < kAiActions.size(); ++i) {
+    const auto *action = ai.mind.action(kAiActions[i]);
+    if (!action) continue;
+    shell.hit_ai_actions[i] = {x, y, body.width * 0.46f, row_h};
+    out.overlay.push_back(FilledRectangle{shell.hit_ai_actions[i],
+                                          {6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "%-16s %-8s util %.2f  w%.1f  cd %.0fd%s",
+                  action->id.c_str(), action->domain.c_str(),
+                  action->score(), action->weight, action->cooldown_days,
+                  action->enabled ? "" : "  DISABLED");
+    out.overlay.push_back(
+        Text{{x + 6 * s, y + 4 * s}, buf,
+             action->enabled ? ink : muted, font});
+    y += row_h + 2 * s;
+  }
+  y += 6 * s;
+
+  // Decision journal — newest first.
+  heading(out, x, y, "JOURNAL");
+  const auto &journal = ai.mind.journal();
+  if (journal.empty()) {
+    line(out, x, y, "state", "no decisions — DECIDE or RUN", font);
+  } else {
+    std::size_t shown = 0;
+    for (auto it = journal.rbegin();
+         it != journal.rend() && shown < 12; ++it, ++shown) {
+      std::snprintf(buf, sizeof(buf), "d%.0f  %-8s %-16s u%.2f  %u cand%s",
+                    it->at_day, it->domain.c_str(), it->action_id.c_str(),
+                    it->utility, it->candidates,
+                    it->switched ? "  SWITCH" : "");
+      out.overlay.push_back(Text{{x, y}, buf, muted, font});
+      y += 15 * s;
+    }
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -5022,6 +5168,9 @@ int main(int argc, char **argv) {
       case Tool::Planet:
         render_planet(draw, shell, body, s);
         break;
+      case Tool::Ai:
+        render_ai(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -5337,6 +5486,40 @@ int main(int argc, char **argv) {
             }
           }
         }
+        if (shell.tool == Tool::Ai &&
+            event.type == InputEventType::LeftReleased) {
+          auto &ai = shell.ai;
+          auto tick_day = [&ai] {
+            ai.minerals = std::max(0.0, ai.minerals + ai.mines * 2.0 -
+                                            ai.fleets * 0.5);
+            ai.threat += 1.0;
+            ai.day += 1.0;
+            ai.mind.decide("economy", ai.day, 0.0, 1.1);
+            ai.mind.decide("military", ai.day, 0.0, 1.1);
+          };
+          if (shell.hit_ai_decide.contains(event.position)) {
+            for (int i = 0; i < 5; ++i) tick_day();
+          } else if (shell.hit_ai_run.contains(event.position)) {
+            ai.running = !ai.running;
+            ai.run_accum = 0.0;
+          } else if (shell.hit_ai_threat_dn.contains(event.position)) {
+            ai.threat = std::max(0.0, ai.threat - 10.0);
+          } else if (shell.hit_ai_threat_up.contains(event.position)) {
+            ai.threat += 10.0;
+          } else if (shell.hit_ai_reset.contains(event.position)) {
+            ai = Shell::AiDemo{};
+            init_ai(ai);
+          } else {
+            for (std::size_t i = 0; i < shell.hit_ai_actions.size(); ++i) {
+              if (shell.hit_ai_actions[i].contains(event.position)) {
+                const auto *action = ai.mind.action(kAiActions[i]);
+                if (action)
+                  ai.mind.set_enabled(action->id, !action->enabled);
+                break;
+              }
+            }
+          }
+        }
       }
 
       FrameTiming timing;
@@ -5356,6 +5539,19 @@ int main(int argc, char **argv) {
         if (shell.sim.run_accum >= 0.5) {
           shell.sim.run_accum = 0.0;
           shell.sim.last = shell.sim.executor.advance();
+        }
+      }
+      if (shell.tool == Tool::Ai && shell.ai.running) {
+        shell.ai.run_accum += elapsed;
+        if (shell.ai.run_accum >= 0.25) {
+          shell.ai.run_accum = 0.0;
+          auto &ai = shell.ai;
+          ai.minerals = std::max(
+              0.0, ai.minerals + ai.mines * 2.0 - ai.fleets * 0.5);
+          ai.threat += 1.0;
+          ai.day += 1.0;
+          ai.mind.decide("economy", ai.day, 0.0, 1.1);
+          ai.mind.decide("military", ai.day, 0.0, 1.1);
         }
       }
     }
