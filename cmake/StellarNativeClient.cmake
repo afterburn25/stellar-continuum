@@ -59,6 +59,7 @@ if(WIN32 AND TARGET stellar_asset_cooker)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:stellar_engine>"
       "$<TARGET_FILE:stellar_native_platform>" "$<TARGET_FILE:stellar_native_image>"
       "$<TARGET_FILE:stellar_texture_codecs>" "$<TARGET_FILE:stellar_asset_cooker>"
+      "$<TARGET_FILE:stellar_native_audio>"
       "${STELLAR_ENGINE_SDK_DIR}/lib/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_importLibrary}"
       "${STELLAR_ENGINE_SDK_DIR}/lib/SDL3.lib"
@@ -74,7 +75,7 @@ if(WIN32 AND TARGET stellar_asset_cooker)
       "${CMAKE_CURRENT_LIST_DIR}/StellarEngineSdk.cmake"
       "${STELLAR_ENGINE_SDK_DIR}/cmake/StellarEngineSdk.cmake"
     DEPENDS stellar_engine stellar_native_platform stellar_native_image
-      stellar_texture_codecs stellar_asset_cooker
+      stellar_texture_codecs stellar_asset_cooker stellar_native_audio
     COMMENT "Exporting engine SDK to engine-sdk/")
   add_dependencies(stellar-engine stellar-engine-sdk)
 endif()
