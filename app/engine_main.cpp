@@ -13,7 +13,9 @@
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/package.hpp>
 #include <stellar/engine/profiler.hpp>
+#include <stellar/engine/project.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -45,11 +47,12 @@ constexpr Color bar_fill{24, 90, 120, 255};
 constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
-enum class Tool { Dashboard, Assets, Profiler, Localization };
-constexpr std::array kTools{Tool::Dashboard, Tool::Assets, Tool::Profiler,
-                            Tool::Localization};
-constexpr std::array<const char *, 4> kToolNames{"Dashboard", "Assets",
-                                                 "Profiler", "Localization"};
+enum class Tool { Projects, Dashboard, Assets, Profiler, Localization };
+constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Assets,
+                            Tool::Profiler, Tool::Localization};
+constexpr std::array<const char *, 5> kToolNames{"Projects", "Dashboard",
+                                                 "Assets", "Profiler",
+                                                 "Localization"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -102,6 +105,24 @@ struct Shell {
   // Localization inspector.
   engine::VirtualizedList key_list;
   std::vector<std::string> sample_keys;
+
+  // Projects tool: directories containing project.stellar.json under
+  // `projects_root`, plus the currently open project's package state.
+  std::filesystem::path projects_root;
+  std::vector<std::filesystem::path> projects;
+  engine::VirtualizedList project_list;
+  std::size_t selected_project{static_cast<std::size_t>(-1)};
+  std::optional<engine::EngineProject> project;
+  engine::PackageRegistry package_registry;
+  engine::PackageLoadPlan load_plan;
+  std::vector<std::string> package_errors;
+  // New-project name field and panel hit regions.
+  bool editing_project_name{};
+  std::string project_name_buffer;
+  UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
+      hit_project_close{};
+  UiRect project_rows{};
+  std::string status{"ready"};
 };
 
 void line(DrawList &out, float x, float &y, std::string label,
@@ -117,8 +138,8 @@ void heading(DrawList &out, float x, float &y, const std::string &title) {
   y += 26.f;
 }
 
-void scan_assets(Shell &shell) {
-  shell.asset_root = find_path("assets");
+void scan_assets(Shell &shell, std::filesystem::path root) {
+  shell.asset_root = std::move(root);
   shell.asset_files.clear();
   std::error_code ec;
   if (!std::filesystem::is_directory(shell.asset_root, ec)) return;
@@ -132,6 +153,68 @@ void scan_assets(Shell &shell) {
   std::ranges::sort(shell.asset_files);
   shell.asset_list.row_count = shell.asset_files.size();
   shell.asset_list.row_height = 22.f;
+}
+
+// Projects tool -----------------------------------------------------------
+//
+// A game project is a directory with project.stellar.json (engine/project).
+// Opening one loads its manifest, scans its content roots into the package
+// registry, resolves the load plan, and re-roots the asset browser at the
+// project's own content so the shell works on the new game rather than on
+// the host repository's assets.
+
+void refresh_projects(Shell &shell) {
+  shell.projects = engine::find_projects(shell.projects_root);
+  shell.project_list.row_count = shell.projects.size();
+  shell.project_list.row_height = 24.f;
+  if (shell.selected_project >= shell.projects.size())
+    shell.selected_project = shell.projects.empty()
+                                 ? static_cast<std::size_t>(-1)
+                                 : shell.projects.size() - 1;
+}
+
+void open_project(Shell &shell, const std::filesystem::path &root) {
+  std::string error;
+  auto loaded = engine::EngineProject::load(root, &error);
+  if (!loaded) {
+    shell.status = "open failed: " + error;
+    return;
+  }
+  shell.project = std::move(*loaded);
+  shell.package_registry = engine::PackageRegistry{};
+  shell.package_registry.protect_namespace(shell.project->id);
+  shell.package_errors.clear();
+  std::size_t count = 0;
+  for (const auto &dir : shell.project->content_dirs)
+    count += engine::scan_packages(shell.package_registry,
+                                   (root / dir).string(),
+                                   &shell.package_errors);
+  shell.load_plan = shell.package_registry.resolve();
+  scan_assets(shell, root / shell.project->content_dirs.front());
+  shell.status = "opened " + shell.project->name + " - " +
+                 std::to_string(count) + " package(s), load plan " +
+                 (shell.load_plan.ok ? "ok" : "FAILED");
+}
+
+void close_project(Shell &shell) {
+  shell.project.reset();
+  scan_assets(shell, find_path("assets"));
+  shell.status = "project closed - browsing host assets";
+}
+
+void create_project_from_field(Shell &shell) {
+  std::string error;
+  const std::string name =
+      shell.project_name_buffer.empty() ? "untitled" : shell.project_name_buffer;
+  const auto id = engine::sanitize_project_id(name);
+  const auto dir = shell.projects_root / id.substr(5);
+  if (engine::create_project(dir, name, STELLAR_ENGINE_VERSION, &error)) {
+    shell.status = "created " + dir.filename().string();
+    shell.project_name_buffer.clear();
+    refresh_projects(shell);
+  } else {
+    shell.status = "create failed: " + error;
+  }
 }
 
 void render_dashboard(DrawList &out, const Shell &shell, UiRect body, float s,
@@ -327,6 +410,111 @@ void render_localization(DrawList &out, Shell &shell, UiRect body, float s,
   }
 }
 
+void shell_button(DrawList &out, const UiRect &rect, const char *label,
+                  bool active, int font, float s) {
+  out.overlay.push_back(
+      FilledRectangle{rect, active ? row_selected : Color{16, 40, 56, 255}});
+  out.overlay.push_back(StrokedRectangle{rect, panel_edge});
+  out.overlay.push_back(Text{{rect.x + rect.width * .5f, rect.y + 7 * s},
+                             label, ink, font, rect.width, rect,
+                             TextAlign::Center});
+}
+
+void field_box(DrawList &out, const UiRect &rect, const std::string &value,
+               bool editing, const char *hint, int font, float s) {
+  out.overlay.push_back(FilledRectangle{rect, {4, 12, 20, 255}});
+  out.overlay.push_back(
+      StrokedRectangle{rect, editing ? accent : panel_edge});
+  out.overlay.push_back(Text{
+      {rect.x + 8 * s, rect.y + 7 * s},
+      value.empty() ? hint : value,
+      value.empty() ? muted : ink, font, rect.width - 12 * s, rect});
+}
+
+void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+
+  heading(out, x, y, "GAME PROJECTS");
+  line(out, x, y, "projects root", shell.projects_root.string(), font);
+  if (shell.project) {
+    line(out, x, y, "open project",
+         shell.project->name + "  (" + shell.project->id + ")", font);
+    line(out, x, y, "path", shell.project->root.generic_string(), font);
+    line(out, x, y, "engine", shell.project->engine_version, font);
+    const auto &plan = shell.load_plan;
+    line(out, x, y, "load plan",
+         std::to_string(plan.order.size()) + " packages, " +
+             std::to_string(plan.conflicts.size()) + " conflicts, " +
+             std::to_string(plan.errors.size() + shell.package_errors.size()) +
+             " errors",
+         font);
+    for (const auto &pkg : plan.order)
+      line(out, x, y, "  package",
+           pkg.id + "  v" + pkg.version.to_string(), font);
+    for (const auto &e : plan.errors)
+      line(out, x, y, "  error", e, font);
+    for (const auto &e : shell.package_errors)
+      line(out, x, y, "  scan error", e, font);
+  } else {
+    line(out, x, y, "open project", "none - browsing host assets", font);
+  }
+  y += 6 * s;
+
+  // New-project row: name field + CREATE.
+  const float field_w = body.width * .5f - 120 * s;
+  shell.hit_project_name = {x, y, field_w, (font + 14) * s};
+  field_box(out, shell.hit_project_name,
+            shell.editing_project_name ? shell.project_name_buffer : "",
+            shell.editing_project_name, "new project name...", font, s);
+  shell.hit_project_create = {x + field_w + 8 * s, y, 108 * s,
+                              shell.hit_project_name.height};
+  shell_button(out, shell.hit_project_create, "CREATE", false, font, s);
+  float bx = shell.hit_project_create.x + shell.hit_project_create.width +
+             10 * s;
+  if (shell.selected_project < shell.projects.size()) {
+    shell.hit_project_open = {bx, y, 96 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_open, "OPEN", false, font, s);
+    bx += 106 * s;
+  } else {
+    shell.hit_project_open = {};
+  }
+  if (shell.project) {
+    shell.hit_project_close = {bx, y, 96 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_close, "CLOSE", false, font, s);
+  } else {
+    shell.hit_project_close = {};
+  }
+  y += shell.hit_project_name.height + 14 * s;
+
+  // Discovered projects under the root.
+  shell.project_rows = {x, y, body.width * .5f - 22 * s,
+                        body.y + body.height - y - 16 * s};
+  out.overlay.push_back(FilledRectangle{shell.project_rows, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{shell.project_rows, panel_edge});
+  shell.project_list.viewport_height = shell.project_rows.height;
+  const auto range = shell.project_list.visible_range();
+  float ry = shell.project_rows.y - shell.project_list.scroll_offset +
+             range.first * shell.project_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += shell.project_list.row_height) {
+    const UiRect row{shell.project_rows.x, ry, shell.project_rows.width,
+                     shell.project_list.row_height};
+    const bool is_open =
+        shell.project && shell.project->root == shell.projects[i];
+    if (i == shell.selected_project)
+      out.overlay.push_back(FilledRectangle{row, row_selected});
+    else if (row.contains(Point{shell.pointer_x, shell.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    out.overlay.push_back(
+        Text{{row.x + 8 * s, row.y + 5 * s},
+             shell.projects[i].filename().generic_string() +
+                 (is_open ? "   [open]" : ""),
+             is_open ? accent : ink, font, 0, shell.project_rows});
+  }
+}
+
 void select_asset(Shell &shell, std::size_t index) {
   shell.selected_asset = index;
   const auto &path = shell.asset_files[index];
@@ -377,7 +565,10 @@ int main(int argc, char **argv) {
     }
 
     Shell shell;
-    scan_assets(shell);
+    shell.projects_root = find_path("projects");
+    std::filesystem::create_directories(shell.projects_root);
+    refresh_projects(shell);
+    scan_assets(shell, find_path("assets"));
     for (const char *probe :
          {"GENERAL_TITLE", "STARTUP_TITLE", "MENU_RESUME", "ECONOMY_TITLE",
           "RESEARCH_TITLE", "FLEET_TITLE", "SYSTEM_BACK",
@@ -408,7 +599,34 @@ int main(int argc, char **argv) {
       shell.pointer_x = snapshot.pointer.x;
       shell.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
-        if (event.type == InputEventType::EscapePressed) return 0;
+        if (event.type == InputEventType::EscapePressed) {
+          if (shell.editing_project_name) {
+            shell.editing_project_name = false;
+            window.set_text_input(false);
+            continue;
+          }
+          return 0;
+        }
+        // New-project name field editing takes precedence in the tool.
+        if (shell.editing_project_name) {
+          if (event.type == InputEventType::TextEntered) {
+            if (shell.project_name_buffer.size() < 80)
+              shell.project_name_buffer += event.text;
+            continue;
+          }
+          if (event.type == InputEventType::BackspacePressed) {
+            if (!shell.project_name_buffer.empty())
+              shell.project_name_buffer.pop_back();
+            continue;
+          }
+          if (event.type == InputEventType::KeyPressed &&
+              event.key == '\r') {
+            shell.editing_project_name = false;
+            window.set_text_input(false);
+            create_project_from_field(shell);
+            continue;
+          }
+        }
         switch (event.type) {
         case InputEventType::PointerMove: last_input = "pointer move"; break;
         case InputEventType::LeftPressed: last_input = "left press"; break;
@@ -417,10 +635,40 @@ int main(int argc, char **argv) {
           for (std::size_t i = 0; i < shell.tool_hits.size(); ++i)
             if (shell.tool_hits[i].contains(event.position))
               shell.tool = kTools[i];
+          if (shell.tool == Tool::Projects) {
+            if (shell.hit_project_name.contains(event.position)) {
+              shell.editing_project_name = true;
+              window.set_text_input(true);
+            } else if (shell.editing_project_name) {
+              shell.editing_project_name = false;
+              window.set_text_input(false);
+            }
+            if (shell.hit_project_create.contains(event.position))
+              create_project_from_field(shell);
+            else if (shell.hit_project_open.contains(event.position) &&
+                     shell.selected_project < shell.projects.size())
+              open_project(shell, shell.projects[shell.selected_project]);
+            else if (shell.hit_project_close.contains(event.position))
+              close_project(shell);
+            else if (shell.project_rows.contains(event.position)) {
+              const auto row = static_cast<std::size_t>(std::max(
+                  0.f, std::floor((event.position.y - shell.project_rows.y +
+                                   shell.project_list.scroll_offset) /
+                                  shell.project_list.row_height)));
+              if (row < shell.projects.size()) shell.selected_project = row;
+            }
+          } else if (shell.editing_project_name) {
+            shell.editing_project_name = false;
+            window.set_text_input(false);
+          }
           break;
         }
         case InputEventType::Wheel:
           last_input = "wheel";
+          if (shell.tool == Tool::Projects &&
+              shell.project_rows.contains(event.position))
+            shell.project_list.scroll_to(shell.project_list.scroll_offset -
+                                         event.wheel_y * 40.f);
           break;
         case InputEventType::KeyPressed:
         case InputEventType::KeyReleased: last_input = "key"; break;
@@ -500,6 +748,9 @@ int main(int argc, char **argv) {
 
       const auto stats = jobs.stats();
       switch (shell.tool) {
+      case Tool::Projects:
+        render_projects(draw, shell, body, s);
+        break;
       case Tool::Dashboard:
         render_dashboard(draw, shell, body, s, stats, demo_jobs_done.load(),
                          locale.size(), locale_status, window,
@@ -517,7 +768,7 @@ int main(int argc, char **argv) {
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
-                               "ESC to quit - F12 screenshots", muted,
+                               shell.status + "  |  ESC to quit - F12 screenshots", muted,
                                static_cast<int>(11 * s)});
 
       // Deferred input handling that needs this frame's list geometry.

@@ -1,0 +1,194 @@
+#include <stellar/engine/project.hpp>
+
+#include <stellar/engine/atomic_file_write.hpp>
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <cctype>
+#include <cstddef>
+#include <fstream>
+#include <iterator>
+#include <span>
+#include <sstream>
+#include <system_error>
+
+namespace stellar::engine {
+namespace {
+
+constexpr int kSchemaVersion = 1;
+
+std::string read_text(const std::filesystem::path &path, bool &ok) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    ok = false;
+    return {};
+  }
+  ok = true;
+  return {std::istreambuf_iterator<char>(input),
+          std::istreambuf_iterator<char>()};
+}
+
+bool write_text(const std::filesystem::path &path, const std::string &text,
+                std::string *error) {
+  try {
+    write_file_atomically(path, std::as_bytes(std::span(text)));
+    return true;
+  } catch (const std::exception &ex) {
+    if (error != nullptr) *error = ex.what();
+    return false;
+  }
+}
+
+} // namespace
+
+std::string sanitize_project_id(std::string_view name) {
+  std::string slug;
+  slug.reserve(name.size());
+  bool last_dash = true; // trim leading separators
+  for (const unsigned char c : name) {
+    if (std::isalnum(c)) {
+      slug.push_back(static_cast<char>(std::tolower(c)));
+      last_dash = false;
+    } else if (!last_dash) {
+      slug.push_back('-');
+      last_dash = true;
+    }
+  }
+  while (!slug.empty() && slug.back() == '-')
+    slug.pop_back();
+  if (slug.empty()) slug = "project";
+  return "game." + slug;
+}
+
+std::optional<EngineProject>
+EngineProject::load(const std::filesystem::path &root, std::string *error) {
+  auto fail = [&](const std::string &message) {
+    if (error != nullptr) *error = message;
+    return std::nullopt;
+  };
+  const auto path = root / std::string(manifest_filename);
+  bool ok = false;
+  const auto text = read_text(path, ok);
+  if (!ok) return fail("cannot read " + path.string());
+
+  nlohmann::json doc;
+  try {
+    doc = nlohmann::json::parse(text);
+  } catch (const std::exception &ex) {
+    return fail(std::string{"manifest parse failed: "} + ex.what());
+  }
+  if (!doc.is_object()) return fail("manifest must be a JSON object");
+  if (doc.value("schemaVersion", 0) != kSchemaVersion)
+    return fail("unsupported project schemaVersion");
+
+  EngineProject project;
+  project.root = root;
+  project.name = doc.value("name", std::string{});
+  project.id = doc.value("id", std::string{});
+  project.engine_version = doc.value("engine", std::string{});
+  if (project.name.empty()) return fail("manifest requires a 'name'");
+  if (project.id.empty()) return fail("manifest requires an 'id'");
+
+  if (doc.contains("content")) {
+    if (!doc.at("content").is_array())
+      return fail("'content' must be an array of directory paths");
+    for (const auto &entry : doc.at("content")) {
+      if (!entry.is_string()) return fail("'content' entries must be strings");
+      const auto dir = entry.get<std::string>();
+      if (dir.empty() || std::filesystem::path(dir).is_absolute() ||
+          dir.find("..") != std::string::npos)
+        return fail("'content' entries must be relative in-root paths");
+      project.content_dirs.push_back(dir);
+    }
+  }
+  if (project.content_dirs.empty()) project.content_dirs.push_back("packages");
+  return project;
+}
+
+std::string EngineProject::to_json() const {
+  nlohmann::json doc;
+  doc["schemaVersion"] = kSchemaVersion;
+  doc["name"] = name;
+  doc["id"] = id;
+  doc["engine"] = engine_version;
+  doc["content"] = content_dirs;
+  return doc.dump(2) + "\n";
+}
+
+bool create_project(const std::filesystem::path &root, std::string_view name,
+                    std::string_view engine_version, std::string *error) {
+  auto fail = [&](const std::string &message) {
+    if (error != nullptr) *error = message;
+    return false;
+  };
+  std::error_code ec;
+  if (std::filesystem::exists(root / std::string(EngineProject::manifest_filename), ec))
+    return fail("a project manifest already exists at " + root.string());
+  const std::string display{name.empty() ? "untitled" : std::string(name)};
+  const std::string id = sanitize_project_id(name);
+
+  EngineProject project;
+  project.root = root;
+  project.name = display;
+  project.id = id;
+  project.engine_version = std::string(engine_version);
+  project.content_dirs = {"packages"};
+
+  // Layout: manifest, one base content package that owns the project
+  // namespace, an empty content directory inside it, and a starter host
+  // source file.
+  const auto package_dir = root / "packages" / id;
+  std::filesystem::create_directories(package_dir / "content", ec);
+  if (ec) return fail("cannot create " + package_dir.string() + ": " + ec.message());
+  std::filesystem::create_directories(root / "src", ec);
+  if (ec) return fail("cannot create src directory: " + ec.message());
+
+  if (!write_text(root / std::string(EngineProject::manifest_filename),
+                  project.to_json(), error))
+    return false;
+
+  nlohmann::json package;
+  package["id"] = id;
+  package["name"] = display;
+  package["version"] = "0.1.0";
+  package["priority"] = 0;
+  package["provides"] = {id};
+  if (!write_text(package_dir / "package.json", package.dump(2) + "\n",
+                  error))
+    return false;
+
+  std::ostringstream stub;
+  stub << "// " << display << " - Stellar Engine game host.\n"
+       << "// Link stellar_engine (+ stellar_native_platform for a window)\n"
+       << "// and drive your content through the package registry.\n"
+       << "#include <stellar/engine/foundation.hpp>\n"
+       << "#include <stellar/engine/package.hpp>\n\n"
+       << "int main() {\n"
+       << "  stellar::engine::PackageRegistry registry;\n"
+       << "  registry.protect_namespace(\"" << id << "\");\n"
+       << "  stellar::engine::scan_packages(registry, \"packages\");\n"
+       << "  const auto plan = registry.resolve();\n"
+       << "  return plan.ok ? 0 : 1;\n"
+       << "}\n";
+  if (!write_text(root / "src" / "main.cpp", stub.str(), error))
+    return false;
+  return true;
+}
+
+std::vector<std::filesystem::path>
+find_projects(const std::filesystem::path &directory) {
+  std::vector<std::filesystem::path> out;
+  std::error_code ec;
+  if (!std::filesystem::is_directory(directory, ec)) return out;
+  for (const auto &entry : std::filesystem::directory_iterator(directory, ec)) {
+    if (!entry.is_directory(ec)) continue;
+    if (std::filesystem::exists(
+            entry.path() / std::string(EngineProject::manifest_filename), ec))
+      out.push_back(entry.path());
+  }
+  std::ranges::sort(out);
+  return out;
+}
+
+} // namespace stellar::engine
