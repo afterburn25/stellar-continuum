@@ -89,7 +89,10 @@ struct RuntimeHostOptions {
 // A ready-made windowed 2D game host: owns the Window, package/content
 // resolution, the ECS World, scene-document hot reload, WASD/arrow 'player'
 // input, velocity integration + wall bounce, sprite rendering (cooked BC7 or
-// loose images), audio playback and F5/F9 world quicksave/quickload. Games
+// loose images), audio playback and F5/F9 world quicksave/quickload. Saves
+// record the resolved package load plan in a "<save>.packages.json" sidecar;
+// loads verify it and report missing/version-mismatched packages through
+// RuntimeDiagnostics (report-only — the load still proceeds). Games
 // customize through the callbacks rather than reimplementing the loop — the
 // same role Unreal's GameInstance plays for its projects.
 class RuntimeHost {

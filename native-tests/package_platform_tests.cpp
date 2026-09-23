@@ -1,6 +1,7 @@
 #include <stellar/engine/package.hpp>
 #include <stellar/engine/platform_services.hpp>
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -130,6 +131,60 @@ int main() {
   check(with_conflict.conflicts.size() == 1 &&
             with_conflict.conflicts[0].winner_id == "mod.b",
         "higher priority wins the conflict");
+
+  // --- Save package-manifest attestation ---
+  const auto save_path = std::filesystem::temp_directory_path() /
+                         "stellar_save_manifest_test.stw";
+  const auto manifest_file = save_path.parent_path() /
+                             (save_path.filename().string() + ".packages.json");
+
+  // No manifest: pre-manifest saves verify as unknown, not incompatible.
+  std::filesystem::remove(manifest_file);
+  const auto absent = verify_save_package_manifest(save_path, good);
+  check(!absent.manifest_present && absent.compatible(),
+        "absent manifest attests as unknown/compatible");
+
+  write_save_package_manifest(save_path, good);
+  const auto same = verify_save_package_manifest(save_path, good);
+  check(same.manifest_present && same.compatible() &&
+            same.extra_packages.empty(),
+        "same plan attests clean");
+
+  // A removed mod reports missing; a version bump reports the mismatch.
+  PackageRegistry reduced;
+  reduced.add(base, nullptr);
+  const auto reduced_plan = reduced.resolve();
+  const auto missing = verify_save_package_manifest(save_path, reduced_plan);
+  check(missing.missing_packages.size() == 1 &&
+            missing.missing_packages[0] == "mod.aurora",
+        "removed package reports missing");
+  check(!missing.compatible(), "missing package is incompatible");
+
+  PackageManifest bumped = base;
+  bumped.version = *PackageVersion::parse("1.1.0");
+  PackageRegistry bumped_registry;
+  bumped_registry.add(bumped, nullptr);
+  bumped_registry.add(*manifest, nullptr);
+  const auto bumped_plan = bumped_registry.resolve();
+  const auto mismatched = verify_save_package_manifest(save_path, bumped_plan);
+  check(mismatched.version_mismatches.size() == 1 &&
+            mismatched.version_mismatches[0].find("stellar.base") !=
+                std::string::npos,
+        "version bump reports mismatch");
+
+  // Content added since the save is informational, not a failure.
+  PackageManifest extra;
+  extra.id = "mod.extra";
+  PackageRegistry grown;
+  grown.add(base, nullptr);
+  grown.add(*manifest, nullptr);
+  grown.add(extra, nullptr);
+  const auto grown_plan = grown.resolve();
+  const auto added = verify_save_package_manifest(save_path, grown_plan);
+  check(added.extra_packages.size() == 1 &&
+            added.extra_packages[0] == "mod.extra" && added.compatible(),
+        "new package is informational");
+  std::filesystem::remove(manifest_file);
 
   // --- Platform services ---
   PlatformServices services;

@@ -841,11 +841,24 @@ int RuntimeHost::run() {
                           impl.cam3_yaw, impl.cam3_pitch, impl.cam3_fov};
       }
       save_world_to_file(world, save_path);
+      // Record the resolved content set beside the save so a later load
+      // under a different package/mod set attests rather than silently
+      // binding stale content.
+      write_save_package_manifest(save_path, plan);
     } catch (const std::exception &) {
     }
   };
   auto load_world = [&] {
     if (!load_world_from_file(world, save_path)) return;
+    const auto pkg_report = verify_save_package_manifest(save_path, plan);
+    if (!pkg_report.compatible()) {
+      std::string note{"world save package mismatch:"};
+      for (const auto &id : pkg_report.missing_packages)
+        note += " missing " + id;
+      for (const auto &m : pkg_report.version_mismatches)
+        note += " " + m;
+      RuntimeDiagnostics::context(note);
+    }
     impl.entities = world.entities();
     // 3D entities restore with the snapshot too — split them out of the
     // 2D tracked set before the tilemap partition below.
@@ -2062,6 +2075,7 @@ int RuntimeHost::run() {
   if (!options.snapshot_out.empty()) {
     try {
       save_world_to_file(world, options.snapshot_out);
+      write_save_package_manifest(options.snapshot_out, plan);
     } catch (const std::exception &) {
       return 1;
     }
