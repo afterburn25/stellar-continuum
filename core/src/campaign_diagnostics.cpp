@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <exception>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -113,14 +114,19 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       system_owners[colony.system_id].insert(colony.civilization_id);
     }
     if(!system_owners.empty()){
-      const auto theater=project_warfare_theater(world.fleets,world.systems);
-      for(const auto &fleet:world.fleets){
+      // The projection refuses fleets the engine model cannot
+      // represent (non-positive/NaN strategic speed) — invariants flag
+      // them; skip the block rather than fail the whole pass.
+      std::optional<engine::WarfareModel> theater;
+      try{theater.emplace(project_warfare_theater(world.fleets,world.systems));}
+      catch(const std::exception&){}
+      if(theater)for(const auto &fleet:world.fleets){
         if(records.size()>=maximum)break;
         if(!fleet.is_active||!fleet.current_system_id||
            fleet.transit_phase!=FleetTransitPhase::None)continue;
         const auto owners=system_owners.find(*fleet.current_system_id);
         if(owners==system_owners.end()||owners->second.contains(fleet.civilization_id))continue;
-        const auto report=theater.report(static_cast<std::uint64_t>(fleet.id));
+        const auto report=theater->report(static_cast<std::uint64_t>(fleet.id));
         if(report.attack<=0.0)continue;
         DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
         r.event_type="foreign_armed_presence";r.severity=DiagnosticSeverity::Warning;
@@ -143,7 +149,12 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   // reach calculator orders use — flagged only when the assessment is
   // authoritative, not provisional.
   if(records.size()<maximum){
-    InterstellarLaneNetwork lanes(world.systems);
+    // Lane construction refuses duplicate system ids and reach
+    // evaluation refuses non-finite metrics — invariants flag both;
+    // skip rather than fail the whole pass.
+    std::optional<InterstellarLaneNetwork> lanes;
+    try{lanes.emplace(world.systems);}catch(const std::exception&){}
+    if(lanes){
     std::unordered_map<int,OperationalReachBatch> batches;
     const auto kind_for=[](FleetRole role){
       switch(role){
@@ -167,9 +178,12 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         r.values["destinationSystemId"]=static_cast<std::int64_t>(*fleet.destination_system_id);
         records.push_back(std::move(r));continue;
       }
-      auto [it,_]=batches.try_emplace(fleet.civilization_id,
-          OperationalReachWorldView{world.systems,world.colonies,lanes},fleet.civilization_id);
-      const auto reach=it->second.assess(fleet,*fleet.destination_system_id,kind_for(fleet.role));
+      MissionReachAssessment reach;
+      try{
+        auto [it,_]=batches.try_emplace(fleet.civilization_id,
+            OperationalReachWorldView{world.systems,world.colonies,*lanes},fleet.civilization_id);
+        reach=it->second.assess(fleet,*fleet.destination_system_id,kind_for(fleet.role));
+      }catch(const std::exception&){continue;}
       if(!reach.is_authoritative||reach.is_supported)continue;
       DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
       r.event_type="route_unreachable";r.severity=DiagnosticSeverity::Warning;
@@ -178,6 +192,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       r.values["destinationSystemId"]=static_cast<std::int64_t>(*fleet.destination_system_id);
       r.values["routeDistanceLightYears"]=reach.route_distance_light_years;
       records.push_back(std::move(r));
+    }
     }
   }
   // Logistics supply: colonies the authoritative economy logistics
@@ -237,6 +252,10 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         // values are invariant findings, not a reason to fail the pass.
         if(eit!=world.economies.end()&&std::isfinite(eit->credits)&&eit->credits>=0.0&&
            std::isfinite(eit->operating_arrears)&&eit->operating_arrears>=0.0){
+          // economy_credit_flow evaluates colony habitat support, which
+          // refuses corrupt colonies (uncatalogued species, unresolved
+          // bodies) — invariants flag them; skip rather than fail.
+          try{
           const auto flow=economy_credit_flow(econ,world.colonies,world.economies,civ.id);
           const auto health=assess_treasury(eit->credits,flow.net_credits_per_day,eit->operating_arrears);
           if(health.state==TreasuryHealthState::Arrears||health.state==TreasuryHealthState::Depleted){
@@ -259,6 +278,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
             r.values["operatingArrears"]=eit->operating_arrears;
             records.push_back(std::move(r));
           }
+          }catch(const std::exception&){}
         }
       }
       // Corridor coverage is only meaningful for civs with colonies
@@ -496,6 +516,9 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       if(system&&!systems.contains(*system))emit("fleet","orphaned_location",f.id,"Fleet references an absent system.");
     if(!std::isfinite(f.position.x)||!std::isfinite(f.position.y))emit("fleet","invalid_position",f.id,"Fleet position is not finite.");
     positive(f.fuel_remaining_light_years,"Fuel",f.id,"fleet");positive(f.embarked_population_millions,"Embarked population",f.id,"fleet");
+    // Strictly positive: the warfare projection refuses speed <= 0.
+    if(!std::isfinite(f.strategic_speed)||f.strategic_speed<=0.0)
+      emit("fleet","invalid_positive_value",f.id,"Strategic speed is non-finite or non-positive.");
     if(f.is_active&&!f.current_system_id&&f.transit_phase!=FleetTransitPhase::InterstellarWarp)
       emit("fleet","missing_location",f.id,"Active non-warping fleet has no system location.");
   }

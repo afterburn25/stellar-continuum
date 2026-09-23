@@ -341,7 +341,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers/tests:** `warfare` tests — validation, cohort merge,
   movement/clamp, interdiction ownership and order gating, engagement
   attrition/destruction, defense absorption, bit-equal determinism,
-  2000-fleet scale. Core fleet/battle adoption pending.
+  2000-fleet scale. **Core consumer:** `project_warfare_theater`
+  (`campaign_warfare_projection`) reshapes authoritative
+  fleets+systems into the engine theater — read-only, hulls
+  preserved as cohorts — and `inspect_campaign_operations` emits
+  `foreign_armed_presence` findings from it. Direct authority
+  adoption still pending the DECISION_LOG graduation criteria.
 - **Save/performance impact:** plain data with caller ids; O(fleets +
   cohorts) advance, O(cohorts²-free) aggregate resolve.
 - **Limitations:** 2D plane, aggregate dps without range/arcs, no
@@ -578,7 +583,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers/tests:** `economy_catalog` tests — valid catalog clean,
   graph closures, every validation class, diagnostics math, live
   `ResourceNetwork` production through the bridge, deterministic issue
-  ordering. Editor economy tool and Core catalog adoption pending.
+  ordering. **Core consumer:** `sustenance_economy_catalog()` +
+  `analyze_colony_sustenance` (`campaign_economy_projection`) run
+  `analyze_economy` over authoritative colony sustenance state —
+  `inspect_campaign_operations` emits `sustenance_shortfall`/
+  `power_shortfall` findings from it. Editor economy tool and direct
+  authority adoption still pending the DECISION_LOG graduation
+  criteria.
 - **Save/performance impact:** pure data + derived immutable graph —
   catalog contents serialize through the package/data layer, nothing
   runtime-persistent. Validation and fixpoint are catalog-scale
@@ -720,14 +731,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   system-scoped (a body id that exists in another system is still
   unresolvable for the colony), populated colonies flag
   `unknown_species`, surface buildings flag `unknown_building_type`,
-  and negative colony ids flag `invalid_nonnegative_value`. Every
-  throwing call in the operations pass (sustenance analysis, the
-  logistics snapshot/coverage/home-network queries, the population
-  projection) is now wrapped so a corrupt colony or duplicate-id
-  skip degrades to "invariant finding + skipped entity" instead of
-  discarding the entire pass's findings — the monitor collects
+  negative colony ids flag `invalid_nonnegative_value`, and fleet
+  `strategic_speed` must be finite positive (`invalid_positive_value`
+  — the warfare projection's class definitions reject `<= 0`). Every
+  throwing call in the operations pass is now wrapped — sustenance
+  analysis, the warfare theater projection, lane-network construction
+  and reach assessment, the logistics snapshot/coverage/home-network
+  queries, credit flow and the population projection — so a corrupt
+  entity degrades to "invariant finding + skipped entity" instead of
+  discarding the entire pass's findings (the monitor collects
   invariants and operations in one batch, so an escape previously
-  lost both.
+  lost both).
   `campaign_colony_projection`
   tests — spec synthesis, flag fidelity, remaining-industry accounting,
   powered-set operating flags, unknown-type fallback, hub-less capacity

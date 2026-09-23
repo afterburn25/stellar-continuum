@@ -340,22 +340,40 @@ int main() {
     ConstructionState con;
     con.civilization_id = 1;
     world.construction.push_back(con);
+    // Zero strategic speed makes the warfare projection's class
+    // definition throw; a duplicate system id makes lane construction
+    // throw. Both must degrade to invariant findings, not kill the pass.
+    FleetState dead_stick;
+    dead_stick.id = 1;
+    dead_stick.civilization_id = 1;
+    dead_stick.is_active = true;
+    dead_stick.current_system_id = 7;
+    dead_stick.strategic_speed = 0.0;
+    world.fleets.push_back(dead_stick);
+    StellarSystem dup;
+    dup.id = 7;
+    dup.name = "Duplicate";
+    world.systems.push_back(dup);
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
-    int invalid = 0, species = 0, type = 0, orphan = 0;
+    int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
+        duplicate = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "invalid_nonnegative_value") ++invalid;
+      else if (finding.event_type == "invalid_positive_value") ++positive;
       else if (finding.event_type == "unknown_species") ++species;
       else if (finding.event_type == "unknown_building_type") ++type;
       else if (finding.event_type == "orphaned_colony") ++orphan;
+      else if (finding.event_type == "duplicate_id") ++duplicate;
     }
     check(invalid == 3,
           "stability, condition and arrears each flag invalid values");
     check(species == 1 && type == 1 && orphan == 1,
           "uncatalogued species/type and cross-system body are flagged");
-    // The ops pass skips the corrupt colony/economy rather than
-    // throwing — before the guards, the unknown species and building
-    // type escaped the whole pass.
+    check(positive == 1 && duplicate == 1,
+          "zero strategic speed and duplicate system are flagged");
+    // The ops pass skips the corrupt entities rather than throwing —
+    // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);
   }
 
