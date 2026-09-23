@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <stellar/engine/resource_amount.hpp>
+
 namespace stellar::engine {
 
 class Inventory;
@@ -25,7 +27,10 @@ class Inventory;
 // Instance ids are CALLER-SUPPLIED so a game's save identity maps
 // directly onto framework objects.
 
-using ResourceAmount = std::pair<std::string, double>; // {resource id, qty}
+// ResourceAmount is the shared {resource id, qty} record from
+// resource_amount.hpp (aggregate-init compatible with the {id, qty}
+// literals used throughout).
+
 
 // Static district template. A district is a developed parcel that hosts
 // a bounded number of structures (its slots) and draws utilities itself.

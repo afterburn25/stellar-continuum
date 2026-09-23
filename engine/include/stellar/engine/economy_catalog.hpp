@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include <stellar/engine/resource_amount.hpp>
 #include <stellar/engine/resource_economy.hpp>
 
 namespace stellar::engine {
@@ -56,11 +57,6 @@ struct ResourceSpec {
     std::string substitution_group;  // inputs may substitute within a group
     std::vector<std::string> tags;   // strategic tags: "strategic", "volatile", ...
     std::string unit;                // informational unit label: "t", "MWh", ...
-};
-
-struct ResourceAmount {
-    std::string resource;
-    double amount{0.0};
 };
 
 struct RecipeSpec {

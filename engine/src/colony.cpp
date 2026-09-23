@@ -212,7 +212,10 @@ Colony::utility_balance() const {
                                spec->utility_demand_per_day);
         }
     }
-    return {map.begin(), map.end()};
+    std::vector<std::pair<std::string, std::pair<double, double>>> out;
+    out.reserve(map.size());
+    for (const auto& [id, sd] : map) out.push_back({id, sd});
+    return out;
 }
 
 ColonyDelta Colony::advance(double elapsed_days, const ColonyInputs& inputs) {
@@ -359,9 +362,15 @@ ColonyDelta Colony::advance(double elapsed_days, const ColonyInputs& inputs) {
             0.0, 1.0);
     }
 
-    delta.outputs_produced.assign(outputs.begin(), outputs.end());
-    delta.upkeep_shortfall.assign(upkeep_shortfall.begin(), upkeep_shortfall.end());
-    delta.input_shortfall.assign(input_shortfall.begin(), input_shortfall.end());
+    auto emit = [](const std::map<std::string, double>& map) {
+        std::vector<ResourceAmount> out;
+        out.reserve(map.size());
+        for (const auto& [id, amount] : map) out.push_back({id, amount});
+        return out;
+    };
+    delta.outputs_produced = emit(outputs);
+    delta.upkeep_shortfall = emit(upkeep_shortfall);
+    delta.input_shortfall = emit(input_shortfall);
     return delta;
 }
 
