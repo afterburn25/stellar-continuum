@@ -15,6 +15,7 @@
 
 namespace stellar::native_map {
 class Mesh3D;
+struct Quaternion;
 }
 
 namespace stellar::engine {
@@ -217,6 +218,15 @@ void resolve_hierarchy(World &world);
 // Scene3dDocument counterparts: spawn/export/hierarchy over the 3D
 // component set. spawn_scene3d returns the spawned ids in document order;
 // scene3d_from_world exports every entity carrying a Transform3D.
+// Authored 3D rotation is euler degrees (yaw about +Y, pitch about +X,
+// roll about +Z, applied roll→pitch→yaw). These convert to/from the
+// quaternion form the renderer, hierarchy and raycast consume — tools
+// building previews from a document need the same convention.
+native_map::Quaternion euler_to_quat3(float yaw_deg, float pitch_deg,
+                                      float roll_deg);
+void quat_to_euler3(const native_map::Quaternion &q, float &yaw_deg,
+                    float &pitch_deg, float &roll_deg);
+
 std::vector<EntityId> spawn_scene3d(World &world, const Scene3dDocument &doc);
 Scene3dDocument scene3d_from_world(const World &world);
 std::vector<EntityId> entities3d(const World &world);

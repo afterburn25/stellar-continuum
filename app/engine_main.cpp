@@ -17,10 +17,14 @@
 #include <shellapi.h>
 #endif
 #include <stellar/engine/asset_registry.hpp>
+#include <stellar/engine/content_resolver.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/mesh3d_loader.hpp>
+#include <stellar/engine/scene_components.hpp>
 #include <stellar/engine/scene_document.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/native_scene3d.hpp>
 #include <stellar/engine/package.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/project.hpp>
@@ -62,12 +66,14 @@ constexpr Color bar_fill{24, 90, 120, 255};
 constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
-enum class Tool { Projects, Dashboard, Scene, Assets, Profiler, Localization };
+enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
+                  Localization };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
-                            Tool::Assets, Tool::Profiler, Tool::Localization};
-constexpr std::array<const char *, 6> kToolNames{"Projects", "Dashboard",
-                                                 "Scene", "Assets", "Profiler",
-                                                 "Localization"};
+                            Tool::Scene3D, Tool::Assets, Tool::Profiler,
+                            Tool::Localization};
+constexpr std::array<const char *, 7> kToolNames{
+    "Projects", "Dashboard", "Scene", "Scene3D",
+    "Assets",   "Profiler",  "Localization"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -227,6 +233,36 @@ struct Shell {
   // Which document tilemap the tile fields/paint mode edit — scenes can
   // stack several grids (decor, collision, foreground) on own layers.
   std::size_t scene_tile_index{};
+
+  // Scene3D tool: authors <project>/editor/scene3d.json — the document
+  // --scene3d hosts load. The preview builds a live Scene3D from the doc
+  // every frame; right-drag orbits the authored camera, wheel tunes fov,
+  // left click ray-picks the entity under the cursor.
+  engine::Scene3dDocument scene3_doc;
+  std::atomic<bool> scene3_dirty{true};
+  bool scene3_modified{};
+  bool editing_scene3{};
+  int scene3_field{0};
+  std::string scene3_buffer;
+  std::size_t scene3_sel{static_cast<std::size_t>(-1)};
+  engine::VirtualizedList scene3_list;
+  engine::UndoHistory<engine::Scene3dDocument> scene3_history{64};
+  std::unordered_map<std::string,
+                     std::shared_ptr<const stellar::native_map::Mesh3D>>
+      scene3_meshes;
+  std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
+      scene3_textures;
+  std::unique_ptr<engine::ContentResolver> scene3_content;
+  bool scene3_looking{}; // right-drag orbit is active in the preview
+  UiRect scene3_preview{}, scene3_rows{};
+  UiRect hit3_add{}, hit3_del{}, hit3_save{}, hit3_undo{}, hit3_redo{},
+      hit3_dup{}, hit3_name{}, hit3_mesh{}, hit3_pos{}, hit3_rot{},
+      hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
+      hit3_opacity{}, hit3_dbl{}, hit3_solid{}, hit3_gravs{},
+      hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_cam{},
+      hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
+      hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
+      hit3_music{};
   std::string status{"ready"};
 };
 
@@ -322,6 +358,8 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
   shell.project = std::move(*loaded);
   shell.cooked_dirty = true;
   shell.scene_dirty = true;
+  shell.scene3_dirty = true;
+  shell.scene3_content.reset(); // rebuilt lazily for the new project
   const auto count = reload_packages(shell);
   scan_assets(shell, root / shell.project->content_dirs.front());
   shell.status = "opened " + shell.project->name + " - " +
@@ -393,6 +431,11 @@ void close_project(Shell &shell) {
   shell.project.reset();
   shell.scene_doc = engine::SceneDocument{};
   shell.selected_entity = static_cast<std::size_t>(-1);
+  shell.scene3_doc = engine::Scene3dDocument{};
+  shell.scene3_sel = static_cast<std::size_t>(-1);
+  shell.scene3_meshes.clear();
+  shell.scene3_textures.clear();
+  shell.scene3_content.reset();
   scan_assets(shell, find_path("assets"));
   {
     std::lock_guard lock(shell.project_mutex);
@@ -1273,6 +1316,519 @@ void commit_scene_field(Shell &shell) {
 
 // Entity indices sorted by draw order: layer ascending, stable within a
 // layer — the last index is the topmost entity for hit-testing.
+// ---- Scene3D tool: authors <project>/editor/scene3d.json -----------
+
+std::filesystem::path scene3_path(const Shell &shell) {
+  return shell.project
+             ? shell.project->root / "editor" /
+                   std::string(engine::Scene3dDocument::filename)
+             : std::filesystem::path{};
+}
+
+void load_scene3(Shell &shell) {
+  shell.scene3_doc = engine::Scene3dDocument{};
+  shell.scene3_sel = static_cast<std::size_t>(-1);
+  shell.scene3_modified = false;
+  shell.scene3_history.clear();
+  shell.scene3_meshes.clear();
+  shell.scene3_textures.clear();
+  if (shell.project && !shell.scene3_content)
+    shell.scene3_content = std::make_unique<engine::ContentResolver>(
+        shell.project->id, shell.project->root,
+        engine::executable_directory());
+  std::string error;
+  if (auto doc =
+          engine::Scene3dDocument::load(scene3_path(shell), &error))
+    shell.scene3_doc = *doc;
+  else if (std::filesystem::is_regular_file(scene3_path(shell)))
+    shell.status = "scene3d load failed: " + error;
+}
+
+engine::Scene3dEntity *selected_scene3_entity(Shell &shell) {
+  if (shell.scene3_sel >= shell.scene3_doc.entities.size())
+    return nullptr;
+  return &shell.scene3_doc.entities[shell.scene3_sel];
+}
+
+std::shared_ptr<const Mesh3D> scene3_mesh(Shell &shell,
+                                          const std::string &spec) {
+  if (const auto it = shell.scene3_meshes.find(spec);
+      it != shell.scene3_meshes.end())
+    return it->second;
+  auto mesh = engine::resolve_mesh_spec(spec, shell.scene3_content.get());
+  shell.scene3_meshes.emplace(spec, mesh);
+  return mesh;
+}
+
+std::shared_ptr<const RgbaImage> scene3_tex(Shell &shell,
+                                            const std::string &path) {
+  if (const auto it = shell.scene3_textures.find(path);
+      it != shell.scene3_textures.end())
+    return it->second;
+  std::shared_ptr<const RgbaImage> img;
+  if (shell.scene3_content)
+    if (const auto loose = shell.scene3_content->loose_path(path);
+        std::filesystem::is_regular_file(loose))
+      img = decode_rgba_image(loose, 4096);
+  shell.scene3_textures.emplace(path, img);
+  return img;
+}
+
+// Parses "x,y,z" into three floats.
+bool parse_triple(std::string_view text, float &a, float &b, float &c) {
+  const auto c1 = text.find(',');
+  const auto c2 = c1 == std::string_view::npos
+                      ? c1
+                      : text.find(',', c1 + 1);
+  if (c1 == std::string_view::npos || c2 == std::string_view::npos)
+    return false;
+  try {
+    a = std::stof(std::string(text.substr(0, c1)));
+    b = std::stof(std::string(text.substr(c1 + 1, c2 - c1 - 1)));
+    c = std::stof(std::string(text.substr(c2 + 1)));
+    return std::isfinite(a) && std::isfinite(b) && std::isfinite(c);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
+// The authored camera's world-space ray through a preview pixel — same
+// convention as RuntimeHost::entity3d_at (local -Z forward, +X right).
+Vec3 scene3_ray(const engine::Scene3dDocument &doc, const UiRect &pv,
+                Point pos) {
+  const float nx = ((pos.x - pv.x) / pv.width) * 2.f - 1.f;
+  const float ny = 1.f - ((pos.y - pv.y) / pv.height) * 2.f;
+  constexpr float kDeg = 3.14159265f / 180.f;
+  const float ht = std::tan(doc.fov_deg * kDeg * .5f);
+  Vec3 d{nx * ht * (pv.width / pv.height), ny * ht, -1.f};
+  const float l = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+  d = {d.x / l, d.y / l, d.z / l};
+  const Quaternion cq = compose_rotation(
+      rotation_axis_angle({0.f, 1.f, 0.f}, doc.cam_yaw_deg * kDeg),
+      rotation_axis_angle({1.f, 0.f, 0.f}, doc.cam_pitch_deg * kDeg));
+  return rotate_vec(cq, d);
+}
+
+// Ray-picks the document entity under a preview pixel via a scratch
+// world (spawn order == document order, so the hit id maps back).
+std::optional<std::size_t> scene3_pick(Shell &shell, Point pos) {
+  const auto &d = shell.scene3_doc;
+  const Vec3 dir = scene3_ray(d, shell.scene3_preview, pos);
+  engine::World scratch;
+  engine::register_scene_components(scratch);
+  const auto ids = engine::spawn_scene3d(scratch, d);
+  const auto resolve = [&shell](const std::string &spec) {
+    return scene3_mesh(shell, spec);
+  };
+  const auto hit = engine::raycast_world3d(
+      scratch, ids, resolve, d.cam_x, d.cam_y, d.cam_z, dir.x, dir.y,
+      dir.z, d.far_plane);
+  if (!hit) return std::nullopt;
+  const auto it = std::find(ids.begin(), ids.end(), hit->entity);
+  return it == ids.end()
+             ? std::nullopt
+             : std::optional<std::size_t>(it - ids.begin());
+}
+
+void commit_scene3_field(Shell &shell) {
+  auto &doc = shell.scene3_doc;
+  auto *e = selected_scene3_entity(shell);
+  const auto fail = [&](const char *hint) {
+    shell.status = std::string("invalid value - ") + hint;
+    shell.scene3_buffer.clear();
+  };
+  const auto ok = [&](std::string msg) {
+    shell.scene3_modified = true;
+    shell.status = msg + " - SAVE to persist";
+    shell.scene3_buffer.clear();
+  };
+  const auto commit = [&] { shell.scene3_history.commit(doc); };
+  // Document-level fields first — no entity needed.
+  float a, b, c;
+  switch (shell.scene3_field) {
+  case 20: // camera position
+    if (!parse_triple(shell.scene3_buffer, a, b, c))
+      return fail("use \"x,y,z\"");
+    commit();
+    doc.cam_x = a; doc.cam_y = b; doc.cam_z = c;
+    return ok("camera position updated");
+  case 21: // camera yaw,pitch
+    if (!parse_pair(shell.scene3_buffer, a, b))
+      return fail("use \"yaw,pitch\" degrees");
+    commit();
+    doc.cam_yaw_deg = a; doc.cam_pitch_deg = std::clamp(b, -89.f, 89.f);
+    return ok("camera orientation updated");
+  case 22: // fov
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 60");
+    }
+    commit();
+    doc.fov_deg = std::clamp(a, 10.f, 140.f);
+    return ok("camera fov updated");
+  case 23: // key light direction
+    if (!parse_triple(shell.scene3_buffer, a, b, c))
+      return fail("use \"x,y,z\"");
+    commit();
+    doc.light_x = a; doc.light_y = b; doc.light_z = c;
+    return ok("key light direction updated");
+  case 24: // key light intensity
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 1.2");
+    }
+    commit();
+    doc.light_intensity = std::max(0.f, a);
+    return ok("key light intensity updated");
+  case 25: // gravity
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 9.8");
+    }
+    commit();
+    doc.gravity = a;
+    return ok("scene gravity updated");
+  case 26: // groundY
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 0");
+    }
+    commit();
+    doc.ground_y = a;
+    return ok("ground plane updated");
+  case 27: // xz bounds
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 30");
+    }
+    commit();
+    doc.bounds = std::max(0.f, a);
+    return ok("XZ bounds updated");
+  case 28: // background color
+    std::uint8_t r8, g8, b8;
+    if (!parse_color(shell.scene3_buffer, r8, g8, b8))
+      return fail("use \"r,g,b\"");
+    commit();
+    doc.bg_r = r8; doc.bg_g = g8; doc.bg_b = b8;
+    return ok("background updated");
+  case 29: // music
+    commit();
+    doc.music = shell.scene3_buffer;
+    return ok(shell.scene3_buffer.empty() ? "scene music cleared"
+                                          : "scene music set");
+  default:
+    break;
+  }
+  if (e == nullptr) {
+    fail("no entity selected");
+    return;
+  }
+  engine::Scene3dEntity next = *e;
+  bool valid = false;
+  const bool truthy = shell.scene3_buffer == "1" ||
+                      shell.scene3_buffer == "true" ||
+                      shell.scene3_buffer == "yes";
+  const bool falsy = shell.scene3_buffer == "0" ||
+                     shell.scene3_buffer == "false" ||
+                     shell.scene3_buffer == "no";
+  switch (shell.scene3_field) {
+  case 1: next.name = shell.scene3_buffer; valid = !next.name.empty(); break;
+  case 2: valid = parse_triple(shell.scene3_buffer, a, b, c);
+          if (valid) { next.x = a; next.y = b; next.z = c; } break;
+  case 3: valid = parse_triple(shell.scene3_buffer, a, b, c);
+          if (valid) { next.vx = a; next.vy = b; next.vz = c; } break;
+  case 4: next.mesh = shell.scene3_buffer; valid = !next.mesh.empty();
+          break;
+  case 5: valid = parse_triple(shell.scene3_buffer, a, b, c);
+          if (valid) {
+            next.yaw_deg = a; next.pitch_deg = b; next.roll_deg = c;
+          }
+          break;
+  case 6:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if ((valid = a > 0.f)) next.scale = a;
+          break;
+  case 7: valid = parse_color(shell.scene3_buffer, next.r, next.g,
+                              next.b); break;
+  case 8: next.texture = shell.scene3_buffer; valid = true; break;
+  case 9:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.opacity = std::clamp(a, 0.f, 1.f); valid = true; break;
+  case 10:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.gravity_scale = a; valid = true; break;
+  case 11: if (truthy || falsy) { next.solid = truthy; valid = true; }
+           break;
+  case 12: if (truthy || falsy) { next.double_sided = truthy;
+                                  valid = true; }
+           break;
+  case 13:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.ttl = std::max(0.f, a); valid = true; break;
+  case 14: next.data = shell.scene3_buffer; valid = true; break;
+  case 15: next.parent = shell.scene3_buffer; valid = true; break;
+  default: break;
+  }
+  if (!valid) return fail("check the field hint");
+  commit();
+  *e = std::move(next);
+  ok("entity updated");
+}
+
+void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "SCENE3D AUTHORING");
+  if (!shell.project) {
+    line(out, x, y, "open project", "none - open one in Projects", font);
+    shell.hit3_add = shell.hit3_del = shell.hit3_save = shell.hit3_undo =
+        shell.hit3_redo = shell.hit3_dup = shell.hit3_name =
+            shell.hit3_mesh = shell.hit3_pos = shell.hit3_rot =
+                shell.hit3_scale = shell.hit3_vel = shell.hit3_color =
+                    shell.hit3_tex = shell.hit3_opacity = shell.hit3_dbl =
+                        shell.hit3_solid = shell.hit3_gravs =
+                            shell.hit3_ttl = shell.hit3_data =
+                                shell.hit3_parent = shell.hit3_cam =
+                                    shell.hit3_camrot = shell.hit3_fov =
+                                        shell.hit3_lightdir =
+                                            shell.hit3_lightint =
+                                                shell.hit3_grav =
+                                                    shell.hit3_ground =
+                                                        shell.hit3_bounds =
+                                                            shell.hit3_bg =
+                                                                shell.hit3_music =
+                                                                    {};
+    shell.scene3_preview = shell.scene3_rows = {};
+    return;
+  }
+  if (shell.scene3_dirty.exchange(false)) load_scene3(shell);
+  auto &doc = shell.scene3_doc;
+  line(out, x, y, "project", shell.project->name, font);
+  line(out, x, y, "document", "editor/scene3d.json", font);
+  line(out, x, y, "entities", std::to_string(doc.entities.size()), font);
+  y += 4 * s;
+
+  // Action row.
+  const float bh = (font + 14) * s;
+  shell.hit3_add = {x, y, 148 * s, bh};
+  shell_button(out, shell.hit3_add, "ADD ENTITY", false, font, s);
+  shell.hit3_del = {x + 158 * s, y, 100 * s, bh};
+  shell_button(out, shell.hit3_del, "DELETE",
+               shell.scene3_sel < doc.entities.size(), font, s);
+  shell.hit3_save = {x + 268 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit3_save,
+               shell.scene3_modified ? "SAVE *" : "SAVE",
+               shell.scene3_modified, font, s);
+  shell.hit3_undo = {x + 368 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit3_undo, "UNDO",
+               shell.scene3_history.can_undo(), font, s);
+  shell.hit3_redo = {x + 468 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit3_redo, "REDO",
+               shell.scene3_history.can_redo(), font, s);
+  shell.hit3_dup = {x + 568 * s, y, 128 * s, bh};
+  shell_button(out, shell.hit3_dup, "DUPLICATE",
+               shell.scene3_sel < doc.entities.size(), font, s);
+  y += bh + 14 * s;
+
+  // Entity list (left) + live 3D preview (right).
+  const UiRect list_rect{x, y, body.width * 0.34f, body.height * 0.42f};
+  out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
+  shell.scene3_rows = list_rect;
+  shell.scene3_list.viewport_height = list_rect.height;
+  shell.scene3_list.row_height = 22 * s;
+  shell.scene3_list.row_count = doc.entities.size();
+  const auto range = shell.scene3_list.visible_range();
+  float ry = list_rect.y - shell.scene3_list.scroll_offset +
+             range.first * shell.scene3_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += shell.scene3_list.row_height) {
+    const auto &e = doc.entities[i];
+    const UiRect row{list_rect.x + 4 * s, ry, list_rect.width - 8 * s,
+                     shell.scene3_list.row_height};
+    if (i == shell.scene3_sel)
+      out.overlay.push_back(FilledRectangle{row, {22, 52, 74, 255}});
+    out.overlay.push_back(Text{
+        {row.x + 8 * s, row.y + 4 * s},
+        e.name + "  [" + e.mesh + "]", ink, font});
+  }
+
+  // Preview: a real Scene3D built from the document — the same scene a
+  // --scene3d host renders (meshes resolve through the shared spec cache).
+  const UiRect pv{list_rect.x + list_rect.width + 16 * s, list_rect.y,
+                  body.x + body.width - list_rect.x - list_rect.width -
+                      38 * s,
+                  list_rect.height};
+  shell.scene3_preview = pv;
+  out.overlay.push_back(
+      FilledRectangle{pv, {doc.bg_r, doc.bg_g, doc.bg_b, 255}});
+  {
+    constexpr float kDeg = 3.14159265f / 180.f;
+    Camera3D cam;
+    cam.position = {doc.cam_x, doc.cam_y, doc.cam_z};
+    const Quaternion cam_q = compose_rotation(
+        rotation_axis_angle({0.f, 1.f, 0.f}, doc.cam_yaw_deg * kDeg),
+        rotation_axis_angle({1.f, 0.f, 0.f}, doc.cam_pitch_deg * kDeg));
+    cam.orientation = cam_q;
+    cam.vertical_fov_radians = doc.fov_deg * kDeg;
+    cam.near_plane = std::max(doc.near_plane, 1e-6f);
+    cam.far_plane = std::clamp(doc.far_plane, cam.near_plane + 1e-3f,
+                               1e7f);
+    std::vector<MeshInstance3D> instances;
+    instances.reserve(doc.entities.size());
+    for (std::size_t i = 0; i < doc.entities.size(); ++i) {
+      const auto &e = doc.entities[i];
+      const auto mesh = scene3_mesh(shell, e.mesh);
+      if (!mesh) continue;
+      MeshInstance3D inst;
+      inst.mesh = mesh;
+      inst.position = {e.x, e.y, e.z};
+      inst.rotation =
+          engine::euler_to_quat3(e.yaw_deg, e.pitch_deg, e.roll_deg);
+      inst.scale = e.scale;
+      inst.material.tint = Color{e.r, e.g, e.b, 255};
+      inst.material.opacity = e.opacity;
+      inst.material.transparent = e.opacity < 1.f;
+      if (!e.texture.empty())
+        inst.material.texture = scene3_tex(shell, e.texture);
+      inst.material.double_sided = e.double_sided;
+      inst.material.light_intensity = doc.light_intensity;
+      inst.material.linear_light = true;
+      // Selected entity highlight: a bright grazing-angle shell marks
+      // the pick (rim_power>0 renders the rim band).
+      if (i == shell.scene3_sel) {
+        inst.material.ambient = .55f;
+        inst.material.rim_power = 2.5f;
+      }
+      instances.push_back(std::move(inst));
+    }
+    const Quaternion inv{-cam_q.x, -cam_q.y, -cam_q.z, cam_q.w};
+    const Vec3 light_cam =
+        rotate_vec(inv, {doc.light_x, doc.light_y, doc.light_z});
+    for (auto &inst : instances)
+      for (std::size_t li = 0; li < doc.lights.size() && li < 2; ++li) {
+        const auto &l = doc.lights[li];
+        inst.material.additional_lights[li] = DirectionalLight3D{
+            rotate_vec(inv, {l.dir_x, l.dir_y, l.dir_z}),
+            {l.r, l.g, l.b}, l.intensity};
+      }
+    if (auto scene =
+            Scene3D::create(cam, std::move(instances), light_cam))
+      out.overlay.push_back(Scene3DView{std::move(scene), pv});
+  }
+  out.overlay.push_back(StrokedRectangle{pv, panel_edge});
+  out.overlay.push_back(
+      Text{{pv.x + 8 * s, pv.y + 6 * s},
+           "drag RMB: orbit camera | wheel: fov | click: select", muted,
+           font - 2});
+
+  // Fields under the list: entity props, then document-level props.
+  const auto *entity = selected_scene3_entity(shell);
+  float fx = list_rect.x;
+  float fy = list_rect.y + list_rect.height + 16 * s;
+  const float col_w = body.width * 0.44f;
+  const auto field = [&](UiRect &hit, const char *label,
+                         const std::string &value, bool editing,
+                         const char *hint) {
+    out.overlay.push_back(Text{{fx, fy}, label, muted, font});
+    hit = {fx + 90 * s, fy - 4 * s, col_w - 90 * s, (font + 8) * s};
+    field_box(out, hit, editing ? shell.scene3_buffer : value, editing,
+              hint, font, s);
+    fy += hit.height + 4 * s;
+  };
+  const auto fmt3 = [](float a, float b, float c) {
+    return std::to_string(static_cast<int>(a)) + "," +
+           std::to_string(static_cast<int>(b)) + "," +
+           std::to_string(static_cast<int>(c));
+  };
+  const auto ed = [&](int f) {
+    return shell.editing_scene3 && shell.scene3_field == f;
+  };
+  field(shell.hit3_name, "name", entity ? entity->name : "", ed(1),
+        "entity name");
+  field(shell.hit3_mesh, "mesh", entity ? entity->mesh : "", ed(4),
+        "box:sx,sy,sz | sphere:c,r | annulus:i,o[,s] | .obj path");
+  field(shell.hit3_pos, "pos",
+        entity ? fmt3(entity->x, entity->y, entity->z) : "", ed(2),
+        "e.g. 0,1.5,-4");
+  field(shell.hit3_rot, "rot",
+        entity ? fmt3(entity->yaw_deg, entity->pitch_deg,
+                      entity->roll_deg)
+               : "",
+        ed(5), "yaw,pitch,roll degrees");
+  field(shell.hit3_scale, "scale",
+        entity ? std::to_string(entity->scale) : "", ed(6),
+        "uniform scale > 0");
+  field(shell.hit3_vel, "vel",
+        entity ? fmt3(entity->vx, entity->vy, entity->vz) : "", ed(3),
+        "units/sec");
+  field(shell.hit3_color, "color",
+        entity ? std::to_string(entity->r) + "," +
+                     std::to_string(entity->g) + "," +
+                     std::to_string(entity->b)
+               : "",
+        ed(7), "e.g. 255,200,60");
+  field(shell.hit3_tex, "texture", entity ? entity->texture : "", ed(8),
+        "content-relative image path");
+  field(shell.hit3_opacity, "opacity",
+        entity ? std::to_string(entity->opacity) : "", ed(9),
+        "0..1 - below 1 renders transparent");
+  field(shell.hit3_solid, "solid",
+        entity ? (entity->solid ? "true" : "false") : "", ed(11),
+        "blocker - things push out of it");
+  field(shell.hit3_dbl, "doubleSided",
+        entity ? (entity->double_sided ? "true" : "false") : "", ed(12),
+        "render back faces (fins, paper)");
+  field(shell.hit3_gravs, "gravScale",
+        entity ? std::to_string(entity->gravity_scale) : "", ed(10),
+        "gravity multiplier - 0 floats");
+  field(shell.hit3_ttl, "ttl",
+        entity ? std::to_string(entity->ttl) : "", ed(13),
+        "seconds until despawn - 0 immortal");
+  field(shell.hit3_data, "data", entity ? entity->data : "", ed(14),
+        "freeform game data");
+  field(shell.hit3_parent, "parent", entity ? entity->parent : "",
+        ed(15), "entity name to follow");
+  // Second column: document-level fields.
+  fx = list_rect.x + col_w + 20 * s;
+  fy = list_rect.y + list_rect.height + 16 * s;
+  field(shell.hit3_cam, "cam pos", fmt3(doc.cam_x, doc.cam_y, doc.cam_z),
+        ed(20), "e.g. 0,3,10");
+  field(shell.hit3_camrot, "cam yaw,pitch",
+        std::to_string(static_cast<int>(doc.cam_yaw_deg)) + "," +
+            std::to_string(static_cast<int>(doc.cam_pitch_deg)),
+        ed(21), "degrees - or drag RMB in preview");
+  field(shell.hit3_fov, "cam fov", std::to_string(doc.fov_deg), ed(22),
+        "10..140 - or wheel in preview");
+  field(shell.hit3_lightdir, "light dir",
+        fmt3(doc.light_x, doc.light_y, doc.light_z), ed(23),
+        "world-space direction");
+  field(shell.hit3_lightint, "light int",
+        std::to_string(doc.light_intensity), ed(24), "multiplier");
+  field(shell.hit3_grav, "gravity", std::to_string(doc.gravity), ed(25),
+        "units/s^2 pulling -Y");
+  field(shell.hit3_ground, "groundY", std::to_string(doc.ground_y),
+        ed(26), "rest plane height");
+  field(shell.hit3_bounds, "bounds", std::to_string(doc.bounds), ed(27),
+        "XZ half-extent clamp");
+  field(shell.hit3_bg, "background",
+        std::to_string((int)doc.bg_r) + "," + std::to_string((int)doc.bg_g) +
+            "," + std::to_string((int)doc.bg_b),
+        ed(28), "clear color r,g,b");
+  field(shell.hit3_music, "music", doc.music, ed(29),
+        "content-relative track");
+}
+
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
   std::vector<std::size_t> order(doc.entities.size());
   for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
@@ -2532,11 +3088,13 @@ int main(int argc, char **argv) {
         }
         // Text-field editing takes precedence over tool clicks.
         if (shell.editing_project_name || shell.editing_import ||
-            shell.editing_package || shell.editing_scene) {
+            shell.editing_package || shell.editing_scene ||
+            shell.editing_scene3) {
           std::string &buffer =
               shell.editing_import      ? shell.import_buffer
               : shell.editing_package   ? shell.package_buffer
               : shell.editing_scene     ? shell.scene_buffer
+              : shell.editing_scene3    ? shell.scene3_buffer
                                         : shell.project_name_buffer;
           if (event.type == InputEventType::TextEntered) {
             if (buffer.size() < 240) buffer += event.text;
@@ -2551,12 +3109,15 @@ int main(int argc, char **argv) {
             const bool was_import = shell.editing_import;
             const bool was_package = shell.editing_package;
             const bool was_scene = shell.editing_scene;
+            const bool was_scene3 = shell.editing_scene3;
             shell.editing_project_name = shell.editing_import =
-                shell.editing_package = shell.editing_scene = false;
+                shell.editing_package = shell.editing_scene =
+                    shell.editing_scene3 = false;
             window.set_text_input(false);
             if (was_import) import_asset(shell);
             else if (was_package) create_package(shell);
             else if (was_scene) commit_scene_field(shell);
+            else if (was_scene3) commit_scene3_field(shell);
             else create_project_from_field(shell);
             continue;
           }
@@ -2564,7 +3125,16 @@ int main(int argc, char **argv) {
         switch (event.type) {
         case InputEventType::PointerMove:
           last_input = "pointer move";
-          if (shell.scene_painting && scene_tile(shell) != nullptr &&
+          if (shell.scene3_looking) {
+            // Right-drag orbits the authored camera — deltas in px map
+            // to degrees; pitch clamps away from the poles.
+            auto &d = shell.scene3_doc;
+            d.cam_yaw_deg += event.delta.x * 0.3f;
+            d.cam_pitch_deg = std::clamp(
+                d.cam_pitch_deg - event.delta.y * 0.3f, -89.f, 89.f);
+            shell.scene3_modified = true;
+          } else if (shell.scene_painting &&
+              scene_tile(shell) != nullptr &&
               shell.scene_preview.contains(event.position)) {
             const auto &pv = shell.scene_preview;
             paint_tile_at(shell,
@@ -2607,8 +3177,33 @@ int main(int argc, char **argv) {
             }
           }
           break;
+        case InputEventType::RightPressed:
+          last_input = "right press";
+          if (shell.tool == Tool::Scene3D &&
+              shell.scene3_preview.contains(event.position)) {
+            // One undo step per orbit gesture.
+            shell.scene3_history.commit(shell.scene3_doc);
+            shell.scene3_looking = true;
+          }
+          break;
+        case InputEventType::RightReleased:
+          last_input = "right release";
+          shell.scene3_looking = false;
+          break;
         case InputEventType::LeftPressed:
           last_input = "left press";
+          if (shell.tool == Tool::Scene3D &&
+              shell.scene3_preview.contains(event.position)) {
+            // Ray-pick the entity under the cursor (nearest triangle).
+            const auto picked = scene3_pick(shell, event.position);
+            shell.scene3_sel =
+                picked.value_or(static_cast<std::size_t>(-1));
+            if (picked)
+              shell.status =
+                  "picked " +
+                  shell.scene3_doc.entities[*picked].name;
+            break;
+          }
           if (shell.tool == Tool::Scene &&
               shell.scene_preview.contains(event.position)) {
             const auto &pv = shell.scene_preview;
@@ -3031,10 +3626,130 @@ int main(int argc, char **argv) {
               if (row < shell.scene_doc.entities.size())
                 shell.selected_entity = row;
             }
+          } else if (shell.tool == Tool::Scene3D) {
+            auto &doc = shell.scene3_doc;
+            auto edit3 = [&](int field, const std::string &seed) {
+              shell.editing_scene3 = true;
+              shell.scene3_field = field;
+              shell.scene3_buffer = seed;
+              window.set_text_input(true);
+            };
+            const auto *se = selected_scene3_entity(shell);
+            if (shell.hit3_add.contains(event.position)) {
+              shell.scene3_history.commit(doc);
+              engine::Scene3dEntity e;
+              e.name = "entity" + std::to_string(doc.entities.size());
+              doc.entities.push_back(std::move(e));
+              shell.scene3_sel = doc.entities.size() - 1;
+              shell.scene3_modified = true;
+            } else if (shell.hit3_del.contains(event.position) && se) {
+              shell.scene3_history.commit(doc);
+              doc.entities.erase(doc.entities.begin() + shell.scene3_sel);
+              shell.scene3_sel = static_cast<std::size_t>(-1);
+              shell.scene3_modified = true;
+            } else if (shell.hit3_dup.contains(event.position) && se) {
+              shell.scene3_history.commit(doc);
+              doc.entities.insert(
+                  doc.entities.begin() + shell.scene3_sel + 1, *se);
+              ++shell.scene3_sel;
+              shell.scene3_modified = true;
+            } else if (shell.hit3_save.contains(event.position) &&
+                       shell.scene3_modified) {
+              std::filesystem::create_directories(
+                  scene3_path(shell).parent_path());
+              doc.save(scene3_path(shell));
+              shell.scene3_modified = false;
+              shell.status = "scene3d saved - " +
+                             scene3_path(shell).filename().string();
+            } else if (shell.hit3_undo.contains(event.position)) {
+              if (auto d = shell.scene3_history.undo(doc)) {
+                doc = std::move(*d);
+                shell.scene3_modified = true;
+              }
+            } else if (shell.hit3_redo.contains(event.position)) {
+              if (auto d = shell.scene3_history.redo(doc)) {
+                doc = std::move(*d);
+                shell.scene3_modified = true;
+              }
+            } else if (shell.hit3_name.contains(event.position) && se)
+              edit3(1, se->name);
+            else if (shell.hit3_pos.contains(event.position) && se)
+              edit3(2, std::to_string((int)se->x) + "," +
+                           std::to_string((int)se->y) + "," +
+                           std::to_string((int)se->z));
+            else if (shell.hit3_vel.contains(event.position) && se)
+              edit3(3, std::to_string((int)se->vx) + "," +
+                           std::to_string((int)se->vy) + "," +
+                           std::to_string((int)se->vz));
+            else if (shell.hit3_mesh.contains(event.position) && se)
+              edit3(4, se->mesh);
+            else if (shell.hit3_rot.contains(event.position) && se)
+              edit3(5, std::to_string((int)se->yaw_deg) + "," +
+                           std::to_string((int)se->pitch_deg) + "," +
+                           std::to_string((int)se->roll_deg));
+            else if (shell.hit3_scale.contains(event.position) && se)
+              edit3(6, std::to_string(se->scale));
+            else if (shell.hit3_color.contains(event.position) && se)
+              edit3(7, std::to_string(se->r) + "," +
+                           std::to_string(se->g) + "," +
+                           std::to_string(se->b));
+            else if (shell.hit3_tex.contains(event.position) && se)
+              edit3(8, se->texture);
+            else if (shell.hit3_opacity.contains(event.position) && se)
+              edit3(9, std::to_string(se->opacity));
+            else if (shell.hit3_solid.contains(event.position) && se)
+              edit3(11, se->solid ? "true" : "false");
+            else if (shell.hit3_dbl.contains(event.position) && se)
+              edit3(12, se->double_sided ? "true" : "false");
+            else if (shell.hit3_gravs.contains(event.position) && se)
+              edit3(10, std::to_string(se->gravity_scale));
+            else if (shell.hit3_ttl.contains(event.position) && se)
+              edit3(13, std::to_string(se->ttl));
+            else if (shell.hit3_data.contains(event.position) && se)
+              edit3(14, se->data);
+            else if (shell.hit3_parent.contains(event.position) && se)
+              edit3(15, se->parent);
+            else if (shell.hit3_cam.contains(event.position))
+              edit3(20, std::to_string((int)doc.cam_x) + "," +
+                            std::to_string((int)doc.cam_y) + "," +
+                            std::to_string((int)doc.cam_z));
+            else if (shell.hit3_camrot.contains(event.position))
+              edit3(21, std::to_string((int)doc.cam_yaw_deg) + "," +
+                            std::to_string((int)doc.cam_pitch_deg));
+            else if (shell.hit3_fov.contains(event.position))
+              edit3(22, std::to_string((int)doc.fov_deg));
+            else if (shell.hit3_lightdir.contains(event.position))
+              edit3(23, std::to_string(doc.light_x) + "," +
+                            std::to_string(doc.light_y) + "," +
+                            std::to_string(doc.light_z));
+            else if (shell.hit3_lightint.contains(event.position))
+              edit3(24, std::to_string(doc.light_intensity));
+            else if (shell.hit3_grav.contains(event.position))
+              edit3(25, std::to_string(doc.gravity));
+            else if (shell.hit3_ground.contains(event.position))
+              edit3(26, std::to_string(doc.ground_y));
+            else if (shell.hit3_bounds.contains(event.position))
+              edit3(27, std::to_string(doc.bounds));
+            else if (shell.hit3_bg.contains(event.position))
+              edit3(28, std::to_string((int)doc.bg_r) + "," +
+                            std::to_string((int)doc.bg_g) + "," +
+                            std::to_string((int)doc.bg_b));
+            else if (shell.hit3_music.contains(event.position))
+              edit3(29, doc.music);
+            else if (shell.scene3_rows.contains(event.position)) {
+              const auto row = static_cast<std::size_t>(std::max(
+                  0.f, std::floor((event.position.y -
+                                   shell.scene3_rows.y +
+                                   shell.scene3_list.scroll_offset) /
+                                  shell.scene3_list.row_height)));
+              if (row < doc.entities.size()) shell.scene3_sel = row;
+            }
           } else if (shell.editing_project_name || shell.editing_import ||
-                     shell.editing_package || shell.editing_scene) {
+                     shell.editing_package || shell.editing_scene ||
+                     shell.editing_scene3) {
             shell.editing_project_name = shell.editing_import =
-                shell.editing_package = shell.editing_scene = false;
+                shell.editing_package = shell.editing_scene =
+                    shell.editing_scene3 = false;
             window.set_text_input(false);
           }
           break;
@@ -3049,6 +3764,20 @@ int main(int argc, char **argv) {
               shell.scene_rows.contains(event.position))
             shell.entity_list.scroll_to(shell.entity_list.scroll_offset -
                                         event.wheel_y * 40.f);
+          if (shell.tool == Tool::Scene3D) {
+            if (shell.scene3_rows.contains(event.position))
+              shell.scene3_list.scroll_to(
+                  shell.scene3_list.scroll_offset -
+                  event.wheel_y * 40.f);
+            else if (shell.scene3_preview.contains(event.position)) {
+              // Wheel tunes the authored fov inside the preview.
+              auto &d = shell.scene3_doc;
+              d.fov_deg =
+                  std::clamp(d.fov_deg - event.wheel_y * 3.f, 10.f,
+                             140.f);
+              shell.scene3_modified = true;
+            }
+          }
           break;
         case InputEventType::KeyPressed:
           // Scene tool undo: Ctrl+Z / Ctrl+Y when no field is being edited.
@@ -3064,6 +3793,21 @@ int main(int argc, char **argv) {
               shell.selected_entity = static_cast<std::size_t>(-1);
               shell.scene_modified = true;
               shell.status = "scene history restored - SAVE to persist";
+            }
+          }
+          if (event.control && shell.tool == Tool::Scene3D &&
+              !shell.editing_scene3) {
+            std::optional<engine::Scene3dDocument> restored;
+            if (event.key == 'z')
+              restored = shell.scene3_history.undo(shell.scene3_doc);
+            else if (event.key == 'y')
+              restored = shell.scene3_history.redo(shell.scene3_doc);
+            if (restored) {
+              shell.scene3_doc = std::move(*restored);
+              shell.scene3_sel = static_cast<std::size_t>(-1);
+              shell.scene3_modified = true;
+              shell.status =
+                  "scene3d history restored - SAVE to persist";
             }
           }
           last_input = "key";
@@ -3155,6 +3899,9 @@ int main(int argc, char **argv) {
         break;
       case Tool::Scene:
         render_scene(draw, shell, body, s);
+        break;
+      case Tool::Scene3D:
+        render_scene3(draw, shell, body, s);
         break;
       case Tool::Assets:
         render_assets(draw, shell, body, s);

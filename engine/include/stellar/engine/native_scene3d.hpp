@@ -15,6 +15,13 @@ struct Quaternion { float x{}, y{}, z{}, w{1}; };
 struct Matrix4 { std::array<float,16> values{}; }; // column major
 [[nodiscard]] Quaternion rotation_axis_angle(Vec3 axis,float radians);
 [[nodiscard]] Quaternion compose_rotation(Quaternion left,Quaternion right);
+// v' = q ⊗ (v,0) ⊗ q* for a unit quaternion q.
+[[nodiscard]] inline Vec3 rotate_vec(Quaternion q,Vec3 v) noexcept {
+  const float tx=2.f*(q.y*v.z-q.z*v.y),ty=2.f*(q.z*v.x-q.x*v.z),
+      tz=2.f*(q.x*v.y-q.y*v.x);
+  return {v.x+q.w*tx+q.y*tz-q.z*ty,v.y+q.w*ty+q.z*tx-q.x*tz,
+          v.z+q.w*tz+q.x*ty-q.y*tx};
+}
 [[nodiscard]] Matrix4 multiply(Matrix4 left,Matrix4 right) noexcept;
 [[nodiscard]] std::array<float,4> transform(Matrix4 matrix,std::array<float,4> point) noexcept;
 

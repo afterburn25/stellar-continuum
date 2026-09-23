@@ -209,9 +209,14 @@ starter `editor/scene3d.json`. `raycast3d(origin,dir,max)` casts
 against actual mesh triangles in each mesh's local frame
 (`physics3d::segment_triangle`, rotation+scale aware) and returns the
 nearest `{entity,distance,point}`; `entity3d_at(sx,sy)` is the
-screen-space pick counterpart of `entity_at`. Limitations: AABB (not
-OBB/triangle) collision, no rigid-body solver, raycast is O(tris) per
-entity with no spatial partition, no editor 3D tool — see the registry
+screen-space pick counterpart of `entity_at`. The engine shell's
+**Scene3D tab** authors `editor/scene3d.json` end-to-end: entity list +
+all entity/document fields, undo history, a live `Scene3D` preview
+(shares `resolve_mesh_spec`/texture decode with the runtime), right-drag
+camera orbit, wheel fov, and click-select via `raycast_world3d` over a
+scratch `spawn_scene3d` world. Limitations: AABB (not OBB/triangle)
+collision, no rigid-body solver, raycast is O(tris) per entity with no
+spatial partition, editor has no transform gizmos — see the registry
 record.
 
 **Recommended next workstream: native validation and release reliability.**

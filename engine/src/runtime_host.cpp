@@ -30,15 +30,7 @@ namespace stellar::engine {
 using namespace stellar::native_map;
 
 namespace {
-// v' = q ⊗ (v,0) ⊗ q* for a unit quaternion q.
-Vec3 quat_rot(Quaternion q, Vec3 v) {
-  const float tx = 2.f * (q.y * v.z - q.z * v.y);
-  const float ty = 2.f * (q.z * v.x - q.x * v.z);
-  const float tz = 2.f * (q.x * v.y - q.y * v.x);
-  return {v.x + q.w * tx + q.y * tz - q.z * ty,
-          v.y + q.w * ty + q.z * tx - q.x * tz,
-          v.z + q.w * tz + q.x * ty - q.y * tx};
-}
+using native_map::rotate_vec;
 // Hamilton product — a∘b applies b's rotation first.
 Quaternion quat_mul(Quaternion a, Quaternion b) {
   return {a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
@@ -357,7 +349,7 @@ RuntimeHost::entity3d_at(float screen_x, float screen_y) const {
                                    impl_->cam3_yaw * kDeg),
                rotation_axis_angle({1.f, 0.f, 0.f},
                                    impl_->cam3_pitch * kDeg));
-  const Vec3 dir = quat_rot(cam_q, dc);
+  const Vec3 dir = rotate_vec(cam_q, dc);
   return raycast3d(impl_->cam3_x, impl_->cam3_y, impl_->cam3_z, dir.x,
                    dir.y, dir.z, impl_->cam3_far);
 }
@@ -1827,7 +1819,7 @@ int RuntimeHost::run() {
       // The pipeline expects a camera-space light direction — rotate the
       // document's world-space dir by the camera's inverse orientation.
       const Quaternion inv{-cam_q.x, -cam_q.y, -cam_q.z, cam_q.w};
-      const Vec3 light_cam = quat_rot(inv, impl.light3);
+      const Vec3 light_cam = rotate_vec(inv, impl.light3);
       // Extra directional lights — same world→camera rotation; the
       // material pipeline evaluates at most two per instance.
       for (auto &inst : instances)
@@ -1835,7 +1827,7 @@ int RuntimeHost::run() {
              ++li) {
           const auto &l = impl.lights3[li];
           inst.material.additional_lights[li] = DirectionalLight3D{
-              quat_rot(inv, {l.dir_x, l.dir_y, l.dir_z}),
+              rotate_vec(inv, {l.dir_x, l.dir_y, l.dir_z}),
               {l.r, l.g, l.b}, l.intensity};
         }
       if (auto scene =

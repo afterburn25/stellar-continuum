@@ -145,9 +145,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   body dynamics (no stacking solver — `groundY` + the upward push-out
   cover landing); `physics3d`/`spatial_index3d` exist engine-side but
   are not yet wired into this mode (raycast uses `segment_triangle`
-  directly); no editor 3D scene tool yet (hand-author `scene3d.json` —
-  generated projects ship a starter); lighting is one key light + up to
-  two directional fills per material; raycast is O(triangles) per entity
+  via `intersect_mesh_segment`); the Scene3D editor tab covers entity +
+  document fields with a live preview/pick but has no transform gizmos
+  or light/emitter authoring UI; lighting is one key light + up to two
+  directional fills per material; raycast is O(triangles) per entity
   with no spatial partition — fine for queries, not per-frame sweeps.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)

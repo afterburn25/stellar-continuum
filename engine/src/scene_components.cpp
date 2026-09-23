@@ -499,10 +499,6 @@ void resolve_hierarchy(World &world) {
   for (const auto e : world.entities()) resolve(e, stack);
 }
 
-namespace {
-// Authored rotation is euler degrees (yaw about +Y, pitch about +X, roll
-// about +Z, applied roll→pitch→yaw) — the quaternion form is what the
-// renderer and hierarchy consume.
 native_map::Quaternion euler_to_quat3(float yaw_deg, float pitch_deg,
                                       float roll_deg) {
   constexpr float deg = 3.14159265358979f / 180.f;
@@ -530,7 +526,6 @@ void quat_to_euler3(const native_map::Quaternion &q, float &yaw_deg,
   yaw_deg = std::atan2(m02, m22) * rad;
   roll_deg = std::atan2(m10, m11) * rad;
 }
-} // namespace
 
 std::vector<EntityId> spawn_scene3d(World &world,
                                     const Scene3dDocument &doc) {
@@ -673,15 +668,6 @@ raycast_world3d(const World &world, std::span<const EntityId> set,
   dx /= dlen;
   dy /= dlen;
   dz /= dlen;
-  // v' = q ⊗ (v,0) ⊗ q* for a unit quaternion q.
-  const auto rot = [](Quaternion q, Vec3 v) {
-    const float tx = 2.f * (q.y * v.z - q.z * v.y);
-    const float ty = 2.f * (q.z * v.x - q.x * v.z);
-    const float tz = 2.f * (q.x * v.y - q.y * v.x);
-    return Vec3{v.x + q.w * tx + q.y * tz - q.z * ty,
-                v.y + q.w * ty + q.z * tx - q.x * tz,
-                v.z + q.w * tz + q.x * ty - q.y * tx};
-  };
   std::optional<WorldRayHit3D> best;
   for (const auto e : set) {
     const auto *t = world.get<Transform3D>(e);
@@ -695,13 +681,13 @@ raycast_world3d(const World &world, std::span<const EntityId> set,
     // Ray → mesh local space: local = R⁻¹·(world − pos) / scale.
     const Quaternion inv{-t->qx / qlen, -t->qy / qlen, -t->qz / qlen,
                          t->qw / qlen};
-    Vec3 lo = rot(inv, {static_cast<float>(ox - t->x),
-                        static_cast<float>(oy - t->y),
-                        static_cast<float>(oz - t->z)});
+    Vec3 lo = rotate_vec(inv, {static_cast<float>(ox - t->x),
+                               static_cast<float>(oy - t->y),
+                               static_cast<float>(oz - t->z)});
     lo = {lo.x / t->scale, lo.y / t->scale, lo.z / t->scale};
-    const Vec3 ld = rot(inv, {static_cast<float>(dx),
-                              static_cast<float>(dy),
-                              static_cast<float>(dz)});
+    const Vec3 ld = rotate_vec(inv, {static_cast<float>(dx),
+                                     static_cast<float>(dy),
+                                     static_cast<float>(dz)});
     // World distance d maps to d/scale local units — so a local segment
     // of max_distance/scale covers the ray, and the returned fraction ×
     // max_distance is the world-space hit distance.
