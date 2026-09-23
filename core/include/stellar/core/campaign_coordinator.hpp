@@ -238,6 +238,12 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] SimulationStepResult
   advance(CampaignSimulationState *campaign, double simulation_days);
 
+  // The engine executor driving the 12 phase tasks — exposed for
+  // diagnostics (domain stats, tick history, tier counts). Phase cadence
+  // policy is coordinator-owned; callers may inspect but not mutate.
+  [[nodiscard]] const stellar::engine::SimulationExecutor &
+  executor() const noexcept { return executor_; }
+
   [[nodiscard]] bool has_matched_combat_runtime() const noexcept;
   [[nodiscard]] CivilizationStrategicRuntimeCoordinator &strategic_runtime()
       noexcept;

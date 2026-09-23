@@ -1352,6 +1352,30 @@ void test_null_advance() {
                        "Value cannot be null. (Parameter 'galaxy')",
           "Null campaign parity");
 }
+
+// The executor is the phase host: every registered phase domain must
+// have run statistics after one advance, and scheduler state must
+// survive the coordinator move contract.
+void test_executor_drives_phases() {
+  CampaignSimulationState state{FreshCampaignState{}};
+  GalaxySimulationStepCoordinator coordinator;
+  (void)coordinator.advance(&state, 1.0);
+  require(coordinator.executor().tick() == 1,
+          "Executor tick did not advance with the first step");
+  for (const auto domain : GalaxySimulationStepCoordinator::phase_names) {
+    const auto *stats =
+        coordinator.executor().domain_stats(std::string(domain));
+    require(stats != nullptr && stats->runs == 1,
+            "Phase domain did not run through the executor: " +
+                std::string(domain));
+  }
+  GalaxySimulationStepCoordinator moved{std::move(coordinator)};
+  require(moved.executor().tick() == 1,
+          "Executor scheduler state did not survive the move");
+  (void)moved.advance(&state, 1.0);
+  require(moved.executor().tick() == 2,
+          "Executor tick did not advance after the move");
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -1385,6 +1409,7 @@ int main(int argc, char **argv) {
     test_lane_ownership_and_invalidation();
     test_time_validation_precedes_lane_graph();
     test_null_advance();
+    test_executor_drives_phases();
     std::cout << "campaign coordinator parity: " << step_cases
               << " step cases, " << outcome_cases
               << " combat outcome cases\n";
