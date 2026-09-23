@@ -218,6 +218,9 @@ struct Shell {
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
       scene_sprites;
   bool scene_dragging{}; // pointer is dragging an entity in the preview
+  UiRect scene_sheet_rect{}; // tile picker strip drawn in paint mode
+  float scene_sheet_scale{1.f};
+  int scene_sheet_cols{0};
   bool scene_paint{};    // PAINT mode: clicks write cells, not select
   bool scene_painting{}; // pointer is mid paint stroke
   int scene_paint_cell{}; // brush value written into tilemap cells
@@ -1447,26 +1450,30 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
            shell.scene_doc.tilemaps[b].layer;
   });
   std::size_t next_tm = 0;
+  // Content-cached tileset decode shared by the map painter and the
+  // paint-mode tile picker.
+  const auto load_tileset = [&](const std::string &path)
+      -> std::shared_ptr<const RgbaImage> {
+    if (path.empty()) return nullptr;
+    const auto full = (shell.project->root / "packages" /
+                       shell.project->id / "content" / path)
+                          .lexically_normal();
+    const auto key = full.generic_string();
+    if (const auto it = shell.scene_sprites.find(key);
+        it != shell.scene_sprites.end())
+      return it->second;
+    std::shared_ptr<const RgbaImage> img;
+    try {
+      img = decode_rgba_image(full, 1024);
+    } catch (const std::exception &) {
+    }
+    shell.scene_sprites[key] = img;
+    return img;
+  };
   const auto draw_tilemap = [&](std::size_t which) {
     const auto &tm = shell.scene_doc.tilemaps[which];
     if (tm.columns <= 0 || tm.tile_w <= 0 || tm.tile_h <= 0) return;
-    std::shared_ptr<const RgbaImage> tiles;
-    if (!tm.tileset.empty()) {
-      const auto full = (shell.project->root / "packages" /
-                         shell.project->id / "content" / tm.tileset)
-                            .lexically_normal();
-      const auto key = full.generic_string();
-      if (const auto it = shell.scene_sprites.find(key);
-          it != shell.scene_sprites.end()) {
-        tiles = it->second;
-      } else {
-        try {
-          tiles = decode_rgba_image(full, 1024);
-        } catch (const std::exception &) {
-        }
-        shell.scene_sprites[key] = tiles;
-      }
-    }
+    const auto tiles = load_tileset(tm.tileset);
     const int set_cols =
         tiles ? tiles->width() / tm.tile_w : 0;
     const int rows = static_cast<int>(tm.cells.size() / tm.columns);
@@ -1607,6 +1614,33 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
              tm.tile_h * sy},
             accent});
     }
+    // Tile picker: the decoded sheet as a strip along the preview's top —
+    // clicking a cell selects it as the brush instead of painting.
+    shell.scene_sheet_rect = {};
+    if (const auto tiles = load_tileset(tm.tileset)) {
+      const int set_cols = std::max(1, tiles->width() / tm.tile_w);
+      const float fit =
+          std::min(2.f, std::min(pv.width / tiles->width(),
+                                 pv.height * .3f / tiles->height()));
+      const float sw = tiles->width() * fit, sh = tiles->height() * fit;
+      shell.scene_sheet_rect = {pv.x, pv.y, sw, sh};
+      shell.scene_sheet_scale = fit;
+      shell.scene_sheet_cols = set_cols;
+      out.overlay.push_back(
+          FilledRectangle{shell.scene_sheet_rect, {10, 14, 22, 220}});
+      out.overlay.push_back(
+          Image{tiles, shell.scene_sheet_rect});
+      if (shell.scene_paint_cell >= 0) {
+        const int bc = shell.scene_paint_cell;
+        out.overlay.push_back(StrokedRectangle{
+            {pv.x + (bc % set_cols) * tm.tile_w * fit,
+             pv.y + (bc / set_cols) * tm.tile_h * fit,
+             tm.tile_w * fit, tm.tile_h * fit},
+            accent});
+      }
+    }
+  } else {
+    shell.scene_sheet_rect = {};
   }
   out.overlay.push_back(Text{
       {pv.x + 6 * s, pv.y + pv.height - 16 * s},
@@ -2565,6 +2599,30 @@ int main(int argc, char **argv) {
             const float wy =
                 (event.position.y - pv.y) / pv.height * 720.f;
             if (shell.scene_paint && scene_tile(shell) != nullptr) {
+              // A click inside the tile-picker strip selects the brush
+              // cell instead of painting.
+              if (const auto &tm = *scene_tile(shell);
+                  tm.tile_w > 0 && tm.tile_h > 0 &&
+                  shell.scene_sheet_scale > 0.f &&
+                  shell.scene_sheet_rect.contains(event.position)) {
+                const auto &sr = shell.scene_sheet_rect;
+                const int cx = static_cast<int>(
+                    (event.position.x - sr.x) /
+                    (tm.tile_w * shell.scene_sheet_scale));
+                const int cy = static_cast<int>(
+                    (event.position.y - sr.y) /
+                    (tm.tile_h * shell.scene_sheet_scale));
+                const int rows = static_cast<int>(
+                    sr.height / (tm.tile_h * shell.scene_sheet_scale));
+                if (cx < 0 || cx >= shell.scene_sheet_cols || cy < 0 ||
+                    cy >= rows)
+                  break;
+                shell.scene_paint_cell =
+                    cy * shell.scene_sheet_cols + cx;
+                shell.status =
+                    "paint brush " + std::to_string(shell.scene_paint_cell);
+                break;
+              }
               // One undo step per stroke.
               shell.scene_history.commit(shell.scene_doc);
               shell.scene_painting = true;

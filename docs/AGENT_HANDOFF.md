@@ -174,8 +174,9 @@ list with an animated/flipped/rotated preview that paints all maps,
 plus TILES + / MAP k/n / TILES - layer-stack controls, tilemap fields
 (tileset, tile size, columns, collide, layer, parallax, cells CSV,
 brush id) that edit the selected map, and a PAINT mode that
-click/drag-writes cells in the preview with a grid overlay and one
-undo step per stroke.
+click/drag-writes cells in the preview with a grid overlay, a
+tileset picker strip along the preview's top edge (click a tile to
+make it the brush), and one undo step per stroke.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in
