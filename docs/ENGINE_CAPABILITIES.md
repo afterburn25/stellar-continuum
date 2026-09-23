@@ -694,8 +694,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   (skipped for homebound civs — coverage is only meaningful with
   external systems), `logistics_link_saturated` for home-system
   corridors at ≥99.9% committed capacity via the
-  `campaign_logistics_projection` utilization view, and
-  `treasury_arrears`/`treasury_depleted` from
+  `campaign_logistics_projection` utilization view,
+  `population_unrest` for colonies whose projected cohort shows
+  ≥10%/year emigration pressure via `campaign_population_projection`,
+  and `treasury_arrears`/`treasury_depleted` from
   the authoritative `assess_treasury` — all previously surfaced only
   in workspace view-models or a player-scoped voice event, never in
   developer diagnostics. Corrupt classifier inputs (non-finite/negative
