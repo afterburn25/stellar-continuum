@@ -133,6 +133,12 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   conventional one); `host.sim_time()` reports deterministic elapsed sim
   seconds; `host.world_width()`/`world_height()` expose the resolved level
   bounds for spawn limits, AI roam ranges and minimap math.
+- **Named save blobs:** `host.save_data(key, bytes)`/`load_data(key)`
+  persist arbitrary game state (quest flags, inventories, settings) under
+  `saves/data/<key>.dat` — atomic writes through the same rotating `.bak`
+  history chain as world snapshots, newest-first recovery on a corrupt
+  primary, `[A-Za-z0-9._-]` key whitelist. Verified live: a generated host
+  writes and reloads a blob across runs.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint

@@ -6,11 +6,14 @@
 #include "stellar/engine/vfx.hpp"
 #include "stellar/engine/world.hpp"
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
+#include <vector>
 
 namespace stellar::native_map {
 class Window;
@@ -162,6 +165,16 @@ public:
   EntityId spawn_entity(const SceneEntity &entity);
   // Destroys a tracked entity; false for untracked/stale ids.
   bool destroy_entity(EntityId id);
+
+  // Named game-data blobs under <root>/saves/data/<key>.dat — quest flags,
+  // inventories, settings, anything the world snapshot doesn't cover.
+  // save_data writes atomically through the same rotating .bak history
+  // chain as world snapshots; load_data walks the chain newest-first when
+  // the primary is absent/corrupt. Keys accept [A-Za-z0-9._-] only —
+  // anything else fails (false / nullopt).
+  bool save_data(std::string_view key, std::span<const std::byte> bytes);
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>>
+  load_data(std::string_view key) const;
 
   // Runs each rendered frame after input handling and scene polling, before
   // the built-in velocity integration. The place for game logic.

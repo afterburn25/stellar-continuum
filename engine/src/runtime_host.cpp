@@ -1,10 +1,12 @@
 #include "stellar/engine/runtime_host.hpp"
 
+#include "stellar/engine/atomic_file_write.hpp"
 #include "stellar/engine/native_audio.hpp"
 #include "stellar/engine/native_map_platform.hpp"
 #include "stellar/engine/package.hpp"
 #include "stellar/engine/runtime_diagnostics.hpp"
 #include "stellar/engine/runtime_paths.hpp"
+#include "stellar/engine/save_history.hpp"
 #include "stellar/engine/texture_cook.hpp"
 
 #include <algorithm>
@@ -160,6 +162,50 @@ EntityId RuntimeHost::spawn_entity(const SceneEntity &entity) {
 }
 bool RuntimeHost::destroy_entity(EntityId id) {
   return impl_->destroy_fn && impl_->destroy_fn(id);
+}
+
+namespace {
+std::optional<std::filesystem::path>
+data_slot_path(const std::filesystem::path &root, std::string_view key) {
+  if (key.empty() || key.size() > 64) return std::nullopt;
+  for (const char c : key)
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
+      return std::nullopt;
+  return root / "saves" / "data" / (std::string(key) + ".dat");
+}
+} // namespace
+
+bool RuntimeHost::save_data(std::string_view key,
+                            std::span<const std::byte> bytes) {
+  const auto path = data_slot_path(impl_->options.project_root, key);
+  if (!path) return false;
+  try {
+    std::filesystem::create_directories(path->parent_path());
+    rotate_save_history(*path);
+    write_file_atomically(*path, bytes);
+    write_history_sidecars(*path);
+  } catch (const std::exception &) {
+    return false;
+  }
+  return true;
+}
+
+std::optional<std::vector<std::uint8_t>>
+RuntimeHost::load_data(std::string_view key) const {
+  const auto path = data_slot_path(impl_->options.project_root, key);
+  if (!path) return std::nullopt;
+  const auto read = [](const std::filesystem::path &p)
+      -> std::optional<std::vector<std::uint8_t>> {
+    std::ifstream in(p, std::ios::binary);
+    if (!in) return std::nullopt;
+    return std::vector<std::uint8_t>{std::istreambuf_iterator<char>(in),
+                                     std::istreambuf_iterator<char>()};
+  };
+  if (auto bytes = read(*path)) return bytes;
+  for (std::size_t slot = 1; slot <= k_default_save_history_depth; ++slot)
+    if (auto bytes = read(history_slot_path(*path, slot))) return bytes;
+  return std::nullopt;
 }
 void RuntimeHost::set_camera(float x, float y, float zoom) {
   impl_->cam_x = x;
