@@ -30,6 +30,7 @@
 #include <stellar/engine/project.hpp>
 #include <stellar/engine/population.hpp>
 #include <stellar/engine/colony.hpp>
+#include <stellar/engine/economy_catalog.hpp>
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
@@ -73,14 +74,15 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization, Simulation, Colony };
+                  Localization, Simulation, Colony, Economy };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
-                            Tool::Colony};
-constexpr std::array<const char *, 9> kToolNames{
+                            Tool::Colony, Tool::Economy};
+constexpr std::array<const char *, 10> kToolNames{
     "Projects", "Dashboard", "Scene", "Scene3D",
-    "Assets",   "Profiler",  "Localization", "Simulation", "Colony"};
+    "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
+    "Economy"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -326,6 +328,28 @@ struct Shell {
       hit_col_enable{}, hit_col_demolish{};
   std::vector<UiRect> hit_col_build;
   std::vector<UiRect> hit_col_rows;
+
+  // Economy tool: a catalog/network inspector over the specialization
+  // economy framework — a fixed EconomyCatalog (ResourceSpec +
+  // RecipeSpec rows) validated on demand, bridged into a live
+  // ResourceNetwork (two nodes, producers, a transfer lane) that
+  // advances over days, with analyze_economy demand/bottleneck
+  // diagnostics rolled up from real network state. A BREAK toggle
+  // injects a dangling recipe to exercise the validation diagnostics.
+  struct EconomyDemo {
+    bool initialized{false};
+    engine::EconomyCatalog catalog;
+    engine::ResourceNetwork network;
+    std::uint64_t smelter_producer{0};
+    bool validated{false};
+    bool break_catalog{false};
+    std::vector<engine::ValidationIssue> issues;
+    bool analyzed{false};
+    std::vector<engine::EconomyDiagnostic> diagnostics;
+    double day{0.0};
+  } eco;
+  UiRect hit_eco_validate{}, hit_eco_break{}, hit_eco_analyze{},
+      hit_eco_step{}, hit_eco_run10{}, hit_eco_producer{};
   std::string status{"ready"};
 };
 
@@ -3252,6 +3276,216 @@ void render_colony(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+// ---- Economy tool: catalog validation + live network diagnostics -----
+
+void init_economy(Shell::EconomyDemo &eco) {
+  namespace eng = engine;
+  using Cat = eng::ResourceCategory;
+  using Store = eng::StorageClass;
+  auto def = [&eco](std::string id, Cat cat, Store store,
+                    double mass, bool stockpiles) {
+    eng::ResourceSpec spec;
+    spec.id = std::move(id);
+    spec.name_key = "RES_" + spec.id;
+    spec.category = cat;
+    spec.storage = store;
+    spec.mass_per_unit = mass;
+    eco.catalog.define(std::move(spec));
+    eng::ResourceDefinition runtime;
+    runtime.id = spec.id;
+    runtime.name_key = spec.name_key;
+    runtime.stockpiles = stockpiles;
+    eco.network.define(std::move(runtime));
+  };
+  def("res.ore", Cat::Raw, Store::Bulk, 1.0, true);
+  def("res.alloys", Cat::Refined, Store::Bulk, 0.8, true);
+  def("res.fuel", Cat::Refined, Store::Liquid, 0.6, true);
+  def("res.food", Cat::Consumable, Store::Bulk, 0.4, true);
+  def("res.water", Cat::Raw, Store::Liquid, 1.0, true);
+
+  auto recipe = [&eco](std::string id,
+                       std::vector<eng::ResourceAmount> inputs,
+                       std::vector<eng::ResourceAmount> outputs,
+                       double days) {
+    eco.catalog.add_recipe({.id = id,
+                            .name_key = "RECIPE_" + id,
+                            .inputs = std::move(inputs),
+                            .outputs = std::move(outputs),
+                            .duration_days = days});
+    eco.network.add_recipe(
+        eng::to_runtime_recipe(*eco.catalog.recipe(id)));
+  };
+  recipe("recipe.smelt", {{"res.ore", 2}}, {{"res.alloys", 1}}, 2.0);
+  recipe("recipe.refine", {{"res.ore", 3}}, {{"res.fuel", 1}}, 3.0);
+  recipe("recipe.hydroponics", {{"res.water", 1}}, {{"res.food", 2}}, 1.0);
+
+  auto &homeworld = eco.network.add_node(1);
+  homeworld.inventory.add("res.ore", 200);
+  homeworld.inventory.add("res.water", 80);
+  auto &colony = eco.network.add_node(2);
+  colony.inventory.add("res.food", 10);
+  eco.smelter_producer = eco.network.add_producer(1, "recipe.smelt");
+  eco.network.add_producer(1, "recipe.hydroponics");
+  eco.network.transfer(1, 2, "res.alloys", 40.0, 5.0);
+  eco.initialized = true;
+}
+
+void render_economy(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &eco = shell.eco;
+  if (!eco.initialized) init_economy(eco);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "ECONOMY");
+
+  shell.hit_eco_validate = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_validate, "VALIDATE", false, font, s);
+  shell.hit_eco_break = {x + 100 * s, y, 150 * s, 24 * s};
+  shell_button(out, shell.hit_eco_break,
+               eco.break_catalog ? "DANGLING: ON" : "DANGLING: OFF",
+               eco.break_catalog, font, s);
+  shell.hit_eco_analyze = {x + 258 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_analyze, "ANALYZE", false, font, s);
+  shell.hit_eco_step = {x + 358 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_step, "ADV 1D", false, font, s);
+  shell.hit_eco_run10 = {x + 458 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_run10, "ADV 10D", false, font, s);
+  shell.hit_eco_producer = {x + 558 * s, y, 130 * s, 24 * s};
+  shell_button(out, shell.hit_eco_producer, "SMELTER ON/OFF", false, font,
+               s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", eco.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "catalog",
+       std::to_string(eco.catalog.resource_count()) + " resources  " +
+           std::to_string(eco.catalog.recipe_count()) + " recipes",
+       font);
+  const auto &unproducible = eco.catalog.graph().unproducible_resources();
+  std::string unp;
+  for (const auto &id : unproducible) {
+    if (!unp.empty()) unp += " ";
+    unp += id;
+  }
+  line(out, x, y, "unproducible", unp.empty() ? "none" : unp, font);
+  y += 4 * s;
+
+  // Validation issues.
+  heading(out, x, y, "VALIDATION");
+  if (!eco.validated) {
+    line(out, x, y, "state", "not run — VALIDATE checks the catalog",
+         font);
+  } else if (eco.issues.empty()) {
+    line(out, x, y, "result", "no issues", font);
+  } else {
+    for (const auto &issue : eco.issues) {
+      const char *sev =
+          issue.severity == engine::ValidationSeverity::Error ? "ERR"
+                                                              : "warn";
+      out.overlay.push_back(Text{
+          {x, y},
+          sev + std::string("  ") + issue.record + "." + issue.field +
+              "  " + issue.reason,
+          issue.severity == engine::ValidationSeverity::Error
+              ? Color{255, 120, 100, 255}
+              : Color{255, 200, 90, 255},
+          font});
+      y += 16 * s;
+    }
+  }
+  y += 4 * s;
+
+  // Analysis table.
+  heading(out, x, y, "ANALYSIS");
+  if (!eco.analyzed) {
+    line(out, x, y, "state",
+         "not run — ANALYZE rolls demand + observed production into "
+         "bottleneck diagnostics",
+         font);
+  } else {
+    out.overlay.push_back(
+        Text{{x, y}, "resource      demand  supply  unmet  reserve  util  flags",
+             muted, font});
+    y += 16 * s;
+    for (const auto &d : eco.diagnostics) {
+      std::string flags;
+      if (d.bottleneck) flags += "BOTTLENECK ";
+      if (d.import_dependent) flags += "IMPORT";
+      char row[160];
+      std::snprintf(
+          row, sizeof(row), "%-13s %6.1f  %6.1f  %5.1f  %7.1f  %4.0f%%  %s",
+          d.resource.c_str(), d.demand_per_day, d.supply_per_day,
+          d.unmet_per_day,
+          std::isinf(d.reserve_days) ? 9999.0 : d.reserve_days,
+          d.utilization * 100.0, flags.c_str());
+      out.overlay.push_back(
+          Text{{x, y}, row, d.bottleneck ? Color{255, 140, 100, 255}
+                                         : ink,
+               font});
+      y += 16 * s;
+    }
+  }
+
+  // Right column: live network state.
+  const float rx = body.x + body.width * 0.52f;
+  float ry = body.y + 60 * s;
+  heading(out, rx, ry, "NETWORK");
+  for (const std::uint64_t node_id : {1ull, 2ull}) {
+    const auto *node = eco.network.node(node_id);
+    if (!node) continue;
+    std::string inv;
+    auto snap = node->inventory.snapshot();
+    std::vector<std::pair<std::string, double>> rows(snap.begin(),
+                                                   snap.end());
+    std::sort(rows.begin(), rows.end());
+    for (const auto &[res, qty] : rows) {
+      if (!inv.empty()) inv += "  ";
+      const auto slash = res.find_last_of('.');
+      inv += res.substr(slash == std::string::npos ? 0 : slash + 1);
+      char num[24];
+      std::snprintf(num, sizeof(num), " %.0f", qty);
+      inv += num;
+    }
+    line(out, rx, ry,
+         "node " + std::to_string(node_id), inv.empty() ? "empty" : inv,
+         font);
+  }
+  const auto state = eco.network.capture_state();
+  for (const auto &p : state.producers) {
+    std::string line_text =
+        p.recipe_id + (p.enabled ? "" : "  DISABLED") + "  progress " +
+        std::to_string(static_cast<int>(p.progress_days * 10) / 10) + "d";
+    line(out, rx, ry, "producer " + std::to_string(p.id), line_text, font);
+  }
+  for (const auto &t : state.transfers) {
+    char tbuf[80];
+    std::snprintf(tbuf, sizeof(tbuf), "%.0f/%.0f %s @ %.0f/d",
+                  t.shipped, t.amount, t.resource.c_str(),
+                  t.rate_per_day);
+    line(out, rx, ry, "lane " + std::to_string(t.id), tbuf, font);
+  }
+  ry += 4 * s;
+  heading(out, rx, ry, "SHORTAGES");
+  const auto shortages = eco.network.shortages();
+  if (shortages.empty()) {
+    line(out, rx, ry, "state", "none", font);
+  } else {
+    for (const auto &shortage : shortages) {
+      char sbuf[96];
+      std::snprintf(sbuf, sizeof(sbuf),
+                    "producer %llu  %s  %.1f/%.1f",
+                    static_cast<unsigned long long>(shortage.producer_id),
+                    shortage.resource.c_str(), shortage.available,
+                    shortage.required);
+      out.overlay.push_back(Text{{rx, ry}, sbuf,
+                                 {255, 140, 100, 255}, font});
+      ry += 16 * s;
+    }
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -4557,6 +4791,9 @@ int main(int argc, char **argv) {
       case Tool::Colony:
         render_colony(draw, shell, body, s);
         break;
+      case Tool::Economy:
+        render_economy(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -4744,6 +4981,76 @@ int main(int argc, char **argv) {
                 break;
               }
             }
+          }
+        }
+        if (shell.tool == Tool::Economy &&
+            event.type == InputEventType::LeftReleased) {
+          auto &eco = shell.eco;
+          if (shell.hit_eco_validate.contains(event.position)) {
+            engine::EconomyCatalog check = eco.catalog;
+            if (eco.break_catalog)
+              // Injects a recipe consuming a resource nothing defines —
+              // exercises the validation diagnostics live.
+              check.add_recipe(
+                  {.id = "recipe.broken",
+                   .name_key = "RECIPE_BROKEN",
+                   .inputs = {{"res.nonexistent", 1}},
+                   .outputs = {{"res.alloys", 1}},
+                   .duration_days = 1.0});
+            eco.issues = check.validate();
+            eco.validated = true;
+          } else if (shell.hit_eco_break.contains(event.position)) {
+            eco.break_catalog = !eco.break_catalog;
+            eco.validated = false;
+          } else if (shell.hit_eco_analyze.contains(event.position)) {
+            // Demand + observed rollups derived from the live network:
+            // enabled producers' recipe throughput per day.
+            std::unordered_map<std::string, engine::ResourceObservation>
+                observed;
+            for (const auto &p : eco.network.capture_state().producers) {
+              if (!p.enabled) continue;
+              const auto *spec = eco.catalog.recipe(p.recipe_id);
+              if (!spec || spec->duration_days <= 0.0) continue;
+              const double runs_per_day = 1.0 / spec->duration_days;
+              for (const auto &a : spec->inputs)
+                observed[a.resource].consumed_per_day +=
+                    a.amount * runs_per_day;
+              for (const auto &a : spec->outputs)
+                observed[a.resource].produced_per_day +=
+                    a.amount * runs_per_day;
+              for (const auto &a : spec->outputs)
+                observed[a.resource].capacity_per_day +=
+                    a.amount * runs_per_day;
+            }
+            for (const std::uint64_t node_id : {1ull, 2ull}) {
+              const auto *node = eco.network.node(node_id);
+              if (!node) continue;
+              for (const auto &[res, qty] : node->inventory.snapshot())
+                observed[res].stock += qty;
+            }
+            std::vector<engine::ResourceAmount> demand;
+            for (const auto &[res, obs] : observed)
+              if (obs.consumed_per_day > 0.0)
+                demand.push_back({res, obs.consumed_per_day});
+            eco.diagnostics =
+                engine::analyze_economy(eco.catalog, demand, observed);
+            eco.analyzed = true;
+          } else if (shell.hit_eco_step.contains(event.position)) {
+            eco.network.advance(1.0);
+            eco.day += 1.0;
+          } else if (shell.hit_eco_run10.contains(event.position)) {
+            eco.network.advance(10.0);
+            eco.day += 10.0;
+          } else if (shell.hit_eco_producer.contains(event.position)) {
+            const auto state = eco.network.capture_state();
+            const auto p =
+                std::find_if(state.producers.begin(), state.producers.end(),
+                             [&](const auto &prod) {
+                               return prod.id == eco.smelter_producer;
+                             });
+            if (p != state.producers.end())
+              eco.network.set_producer_enabled(eco.smelter_producer,
+                                               !p->enabled);
           }
         }
       }
