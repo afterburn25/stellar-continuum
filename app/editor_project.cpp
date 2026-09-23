@@ -13,7 +13,7 @@ std::string serialize_project(const EditorProject &project) {
     for (const auto &[id, edit] : map) {
       if (edit.name.empty() && edit.note.empty() && !edit.bookmarked &&
           !edit.anomaly && !edit.rare_resource && !edit.pre_warp_civilization &&
-          !edit.radius_earth && !edit.orbit_au)
+          !edit.radius_earth && !edit.orbit_au && !edit.mass_earth)
         continue;
       auto row = nlohmann::json{{"id", id},
                                 {"name", edit.name},
@@ -25,6 +25,7 @@ std::string serialize_project(const EditorProject &project) {
         row["preWarpCivilization"] = *edit.pre_warp_civilization;
       if (edit.radius_earth) row["radiusEarth"] = *edit.radius_earth;
       if (edit.orbit_au) row["orbitAu"] = *edit.orbit_au;
+      if (edit.mass_earth) row["massEarth"] = *edit.mass_earth;
       rows.push_back(std::move(row));
     }
     return rows;
@@ -73,9 +74,12 @@ EditorProject parse_project(std::string_view text) {
         if (const auto it = row.find("orbitAu");
             it != row.end() && it->is_number() && it->get<double>() > 0.)
           edit.orbit_au = it->get<double>();
+        if (const auto it = row.find("massEarth");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.mass_earth = it->get<double>();
         if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
             edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
-            edit.radius_earth || edit.orbit_au)
+            edit.radius_earth || edit.orbit_au || edit.mass_earth)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };

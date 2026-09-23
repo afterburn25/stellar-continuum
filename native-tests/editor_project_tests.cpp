@@ -48,6 +48,7 @@ int main() {
     project.body_edits[3].bookmarked = true;
     project.body_edits[3].radius_earth = 1.25; // numeric override
     project.body_edits[3].orbit_au = 1.524; // stellar orbit override
+    project.body_edits[3].mass_earth = 0.83; // mass override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -93,6 +94,11 @@ int main() {
             "orbit override did not round-trip");
     require(!restored.body_edits.at(9).orbit_au,
             "unset orbit override must stay unset (AUTO follows generated)");
+    require(restored.body_edits.at(3).mass_earth &&
+                *restored.body_edits.at(3).mass_earth == 0.83,
+            "mass override did not round-trip");
+    require(!restored.body_edits.at(9).mass_earth,
+            "unset mass override must stay unset (AUTO follows generated)");
 
     // Documents without the additive bodyEdits array still parse.
     const auto legacy = parse_project(

@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -251,7 +251,7 @@ struct Editor {
       hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
-      hit_radius{}, hit_orbit{};
+      hit_radius{}, hit_orbit{}, hit_mass{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -328,6 +328,20 @@ double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
       it != ed.body_edits.end() && it->second.radius_earth)
     return *it->second.radius_earth;
   return body.radius_earth;
+}
+double body_mass_earth(const Editor &ed, const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.mass_earth)
+    return *it->second.mass_earth;
+  return body.mass_earth;
+}
+// Surface gravity derives from the effective mass/radius the same way
+// generation computes it (mass / radius^2) — overrides never leave a
+// stale gravity reading.
+double body_gravity_g(const Editor &ed, const core::PlanetaryBody &body) {
+  const auto radius = body_radius_earth(ed, body);
+  if (radius <= 0.) return body.environment.gravity_g;
+  return body_mass_earth(ed, body) / (radius * radius);
 }
 
 bool matches(const Editor &ed, const core::StellarSystem &sys) {
@@ -448,13 +462,17 @@ void commit_active_field(Editor &ed) {
                          ed.project_name});
       ed.project_name = ed.edit_buffer;
     }
-  } else if (ed.editing == Field::BodyRadius || ed.editing == Field::BodyOrbit) {
+  } else if (ed.editing == Field::BodyRadius ||
+             ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass) {
     // Body-only numeric overrides: empty restores AUTO, otherwise a positive
     // finite number wins over the generated property.
-    const auto member = ed.editing == Field::BodyRadius
-                            ? &edproj::SystemEdit::radius_earth
-                            : &edproj::SystemEdit::orbit_au;
-    const auto label = ed.editing == Field::BodyRadius ? "radius" : "orbit";
+    const auto member =
+        ed.editing == Field::BodyRadius ? &edproj::SystemEdit::radius_earth
+        : ed.editing == Field::BodyOrbit ? &edproj::SystemEdit::orbit_au
+                                        : &edproj::SystemEdit::mass_earth;
+    const auto label = ed.editing == Field::BodyRadius ? "radius"
+                       : ed.editing == Field::BodyOrbit ? "orbit"
+                                                      : "mass";
     if (const auto target = annotation_target(ed); target && target->second) {
       const auto it = ed.body_edits.find(target->first);
       const auto current = it != ed.body_edits.end()
@@ -547,8 +565,8 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("id", std::to_string(body.id));
   row("kind", std::string(body_kind_name(body.kind)));
   row("radius", fspec("%.3f", body_radius_earth(ed, body)) + " Re");
-  row("mass", fspec("%.3f", body.mass_earth) + " Me");
-  row("gravity", fspec("%.3f", body.environment.gravity_g) + " g");
+  row("mass", fspec("%.3f", body_mass_earth(ed, body)) + " Me");
+  row("gravity", fspec("%.3f", body_gravity_g(ed, body)) + " g");
   row("temperature",
       fspec("%.0f", body.environment.temperature_kelvin) + " K");
   row("pressure", fspec("%.1f", body.environment.pressure_kpa) + " kPa");
@@ -721,7 +739,7 @@ void rebuild_detail_rows(Editor &ed) {
       const auto &body = ed.bodies[body_index];
       std::string value = std::string(body_kind_name(body.kind)) + ", " +
                           fspec("%.2f", body_radius_earth(ed, body)) + " Re, " +
-                          fspec("%.2f", body.environment.gravity_g) + " g, " +
+                          fspec("%.2f", body_gravity_g(ed, body)) + " g, " +
                           fspec("%.0f", body.environment.temperature_kelvin) +
                           " K, " + std::string(atmosphere_name(
                                        body.environment.atmosphere));
@@ -905,6 +923,20 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
               ed.editing == Field::BodyRadius, "earth radii, empty = auto...",
               font);
     y += ed.hit_radius.height + 8 * s;
+    out.overlay.push_back(
+        Text{{x, y}, "mass override (Earth masses)", muted, font - 1});
+    y += font + 4;
+    ed.hit_mass = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto mass_value =
+        ed.editing == Field::BodyMass
+            ? ed.edit_buffer
+            : (stored.mass_earth
+                   ? fspec("%.3f", *stored.mass_earth)
+                   : fspec("%.3f", body.mass_earth) + " (auto)");
+    field_box(out, ed.hit_mass, mass_value,
+              ed.editing == Field::BodyMass, "earth masses, empty = auto...",
+              font);
+    y += ed.hit_mass.height + 8 * s;
     // Star-orbiting bodies only: moons ride their parent's satellite orbit.
     if (!body.parent_body_id) {
       out.overlay.push_back(
@@ -929,6 +961,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   } else {
     ed.hit_radius = {};
     ed.hit_orbit = {};
+    ed.hit_mass = {};
   }
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
@@ -2114,6 +2147,17 @@ int main(int argc, char **argv) {
               ed.edit_buffer =
                   it != ed.body_edits.end() && it->second.orbit_au
                       ? fspec("%.4f", *it->second.orbit_au)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_mass.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyMass;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.mass_earth
+                      ? fspec("%.3f", *it->second.mass_earth)
                       : std::string{};
               window.set_text_input(true);
             }

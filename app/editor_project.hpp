@@ -27,6 +27,12 @@ struct SystemEdit {
   // generated orbit's other elements stay; the ring and position recompute
   // from the patched AnalyticOrbit.
   std::optional<double> orbit_au;
+  // Numeric property override (body edits only): unset follows the
+  // generated mass_earth; a set value wins everywhere the editor reads it.
+  // Surface gravity derives as effective_mass / effective_radius^2, the
+  // same relationship generation applies — an overridden radius or mass
+  // never leaves a stale gravity reading.
+  std::optional<double> mass_earth;
 };
 
 struct EditorProject {
