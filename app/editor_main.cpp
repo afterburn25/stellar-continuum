@@ -18,6 +18,7 @@
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
+#include <stellar/engine/undo_history.hpp>
 
 #include <algorithm>
 #include <array>
@@ -156,6 +157,7 @@ struct Editor {
 
   // Annotation layer + text editing state.
   std::unordered_map<int, edproj::SystemEdit> edits;
+  engine::UndoHistory<std::unordered_map<int, edproj::SystemEdit>> history{64};
   Field editing{Field::None};
   std::string edit_buffer, search;
 
@@ -163,7 +165,7 @@ struct Editor {
   std::vector<UiRect> hits;
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
-      hit_save{}, hit_load{}, hit_search{};
+      hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{};
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{};
   std::filesystem::path project_path;
   float pointer_x{}, pointer_y{};
@@ -196,6 +198,47 @@ void rebuild_filter(Editor &ed) {
   for (std::size_t i = 0; i < ed.systems.size(); ++i)
     if (matches(ed, ed.systems[i])) ed.filtered.push_back(i);
   ed.system_list.row_count = ed.filtered.size();
+}
+
+// Commits the in-progress field buffer into the annotation layer, recording
+// an undo snapshot only when the value actually changes.
+void commit_active_field(Editor &ed) {
+  if (ed.editing == Field::None) return;
+  if (ed.editing == Field::Search) {
+    if (ed.search != ed.edit_buffer) {
+      ed.search = ed.edit_buffer;
+      rebuild_filter(ed);
+    }
+  } else if (ed.selected < ed.systems.size()) {
+    const auto id = ed.systems[ed.selected].id;
+    const auto it = ed.edits.find(id);
+    const std::string current_value =
+        it == ed.edits.end()
+            ? std::string{}
+            : (ed.editing == Field::Name ? it->second.name : it->second.note);
+    if (current_value != ed.edit_buffer) {
+      ed.history.commit(ed.edits);
+      auto &stored = ed.edits[id];
+      (ed.editing == Field::Name ? stored.name : stored.note) = ed.edit_buffer;
+    }
+  }
+  ed.editing = Field::None;
+}
+
+void apply_undo(Editor &ed) {
+  if (auto state = ed.history.undo(ed.edits)) {
+    ed.edits = std::move(*state);
+    rebuild_filter(ed);
+    ed.status = "undo";
+  }
+}
+
+void apply_redo(Editor &ed) {
+  if (auto state = ed.history.redo(ed.edits)) {
+    ed.edits = std::move(*state);
+    rebuild_filter(ed);
+    ed.status = "redo";
+  }
 }
 
 Point world_to_screen(const Editor &ed, float x, float y) {
@@ -257,12 +300,17 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
                           TextAlign::Left, FontFace::Heading});
   y += (font + 14) * s;
 
-  // Project actions docked at the inspector bottom (drawn unconditionally).
+  // Project actions + history docked at the inspector bottom (drawn
+  // unconditionally — undo must work with no selection, e.g. after a load).
   const float bw = (r.width - 34 * s) * .5f;
   ed.hit_save = {x, r.y + r.height - (font + 20) * s, bw, (font + 12) * s};
   ed.hit_load = {x + bw + 6 * s, ed.hit_save.y, bw, ed.hit_save.height};
   small_button(out, ed.hit_save, "SAVE PROJECT", false, font);
   small_button(out, ed.hit_load, "LOAD PROJECT", false, font);
+  ed.hit_undo = {x, ed.hit_save.y - (font + 18) * s, bw, (font + 12) * s};
+  ed.hit_redo = {x + bw + 6 * s, ed.hit_undo.y, bw, ed.hit_undo.height};
+  small_button(out, ed.hit_undo, "UNDO", ed.history.can_undo(), font);
+  small_button(out, ed.hit_redo, "REDO", ed.history.can_redo(), font);
 
   if (ed.selected >= ed.systems.size()) {
     out.text.push_back(Text{{x, y}, "No system selected", muted, font});
@@ -407,6 +455,7 @@ void load_project(Editor &ed) {
                            std::istreambuf_iterator<char>()};
     auto project = edproj::parse_project(text);
     // Swap only on full success: a malformed file leaves existing work intact.
+    ed.history.commit(ed.edits);
     ed.edits = std::move(project.edits);
     rebuild_filter(ed);
     ed.status = "project loaded - " + std::to_string(ed.edits.size()) +
@@ -560,6 +609,19 @@ int main(int argc, char **argv) {
           }
           continue;
         }
+        // Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) operate on the committed
+        // annotation layer; an in-progress field commits first so its buffer
+        // is never silently lost.
+        if (event.type == InputEventType::KeyPressed && event.control &&
+            (event.key == 'z' || event.key == 'y')) {
+          commit_active_field(ed);
+          window.set_text_input(false);
+          if (event.key == 'y' || event.shift)
+            apply_redo(ed);
+          else
+            apply_undo(ed);
+          continue;
+        }
         // Text editing takes precedence while a field has focus.
         if (ed.editing != Field::None) {
           if (event.type == InputEventType::TextEntered) {
@@ -579,16 +641,7 @@ int main(int argc, char **argv) {
             continue;
           }
           if (event.type == InputEventType::KeyPressed && event.key == '\r') {
-            // Enter commits.
-            if (ed.editing == Field::Search) {
-              ed.search = ed.edit_buffer;
-              rebuild_filter(ed);
-            } else if (ed.selected < ed.systems.size()) {
-              auto &edit = ed.edits[ed.systems[ed.selected].id];
-              if (ed.editing == Field::Name) edit.name = ed.edit_buffer;
-              if (ed.editing == Field::Note) edit.note = ed.edit_buffer;
-            }
-            ed.editing = Field::None;
+            commit_active_field(ed);
             window.set_text_input(false);
             continue;
           }
@@ -597,15 +650,7 @@ int main(int argc, char **argv) {
           // Commit whatever field was being edited before handling the click,
           // so switching fields never silently drops the buffer.
           if (ed.editing != Field::None) {
-            if (ed.editing == Field::Search) {
-              ed.search = ed.edit_buffer;
-              rebuild_filter(ed);
-            } else if (ed.selected < ed.systems.size()) {
-              auto &edit = ed.edits[ed.systems[ed.selected].id];
-              if (ed.editing == Field::Name) edit.name = ed.edit_buffer;
-              if (ed.editing == Field::Note) edit.note = ed.edit_buffer;
-            }
-            ed.editing = Field::None;
+            commit_active_field(ed);
             window.set_text_input(false);
           }
           if (ed.hit_regen.contains(event.position)) {
@@ -619,8 +664,13 @@ int main(int argc, char **argv) {
             load_project(ed);
           } else if (ed.hit_bookmark.contains(event.position) &&
                      ed.selected < ed.systems.size()) {
+            ed.history.commit(ed.edits);
             auto &edit = ed.edits[ed.systems[ed.selected].id];
             edit.bookmarked = !edit.bookmarked;
+          } else if (ed.hit_undo.contains(event.position)) {
+            apply_undo(ed);
+          } else if (ed.hit_redo.contains(event.position)) {
+            apply_redo(ed);
           } else if (ed.hit_name.contains(event.position) &&
                      ed.selected < ed.systems.size()) {
             ed.editing = Field::Name;
