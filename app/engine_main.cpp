@@ -27,6 +27,7 @@
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
+#include <stellar/engine/undo_history.hpp>
 
 #include <algorithm>
 #include <array>
@@ -188,6 +189,9 @@ struct Shell {
   bool editing_scene{};
   int scene_field{}; // 1=name, 2=pos, 3=vel, 4=sprite, 5=size, 6=color
   std::string scene_buffer;
+  // Bounded whole-document undo: every mutation commits the pre-state.
+  engine::UndoHistory<engine::SceneDocument> scene_history{64};
+  UiRect hit_scene_undo{}, hit_scene_redo{};
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, scene_preview{}, scene_rows{};
@@ -875,6 +879,7 @@ void load_scene(Shell &shell) {
   shell.scene_doc = engine::SceneDocument{};
   shell.selected_entity = static_cast<std::size_t>(-1);
   shell.scene_modified = false;
+  shell.scene_history.clear();
   shell.scene_sprites.clear();
   if (!shell.project) return;
   std::string error;
@@ -941,21 +946,28 @@ void commit_scene_field(Shell &shell) {
     shell.scene_buffer.clear();
     return;
   }
+  // Parse into a scratch copy so a failed parse leaves the document
+  // untouched and produces no undo step.
+  auto next = *entity;
   bool ok = false;
   if (shell.scene_field == 1 && !shell.scene_buffer.empty()) {
-    entity->name = shell.scene_buffer;
+    next.name = shell.scene_buffer;
     ok = true;
   } else if (shell.scene_field == 2) {
-    ok = parse_pair(shell.scene_buffer, entity->x, entity->y);
+    ok = parse_pair(shell.scene_buffer, next.x, next.y);
   } else if (shell.scene_field == 3) {
-    ok = parse_pair(shell.scene_buffer, entity->vx, entity->vy);
+    ok = parse_pair(shell.scene_buffer, next.vx, next.vy);
   } else if (shell.scene_field == 4) {
-    entity->sprite = shell.scene_buffer;
+    next.sprite = shell.scene_buffer;
     ok = true;
   } else if (shell.scene_field == 5) {
-    ok = parse_pair(shell.scene_buffer, entity->w, entity->h);
+    ok = parse_pair(shell.scene_buffer, next.w, next.h);
   } else if (shell.scene_field == 6) {
-    ok = parse_color(shell.scene_buffer, entity->r, entity->g, entity->b);
+    ok = parse_color(shell.scene_buffer, next.r, next.g, next.b);
+  }
+  if (ok) {
+    shell.scene_history.commit(shell.scene_doc);
+    *entity = std::move(next);
   }
   if (ok) {
     shell.scene_modified = true;
@@ -973,7 +985,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   heading(out, x, y, "SCENE AUTHORING");
   if (!shell.project) {
     line(out, x, y, "open project", "none - open one in Projects", font);
-    shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save = {};
+    shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save =
+        shell.hit_scene_undo = shell.hit_scene_redo = {};
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
             shell.hit_scene_color = {};
@@ -999,6 +1012,12 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_save,
                shell.scene_modified ? "SAVE *" : "SAVE", shell.scene_modified,
                font, s);
+  shell.hit_scene_undo = {x + 368 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit_scene_undo, "UNDO",
+               shell.scene_history.can_undo(), font, s);
+  shell.hit_scene_redo = {x + 468 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit_scene_redo, "REDO",
+               shell.scene_history.can_redo(), font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1823,6 +1842,8 @@ int main(int argc, char **argv) {
             }
             shell.scene_dragging =
                 shell.selected_entity < shell.scene_doc.entities.size();
+            if (shell.scene_dragging)
+              shell.scene_history.commit(shell.scene_doc);
           }
           break;
         case InputEventType::LeftReleased: {
@@ -1934,11 +1955,13 @@ int main(int argc, char **argv) {
               e.name = "entity" +
                        std::to_string(shell.scene_doc.entities.size() + 1);
               e.x = 200.f; e.y = 200.f; e.vx = 120.f; e.vy = 90.f;
+              shell.scene_history.commit(shell.scene_doc);
               shell.scene_doc.entities.push_back(e);
               shell.selected_entity = shell.scene_doc.entities.size() - 1;
               shell.scene_modified = true;
             } else if (shell.hit_scene_del.contains(event.position)) {
               if (auto *e = selected_scene_entity(shell); e != nullptr) {
+                shell.scene_history.commit(shell.scene_doc);
                 shell.scene_doc.entities.erase(
                     shell.scene_doc.entities.begin() +
                     static_cast<std::ptrdiff_t>(shell.selected_entity));
@@ -1947,6 +1970,22 @@ int main(int argc, char **argv) {
               }
             } else if (shell.hit_scene_save.contains(event.position)) {
               save_scene(shell);
+            } else if (shell.hit_scene_undo.contains(event.position)) {
+              if (auto prev =
+                      shell.scene_history.undo(shell.scene_doc)) {
+                shell.scene_doc = std::move(*prev);
+                shell.selected_entity =
+                    static_cast<std::size_t>(-1);
+                shell.scene_modified = true;
+              }
+            } else if (shell.hit_scene_redo.contains(event.position)) {
+              if (auto next =
+                      shell.scene_history.redo(shell.scene_doc)) {
+                shell.scene_doc = std::move(*next);
+                shell.selected_entity =
+                    static_cast<std::size_t>(-1);
+                shell.scene_modified = true;
+              }
             } else if (shell.scene_preview.contains(event.position)) {
               // Press already selected/placed; release ends the drag.
               shell.scene_dragging = false;
@@ -1978,6 +2017,23 @@ int main(int argc, char **argv) {
                                         event.wheel_y * 40.f);
           break;
         case InputEventType::KeyPressed:
+          // Scene tool undo: Ctrl+Z / Ctrl+Y when no field is being edited.
+          if (event.control && shell.tool == Tool::Scene &&
+              !shell.editing_scene) {
+            std::optional<engine::SceneDocument> restored;
+            if (event.key == 'z')
+              restored = shell.scene_history.undo(shell.scene_doc);
+            else if (event.key == 'y')
+              restored = shell.scene_history.redo(shell.scene_doc);
+            if (restored) {
+              shell.scene_doc = std::move(*restored);
+              shell.selected_entity = static_cast<std::size_t>(-1);
+              shell.scene_modified = true;
+              shell.status = "scene history restored - SAVE to persist";
+            }
+          }
+          last_input = "key";
+          break;
         case InputEventType::KeyReleased: last_input = "key"; break;
         default: break;
         }
