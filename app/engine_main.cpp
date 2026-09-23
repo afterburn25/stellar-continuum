@@ -1801,14 +1801,26 @@ int main(int argc, char **argv) {
             } else if (shell.hit_scene_save.contains(event.position)) {
               save_scene(shell);
             } else if (shell.scene_preview.contains(event.position)) {
-              if (auto *e = selected_scene_entity(shell); e != nullptr) {
-                const auto &pv = shell.scene_preview;
-                e->x = std::clamp(
-                    (event.position.x - pv.x) / pv.width * 1280.f, 0.f,
-                    1280.f - e->w);
-                e->y = std::clamp(
-                    (event.position.y - pv.y) / pv.height * 720.f, 0.f,
-                    720.f - e->h);
+              const auto &pv = shell.scene_preview;
+              const float wx = (event.position.x - pv.x) / pv.width * 1280.f;
+              const float wy = (event.position.y - pv.y) / pv.height * 720.f;
+              // Clicking an entity selects it (topmost = last drawn);
+              // clicking empty space places the selected entity there.
+              std::size_t hit = shell.scene_doc.entities.size();
+              for (std::size_t i = shell.scene_doc.entities.size(); i-- > 0;) {
+                const auto &e = shell.scene_doc.entities[i];
+                if (wx >= e.x && wx <= e.x + e.w && wy >= e.y &&
+                    wy <= e.y + e.h) {
+                  hit = i;
+                  break;
+                }
+              }
+              if (hit < shell.scene_doc.entities.size()) {
+                shell.selected_entity = hit;
+              } else if (auto *e = selected_scene_entity(shell);
+                         e != nullptr) {
+                e->x = std::clamp(wx, 0.f, 1280.f - e->w);
+                e->y = std::clamp(wy, 0.f, 720.f - e->h);
                 shell.scene_modified = true;
               }
             } else if (shell.scene_rows.contains(event.position)) {
