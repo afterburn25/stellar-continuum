@@ -12,6 +12,7 @@
 
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/planet_appearance.hpp>
+#include <stellar/core/planetary_adapter.hpp>
 #include <stellar/core/planetary_catalog.hpp>
 #include <stellar/core/planetary_satellites.hpp>
 #include <stellar/core/stellar_orbits.hpp>
@@ -20,6 +21,7 @@
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/project.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/planetary.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
@@ -455,6 +457,38 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   if (body.has_pre_warp_civilization) flags += "pre-warp-civ ";
   if (body.cracked_world) flags += "cracked ";
   row("traits", flags.empty() ? "none" : flags);
+
+  // Engine planetary-framework assessment: the same projection +
+  // evaluator the engine tools and future games consume
+  // (planetary_adapter → evaluate_habitability), scored against a
+  // terran-like reference profile. Core species suitability stays
+  // authoritative for campaign rules — this row set reports the
+  // reusable engine view.
+  const auto engine_env = core::to_engine_environment(body);
+  static const engine::HabitabilityProfile terran_like = [] {
+    engine::HabitabilityProfile profile;
+    profile.id = "terran_like";
+    profile.temperature_min_k = 240.0;
+    profile.temperature_max_k = 330.0;
+    profile.atmosphere_min = 0.3;
+    profile.atmosphere_max = 3.0;
+    profile.gravity_min_g = 0.4;
+    profile.gravity_max_g = 1.6;
+    profile.water_min = 0.05;
+    profile.tolerance = 0.25;
+    profile.required_tags = {"atmosphere.oxygen_nitrogen",
+                           "solvent.water"};
+    profile.forbidden_tags = {"high_radiation", "gas_giant", "immersed",
+                            "cracked"};
+    return profile;
+  }();
+  const auto report = engine::evaluate_habitability(engine_env,
+                                                    terran_like);
+  row("engine suitability",
+      fspec("%.3f", report.suitability) +
+          (report.habitable ? " (habitable)" : ""));
+  for (const auto &reason : report.unmet)
+    row("suitability unmet", reason);
 }
 
 // Flattens the selected system's authoritative generated record into
