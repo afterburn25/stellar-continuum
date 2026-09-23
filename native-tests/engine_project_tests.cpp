@@ -205,6 +205,7 @@ int main() {
                             "score", 0.0f, true});
     scene.entities[0].frames = 4;
     scene.entities[0].fps = 6.0f;
+    scene.entities[0].fcols = 2;
     scene.entities[0].rotation = 45.0f;
     scene.entities[0].ttl = 2.5f;
     scene.entities[0].flip_x = true;
@@ -249,6 +250,7 @@ int main() {
               reparsed->entities[0].solid &&
               reparsed->entities[0].frames == 4 &&
               reparsed->entities[0].fps == 6.0f &&
+              reparsed->entities[0].fcols == 2 &&
               reparsed->entities[0].rotation == 45.0f &&
               reparsed->entities[0].ttl == 2.5f &&
               reparsed->entities[0].flip_x &&

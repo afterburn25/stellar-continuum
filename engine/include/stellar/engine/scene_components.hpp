@@ -56,9 +56,11 @@ struct GravityScale {
 // are exempt from integration (they never move or fall).
 struct Solid {};
 struct Anim {
-  // Sprite-strip animation: `frames` cells at `fps` per sim second.
+  // Sprite-sheet animation: `frames` cells at `fps` per sim second.
+  // `cols` is the sheet's columns per row — 0 means a horizontal strip.
   int frames{1};
   float fps{0.0f};
+  int cols{0};
 };
 struct Rotation {
   // Degrees clockwise about the entity rect's center (sprites only).

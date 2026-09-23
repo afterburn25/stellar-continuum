@@ -202,6 +202,7 @@ struct Shell {
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_data{}, hit_scene_opacity{}, hit_scene_parent{},
+      hit_scene_fcols{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tilesel{},
       hit_scene_tiledel{}, hit_scene_tileset{},
@@ -1242,6 +1243,12 @@ void commit_scene_field(Shell &shell) {
   } else if (shell.scene_field == 26) {
     next.parent = shell.scene_buffer;
     ok = true;
+  } else if (shell.scene_field == 27) {
+    try {
+      next.fcols = std::max(0, std::stoi(shell.scene_buffer));
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1323,7 +1330,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
                                 shell.hit_scene_bounce =
-                                    shell.hit_scene_parent = {};
+                                    shell.hit_scene_parent =
+                                        shell.hit_scene_fcols = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1530,14 +1538,17 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     if (sprite) {
       Image img{sprite, rect};
       if (e.frames > 1) {
-        const float cell_w =
-            static_cast<float>(sprite->width()) / e.frames;
+        const int cols =
+            e.fcols > 0 ? std::min(e.fcols, e.frames) : e.frames;
+        const int rows = (e.frames + cols - 1) / cols;
+        const float cell_w = static_cast<float>(sprite->width()) / cols;
+        const float cell_h = static_cast<float>(sprite->height()) / rows;
         const int frame = e.fps > 0.f
                               ? static_cast<int>(preview_now * e.fps) %
                                     e.frames
                               : 0;
-        img.source = UiRect{frame * cell_w, 0.f, cell_w,
-                            static_cast<float>(sprite->height())};
+        img.source = UiRect{(frame % cols) * cell_w,
+                            (frame / cols) * cell_h, cell_w, cell_h};
       }
       img.rotation_degrees = e.rotation + e.spin * preview_now;
       img.flip_horizontal = e.flip_x;
@@ -1610,7 +1621,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float row_pitch = (font + 12) * s + 4 * s;
   const int rows_per_col = std::max(
       1, static_cast<int>((body.y + body.height - fy0) / row_pitch));
-  const int field_count = 32;
+  const int field_count = 38;
   const int cols =
       std::max(2, (field_count + rows_per_col - 1) / rows_per_col);
   const float col_w = pv.width / cols - 8 * s;
@@ -1732,6 +1743,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? entity->parent : "",
         shell.editing_scene && shell.scene_field == 26,
         "follow this entity at authored offset");
+  field(shell.hit_scene_fcols, "fcols",
+        entity ? std::to_string(entity->fcols) : "",
+        shell.editing_scene && shell.scene_field == 27,
+        "sheet columns/row - 0 = strip");
   // Tilemap fields (doc-level, selected layer) — editing creates the
   // tilemap on demand.
   const auto *tm = scene_tile(shell);
@@ -2702,6 +2717,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->bounce ? "true" : "false";
               else if (field == 26 && e)
                 shell.scene_buffer = e->parent;
+              else if (field == 27 && e)
+                shell.scene_buffer = std::to_string(e->fcols);
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
               else if (field == 39)
@@ -2818,6 +2835,8 @@ int main(int argc, char **argv) {
               edit_field(25);
             else if (shell.hit_scene_parent.contains(event.position))
               edit_field(26);
+            else if (shell.hit_scene_fcols.contains(event.position))
+              edit_field(27);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

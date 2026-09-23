@@ -1251,18 +1251,25 @@ int RuntimeHost::run() {
         img.tint = {tint->r, tint->g, tint->b, alpha};
         if (const auto *anim = world.get<Anim>(impl.entities[i]);
             anim != nullptr && anim->frames > 1) {
-          // Horizontal strip: cell width = sprite width / frames, current
-          // cell from accumulated sim time (deterministic in fixed-step).
+          // Current cell from accumulated sim time (deterministic in
+          // fixed-step). cols>0 slices a grid sheet (frame -> col,row);
+          // 0 treats the sheet as one horizontal strip.
           const auto &res = *impl.sprites[i];
+          const int cols =
+              anim->cols > 0 ? std::min(anim->cols, anim->frames)
+                             : anim->frames;
+          const int rows = (anim->frames + cols - 1) / cols;
           const float cell_w =
-              static_cast<float>(res.width()) / anim->frames;
+              static_cast<float>(res.width()) / cols;
+          const float cell_h =
+              static_cast<float>(res.height()) / rows;
           const int frame = anim->fps > 0.f
                                 ? static_cast<int>(impl.sim_time *
                                                    anim->fps) %
                                       anim->frames
                                 : 0;
-          img.source = UiRect{frame * cell_w, 0.f, cell_w,
-                              static_cast<float>(res.height())};
+          img.source = UiRect{(frame % cols) * cell_w,
+                              (frame / cols) * cell_h, cell_w, cell_h};
         }
         if (const auto *rot = world.get<Rotation>(impl.entities[i]))
           img.rotation_degrees = rot->value;

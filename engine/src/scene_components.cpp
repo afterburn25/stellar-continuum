@@ -160,6 +160,26 @@ Parent decode_parent(const std::vector<std::uint8_t> &b) {
   return p;
 }
 
+// Anim codec: frames/fps/cols — the appended cols field decodes as 0
+// (horizontal strip) on pre-grid payloads.
+std::vector<std::uint8_t> encode_anim(const Anim &a) {
+  std::vector<std::uint8_t> out;
+  put_i32(out, a.frames);
+  put_f32(out, a.fps);
+  put_i32(out, a.cols);
+  return out;
+}
+
+Anim decode_anim(const std::vector<std::uint8_t> &b) {
+  Anim a;
+  std::size_t at = 0;
+  a.frames = static_cast<int>(get_u32(b, at));
+  const std::uint32_t fbits = get_u32(b, at);
+  std::memcpy(&a.fps, &fbits, 4);
+  a.cols = static_cast<int>(get_u32(b, at));
+  return a;
+}
+
 } // namespace
 
 void register_scene_components(World &world) {
@@ -187,8 +207,7 @@ void register_scene_components(World &world) {
                                   [](const std::vector<std::uint8_t> &) {
                                     return Solid{};
                                   });
-  world.register_component<Anim>("anim", encode_pod<Anim>,
-                                 decode_pod<Anim>);
+  world.register_component<Anim>("anim", encode_anim, decode_anim);
   world.register_component<Rotation>("rotation", encode_pod<Rotation>,
                                      decode_pod<Rotation>);
   world.register_component<Spin>("spin", encode_pod<Spin>,
@@ -233,7 +252,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.frames != 1 || s.fps != 0.f)
-      world.add(entity, Anim{s.frames, s.fps});
+      world.add(entity, Anim{s.frames, s.fps, s.fcols});
     if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
     if (s.spin != 0.f) world.add(entity, Spin{s.spin});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -328,6 +347,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *a = world.get<Anim>(entity)) {
       s.frames = a->frames;
       s.fps = a->fps;
+      s.fcols = a->cols;
     }
     if (const auto *rot = world.get<Rotation>(entity))
       s.rotation = rot->value;
