@@ -195,7 +195,7 @@ struct Shell {
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
-      scene_preview{}, scene_rows{};
+      hit_scene_parallax{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -971,6 +971,12 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 8) {
+    try {
+      next.parallax = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1007,7 +1013,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_undo = shell.hit_scene_redo = shell.hit_scene_dup = {};
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
-            shell.hit_scene_color = shell.hit_scene_layer = {};
+            shell.hit_scene_color = shell.hit_scene_layer =
+                shell.hit_scene_parallax = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1076,7 +1083,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float ph = pw * 720.f / 1280.f;
   shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.55f)};
   const auto &pv = shell.scene_preview;
-  out.overlay.push_back(FilledRectangle{pv, {8, 16, 26, 255}});
+  out.overlay.push_back(FilledRectangle{
+      pv, {shell.scene_doc.bg_r, shell.scene_doc.bg_g, shell.scene_doc.bg_b,
+           255}});
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   const float sx = pv.width / 1280.f, sy = pv.height / 720.f;
   for (const auto i : scene_draw_order(shell.scene_doc)) {
@@ -1149,6 +1158,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->layer) : "",
         shell.editing_scene && shell.scene_field == 7,
         "draw order - higher draws on top");
+  field(shell.hit_scene_parallax, "parallax",
+        entity ? std::to_string(entity->parallax) : "",
+        shell.editing_scene && shell.scene_field == 8,
+        "camera scroll factor - 0 pins to screen");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -1984,6 +1997,8 @@ int main(int argc, char **argv) {
                                      std::to_string((int)e->b);
               else if (field == 7 && e)
                 shell.scene_buffer = std::to_string(e->layer);
+              else if (field == 8 && e)
+                shell.scene_buffer = std::to_string(e->parallax);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2001,6 +2016,8 @@ int main(int argc, char **argv) {
               edit_field(6);
             else if (shell.hit_scene_layer.contains(event.position))
               edit_field(7);
+            else if (shell.hit_scene_parallax.contains(event.position))
+              edit_field(8);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

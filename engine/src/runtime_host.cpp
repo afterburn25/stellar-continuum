@@ -42,6 +42,8 @@ struct RuntimeHost::Impl {
   std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping;
   float cam_x = 0.f, cam_y = 0.f, cam_zoom = 1.f;
   int view_w = 0, view_h = 0;
+  // Clear color from the active scene document (defaults when absent).
+  std::uint8_t bg_r = 8, bg_g = 16, bg_b = 26;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -179,6 +181,9 @@ int RuntimeHost::run() {
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
   auto spawn_entities = [&](const SceneDocument &doc) {
+    impl.bg_r = doc.bg_r;
+    impl.bg_g = doc.bg_g;
+    impl.bg_b = doc.bg_b;
     for (const auto e : impl.entities) world.destroy(e);
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
@@ -403,7 +408,8 @@ int RuntimeHost::run() {
     audio.service();
 
     DrawList draw;
-    draw.overlay.push_back(FilledRectangle{{0, 0, w, h}, {8, 16, 26, 255}});
+    draw.overlay.push_back(
+        FilledRectangle{{0, 0, w, h}, {impl.bg_r, impl.bg_g, impl.bg_b, 255}});
     // Draw in layer order (stable — same-layer entities keep spawn order).
     std::vector<std::size_t> order(impl.entities.size());
     for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
@@ -417,8 +423,10 @@ int RuntimeHost::run() {
       const auto *ext = world.get<Extent2D>(impl.entities[i]);
       const auto *tint = world.get<Tint>(impl.entities[i]);
       if (!t || !ext || !tint) continue;
-      const UiRect rect{(t->x - impl.cam_x) * impl.cam_zoom,
-                        (t->y - impl.cam_y) * impl.cam_zoom,
+      const auto *px = world.get<Parallax>(impl.entities[i]);
+      const float parallax = px ? px->value : 1.0f;
+      const UiRect rect{(t->x - impl.cam_x * parallax) * impl.cam_zoom,
+                        (t->y - impl.cam_y * parallax) * impl.cam_zoom,
                         ext->w * impl.cam_zoom, ext->h * impl.cam_zoom};
       // View culling: skip entities fully outside the window.
       if (rect.x + rect.width < 0 || rect.y + rect.height < 0 ||

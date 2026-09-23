@@ -194,16 +194,20 @@ int main() {
   // SceneDocument: round-trip, malformed rejection, atomic save/load.
   {
     engine::SceneDocument scene;
+    scene.bg_r = 4; scene.bg_g = 8; scene.bg_b = 40;
     scene.entities.push_back(
         engine::SceneEntity{"box", 10.f, 20.f, 64.f, 32.f, 100.f, 50.f,
-                            255, 128, 0, "data/logo.png", -2});
+                            255, 128, 0, "data/logo.png", -2, 0.5f});
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
               reparsed->entities[0].vx == 100.f &&
               reparsed->entities[0].r == 255 && reparsed->entities[0].g == 128 &&
               reparsed->entities[0].sprite == "data/logo.png" &&
-              reparsed->entities[0].layer == -2,
+              reparsed->entities[0].layer == -2 &&
+              reparsed->entities[0].parallax == 0.5f &&
+              reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
+              reparsed->bg_b == 40,
           "scene document round-trips");
     const auto path = root / "editor" / "scene.json";
     scene.save(path);

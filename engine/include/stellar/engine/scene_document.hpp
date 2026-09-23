@@ -25,10 +25,15 @@ struct SceneEntity {
   // Draw order — higher layers render above lower ones; equal layers keep
   // document order.
   int layer{};
+  // Camera scroll factor: 1.0 (default) moves with the world, 0.0 pins the
+  // entity to the screen (HUD/backdrop), 0.5 drifts at half speed.
+  float parallax{1.0f};
 };
 
 struct SceneDocument {
   std::vector<SceneEntity> entities;
+  // Background clear color; defaults to the engine's dark space blue.
+  std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
 
   static constexpr std::string_view filename{"scene.json"};
 

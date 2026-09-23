@@ -40,6 +40,10 @@ struct Layer {
   // Draw order — higher layers render above lower ones.
   int value{};
 };
+struct Parallax {
+  // Camera scroll factor: 1.0 follows the world, 0.0 pins to the screen.
+  float value{1.0f};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.
