@@ -660,10 +660,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `degraded_structures` findings — complete+enabled structures at or
   below `minimum_operational_condition` silently contribute nothing to
   surface output; the finding reports count and worst condition per
-  colony. `campaign_colony_projection` tests — spec synthesis, flag
-  fidelity, remaining-industry accounting, powered-set operating flags,
-  unknown-type fallback, hub-less capacity floor, and the consumer path
-  (only worn colonies flagged).
+  colony. The same pass gained authoritative logistics findings:
+  `logistics_strained`/`logistics_critical` per colony the economy
+  logistics model rates under-covered (import requirement + coverage
+  ratio in `values`; severity stays Warning — Critical is reserved for
+  invariants) and `freight_corridor_gap` when a civilization's
+  external colonies import support no represented corridor carries —
+  previously surfaced only as a player-scoped voice event for
+  criticals, never in developer diagnostics. `campaign_colony_projection`
+  tests — spec synthesis, flag fidelity, remaining-industry accounting,
+  powered-set operating flags, unknown-type fallback, hub-less capacity
+  floor, and the consumer paths (only worn/under-covered colonies
+  flagged; civs missing economy/construction rows are skipped, not
+  thrown).
 - **Save/performance impact:** read-only projection — zero persistent
   state; settlement build is O(buildings) once per colony per daily
   diagnostics pass.

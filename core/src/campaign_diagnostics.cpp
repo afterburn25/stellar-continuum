@@ -1,10 +1,14 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_colony_projection.hpp>
+#include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
+#include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_reach.hpp>
+#include <stellar/core/fleet_state.hpp>
 #include <stellar/core/lane_network.hpp>
+#include <stellar/core/logistics.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_economy.hpp>
 #include <cmath>
@@ -163,6 +167,66 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       r.values["destinationSystemId"]=static_cast<std::int64_t>(*fleet.destination_system_id);
       r.values["routeDistanceLightYears"]=reach.route_distance_light_years;
       records.push_back(std::move(r));
+    }
+  }
+  // Logistics supply: colonies the authoritative economy logistics
+  // model rates Strained or Critical (import requirements outrunning
+  // local support), and civilizations whose external systems import
+  // support no represented freight corridor carries. Conditions and
+  // coverage come from `economy_logistics`/`civilization_logistics_coverage`
+  // — the same authoritative computations the logistics workspace and
+  // voice bridge consume — not re-derived here.
+  if(records.size()<maximum){
+    const auto econ_construction=economic_construction_projection(world.construction);
+    const auto econ_fleets=economic_fleet_projection(world.fleets);
+    const EconomyWorldView econ{world.civilizations,world.bodies,econ_construction,econ_fleets};
+    for(const auto &civ:world.civilizations){
+      if(records.size()>=maximum)break;
+      // The authoritative queries throw when a civ lacks economy or
+      // construction rows — missing rows are an invariant finding, not
+      // a logistics one; skip rather than fail the whole pass.
+      const auto has_economy=std::any_of(world.economies.begin(),world.economies.end(),
+          [&](const auto &e){return e.civilization_id==civ.id;});
+      const auto has_construction=std::any_of(econ_construction.begin(),econ_construction.end(),
+          [&](const auto &s){return s.civilization_id==civ.id;});
+      if(!has_economy||!has_construction)continue;
+      const auto snapshot=economy_logistics(econ,world.colonies,world.economies,civ.id);
+      for(const auto &colony:snapshot.colonies){
+        if(records.size()>=maximum)break;
+        if(colony.condition==SupplyCondition::Healthy)continue;
+        DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";
+        r.event_type=colony.condition==SupplyCondition::Critical?"logistics_critical":"logistics_strained";
+        // Severity stays Warning like every operational finding —
+        // Critical is reserved for invariant violations; the
+        // event_type already distinguishes the supply condition.
+        r.severity=DiagnosticSeverity::Warning;
+        r.entity_id=colony.colony_id;r.civilization_id=civ.id;r.system_id=colony.system_id;
+        char message[160];
+        std::snprintf(message,sizeof(message),
+                      "Colony logistics %s: imports %.2f/day required, coverage %.0f%%.",
+                      colony.condition==SupplyCondition::Critical?"critical":"strained",
+                      colony.imported_support_required_per_day,colony.coverage_ratio*100.0);
+        r.message=message;
+        r.values["importRequiredPerDay"]=colony.imported_support_required_per_day;
+        r.values["coverageRatio"]=colony.coverage_ratio;
+        records.push_back(std::move(r));
+      }
+      if(records.size()<maximum){
+        const auto coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);
+        if(coverage.has_unrepresented_interstellar_support_gap){
+          DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";
+          r.event_type="freight_corridor_gap";r.severity=DiagnosticSeverity::Warning;
+          r.civilization_id=civ.id;
+          char message[192];
+          std::snprintf(message,sizeof(message),
+                        "External colonies import %.2f support/day with no represented freight corridor.",
+                        coverage.unrepresented_interstellar_support_per_day);
+          r.message=message;
+          r.values["unrepresentedSupportPerDay"]=coverage.unrepresented_interstellar_support_per_day;
+          r.values["externalSystemCount"]=static_cast<double>(coverage.external_system_count);
+          records.push_back(std::move(r));
+        }
+      }
     }
   }
   return records;

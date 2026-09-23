@@ -1,5 +1,6 @@
 #include <stellar/core/campaign_colony_projection.hpp>
 #include <stellar/core/campaign_diagnostics.hpp>
+#include <stellar/core/construction_state.hpp>
 #include <stellar/core/surface_economy.hpp>
 
 #include <algorithm>
@@ -196,6 +197,85 @@ int main() {
             "finding reports the worst condition");
     }
     check(degraded == 1, "only the worn colony is flagged");
+  }
+
+  // Consumer: inspect_campaign_operations surfaces logistics supply
+  // findings and the unrepresented freight-corridor gap, and skips
+  // civilizations whose economy/construction rows are absent rather
+  // than failing the pass.
+  {
+    FreshCampaignState world;
+    StellarSystem home;
+    home.id = 7;
+    home.name = "Home";
+    home.position = {0.0f, 0.0f};
+    world.systems.push_back(home);
+    StellarSystem far;
+    far.id = 8;
+    far.name = "Far";
+    far.position = {30.0f, 0.0f};
+    world.systems.push_back(far);
+
+    Civilization civ;
+    civ.id = 1;
+    civ.name = "Strained Republic";
+    civ.home_system_id = 7;
+    world.civilizations.push_back(civ);
+    Civilization healthy;
+    healthy.id = 2;
+    healthy.name = "Green Compact";
+    healthy.home_system_id = 7;
+    world.civilizations.push_back(healthy);
+    Civilization sparse;
+    sparse.id = 3;
+    sparse.name = "Unstated Rim";
+    sparse.home_system_id = 7;
+    world.civilizations.push_back(sparse);
+
+    world.economies.push_back({/*civilization_id=*/1});
+    world.economies.push_back({/*civilization_id=*/2});
+    ConstructionState con1;
+    con1.civilization_id = 1;
+    world.construction.push_back(con1);
+    ConstructionState con2;
+    con2.civilization_id = 2;
+    world.construction.push_back(con2);
+    // civ 3 deliberately has no economy or construction rows.
+
+    Colony critical = make_colony(20, 1);
+    critical.population_millions = 1000.0; // demand 1.25, local .72 -> .58
+    world.colonies.push_back(critical);
+    Colony strained = make_colony(21, 1);
+    strained.system_id = 8; // external system -> corridor gap
+    strained.population_millions = 1000.0;
+    strained.infrastructure = 1.2; // coverage .72 -> Strained
+    world.colonies.push_back(strained);
+    Colony fine = make_colony(22, 2);
+    fine.population_millions = 1000.0;
+    fine.infrastructure = 2.0; // coverage ~1.31 -> Healthy
+    world.colonies.push_back(fine);
+    world.colonies.push_back(make_colony(23, 3));
+
+    const auto findings = inspect_campaign_operations(world, 0, 100.0);
+    int critical_n = 0, strained_n = 0, gap_n = 0;
+    for (const auto &finding : findings) {
+      if (finding.event_type == "logistics_critical") {
+        ++critical_n;
+        check(finding.entity_id && *finding.entity_id == 20 &&
+                  finding.severity == stellar::engine::DiagnosticSeverity::Warning,
+              "critical finding names the under-covered colony");
+      } else if (finding.event_type == "logistics_strained") {
+        ++strained_n;
+        check(finding.entity_id && *finding.entity_id == 21,
+              "strained finding names the marginal colony");
+      } else if (finding.event_type == "freight_corridor_gap") {
+        ++gap_n;
+        check(finding.civilization_id && *finding.civilization_id == 1,
+              "corridor gap names the importing civilization");
+      }
+    }
+    check(critical_n == 1 && strained_n == 1 && gap_n == 1,
+          "logistics conditions and corridor gap each fire once");
   }
 
   if (failures == 0)
