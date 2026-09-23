@@ -148,7 +148,8 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
     const auto metadata_height = static_cast<float>(measure(text_measurer, metadata).height);
     const Text message{{}, item.message, message_color, body_pixels, measure_clip.width, std::nullopt, TextAlign::Left, FontFace::Interface};
     const float message_height = static_cast<float>(measure(text_measurer, message).height);
-    const float action_height = item.diplomatic_contact_id ? 27.f * s : 0.f;
+    const float action_height =
+        (item.diplomatic_contact_id || item.system_id) ? 27.f * s : 0.f;
     const float card_height = card_pad + metadata_height + 3.f * s + message_height +
                               (action_height ? 6.f * s + action_height : 0.f) + card_pad;
     NotificationCardLayout entry;
@@ -165,6 +166,17 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
                                     entry.message_bounds.y + message_height + 6.f * s,
                                     std::min(150.f * s, entry.bounds.width - card_pad * 2.f), action_height};
     }
+    if (item.system_id) {
+      // Located reports navigate to their system — same row as the
+      // contact action (publishers never set both on one item).
+      const float system_x = entry.contact_button
+          ? entry.contact_button->x + entry.contact_button->width + 6.f * s
+          : entry.bounds.x + card_pad;
+      entry.system_button = UiRect{system_x,
+                                   entry.message_bounds.y + message_height + 6.f * s,
+                                   std::min(150.f * s, entry.bounds.width - card_pad * 2.f),
+                                   action_height};
+    }
     layout.entries.push_back(entry);
     cursor += card_height + 7.f * s;
   }
@@ -176,6 +188,7 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
     entry.metadata_bounds.y -= layout.scroll;
     entry.message_bounds.y -= layout.scroll;
     if (entry.contact_button) entry.contact_button->y -= layout.scroll;
+    if (entry.system_button) entry.system_button->y -= layout.scroll;
     layout.cards.push_back(entry.bounds);
     layout.contact_buttons.push_back(entry.contact_button);
   }
@@ -183,9 +196,10 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
 }
 
 void NativeNotificationFeed::publish(std::string category, std::string date, std::string message,
-                                     std::optional<int> contact) {
+                                     std::optional<int> contact,
+                                     std::optional<int> system_id) {
   if (category.empty() || date.empty() || message.empty()) return;
-  items_.push_back({next_sequence_++, std::move(category), std::move(date), std::move(message), contact});
+  items_.push_back({next_sequence_++, std::move(category), std::move(date), std::move(message), contact, system_id});
   while (items_.size() > maximum_items) items_.pop_front();
 }
 
@@ -198,6 +212,7 @@ void NativeNotificationView::cancel_press() noexcept {
   pointer_captured_ = false;
   press_target_ = PressTarget::None;
   pressed_contact_id_.reset();
+  pressed_system_id_.reset();
   pressed_bounds_.reset();
 }
 void NativeNotificationView::open(std::int64_t latest_sequence) noexcept {
@@ -221,28 +236,36 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     // owned until its matching release or focus cancellation.
     press_target_ = PressTarget::None;
     pressed_contact_id_.reset();
+    pressed_system_id_.reset();
     pressed_bounds_.reset();
     scroll_ = std::clamp(scroll_ - event.wheel_y * 42.f * layout.scale, 0.f, layout.max_scroll);
     command.captured = true; return command;
   }
   if (event.type == native_map::InputEventType::LeftPressed) {
     if (!layout.panel.contains(event.position)) return command;
-    pointer_captured_ = true; press_origin_ = event.position; press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_bounds_.reset();
+    pointer_captured_ = true; press_origin_ = event.position; press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_system_id_.reset(); pressed_bounds_.reset();
     if (layout.close_button.contains(event.position)) press_target_ = PressTarget::Close;
     else if (layout.chronicle_button.contains(event.position)) press_target_ = PressTarget::Chronicle;
     else for (std::size_t i = 0; i < layout.entries.size(); ++i) {
       const auto& entry = layout.entries[i];
-      if (!entry.contact_button || !entry.contact_button->contains(event.position) ||
-          !contains_rect(layout.list_viewport, *entry.contact_button)) continue;
-      const auto& item = items[entry.item_index];
-      if (item.diplomatic_contact_id) { press_target_ = PressTarget::Contact; pressed_contact_id_ = item.diplomatic_contact_id; pressed_bounds_ = entry.contact_button; }
-      break;
+      if (entry.contact_button && entry.contact_button->contains(event.position) &&
+          contains_rect(layout.list_viewport, *entry.contact_button)) {
+        const auto& item = items[entry.item_index];
+        if (item.diplomatic_contact_id) { press_target_ = PressTarget::Contact; pressed_contact_id_ = item.diplomatic_contact_id; pressed_bounds_ = entry.contact_button; }
+        break;
+      }
+      if (entry.system_button && entry.system_button->contains(event.position) &&
+          contains_rect(layout.list_viewport, *entry.system_button)) {
+        const auto& item = items[entry.item_index];
+        if (item.system_id) { press_target_ = PressTarget::System; pressed_system_id_ = item.system_id; pressed_bounds_ = entry.system_button; }
+        break;
+      }
     }
     command.captured = true; return command;
   }
   if (event.type == native_map::InputEventType::PointerMove && pointer_captured_) {
     const float dx = event.position.x - press_origin_.x, dy = event.position.y - press_origin_.y;
-    if (dx * dx + dy * dy > 25.f) { press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_bounds_.reset(); }
+    if (dx * dx + dy * dy > 25.f) { press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_system_id_.reset(); pressed_bounds_.reset(); }
     command.captured = true; return command;
   }
   if (event.type != native_map::InputEventType::LeftReleased || !pointer_captured_) {
@@ -259,6 +282,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   command.captured = true;
   const auto target = press_target_;
   const auto contact = pressed_contact_id_;
+  const auto system = pressed_system_id_;
   const auto pressed_bounds = pressed_bounds_;
   cancel_press();
   if (target == PressTarget::Close && layout.close_button.contains(event.position)) { close(); command.kind = NotificationViewCommandKind::Close; }
@@ -274,6 +298,20 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
         continue;
       close(); command.kind = NotificationViewCommandKind::OpenDiplomaticContact;
       command.civilization_id = *contact;
+      break;
+    }
+  }
+  else if (target == PressTarget::System && system && pressed_bounds &&
+           pressed_bounds->contains(event.position)) {
+    for (const auto& entry : layout.entries) {
+      if (!entry.system_button || !same_rect(*entry.system_button, *pressed_bounds) ||
+          !contains_rect(layout.list_viewport, *entry.system_button))
+        continue;
+      const auto& current = items[entry.item_index];
+      if (!current.system_id || *current.system_id != *system)
+        continue;
+      close(); command.kind = NotificationViewCommandKind::OpenSystem;
+      command.system_id = *system;
       break;
     }
   }
@@ -336,6 +374,17 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                          entry.contact_button->y + (entry.contact_button->height - action_extent.height) * .5f},
         action_text, title_color, action_pixels, entry.contact_button->width - 4.f * s,
         *entry.contact_button, TextAlign::Center); }
+    if (entry.system_button && contains_rect(layout.list_viewport, *entry.system_button)) { stellar::engine::ui_skin::control(out,*entry.system_button,entry.system_button->contains(pointer_),false,true,s);
+      const int action_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));
+      const auto action_text = resolve(locale_, "NOTIFY_VIEW_SYSTEM", "VIEW SYSTEM");
+      const Text action_probe{{}, action_text, title_color, action_pixels,
+                              entry.system_button->width - 4.f * s,
+                              std::nullopt, TextAlign::Center, FontFace::Interface};
+      const auto action_extent = measure(measure_, action_probe);
+      clipped_text(out, {entry.system_button->x + entry.system_button->width * .5f,
+                         entry.system_button->y + (entry.system_button->height - action_extent.height) * .5f},
+        action_text, title_color, action_pixels, entry.system_button->width - 4.f * s,
+        *entry.system_button, TextAlign::Center); }
   }
   if (layout.max_scroll > 0.f) { const float thumb_h = std::max(16.f * s, layout.list_viewport.height * layout.list_viewport.height / layout.content_height);
     const float y = layout.list_viewport.y + (layout.list_viewport.height - thumb_h) * (layout.scroll / layout.max_scroll);

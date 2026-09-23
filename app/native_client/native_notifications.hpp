@@ -21,6 +21,7 @@ struct NativePlayerNotification {
   std::int64_t sequence{};
   std::string category, date, message;
   std::optional<int> diplomatic_contact_id;
+  std::optional<int> system_id; // located events can navigate there
 };
 
 class NativeNotificationFeed final {
@@ -28,7 +29,8 @@ class NativeNotificationFeed final {
   static constexpr std::size_t maximum_items = 32;
 
   void publish(std::string category, std::string date, std::string message,
-               std::optional<int> diplomatic_contact_id = std::nullopt);
+               std::optional<int> diplomatic_contact_id = std::nullopt,
+               std::optional<int> system_id = std::nullopt);
   [[nodiscard]] const std::deque<NativePlayerNotification>& items() const noexcept { return items_; }
   [[nodiscard]] std::int64_t latest_sequence() const noexcept { return next_sequence_ - 1; }
   [[nodiscard]] int unread_count(std::int64_t last_read) const noexcept;
@@ -42,7 +44,7 @@ class NativeNotificationFeed final {
 struct NotificationCardLayout {
   std::size_t item_index{}; // Index into the feed, newest first in layout order.
   native_map::UiRect bounds, metadata_bounds, message_bounds;
-  std::optional<native_map::UiRect> contact_button;
+  std::optional<native_map::UiRect> contact_button, system_button;
 };
 
 struct NotificationLayout {
@@ -68,12 +70,14 @@ enum class NotificationViewCommandKind {
   None,
   Close,
   OpenDiplomaticContact,
-  OpenChronicle
+  OpenChronicle,
+  OpenSystem
 };
 struct NotificationViewCommand {
   NotificationViewCommandKind kind{NotificationViewCommandKind::None};
   bool captured{};
   int civilization_id{-1};
+  int system_id{-1};
 };
 
 class NativeNotificationView final {
@@ -100,7 +104,7 @@ class NativeNotificationView final {
               int height) const;
 
  private:
-  enum class PressTarget { None, Close, Contact, Chronicle };
+  enum class PressTarget { None, Close, Contact, Chronicle, System };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -110,7 +114,7 @@ class NativeNotificationView final {
   native_map::Point press_origin_{};
   bool pointer_captured_{};
   PressTarget press_target_{PressTarget::None};
-  std::optional<int> pressed_contact_id_;
+  std::optional<int> pressed_contact_id_, pressed_system_id_;
   std::optional<native_map::UiRect> pressed_bounds_;
   TextMeasurer measure_;
   const stellar::engine::LocalizationTable* locale_{};

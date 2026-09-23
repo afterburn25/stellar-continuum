@@ -132,6 +132,32 @@ void activation_owns_full_press_release_gesture() {
   command = view.handle({InputEventType::LeftReleased, center(layout.close_button)}, notifications.items(), 1280, 720);
   require(command.kind == NotificationViewCommandKind::Close && !view.visible(), "matching close press and release did not dismiss panel");
 }
+void system_navigation_command() {
+  NativeNotificationFeed notifications;
+  notifications.publish("Combat", "Day 10", "Fleet engaged over Halcyon",
+                        std::nullopt, 9);
+  notifications.publish("Research", "Day 11", "Discovery completed");
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.open(notifications.latest_sequence());
+  const auto layout = notification_layout_for(notifications.items(), 1280, 720, measured);
+  // Newest first: entry 0 is the locationless report, entry 1 located.
+  require(!layout.entries[0].system_button &&
+              layout.entries[1].system_button &&
+              !layout.entries[0].contact_button,
+          "system action row missing or leaked onto locationless report");
+  const Point at = center(*layout.entries[1].system_button);
+  auto command = view.handle({InputEventType::LeftReleased, at}, notifications.items(), 1280, 720);
+  require(command.kind == NotificationViewCommandKind::None && command.captured,
+          "orphan release on system action leaked");
+  command = view.handle({InputEventType::LeftPressed, at}, notifications.items(), 1280, 720);
+  require(command.captured, "system action press not captured");
+  command = view.handle({InputEventType::LeftReleased, at}, notifications.items(), 1280, 720);
+  require(command.kind == NotificationViewCommandKind::OpenSystem &&
+              command.system_id == 9 && !view.visible(),
+          "system action did not emit OpenSystem");
+}
+
 } // namespace
 
 int main() {
@@ -139,6 +165,7 @@ int main() {
     bounded_feed_and_reachable_scroll();
     measured_wrapping_and_narrow_geometry();
     activation_owns_full_press_release_gesture();
+    system_navigation_command();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

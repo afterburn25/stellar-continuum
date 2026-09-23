@@ -5867,6 +5867,9 @@ class NativeCampaign final {
             diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
           refresh_diplomacy(true);
         }
+        if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenSystem){
+          (void)enter_system(command.system_id,width,height);
+        }
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenChronicle){
           notification_view_.close();
           chronicle_view_.open(session_->frame().runtime().history(),

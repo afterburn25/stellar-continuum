@@ -209,7 +209,10 @@ out of the transient feed. An actor-scope toggle (ALL ↔ MINE)
 distinguishes passive intel from events involving the observer via
 `actors`. Located entries navigate — clicking one returns its system
 through `navigation()` and the client enters that system (the
-workspace's observation check still gates visibility). Chronicle
+workspace's observation check still gates visibility). The transient
+feed mirrors it: chronicle-seeded reports carry `system_id` and render
+a VIEW SYSTEM action; the coalesced feedback path stays id-free.
+Chronicle
 retention landed too: `maintain_chronicle` (in
 `campaign_event_history`) runs after each advance — once the history
 reaches 90% of capacity it prunes routine records (<0.35 significance)

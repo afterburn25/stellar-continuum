@@ -107,8 +107,12 @@ mapping history categories onto the feed's existing display vocabulary
 (Construction/Ships/Research/Exploration/Colony/Combat; unmapped
 categories keep their stable raw id). Observer privacy is the
 chronicle's own projection — the publisher never re-derives visibility.
+Located seeded reports carry their `system_id` into the feed, so the
+panel renders a VIEW SYSTEM action (`OpenSystem` → `enter_system`);
+the coalesced transient feedback path deliberately stays id-free.
 Coverage: `native_notification_events` tests (chronicle ordering,
-observer filtering, bound, category labels, empty history).
+observer filtering, bound, category labels, system propagation, empty
+history).
 
 For history beyond the transient window, `native_chronicle` adds the
 scrollable chronicle browser: `snapshot()` projects

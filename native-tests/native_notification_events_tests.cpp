@@ -49,12 +49,13 @@ void chronicle_seeding(){
   stellar::engine::EventHistory history;
   const auto add=[&](double day,std::string category,std::string summary,
                      std::vector<std::uint64_t> visible={},
-                     double significance=0.5){
+                     double significance=0.5,std::uint64_t location=0){
     stellar::engine::HistoryEvent event;event.at_day=day;
     event.category=std::move(category);event.summary=std::move(summary);
-    event.significance=significance;
+    event.significance=significance;event.location=location;
     event.visible_to=std::move(visible);history.record(std::move(event));};
-  add(400.,"exploration.system_surveyed","System survey completed");
+  add(400.,"exploration.system_surveyed","System survey completed",
+      {},0.5,9);
   add(410.,"war.battle","FOREIGN BATTLE REPORT",{7});
   add(415.,"war.damage_applied","TRIVIA DAMAGE TICK",{1},0.1);
   add(420.,"colony.founded","Colony established",{1});
@@ -70,6 +71,9 @@ void chronicle_seeding(){
       "Unmapped category lost its stable id");
   require(feed.items().front().date!=feed.items().back().date,
       "Recorded event dates not preserved");
+  require(feed.items().front().system_id&&*feed.items().front().system_id==9&&
+      !feed.items()[1].system_id,
+      "Seeded report lost its system location");
   NativeNotificationFeed bounded;
   seed_chronicle_notifications(bounded,history,1,2);
   require(bounded.items().size()==2&&

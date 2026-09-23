@@ -161,7 +161,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `native_notification_events` seeds the player notification feed from
   `history().feed()` at campaign admission — recorded dates/summaries
   survive load, category labels mapped, observer filtering delegated to
-  the chronicle (`native_notification_events` tests).
+  the chronicle; located seeded reports carry `system_id` and render a
+  VIEW SYSTEM action navigating via `enter_system`
+  (`native_notification_events`/`native_notification` tests).
   `native_chronicle` adds the scrollable chronicle browser —
   `snapshot()` projects `feed()` newest-first (4000-entry cap applied
   after optional category-domain, significance-floor and
