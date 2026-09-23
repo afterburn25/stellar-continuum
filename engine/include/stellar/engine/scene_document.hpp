@@ -44,6 +44,9 @@ struct SceneEntity {
   int frames{1};
   float fps{0.0f};
   int fcols{0};
+  // false = play once and hold the last frame (explosions, effects) —
+  // pair with ttl to despawn when the clip ends.
+  bool anim_loop{true};
   // Clockwise rotation in degrees — sprites rotate about their rect's
   // center; tinted rects ignore it (no rotated-fill primitive).
   float rotation{0.0f};

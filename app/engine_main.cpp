@@ -202,7 +202,7 @@ struct Shell {
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_data{}, hit_scene_opacity{}, hit_scene_parent{},
-      hit_scene_fcols{},
+      hit_scene_fcols{}, hit_scene_animloop{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tilesel{},
       hit_scene_tiledel{}, hit_scene_tileset{},
@@ -1204,7 +1204,7 @@ void commit_scene_field(Shell &shell) {
     }
   } else if (shell.scene_field == 18 || shell.scene_field == 19 ||
              shell.scene_field == 20 || shell.scene_field == 21 ||
-             shell.scene_field == 25) {
+             shell.scene_field == 25 || shell.scene_field == 28) {
     const auto b = shell.scene_buffer;
     bool value;
     if (b == "1" || b == "true" || b == "yes") {
@@ -1225,8 +1225,10 @@ void commit_scene_field(Shell &shell) {
         next.visible = value;
       else if (shell.scene_field == 21)
         next.oneway = value;
-      else
+      else if (shell.scene_field == 25)
         next.bounce = value;
+      else
+        next.anim_loop = value;
     }
   } else if (shell.scene_field == 22) {
     next.data = shell.scene_buffer;
@@ -1334,7 +1336,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                             shell.hit_scene_worldsize =
                                 shell.hit_scene_bounce =
                                     shell.hit_scene_parent =
-                                        shell.hit_scene_fcols = {};
+                                        shell.hit_scene_fcols =
+                                            shell.hit_scene_animloop = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1550,10 +1553,13 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         const int rows = (e.frames + cols - 1) / cols;
         const float cell_w = static_cast<float>(sprite->width()) / cols;
         const float cell_h = static_cast<float>(sprite->height()) / rows;
-        const int frame = e.fps > 0.f
-                              ? static_cast<int>(preview_now * e.fps) %
-                                    e.frames
-                              : 0;
+        const int elapsed =
+            static_cast<int>(preview_now * e.fps);
+        const int frame =
+            e.fps > 0.f
+                ? (e.anim_loop ? elapsed % e.frames
+                               : std::min(elapsed, e.frames - 1))
+                : 0;
         img.source = UiRect{(frame % cols) * cell_w,
                             (frame / cols) * cell_h, cell_w, cell_h};
       }
@@ -1655,7 +1661,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float row_pitch = (font + 12) * s + 4 * s;
   const int rows_per_col = std::max(
       1, static_cast<int>((body.y + body.height - fy0) / row_pitch));
-  const int field_count = 38;
+  const int field_count = 39;
   const int cols =
       std::max(2, (field_count + rows_per_col - 1) / rows_per_col);
   const float col_w = pv.width / cols - 8 * s;
@@ -1781,6 +1787,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->fcols) : "",
         shell.editing_scene && shell.scene_field == 27,
         "sheet columns/row - 0 = strip");
+  field(shell.hit_scene_animloop, "animloop",
+        entity ? (entity->anim_loop ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 28,
+        "false holds the last frame");
   // Tilemap fields (doc-level, selected layer) — editing creates the
   // tilemap on demand.
   const auto *tm = scene_tile(shell);
@@ -2777,6 +2787,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->parent;
               else if (field == 27 && e)
                 shell.scene_buffer = std::to_string(e->fcols);
+              else if (field == 28 && e)
+                shell.scene_buffer = e->anim_loop ? "true" : "false";
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
               else if (field == 39)
@@ -2895,6 +2907,8 @@ int main(int argc, char **argv) {
               edit_field(26);
             else if (shell.hit_scene_fcols.contains(event.position))
               edit_field(27);
+            else if (shell.hit_scene_animloop.contains(event.position))
+              edit_field(28);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

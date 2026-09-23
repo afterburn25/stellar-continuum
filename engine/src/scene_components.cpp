@@ -160,13 +160,14 @@ Parent decode_parent(const std::vector<std::uint8_t> &b) {
   return p;
 }
 
-// Anim codec: frames/fps/cols — the appended cols field decodes as 0
-// (horizontal strip) on pre-grid payloads.
+// Anim codec: frames/fps/cols/loop — appended fields decode as
+// cols=0 (strip) and loop=true on older payloads.
 std::vector<std::uint8_t> encode_anim(const Anim &a) {
   std::vector<std::uint8_t> out;
   put_i32(out, a.frames);
   put_f32(out, a.fps);
   put_i32(out, a.cols);
+  out.push_back(a.loop ? 1 : 0);
   return out;
 }
 
@@ -177,6 +178,7 @@ Anim decode_anim(const std::vector<std::uint8_t> &b) {
   const std::uint32_t fbits = get_u32(b, at);
   std::memcpy(&a.fps, &fbits, 4);
   a.cols = static_cast<int>(get_u32(b, at));
+  a.loop = at >= b.size() || b[at] != 0;
   return a;
 }
 
@@ -251,8 +253,8 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.text.empty()) world.add(entity, Label{s.text});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
-    if (s.frames != 1 || s.fps != 0.f)
-      world.add(entity, Anim{s.frames, s.fps, s.fcols});
+    if (s.frames != 1 || s.fps != 0.f || !s.anim_loop)
+      world.add(entity, Anim{s.frames, s.fps, s.fcols, s.anim_loop});
     if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
     if (s.spin != 0.f) world.add(entity, Spin{s.spin});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -348,6 +350,7 @@ SceneDocument scene_from_world(const World &world) {
       s.frames = a->frames;
       s.fps = a->fps;
       s.fcols = a->cols;
+      s.anim_loop = a->loop;
     }
     if (const auto *rot = world.get<Rotation>(entity))
       s.rotation = rot->value;

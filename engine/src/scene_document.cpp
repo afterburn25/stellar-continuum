@@ -33,6 +33,7 @@ std::string SceneDocument::to_json() const {
     if (e.frames != 1) item["frames"] = e.frames;
     if (e.fps != 0.0f) item["fps"] = e.fps;
     if (e.fcols != 0) item["frameCols"] = e.fcols;
+    if (!e.anim_loop) item["animLoop"] = false;
     if (e.rotation != 0.0f) item["rotation"] = e.rotation;
     if (e.ttl != 0.0f) item["ttl"] = e.ttl;
     if (e.flip_x) item["flipX"] = true;
@@ -118,6 +119,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.frames = item.value("frames", 1);
       entity.fps = item.value("fps", 0.0f);
       entity.fcols = item.value("frameCols", 0);
+      entity.anim_loop = item.value("animLoop", true);
       entity.rotation = item.value("rotation", 0.0f);
       entity.ttl = item.value("ttl", 0.0f);
       entity.flip_x = item.value("flipX", false);

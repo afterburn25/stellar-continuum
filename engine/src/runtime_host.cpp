@@ -1283,11 +1283,13 @@ int RuntimeHost::run() {
               static_cast<float>(res.width()) / cols;
           const float cell_h =
               static_cast<float>(res.height()) / rows;
-          const int frame = anim->fps > 0.f
-                                ? static_cast<int>(impl.sim_time *
-                                                   anim->fps) %
-                                      anim->frames
-                                : 0;
+          const int elapsed =
+              static_cast<int>(impl.sim_time * anim->fps);
+          const int frame =
+              anim->fps > 0.f
+                  ? (anim->loop ? elapsed % anim->frames
+                                : std::min(elapsed, anim->frames - 1))
+                  : 0;
           img.source = UiRect{(frame % cols) * cell_w,
                               (frame / cols) * cell_h, cell_w, cell_h};
         }

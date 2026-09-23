@@ -145,7 +145,8 @@ tint, sprite path, layer (stable-sorted draw order), parallax
 (0 = screen-pinned), text label, gravityScale + solid (platformer
 physics: doc-level gravity, landing on solid tops, side blocking,
 grounded W/Up jump), sprite-sheet `frames`/`fps`/`fcols` (sim-time
-indexed; `fcols` slices grid sheets, 0 = horizontal strip),
+indexed; `fcols` slices grid sheets, 0 = strip; `animLoop`
+false holds the last frame),
 `rotation`, `ttl` (sim-time self-destruct),
 `flipX`/`flipY`, `visible`, `bounce`, `spin`, `data`, `opacity`,
 `oneway`, and `parent` — name-keyed attachment resolved by

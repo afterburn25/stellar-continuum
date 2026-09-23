@@ -58,9 +58,11 @@ struct Solid {};
 struct Anim {
   // Sprite-sheet animation: `frames` cells at `fps` per sim second.
   // `cols` is the sheet's columns per row — 0 means a horizontal strip.
+  // `loop` false holds the last frame instead of wrapping (one-shots).
   int frames{1};
   float fps{0.0f};
   int cols{0};
+  bool loop{true};
 };
 struct Rotation {
   // Degrees clockwise about the entity rect's center (sprites only).
