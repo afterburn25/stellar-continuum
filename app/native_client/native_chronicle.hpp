@@ -47,31 +47,39 @@ struct ChronicleSnapshot {
   std::size_t total{};                 // visible count before the cap
 };
 
+// Presentation-side filter bundle over the observer's authorized
+// feed. Every axis applies before the entry cap, so a filtered view
+// still reaches deep history and `total` reports the filtered visible
+// count. All axes compose; an empty/zero/-inf axis is inert.
+struct ChronicleFilter {
+  // Category prefix restricting to one domain ("war.", "exploration.").
+  std::string_view category_prefix{};
+  // The feed's own significance floor — trivia drops without the
+  // presentation re-scoring anything.
+  double min_significance{0.0};
+  // 0 = all; otherwise only events listing this civilization in
+  // `actors` — "all intel" (events merely witnessed via known
+  // systems) vs "what a given empire actually did".
+  std::uint64_t actor{0};
+  // HistoryQuery::tag semantics — exact match on a recorded reference
+  // tag ("fleet:12"): "everything this entity did that we can see".
+  std::string_view tag{};
+  // The feed's own recency bound — only events at or after this
+  // campaign day appear.
+  double since_day{-std::numeric_limits<double>::infinity()};
+  // Case-insensitive substring over the recorded summary OR category
+  // id — free-text lookup over the authorized feed.
+  std::string_view search{};
+};
+
 // Projects the observer-filtered chronicle into display entries,
 // newest first, capped at `max_entries` (the tail end of history —
 // a chronicle can hold 100k records; the view shows the newest slice
-// and reports the true total). `category_prefix` restricts to one
-// domain ("war.", "exploration.", ...) and `min_significance` is the
-// feed's own floor — all apply before the cap so a filtered view
-// still reaches deep history. `actor` (0 = all) further restricts to
-// events listing that civilization in `actors` — the difference
-// between "all intel" (events merely visible via known systems) and
-// "what a given empire actually did". `tag` (empty = off) restricts to
-// events carrying that exact reference tag ("fleet:12", "system:5") —
-// HistoryQuery::tag's semantics — so a tag chip becomes "everything
-// this entity did that we can see". `since_day` (default -inf) is the
-// feed's own recency bound — only events at or after that campaign day
-// appear. `search` (empty = off) is a case-insensitive substring match
-// on the recorded summary OR category id — free-text lookup over the
-// authorized feed. `total` reports the filtered visible count.
+// and reports the true total). Visibility is delegated entirely to
+// `EventHistory::feed` — the projection never re-derives it.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
-         std::size_t max_entries = 4000,
-         std::string_view category_prefix = {},
-         double min_significance = 0.0, std::uint64_t actor = 0,
-         std::string_view tag = {},
-         double since_day = -std::numeric_limits<double>::infinity(),
-         std::string_view search = {});
+         const ChronicleFilter &filter = {}, std::size_t max_entries = 4000);
 
 class NativeChronicleView final {
 public:

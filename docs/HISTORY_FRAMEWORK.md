@@ -116,8 +116,9 @@ history).
 
 For history beyond the transient window, `native_chronicle` adds the
 scrollable chronicle browser: `snapshot()` projects
-`feed(observer, -inf, min_significance)` into display entries (newest
-first, capped at 4000 with the true total reported) and
+`feed(observer, since_day, min_significance)` into display entries (newest
+first, capped at 4000 with the true total reported) under a
+`ChronicleFilter` bundle and
 `NativeChronicleView` renders them as a scrollable overlay — opened
 from a CHRONICLE button in the notification panel header, refreshed on
 demand while open, closed on every session/modal transition alongside

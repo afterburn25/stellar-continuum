@@ -274,29 +274,27 @@ const char *category_label(std::string_view category) noexcept {
 
 ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
-                           std::size_t max_entries,
-                           std::string_view category_prefix,
-                           double min_significance, std::uint64_t actor,
-                           std::string_view tag, double since_day,
-                           std::string_view search) {
+                           const ChronicleFilter &filter,
+                           std::size_t max_entries) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   const auto events =
-      history.feed(observer, since_day, min_significance);
-  const std::string needle = upper(std::string(search));
+      history.feed(observer, filter.since_day, filter.min_significance);
+  const std::string needle = upper(std::string(filter.search));
   ChronicleSnapshot snap;
   snap.entries.reserve(std::min(max_entries, events.size()));
   for (auto it = events.end(); it != events.begin();) {
     --it;
     const auto *event = *it;
-    if (!category_prefix.empty() &&
-        !event->category.starts_with(category_prefix))
+    if (!filter.category_prefix.empty() &&
+        !event->category.starts_with(filter.category_prefix))
       continue;
-    if (actor != 0 && std::ranges::find(event->actors, actor) ==
-                          event->actors.end())
+    if (filter.actor != 0 &&
+        std::ranges::find(event->actors, filter.actor) ==
+            event->actors.end())
       continue;
-    if (!tag.empty() && std::ranges::find(event->tags, tag) ==
-                            event->tags.end())
+    if (!filter.tag.empty() &&
+        std::ranges::find(event->tags, filter.tag) == event->tags.end())
       continue;
     if (!needle.empty() &&
         upper(event->summary).find(needle) == std::string::npos &&
@@ -356,13 +354,17 @@ void NativeChronicleView::refresh() {
   if (!history_) return;
   // Recency window rides the feed's own since_day bound; without a
   // campaign-day source the filter is inert (all history).
-  const double since =
+  ChronicleFilter filter;
+  filter.category_prefix = domain_filter_;
+  filter.min_significance = significance_floor_;
+  filter.actor = actor_filter_;
+  filter.tag = tag_filter_;
+  filter.since_day =
       (recency_window_ > 0.0 && campaign_day_source_)
           ? campaign_day_source_() - recency_window_
           : -std::numeric_limits<double>::infinity();
-  snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
-                       significance_floor_, actor_filter_, tag_filter_,
-                       since, search_);
+  filter.search = search_;
+  snapshot_ = snapshot(*history_, observer_, filter);
   scroll_ = 0.f;
 }
 

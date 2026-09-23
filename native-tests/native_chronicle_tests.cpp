@@ -51,7 +51,7 @@ void snapshot_projection() {
               foreign.entries.front().summary == "FOREIGN BATTLE REPORT",
           "Foreign observer saw wrong audience");
 
-  const auto bounded = snapshot(history, 1, 2);
+  const auto bounded = snapshot(history, 1, {}, 2);
   require(bounded.total == 3 && bounded.entries.size() == 2 &&
               bounded.entries.back().summary == "Colony established",
           "Snapshot cap kept wrong entries");
@@ -65,15 +65,15 @@ void domain_filtering() {
   war.summary = "Fleet engaged";
   war.visible_to = {1};
   history.record(std::move(war));
-  const auto wars = snapshot(history, 1, 4000, "war.");
+  const auto wars = snapshot(history, 1, {.category_prefix = "war."});
   require(wars.total == 1 && wars.entries.size() == 1 &&
               wars.entries.front().summary == "Fleet engaged",
           "Domain filter kept foreign categories");
-  const auto colonies = snapshot(history, 1, 4000, "colony.");
+  const auto colonies = snapshot(history, 1, {.category_prefix = "colony."});
   require(colonies.total == 1 &&
               colonies.entries.front().summary == "Colony established",
           "Colony filter missed its domain");
-  const auto empty = snapshot(history, 1, 4000, "research.");
+  const auto empty = snapshot(history, 1, {.category_prefix = "research."});
   require(empty.total == 0 && empty.entries.empty(),
           "Empty domain reported entries");
 
@@ -105,14 +105,14 @@ void significance_filtering() {
   add(420., "war.engagement_started", 0.7);   // major
   const auto all = snapshot(history, 1);
   require(all.total == 3, "Unfiltered snapshot dropped events");
-  const auto routine = snapshot(history, 1, 4000, {}, 0.3);
+  const auto routine = snapshot(history, 1, {.min_significance = 0.3});
   require(routine.total == 2, "Routine floor kept trivia");
-  const auto major = snapshot(history, 1, 4000, {}, 0.7);
+  const auto major = snapshot(history, 1, {.min_significance = 0.7});
   require(major.total == 1 &&
               major.entries.front().summary == "war.engagement_started",
           "Major floor kept routine events");
   // Domain + significance compose.
-  const auto major_war = snapshot(history, 1, 4000, "war.", 0.5);
+  const auto major_war = snapshot(history, 1, {.category_prefix = "war.", .min_significance = 0.5});
   require(major_war.total == 1, "Combined filters did not compose");
 
   NativeChronicleView view;
@@ -193,19 +193,19 @@ void actor_filtering() {
 
   const auto intel = snapshot(history, 1);
   require(intel.total == 4, "Observer lost visible intel");
-  const auto mine = snapshot(history, 1, 4000, {}, 0.0, 1);
+  const auto mine = snapshot(history, 1, {.actor = 1});
   require(mine.total == 2, "Actor filter kept non-actor events");
-  const auto theirs = snapshot(history, 1, 4000, {}, 0.0, 7);
+  const auto theirs = snapshot(history, 1, {.actor = 7});
   require(theirs.total == 2 &&
               theirs.entries.front().summary == "war.battle",
           "Foreign actor filter missed joint + solo events");
-  const auto nobody = snapshot(history, 1, 4000, {}, 0.0, 99);
+  const auto nobody = snapshot(history, 1, {.actor = 99});
   require(nobody.total == 0, "Unknown actor produced entries");
   // Actor filter composes with domain + significance.
   const auto my_colonies =
-      snapshot(history, 1, 4000, "colony.", 0.0, 1);
+      snapshot(history, 1, {.category_prefix = "colony.", .actor = 1});
   require(my_colonies.total == 1, "Actor filter did not compose");
-  const auto their_wars = snapshot(history, 1, 4000, "war.", 0.0, 7);
+  const auto their_wars = snapshot(history, 1, {.category_prefix = "war.", .actor = 7});
   require(their_wars.total == 2, "Actor+domain composition wrong");
 
   NativeChronicleView view;
@@ -311,13 +311,13 @@ void tag_focus() {
 
   // The snapshot's tag axis is HistoryQuery::tag semantics — exact
   // match on the recorded reference.
-  auto snap = snapshot(history, 1, 4000, {}, 0., 0, "fleet:12");
+  auto snap = snapshot(history, 1, {.tag = "fleet:12"});
   require(snap.total == 2 && snap.entries.size() == 2 &&
               snap.entries[0].summary == "war.engagement_started",
           "Tag filter did not isolate fleet:12 events");
-  snap = snapshot(history, 1, 4000, {}, 0., 0, "system:5");
+  snap = snapshot(history, 1, {.tag = "system:5"});
   require(snap.total == 2, "Tag filter missed system:5 events");
-  snap = snapshot(history, 1, 4000, "war.", 0., 0, "fleet:12");
+  snap = snapshot(history, 1, {.category_prefix = "war.", .tag = "fleet:12"});
   require(snap.total == 2, "Tag filter did not compose with domain");
   require(snapshot(history, 1).entries[0].tags.size() == 1 &&
               snapshot(history, 1).entries[0].tags[0] == "system:5",
@@ -379,10 +379,10 @@ void recency_filtering() {
 
   // The snapshot's since_day rides feed()'s own bound.
   auto snap =
-      snapshot(history, 1, 4000, {}, 0., 0, {}, 770.);
+      snapshot(history, 1, {.since_day = 770.});
   require(snap.total == 2 && snap.entries.size() == 2,
           "since_day did not bound the snapshot");
-  snap = snapshot(history, 1, 4000, {}, 0., 0, {}, 435.);
+  snap = snapshot(history, 1, {.since_day = 435.});
   require(snap.total == 3, "since_day missed mid-window events");
 
   // The view's TIME cycle composes with the live day source.
@@ -432,13 +432,9 @@ void search_filtering() {
   add(420., "war.engagement_started", "Raiders destroyed convoy");
 
   // Case-insensitive substring over summary OR category id.
-  require(snapshot(history, 1, 4000, {}, 0., 0, {},
-                   -std::numeric_limits<double>::infinity(), "terra")
-                  .total == 1,
+  require(snapshot(history, 1, {.search = "terra"}).total == 1,
           "Summary substring search missed");
-  require(snapshot(history, 1, 4000, {}, 0., 0, {},
-                   -std::numeric_limits<double>::infinity(), "WAR.")
-                  .total == 2,
+  require(snapshot(history, 1, {.search = "WAR."}).total == 2,
           "Category substring search missed");
 
   // The header field: click focuses it, text filters live, backspace
