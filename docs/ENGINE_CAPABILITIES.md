@@ -62,6 +62,47 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Engine-shell Simulation tool + Core executor adoption (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestones 1/12 — make the
+  simulation LOD machinery (a) authoritative in Stellar Continuum and
+  (b) inspectable in the standalone engine shell as a genre tool.
+- **Core adoption:** `GalaxySimulationStepCoordinator::advance` runs all
+  12 strategic phases (economy → strategic_ai → automatic_orders →
+  industry_allocation → construction → shipbuilding → legacy_research →
+  exploration → freight → combat → colonization → economy_storage) as
+  Active-tier `SimulationExecutor` tasks, dependency-chained to preserve
+  the exact original ordering. Phase bodies capture the coordinator
+  through bound lambdas — the coordinator's move constructor rebinds
+  them so moved instances keep running phases against live context.
+  `phase_executor()` exposes the executor for diagnostics; the
+  executor's per-domain run statistics make phase activity observable.
+- **Tool:** the SIMULATION tab in `stellar-engine.exe` hosts a live
+  executor driving real framework state — three `Population` cohort
+  settlements, a power `FlowNetwork` and a `LogisticsNetwork` freight
+  route across Active/Normal/Background/Dormant tiers. STEP advances
+  one tick, RUN auto-advances with the frame delta, WAKE exercises the
+  event-wakeup path, TIER live-promotes/demotes the selected task; the
+  panel shows tick, last-step report (eligible/ran/deferred/wakes/
+  wall), tier counts and per-domain statistics.
+- **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase
+  domains execute through the executor, empty campaigns advance safely,
+  and scheduler state survives coordinator moves; the 28-case
+  coordinator parity matrix, fresh/persistable/integrated-adaptive
+  campaign parity and player17 v17 parity all pass unchanged (behavior
+  identical — only the dispatch mechanism changed). The shell tool is
+  UI-only over real engine state (manual launch).
+- **Save/performance impact:** executor state (tick, task elapsed/
+  deferred/dirty/wake flags) is runtime-only — coordinator saves were
+  already driven by authoritative domain state; `capture_state`/
+  `restore_state` exist for embedders that persist the executor itself.
+  Per-phase dispatch adds one executor advance per strategic step —
+  negligible vs. phase work.
+- **Limitations:** phases remain sequential (dependencies form one
+  chain — no intra-step parallelism yet); the Simulation tool scenario
+  is fixed/synthetic, not a save-loaded game; no per-phase wall-time
+  split in the coordinator diagnostics path yet.
+
 ## Event history framework (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 14 — the
