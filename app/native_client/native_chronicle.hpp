@@ -67,8 +67,9 @@ struct ChronicleFilter {
   // The feed's own recency bound — only events at or after this
   // campaign day appear.
   double since_day{-std::numeric_limits<double>::infinity()};
-  // Case-insensitive substring over the recorded summary OR category
-  // id — free-text lookup over the authorized feed.
+  // Case-insensitive substring over the recorded summary, category id
+  // or reference tags — free-text lookup over the authorized feed
+  // (typing "fleet:12" finds the same records the tag chip focuses).
   std::string_view search{};
 };
 

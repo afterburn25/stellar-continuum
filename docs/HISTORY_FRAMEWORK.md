@@ -147,7 +147,8 @@ or the X focus button in the intro row clears it. A search field in
 the header (click to focus — the view's `wants_text_input()` joins the
 client's text-input gate, Escape unfocuses before closing, UTF-8-safe
 backspace) applies `snapshot()`'s case-insensitive `search` match over
-summary or category id. Coverage:
+summary, category id or reference tags (typing "fleet:12" finds the
+same records the tag chip focuses). Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
 total, domain, significance, actor, tag, recency and search
 filtering, entry

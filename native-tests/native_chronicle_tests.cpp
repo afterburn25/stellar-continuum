@@ -430,12 +430,23 @@ void search_filtering() {
   add(400., "war.battle", "Fleet action at Proxima");
   add(410., "colony.founded", "Colony established on Terra");
   add(420., "war.engagement_started", "Raiders destroyed convoy");
+  {
+    engine::HistoryEvent tagged;
+    tagged.at_day = 425.;
+    tagged.category = "war.battle";
+    tagged.summary = "Ambush at the rim";
+    tagged.tags = {"fleet:12"};
+    tagged.visible_to = {1};
+    history.record(std::move(tagged));
+  }
 
   // Case-insensitive substring over summary OR category id.
   require(snapshot(history, 1, {.search = "terra"}).total == 1,
           "Summary substring search missed");
-  require(snapshot(history, 1, {.search = "WAR."}).total == 2,
+  require(snapshot(history, 1, {.search = "WAR."}).total == 3,
           "Category substring search missed");
+  require(snapshot(history, 1, {.search = "FLEET:12"}).total == 1,
+          "Tag substring search missed");
 
   // The header field: click focuses it, text filters live, backspace
   // pops a codepoint, Escape unfocuses before closing.

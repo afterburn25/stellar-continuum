@@ -298,7 +298,10 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
       continue;
     if (!needle.empty() &&
         upper(event->summary).find(needle) == std::string::npos &&
-        upper(event->category).find(needle) == std::string::npos)
+        upper(event->category).find(needle) == std::string::npos &&
+        std::ranges::none_of(event->tags, [&](const auto &t) {
+          return upper(t).find(needle) != std::string::npos;
+        }))
       continue;
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
