@@ -336,6 +336,7 @@ int main() {
     CivilizationEconomy broken;
     broken.civilization_id = 1;
     broken.operating_arrears = -3.0;
+    broken.last_research_funding_fraction = 2.0; // clamped [0,1] upstream
     world.economies.push_back(broken);
     ConstructionState con;
     con.civilization_id = 1;
@@ -350,6 +351,11 @@ int main() {
     dead_stick.current_system_id = 7;
     dead_stick.strategic_speed = 0.0;
     dead_stick.freight_home_colony_id = 999; // absent colony
+    dead_stick.transit_progress = 1.5;       // loader enforces [0,1]
+    dead_stick.fuel_capacity_light_years = 100.0;
+    dead_stick.fuel_remaining_light_years = 2000.0; // refuel caps at capacity
+    dead_stick.cargo_material_capacity = 10.0;
+    dead_stick.cargo_materials = 50.0; // freight clamps at capacity
     dead_stick.combat = FleetCombatState{};
     dead_stick.combat->hull = -5.0;
     dead_stick.combat->target_fleet_id = 999; // absent fleet
@@ -383,9 +389,10 @@ int main() {
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
-        fleet_refs = 0;
+        fleet_refs = 0, ranged = 0;
     for (const auto &finding : findings) {
-      if (finding.event_type == "invalid_nonnegative_value") ++invalid;
+      if (finding.event_type == "out_of_range") ++ranged;
+      else if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_positive_value") ++positive;
       else if (finding.event_type == "unknown_species") ++species;
       else if (finding.event_type == "unknown_building_type") ++type;
@@ -411,6 +418,9 @@ int main() {
           "and queue overflow are flagged");
     check(fleet_refs == 2,
           "freight and attack orders flag absent colony/fleet refs");
+    check(ranged == 4,
+          "transit progress, fuel, cargo and funding fraction flag "
+          "over-bound values");
     // The ops pass skips the corrupt entities rather than throwing —
     // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);

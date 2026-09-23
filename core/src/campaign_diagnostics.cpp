@@ -471,6 +471,16 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   const auto positive=[&](double value,std::string_view name,int id,std::string_view subsystem){
     if(!std::isfinite(value)||value< -1e-6)emit(std::string(subsystem),"invalid_nonnegative_value",id,std::string(name)+" is non-finite or negative.");
   };
+  // Semantic bounds: the authoritative writers clamp these (refuel
+  // caps at capacity*service, freight loads cap at capacity, the
+  // fleet loader enforces transit progress in [0,1], funding
+  // fractions clamp to [0,1]) — an in-memory violation means the
+  // state was corrupted after load. Skipped when either side is
+  // non-finite or the bound is negative: `positive` already names it.
+  const auto bounded=[&](double value,double bound,std::string_view name,int id,std::string_view subsystem){
+    if(std::isfinite(value)&&std::isfinite(bound)&&bound>=0.0&&value>bound+1e-6)
+      emit(std::string(subsystem),"out_of_range",id,std::string(name)+" exceeds its authoritative bound.");
+  };
   // Reference lookups the operations pass relies on: bodies keyed by
   // (system,id) — a body that exists in another system is still
   // unresolvable for the colony — plus catalogued building types and
@@ -554,6 +564,8 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     if(!civilizations.contains(e.civilization_id))emit("economy","orphaned_economy",e.civilization_id,"Economy references an absent civilization.");
     positive(e.credits,"Credits",e.civilization_id,"economy");positive(e.industry,"Industry",e.civilization_id,"economy");positive(e.science,"Science",e.civilization_id,"economy");
     positive(e.operating_arrears,"Operating arrears",e.civilization_id,"economy");
+    bounded(e.last_research_funding_fraction,1.0,"Research funding fraction",e.civilization_id,"economy");
+    bounded(e.last_base_operations_funding_fraction,1.0,"Operations funding fraction",e.civilization_id,"economy");
   }
   for(const auto &f:w.fleets){
     if(!civilizations.contains(f.civilization_id))emit("fleet","orphaned_fleet",f.id,"Fleet references an absent civilization.");
@@ -569,10 +581,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     // Order and cargo state: dangling refs and corrupt magnitudes the
     // simulation dereferences every tick.
     positive(f.transit_progress,"Transit progress",f.id,"fleet");
+    bounded(f.transit_progress,1.0,"Transit progress",f.id,"fleet");
     positive(f.maximum_leg_range_light_years,"Maximum leg range",f.id,"fleet");
     positive(f.fuel_capacity_light_years,"Fuel capacity",f.id,"fleet");
+    bounded(f.fuel_remaining_light_years,f.fuel_capacity_light_years,"Fuel",f.id,"fleet");
     positive(f.cargo_material_capacity,"Cargo capacity",f.id,"fleet");
     positive(f.cargo_materials,"Cargo load",f.id,"fleet");
+    bounded(f.cargo_materials,f.cargo_material_capacity,"Cargo load",f.id,"fleet");
     positive(f.settlement_days_completed,"Settlement progress",f.id,"fleet");
     positive(f.reconnaissance_days_completed,"Reconnaissance progress",f.id,"fleet");
     if(f.destination_planetary_body_id&&!bodies.contains(*f.destination_planetary_body_id))

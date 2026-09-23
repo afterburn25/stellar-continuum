@@ -749,7 +749,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   system refs, freight outpost/home-colony refs, and the combat
   block's shield/armor/hull/cooldown/retreat magnitudes plus
   `orphaned_target`/`orphaned_defense`/`orphaned_disengagement`
-  order refs. Every
+  order refs. Semantic bounds are flagged as `out_of_range`:
+  `transit_progress` beyond 1 (the loader enforces [0,1]),
+  `fuel_remaining_light_years` beyond `fuel_capacity_light_years`
+  (refuel caps at capacity×service), `cargo_materials` beyond
+  `cargo_material_capacity` (freight loads clamp at capacity), and
+  the economy `last_research_funding_fraction`/
+  `last_base_operations_funding_fraction` beyond 1 (authoritative
+  writes clamp to [0,1]). Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network
