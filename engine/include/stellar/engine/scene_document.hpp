@@ -99,6 +99,26 @@ struct SceneTilemap {
   std::vector<int> cells;
 };
 
+// Declarative particle emitter definition — registers into the runtime's
+// VfxSystem on scene load so entity `vfx` fields need no game code.
+// Curves are (normalized-age, value) key lists.
+struct SceneEmitterDef {
+  std::string id;
+  std::string sprite;              // content-relative particle texture
+  float rate{0.f};                 // particles spawned per sim second
+  float lifetime{1.0f};            // per-particle lifetime in seconds
+  float vx_min{}, vx_max{};        // initial velocity range (px/s)
+  float vy_min{}, vy_max{};
+  float spread_deg{0.f};           // cone spread around velocity, degrees
+  float gx{}, gy{};                // per-particle gravity
+  std::vector<std::pair<float, float>> scale_keys;    // over-life
+  std::vector<std::pair<float, float>> opacity_keys;
+  std::vector<std::pair<float, float>> tint_r, tint_g, tint_b;
+  std::uint32_t max_particles{256};
+  float lod_fade_distance{0.f};
+  float lod_min_rate_scale{0.f};
+};
+
 struct SceneDocument {
   std::vector<SceneEntity> entities;
   // Grid terrain layers — empty in most scenes; each draws at its own
@@ -116,6 +136,10 @@ struct SceneDocument {
   // Level world bounds in px — 0 inherits the runtime's --world-w/--world-h
   // option or the viewport. Lets each scene own its playable extent.
   float world_w{0.0f}, world_h{0.0f};
+  // Particle emitter definitions registered into the host's VfxSystem on
+  // load — entity `vfx` fields reference these by id (game-registered
+  // definitions via host.vfx().define() still work).
+  std::vector<SceneEmitterDef> emitters;
 
   static constexpr std::string_view filename{"scene.json"};
 

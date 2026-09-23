@@ -239,6 +239,28 @@ int main() {
     tm1.layer = 5;
     tm1.parallax = 0.5f;
     tm1.cells.assign(16, 2);
+    // Declarative emitter definition — entity `vfx` references resolve
+    // against these without game code.
+    scene.emitters.push_back(engine::SceneEmitterDef{});
+    auto &em = scene.emitters.back();
+    em.id = "ember";
+    em.sprite = "sprites/dot.png";
+    em.rate = 40.f;
+    em.lifetime = 0.5f;
+    em.vx_min = -30.f;
+    em.vx_max = 30.f;
+    em.vy_min = -60.f;
+    em.vy_max = -20.f;
+    em.spread_deg = 15.f;
+    em.gy = 140.f;
+    em.scale_keys = {{0.f, 1.f}, {1.f, 0.4f}};
+    em.opacity_keys = {{0.f, 1.f}, {1.f, 0.f}};
+    em.tint_r = {{0.f, 1.f}, {1.f, 0.9f}};
+    em.tint_g = {{0.f, 0.85f}, {1.f, 0.2f}};
+    em.tint_b = {{0.f, 0.3f}, {1.f, 0.05f}};
+    em.max_particles = 64;
+    em.lod_fade_distance = 800.f;
+    em.lod_min_rate_scale = 0.25f;
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -283,7 +305,23 @@ int main() {
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f &&
               reparsed->music == "audio/level1.ogg" &&
-              reparsed->world_w == 2560.f && reparsed->world_h == 1440.f,
+              reparsed->world_w == 2560.f && reparsed->world_h == 1440.f &&
+              reparsed->emitters.size() == 1 &&
+              reparsed->emitters[0].id == "ember" &&
+              reparsed->emitters[0].sprite == "sprites/dot.png" &&
+              reparsed->emitters[0].rate == 40.f &&
+              reparsed->emitters[0].lifetime == 0.5f &&
+              reparsed->emitters[0].vx_min == -30.f &&
+              reparsed->emitters[0].vy_max == -20.f &&
+              reparsed->emitters[0].spread_deg == 15.f &&
+              reparsed->emitters[0].gy == 140.f &&
+              reparsed->emitters[0].scale_keys.size() == 2 &&
+              reparsed->emitters[0].scale_keys[1].second == 0.4f &&
+              reparsed->emitters[0].opacity_keys.size() == 2 &&
+              reparsed->emitters[0].tint_g.size() == 2 &&
+              reparsed->emitters[0].max_particles == 64 &&
+              reparsed->emitters[0].lod_fade_distance == 800.f &&
+              reparsed->emitters[0].lod_min_rate_scale == 0.25f,
           "scene document round-trips");
     const auto path = root / "editor" / "scene.json";
     scene.save(path);
@@ -319,6 +357,14 @@ int main() {
               R"({"entities":[],"tilemaps":[{"tileW":32,"tileH":32,"columns":4,"cells":[0,1,2]}]})")
               .has_value(),
           "bad tilemaps-array entry rejected");
+    check(!engine::SceneDocument::from_json(
+              R"({"entities":[],"emitters":[{"rate":10}]})")
+              .has_value(),
+          "id-less emitter rejected");
+    check(!engine::SceneDocument::from_json(
+              R"({"entities":[],"emitters":[{"id":"x","scale":[[0,1,2]]}]})")
+              .has_value(),
+          "malformed emitter curve rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

@@ -464,10 +464,43 @@ int RuntimeHost::run() {
       impl.vfx_tracks.push_back({id, vr->name, e});
   };
 
+  // Scene-declared emitter definitions register into the VfxSystem on
+  // load, converting the document's degrees/key-list form to the engine's
+  // radians/FloatCurve form — entity `vfx` fields then attach with no
+  // game code at all.
+  const auto register_emitters = [&](const SceneDocument &doc) {
+    const auto curve_of = [](const auto &keys) {
+      FloatCurve c;
+      for (const auto &[t, v] : keys) c.add_key(t, v);
+      return c;
+    };
+    for (const auto &em : doc.emitters) {
+      EmitterDefinition def;
+      def.id = em.id;
+      def.sprite = em.sprite;
+      def.spawn_rate_per_second = em.rate;
+      def.particle_lifetime_seconds = em.lifetime;
+      def.velocity_min = {em.vx_min, em.vy_min, 0.f};
+      def.velocity_max = {em.vx_max, em.vy_max, 0.f};
+      def.spread_radians = em.spread_deg * (3.14159265f / 180.f);
+      def.gravity = {em.gx, em.gy, 0.f};
+      def.scale_over_life = curve_of(em.scale_keys);
+      def.opacity_over_life = curve_of(em.opacity_keys);
+      def.tint_r = curve_of(em.tint_r);
+      def.tint_g = curve_of(em.tint_g);
+      def.tint_b = curve_of(em.tint_b);
+      def.max_particles = em.max_particles;
+      def.lod_fade_distance = em.lod_fade_distance;
+      def.lod_min_rate_scale = em.lod_min_rate_scale;
+      impl.vfx.define(std::move(def));
+    }
+  };
+
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
   std::string scene_music;
   auto spawn_entities = [&](const SceneDocument &doc) {
+    register_emitters(doc);
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;

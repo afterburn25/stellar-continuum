@@ -71,6 +71,35 @@ std::string SceneDocument::to_json() const {
     }
     doc["tilemaps"] = std::move(list);
   }
+  if (!emitters.empty()) {
+    const auto keys_json = [](const auto &keys) {
+      nlohmann::json out = nlohmann::json::array();
+      for (const auto &[t, v] : keys) out.push_back({t, v});
+      return out;
+    };
+    nlohmann::json list = nlohmann::json::array();
+    for (const auto &em : emitters) {
+      nlohmann::json e;
+      e["id"] = em.id;
+      if (!em.sprite.empty()) e["sprite"] = em.sprite;
+      e["rate"] = em.rate;
+      e["lifetime"] = em.lifetime;
+      e["vmin"] = {em.vx_min, em.vy_min};
+      e["vmax"] = {em.vx_max, em.vy_max};
+      if (em.spread_deg != 0.f) e["spread"] = em.spread_deg;
+      if (em.gx != 0.f || em.gy != 0.f) e["egravity"] = {em.gx, em.gy};
+      if (!em.scale_keys.empty()) e["scale"] = keys_json(em.scale_keys);
+      if (!em.opacity_keys.empty()) e["opacity"] = keys_json(em.opacity_keys);
+      if (!em.tint_r.empty()) e["tintR"] = keys_json(em.tint_r);
+      if (!em.tint_g.empty()) e["tintG"] = keys_json(em.tint_g);
+      if (!em.tint_b.empty()) e["tintB"] = keys_json(em.tint_b);
+      if (em.max_particles != 256) e["max"] = em.max_particles;
+      if (em.lod_fade_distance != 0.f) e["lodFade"] = em.lod_fade_distance;
+      if (em.lod_min_rate_scale != 0.f) e["lodMin"] = em.lod_min_rate_scale;
+      list.push_back(std::move(e));
+    }
+    doc["emitters"] = std::move(list);
+  }
   return doc.dump(2) + "\n";
 }
 
@@ -198,6 +227,67 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       SceneTilemap map;
       if (!parse_tilemap(doc.at("tilemap"), map)) return std::nullopt;
       scene.tilemaps.push_back(std::move(map));
+    }
+    if (doc.contains("emitters")) {
+      const auto &list = doc.at("emitters");
+      if (!list.is_array()) return fail("emitters must be an array");
+      const auto keys_of = [&fail](const nlohmann::json &em,
+                                   const char *name,
+                                   auto &out) -> bool {
+        if (!em.contains(name)) return true;
+        const auto &arr = em.at(name);
+        if (!arr.is_array()) {
+          fail(std::string("emitter curve ") + name + " must be an array");
+          return false;
+        }
+        for (const auto &k : arr) {
+          if (!k.is_array() || k.size() != 2) {
+            fail(std::string("emitter curve ") + name +
+                 " keys must be [time,value] pairs");
+            return false;
+          }
+          out.emplace_back(k[0].get<float>(), k[1].get<float>());
+        }
+        return true;
+      };
+      const auto vec2_of = [&fail](const nlohmann::json &em,
+                                   const char *name, float &x,
+                                   float &y) -> bool {
+        if (!em.contains(name)) return true;
+        const auto &arr = em.at(name);
+        if (!arr.is_array() || arr.size() != 2) {
+          fail(std::string("emitter ") + name + " must be [x,y]");
+          return false;
+        }
+        x = arr[0].get<float>();
+        y = arr[1].get<float>();
+        return true;
+      };
+      for (const auto &item : list) {
+        if (!item.is_object()) return fail("emitter entry is not an object");
+        SceneEmitterDef em;
+        em.id = item.value("id", std::string{});
+        if (em.id.empty()) return fail("emitter requires an id");
+        em.sprite = item.value("sprite", std::string{});
+        em.rate = item.value("rate", 0.0f);
+        em.lifetime = item.value("lifetime", 1.0f);
+        em.spread_deg = item.value("spread", 0.0f);
+        em.max_particles = item.value("max", 256u);
+        em.lod_fade_distance = item.value("lodFade", 0.0f);
+        em.lod_min_rate_scale = item.value("lodMin", 0.0f);
+        if (!vec2_of(item, "vmin", em.vx_min, em.vy_min) ||
+            !vec2_of(item, "vmax", em.vx_max, em.vy_max) ||
+            !vec2_of(item, "egravity", em.gx, em.gy) ||
+            !keys_of(item, "scale", em.scale_keys) ||
+            !keys_of(item, "opacity", em.opacity_keys) ||
+            !keys_of(item, "tintR", em.tint_r) ||
+            !keys_of(item, "tintG", em.tint_g) ||
+            !keys_of(item, "tintB", em.tint_b))
+          return std::nullopt;
+        if (em.rate < 0.f || em.lifetime <= 0.f || em.max_particles == 0)
+          return fail("emitter requires rate>=0, lifetime>0, max>0");
+        scene.emitters.push_back(std::move(em));
+      }
     }
   } catch (const std::exception &e) {
     return fail(std::string("malformed entity: ") + e.what());

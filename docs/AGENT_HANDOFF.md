@@ -150,7 +150,7 @@ indexed; `fcols` slices grid sheets, 0 = strip; `animLoop`
 false holds the last frame),
 `rotation`, `ttl` (sim-time self-destruct),
 `flipX`/`flipY`, `visible`, `bounce`, `spin`, `data`, `opacity`,
-`oneway`, `vfx` (named emitter auto-attached on spawn and re-attached after save restore),
+`oneway`, `vfx` (named emitter auto-attached on spawn and re-attached after save restore — definitions can be declared in the document's `emitters` array: rate/lifetime/velocity/spread/gravity/over-life curves/max/LOD, so particles need no game code),
 and `parent` — name-keyed attachment resolved by
 `resolve_hierarchy` each sim step: children keep their authored
 offset and follow the resolved parent (chains root-first; cycles
