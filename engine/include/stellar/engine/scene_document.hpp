@@ -70,6 +70,10 @@ struct SceneEntity {
   float spin{0.0f};
   // false = clamp dead at world bounds instead of rebounding (projectiles).
   bool bounce{true};
+  // Name of a registered VfxSystem emitter to attach on spawn — the host
+  // keeps it anchored to the entity and stops it when the entity dies.
+  // Games register definitions via host.vfx().define(...).
+  std::string vfx;
   // Name of another entity this one follows, keeping its authored offset —
   // riders on moving platforms, weapons on ships. Resolution folds the
   // child's own world-space motion (velocity, collisions) into the offset,

@@ -446,6 +446,24 @@ int RuntimeHost::run() {
     }
   };
 
+  // Attaches an entity's VfxRef-named emitter, anchored at its center —
+  // games register definitions via host.vfx().define(); the track table
+  // re-anchors the emitter each step and stops it when the entity dies.
+  const auto attach_vfx = [&](EntityId e) {
+    const auto *vr = world.get<VfxRef>(e);
+    if (!vr || vr->name.empty() || impl.vfx.definition(vr->name) == nullptr)
+      return;
+    const auto *t = world.get<Transform2D>(e);
+    const auto *x = world.get<Extent2D>(e);
+    const auto id = impl.vfx.spawn(
+        vr->name,
+        {t ? t->x + (x ? x->w * .5f : 0.f) : 0.f,
+         t ? t->y + (x ? x->h * .5f : 0.f) : 0.f, 0.f},
+        e);
+    if (id != invalid_vfx_instance)
+      impl.vfx_tracks.push_back({id, vr->name, e});
+  };
+
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
   std::string scene_music;
@@ -484,6 +502,7 @@ int RuntimeHost::run() {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
+      attach_vfx(impl.entities[i]);
     }
   };
 
@@ -515,6 +534,7 @@ int RuntimeHost::run() {
     impl.entities.push_back(ids.front());
     impl.sprites.push_back(
         entity.sprite.empty() ? nullptr : decode_sprite(entity.sprite));
+    attach_vfx(ids.front());
     return ids.front();
   };
   impl.destroy_fn = [&](EntityId id) -> bool {
@@ -601,6 +621,7 @@ int RuntimeHost::run() {
       if (const auto *sp = world.get<SpriteRef>(impl.entities[i]);
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
+      attach_vfx(impl.entities[i]);
     }
   };
 

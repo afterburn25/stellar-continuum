@@ -114,6 +114,11 @@ struct Parent {
   float last_px{0.f}, last_py{0.f}; // parent's resolved pos at last resolve
   bool resolved{false};
 };
+struct VfxRef {
+  // Named VfxSystem emitter to attach while the entity lives — the host
+  // spawns it on scene load/runtime spawn and stops it on destroy.
+  std::string name;
+};
 // Grid terrain state, carried on dedicated world entities — one per
 // document tilemap, absent from spawn_scene's return list (locate via
 // tilemap_entities). Holding it as a component makes runtime cell edits

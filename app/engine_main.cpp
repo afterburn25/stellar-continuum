@@ -202,7 +202,7 @@ struct Shell {
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
       hit_scene_data{}, hit_scene_opacity{}, hit_scene_parent{},
-      hit_scene_fcols{}, hit_scene_animloop{},
+      hit_scene_fcols{}, hit_scene_animloop{}, hit_scene_vfx{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tilesel{},
       hit_scene_tiledel{}, hit_scene_tileset{},
@@ -1254,6 +1254,9 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 29) {
+    next.vfx = shell.scene_buffer;
+    ok = true;
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1337,7 +1340,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                 shell.hit_scene_bounce =
                                     shell.hit_scene_parent =
                                         shell.hit_scene_fcols =
-                                            shell.hit_scene_animloop = {};
+                                            shell.hit_scene_animloop =
+                                                shell.hit_scene_vfx = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1661,7 +1665,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float row_pitch = (font + 12) * s + 4 * s;
   const int rows_per_col = std::max(
       1, static_cast<int>((body.y + body.height - fy0) / row_pitch));
-  const int field_count = 39;
+  const int field_count = 40;
   const int cols =
       std::max(2, (field_count + rows_per_col - 1) / rows_per_col);
   const float col_w = pv.width / cols - 8 * s;
@@ -1791,6 +1795,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->anim_loop ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 28,
         "false holds the last frame");
+  field(shell.hit_scene_vfx, "vfx",
+        entity ? entity->vfx : "",
+        shell.editing_scene && shell.scene_field == 29,
+        "named emitter attached on spawn");
   // Tilemap fields (doc-level, selected layer) — editing creates the
   // tilemap on demand.
   const auto *tm = scene_tile(shell);
@@ -2789,6 +2797,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->fcols);
               else if (field == 28 && e)
                 shell.scene_buffer = e->anim_loop ? "true" : "false";
+              else if (field == 29 && e)
+                shell.scene_buffer = e->vfx;
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
               else if (field == 39)
@@ -2909,6 +2919,8 @@ int main(int argc, char **argv) {
               edit_field(27);
             else if (shell.hit_scene_animloop.contains(event.position))
               edit_field(28);
+            else if (shell.hit_scene_vfx.contains(event.position))
+              edit_field(29);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

@@ -45,6 +45,7 @@ std::string SceneDocument::to_json() const {
     if (e.spin != 0.0f) item["spin"] = e.spin;
     if (!e.bounce) item["bounce"] = false;
     if (!e.parent.empty()) item["parent"] = e.parent;
+    if (!e.vfx.empty()) item["vfx"] = e.vfx;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -131,6 +132,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.spin = item.value("spin", 0.0f);
       entity.bounce = item.value("bounce", true);
       entity.parent = item.value("parent", std::string{});
+      entity.vfx = item.value("vfx", std::string{});
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {

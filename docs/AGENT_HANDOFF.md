@@ -149,7 +149,8 @@ indexed; `fcols` slices grid sheets, 0 = strip; `animLoop`
 false holds the last frame),
 `rotation`, `ttl` (sim-time self-destruct),
 `flipX`/`flipY`, `visible`, `bounce`, `spin`, `data`, `opacity`,
-`oneway`, and `parent` — name-keyed attachment resolved by
+`oneway`, `vfx` (named emitter auto-attached on spawn and re-attached after save restore),
+and `parent` — name-keyed attachment resolved by
 `resolve_hierarchy` each sim step: children keep their authored
 offset and follow the resolved parent (chains root-first; cycles
 and missing parents keep the last position), while a child's own

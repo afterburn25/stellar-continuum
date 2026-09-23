@@ -231,6 +231,14 @@ void register_scene_components(World &world) {
   world.register_component<Tilemap>("tilemap", encode_tilemap,
                                     decode_tilemap);
   world.register_component<Parent>("parent", encode_parent, decode_parent);
+  world.register_component<VfxRef>(
+      "vfxref",
+      [](const VfxRef &v) {
+        return std::vector<std::uint8_t>{v.name.begin(), v.name.end()};
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        return VfxRef{{b.begin(), b.end()}};
+      });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -282,6 +290,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
       world.add(entity,
                 Parent{s.parent, s.x - px, s.y - py, px, py, true});
     }
+    if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
     spawned.push_back(entity);
   }
   // Each tilemap lives on its own entity (not returned) so runtime cell
@@ -366,6 +375,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
     if (const auto *par = world.get<Parent>(entity)) s.parent = par->name;
+    if (const auto *vr = world.get<VfxRef>(entity)) s.vfx = vr->name;
     doc.entities.push_back(std::move(s));
   }
   return doc;

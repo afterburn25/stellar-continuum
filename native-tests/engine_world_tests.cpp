@@ -221,6 +221,7 @@ int main() {
         hero.fps = 6.f;
         hero.fcols = 2;
         hero.anim_loop = false;
+        hero.vfx = "ember";
         hero.rotation = 45.f;
         hero.ttl = 2.5f;
         hero.flip_x = true;
@@ -309,6 +310,8 @@ int main() {
                   world.get<Anim>(spawned[0])->fps == 6.f &&
                   world.get<Anim>(spawned[0])->cols == 2 &&
                   !world.get<Anim>(spawned[0])->loop &&
+                  world.get<VfxRef>(spawned[0]) != nullptr &&
+                  world.get<VfxRef>(spawned[0])->name == "ember" &&
                   world.get<Anim>(spawned[1]) == nullptr,
               "spawn_scene animation");
         check(world.get<Rotation>(spawned[0]) &&
@@ -427,6 +430,7 @@ int main() {
                   ex_player->gravity_scale == 0.0f && ex_player->solid &&
                   ex_player->frames == 4 && ex_player->fps == 6.f &&
                   ex_player->fcols == 2 && !ex_player->anim_loop &&
+                  ex_player->vfx == "ember" &&
                   ex_player->rotation == 45.f && ex_player->ttl == 2.5f &&
                   ex_player->flip_x && !ex_player->flip_y &&
                   !ex_player->visible && ex_player->oneway &&
