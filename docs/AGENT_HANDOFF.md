@@ -131,9 +131,14 @@ deterministic dispatch queue and (eta,id) deliveries — see
 landed: `PlanetEnvironment` + `evaluate_habitability` (planetary.hpp)
 adapter surface for Core planet state, and `Terraforming`
 (terraforming.hpp) staged environment mutation — see
-[TERRAFORMING_FRAMEWORK.md](TERRAFORMING_FRAMEWORK.md). Next: Milestone
-9 (civilization AI), then fleet-scale architecture; adopt the executor
-for real Core/game phases when consuming these.
+[TERRAFORMING_FRAMEWORK.md](TERRAFORMING_FRAMEWORK.md). Milestone 9
+landed: `StrategicMind` (strategic_ai.hpp) deterministic utility
+decision machinery — domain-partitioned actions, hysteresis, cooldowns,
+bounded decision journal; cadence is caller-owned via executor tiers —
+see [STRATEGIC_AI.md](STRATEGIC_AI.md). Next: Milestone 10
+(fleet/warfare scale), then combined benchmarks and the event/history
+framework; adopt the executor for real Core/game phases when consuming
+these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

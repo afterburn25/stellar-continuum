@@ -62,6 +62,32 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Strategic AI decision machinery (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 9 — deterministic
+  utility-based action selection for civilizations/factions; the
+  decision machinery, not the policy. See
+  [STRATEGIC_AI.md](STRATEGIC_AI.md).
+- **Engine APIs/ownership:** `StrategicMind` — `UtilityAction`s
+  (caller scorers + commit effects, cooldowns, weights, enable) grouped
+  by domain; `decide(domain, day, min_utility, hysteresis)` evaluates
+  in ascending id order, incumbent hysteresis prevents oscillation,
+  argmax with smallest-id tie-break commits and journals a bounded
+  `Decision` ring buffer (day/domain/action/utility/candidates/
+  switched). Planning cadence is caller-owned — intended as
+  `SimulationExecutor` domain tasks at different tiers.
+- **Consumers/tests:** `strategic_ai` tests — argmax, id tie-break,
+  hysteresis hold/switch, min-utility gate, cooldowns, domain
+  independence, disabled actions, bounded journal, bit-equal
+  determinism, 200-action × 5000-decision scale. Core faction AI
+  adoption pending.
+- **Save/performance impact:** actions are code (re-register on load);
+  persistent state is per-domain incumbent + per-action last-commit
+  day. Decide cost is O(actions in domain).
+- **Limitations:** flat scoring — no goal decomposition, opponent
+  modeling or action budgets; fog-of-war/privacy filtering is the
+  scorer's contract; journal is memory-only.
+
 ## Planetary habitability + terraforming (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestones 7–8 — adapter
