@@ -217,7 +217,9 @@ clickable chips applying `HistoryQuery::tag`'s exact-match focus, and
 a TIME button cycles the feed's `since_day` bound (all → 30d → 1y →
 10y) driven by a live campaign-day source — and while a window is
 bounded, ◀ ▶ page buttons shift it by its own width (`since_day` +
-`before_day` as a closed window, so the whole timeline is pageable) —
+`before_day`; both query bounds are inclusive so older pages pass a
+`nextafter`-lowered upper edge — boundary-day entries tile onto
+exactly one page, while the newest page keeps `now` inclusive) —
 and a header search field
 (case-insensitive substring over summary/category) joins the client's
 `wants_text_input()` gate. The

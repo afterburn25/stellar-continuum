@@ -383,11 +383,17 @@ void NativeChronicleView::refresh() {
   filter.actor = actor_filter_;
   filter.tag = tag_filter_;
   if (recency_window_ > 0.0 && campaign_day_source_) {
-    // Closed window: [now - (page+1)*width, now - page*width].
+    // Window [end - width, end]. Both HistoryQuery bounds are inclusive,
+    // so an entry at exactly `end` would repeat on the next-older page —
+    // make older pages half-open on their upper edge (the newest page
+    // keeps `end` inclusive: nothing newer exists to claim it).
     const double end =
         campaign_day_source_() - recency_window_ * window_page_;
     filter.since_day = end - recency_window_;
-    filter.before_day = end;
+    filter.before_day =
+        window_page_ == 0
+            ? end
+            : std::nextafter(end, -std::numeric_limits<double>::infinity());
   } else {
     filter.since_day = -std::numeric_limits<double>::infinity();
   }

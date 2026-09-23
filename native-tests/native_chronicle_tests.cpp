@@ -425,16 +425,22 @@ void recency_filtering() {
                                 "Colony",
           "upper-bound-only window kept wrong entries");
 
+  // A boundary-day entry: day 435 is both the newest window's lower
+  // edge and the first older page's upper edge — both bounds are
+  // inclusive, so it must tile onto the newer page only.
+  add(435., "exploration.system_surveyed");
+
   // The view sat at a (sourceless) 30d window — one cycle lands on
   // the 1y window [435, 800] at page 0.
   view.set_campaign_day_source([] { return 800.; });
   view.cycle_recency(); // 1y
   require(view.recency_window() == 365.0 && view.window_page() == 0 &&
-              view.current().entries.size() == 3,
+              view.current().entries.size() == 4,
           "Window did not restart at the present edge");
   view.page_newer(); // clamped at page 0
   require(view.window_page() == 0, "page_newer escaped page 0");
-  view.page_older(); // [70, 435] — the battle at day 400 only
+  view.page_older(); // [70, 435) — the battle at day 400 only; the
+                     // boundary entry at 435 stays on the newer page
   require(view.window_page() == 1 &&
               view.current().entries.size() == 1 &&
               view.current().entries.front().category == "Combat",
@@ -449,13 +455,13 @@ void recency_filtering() {
           "page_newer did not step forward");
   view.cycle_recency(); // 10y — page resets to 0
   require(view.window_page() == 0 &&
-              view.current().entries.size() == 4,
+              view.current().entries.size() == 5,
           "Window cycle did not reset the page");
   // Paging is inert without a bounded window.
   view.cycle_recency(); // all
   view.page_older();
   require(view.window_page() == 0 &&
-              view.current().entries.size() == 4,
+              view.current().entries.size() == 5,
           "Paging the all-history window did anything");
 }
 
