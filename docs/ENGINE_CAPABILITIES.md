@@ -142,7 +142,12 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   entity by authored name (doors, waypoints, triggers — "player" is just the
   conventional one); `host.sim_time()` reports deterministic elapsed sim
   seconds; `host.world_width()`/`world_height()` expose the resolved level
-  bounds for spawn limits, AI roam ranges and minimap math.
+  bounds for spawn limits, AI roam ranges and minimap math;
+  `host.screen_to_world(sx, sy)` maps pointer positions into the world
+  under the camera (aim, click-to-move) and `host.entity_at(sx, sy)`
+  hit-tests drawn bounds topmost-first (layer order, doc-order ties) with
+  per-entity parallax and zoom applied — HUD picks where it appears,
+  hidden entities and tilemap carriers never match.
 - **Named save blobs:** `host.save_data(key, bytes)`/`load_data(key)`
   persist arbitrary game state (quest flags, inventories, settings) under
   `saves/data/<key>.dat` — atomic writes through the same rotating `.bak`

@@ -265,6 +265,41 @@ int RuntimeHost::viewport_height() const {
 }
 float RuntimeHost::world_width() const { return impl_->world_w; }
 float RuntimeHost::world_height() const { return impl_->world_h; }
+std::pair<float, float> RuntimeHost::screen_to_world(float sx,
+                                                     float sy) const {
+  const float zoom = impl_->cam_zoom != 0.f ? impl_->cam_zoom : 1.f;
+  return {impl_->cam_x + sx / zoom, impl_->cam_y + sy / zoom};
+}
+std::optional<EntityId> RuntimeHost::entity_at(float screen_x,
+                                               float screen_y) const {
+  std::optional<EntityId> best;
+  int best_layer = 0;
+  for (const auto e : impl_->entities) {
+    const auto *t = impl_->world.get<Transform2D>(e);
+    const auto *ext = impl_->world.get<Extent2D>(e);
+    if (!t || !ext || impl_->world.get<Hidden>(e) != nullptr) continue;
+    // Hit-test the DRAWN rect: per-entity parallax + zoom apply, so
+    // screen-pinned HUD elements pick where they appear.
+    const auto *px = impl_->world.get<Parallax>(e);
+    const float parallax = px ? px->value : 1.f;
+    const float dx = (t->x - impl_->cam_x * parallax) * impl_->cam_zoom;
+    const float dy = (t->y - impl_->cam_y * parallax) * impl_->cam_zoom;
+    const float dw = ext->w * impl_->cam_zoom;
+    const float dh = ext->h * impl_->cam_zoom;
+    if (screen_x < dx || screen_x > dx + dw || screen_y < dy ||
+        screen_y > dy + dh)
+      continue;
+    // Iterating in document order means a later (on-top) entity within
+    // the same layer always replaces an earlier hit.
+    const auto *l = impl_->world.get<Layer>(e);
+    const int layer = l ? l->value : 0;
+    if (!best || layer >= best_layer) {
+      best = e;
+      best_layer = layer;
+    }
+  }
+  return best;
+}
 
 int RuntimeHost::run() {
   RuntimeDiagnostics::context("runtime:package-scan");

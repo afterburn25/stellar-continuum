@@ -177,6 +177,19 @@ public:
   // — spawn limits, AI roam ranges, minimap scaling.
   [[nodiscard]] float world_width() const;
   [[nodiscard]] float world_height() const;
+  // Converts a window-space point (event position, pointer) into world
+  // space under the current camera — click-to-move, aiming, picking.
+  // Assumes the gameplay plane (parallax 1).
+  [[nodiscard]] std::pair<float, float> screen_to_world(float sx,
+                                                        float sy) const;
+  // Topmost tracked entity whose drawn bounds contain a window-space
+  // point — highest layer wins, later document order breaks ties.
+  // Per-entity parallax and zoom are applied, so HUD (parallax 0) and
+  // world entities pick correctly under a moving camera. Hidden
+  // entities and tilemap carriers never match (query maps with
+  // tile_at).
+  [[nodiscard]] std::optional<EntityId> entity_at(float screen_x,
+                                                  float screen_y) const;
 
   // Spawns one entity at runtime (bullets, pickups, effects) — it joins the
   // tracked set: velocity integration, wall bounce, rendering, collisions.
