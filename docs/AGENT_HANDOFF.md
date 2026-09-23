@@ -123,8 +123,12 @@ scaling, upkeep/input draws, condition repair — see
 graphs with node supply/demand/storage, capacity edges, lazily rebuilt
 union-find component cache on topology dirtying, deterministic
 ascending-id greedy transport and unmet/saturation diagnostics — see
-[INFRASTRUCTURE_FRAMEWORK.md](INFRASTRUCTURE_FRAMEWORK.md). Next:
-Milestone 6 (strategic logistics), then planetary adapters; adopt the
+[INFRASTRUCTURE_FRAMEWORK.md](INFRASTRUCTURE_FRAMEWORK.md). Milestone 6
+landed: `LogisticsNetwork` (logistics.hpp) — waypoint nodes, explicit
+multi-leg `FreightRoute`s with transit days and in-flight capacity,
+deterministic dispatch queue and (eta,id) deliveries — see
+[LOGISTICS_FRAMEWORK.md](LOGISTICS_FRAMEWORK.md). Next: Milestone 7
+(planetary development adapters), then terraforming/civ-AI; adopt the
 executor for real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools

@@ -62,6 +62,30 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Strategic logistics framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 6 — freight
+  moving between settlements over explicit multi-leg routes with
+  transit time and route capacity. See
+  [LOGISTICS_FRAMEWORK.md](LOGISTICS_FRAMEWORK.md).
+- **Engine APIs/ownership:** `LogisticsNetwork` — caller-owned waypoint
+  nodes, `FreightRoute` explicit paths with per-leg transit days and
+  in-flight capacity, `dispatch`/`cancel` shipment queue draining in
+  ascending id order as capacity frees, `advance` delivering in
+  (eta, id) order. Cargo accounting stays with the owner (deliveries
+  are records, not inventory mutation); pathfinding stays with the
+  caller's routing engine.
+- **Consumers/tests:** `logistics` tests — route validation, transit
+  timing, capacity queueing, disabled-route hold/resume, cancellation
+  bounds, delivery ordering, bit-equal determinism, 20k-shipment scale.
+  Core lane/freight planner adoption pending.
+- **Save/performance impact:** routes/queue/transit are plain
+  caller-id data; `now()` plus the manifests serialize directly.
+  Per-advance cost is O(queue + transit).
+- **Limitations:** no pathfinding/rerouting; no per-leg positions,
+  convoy composition, edge loss/latency, or interdiction hooks;
+  `remove_route` loses in-flight cargo.
+
 ## Infrastructure flow networks (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 5 — reusable
