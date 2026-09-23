@@ -103,7 +103,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   shows per-fleet aggregate reports, cohort detail and whether the
   hostile fleet's position is interdiction-gated.
   Generated game projects scaffold a `SimulationExecutor` demo — new
-  games start with deterministic LOD scheduling wired into the loop.
+  games start with deterministic LOD scheduling wired into the loop —
+  plus a persistence example: the starter host captures/restores
+  `SimulationExecutor::State` through `framework_state_json` codecs into
+  `RuntimeHost::save_data`/`load_data` slots (F5/F9 alongside the world
+  quicksave, corrupt blobs fall back to fresh state), so the
+  capture→serialize→restore contract is demonstrated for game-defined
+  state rather than left as an undocumented gap.
 - **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase
   domains execute through the executor, empty campaigns advance safely,
   and scheduler state survives coordinator moves; the 28-case
