@@ -75,6 +75,7 @@ public:
   NativeNewCampaignGenerationController &
   operator=(NativeNewCampaignGenerationController &&) = delete;
 
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept;
   [[nodiscard]] NativeNewCampaignGenerationStart start(
       const NativePreparedNewCampaign &, std::filesystem::path research_root,
       std::filesystem::path catalog_path);

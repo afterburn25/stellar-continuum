@@ -31,37 +31,48 @@ std::vector<std::uint8_t> read_file(const std::filesystem::path&p,std::size_t li
 Json chunk_json(const AssetChunk&c){return Json{{"package",c.package},{"hash",c.hash},{"offset",c.offset},{"stored",c.stored_bytes},{"raw",c.raw_bytes},{"codec",static_cast<unsigned>(c.codec)},{"width",c.width},{"height",c.height}};}
 }
 std::string asset_path_utf8(const std::filesystem::path&p){const auto s=p.generic_u8string();return {s.begin(),s.end()};}
-std::vector<std::uint8_t> compress_asset_bytes(std::span<const std::uint8_t> bytes,AssetCodec& codec,bool rgba_predictor){
-  if(rgba_predictor&&bytes.size()>4&&bytes.size()%4==0){
-    auto direct=compress_asset_bytes(bytes,codec,false);std::vector<std::uint8_t> delta(bytes.begin(),bytes.end());
-    for(std::size_t i=4;i<bytes.size();++i)delta[i]=static_cast<std::uint8_t>(bytes[i]-bytes[i-4]);
-    AssetCodec predicted_codec{};auto predicted=compress_asset_bytes(delta,predicted_codec,false);
-    if(predicted_codec==AssetCodec::XpressHuff&&predicted.size()<direct.size()){codec=AssetCodec::XpressRgbaDelta;return predicted;}
-    return direct;
-  }
-  codec=AssetCodec::None;
-  if(bytes.empty())return {};
+namespace {
 #ifdef _WIN32
+std::vector<std::uint8_t> windows_compress(std::span<const std::uint8_t> bytes,DWORD algorithm){
   COMPRESSOR_HANDLE compressor{};
-  if(!CreateCompressor(COMPRESS_ALGORITHM_XPRESS_HUFF,nullptr,&compressor))throw std::runtime_error("XPRESS compressor unavailable");
+  if(!CreateCompressor(algorithm,nullptr,&compressor))return {};
   SIZE_T required{};Compress(compressor,bytes.data(),bytes.size(),nullptr,0,&required);
   std::vector<std::uint8_t> result(required);
   const auto ok=Compress(compressor,bytes.data(),bytes.size(),result.data(),result.size(),&required);CloseCompressor(compressor);
-  if(ok&&required+64<bytes.size()*95/100){result.resize(required);codec=AssetCodec::XpressHuff;return result;}
+  if(!ok||required+64>=bytes.size()*95/100)return {};
+  result.resize(required);return result;
+}
 #endif
-  return {bytes.begin(),bytes.end()};
+}
+std::vector<std::uint8_t> compress_asset_bytes(std::span<const std::uint8_t> bytes,AssetCodec& codec,bool rgba_predictor){
+  codec=AssetCodec::None;
+  if(bytes.empty())return {};
+  std::vector<std::uint8_t> best(bytes.begin(),bytes.end());
+#ifdef _WIN32
+  // Huffman-only coding is cheap but weak on image data; LZMS costs more cook
+  // time and is tried only where the bytes justify it (the RGBA8 path).
+  if(rgba_predictor)if(auto packed=windows_compress(bytes,COMPRESS_ALGORITHM_LZMS);!packed.empty()&&packed.size()<best.size()){best=std::move(packed);codec=AssetCodec::Lzms;}
+  if(auto packed=windows_compress(bytes,COMPRESS_ALGORITHM_XPRESS_HUFF);!packed.empty()&&packed.size()<best.size()){best=std::move(packed);codec=AssetCodec::XpressHuff;}
+  if(rgba_predictor&&bytes.size()>4&&bytes.size()%4==0){
+    std::vector<std::uint8_t> delta(bytes.begin(),bytes.end());
+    for(std::size_t i=4;i<bytes.size();++i)delta[i]=static_cast<std::uint8_t>(bytes[i]-bytes[i-4]);
+    if(auto packed=windows_compress(delta,COMPRESS_ALGORITHM_LZMS);!packed.empty()&&packed.size()<best.size()){best=std::move(packed);codec=AssetCodec::LzmsRgbaDelta;}
+    if(auto packed=windows_compress(delta,COMPRESS_ALGORITHM_XPRESS_HUFF);!packed.empty()&&packed.size()<best.size()){best=std::move(packed);codec=AssetCodec::XpressRgbaDelta;}
+  }
+#endif
+  return best;
 }
 std::vector<std::uint8_t> decompress_asset_bytes(std::span<const std::uint8_t> bytes,AssetCodec codec,std::size_t raw){
   if(raw>maximum_chunk)throw std::runtime_error("Asset chunk exceeds decompression budget");
-  if(codec==AssetCodec::XpressRgbaDelta){
+  if(codec==AssetCodec::XpressRgbaDelta||codec==AssetCodec::LzmsRgbaDelta){
     if(raw%4)throw std::runtime_error("Invalid RGBA predictor length");
-    auto out=decompress_asset_bytes(bytes,AssetCodec::XpressHuff,raw);
+    auto out=decompress_asset_bytes(bytes,codec==AssetCodec::LzmsRgbaDelta?AssetCodec::Lzms:AssetCodec::XpressHuff,raw);
     for(std::size_t i=4;i<out.size();++i)out[i]=static_cast<std::uint8_t>(out[i]+out[i-4]);
     return out;
   }
   if(codec==AssetCodec::None){if(bytes.size()!=raw)throw std::runtime_error("Uncompressed asset length mismatch");return {bytes.begin(),bytes.end()};}
 #ifdef _WIN32
-  if(codec==AssetCodec::XpressHuff){DECOMPRESSOR_HANDLE handle{};if(!CreateDecompressor(COMPRESS_ALGORITHM_XPRESS_HUFF,nullptr,&handle))throw std::runtime_error("XPRESS decompressor unavailable");std::vector<std::uint8_t> out(raw);SIZE_T actual{};const auto ok=Decompress(handle,bytes.data(),bytes.size(),out.data(),out.size(),&actual);CloseDecompressor(handle);if(!ok||actual!=raw)throw std::runtime_error("Invalid compressed asset chunk");return out;}
+  if(codec==AssetCodec::XpressHuff||codec==AssetCodec::Lzms){const auto algorithm=codec==AssetCodec::Lzms?COMPRESS_ALGORITHM_LZMS:COMPRESS_ALGORITHM_XPRESS_HUFF;DECOMPRESSOR_HANDLE handle{};if(!CreateDecompressor(algorithm,nullptr,&handle))throw std::runtime_error("Windows decompressor unavailable");std::vector<std::uint8_t> out(raw);SIZE_T actual{};const auto ok=Decompress(handle,bytes.data(),bytes.size(),out.data(),out.size(),&actual);CloseDecompressor(handle);if(!ok||actual!=raw)throw std::runtime_error("Invalid compressed asset chunk");return out;}
 #endif
   throw std::runtime_error("Unsupported package compression codec");
 }
@@ -87,7 +98,7 @@ AssetRegistry::AssetRegistry(const std::filesystem::path& manifest):impl_(std::m
   for(const auto&a:j.at("assets")){if(impl_->records.size()>=100000)throw std::runtime_error("Excessive asset count");AssetRecord r;r.id=a.at("id");r.type=a.at("type");r.subtype=a.at("subtype");r.format=a.at("format");r.source_hash=a.at("sourceHash");r.source_bytes=a.at("sourceBytes");r.aliases=a.at("aliases").get<std::vector<std::string>>();r.dependencies=a.at("dependencies").get<std::vector<std::string>>();r.width=a.at("width");r.height=a.at("height");r.canvas_width=a.at("canvasWidth");r.canvas_height=a.at("canvasHeight");r.crop_x=a.at("cropX");r.crop_y=a.at("cropY");r.quality_rmse=a.at("rmse");r.quality_max_error=a.at("maxError");
     auto add=[&](const std::string&name){safe_name(name);if(!impl_->lookup.emplace(normalized(name),impl_->records.size()).second)throw std::runtime_error("Duplicate asset ID/alias: "+name);};add(r.id);for(const auto&alias:r.aliases)if(normalized(alias)!=normalized(r.id))add(alias);
     for(const auto&c:a.at("chunks")){AssetChunk ch;ch.package=c.at("package");ch.hash=c.at("hash");ch.offset=c.at("offset");ch.stored_bytes=c.at("stored");ch.raw_bytes=c.at("raw");ch.codec=static_cast<AssetCodec>(c.at("codec").get<unsigned>());ch.width=c.at("width");ch.height=c.at("height");auto pi=packages.find(ch.package);
-      if(pi==packages.end()||ch.offset<16||ch.offset>pi->second||ch.stored_bytes>pi->second-ch.offset||ch.raw_bytes>maximum_chunk||ch.stored_bytes>maximum_chunk||static_cast<unsigned>(ch.codec)>2||!valid_hash(ch.hash)||(ch.codec==AssetCodec::None&&ch.raw_bytes!=ch.stored_bytes))throw std::runtime_error("Invalid chunk bounds/codec: "+r.id+" package="+ch.package+" offset="+std::to_string(ch.offset));r.chunks.push_back(std::move(ch));}
+      if(pi==packages.end()||ch.offset<16||ch.offset>pi->second||ch.stored_bytes>pi->second-ch.offset||ch.raw_bytes>maximum_chunk||ch.stored_bytes>maximum_chunk||static_cast<unsigned>(ch.codec)>4||!valid_hash(ch.hash)||(ch.codec==AssetCodec::None&&ch.raw_bytes!=ch.stored_bytes))throw std::runtime_error("Invalid chunk bounds/codec: "+r.id+" package="+ch.package+" offset="+std::to_string(ch.offset));r.chunks.push_back(std::move(ch));}
     if(r.chunks.empty()||r.chunks.size()>14||!valid_hash(r.source_hash)||!std::isfinite(r.quality_rmse)||r.quality_rmse<0||!std::isfinite(r.quality_max_error)||r.quality_max_error<0)throw std::runtime_error("Invalid asset metadata: "+r.id);
     if(r.type=="texture"){
       if(r.width<1||r.height<1||r.width>8192||r.height>8192||static_cast<std::uint64_t>(r.width)*r.height*4>64u*1024u*1024u||r.canvas_width<r.width||r.canvas_height<r.height||r.canvas_width>8192||r.canvas_height>8192||r.crop_x<0||r.crop_y<0||r.crop_x>r.canvas_width-r.width||r.crop_y>r.canvas_height-r.height)throw std::runtime_error("Invalid texture bounds: "+r.id);
@@ -118,6 +129,6 @@ std::shared_ptr<const AssetRegistry> mounted_asset_registry(){std::lock_guard lo
 std::string asset_alias(const std::filesystem::path&p){std::lock_guard lock(mount_mutex);if(!p.is_absolute())return asset_path_utf8(p.lexically_normal());return asset_path_utf8(p.lexically_normal().lexically_relative(mount_root));}
 bool resource_exists(const std::filesystem::path&p){auto r=mounted_asset_registry();if(r&&r->find(asset_alias(p)))return true;{std::lock_guard lock(mount_mutex);if(r&&!fallback)return false;}return std::filesystem::is_regular_file(p);}
 std::vector<std::uint8_t> read_resource(const std::filesystem::path&p,std::size_t maximum){auto r=mounted_asset_registry();if(r){if(const auto*a=r->find(asset_alias(p))){if(a->chunks.front().raw_bytes>maximum)throw std::runtime_error("Resource exceeds requested budget: "+a->id);return r->read(*a);}std::lock_guard lock(mount_mutex);if(!fallback)throw std::runtime_error("Missing cooked asset (source fallback disabled): "+asset_path_utf8(p));}return read_file(p,maximum);}
-std::istringstream resource_stream(const std::filesystem::path&p){auto b=read_resource(p);return std::istringstream(std::string(b.begin(),b.end()));}
+std::istringstream resource_stream(const std::filesystem::path&p){if(!resource_exists(p)){std::istringstream s;s.setstate(std::ios_base::failbit);return s;}auto b=read_resource(p);return std::istringstream(std::string(b.begin(),b.end()));}
 }
 

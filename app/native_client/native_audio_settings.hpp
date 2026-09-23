@@ -1,11 +1,13 @@
 #pragma once
 #include "native_menu_hover.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace stellar::native_audio {
@@ -42,6 +44,7 @@ class NativeAudioSettings final {
   void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_video_navigation(Confirm callback) { require_owner(); video_navigation_ = std::move(callback); }
   void set_general_navigation(Confirm callback) { require_owner(); general_navigation_ = std::move(callback); }
+  void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   [[nodiscard]] bool visible() const;
   // While visible this consumes every event, including events outside the panel.
@@ -62,6 +65,7 @@ class NativeAudioSettings final {
   void save();
   void set_from_track(Dragged, stellar::native_map::Point,
                       const AudioSettingsLayout&);
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
 
   std::thread::id owner_{std::this_thread::get_id()};
   std::filesystem::path path_;
@@ -78,6 +82,7 @@ class NativeAudioSettings final {
   int viewport_width_{};
   int viewport_height_{};
   bool save_diagnostic_emitted_{};
+  const stellar::engine::LocalizationTable* locale_{};
 };
 
 } // namespace stellar::native_audio

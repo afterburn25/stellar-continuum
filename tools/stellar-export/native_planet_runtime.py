@@ -29,6 +29,6 @@ def native_planet_asset_files(root):
         if digest!=record['sha256']:raise RuntimeError(f'Prepared planet map changed: {relative}')
         result[relative]=path
     for name in ('planet-art-v1.json','planet-types-v1.json'):
-        relative='data/planets/'+name;result[relative]=root/relative
+        relative='Data/planets/'+name;result[relative]=root/('data/planets/'+name)
     result['export/native-planet-assets.json']=root/'export/native-planet-assets.json'
     return result

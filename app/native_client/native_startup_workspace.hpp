@@ -10,7 +10,10 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_startup_ui {
 
@@ -55,6 +58,10 @@ public:
   // presents the value it is given.
   void set_build_label(std::string value) { build_label_ = std::move(value); }
   void set_diagnostics(std::string value) { diagnostics_ = std::move(value); }
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+    setup_.set_localization(table);
+  }
   void set_return_to_campaign_available(bool available) noexcept;
   void set_continue_save(std::filesystem::path value) {continue_save_=std::move(value);}
   void show_setup() noexcept;
@@ -78,6 +85,8 @@ public:
 
 private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
   void reset_pointer() noexcept;
   StartupScreen screen_{StartupScreen::Entry};
   stellar::native_setup_ui::NativeNewGameWorkspace setup_;
@@ -95,5 +104,6 @@ private:
   std::filesystem::path continue_save_;
   stellar::native_map::Point pointer_{};
   bool return_to_campaign_available_{};
+  const stellar::engine::LocalizationTable *locale_{};
 };
 } // namespace stellar::native_startup_ui

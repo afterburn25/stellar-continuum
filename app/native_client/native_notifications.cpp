@@ -44,6 +44,20 @@ std::string upper(std::string value) {
   return value;
 }
 
+std::string resolve(const stellar::engine::LocalizationTable* locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+// Categories are stable publisher IDs (they also drive category_color), so the
+// catalog key derives from the ID and only the displayed label is translated.
+std::string category_label(const std::string& category,
+                           const stellar::engine::LocalizationTable* locale) {
+  return upper(resolve(locale, "NOTIFY_CATEGORY_" + upper(category), category));
+}
+
 bool intersects(UiRect a, UiRect b) noexcept {
   return a.x < b.x + b.width && a.x + a.width > b.x &&
          a.y < b.y + b.height && a.y + a.height > b.y;
@@ -96,7 +110,8 @@ void clipped_text(DrawList& out, Point at, std::string value, Color color, int p
 NotificationLayout notification_layout_for(const std::deque<NativePlayerNotification>& items,
                                            int width, int height,
                                            const TextMeasurer& text_measurer,
-                                           float requested_scroll) {
+                                           float requested_scroll,
+                                           const stellar::engine::LocalizationTable* locale) {
   NotificationLayout layout;
   if (width <= 0 || height <= 0) return layout;
   const float sw = static_cast<float>(width), sh = static_cast<float>(height);
@@ -124,7 +139,7 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
     const std::size_t index = items.size() - 1 - reverse;
     const auto& item = items[index];
     const UiRect measure_clip{0, 0, std::max(1.f, layout.list_viewport.width - card_pad * 2.f), 1.f};
-    const Text metadata{{}, upper(item.category) + "  " + item.date,
+    const Text metadata{{}, category_label(item.category, locale) + "  " + item.date,
                         category_color(item.category), small_pixels,
                         measure_clip.width, std::nullopt, TextAlign::Left,
                         FontFace::Interface};
@@ -194,7 +209,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   NotificationViewCommand command{};
   if (!visible_) return command;
   pointer_ = event.position;
-  auto layout = notification_layout_for(items, width, height, measure_, scroll_);
+  auto layout = notification_layout_for(items, width, height, measure_, scroll_, locale_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) { close(); command.kind = NotificationViewCommandKind::Close; command.captured = true; return command; }
   if (event.type == native_map::InputEventType::PointerCancelled) { const bool captured = pointer_captured_; cancel_press(); command.captured = captured; return command; }
@@ -264,16 +279,17 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
 void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayerNotification>& items,
                                     int width, int height) const {
   if (!visible_) return;
-  const auto layout = notification_layout_for(items, width, height, measure_, scroll_);
+  const auto layout = notification_layout_for(items, width, height, measure_, scroll_, locale_);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out,layout.panel,s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
-  const Text title_probe{{}, "RECENT EVENTS", title_color, title_pixels, 0.f,
+  const auto title_text = resolve(locale_, "NOTIFY_TITLE", "RECENT EVENTS");
+  const Text title_probe{{}, title_text, title_color, title_pixels, 0.f,
                          std::nullopt, TextAlign::Left, FontFace::Interface};
   const auto title_extent = measure(measure_, title_probe);
   clipped_text(out, {layout.header.x,
                      layout.header.y + (layout.header.height - title_extent.height) * .5f},
-               "RECENT EVENTS", title_color, title_pixels, 0.f, layout.header);
+               title_text, title_color, title_pixels, 0.f, layout.header);
   stellar::engine::ui_skin::control(out,layout.close_button,layout.close_button.contains(pointer_),false,true,s);
   const int close_pixels = std::max(10, static_cast<int>(std::lround(12.f * s)));
   const Text close_probe{{}, "X", muted_color, close_pixels, 0.f,
@@ -283,27 +299,28 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                      layout.close_button.y + (layout.close_button.height - close_extent.height) * .5f},
                "X", muted_color, close_pixels, 0.f, layout.close_button, TextAlign::Center);
   clipped_text(out, {layout.list_viewport.x, layout.header.y + layout.header.height + 13.f * s},
-               "Recent reports from your empire.", muted_color,
+               resolve(locale_, "NOTIFY_SUBTITLE", "Recent reports from your empire."), muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))), layout.list_viewport.width, layout.panel);
-  if (items.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, "No major events yet.", muted_color,
+  if (items.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, resolve(locale_, "NOTIFY_EMPTY", "No major events yet."), muted_color,
       std::max(11, static_cast<int>(std::lround(13.f * s))), layout.empty_hint.width, layout.empty_hint); return; }
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto& entry = layout.entries[i]; if (!intersects(entry.bounds, layout.list_viewport)) continue;
     const auto& item = items[entry.item_index];
     stellar::engine::ui_skin::surface(out,entry.bounds,s,false,layout.list_viewport);
-    clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y}, upper(item.category) + "  " + item.date,
+    clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y}, category_label(item.category, locale_) + "  " + item.date,
                  category_color(item.category), std::max(9, static_cast<int>(std::lround(11.f * s))), entry.metadata_bounds.width, layout.list_viewport);
     clipped_text(out, {entry.message_bounds.x, entry.message_bounds.y}, item.message, message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))), entry.message_bounds.width, layout.list_viewport);
     if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button)) { stellar::engine::ui_skin::control(out,*entry.contact_button,entry.contact_button->contains(pointer_),false,true,s);
       const int action_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));
-      const Text action_probe{{}, "OPEN RELATIONS", title_color, action_pixels,
+      const auto action_text = resolve(locale_, "NOTIFY_OPEN_RELATIONS", "OPEN RELATIONS");
+      const Text action_probe{{}, action_text, title_color, action_pixels,
                               entry.contact_button->width - 4.f * s,
                               std::nullopt, TextAlign::Center, FontFace::Interface};
       const auto action_extent = measure(measure_, action_probe);
       clipped_text(out, {entry.contact_button->x + entry.contact_button->width * .5f,
                          entry.contact_button->y + (entry.contact_button->height - action_extent.height) * .5f},
-        "OPEN RELATIONS", title_color, action_pixels, entry.contact_button->width - 4.f * s,
+        action_text, title_color, action_pixels, entry.contact_button->width - 4.f * s,
         *entry.contact_button, TextAlign::Center); }
   }
   if (layout.max_scroll > 0.f) { const float thumb_h = std::max(16.f * s, layout.list_viewport.height * layout.list_viewport.height / layout.content_height);

@@ -9,6 +9,8 @@
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/galaxy_payload_persistence.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -24,6 +26,7 @@
 #include <string>
 #include <string_view>
 #include <typeinfo>
+#include <unordered_set>
 #include <utility>
 
 // Reuse the accepted current-format aggregate decoder and raw-state projections

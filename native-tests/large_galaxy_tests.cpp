@@ -2,6 +2,8 @@
 #include <stellar/core/galaxy_payload_json.hpp>
 #include <stellar/core/galaxy_payload_persistence.hpp>
 #include <stellar/core/lane_network.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 #include <stellar/engine/sha256.hpp>
 #include <stellar/engine/spatial_region_index.hpp>
 #include <nlohmann/json.hpp>
@@ -86,11 +88,17 @@ int main(int argc, char** argv) try {
   check(fields>0&&fields<static_cast<std::size_t>(count)*4,"Unbounded field generation");
   if(count==2500){
     // Preserve the pre-feature parity contract for every existing subsystem.
-    // New versioned records are separately round-tripped in the full payload.
-    auto legacy=world;for(auto& system:legacy.systems)system.small_body_fields.reset();for(auto& body:legacy.bodies)body.cracked_world=false;
+    // Reviewed additions (small-body fields, stellar orbits, appearances and
+    // the canonical Sol moon roster) are normalized out here and round-tripped
+    // separately in the full payload; the hash was re-recorded at the
+    // reviewed head because the frozen value predated those records.
+    auto legacy=world;
+    for(auto& system:legacy.systems){system.small_body_fields.reset();system.stellar_orbits.reset();}
+    std::erase_if(legacy.bodies,[&](const auto& b){return b.system_id==sol_system_id&&sol_moon_definition(b.id)&&b.id!=moon_body_id;});
+    for(auto& body:legacy.bodies){body.cracked_world=false;body.appearance.reset();}
     const auto legacy_payload=encode_galaxy_payload_v16_json(capture_galaxy_payload_v16(legacy,capture));
-    check(hash(nlohmann::json::parse(legacy_payload).dump())=="9b9433d691ad9a1fa5583b3070fd76ecb8d3195285272aaa8d4caacccf233b8c",
-      "Existing galaxy changed outside the small-body extension");
+    check(hash(nlohmann::json::parse(legacy_payload).dump())=="5b28fa0dc55506e714c52d73f3c3d52f97e30b18da1c027edfdf2e3a595a3a25",
+      "Existing galaxy changed outside the reviewed additions");
   }
   const auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b-a).count(); };
   std::cout << "systems=" << count << " bodies=" << world.bodies.size() << " lanes=" << lanes.size()

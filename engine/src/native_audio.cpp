@@ -128,8 +128,11 @@ std::span<const float> AudioClip::samples() const noexcept { return samples_; }
 std::size_t AudioClip::byte_size() const noexcept { return samples_.size() * sizeof(float); }
 std::uint64_t AudioClip::sample_frames() const noexcept { return samples_.size() / audio_channels; }
 
-std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& path) {
-  const auto encoded=read_resource(path,maximum_source_audio_bytes);if(encoded.empty())throw std::runtime_error("Empty audio asset");
+namespace {
+
+std::shared_ptr<const AudioClip> decode_audio_clip_impl(
+    std::span<const std::uint8_t> encoded, const std::filesystem::path& path) {
+  if(encoded.empty())throw std::runtime_error("Empty audio asset");
   ComApartment apartment(path);
   using Microsoft::WRL::ComPtr;
   ComPtr<IMFAttributes> reader_attributes;
@@ -210,6 +213,19 @@ std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& 
     sample = std::clamp(sample, -1.0f, 1.0f);
   }
   return AudioClip::create(std::move(decoded));
+}
+
+} // namespace
+
+std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& path) {
+  return decode_audio_clip_impl(
+      read_resource(path, maximum_source_audio_bytes), path);
+}
+
+std::shared_ptr<const AudioClip> decode_audio_clip(
+    std::span<const std::uint8_t> encoded,
+    const std::filesystem::path& label) {
+  return decode_audio_clip_impl(encoded, label);
 }
 
 struct AudioOutput::Storage {

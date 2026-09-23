@@ -2,8 +2,10 @@
 
 #include "native_construction_controller.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -53,6 +55,10 @@ public:
   [[nodiscard]] bool confirmation_open() const noexcept {
     return cancel_confirmation_id_.has_value();
   }
+  void
+  set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   void set_view(stellar::native_construction::NativeConstructionView view);
   void discard_campaign();
   void set_notice(std::string message, bool accepted);
@@ -74,7 +80,17 @@ private:
   selected_project() const noexcept;
   void reconcile_selection();
   void rebuild_status_order();
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
+  [[nodiscard]] std::string state_label(
+      const stellar::native_construction::NativeConstructionProject &) const;
+  [[nodiscard]] std::string
+  category_label(stellar::core::ConstructionCategory) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};
   stellar::native_map::Point pointer_{};
   std::optional<stellar::native_construction::NativeConstructionView> view_;

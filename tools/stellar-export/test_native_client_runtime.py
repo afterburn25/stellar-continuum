@@ -13,8 +13,10 @@ from native_client_runtime import (_validate_capture, copy_native_client_runtime
                                    validate_native_client_export)
 from native_celestial_runtime import NATIVE_CELESTIAL_SOURCES
 from native_species_runtime import NATIVE_SPECIES_SOURCES
+from native_voice_runtime import NATIVE_VOICE_SOURCES
 from native_startup_art_runtime import NATIVE_STARTUP_ART_SOURCES
 from native_galaxy_art_runtime import NATIVE_GALAXY_ART_SOURCES
+from native_leader_art_runtime import NATIVE_LEADER_ART_SOURCES
 from native_ship_art_runtime import NATIVE_SHIP_ART_SOURCES
 from native_audio_assets import NATIVE_AUDIO_SOURCES
 from native_navigation_assets import SOURCES as NATIVE_NAVIGATION_SOURCES
@@ -174,6 +176,15 @@ class NativeClientDependencyTests(unittest.TestCase):
         manifest_path = self.root / "data/stellar/phenomenon-art-v1.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(phenomenon_manifest))
+        leader_art_records = {}
+        for key, (source, destination) in NATIVE_LEADER_ART_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only leader art " + key).encode())
+            leader_art_records[key] = {"source": source, "runtimePath": destination,
+                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.leader_art_declaration = self.root / "export/native-leader-art-assets.json"
+        self.leader_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":leader_art_records}))
         ship_art_records = {}
         for key, (source, destination) in NATIVE_SHIP_ART_SOURCES.items():
             asset = fixture_asset(source, "ship art " + key)
@@ -181,6 +192,92 @@ class NativeClientDependencyTests(unittest.TestCase):
                                       "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
         self.ship_art_declaration = self.root / "export/native-ship-art-assets.json"
         self.ship_art_declaration.write_text(json.dumps({"schemaVersion":1,"assets":ship_art_records}))
+        voice_records = {}
+        for key, (source, destination) in NATIVE_VOICE_SOURCES.items():
+            asset = self.root / source
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(("test-only voice " + key).encode())
+            voice_records[key] = {"source": source, "runtimePath": destination,
+                                  "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()}
+        self.voice_declaration = self.root / "export/native-voice-assets.json"
+        self.voice_declaration.write_text(json.dumps({"schemaVersion":1,"assets":voice_records}))
+
+        planet_art = {"assets": [{"id": "approved", "materialId": "approved",
+                                "status": "accepted", "earthGeography": False}],
+                    "rejectedAssets": [{"id": "rejected", "status": "rejected",
+                                        "reason": "Wrong surface"}]}
+        (self.root / "data/planets").mkdir(parents=True, exist_ok=True)
+        (self.root / "data/planets/planet-art-v1.json").write_text(json.dumps(planet_art))
+        (self.root / "data/planets/planet-types-v1.json").write_text("{}")
+        planet_records = []
+        for name in ("albedo", "normal", "properties", "clouds", "emission", "thumbnail"):
+            relative = f"assets/visual/planets/approved/{name}.png"
+            asset = fixture_asset(relative, "planet map " + name)
+            planet_records.append({"path": relative,
+                                   "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()})
+        (self.root / "export/native-planet-assets.json").write_text(
+            json.dumps({"schemaVersion": 1, "files": planet_records}))
+
+        # Environment package: a reviewed ring family, one approved starfield
+        # background, the Pluto map set and the audit registries the packager
+        # ships as data.
+        (self.root / "data/planets").mkdir(parents=True, exist_ok=True)
+        (self.root / "data/stellar").mkdir(parents=True, exist_ok=True)
+        (self.root / "data/planets/ring-types-v1.json").write_text(
+            json.dumps({"assets": [{"id": "ice", "status": "accepted"}]}))
+        starfield_rel = "assets/visual/starfields/fixture-sky.png"
+        starfield_asset = fixture_asset(starfield_rel, "starfield")
+        starfield_hash = hashlib.sha256(starfield_asset.read_bytes()).hexdigest()
+        (self.root / "data/stellar/starfields-v1.json").write_text(
+            json.dumps({"assets": [{"id": "fixture-sky", "path": starfield_rel}]}))
+        (self.root / "data/stellar/starfield-asset-audit-v1.json").write_text(
+            json.dumps({"images": [{"id": "fixture-sky", "path": starfield_rel,
+                                    "accepted": True, "sha256": starfield_hash}]}))
+        for name in ("giant-asset-audit-v1.json", "ring-asset-audit-v1.json",
+                     "deprecated-giant-art-v1.json"):
+            (self.root / "data/planets" / name).write_text("{}")
+        environment_paths = [starfield_rel, "assets/visual/rings/ice/radial.png"]
+        for name in ("albedo", "normal", "properties", "clouds", "emission", "thumbnail"):
+            environment_paths.append(f"assets/visual/planets/sol-pluto-v2/{name}.png")
+        environment_records = []
+        for relative in environment_paths:
+            asset = fixture_asset(relative, "environment")
+            environment_records.append({"path": relative,
+                                        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()})
+        (self.root / "export/native-environment-assets.json").write_text(
+            json.dumps({"schemaVersion": 1, "files": environment_records}))
+
+        # Stellar artwork manifest, population registry and the 204-entry
+        # eruption sequence registry (empty texture lists need no files).
+        stellar_dir = self.root / "assets/visual/stellar"
+        stellar_dir.mkdir(parents=True, exist_ok=True)
+        (stellar_dir / "fixture-close.png").write_bytes(b"close")
+        (stellar_dir / "fixture-far.png").write_bytes(b"far")
+        (stellar_dir / "manifest.json").write_text(json.dumps({
+            "version": 1,
+            "files": [{"filename": "fixture-close.png",
+                       "sha256": hashlib.sha256(b"close").hexdigest()},
+                      {"filename": "fixture-far.png",
+                       "sha256": hashlib.sha256(b"far").hexdigest()}],
+            "objects": [{"objectType": "m-red-dwarf-quiet",
+                         "closeAsset": "fixture-close.png",
+                         "distanceAsset": "fixture-far.png"},
+                        {"objectType": "central-supermassive-black-hole",
+                         "closeAsset": "fixture-close.png",
+                         "distanceAsset": "fixture-far.png"}]}))
+        (self.root / "data/stellar/population-v1.json").write_text(
+            json.dumps({"objects": []}))
+        (self.root / "data/stellar/population-profiles-v1.json").write_text("{}")
+        (self.root / "data/stellar/stellar-activity-v1.json").write_text("{}")
+        eruption_root = self.root / "assets/visual/stellar-eruptions"
+        eruption_root.mkdir(parents=True, exist_ok=True)
+        (eruption_root / "manifest.json").write_text(json.dumps(
+            {"schemaVersion": 1,
+             "visualSets": [{"textures": []} for _ in range(204)]}))
+        (self.root / "docs").mkdir(parents=True, exist_ok=True)
+        for doc in ("stellar-asset-validation.md", "stellar-generation-validation.md",
+                    "stellar-population-profiles.md"):
+            (self.root / "docs" / doc).write_text("fixture")
 
         audio_records = {}
         for key, (source, destination) in NATIVE_AUDIO_SOURCES.items():
@@ -417,20 +514,26 @@ class NativeClientDependencyTests(unittest.TestCase):
             with self.subTest(source=source):
                 path = self.root / source
                 original = path.read_bytes()
-                path.unlink()
-                with self.assertRaisesRegex(RuntimeError, "Missing native galaxy art"):
-                    self.copy()
-                path.write_bytes(original)
+                try:
+                    path.unlink()
+                    # The galaxy card is shared with the startup manifest whose
+                    # earlier check reports the deletion first.
+                    with self.assertRaisesRegex(RuntimeError, "Missing native (galaxy|startup) art"):
+                        self.copy()
+                finally:
+                    path.write_bytes(original)
 
     def test_tampered_galaxy_art_blocks_package(self):
         for source, destination in NATIVE_GALAXY_ART_SOURCES.values():
             with self.subTest(source=source):
                 path = self.root / source
                 original = path.read_bytes()
-                path.write_bytes(b"altered")
-                with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
-                    self.copy()
-                path.write_bytes(original)
+                try:
+                    path.write_bytes(b"altered")
+                    with self.assertRaisesRegex(RuntimeError, "differs from reviewed content"):
+                        self.copy()
+                finally:
+                    path.write_bytes(original)
 
     def test_galaxy_art_paths_cannot_expand_package_scope(self):
         original = self.galaxy_art_declaration.read_text()

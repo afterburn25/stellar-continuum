@@ -1,16 +1,24 @@
 #pragma once
 #include "native_audio_director.hpp"
+#include "native_voice_playback.hpp"
 #include <stellar/engine/native_map_platform.hpp>
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace stellar::native_audio {
 template<class Measure>
 void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirector* audio,
-                          int width,int height,Measure measure) {
+                          int width,int height,Measure measure,
+                          const stellar::native_voice::NativeVoicePlayback* playback=nullptr) {
   using namespace stellar::native_map;
   if(!audio)return;
-  const auto current=audio->caption();if(!current)return;
+  std::optional<VoiceCaption> current;
+  if(playback&&playback->has_active_subtitle())
+    current=VoiceCaption{playback->active_speaker_name(),playback->active_subtitle(),
+                         std::chrono::steady_clock::now()+std::chrono::seconds(1)};
+  if(!current)current=audio->caption();
+  if(!current)return;
   const auto preferences=audio->voice_preferences();
   const float scale=std::clamp(height/1080.f,.8f,2.5f);
   const int pixels=std::max(12,static_cast<int>(std::lround(preferences.subtitle_size*scale)));

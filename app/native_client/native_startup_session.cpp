@@ -1,6 +1,7 @@
 #include "native_startup_session.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -35,6 +36,13 @@ bool terminal(NativeStartupPhase phase) {
   return phase == NativeStartupPhase::Failed ||
          phase == NativeStartupPhase::Cancelled ||
          phase == NativeStartupPhase::Consumed;
+}
+
+std::string tr(const stellar::engine::LocalizationTable *locale,
+               std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
 }
 } // namespace
 
@@ -133,6 +141,7 @@ struct NativeStartupSessionController::Storage {
   mutable std::mutex mutex;
   std::uint64_t next_id{1}, request_id{}, revision{}, generation_id{};
   NativeStartupPhase phase{NativeStartupPhase::Idle};
+  const stellar::engine::LocalizationTable *locale{nullptr};
   std::string status{"No startup operation is active."};
   std::optional<double> progress;
   bool cancel_requested{};
@@ -161,6 +170,12 @@ NativeStartupSessionController::~NativeStartupSessionController() {
   if (storage_->loader.joinable()) storage_->loader.join();
 }
 
+void NativeStartupSessionController::set_localization(
+    const stellar::engine::LocalizationTable *table) noexcept {
+  storage_->locale = table;
+  storage_->generation.set_localization(table);
+}
+
 void NativeStartupSessionController::set_developer_mode(bool enabled) {
   storage_->require_owner();
   const auto current=poll();
@@ -174,11 +189,11 @@ NativeStartupStart NativeStartupSessionController::start_new(
     std::string game_version) {
   storage_->require_owner();
   if(prepared.developer_mode()!=storage_->dependencies.developer_session)
-    return {false,0,"Prepared campaign mode does not match the startup session."};
+    return {false,0,tr(storage_->locale,"STARTUP_ERR_MODE_MISMATCH","Prepared campaign mode does not match the startup session.")};
   require_path(configured_default_save, "A configured campaign save path is required.");
   const auto current = poll();
   if (current.phase != NativeStartupPhase::Idle && !terminal(current.phase))
-    return {false, current.request_id, "Finish or cancel the current startup operation first."};
+    return {false, current.request_id, tr(storage_->locale,"STARTUP_ERR_BUSY","Finish or cancel the current startup operation first.")};
   if (storage_->loader.joinable()) storage_->loader.join();
   const auto started = storage_->generation.start(prepared, research_root, catalog_path);
   std::lock_guard lock(storage_->mutex);
@@ -206,7 +221,7 @@ NativeStartupStart NativeStartupSessionController::start_load(
   require_path(selected_save, "A selected campaign save path is required.");
   const auto current = poll();
   if (current.phase != NativeStartupPhase::Idle && !terminal(current.phase))
-    return {false, current.request_id, "Finish or cancel the current startup operation first."};
+    return {false, current.request_id, tr(storage_->locale,"STARTUP_ERR_BUSY","Finish or cancel the current startup operation first.")};
   if (storage_->loader.joinable()) storage_->loader.join();
   std::uint64_t id;
   {
@@ -220,7 +235,7 @@ NativeStartupStart NativeStartupSessionController::start_load(
     storage_->loaded.reset();
     storage_->ready_session.reset();
     storage_->phase = NativeStartupPhase::LoadingSave;
-    storage_->status = "Loading the selected campaign save.";
+    storage_->status = tr(storage_->locale,"STARTUP_STATUS_LOADING","Loading the selected campaign save.");
     storage_->progress = 0.;
     ++storage_->revision;
   }
@@ -246,11 +261,11 @@ NativeStartupStart NativeStartupSessionController::start_load(
         std::lock_guard lock(state->mutex);
         if (state->request_id != id || state->cancel_requested) {
           state->phase = NativeStartupPhase::Cancelled;
-          state->status = "Startup load was discarded.";
+          state->status = tr(state->locale,"STARTUP_LOAD_DISCARDED","Startup load was discarded.");
         } else {
           state->loaded.emplace(std::move(loaded));
           state->phase = NativeStartupPhase::AwaitingOwnerActivation;
-          state->status = "Save restored and awaiting owner-thread activation.";
+          state->status = tr(state->locale,"STARTUP_LOAD_AWAITING","Save restored and awaiting owner-thread activation.");
           state->progress = 1.;
         }
         ++state->revision;
@@ -259,33 +274,33 @@ NativeStartupStart NativeStartupSessionController::start_load(
         state->phase = state->cancel_requested ? NativeStartupPhase::Cancelled
                                                : NativeStartupPhase::Failed;
         state->status = state->cancel_requested
-                            ? "Startup load was discarded."
-                            : std::string{"Campaign load failed: "} + error.what();
+                            ? tr(state->locale,"STARTUP_LOAD_DISCARDED","Startup load was discarded.")
+                            : tr(state->locale,"STARTUP_LOAD_FAILED","Campaign load failed: ") + error.what();
         ++state->revision;
       } catch (...) {
         std::lock_guard lock(state->mutex);
         state->phase = state->cancel_requested ? NativeStartupPhase::Cancelled
                                                : NativeStartupPhase::Failed;
         state->status = state->cancel_requested
-                            ? "Startup load was discarded."
-                            : "Campaign load failed: unknown error.";
+                            ? tr(state->locale,"STARTUP_LOAD_DISCARDED","Startup load was discarded.")
+                            : tr(state->locale,"STARTUP_LOAD_FAILED_UNKNOWN","Campaign load failed: unknown error.");
         ++state->revision;
       }
     });
   } catch (const std::exception &error) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeStartupPhase::Failed;
-    storage_->status = std::string{"Campaign load failed to start: "} + error.what();
+    storage_->status = tr(storage_->locale,"STARTUP_LOAD_START_FAILED","Campaign load failed to start: ") + error.what();
     ++storage_->revision;
     return {false, id, storage_->status};
   } catch (...) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeStartupPhase::Failed;
-    storage_->status = "Campaign load failed to start: unknown error.";
+    storage_->status = tr(storage_->locale,"STARTUP_LOAD_START_UNKNOWN","Campaign load failed to start: unknown error.");
     ++storage_->revision;
     return {false, id, storage_->status};
   }
-  return {true, id, "Campaign load started."};
+  return {true, id, tr(storage_->locale,"STARTUP_LOAD_STARTED","Campaign load started.")};
 }
 
 void NativeStartupSessionController::service() {
@@ -335,7 +350,7 @@ void NativeStartupSessionController::service() {
       {
         std::lock_guard lock(storage_->mutex);
         storage_->phase = NativeStartupPhase::Activating;
-        storage_->status = "Creating the campaign session on its owner thread.";
+        storage_->status = tr(storage_->locale,"STARTUP_ACTIVATING","Creating the campaign session on its owner thread.");
         ++storage_->revision;
       }
       auto runtime = storage_->generation.activate_ready(generation_id);
@@ -347,22 +362,22 @@ void NativeStartupSessionController::service() {
       std::lock_guard lock(storage_->mutex);
       if (storage_->request_id != id || storage_->cancel_requested) {
         storage_->phase = NativeStartupPhase::Cancelled;
-        storage_->status = "Generated campaign session was discarded.";
+        storage_->status = tr(storage_->locale,"STARTUP_SESSION_DISCARDED","Generated campaign session was discarded.");
       } else {
         storage_->ready_session = std::move(session);
         storage_->phase = NativeStartupPhase::Ready;
-        storage_->status = "New campaign session is ready.";
+        storage_->status = tr(storage_->locale,"STARTUP_SESSION_READY","New campaign session is ready.");
       }
       ++storage_->revision;
     } catch (const std::exception &error) {
       std::lock_guard lock(storage_->mutex);
       storage_->phase = NativeStartupPhase::Failed;
-      storage_->status = std::string{"Campaign activation failed: "} + error.what();
+      storage_->status = tr(storage_->locale,"STARTUP_ACTIVATION_FAILED","Campaign activation failed: ") + error.what();
       ++storage_->revision;
     } catch (...) {
       std::lock_guard lock(storage_->mutex);
       storage_->phase = NativeStartupPhase::Failed;
-      storage_->status = "Campaign activation failed: unknown error.";
+      storage_->status = tr(storage_->locale,"STARTUP_ACTIVATION_UNKNOWN","Campaign activation failed: unknown error.");
       ++storage_->revision;
     }
     return;
@@ -377,7 +392,7 @@ void NativeStartupSessionController::service() {
     if (storage_->phase != NativeStartupPhase::AwaitingOwnerActivation ||
         !storage_->loaded) return;
     storage_->phase = NativeStartupPhase::Activating;
-    storage_->status = "Creating the loaded campaign session on its owner thread.";
+    storage_->status = tr(storage_->locale,"STARTUP_ACTIVATING_LOADED","Creating the loaded campaign session on its owner thread.");
     loaded = std::move(storage_->loaded);
     research = storage_->research_root;
     save = storage_->save_path;
@@ -392,22 +407,22 @@ void NativeStartupSessionController::service() {
     std::lock_guard lock(storage_->mutex);
     if (storage_->request_id != id || storage_->cancel_requested) {
       storage_->phase = NativeStartupPhase::Cancelled;
-      storage_->status = "Loaded campaign session was discarded.";
+      storage_->status = tr(storage_->locale,"STARTUP_LOADED_DISCARDED","Loaded campaign session was discarded.");
     } else {
       storage_->ready_session = std::move(session);
       storage_->phase = NativeStartupPhase::Ready;
-      storage_->status = "Loaded campaign session is ready.";
+      storage_->status = tr(storage_->locale,"STARTUP_LOADED_READY","Loaded campaign session is ready.");
     }
     ++storage_->revision;
   } catch (const std::exception &error) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeStartupPhase::Failed;
-    storage_->status = std::string{"Campaign activation failed: "} + error.what();
+    storage_->status = tr(storage_->locale,"STARTUP_ACTIVATION_FAILED","Campaign activation failed: ") + error.what();
     ++storage_->revision;
   } catch (...) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeStartupPhase::Failed;
-    storage_->status = "Campaign activation failed: unknown error.";
+    storage_->status = tr(storage_->locale,"STARTUP_ACTIVATION_UNKNOWN","Campaign activation failed: unknown error.");
     ++storage_->revision;
   }
 }
@@ -440,8 +455,8 @@ bool NativeStartupSessionController::cancel(const std::uint64_t request_id) {
     storage_->phase = immediate ? NativeStartupPhase::Cancelled
                                 : NativeStartupPhase::Cancelling;
     storage_->status = immediate
-                           ? "Startup result was discarded."
-                           : "Discarding startup work when its current operation finishes.";
+                           ? tr(storage_->locale,"STARTUP_RESULT_DISCARDED","Startup result was discarded.")
+                           : tr(storage_->locale,"STARTUP_CANCELLING","Discarding startup work when its current operation finishes.");
     ++storage_->revision;
   }
   if (kind == Storage::Kind::New)
@@ -458,7 +473,7 @@ NativeStartupSessionController::take_ready_session(const std::uint64_t request_i
     return {};
   auto result = std::move(storage_->ready_session);
   storage_->phase = NativeStartupPhase::Consumed;
-  storage_->status = "Startup campaign session was consumed.";
+  storage_->status = tr(storage_->locale,"STARTUP_SESSION_CONSUMED","Startup campaign session was consumed.");
   ++storage_->revision;
   return result;
 }

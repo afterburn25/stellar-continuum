@@ -31,24 +31,34 @@ bool unique_ids(const Range &items, Projection projection) {
   return true;
 }
 
-std::string kind(const stellar::core::SettlementKind value) {
-  return value == stellar::core::SettlementKind::ResourceOutpost
-             ? "Resource outpost"
-             : "Colony";
+std::string translate(const stellar::engine::LocalizationTable *locale,
+                      std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
 }
 
-std::string population(double value) {
+std::string kind(const stellar::core::SettlementKind value,
+                 const stellar::engine::LocalizationTable *locale) {
+  return value == stellar::core::SettlementKind::ResourceOutpost
+             ? translate(locale, "ROSTER_KIND_OUTPOST", "Resource outpost")
+             : translate(locale, "ROSTER_KIND_COLONY", "Colony");
+}
+
+std::string population(double value,
+                       const stellar::engine::LocalizationTable *locale) {
   if (!std::isfinite(value) || value < 0.)
-    return "Unconfirmed";
+    return translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
   std::ostringstream out;
   if (value >= 1000.)
     out << std::fixed << std::setprecision(value >= 10000. ? 0 : 1)
-        << value / 1000. << "B";
+        << value / 1000. << translate(locale, "ROSTER_POP_BILLIONS", "B");
   else if (value >= 1.)
     out << std::fixed << std::setprecision(value >= 100. ? 0 : 1) << value
-        << "M";
+        << translate(locale, "ROSTER_POP_MILLIONS", "M");
   else
-    out << std::fixed << std::setprecision(0) << value * 1000. << "K";
+    out << std::fixed << std::setprecision(0) << value * 1000.
+        << translate(locale, "ROSTER_POP_THOUSANDS", "K");
   return out.str();
 }
 
@@ -76,7 +86,8 @@ bool pointer(InputEventType type) {
 } // namespace
 
 View build(const stellar::core::FreshCampaignState &campaign,
-           std::uint64_t generation) {
+           std::uint64_t generation,
+           const stellar::engine::LocalizationTable *locale) {
   try {
     const int player = campaign.player_civilization_id;
     const auto player_count = std::ranges::count(
@@ -89,13 +100,14 @@ View build(const stellar::core::FreshCampaignState &campaign,
         player_it == campaign.civilizations.end() || !player_it->is_player)
       return unavailable(
           generation, player,
-          "Colony roster unavailable: the active player identity is invalid.");
+          translate(locale, "ROSTER_ERROR_PLAYER",
+                    "Colony roster unavailable: the active player identity is invalid."));
     if (!unique_ids(campaign.systems, &stellar::core::StellarSystem::id) ||
         !unique_ids(campaign.bodies, &stellar::core::PlanetaryBody::id) ||
         !unique_ids(campaign.colonies, &stellar::core::Colony::id))
       return unavailable(generation, player,
-                         "Colony roster unavailable: duplicate canonical "
-                         "colony, body, or system records were found.");
+                         translate(locale, "ROSTER_ERROR_DUPLICATE",
+                                   "Colony roster unavailable: duplicate canonical colony, body, or system records were found."));
 
     const auto invalid_system = std::ranges::any_of(
         campaign.systems, [](const auto &item) { return item.id < 0; });
@@ -111,11 +123,13 @@ View build(const stellar::core::FreshCampaignState &campaign,
         });
     if (invalid_system || invalid_body || invalid_colony)
       return unavailable(generation, player,
-                         "Colony roster unavailable: a canonical record has an "
-                         "invalid identity.");
+                         translate(locale, "ROSTER_ERROR_IDENTITY",
+                                   "Colony roster unavailable: a canonical record has an invalid identity."));
 
     View result{
-        generation, player, {}, "No owned colonies are available.", true};
+        generation, player, {},
+        translate(locale, "ROSTER_EMPTY", "No owned colonies are available."),
+        true};
     result.developer_inspection = stellar::core::developer_observation(campaign, player);
     for (const auto &colony : campaign.colonies) {
       if (!stellar::core::can_inspect_settlement(campaign, player, colony))
@@ -123,16 +137,18 @@ View build(const stellar::core::FreshCampaignState &campaign,
       Row row;
       row.colony_id = colony.id;
       row.name = colony.name;
-      row.kind_label = kind(colony.kind);
+      row.kind_label = kind(colony.kind, locale);
       if (stellar::core::developer_observation(campaign, player)) {
         const auto owner = std::ranges::find(campaign.civilizations, colony.civilization_id,
                                             &stellar::core::Civilization::id);
         if (owner != campaign.civilizations.end()) row.kind_label += " · " + owner->name;
       }
-      row.population = population(colony.population_millions);
+      row.population = population(colony.population_millions, locale);
       if (!colony.planetary_body_id) {
-        row.body_name = row.system_name = "Unconfirmed";
-        row.reason = "This owned colony has no canonical world reference.";
+        row.body_name = row.system_name =
+            translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
+        row.reason = translate(locale, "ROSTER_REASON_NO_WORLD",
+                               "This owned colony has no canonical world reference.");
         result.rows.push_back(std::move(row));
         continue;
       }
@@ -141,8 +157,10 @@ View build(const stellar::core::FreshCampaignState &campaign,
                             &stellar::core::PlanetaryBody::id);
       if (body == campaign.bodies.end() ||
           body->system_id != colony.system_id) {
-        row.body_name = row.system_name = "Unconfirmed";
-        row.reason = "This owned colony's world reference is unavailable.";
+        row.body_name = row.system_name =
+            translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
+        row.reason = translate(locale, "ROSTER_REASON_WORLD_GONE",
+                               "This owned colony's world reference is unavailable.");
         result.rows.push_back(std::move(row));
         continue;
       }
@@ -151,13 +169,17 @@ View build(const stellar::core::FreshCampaignState &campaign,
       const auto system = std::ranges::find(campaign.systems, body->system_id,
                                             &stellar::core::StellarSystem::id);
       if (system == campaign.systems.end()) {
-        row.body_name = row.system_name = "Unconfirmed";
-        row.reason = "This owned colony's system reference is unavailable.";
+        row.body_name = row.system_name =
+            translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
+        row.reason = translate(locale, "ROSTER_REASON_SYSTEM_GONE",
+                               "This owned colony's system reference is unavailable.");
       } else if (stellar::core::observation_survey_level(campaign, player, body->system_id) <
                  stellar::core::SystemSurveyLevel::fully_surveyed) {
-        row.body_name = row.system_name = "Unconfirmed";
+        row.body_name = row.system_name =
+            translate(locale, "ROSTER_UNCONFIRMED", "Unconfirmed");
         row.reason =
-            "A full survey is required before this world can be opened.";
+            translate(locale, "ROSTER_REASON_SURVEY",
+                      "A full survey is required before this world can be opened.");
       } else {
         row.body_name = body->name;
         row.system_name = system->name;
@@ -167,15 +189,18 @@ View build(const stellar::core::FreshCampaignState &campaign,
     }
     std::ranges::sort(result.rows, {}, &Row::colony_id);
     result.message = result.rows.empty()
-                         ? "No colonies belong to the active player."
+                         ? translate(locale, "ROSTER_MESSAGE_EMPTY",
+                                     "No colonies belong to the active player.")
                          : stellar::core::developer_observation(campaign, player)
-                             ? "Developer inspection · All empires · Select a colony for live statistics."
-                             : "Select an owned colony to inspect its world.";
+                             ? translate(locale, "ROSTER_MESSAGE_DEVELOPER",
+                                         "Developer inspection · All empires · Select a colony for live statistics.")
+                             : translate(locale, "ROSTER_MESSAGE_READY",
+                                         "Select an owned colony to inspect its world.");
     return result;
   } catch (const std::exception &) {
     return unavailable(generation, campaign.player_civilization_id,
-                       "Colony roster could not be projected. Refresh when the "
-                       "campaign is ready.");
+                       translate(locale, "ROSTER_ERROR_PROJECTION",
+                                 "Colony roster could not be projected. Refresh when the campaign is ready."));
   }
 }
 
@@ -197,6 +222,13 @@ RosterLayout RosterLayout::for_viewport(int width, int height) noexcept {
           std::max(58.f * s, height <= 800 ? 66.f * s : 60.f * s)};
 }
 
+std::string RosterWorkspace::tr(std::string_view key,
+                                std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void RosterWorkspace::clear_press() noexcept {
   pressed_row_.reset();
   pressed_target_ = PressTarget::none;
@@ -209,7 +241,7 @@ void RosterWorkspace::set_view(View value) {
       value.available != view_.available || value.rows != view_.rows;
   view_ = std::move(value);
   if (identity_changed) {
-    scroll_ = 0;
+    list_.scroll_offset = 0;
     notice_.clear();
     clear_press();
   } else if (content_changed) {
@@ -218,7 +250,7 @@ void RosterWorkspace::set_view(View value) {
 }
 void RosterWorkspace::open() noexcept {
   visible_ = true;
-  scroll_ = 0;
+  list_.scroll_offset = 0;
   clear_press();
 }
 void RosterWorkspace::close() noexcept {
@@ -229,13 +261,17 @@ void RosterWorkspace::discard_campaign() noexcept {
   close();
   view_ = {};
   notice_.clear();
-  scroll_ = 0;
+  list_.scroll_offset = 0;
+}
+void RosterWorkspace::sync_scroll(const RosterLayout &layout) const noexcept {
+  list_.row_count = view_.rows.size();
+  list_.row_height = layout.row_height + 5.f * layout.scale;
+  list_.viewport_height = layout.list.height;
 }
 float RosterWorkspace::maximum_scroll(
     const RosterLayout &layout) const noexcept {
-  const float content = static_cast<float>(view_.rows.size()) *
-                        (layout.row_height + 5.f * layout.scale);
-  return std::max(0.f, content - layout.list.height);
+  sync_scroll(layout);
+  return list_.max_scroll();
 }
 UiRect RosterWorkspace::row_button(int index, int width,
                                    int height) const noexcept {
@@ -246,7 +282,7 @@ UiRect RosterWorkspace::row_button(int index, int width,
           layout.list.y +
               static_cast<float>(index) *
                   (layout.row_height + 5.f * layout.scale) -
-              scroll_,
+              list_.scroll_offset,
           layout.list.width, layout.row_height};
 }
 RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
@@ -261,7 +297,8 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     clear_press();
   }
   const auto layout = RosterLayout::for_viewport(width, height);
-  scroll_ = std::clamp(scroll_, 0.f, maximum_scroll(layout));
+  sync_scroll(layout);
+  list_.scroll_to(list_.scroll_offset);
   if (event.type == InputEventType::PointerCancelled) {
     clear_press();
     return {true};
@@ -304,7 +341,8 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
         command.body_id = row.body_id;
         command.system_id = row.system_id;
       } else
-        notice_ = row.reason.empty() ? "This colony cannot be opened yet."
+        notice_ = row.reason.empty()
+                      ? tr("ROSTER_CANNOT_OPEN", "This colony cannot be opened yet.")
                                      : row.reason;
     }
     clear_press();
@@ -316,8 +354,7 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     return {};
   if (event.type == InputEventType::Wheel) {
     if (layout.list.contains(event.position))
-      scroll_ = std::clamp(scroll_ - event.wheel_y * 48.f * layout.scale, 0.f,
-                           maximum_scroll(layout));
+      list_.scroll_to(list_.scroll_offset - event.wheel_y * 48.f * layout.scale);
     return {true};
   }
   if (event.type == InputEventType::LeftPressed) {
@@ -357,7 +394,10 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
   text(out,
        {p.x + 16.f * layout.scale, p.y + 12.f * layout.scale,
         p.width - 190.f * layout.scale, 29.f * layout.scale},
-       view_.developer_inspection ? "ALL COLONIES" : "OWNED COLONIES", std::max(15, static_cast<int>(23.f * layout.scale)),
+       view_.developer_inspection
+           ? tr("ROSTER_TITLE_ALL", "ALL COLONIES")
+           : tr("ROSTER_TITLE_OWNED", "OWNED COLONIES"),
+       std::max(15, static_cast<int>(23.f * layout.scale)),
        ink, p);
   stellar::native_ui_style::panel(out, layout.refresh,
                                   layout.refresh.contains(pointer_), false);
@@ -365,7 +405,7 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
        {layout.refresh.x + 8.f * layout.scale,
         layout.refresh.y + 5.f * layout.scale,
         layout.refresh.width - 16.f * layout.scale, 20.f * layout.scale},
-       "REFRESH", font, cyan, layout.refresh);
+       tr("ROSTER_REFRESH", "REFRESH"), font, cyan, layout.refresh);
   stellar::native_ui_style::panel(out, layout.close,
                                   layout.close.contains(pointer_), false);
   text(out,
@@ -389,26 +429,26 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
          {layout.list.x + layout.list.width * .70f,
           layout.list.y - 20.f * layout.scale, layout.list.width * .28f,
           17.f * layout.scale},
-         "POPULATION", font - 2, muted, p);
+         tr("ROSTER_COL_POPULATION", "POPULATION"), font - 2, muted, p);
   } else {
     text(out,
          {layout.list.x + 8.f * layout.scale,
           layout.list.y - 24.f * layout.scale, layout.list.width * .37f,
           20.f * layout.scale},
-         "COLONY / KIND", font - 2, muted, p);
+         tr("ROSTER_COL_COLONY", "COLONY / KIND"), font - 2, muted, p);
     text(out,
          {layout.list.x + layout.list.width * .39f,
           layout.list.y - 24.f * layout.scale, layout.list.width * .38f,
           20.f * layout.scale},
-         "WORLD / SYSTEM", font - 2, muted, p);
+         tr("ROSTER_COL_WORLD", "WORLD / SYSTEM"), font - 2, muted, p);
     text(out,
          {layout.list.x + layout.list.width * .79f,
           layout.list.y - 24.f * layout.scale, layout.list.width * .18f,
           20.f * layout.scale},
-         "POPULATION / ACTION", font - 2, muted, p);
+         tr("ROSTER_COL_ACTION", "POPULATION / ACTION"), font - 2, muted, p);
   }
   const float maximum = maximum_scroll(layout);
-  scroll_ = std::clamp(scroll_, 0.f, maximum);
+  list_.scroll_to(list_.scroll_offset);
   for (std::size_t i = 0; i < view_.rows.size(); ++i) {
     const auto box = row_button(static_cast<int>(i), width, height);
     const auto visible = clip_intersection(box, layout.list);
@@ -441,7 +481,9 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
       text(out,
            {box.x + box.width * .70f, box.y + 30.f * layout.scale,
             box.width * .28f, 20.f * layout.scale},
-           row.population + "  " + (row.can_open ? "VIEW" : "UNAVAILABLE"),
+           row.population + "  " +
+               (row.can_open ? tr("ROSTER_ACTION_VIEW", "VIEW")
+                             : tr("ROSTER_ACTION_UNAVAILABLE", "UNAVAILABLE")),
            font - 1, row.can_open ? cyan : amber, layout.list);
     } else {
       text(out,
@@ -467,7 +509,9 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
       text(out,
            {box.x + box.width * .79f, box.y + 31.f * layout.scale,
             box.width * .18f, 18.f * layout.scale},
-           row.can_open ? "VIEW" : "UNAVAILABLE", font - 2,
+           row.can_open ? tr("ROSTER_ACTION_VIEW", "VIEW")
+                        : tr("ROSTER_ACTION_UNAVAILABLE", "UNAVAILABLE"),
+           font - 2,
            row.can_open ? cyan : amber, layout.list);
     }
   }
@@ -476,14 +520,16 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
          {layout.list.x + 8.f * layout.scale,
           layout.list.y + 12.f * layout.scale,
           layout.list.width - 16.f * layout.scale, 40.f * layout.scale},
-         view_.available ? "No owned colonies." : "Roster unavailable.", font,
+         view_.available ? tr("ROSTER_LIST_EMPTY", "No owned colonies.")
+                         : tr("ROSTER_LIST_UNAVAILABLE", "Roster unavailable."),
+         font,
          muted, layout.list);
   if (maximum > 0) {
     const float thumb =
         std::max(24.f * layout.scale, layout.list.height * layout.list.height /
                                           (maximum + layout.list.height));
     const float y =
-        layout.list.y + (layout.list.height - thumb) * scroll_ / maximum;
+        layout.list.y + (layout.list.height - thumb) * list_.scroll_offset / maximum;
     out.overlay.emplace_back(
         FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
                          layout.list.y, 3.f * layout.scale, layout.list.height},

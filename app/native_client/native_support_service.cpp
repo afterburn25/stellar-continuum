@@ -1,6 +1,7 @@
 #include "native_support_service.hpp"
 #include <algorithm>
 #include <chrono>
+#include <memory>
 #include <stdexcept>
 
 namespace stellar::native_support {
@@ -32,8 +33,11 @@ bool NativeSupportService::request(SupportBundleRequest request){
   result_.clear();error_.clear();
   request.session_log=log_snapshot();
   try {
-    worker_=std::async(std::launch::async,[writer=writer_,request=std::move(request)]{
-      return writer(request);
+    const auto promise=std::make_shared<std::promise<std::filesystem::path>>();
+    worker_=promise->get_future();
+    worker_status_=jobs_.submit("support-export",stellar::engine::JobPriority::Normal,stellar::engine::JobCancelToken{},
+        [writer=writer_,request=std::move(request),promise]{
+      try{promise->set_value(writer(request));}catch(...){try{promise->set_exception(std::current_exception());}catch(...){}}
     });
     state_=SupportExportState::Working;
     return true;

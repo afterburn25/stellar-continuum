@@ -14,6 +14,7 @@
 #include <string_view>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
 namespace stellar::native_setup_ui {
 
 struct NativeSpeciesPresentation {
@@ -85,6 +86,9 @@ public:
       const stellar::native_map::RgbaImage>(std::string_view asset_path)>;
 
   void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   void set_view(stellar::native_setup::NativeNewCampaignSetupView);
   void clear() noexcept;
   void set_assessment_message(std::string message, bool accepted);
@@ -146,6 +150,11 @@ private:
   void reconcile();
   void restore_defaults();
   void reset_interaction() noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
 
   std::optional<stellar::native_setup::NativeNewCampaignSetupView> view_;
   std::string selected_species_id_, seed_text_, message_;
@@ -158,6 +167,7 @@ private:
   float species_scroll_{}, detail_scroll_{};
   bool seed_focused_{}, seed_replace_pending_{}, assessment_accepted_{}, pressed_{};
   stellar::native_map::Point pointer_{};
+  const stellar::engine::LocalizationTable *locale_{};
 };
 
 } // namespace stellar::native_setup_ui

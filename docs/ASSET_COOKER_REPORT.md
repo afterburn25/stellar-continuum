@@ -75,9 +75,11 @@ Game.cmd` and `Developer Game.cmd`.
 BC4 is implemented and fixture-tested; this release has no standalone BC4
 record. Of the RGBA8 results, 991 are quality-gate fallbacks; UI policy accounts
 for the other lossless records. HDR/BC6H is not implemented and no HDR input is
-admitted. Windows package codecs use XPRESS or reversible RGBA channel-delta
-plus XPRESS when beneficial. GPU format tags remain distinct from package
-compression tags, with decoded fallback on unsupported graphics hardware.
+admitted. Windows package codecs select the smallest of XPRESS, LZMS, or a
+reversible RGBA channel-delta under either codec, per chunk; this report's
+package predates LZMS and used XPRESS only. GPU format tags remain distinct
+from package compression tags, with decoded fallback on unsupported graphics
+hardware.
 
 Planets/moons ship prepared material maps, with normalized normal-map mips and
 linear-light, alpha-aware color mips through 1x1. Existing requests select mip

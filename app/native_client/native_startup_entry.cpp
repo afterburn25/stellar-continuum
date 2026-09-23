@@ -54,8 +54,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
       throw std::runtime_error("Developer smoke requires explicit launch eligibility.");
   }
   NativeStartupHost host(config.host);
+  host.set_localization(config.locale);
   if(config.developer_access&&config.developer_access->active())host.set_developer_mode(true);
   NativeStartupWorkspace workspace;
+  workspace.set_localization(config.locale);
   workspace.set_hover_callback(config.audio.hover);
   workspace.set_build_label("Stellar Continuum " + config.host.game_version);
   const std::string system_info="Stellar Continuum "+config.host.game_version+"\n"+window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height());
@@ -126,7 +128,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
       draw.overlay.emplace_back(FilledRectangle{veil, {5, 14, 27, 210}});
       draw.overlay.emplace_back(Text{{veil.x + veil.width * .5f,
                                       veil.y + 12.f * scale},
-                                     "LOADING GAME ASSETS", {235,244,255,255},
+                                     (config.locale&&config.locale->contains("STARTUP_LOADING_ASSETS")?std::string(config.locale->translate("STARTUP_LOADING_ASSETS")):std::string("LOADING GAME ASSETS")), {235,244,255,255},
                                      static_cast<int>(18 * scale), veil.width,
                                      veil, TextAlign::Center, FontFace::Heading});
       const UiRect track{veil.x + 26.f * scale, veil.y + 48.f * scale,
@@ -168,6 +170,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     case StartupIntentKind::CopySetup:
       try {
         NativeNewCampaignSetupController controller;
+        controller.set_localization(config.locale);
         const auto prepared=controller.prepare({intent.seed_text,intent.system_count,intent.species_id,
           config.utc_timestamp(),intent.pre_warp_civilization_count,intent.ancient_civilization_count,
           intent.stellar_population,intent.developer_research,intent.developer_full_coverage,intent.requested_population,intent.developer_full_exploration},

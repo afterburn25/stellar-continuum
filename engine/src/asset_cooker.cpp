@@ -37,6 +37,21 @@ std::map<std::string,Recipe> discover(const AssetCookOptions&o,Json&excluded){
   const auto it=recipes.find(alias);if(it!=recipes.end()){if(it->second.source!=source||!expected.empty()&&!it->second.expected.empty()&&it->second.expected!=expected)throw std::runtime_error("Conflicting runtime alias: "+alias);return;}
   recipes.emplace(alias,std::move(r));
  };
+ if(o.scan_content){
+  safe_relative(o.package_group);
+  if(o.package_group.find('/')!=o.package_group.npos)throw std::runtime_error("Invalid package group");
+  // Generic project mode: index every regular file under the content root
+  // with a stable alias equal to its relative POSIX path, so a project can
+  // cook its own content tree without reviewed export manifests.
+  for(const auto&entry:std::filesystem::recursive_directory_iterator(o.root)){
+   if(!entry.is_regular_file())continue;
+   const auto alias=asset_path_utf8(std::filesystem::relative(entry.path(),o.root));
+   if(alias.starts_with("build/"))continue;
+   add(alias,alias);
+   if(const auto it=recipes.find(alias);it!=recipes.end())it->second.group=o.package_group;
+  }
+  return recipes;
+ }
  // Import existing reviewed catalogs, preserving their allowlists and SHA pins.
  for(const auto&e:std::filesystem::directory_iterator(o.root/"export")){const auto name=asset_path_utf8(e.path().filename());if(!name.starts_with("native-")||!name.ends_with("-assets.json"))continue;
   const auto j=read_json(e.path());auto visit=[&](auto&&self,const Json&node)->void{
@@ -60,6 +75,7 @@ std::map<std::string,Recipe> discover(const AssetCookOptions&o,Json&excluded){
  for(const auto&set:vfx.at("visualSets"))for(const auto&texture:set.at("textures")){const auto name=texture.get<std::string>();const auto alias=eruptions+"1024/"+name;add(alias,alias);auto&r=recipes.at(alias);r.aliases={eruptions+"256/"+name,eruptions+"512/"+name};}
  const auto research=read_json(o.root/"export/research-runtime-files.json");for(const auto&f:research.at("files"))add(research.at("destination").get<std::string>()+"/"+f.get<std::string>(),research.at("root").get<std::string>()+"/"+f.get<std::string>());
  add("Data/astronomy/hyg-nearby-500-v1.json","data/astronomy/hyg-nearby-500-v1.json");
+ if(std::filesystem::is_regular_file(o.root/"data/locale/en.json"))add("Data/locale/en.json","data/locale/en.json");
  // The cooker configuration is an additive reviewed override, never a recursive
  // 'include everything' switch. IDs remain stable while sources can be renamed.
  const auto config_path=o.root/"export/cooker-assets.json";
@@ -127,7 +143,8 @@ void cook_asset_repository(const AssetCookOptions&o){
    for(const auto&ch:meta.at("chunks")){AssetChunk chunk;chunk.hash=ch.at("hash");chunk.raw_bytes=ch.at("raw");chunk.stored_bytes=ch.at("stored");chunk.codec=static_cast<AssetCodec>(ch.at("codec").get<unsigned>());chunk.width=ch.at("width");chunk.height=ch.at("height");a.chunks.push_back(chunk);c.files.push_back(o.cache/ch.at("file").get<std::string>());}
    a.width=a.canvas_width=a.chunks.front().width;a.height=a.canvas_height=a.chunks.front().height;
   }catch(const std::exception&e){c.error=e.what();}
-  const auto finished=++done;if(finished%100==0||finished==ordered.size()){std::lock_guard lock(console);std::cout<<"Cooked "<<finished<<" / "<<ordered.size()<<" assets\n"<<std::flush;}
+  const auto finished=++done;if(o.progress)o.progress(finished,ordered.size());
+  if(finished%100==0||finished==ordered.size()){std::lock_guard lock(console);std::cout<<"Cooked "<<finished<<" / "<<ordered.size()<<" assets\n"<<std::flush;}
  }});
  workers.clear();Json errors=Json::array();for(std::size_t i=0;i<cooked.size();++i)if(!cooked[i].error.empty())errors.push_back({{"asset",ordered[i].alias},{"error",cooked[i].error}});
  if(!errors.empty()){write_json(o.report,{{"errors",errors},{"excluded",excluded}});throw std::runtime_error("Asset cooking failed; see "+asset_path_utf8(o.report));}

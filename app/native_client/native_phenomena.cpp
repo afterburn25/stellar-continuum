@@ -16,6 +16,7 @@ std::uint8_t byte(double v){return static_cast<std::uint8_t>(std::clamp(std::lro
 double fade(std::chrono::steady_clock::time_point start){return std::clamp(std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()/.65,0.,1.);}
 const GalaxyPhenomenon& region(const GalaxyPhenomena& f,std::uint32_t id){return *std::ranges::find(f.regions,id,&GalaxyPhenomenon::id);}
 struct LocalLayer{GalaxyPhenomenon region;PhenomenonOverlap overlap;PhenomenonVisualAsset asset;std::shared_ptr<const RgbaImage> texture;};
+std::string tr(const LocalizationTable* locale,std::string_view key,std::string_view fallback){if(locale&&locale->contains(key))return std::string(locale->translate(key));return std::string(fallback);}
 std::array<double,4> sample(const RgbaImage& image,double u,double v){
   if(u<0||v<0||u>1||v>1)return {};
   const double px=u*(image.width()-1),py=v*(image.height()-1);const int x=static_cast<int>(px),y=static_cast<int>(py);const double fx=px-x,fy=py-y;
@@ -119,7 +120,7 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
       if(batches.empty()||!append_decal_batch(batches.back(),std::move(mesh)))batches.push_back(std::move(mesh));
     }
     if(options.bounds){const Color line{90,220,255,130};diagnostics.world.emplace_back(Line{{dest.x,dest.y},{dest.x+dest.width,dest.y},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y},{dest.x+dest.width,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y+dest.height},{dest.x,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x,dest.y+dest.height},{dest.x,dest.y},line});}
-    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?phenomenon_definition(r.type).name:"Uncharted cloud")+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
+    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?phenomenon_definition(r.type).name:tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
   }
   for(auto& mesh:batches)out.world.emplace_back(std::move(mesh));
   for(auto& command:diagnostics.world)out.world.emplace_back(std::move(command));
@@ -147,11 +148,11 @@ void NativePhenomena::inspect(DrawList& out,const Camera& camera,Point pointer,i
   if(!field_||pointer.x<60||pointer.y<110||pointer.x>w-330||pointer.y>h-105)return;
   const auto p=camera.unproject(pointer,w,h);const auto c=phenomenon_context(field(),p.x,p.y);if(!c.dominant)return;
   const auto& r=region(*field_,*c.dominant);const bool known=developer||surveyed.contains(r.id);const auto& d=phenomenon_definition(r.type);
-  std::ostringstream text;text<<(known?r.designation+" · "+d.name:"Uncharted interstellar cloud")<<'\n';
-  if(known){text<<d.description<<"\nSensor range "<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · Survey effort "<<std::setprecision(2)<<c.effects.scanning<<"x\n";
-    text<<"Radiation potential "<<std::setprecision(2)<<c.effects.hazard<<" · "<<r.systems_contained.size()<<" intersecting systems";
+  std::ostringstream text;text<<(known?r.designation+" · "+d.name:tr(locale_,"PHENOMENA_UNKNOWN","Uncharted interstellar cloud"))<<'\n';
+  if(known){text<<d.description<<'\n'<<tr(locale_,"PHENOMENA_SENSOR","Sensor range")<<' '<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · "<<tr(locale_,"PHENOMENA_SURVEY","Survey effort")<<' '<<std::setprecision(2)<<c.effects.scanning<<"x\n";
+    text<<tr(locale_,"PHENOMENA_RADIATION","Radiation potential")<<' '<<std::setprecision(2)<<c.effects.hazard<<" · "<<r.systems_contained.size()<<' '<<tr(locale_,"PHENOMENA_INTERSECTING","intersecting systems");
     if(developer)text<<"\nID "<<r.id<<" · "<<c.overlaps.size()<<" overlaps · edge "<<c.overlaps.front().edge_distance<<" ly\nDensity "<<c.overlaps.front().density<<" · shape seed "<<r.shape.seed;
-  }else text<<"Survey a system inside this cloud to identify its environment.";
+  }else text<<tr(locale_,"PHENOMENA_HINT","Survey a system inside this cloud to identify its environment.");
   const float s=std::clamp(h/1080.f,.75f,1.6f);const UiRect panel{pinned?70.f:pointer.x+18*s,pinned?h-295*s:pointer.y+18*s,380*s,(developer?180.f:145.f)*s};
   auto bounded=panel;bounded.x=std::min(bounded.x,w-bounded.width-20);bounded.y=std::min(bounded.y,h-bounded.height-85*s);
   native_menu_style::panel(out,bounded,s);native_menu_style::text(out,{bounded.x+12*s,bounded.y+10*s,bounded.width-24*s,bounded.height-20*s},text.str(),static_cast<int>(15*s));

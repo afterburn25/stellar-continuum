@@ -5,6 +5,7 @@
 #include <stellar/engine/texture_decal.hpp>
 #include <stellar/engine/spatial_region_index.hpp>
 #include <stellar/engine/native_image_preparation.hpp>
+#include <stellar/engine/localization.hpp>
 #include <chrono>
 #include <map>
 #include <set>
@@ -23,6 +24,7 @@ class NativePhenomena {
 public:
   void use_assets(std::filesystem::path root);
   void use_queue(std::shared_ptr<ImagePreparationQueue> q){queue_=std::move(q);}
+  void set_localization(const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
   void bind(const stellar::core::GalaxyPhenomena* field);
   void poll();
   void append_map(DrawList&,const Camera&,int,int,const VisualOptions&,const std::set<std::uint32_t>& surveyed);
@@ -49,5 +51,6 @@ private:
   int local_system_{-1};bool ready_{true};
   std::chrono::steady_clock::time_point transition_{std::chrono::steady_clock::now()};
   bool previous_system_{};
+  const stellar::engine::LocalizationTable* locale_{nullptr};
 };
 }

@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cwctype>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 
 #if defined(_WIN32)
 #define NOMINMAX
@@ -89,6 +91,16 @@ std::wstring extended_path(const std::filesystem::path &path) {
 std::error_code windows_error(DWORD value = GetLastError()) {
   return {static_cast<int>(value), std::system_category()};
 }
+
+// A destination another process just published or is scanning can be
+// transiently locked (antivirus, indexer); these errors usually clear quickly.
+bool transient_lock_error(DWORD error) {
+  return error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION ||
+         error == ERROR_LOCK_VIOLATION;
+}
+
+constexpr int kTransientLockAttempts = 50;
+constexpr auto kTransientLockDelay = std::chrono::milliseconds(20);
 
 std::wstring guid_token() {
   GUID guid{};
@@ -430,10 +442,18 @@ void write_file_atomically_stream(const std::filesystem::path &path,
       }
     }
 #endif
-    if (!MoveFileExW(extended_path(temporary).c_str(),
-                     extended_path(primary).c_str(), MOVEFILE_WRITE_THROUGH))
-      fail(windows_error(), AtomicFileWriteOperation::move_new, primary,
-           backup, temporary, false);
+    DWORD move_error = ERROR_SUCCESS;
+    for (int attempt = 0;; ++attempt) {
+      if (MoveFileExW(extended_path(temporary).c_str(),
+                      extended_path(primary).c_str(), MOVEFILE_WRITE_THROUGH))
+        break;
+      move_error = GetLastError();
+      if (!transient_lock_error(move_error) ||
+          attempt >= kTransientLockAttempts)
+        fail(windows_error(move_error), AtomicFileWriteOperation::move_new,
+             primary, backup, temporary, false);
+      std::this_thread::sleep_for(kTransientLockDelay);
+    }
     return;
   }
 
@@ -446,17 +466,26 @@ void write_file_atomically_stream(const std::filesystem::path &path,
 
   // Keep owned storage alive for the duration of ReplaceFileW.
   const auto backup_native = extended_path(backup);
-  if (!ReplaceFileW(extended_path(primary).c_str(),
-                    extended_path(temporary).c_str(),
-                    options.preserve_existing_backup
-                        ? nullptr
-                        : backup_native.c_str(),
-                    REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr)) {
-    const auto error = GetLastError();
-    const bool ambiguous = error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
-                           error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2;
-    fail(windows_error(error), AtomicFileWriteOperation::replace_existing,
-         primary, backup, temporary, ambiguous);
+  DWORD replace_error = ERROR_SUCCESS;
+  for (int attempt = 0;; ++attempt) {
+    if (ReplaceFileW(extended_path(primary).c_str(),
+                     extended_path(temporary).c_str(),
+                     options.preserve_existing_backup
+                         ? nullptr
+                         : backup_native.c_str(),
+                     REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr))
+      break;
+    replace_error = GetLastError();
+    if (!transient_lock_error(replace_error) ||
+        attempt >= kTransientLockAttempts) {
+      const bool ambiguous =
+          replace_error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
+          replace_error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2;
+      fail(windows_error(replace_error),
+           AtomicFileWriteOperation::replace_existing, primary, backup,
+           temporary, ambiguous);
+    }
+    std::this_thread::sleep_for(kTransientLockDelay);
   }
 #endif
 }

@@ -209,22 +209,15 @@ inline float native_workspace_top(int width,int height)noexcept{
 // Shared by presentation and hit testing, in drawable pixels (never desktop DPI).
 struct CommandHudLayout {
   float scale{};
-  UiRect resource_strip, context, crest, switch_view, planets, planet_list;
-  float row_height{};
+  UiRect resource_strip, context, crest, switch_view;
   static CommandHudLayout make(int width, int height) {
     const float s = NativeUiLayout::for_viewport(width,height).scale;
     const float w = static_cast<float>(width), h = static_cast<float>(height);
-    const float plate = std::min(430.f*s,w*.48f), side = 254.f*s;
+    const float plate = std::min(430.f*s,w*.48f);
     const UiRect context{(w-plate)*.5f,h-66.f*s,plate,58.f*s};
-    const UiRect planets{w-side-12.f*s,52.f*s,side,196.f*s};
     return {s,{0,0,w,36.f*s},context,
         {context.x+8.f*s,context.y+9.f*s,40.f*s,40.f*s},
-        {context.x+context.width-52.f*s,context.y+7.f*s,44.f*s,44.f*s},
-        planets,{planets.x+8.f*s,planets.y+32.f*s,planets.width-16.f*s,planets.height-40.f*s},48.f*s};
-  }
-  UiRect row(std::size_t index,float scroll) const {
-    return {planet_list.x,planet_list.y+static_cast<float>(index)*row_height-scroll,
-            planet_list.width,row_height};
+        {context.x+context.width-52.f*s,context.y+7.f*s,44.f*s,44.f*s}};
   }
 };
 

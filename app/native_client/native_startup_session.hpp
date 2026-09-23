@@ -68,6 +68,7 @@ public:
   // Performs only owner-thread activation. It never blocks waiting for a worker.
   void service();
   void set_developer_mode(bool enabled);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept;
   [[nodiscard]] NativeStartupView poll() const;
   [[nodiscard]] bool cancel(std::uint64_t request_id);
   [[nodiscard]] std::unique_ptr<stellar::native_map::NativeCampaignSession>

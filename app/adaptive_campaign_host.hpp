@@ -20,6 +20,8 @@ struct AdaptiveCampaignHostOptions {
   int pre_warp_civilizations{6};
   int ancient_civilizations{1};
   std::string player_species{"terran_baseline"};
+  int autosave_every{0};
+  int stress_fleets{0};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

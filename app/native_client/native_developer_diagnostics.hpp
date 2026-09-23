@@ -2,6 +2,7 @@
 #include "native_dropdown.hpp"
 #include "../campaign_diagnostic_monitor.hpp"
 #include <stellar/engine/asset_registry.hpp>
+#include <stellar/engine/profiler.hpp>
 #include <iomanip>
 #include <sstream>
 
@@ -67,14 +68,19 @@ public:
       label({l.list.x+600*s,l.list.y-31*s,170*s,27*s},"Mean ms",native_menu_style::muted);
       label({l.list.x+810*s,l.list.y-31*s,190*s,27*s},"Maximum ms",native_menu_style::muted);
       const auto samples=frame.runtime().performance_samples();
-      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(samples.size())-14));
-      for(int i=0;i<14&&begin+i<static_cast<int>(samples.size());++i){
-        const auto &p=samples[begin+i];const auto y=l.list.y+i*33*s;
+      struct Row{std::string phase;std::uint64_t n,total,maximum;};
+      std::vector<Row> rows;rows.reserve(samples.size()+8);
+      for(const auto&p:samples)rows.push_back({std::string(p.phase),p.timing.samples,p.timing.total_nanoseconds,p.timing.maximum_nanoseconds});
+      for(const auto&a:stellar::engine::Profiler::instance().aggregates())
+        rows.push_back({"client/"+a.name,a.calls,a.total_nanoseconds,a.max_nanoseconds});
+      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(rows.size())-14));
+      for(int i=0;i<14&&begin+i<static_cast<int>(rows.size());++i){
+        const auto &p=rows[begin+i];const auto y=l.list.y+i*33*s;
         if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
-        label({l.list.x+8*s,y+4*s,400*s,25*s},std::string(p.phase));
-        label({l.list.x+430*s,y+4*s,140*s,25*s},std::to_string(p.timing.samples));
-        label({l.list.x+600*s,y+4*s,170*s,25*s},p.timing.samples?number(static_cast<double>(p.timing.total_nanoseconds)/p.timing.samples/1e6):"Unmeasured");
-        label({l.list.x+810*s,y+4*s,190*s,25*s},p.timing.samples?number(p.timing.maximum_nanoseconds/1e6):"Unmeasured");
+        label({l.list.x+8*s,y+4*s,400*s,25*s},p.phase);
+        label({l.list.x+430*s,y+4*s,140*s,25*s},std::to_string(p.n));
+        label({l.list.x+600*s,y+4*s,170*s,25*s},p.n?number(static_cast<double>(p.total)/p.n/1e6):"Unmeasured");
+        label({l.list.x+810*s,y+4*s,190*s,25*s},p.n?number(p.maximum/1e6):"Unmeasured");
       }
     }else{
       label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(snapshot_.size())+" retained events · newest first · snapshot captured on refresh",native_menu_style::muted);

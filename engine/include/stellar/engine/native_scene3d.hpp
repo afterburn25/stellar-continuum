@@ -15,6 +15,13 @@ struct Quaternion { float x{}, y{}, z{}, w{1}; };
 struct Matrix4 { std::array<float,16> values{}; }; // column major
 [[nodiscard]] Quaternion rotation_axis_angle(Vec3 axis,float radians);
 [[nodiscard]] Quaternion compose_rotation(Quaternion left,Quaternion right);
+// v' = q ⊗ (v,0) ⊗ q* for a unit quaternion q.
+[[nodiscard]] inline Vec3 rotate_vec(Quaternion q,Vec3 v) noexcept {
+  const float tx=2.f*(q.y*v.z-q.z*v.y),ty=2.f*(q.z*v.x-q.x*v.z),
+      tz=2.f*(q.x*v.y-q.y*v.x);
+  return {v.x+q.w*tx+q.y*tz-q.z*ty,v.y+q.w*ty+q.z*tx-q.x*tz,
+          v.z+q.w*tz+q.x*ty-q.y*tx};
+}
 [[nodiscard]] Matrix4 multiply(Matrix4 left,Matrix4 right) noexcept;
 [[nodiscard]] std::array<float,4> transform(Matrix4 matrix,std::array<float,4> point) noexcept;
 
@@ -43,11 +50,17 @@ class Mesh3D final {
   [[nodiscard]] const auto& vertices()const noexcept{return vertices_;}
   [[nodiscard]] const auto& indices()const noexcept{return indices_;}
   [[nodiscard]] float bounding_radius()const noexcept{return radius_;}
+  // Local-space axis-aligned bounds — collision and ground resting use
+  // these (scaled by instance scale) instead of the bounding sphere so
+  // boxes collide as boxes.
+  [[nodiscard]] Vec3 bounds_min()const noexcept{return bounds_min_;}
+  [[nodiscard]] Vec3 bounds_max()const noexcept{return bounds_max_;}
   [[nodiscard]] std::size_t byte_size()const noexcept{return vertices_.size()*sizeof(Vertex3D)+indices_.size()*sizeof(std::uint32_t);}
  private:
-  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius)
-      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius){}
+  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max)
+      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max){}
   std::vector<Vertex3D> vertices_;std::vector<std::uint32_t> indices_;float radius_{};
+  Vec3 bounds_min_{},bounds_max_{};
 };
 enum class Projection3D { Perspective,Orthographic };
 struct Camera3D {

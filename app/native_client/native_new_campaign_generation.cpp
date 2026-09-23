@@ -2,6 +2,7 @@
 
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <mutex>
 #include <stdexcept>
@@ -10,30 +11,38 @@
 
 namespace stellar::native_setup {
 namespace {
-std::string status_for(const NativeNewCampaignGenerationPhase phase) {
+std::string tr(const stellar::engine::LocalizationTable *locale,
+               std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string status_for(const NativeNewCampaignGenerationPhase phase,
+                       const stellar::engine::LocalizationTable *locale) {
   switch (phase) {
   case NativeNewCampaignGenerationPhase::Idle:
-    return "No campaign generation is active.";
+    return tr(locale,"GEN_IDLE","No campaign generation is active.");
   case NativeNewCampaignGenerationPhase::LoadingCatalog:
-    return "Loading the stellar catalog.";
+    return tr(locale,"GEN_LOADING_CATALOG","Loading the stellar catalog.");
   case NativeNewCampaignGenerationPhase::LoadingResearchDefinitions:
-    return "Loading research definitions.";
+    return tr(locale,"GEN_LOADING_RESEARCH","Loading research definitions.");
   case NativeNewCampaignGenerationPhase::SeedingCampaign:
-    return "Generating the campaign. This step has no progress estimate.";
+    return tr(locale,"GEN_SEEDING","Generating the campaign. This step has no progress estimate.");
   case NativeNewCampaignGenerationPhase::Ready:
-    return "Campaign generation is ready.";
+    return tr(locale,"GEN_READY","Campaign generation is ready.");
   case NativeNewCampaignGenerationPhase::Failed:
-    return "Campaign generation failed.";
+    return tr(locale,"GEN_FAILED","Campaign generation failed.");
   case NativeNewCampaignGenerationPhase::Cancelling:
-    return "Cancellation requested. Work stops at the next generation "
+    return tr(locale,"GEN_CANCELLING","Cancellation requested. Work stops at the next generation "
            "boundary; an in-progress campaign seed must finish before its "
-           "result is discarded.";
+           "result is discarded.");
   case NativeNewCampaignGenerationPhase::Cancelled:
-    return "Campaign generation was discarded.";
+    return tr(locale,"GEN_CANCELLED","Campaign generation was discarded.");
   case NativeNewCampaignGenerationPhase::Consumed:
-    return "Campaign generation was consumed.";
+    return tr(locale,"GEN_CONSUMED","Campaign generation was consumed.");
   }
-  return "Campaign generation state is unavailable.";
+  return tr(locale,"GEN_UNKNOWN","Campaign generation state is unavailable.");
 }
 
 bool terminal(const NativeNewCampaignGenerationPhase phase) noexcept {
@@ -84,7 +93,8 @@ struct NativeNewCampaignGenerationController::Storage {
   std::jthread worker;
   std::uint64_t next_request_id{1}, request_id{}, revision{};
   NativeNewCampaignGenerationPhase phase{NativeNewCampaignGenerationPhase::Idle};
-  std::string status{status_for(NativeNewCampaignGenerationPhase::Idle)};
+  const stellar::engine::LocalizationTable *locale{nullptr};
+  std::string status{status_for(NativeNewCampaignGenerationPhase::Idle,locale)};
   bool cancel_requested{};
   std::optional<NativeDetachedNewCampaign> result;
 };
@@ -108,6 +118,11 @@ NativeNewCampaignGenerationController::~NativeNewCampaignGenerationController() 
   if (storage_->worker.joinable()) storage_->worker.join();
 }
 
+void NativeNewCampaignGenerationController::set_localization(
+    const stellar::engine::LocalizationTable *table) noexcept {
+  storage_->locale = table;
+}
+
 NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
     const NativePreparedNewCampaign &prepared,
     std::filesystem::path research_root, std::filesystem::path catalog_path) {
@@ -118,7 +133,7 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
         (!terminal(storage_->phase) &&
          storage_->phase != NativeNewCampaignGenerationPhase::Idle))
       return {false, storage_->request_id,
-              "Finish or discard the current campaign generation first."};
+              tr(storage_->locale,"GEN_ERR_BUSY","Finish or discard the current campaign generation first.")};
   }
   if (storage_->worker.joinable()) storage_->worker.join();
 
@@ -130,7 +145,7 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
     storage_->cancel_requested = false;
     storage_->result.reset();
     storage_->phase = NativeNewCampaignGenerationPhase::LoadingCatalog;
-    storage_->status = status_for(storage_->phase);
+    storage_->status = status_for(storage_->phase,storage_->locale);
     ++storage_->revision;
   }
   try {
@@ -148,7 +163,7 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
           if (state->request_id != request_id || state->cancel_requested)
             throw GenerationCancelled{};
           state->phase = phase;
-          state->status = status_for(phase);
+          state->status = status_for(phase,state->locale);
           ++state->revision;
         };
         try {
@@ -162,27 +177,27 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
           std::lock_guard lock(state->mutex);
           if (state->request_id != request_id || state->cancel_requested) {
             state->phase = NativeNewCampaignGenerationPhase::Cancelled;
-            state->status = status_for(state->phase);
+            state->status = status_for(state->phase,state->locale);
           } else {
             state->result.emplace(std::move(generated));
             state->phase = NativeNewCampaignGenerationPhase::Ready;
-            state->status = status_for(state->phase);
+            state->status = status_for(state->phase,state->locale);
           }
           ++state->revision;
         } catch (const GenerationCancelled &) {
           std::lock_guard lock(state->mutex);
           state->result.reset();
           state->phase = NativeNewCampaignGenerationPhase::Cancelled;
-          state->status = status_for(state->phase);
+          state->status = status_for(state->phase,state->locale);
           ++state->revision;
         } catch (const std::exception &error) {
           std::lock_guard lock(state->mutex);
           if (state->request_id != request_id || state->cancel_requested) {
             state->phase = NativeNewCampaignGenerationPhase::Cancelled;
-            state->status = status_for(state->phase);
+            state->status = status_for(state->phase,state->locale);
           } else {
             state->phase = NativeNewCampaignGenerationPhase::Failed;
-            state->status = std::string{"Campaign generation failed: "} +
+            state->status = tr(state->locale,"GEN_FAILED_DETAIL","Campaign generation failed: ") +
                             error.what();
           }
           ++state->revision;
@@ -192,15 +207,15 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
                              ? NativeNewCampaignGenerationPhase::Cancelled
                              : NativeNewCampaignGenerationPhase::Failed;
           state->status = state->cancel_requested
-                              ? status_for(state->phase)
-                              : "Campaign generation failed: unknown error.";
+                              ? status_for(state->phase,state->locale)
+                              : tr(state->locale,"GEN_FAILED_UNKNOWN","Campaign generation failed: unknown error.");
           ++state->revision;
         }
       });
   } catch (const std::exception &error) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeNewCampaignGenerationPhase::Failed;
-    storage_->status = std::string{"Campaign generation failed to start: "} +
+    storage_->status = tr(storage_->locale,"GEN_START_FAILED","Campaign generation failed to start: ") +
                        error.what();
     ++storage_->revision;
     return {false, request_id, storage_->status};
@@ -208,11 +223,11 @@ NativeNewCampaignGenerationStart NativeNewCampaignGenerationController::start(
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeNewCampaignGenerationPhase::Failed;
     storage_->status =
-        "Campaign generation failed to start: unknown error.";
+        tr(storage_->locale,"GEN_START_FAILED_UNKNOWN","Campaign generation failed to start: unknown error.");
     ++storage_->revision;
     return {false, request_id, storage_->status};
   }
-  return {true, request_id, "Campaign generation started."};
+  return {true, request_id, tr(storage_->locale,"GEN_STARTED","Campaign generation started.")};
 }
 
 NativeNewCampaignGenerationView
@@ -244,7 +259,7 @@ bool NativeNewCampaignGenerationController::cancel(
   } else {
     storage_->phase = NativeNewCampaignGenerationPhase::Cancelling;
   }
-  storage_->status = status_for(storage_->phase);
+  storage_->status = status_for(storage_->phase,storage_->locale);
   ++storage_->revision;
   return true;
 }
@@ -266,7 +281,7 @@ NativeNewCampaignGenerationController::take_ready(
   auto result = std::move(storage_->result);
   storage_->result.reset();
   storage_->phase = NativeNewCampaignGenerationPhase::Consumed;
-  storage_->status = status_for(storage_->phase);
+  storage_->status = status_for(storage_->phase,storage_->locale);
   ++storage_->revision;
   return result;
 }
@@ -286,13 +301,13 @@ NativeNewCampaignGenerationController::activate_ready(
   } catch (const std::exception &error) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeNewCampaignGenerationPhase::Failed;
-    storage_->status = std::string{"Campaign activation failed: "} + error.what();
+    storage_->status = tr(storage_->locale,"GEN_ACTIVATION_FAILED","Campaign activation failed: ") + error.what();
     ++storage_->revision;
     throw;
   } catch (...) {
     std::lock_guard lock(storage_->mutex);
     storage_->phase = NativeNewCampaignGenerationPhase::Failed;
-    storage_->status = "Campaign activation failed: unknown error.";
+    storage_->status = tr(storage_->locale,"GEN_ACTIVATION_UNKNOWN","Campaign activation failed: unknown error.");
     ++storage_->revision;
     throw;
   }

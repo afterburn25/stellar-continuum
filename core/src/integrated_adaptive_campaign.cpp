@@ -91,7 +91,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
              diplomacy_runtime.create_combat_command_runtime()) {
     diplomacy_runtime.reset(current_day, true);
     auto& activity_day=world.campaign().stellar_activity_day;
-    if(!activity_day)activity_day=current_day;
+    // Legacy saves without a clock start activity at the saved epoch; clamp
+    // pathological epochs to the clock domain instead of rejecting the load.
+    if(!activity_day)
+      activity_day=std::isfinite(current_day)?std::clamp(current_day,0.,1e12):1e12;
     validate_stellar_activity_clock(activity_day);
     initialize_stellar_activity(world.campaign().seed,world.campaign().systems,*activity_day);
     stellar_activity.rebuild(world.campaign().systems);
@@ -100,10 +103,10 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
 
 StellarActivityScheduler& IntegratedAdaptiveCampaignRuntime::stellar_activity() noexcept {return storage_->stellar_activity;}
 double IntegratedAdaptiveCampaignRuntime::stellar_activity_day() const noexcept {return storage_->world.campaign().stellar_activity_day.value_or(0.);}
-std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stellar_activity(double seconds){
-  if(!std::isfinite(seconds)||seconds<0)throw std::invalid_argument("Invalid stellar activity frame time");
-  if(seconds==0)return {};
-  const double day=stellar_activity_day()+seconds/24.;
+std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stellar_activity(double simulation_hours){
+  if(!std::isfinite(simulation_hours)||simulation_hours<0)throw std::invalid_argument("Invalid stellar activity frame time");
+  if(simulation_hours==0)return {};
+  const double day=stellar_activity_day()+simulation_hours/24.;
   validate_stellar_activity_clock(day);
   auto launches=storage_->stellar_activity.advance(storage_->world.campaign().systems,day);
   storage_->world.campaign().stellar_activity_day=day;

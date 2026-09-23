@@ -1,9 +1,13 @@
 #pragma once
 #include "native_logistics.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_logistics {
@@ -16,6 +20,7 @@ struct SupplyCommand { bool captured{}, refresh{}; };
 class SupplyWorkspace {
 public:
   void set_text_measurer(std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> value);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; }
   void open() noexcept;
   void close() noexcept;
   bool visible() const noexcept { return visible_; }
@@ -35,6 +40,10 @@ private:
   [[nodiscard]] const CachedRows &rows_for(const View &, const SupplyLayout &,
                                             int, int) const;
   void clear_rows() noexcept;
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key, std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   bool visible_{}, owned_{};
   mutable float scroll_{};

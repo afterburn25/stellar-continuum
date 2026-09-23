@@ -84,16 +84,23 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   return out.str();
 }
 
-[[nodiscard]] std::string role_name(stellar::core::FleetRole role) {
+[[nodiscard]] std::string
+role_name(stellar::core::FleetRole role,
+          const stellar::engine::LocalizationTable *locale) {
   using stellar::core::FleetRole;
+  const auto resolve = [&](std::string_view key, std::string_view fallback) {
+    if (locale && locale->contains(key))
+      return std::string(locale->translate(key));
+    return std::string(fallback);
+  };
   switch (role) {
-  case FleetRole::Scout: return "Scout";
-  case FleetRole::Science: return "Science";
-  case FleetRole::Colony: return "Colony";
-  case FleetRole::Military: return "Military";
-  case FleetRole::Logistics: return "Logistics";
+  case FleetRole::Scout: return resolve("SHIPYARD_ROLE_SCOUT","Scout");
+  case FleetRole::Science: return resolve("SHIPYARD_ROLE_SCIENCE","Science");
+  case FleetRole::Colony: return resolve("SHIPYARD_ROLE_COLONY","Colony");
+  case FleetRole::Military: return resolve("SHIPYARD_ROLE_MILITARY","Military");
+  case FleetRole::Logistics: return resolve("SHIPYARD_ROLE_LOGISTICS","Logistics");
   }
-  return "Ship";
+  return resolve("SHIPYARD_ROLE_SHIP","Ship");
 }
 
 [[nodiscard]] float progress_width(double fraction, float width) noexcept {
@@ -118,6 +125,29 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
 } // namespace
 
 #include "native_shipyard_dashboard.inl"
+
+std::string NativeShipyardWorkspace::tr(std::string_view key,
+                                        std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+std::string NativeShipyardWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
 
 void NativeShipyardWorkspace::open() noexcept { visible_ = true; }
 
@@ -184,7 +214,8 @@ bool NativeShipyardWorkspace::arm_cancel_confirmation(
   selected_design_id_.reset();
   selected_order_id_ = found->order_id;
   cancel_confirmation_id_ = found->order_id;
-  notice_ = "Confirm cancellation to return " + found->formatted_refund + ".";
+  notice_ = trf("SHIPYARD_CONFIRM_CANCEL",{found->formatted_refund},
+                "Confirm cancellation to return {0}.");
   notice_accepted_ = true;
   return true;
 }

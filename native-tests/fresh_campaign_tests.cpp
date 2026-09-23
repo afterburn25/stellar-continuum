@@ -1,4 +1,6 @@
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +13,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 using Json = nlohmann::json;
@@ -1034,14 +1037,36 @@ void equal_shipyard(const ShipyardState &actual, const Json &expected,
         field + ".PendingBuildCount");
 }
 
+// The frozen C# oracles predate the canonical Sol expansion. Filter exactly
+// the reviewed moon/Pluto additions that are absent from the oracle so every
+// other generated body still aligns element-for-element.
+std::vector<PlanetaryBody> oracle_compatible_bodies(
+    const std::vector<PlanetaryBody> &actual, const Json &expected) {
+  std::unordered_set<int> expected_ids;
+  for (const auto &body : expected)
+    expected_ids.insert(body.at("Id").get<int>());
+  std::vector<PlanetaryBody> filtered;
+  filtered.reserve(actual.size());
+  for (const auto &body : actual) {
+    const auto *moon = sol_moon_definition(body.id);
+    const bool canonical_addition =
+        body.system_id == sol_system_id &&
+        ((moon && body.id != moon_body_id) || body.id == pluto_body_id) &&
+        !expected_ids.contains(body.id);
+    if (!canonical_addition) filtered.push_back(body);
+  }
+  return filtered;
+}
+
 void equal_campaign(const FreshCampaignState &actual, const Json &expected,
                     const std::string &field) {
   check(actual.seed == expected.at("Seed").get<std::int64_t>(),
         field + ".Seed");
   equal_list<StellarSystem>(actual.systems, expected.at("Systems"),
                             field + ".Systems", equal_system);
-  equal_list<PlanetaryBody>(actual.bodies, expected.at("Bodies"),
-                            field + ".Bodies", equal_body);
+  equal_list<PlanetaryBody>(
+      oracle_compatible_bodies(actual.bodies, expected.at("Bodies")),
+      expected.at("Bodies"), field + ".Bodies", equal_body);
   equal_list<Civilization>(actual.civilizations, expected.at("Civilizations"),
                            field + ".Civilizations", equal_civilization);
   equal_list<FleetState>(actual.fleets, expected.at("Fleets"),
@@ -1208,8 +1233,9 @@ void equal_warp(const WarpResult &actual, const Json &expected,
         field + ".Seed");
   equal_list<StellarSystem>(actual.systems, expected.at("Systems"),
                             field + ".Systems", equal_system);
-  equal_list<PlanetaryBody>(actual.bodies, expected.at("Bodies"),
-                            field + ".Bodies", equal_body);
+  equal_list<PlanetaryBody>(
+      oracle_compatible_bodies(actual.bodies, expected.at("Bodies")),
+      expected.at("Bodies"), field + ".Bodies", equal_body);
   equal_list<Civilization>(actual.civilizations, expected.at("Civilizations"),
                            field + ".Civilizations", equal_civilization);
   equal_list<Colony>(actual.colonies_before, expected.at("ColoniesBefore"),

@@ -13,9 +13,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Capability | Status | Owner / important source | Tests | Known limitation / next work |
 | --- | --- | --- | --- | --- |
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
-| Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp`; App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `native_ui_layout` | No complete action-map/rebinding/gamepad/accessibility framework |
+| Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`, action contexts incl. pad buttons/axes); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, multi-pad, or accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp` | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests | Bounded CPU submission and fixed caches; no render graph/GPU-driven scene |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD) | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission and fixed caches; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); no render graph/GPU-driven scene |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
@@ -32,8 +32,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh | `native_stellar_eruptions`, scene GPU tests | Image-derived curved surfaces; blurry ray-marched production mode retired; general particle framework absent |
 | Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; Core domain IDs | `foundation`, persistence tests | No unified World/component store or full entity lifecycle across game domains |
 | Clocks/scheduling | PARTIALLY IMPLEMENTED | Engine `FixedClock`; Core strategic/tactical/developer clocks, campaign phases | `foundation`, `strategic_clock_parity`, `campaign_frame_parity` | No reusable dependency scheduler or simulation LOD |
-| Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem`, image preparation; App async campaign session | `foundation`, image preparation, campaign session tests | Bounded specialized consumers; no general dependency/prioritized task graph |
-| Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>`; Core domain events | `foundation`, notification/activity tests | Not a cross-thread subscription bus or mission/event framework |
+| Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); save writer, image preparation, audio director, territory overlay, campaign session, planet-material decode queue | `job_system`, `foundation`, image preparation, campaign session, planet-material tests | Bounded specialized consumers; no work-stealing or affinity policy |
+| Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>` + `event_bus.cpp` typed subscriptions; Core domain events | `foundation`, `event_bus`, `mission_graph`, notification/activity tests | Event bus library unconsumed by the game; no cross-thread dispatch policy |
 | Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp` | scene/triangle/orbit/scale tests | Kinematics and continuous primitive queries; no general rigid-body/constraint/N-body world |
 | Spatial queries | PARTIALLY IMPLEMENTED | Engine point/region/3D indices, parent chains; Core batch indices | `engine_parent_chain_index`, scale/survey/economy tests | Reusable pieces; no unified query scheduler or stable world-wide index lifetime policy |
 | Navigation/logistics | IMPLEMENTED BUT NEEDS POLISH | Core lane network, reach, exploration, freight/logistics | route/reach/freight/exploration parity | Domain-specific rules, not generic Engine route service; combined fleet stress still needed |
@@ -44,9 +44,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
-| Replay | PARTIALLY IMPLEMENTED | Deterministic parity fixtures, QA checkpoints and invocation metadata | QA/persistence/parity tests | No complete interactive command journal/replay divergence tool |
+| Replay | PARTIALLY IMPLEMENTED | Engine `replay.cpp` command journal consumed by the client (`--record`/`--replay`, verified `diverged:false`); deterministic parity fixtures, QA checkpoints | QA/persistence/parity tests, replay smoke | No interactive divergence-localization tooling |
 | Asset registry/packages | IMPLEMENTED | Engine `asset_registry.cpp`, checksummed aliases/chunks | `engine_asset_cooker`, cooked validation evidence | Shipping marker forbids loose fallback; missing/corrupt content is an error |
-| Asset cooker/compression | IMPLEMENTED BUT NEEDS POLISH | Engine asset cooker/texture cook/codecs, `StellarCooker` | `engine_asset_cooker`, image/GPU tests | Current distribution grew; HDR/mesh cooking absent; many quality fallbacks |
+| Asset cooker/compression | IMPLEMENTED BUT NEEDS POLISH | Engine asset cooker/texture cook/XPRESS+LZMS codecs, `StellarCooker`; **generic `scan_content` project mode** recursively indexes any content root into a project-namespaced package — no reviewed SC export manifests required | `engine_asset_cooker` (incl. scan-mode cook: namespaced package, texture cook, byte round-trip), image/GPU tests | HDR/mesh cooking absent; ~1,011 legitimate quality-gate fallbacks remain (LZMS cut stored bytes ~12%) |
 | Texture streaming/residency | PARTIALLY IMPLEMENTED | Metadata/mip selection, bounded preparation and image/GPU caches | image preparation/GPU/cooked flare regressions | No virtual textures or adaptive device VRAM budget |
 | Audio | PARTIALLY IMPLEMENTED | Engine native audio + Windows media decode; App director/settings | `native_audio`, `native_audio_director`, settings tests | Current-track PCM and bounded queues; incremental/spatial/bus architecture unfinished |
 | Cosmetic animation | PARTIALLY IMPLEMENTED | Shared axis/phase, slow spin/tumble and event interpolation | moon/small-body/activity tests | Specialized consumers, no general animation graph/tracks |
@@ -54,7 +54,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Diagnostics/crash reports | IMPLEMENTED BUT NEEDS POLISH | Engine runtime diagnostics/log/bundle; App context and support service | `engine_runtime_diagnostics`, developer fault/support tests | Local/bounded/best-effort; forced kill/power loss not guaranteed, no automatic upload |
 | Profiling/memory accounting | PARTIALLY IMPLEMENTED | Engine phase timing, queue/cache ledgers; QA process samples | diagnostics/scale tests | No integrated GPU timeline or allocator-tag census |
 | Versioned Windows maintenance | IMPLEMENTED BUT NEEDS POLISH | Engine product version/lease; `installer/`; update scripts | `engine_windows_maintenance`, `engine_windows_maintenance_os` | Offline unsigned dev, exact-base whole-file updates; no remote updater or rollback after successful cleanup |
-| Localization/Steam | NOT STARTED | No current native implementation established | None claimed | Plan isolated contracts after reliability work |
+| Localization | PARTIALLY IMPLEMENTED | Engine `LocalizationTable`/`LocalizationService` (fallback chain, format/plural, reload); the startup screens, new-game setup (species details, galaxy selection, sandbox configuration), diplomacy, research (workspace plus the projection's purpose/benefit text, action reasons, domain tabs and notices), fleet, construction, inspection, economy (workspace plus the treasury view-model's cards, treasury/priority status, flow rows and notices), supply, colony-roster, colony-workspace, planetary-screen, system (including the small-body survey panel), battle, shipyard, overview, notification-feed, command-HUD, planet-globe, controlled-assets, settlement, galaxy-phenomena hover/label surfaces (secrecy labels preserved), the setup controller's preset labels and validation messages, and the startup/generation session status strings, pause menu, settings hub, and General/Audio/Video/Voice panels plus voice-cue subtitles consume `data/locale/en.json` | `localization`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings`, `native_settings_hub`, `native_startup_workspace`, `native_new_game_workspace`, `native_diplomacy_workspace`, `native_research_workspace`, `native_research_controller`, `native_fleet_workspace`, `native_construction_workspace`, `native_inspection`, `native_economy_workspace`, `native_economy`, `native_logistics_workspace`, `native_colony_roster`, `native_colony_workspace`, `native_planetary_screen`, `native_system_workspace`, `native_small_body_panel`, `native_body_inspection`, `native_battle_workspace`, `native_shipyard_workspace`, `native_overview`, `native_notifications`, `native_command_hud`, `native_planet_globe`, `native_controlled_assets`, `native_settlement_workspace`, `native_phenomena`, `native_new_campaign_setup`, `native_new_campaign_generation`, `native_startup_session`, `native_voice_playback` | Startup chrome, setup wizard (including producer-side preset labels and validation messages), diplomacy/research/fleet/construction/inspection/economy/supply/colony-roster/colony/planetary/system/battle/shipyard/overview surfaces, small-body survey panel, phenomena hover cards (knowledge-gated labels resolve only at presentation), navigation/resource HUD chrome, notification feed (categories stay stable publisher IDs — only display labels translate), menus, and voice cue keys resolve through the catalog, English only; test-only dead presentation code and a few HUD surfaces remain literal |
+| Steam/platform services | PARTIALLY IMPLEMENTED | Engine `PlatformServices` facade + `NullPlatformBackend`; client reports backend status in support bundles | `package_platform` | No Steamworks backend yet; standalone behavior unchanged |
+| Standalone engine shell | IMPLEMENTED BUT NEEDS POLISH | `app/engine_main.cpp` (`stellar-engine.exe`) links only `stellar_engine` + `stellar_native_platform` — windowed Vulkan tools host (Projects/Dashboard/Assets/Profiler/Localization sidebar), JobSystem demo work, Profiler aggregates/frame graph, `VirtualizedList` asset browser with image preview, `LocalizationTable` catalog inspector, diagnostics install. The Projects tool runs the complete game loop: create -> author (Scene tool: ~30-field entity+tilemap property list, animated/flipped/rotated/tilemap preview, drag-move, undo, duplicate, reorder) -> cook -> build -> test -> run -> package. **Projects tool** creates/opens `EngineProject` game projects (`project.stellar.json` manifest, scaffolded `packages/<id>` base package owning the project namespace, starter `src/main.cpp`), resolves their content packages through `PackageRegistry`, and re-roots the asset browser at the project's own content tree; **COOK** runs the asset cooker's generic `scan_content` mode on the JobSystem, producing `build/cooked` packages + validated manifest + cook report under the project directory, streaming per-asset progress (done/total) via `AssetCookOptions::progress`; **BUILD** configures/compiles the project's generated `CMakeLists.txt` + windowed `src/main.cpp` host (opens a `stellar::platform` Window, renders package status, Escape quits) against the exported `engine-sdk/` (headers, prebuilt libs, SDL3 runtime + default font, `StellarEngineSdk.cmake` consumer targets `stellar::engine`/`stellar::cooker`/`stellar::platform`/`stellar::audio`, staged by the `stellar-engine-sdk` target); **RUN** launches the built host with the project root as working directory; **IMPORT** copies a file into `packages/<id>/content/`; **NEW PACKAGE** scaffolds additional content packages under the project namespace with a dependency on the base; **EDITOR** launches `stellar-editor.exe --project <root>` (its document directory becomes `<project>/editor/`, the manifest seeds the project name); **TEST** smoke-runs the built host hidden for `--frames N` frames and reports pass/fail (30s timeout); **PACKAGE** assembles a distributable `dist/<name>/` folder (host exe + SDL3 runtime + default font + cooked `Content/` + source `packages/`); the starter host is a live ECS demo (`World` entities with Transform/Velocity components ticked per frame, rendered square) and validates cooked content via a local `AssetRegistry` probing `Content/` beside the exe (packaged layout) then `build/cooked/` (dev layout) — not the global mount, which would break loose-file font loading; scaffolded layout includes a `mods/` directory scanned after the project's protected namespace so mod packages cannot override the base | `engine_project` tests (scaffold layout incl. consumer CMakeLists, manifest round-trip, malformed rejection, discovery); `engine_asset_cooker` scan-mode coverage; verified end-to-end: scaffold → cook → configure against engine-sdk → build → run → windowed render | Tools host foundation: full create → open → browse → import → cook → build → run → edit → package loop works end-to-end and was verified on external projects via both the UI and the headless CLI (`--create/--cook/--build/--test/--package/--run`, plus `--project`/`--tool` deep-links); the Scene tool authors `editor/scene.json` with bounded whole-document undo/redo (engine `UndoHistory`, Ctrl+Z/Y + UNDO/REDO buttons) — (engine `SceneDocument`: named entities with position/extent/velocity/tint/optional content-relative `sprite` an integer `layer` draw order — higher layers render on top, stable within a layer; the tool exposes layer/parallax fields and preview/hit-test honor draw order — plus a per-entity `parallax` camera-scroll factor (0 pins to screen) a document `background` clear color, and a `text` field whose Label component draws a centered caption inside the entity rect (sprite/tint + text = buttons and HUD banners) — all honored by RuntimeHost and the tool preview; a document-level `gravity` (px/s^2) turns the host into a platformer sim — gravity-scaled entities integrate downward, rest on the floor instead of bouncing, up/W becomes a grounded jump impulse (grounded = resting on the world floor or a platform top), held-key vertical velocity only applies when gravity is off, and entities marked `solid` act as static platforms — downward movers land on their tops, movers stop against their sides and bump their heads underneath (all-direction blocking works in top-down scenes too, not just under gravity) (full AABB blocking for gravity-affected entities; `oneway` entities are landable from above but never side-block); solids with velocity are kinematic moving platforms — they integrate, stop at world bounds, and carry riders standing on their tops), sprite-sheet animation (`frames`/`fps`/`fcols` — frame index from accumulated sim time, deterministic under --fixed-hz; `fcols` slices grid sheets row-major, 0 = horizontal strip; `animLoop` false holds the last frame for one-shots), and sprite `rotation` (degrees about the rect center; tinted rects cannot rotate), and entity `ttl` — a sim-time countdown that self-destructs spawned effects (the starter demo's Space-fired spark expires after 3s if it never collides), and sprite `flipX`/`flipY` mirroring (new `Image` flip fields route through SDL_RenderTextureRotated even at 0 degrees), and a `visible` flag — hidden entities simulate and collide but are skipped by the renderer (ghosted in the Scene tool preview, which also now shows live frame animation/rotation/flip), and entity `parent` — name-keyed attachment resolved by `resolve_hierarchy` each sim step: the child keeps its authored offset and follows the resolved parent (chains resolve root-first, cycles/missing parents keep the last position), while the child's own world-space motion (velocity, collisions, game writes) re-bakes into its stored offset — verified end-to-end with a turret tracking a moving ship)) which the windowed starter spawns into its `World` — sprites decode once under the base package's content dir, the starter polls the document for changes so Scene-tool saves hot-reload into the running game, and the entity named `player` is driven by WASD/arrow keys (held-key velocity control fed by KeyPressed/KeyReleased events); `audio/bounce.wav|mp3` under the base package content decodes through `engine::audio::decode_audio_clip` and plays via `AudioOutput::play_effect` when the player bounces; `runtime_host.hpp` (`stellar::runtime`) is a ready-made windowed game host owning the SDL loop, package scan + namespace protection, ECS world, scene hot-reload, WASD player input, velocity/bounce integration, sprite rendering, audio and F5/F9 quicksave — games customize via on_update/on_event/on_status/on_draw callbacks, so a scaffolded main.cpp is ~20 lines; options support fixed-timestep simulation (`--fixed-hz`; frame-limited runs step once per frame so `--frames N --fixed-hz R --snapshot-out <path>` produces byte-identical world dumps across runs — verified deterministic), bounce clamps position to the frame, for deterministic ticks and CI smoke tests, P toggles a sim pause (rendering continues), `time_scale`/`--speed` scales sim dt, and game code can drive the loop through `request_quit`/`set_paused`/`set_scene` (project-relative scene switching — level loads); `--scene <path>`/`--width`/`--height`/`--fullscreen`/`--speed` adjust the scene, window and sim rate, F12 screenshots land in project `screenshots/`, `rng()` exposes a host-owned `DeterministicRandom` living on a world entity so its state snapshots with F5/F9 saves — same `--seed` reproduces the same stream, verified across runs; generated games install `RuntimeDiagnostics` (session log + crash minidumps under `logs/`), and `spawn_entity`/`destroy_entity`/`on_collision`/`on_collision_exit`/`on_land`/`on_tile_land` give dynamic entity spawning plus AABB contact enter/exit and touchdown events (once per landing, not per resting step; tile events identify map/cell/tile); `entities_in_rect`/`entities_in_radius` run world-space region queries over tracked entities (AoE, aggro, selection boxes — Hidden entities included, tilemap carriers excluded); `vfx()`/`spawn_emitter()` run the deterministic particle framework inside the sim step; a scene `vfx` field auto-attaches a named emitter (VfxRef component — re-anchored each step, stopped when the entity dies, re-attached on save restore), and a document-level `emitters` array declares full `EmitterDefinition`s (rate/lifetime/velocity range/spread/gravity/over-life scale+opacity+tint curves/max/LOD) in JSON so particles need no game code at all; `on_spawn` fires per spawned scene entity so games attach custom components keyed off `name`/`data`; `set_camera`/`camera_x/y/zoom`/`viewport_width/height` provide a world-space 2D view transform (entities draw at (world - camera) * zoom, off-screen entities culled, HUD stays screen-space) so generated games can scroll/zoom — the starter demo centers the camera on the player from on_update; `world_width`/`world_height` (`--world-w`/`--world-h`/`--move-speed`/`--jump`/`--save`) bound the built-in wall bounce independently of the window so camera games can build levels larger than one screen; `content_resolver.hpp` gives hosts a single content-path API over cooked manifests (packaged `Content/` then dev `build/cooked/`) and loose `packages/<id>/content/` files, with package-qualified overloads (`"pkg:path"` or explicit package arguments) so mod packages resolve through the same API; `scene_components.hpp` ships the canonical scene component set (Transform2D, Velocity2D, Extent2D, Tint, EntityName, SpriteRef, Layer, Parallax, Label, GravityScale, Solid, Anim, Rotation, Lifetime, Flip, Hidden, Oneway, NoBounce, UserData, Opacity, Spin, Parent, Tilemap) with `register_scene_components` codecs, `spawn_scene`, `find_entity_by_name`, and file-backed `save_world_to_file`/`load_world_from_file` (atomic write, safe false on corrupt/missing) so hosts no longer hand-roll ECS spawn/persistence; the starter registers codecs for its components (transform, velocity, extent, tint, name, sprite path) and quicksaves via `World::snapshot()` to `saves/quicksave.stw` on F5, restoring on F9 (player handle re-resolved by name so no stale `EntityId` survives); starter templates: `windowed` (platform + ECS demo) or `blank` (console); positional hierarchy is name-keyed only (no parent rotation/scale propagation, no cascade destroy — use World::set_parent for structural grouping); no custom scene-field extensibility or debugger attach; SDK is Windows/Release-only |
+| Native engine editor | PARTIALLY IMPLEMENTED | `app/editor_main.cpp` + `app/editor_project.cpp` (`stellar-editor.exe`) links engine + core + platform — galaxy workspace running the full authoritative world-assembly pipeline (catalog, planetary bodies, stellar physics, small-body fields, orbit init, activity) on a JobSystem worker (250/500/1000/2500 sizes, seed regen), pannable/zoomable class-colored star map, system orbit workspace (Kepler ring polylines via `analytic_orbit_position`, companion hosts, small-body bands, time-scrubbed body markers/labels), **body workspace** (per-body satellite view: moon orbit rings via `planetary_satellite_orbit`, positions via `satellite_relative_position`, km-scale camera, Galaxy→System→Body view descent), click-select system inspector and body inspector (physical properties, environment, orbit/exposure, flags), searchable virtualized systems list, **system- and body-level annotation layer** (display-name/note/bookmark per record, body rows clickable to a body inspector context, bookmark markers on list rows and orbit markers) with bounded undo/redo over the whole project document (engine `UndoHistory`, Ctrl+Z/Y), editable project name, atomic JSON project save/load (`write_file_atomically`, schemaVersion 1, all-or-nothing parse, additive `bodyEdits`/`name` keys); succeeds the stranded 0.1.9 WPF editor on `work/stellar-engine-editor` (PR #326) | `editor_project` document tests (round-trip incl. body edits + project name + malformed rejection), `undo_history` engine tests; generation path covered by `galaxy_catalog`/planetary/orbit family tests; manual launch for UI | Authoring foundation: no multi-file projects/Save-As picker, asset embedding, or property mutation yet — generated data is read-only |
 | Mods/accessibility/editor | PLANNED / PARTIALLY IMPLEMENTED foundations | Data catalogs, input/settings, Developer tools/import CLI | Existing scoped tests only | These pieces do not constitute a complete mod/accessibility/editor product; see the 30-item roadmap |
 
 ## Implementation records (newest first)
@@ -62,6 +65,223 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 Records below retain purpose, API, consumers, tests, save/performance impact and
 limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 [celestial status](CELESTIAL_CONTENT_STATUS.md) resolve superseded descriptions.
+
+## Reusable 3D scene mode for generated games (2026-09-23)
+
+- **Purpose:** the same generated-project loop (author → cook → build →
+  run → save) now supports 3D worlds — a `scene3d.json` document drives a
+  world of mesh entities simulated and rendered by the engine's existing
+  GPU `Scene3D` pipeline, composited under the 2D pass so scene entities
+  remain usable as HUD/overlay.
+- **Engine APIs/ownership:** `Scene3dDocument` (scene_document.hpp) is
+  the 3D counterpart of `SceneDocument`: camera (pos + yaw/pitch deg +
+  fov + near/far), directional key light (world-space dir + intensity),
+  background, `gravity` (−Y), `groundY` rest plane, `bounds` XZ
+  half-extent, `music`, and the shared `emitters` table — serialized as
+  strict all-or-nothing JSON. `Scene3dEntity` covers name, mesh spec,
+  pos/rot (yaw-pitch-roll deg)/scale, velocity, color/opacity/texture,
+  `doubleSided`, `gravityScale`, `solid`, `ttl`, `data`, `parent`.
+  ECS: `Transform3D` (pos + quaternion + scale), `Velocity3D`,
+  `MeshRef`, `TextureRef`, `DoubleSided`, `Parent3D` — all snapshot-
+  persisted via registered codecs alongside the existing 2D set.
+  `spawn_scene3d`/`entities3d`/`scene3d_from_world`/`resolve_hierarchy3d`
+  mirror the 2D helpers; `Mesh3D` now carries local AABB bounds
+  (`bounds_min`/`bounds_max`) computed in `create()`.
+- **Mesh sources:** `MeshRef::spec` accepts `box[:sx,sy,sz]` and
+  `annulus:inner,outer[,segments]` primitives
+  (native_geometry3d.hpp), `sphere[:cols,rows]` (`Mesh3D::uv_sphere`),
+  or a content-relative `.obj` path loaded through `ContentResolver`
+  (cooked bytes or loose file) by `load_obj_mesh` — a minimal Wavefront
+  OBJ parser (v/vn/vt/f, fan triangulation, generated flat normals).
+- **RuntimeHost --scene3d:** `RuntimeHostOptions::scene3d` /
+  `scene3d_file` (`--scene3d`, `--scene3d-file`, `--fly-speed`). The host
+  loads the document into the same World (3D entities form a separate
+  tracked set), hot-reloads it with the 2D scene poll, flies the camera
+  with the rebindable "game" context (WASD move, Space/C up/down,
+  right-drag look, wheel fov), integrates gravity + velocity at the
+  fixed timestep, rests entities on `groundY` by their mesh's scaled
+  world-AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out),
+  ticks `Lifetime`, resolves `Parent3D` follow, and runs contact events
+  — solid movers push out along the least-penetrated axis and zero
+  inward velocity; `on_collision`/`on_collision_exit`/`on_land` fire for
+  the 3D set. Public API: `scene3d()`, `entities3d()`,
+  `entities3d_in_radius`, `spawn_entity3d`, `on_spawn3d`,
+  `set_camera3d` + getters, `gravity3d()`, `ground_y()`, `raycast3d`,
+  `entity3d_at`. F5/F9 snapshots capture the 3D set —
+  including a `Camera3DState` carrier that restores the fly camera — and
+  `load_world` partitions it back out of the 2D list. Narrow-phase
+  collision uses SAT over oriented bounding boxes (`ObBox3D` +
+  `obb_separation` in physics3d.hpp — each entity's local mesh bounds
+  transformed by its quaternion/scale): rotated boxes resolve on their
+  true faces instead of the conservative world AABB, and the returned
+  minimum translation vector drives push-out + landing. The world AABB
+  is still computed alongside for the ground plane, `bounds` clamping,
+  and broad-phase pair rejection. A `lights` document
+  array (max 2) feeds `Material3D::additional_lights` as world-space
+  directional fills. `create_project`'s windowed starter ships a ready
+  `editor/scene3d.json` and documents `--scene3d` in the host comment.
+  `raycast3d(origin, dir, max_distance)` casts a ray against actual
+  mesh triangles — shared `raycast_world3d` (scene_components) +
+  `resolve_mesh_spec` (mesh3d_loader) transform the ray into each
+  mesh's local frame (rotation + scale aware) and test triangles via
+  `intersect_mesh_segment` (bounding-sphere reject); the nearest hit
+  returns `{entity, distance, world point}`. `entity3d_at(sx, sy)`
+  builds the camera ray through a viewport pixel for mouse picking.
+  Both shared functions are reusable by tools — e.g. a scratch world
+  from `spawn_scene3d` gives document-level picking without a host.
+  Verified live: vertical rays hit box tops exactly, a 45°-rolled plank
+  reports its true rotated face (local y≈0.25), a sphere occludes the
+  plank behind it, and a screen-center pick through the pitched camera
+  lands at the analytically-correct floor point.
+- **Consumers/tests:** any generated host passes `--scene3d`;
+  `engine_project` tests cover document round-trip/malformed/save-load,
+  `engine_world` covers spawn/components/codecs/hierarchy/export/
+  box_mesh/OBJ. Verified live: a gravity ball falls and rests on the
+  ground plane (AABB bottom), static solids stay put, the scene renders
+  through `Scene3DView` under the 2D HUD.
+- **Save/performance impact:** 3D components are POD/string codecs in
+  the same snapshot stream; meshes/textures cache per spec; contact scan
+  is O(n²) over the 3D set (small scene counts); rendering reuses the
+  existing bounded `Scene3D` submission path.
+- **Limitations:** collision is OBB over the mesh's local AABB (not
+  per-triangle — a sphere mesh still collides as its box); solids are
+  blockers, not full rigid-body dynamics (no stacking solver — `groundY`
+  + the upward push-out cover landing); ground plane and `bounds` still
+  use the world AABB; `physics3d` kinematics/`spatial_index3d` exist
+  engine-side but are not wired into this mode (raycast uses
+  `segment_triangle` via `intersect_mesh_segment`); the Scene3D editor
+  tab covers entity + document fields with a live preview/pick but has
+  no transform gizmos or light/emitter authoring UI; lighting is one key
+  light + up to two directional fills per material; raycast is
+  O(triangles) per entity with no spatial partition — fine for queries,
+  not per-frame sweeps.
+
+## Authored tilemap layers for generated 2D games (2026-09-21)
+
+- **Purpose:** reusable grid terrain for generated projects — authored
+  tilemaps render tileset images across cell grids, each drawing at its own
+  layer between entities, and optionally participating in authoritative
+  collision (side-blocking, top landing, grounded detection for jump).
+- **Engine APIs/ownership:** `SceneDocument::tilemaps` is a vector of
+  `SceneTilemap` (tileset path, `x`/`y` grid origin in world px —
+  chunked/procedural maps place tiles at nonzero offsets, `tileW`/`tileH`
+  cell size, `columns`, `layer`, `parallax`, `collide`, `cells` with `-1`
+  empty) serialized as a
+  `"tilemaps"` JSON array with strict per-entry validation (positive
+  dimensions, cell count divisible by columns); legacy single-`"tilemap"`
+  documents still parse as a one-element array. `spawn_scene` carries each
+  tilemap into the world as a `Tilemap` component on its own dedicated
+  entity in document order (`tilemap_entities()` lists them,
+  `tilemap_entity()` returns the first, `scene_from_world` re-exports all),
+  so cell state is authoritative and snapshots with F5/F9 quicksaves —
+  runtime cell edits (destructible terrain) persist. The host resolves each
+  map's tileset through `ContentResolver` (per-map image cache), renders
+  cells via the `Image` source-rectangle path in layer-sorted order that
+  interleaves with the entity pass, honors camera transform and per-map
+  parallax, and runs tile collision against every `collide` map inside the
+  same authoritative movement pass as solid/oneway entities — each probe
+  uses that map's own tile geometry and cells. `RuntimeHost::tile_at`/
+  `set_tile_at` take an optional document-order map index (default 0 =
+  the primary grid) and `tilemap_count()` reports the layer count;
+  `tilemap_entities()` exposes the carriers for direct component work.
+  `spawn_tilemap(SceneTilemap)`/`destroy_tilemap` add and remove layers
+  at runtime (procedural terrain) — they join the same tracked set, so
+  they render, collide and snapshot identically to scene-authored maps
+  (scene hot-reload rebuilds all layers, like respawned entities).
+- **RuntimeHost input actions:** the host now feeds every platform event into
+  an `InputMapper` — a built-in "game" context (move_left/right/up/down on
+  WASD+arrows+D-pad, `move_x`/`move_y` analog Axis1D on the left stick with a
+  0.18 deadzone folded into player velocity, jump on Space/W/Up/pad-South,
+  fire on Space/LMB/pad-RB, mine on C/pad-West) drives the player, so
+  `RuntimeHostOptions::input_map`/`--input-map` JSON stacks project contexts
+  on top and `host.input()` exposes `pressed`/`just_pressed`/`axis`/`rebind`
+  to game code. `InputMapper::context_names()` enumerates registered contexts
+  so a loaded map activates without name plumbing.
+- **Gamepad input:** the platform layer opens the first attached SDL gamepad
+  (`SDL_INIT_GAMEPAD`, hot-plug add/remove), normalizes buttons and
+  clamped -1..1 axis motion into `GamepadPressed`/`GamepadReleased`/
+  `GamepadAxis` `InputEvent`s, and `RuntimeHost` converts them into mapper
+  `RawInputEvent`s — so generated games read pad input through the same
+  action names as keyboard/mouse. `InputMapper` keeps per-axis last-value
+  state (`gamepad_axes_`) because devices only emit axis events on change;
+  `axis()` folds live GamepadAxis bindings into the per-frame result.
+  Covered by `input_actions` tests (context_names enumeration, pad button
+  press/release edges, axis persistence/update across frames, plus the
+  existing feed/axis/chord/rebind suite); verified `--input-map` loads and
+  degrades to defaults on missing/malformed files. Remaining gap: no
+  rebinding UI or pad-specific glyphs in the tools; only the first pad is
+  used.
+- **Scene music:** `SceneDocument::music` names a content-relative track the
+  host plays when the scene loads — per-level music for `set_scene()`
+  switching and hot reload (a change to the field restarts the new track;
+  empty keeps the current/options track). The Scene tool exposes a doc-level
+  `music` field; covered by `engine_project` round-trip tests.
+- **Scene world bounds:** `SceneDocument::worldSize [w,h]` lets each level
+  declare its playable extent — the runtime resolves bounce/camera bounds as
+  `--world-w/--world-h` argv > scene `worldSize` > viewport. The Scene tool
+  exposes a doc-level `worldsize` field; verified by snapshot runs (an entity
+  clamps at 400 vs 4000-wide bounds).
+- **Entity spin:** `SceneEntity::spin` (deg/s) becomes a `Spin` component that
+  integrates into `Rotation` each sim step — rotating hazards/props without
+  per-frame game code. Snapshot-verified (spin advances the serialized
+  rotation); the Scene tool exposes a `spin` field and the preview shows
+  live rotation.
+- **Entity bounce opt-out:** `SceneEntity::bounce=false` adds the `NoBounce`
+  marker — the entity clamps dead at world bounds instead of rebounding
+  (projectiles, debris). Snapshot-verified: a `bounce:false` mover stops at
+  `world_w - w`; the Scene tool exposes a `bounce` bool field.
+- **Runtime query surface:** `host.find_entity(name)` locates a tracked
+  entity by authored name (doors, waypoints, triggers — "player" is just the
+  conventional one); `host.sim_time()` reports deterministic elapsed sim
+  seconds; `host.world_width()`/`world_height()` expose the resolved level
+  bounds for spawn limits, AI roam ranges and minimap math;
+  `host.screen_to_world(sx, sy)` maps pointer positions into the world
+  under the camera (aim, click-to-move) and `host.entity_at(sx, sy)`
+  hit-tests drawn bounds topmost-first (layer order, doc-order ties) with
+  per-entity parallax and zoom applied — HUD picks where it appears,
+  hidden entities and tilemap carriers never match.
+- **Named save blobs:** `host.save_data(key, bytes)`/`load_data(key)`
+  persist arbitrary game state (quest flags, inventories, settings) under
+  `saves/data/<key>.dat` — atomic writes through the same rotating `.bak`
+  history chain as world snapshots, newest-first recovery on a corrupt
+  primary, `[A-Za-z0-9._-]` key whitelist. Verified live: a generated host
+  writes and reloads a blob across runs.
+- **Consumers:** `RuntimeHost` generated hosts (multi-map rendering, gravity
+  landing, wall blocking, grounded jumps, hot reload); the shell Scene tool
+  (TILES + adds a grid layer, MAP k/n cycles which tilemap the fields and
+  PAINT edit, TILES - removes the selected layer — all under the document
+  undo history; tileset/tilesize/columns/collide/layer/parallax/cells/paint
+  fields, preview rendering with the same layer-sorted interleave and a
+  checkerboard fallback when no tileset is set, PAINT mode that writes cells
+  into the selected map by click/drag with a grid overlay and one undo step
+  per stroke).
+- **Save/determinism/performance:** every tilemap is a `Tilemap` component on
+  its own world entity, so quicksaves snapshot all maps' cell edits and
+  `scene_from_world` re-exports them in spawn order; pre-tilemap saves simply
+  lack the components (scene reload restores them). Hot reload respawns all
+  carriers with the document. Cell scans are O(columns x rows) per map with
+  viewport culling; collision probes sample a few cell points per moving
+  entity per colliding map per fixed step. Grid order is row-major and both
+  spawn and draw order are deterministic (stable layer sort, doc order within
+  a layer).
+- **Tests:** `engine_project` tests cover JSON round-trip of a two-tilemap
+  document (independent tilesets, dims, layer, parallax, collide, cells),
+  legacy single-`"tilemap"` parsing, and rejection of malformed maps in both
+  forms; `engine_world` tests cover per-map dedicated-entity spawn, both
+  carriers staying out of the gameplay list, codec round-trips through
+  `snapshot()`/`restore()` including independent runtime cell edits on each
+  map, and `scene_from_world` exporting both; live verification on a
+  generated project: a ball lands on the SECOND map's platform (y=160 vs the
+  first map's floor at y=672 — each map's own geometry applies) and rests on
+  the first map's floor when the platform map is removed.
+- **Limits/reuse:** `tile_at`/`set_tile_at` take a document-order map index
+  (`tilemap_count()` reports the layer count) and `tilemap_entities()`
+  exposes the carriers — but there is no named-map lookup; the editor
+  selects but cannot reorder tilemap layers (edit `layer` for draw order);
+  collision is cell-level solid only (no per-tile slopes/one-way flags);
+  paint strokes fill single cells (no brush size or fill tool). Other
+  RuntimeHost consumers (2D platformers, top-down maps, puzzle boards)
+  reuse the same path.
 
 ## Cooked flare reservations, local crash reports and small updates (2026-09-20)
 
@@ -228,6 +448,36 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   optimization scope is not implied complete. See [cooker guide](ASSET_COOKER.md).
   Actual sizes and acceptance evidence: [cooked release report](ASSET_COOKER_REPORT.md).
 
+## Package codec escalation and BC7 quality retries (2026-10-08)
+
+- **Purpose/ownership:** shrink cooked packages without relaxing the texture
+  quality gates. Engine `texture_cook` retries quality-gate failures at maximum
+  BC7 encoder effort before declaring a lossless RGBA8 fallback; engine
+  `asset_registry` selects the smallest result across `None`, `XpressHuff`,
+  `XpressRgbaDelta`, `Lzms` and `LzmsRgbaDelta` per chunk. Failed compressor
+  output is never tagged as compressed.
+- **Public APIs:** `AssetCodec` gains `Lzms`/`LzmsRgbaDelta` (values 3/4);
+  `compress_asset_bytes`, `decompress_asset_bytes`, chunk headers and manifest
+  codec validation accept the expanded bounded range. BC4/BC5 paths are
+  unaffected because encoder effort is a BC7-only parameter.
+- **Consumers:** every cooked-package reader (image/GPU loaders, fonts, audio,
+  catalogs) transparently decodes the new codecs through `decompress_asset_bytes`.
+  Package readers and manifests produced before this change remain readable:
+  codec 0–2 data is unchanged and old loaders reject unknown tags safely.
+- **Data/performance:** measured on the four fallback-heavy categories (vfx,
+  properties, critical, background): cooked unique bytes 3.88 GB → 3.42 GB
+  (−11.9%) with identical fallback counts and unchanged quality metrics.
+  LZMS encoding roughly doubles per-chunk cook time on those categories;
+  decompression cost stays in the same class as XPRESS. BC7 effort escalation
+  rescued 2 of 1,013 fallbacks and is retained mainly for diagnostic quality
+  reporting; remaining fallbacks are legitimate gate failures.
+- **Tests:** `engine_asset_cooker` covers codec-tag bounds, predictor round
+  trips, LZMS and LZMS+delta round trips, empty-input handling, damaged-size
+  rejection, and failed-compressor fallback to `None`. Deterministic-cache,
+  integrity and maintenance suites unchanged.
+- **Limits/reuse:** LZMS is Windows Compression API only; portable cooks would
+  need another codec id. No adaptive streaming yet — storage saving only.
+
 ## Canonical moons, stable axes and quiet skies (2026-09-20)
 
 - **Purpose:** import all 18 supplied major Sol moons into fresh and saved games,
@@ -377,6 +627,53 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   campaign persistence suites and loading the copied developer campaign.
 - **Limits/reuse:** only the known v1 ordinal table is accepted. Unknown class IDs
   remain errors rather than being silently assigned a different world type.
+
+## Appearance completion for population-free generation (2026-09-21)
+
+- **Purpose/modules:** Core `planet_appearance.cpp`'s
+  `generate_planet_appearances` previously skipped bodies whose system had no
+  stellar object (population-free generation), leaving the first save capture
+  appearance-less. Restore then synthesized appearances, breaking save/load
+  idempotence for those campaigns.
+- **Interfaces/consumers:** starless-system bodies now receive
+  `planet_appearance_for_existing` during generation, so every generated body
+  carries appearance before the first capture. Player campaign save/load and
+  all galaxy-payload consumers see idempotent round trips.
+- **Save/determinism/performance:** deterministic (`visual_seed` derives from
+  the campaign seed and body id); no schema change — saved payloads simply
+  contain appearance records that restore already produced anyway.
+- **Tests:** `native_research_controller` cancelled-research full-save round
+  trip, `native_fresh_progression`, and the galaxy/player persistence parity
+  suites.
+- **Limits/reuse:** starless bodies use the preserve-existing-environment
+  appearance path (no stellar class eligibility without a star); systems with
+  stellar objects are unaffected.
+
+## Combined-scenario benchmark instrumentation (2026-09-21)
+
+- **Purpose/modules:** `app/adaptive_campaign_host.cpp` — the
+  `--simulate-adaptive-campaign` benchmark measures combined late-game
+  workload: `--autosave-every N` runs the real Player17
+  capture/encode/atomic-write inside the running campaign every N ticks, and
+  `--stress-fleets N` injects N active military fleets per spacefaring
+  civilization (half in interstellar transit toward Sol, exercising movement
+  and sensor/contact phases). The campaign seeds via
+  `seed_persistable_fresh_campaign` so the world carries the authoritative
+  galactic core and metadata the real save path requires.
+- **Interfaces/consumers:** CLI flags on the headless executable; the JSON
+  report gains `autosaveIntervalTicks/Count/MeanMs/P95Ms/PeakMs/Bytes`,
+  `stressFleetsPerCivilization`, `finalStateCounts.fleets` and per-phase
+  `phaseTimings` from the existing `CampaignPerformanceSample` counters.
+- **Save/determinism/performance:** autosaves write to a benchmark temp file
+  and are deleted afterwards; capture does not mutate campaign state, so
+  repeat determinism checks still hold. Phase profiling is the existing
+  counter path (~sub-microsecond per phase per tick).
+- **Tests/verification:** measured scenario in
+  `docs/PERFORMANCE_AUDIT_20260920.md` (2500 systems, 1,000 fleets, 4,000
+  ticks, 8 autosaves).
+- **Limits/reuse:** stress fleets are uniform military squadrons for load
+  measurement, not gameplay content; organic combat engagement is not
+  forced.
 
 ## Volumetric eruptions, shared visual spin and navigation (2026-09-19)
 
@@ -719,6 +1016,10 @@ static portraits and the policy against added cloud layers remain unchanged.
   and bounded ring geometry. GPU uploads remain on the renderer thread, validated
   against combined-frame 128-entry/192 MiB image admission limits. 3,990 prepared
   map files are allowlisted and hash-verified; original renders are not runtime data.
+  The owner thread must call `NativePlanetMaterialCache::poll()` once per update
+  frame (`native_client/main.cpp` `update()`); polling is no longer lazy inside
+  `request()`, so completed material jobs drain and `ready()` resolves even when
+  no active view requests more materials.
 - **Tests:** `planet_appearance`, `native_planet_materials`,
   `engine_spherical_material`, `native_developer_index`, `native_scene3d_gpu`,
   fresh/persistable campaigns, legacy migration, body persistence, system/planetary
@@ -2324,6 +2625,11 @@ campaign, save-memory and physical-simulation limits remain unchanged. See
   schematic planet phases. No GPU instancing, n-body physics, rock collision
   or automatic fleet mining/logistics consumption. Compiled configuration requires
   rebuilding. Comets, satellites and fragment effects can reuse Engine primitives.
+  Read-only inspection: `NativeSmallBodyRenderer::last_scene()` exposes the exact
+  solids `Scene3D` submitted to the current frame (the frame also carries the
+  sky dome and planet globe views, so tests must not guess by list order), and
+  `NativeSystemWorkspace::focused_small_body()`/`small_body_scene()` forward the
+  focused seeded instance and submitted scene for validation tools.
   See [the complete implementation report](NATIVE_SMALL_BODY_FIELDS_REPORT.md).
 
 ## Directional solids, per-object lighting and system zoom
@@ -2357,3 +2663,131 @@ campaign, save-memory and physical-simulation limits remain unchanged. See
   or automatic mining loop. Directional solids and per-object light can also serve
   moons, debris and terrain props without Engine knowing their gameplay identity.
   See [the current 3D and zoom report](NATIVE_SMALL_BODY_3D_REPORT.md).
+
+---
+
+## Foundation expansion 1–30 registry (`engine/foundation-expansion-1-30`)
+
+Baseline: `fbb3165b` (merged Developer-mode + design-system line, 172/172 CTest,
+425 Python, sealed export `6ad1650b` green). Work branch:
+`engine/foundation-expansion-1-30` — latest `1c2df367`, 188/188 CTest green.
+
+Status vocabulary: **MISSING** (greenfield), **PARTIAL** (exists but does not
+meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
+(engine side complete, outside dependency pending).
+
+| # | Capability | Prior state | Current state | Files | Tests |
+|---|---|---|---|---|---|
+| 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` only | **ENGINE-COMPLETE** — `World` store: components, hierarchy, queries, binary snapshot/restore, legacy ID map. Game-side adoption pending. | `engine/…/world.hpp`, `engine/src/world.cpp` | `engine_world` |
+| 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE** — `SimulationScheduler`: tier policies (ACTIVE/NEARBY/NORMAL/BACKGROUND/DORMANT), cadence, deterministic ordering, dormant analytic skip. Integration into campaign frame pending. | `engine/…/simulation_scheduler.hpp` | `simulation_scheduler` |
+| 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE + LIVE CONSUMERS** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. All app/core/engine `std::async` sites migrated: save-writer (`PlayerCampaignSaveController`), image preparation, audio director, territory overlay, planet-material decode queue (`MaterialCache` — persistent tagged worker replacing a fresh thread per decode; `job_stats()` exposes per-tag counts), support-bundle export, and campaign-session load. Voice synthesis keeps a dedicated COM-initialized thread (SAPI apartment requirement). | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
+| 4 | Render graph | MISSING | **ENGINE-COMPLETE (policy layer)** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. Backend adoption pending (DrawList layer today; SDL_GPU follow-on). | `engine/…/render_graph.hpp` | `render_pipeline` |
+| 5 | GPU-driven rendering | MISSING | **PARTIAL** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. True indirect draw requires the SDL_GPU pipeline follow-on. | `engine/…/draw_batcher.hpp` | `batcher_ui` |
+| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE (policy layer)** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. Backend consumption pending. | `engine/…/texture_streaming.hpp` | `render_pipeline` |
+| 7 | Shader library + cache | MISSING — SDL built-ins only | **ENGINE-COMPLETE (management layer)** — `ShaderLibrary`: families, canonical variant keys, artifact hashes, version invalidation, diagnostics. Consumption pending SDL_GPU pipeline. | `engine/…/shader_library.hpp` | `render_pipeline` |
+| 8 | Particle/VFX framework | MISSING — procedural flares | **ENGINE-COMPLETE** — `VfxSystem`: data-driven emitters, deterministic per-instance RNG pools, gravity/integration, LOD rate scaling, curve-driven scale/opacity/tint. RuntimeHost steps it in sim time and renders particles as camera-transformed tinted rects; host.spawn_emitter supports entity attachment with auto-stop on death (generated starter trails embers from its spark). Flare migration pending. | `engine/…/vfx.hpp`, `vfx.cpp` | `render_pipeline` |
+| 9 | Physics layer | MISSING — combat-only grid | **ENGINE-COMPLETE** — `PhysicsWorld`: circle/AABB/segment primitives, broadphase over SpatialGrid, overlap/raycast/sweep, trigger enter/stay/exit events. | `engine/…/physics.hpp`, `physics.cpp` | `spatial_physics` |
+| 10 | Spatial query framework | PARTIAL — private combat index | **ENGINE-COMPLETE + LIVE CONSUMER** — `SpatialGrid`: deterministic cell order, insert/remove/update, radius/AABB/ray queries, broadphase candidates. Galaxy-map `system_hit` uses a lazily rebuilt world-space `SpatialGrid<int>` (invalidated on session cache generation) for pointer hit-testing — O(cells touched) instead of scanning every system per event. Parity review concluded the massive-combat `SpatialIndex` stays private: it is a 3D Chebyshev cell-box scan returning *all* occupants (callers distance-filter), while `SpatialGrid` is 2D and `SpatialIndex3D` is k-nearest k-d — neither reproduces the exact candidate set/order combat determinism requires. | `engine/…/spatial_index.hpp`, `spatial_index3d.hpp` | `spatial_physics` |
+| 11 | Route engine | PRESENT-PARTIAL | **EXTENDED** — `RoutePolicy` (blocked sets, per-system traversal cost = hostile-territory penalties) + `find_fuel_feasible_route` waypoint insertion with refuel callbacks. | `core/lane_network.*` | `route_policy` |
+| 12 | Knowledge/FoW | PRESENT-PARTIAL | **UNCHANGED** — `CivilizationKnowledgeState` covers observer filtering; per-callsite discipline retained. | `core/knowledge.*` | `settlement_knowledge_parity` |
+| 13 | Generic economy/resources | MISSING — per-resource fields | **ENGINE-COMPLETE** — `ResourceDefinition`/`Inventory`/`Recipe`/`Producer`/`TransferOrder`/`ResourceNetwork` with shortage reporting and bounded transfers. | `engine/…/resource_economy.hpp` | `economy_animation` |
+| 14 | Event bus | PARTIAL — `EventQueue<T>` | **ENGINE-COMPLETE** — `EventBus`: typed subscribe, RAII `Subscription`, deferred tick-ordered queue, owner-thread enforcement. Core event-flow adoption pending. | `engine/…/event_bus.hpp` | `event_bus` |
+| 15 | Mission/event framework | MISSING | **ENGINE-COMPLETE** — `MissionGraph`: JSON-defined triggers/conditions/stages/choices/timers, persistent instances, serialize/restore, effects emitted via EventBus. | `engine/…/mission_graph.hpp` | `mission_graph` |
+| 16 | Advanced saves | MOSTLY PRESENT | **EXTENDED** — fnv1a64 integrity sidecars (atomic, incl. `.bak`), rolling history `.bak.2`..`.bak.4` with loader fallback, `read_player_campaign_preview` metadata reader (player + developer envelopes). Existing: v17 schema, migrations, autosave scheduler, async writer. | `engine/…/save_integrity.hpp`, `save_history.hpp`, `core/save_preview.*`, `core/player_campaign_*.cpp` | `save_integrity`, `save_history` |
+| 17 | Deterministic replay | MISSING | **ENGINE-COMPLETE** — `ReplayRecorder`/`ReplayPlayer`: ordered command stream, FNV checkpoints, JSON round-trip. Session-journal integration pending. | `engine/…/replay.hpp` | `economy_animation` |
+| 18 | Crash reporter | PARTIAL — support bundle only | **INTEGRATED VIA CODEX PATH** — `RuntimeDiagnostics` owns the real capture: unhandled-exception filter, terminate/abort handlers, session log, minidump and rolling context at client startup. The expansion `CrashReporter` is a parallel implementation kept library-only — installing it would displace the richer codex filter (it does not chain). Its context/event-bundle API remains available if a second consumer needs a non-fatal bundle writer. | `engine/…/runtime_diagnostics.*`, `engine/…/crash_reporter.hpp` | `runtime_diagnostics`, `crash_reporter` |
+| 19 | Profiler | MISSING | **ENGINE-COMPLETE + CLIENT-CONSUMED** — `Profiler`: scoped spans, per-frame counters, thread-buffer drain, JSON export. Client frames bracketed in `scene()` (drains the preceding `update` spans), `update`/`simulation`/`scene` spans recorded, gated by developer session; aggregates render as `client/*` rows in the diagnostics LIVE PERFORMANCE table. GPU timeline and scenario comparison pending. | `engine/…/profiler.hpp`, `app/native_client/native_developer_diagnostics.hpp` | `engine_diagnostics`, `native_developer_diagnostics` |
+| 20 | Memory tracking | MISSING | **ENGINE-COMPLETE + CLIENT-CONSUMED** — `MemoryTracker`: subsystem registry, high-water marks, `TrackedAllocator` adapter, JSON export. Client reports planet-material cache residency (`used`/`reserved` against its 96 MiB budget) each update; developer diagnostic bundles include `memory.json`. Broader tagged-allocation and VRAM attribution pending. | `engine/…/memory_tracker.hpp`, `app/developer_diagnostic_report.hpp` | `engine_diagnostics`, `developer_diagnostic_report` |
+| 21 | Input actions | PARTIAL — raw events | **ADOPTED** — `InputMapper` drives the client's galaxy keyboard shortcuts: `NativeCampaign` loads a data-driven `GALAXY` JSON context (pause, speeds 1–5 incl. Developer-only Demo, research/construction candidates, new campaign, F6 save, F8 support bundle) and dispatches `KeyPressed` events through `feed`/`just_pressed`. Stacked contexts, axes, chords and runtime rebinding ship in the engine for future UI. | `engine/…/input_actions.hpp`, `app/native_client/main.cpp` | `input_actions`, galaxy smoke key check |
+| 22 | Audio engine | PARTIAL — CPU mixer | **EXTENDED** — the event-driven gameplay voice pipeline is now the live client path: `NativeGameplayVoiceBridge` observes `CampaignFrameResult`s after each authoritative advance (fleet/hull/diplomacy/economy/logistics + event routes, observer-safe), `NativeVoiceRouter` resolves cues from `Data/voice_profiles/events.json`, and `NativeVoicePlayback` (8-deep priority queue, dedupe, subtitle fallback) plays through `NativeAudioDirector::play_dialogue_pcm` on the engine `AudioOutput` voice channel — no parallel audio stack. `prerecordedPath`/`subtitleText` cue fields are now honored: the three approved scientist WAVs play recorded; all other events synthesize via SAPI with subtitle fallback. Legacy `VoiceCue` remains as the fallback when voice data is absent. Minted `localization_key`s now resolve through the live `LocalizationTable` at subtitle presentation — a catalogued `voice.<dialogue>.<variant>` entry overrides authored cue text; shipped catalogs carry no voice keys yet, so authored English remains the baseline. | `native_audio*`, `native_voice*` | `native_audio`, `native_voice` |
+| 23 | Animation | MISSING | **ENGINE-COMPLETE** — `FloatCurve` (5 easings), `Timeline` tracks + loop modes (Once/Loop/PingPong) + crossed events. Skeletal blending out of scope. | `engine/…/animation.hpp` | `economy_animation` |
+| 24 | Advanced UI | PARTIAL — theme helpers | **PARTIAL** — `VirtualizedList`, `TableModel` (sort/filter), `TreeModel` (expand/flatten), `UndoHistory` (bounded snapshot undo/redo) in engine; `VirtualizedList` is the colony roster's and the editor systems list's scroll model (stride row_height, `scroll_to`/`max_scroll` clamps, wheel input); `UndoHistory` backs the editor's annotation layer (Ctrl+Z/Y). Table/Tree screen adoption pending. | `engine/…/ui_viewmodels.hpp`, `engine/…/undo_history.hpp`, `app/native_client/native_colony_roster.cpp`, `app/editor_main.cpp` | `batcher_ui`, `native_colony_roster`, `undo_history` |
+| 25 | Localization | MISSING | **ADOPTED (menus, settings, setup wizard + voice cues)** — `LocalizationTable`/`LocalizationService` (JSON locales, fallback chain, positional+named formatting, plurals, runtime reload). The startup screens, pause menu, settings hub, all four settings panels (General, Audio, Video, Voice & Subtitles), and the new-game setup wizard (mode/species cards, galaxy-type and population pages, seed/size/dev controls, environment tolerance details) resolve their labels through `data/locale/en.json` (packaged to `Data/locale/en.json` via `resource_stream`; missing keys fall back to literals). The diplomacy workspace resolves its chrome the same way — title, filter/tab labels, relationship meters, action buttons, modal text, empty states, and secrecy-preserving placeholders (`THE UNDISCOVERED`, `UNRESOLVED INFORMATION`) — while controller-produced values (political status, agreement/history entries) stay authoritative data. `NativeVoicePlayback` resolves minted `voice.<dialogue>.<variant>` cue keys the same way, so a locale pack can override subtitle text. Earlier claims of a developer-tools embedded catalog were wrong — no such consumer existed. Gameplay HUD strings are still literal; only English ships. | `engine/…/localization.hpp`, `data/locale/en.json`, `app/native_client/native_general_settings.*`, `app/native_client/native_audio_settings.*`, `app/native_client/native_video_settings.*`, `app/native_client/native_voice_settings.*` | `localization`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings` |
+| 26 | Accessibility | PARTIAL — subtitle size | **ENGINE-COMPLETE (settings layer), PARTIALLY CONSUMED** — `AccessibilitySettings`: ui/text scale, high contrast, color-blind modes, reduced motion/flashing, subtitles; sanitize + JSON round-trip. Client adoption began: General Settings now persists a `reduceMotion` preference that gates decorative motion (system tumble/planet spin, eruption animation) without touching simulation. ui/text scale, contrast, color-blind and reduced-flashing presentation adoption pending. | `engine/…/accessibility.hpp`, `app/native_client/native_general_settings.*` | `economy_animation`, `native_general_settings` |
+| 27 | Platform layer | PARTIAL — Win32+SDL+GDI | **UNCHANGED-PARTIAL** — existing paths/atomic-write/image layer retained; `PlatformServices` (Req 28) adds the services seam. Full OS abstraction documented as follow-on. | `engine/*` | — |
+| 28 | Steam layer | MISSING | **ENGINE-COMPLETE — EXTERNAL** — `PlatformServices` facade + `NullPlatformBackend`; feature gating, user identity, achievement/presence/cloud calls. Live Steamworks SDK backend pending credentials. | `engine/…/platform_services.hpp` | `package_platform` |
+| 29 | Mod architecture | MISSING | **ENGINE-COMPLETE** — `PackageManifest` (semver, deps, provides), `PackageRegistry` (protected namespaces, deterministic topo load order, conflict reporting), `scan_packages` directory discovery. | `engine/…/package.hpp` | `package_platform` |
+| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **EXTENDED** — tabbed tools host: Commands / Diagnostics (live Profiler + MemoryTracker overlays, session stats) / Saves (rolling-chain slots with integrity + preview fields). Profiler `begin/end_frame` actually wired: one frame per `scene()` call, `update`/`simulation`/`scene` spans, aggregates shown in LIVE PERFORMANCE. Entity/asset/event-log inspectors remain follow-on. | `native_developer_tools.*`, `main.cpp` | `native_developer_tools` |
+
+## Foundation expansion integration into the codex native line (2026-09-20)
+
+Branch `work/foundation-1-30-codex-integration` merges
+`engine/foundation-expansion-1-30` (`aa90d0e6`, 13 commits over `fbb3165b`)
+onto `cpp/codex-native-architecture-integration` tip `e20e83a9`
+(game `0.1.14.2-dev`, engine `0.1.64`). The codex architecture won every
+overlapping subsystem — renderer, artwork policy, campaign session, installer
+and packaging — and expansion work was kept only where additive.
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Save history and recovery (req 16):** rolling `.bak`, `.bak.2` …
+  `.bak.N` slots rotate on each save and the loader walks the chain.
+  `PlayerCampaignLoadOrigin::History` recoveries now publish a distinct
+  "Recovered campaign from an older autosave" notice in the session layer.
+- **Deterministic replay (req 17):** `ReplayRecorder`/`ReplayPlayer` are wired
+  into `NativeCampaign` (`--record`/`--replay`, fixed-step playback, FNV
+  checkpoints). Verified: recorded checkpoint replayed with
+  `verified_checkpoints:1`, `diverged:false`.
+- **Input actions (req 21):** `InputMapper` drives galaxy keyboard shortcuts
+  from a data-driven context, and `SDL_EVENT_KEY_UP` now emits
+  `InputEventType::KeyReleased` (Escape/Backspace excluded) for correct
+  pause/release behavior — verified by the galaxy-art smoke `paused:true`.
+  The mapper's `begin_frame()` is called once per `update()` and its feed
+  runs before workspace handlers so releases always clear held state;
+  `--navigation-smoke` verifies speed/pause/save shortcuts in both galaxy
+  and system views plus four blocked contexts.
+- **Developer tools host (req 30):** codex's developer panel/diagnostics/
+  empire-monitor subsystem retained; the expansion's parallel development-menu
+  machinery was omitted as superseded. `--developer-smoke` runs through the
+  codex path (SYNC-006 planet-map assertion still open).
+- **Fleet overview:** `native_fleet_workspace` gained the overview/council
+  rows (`OverviewRowKind`, colony navigation) adapted to codex's controller
+  APIs and `selected_changed` lambda.
+- **Localization (req 25):** `LocalizationTable`/`LocalizationService` ship in
+  the engine; the startup screens, pause menu, settings hub, all four settings
+  panels (General, Audio, Video, Voice), and the new-game setup wizard consume
+  the cooked `Data/locale/en.json` catalog, and minted voice-cue localization
+  keys resolve through the live table at subtitle presentation.
+- **Engine libraries present, verified by unit tests:** World store,
+  SimulationScheduler, JobSystem priorities, RenderGraph policy layer,
+  DrawBatcher, TextureStreamer, ShaderLibrary, VfxSystem, PhysicsWorld,
+  SpatialGrid, ResourceNetwork, EventBus, MissionGraph, CrashReporter
+  (library-only — codex `RuntimeDiagnostics` owns the installed handlers),
+  Profiler, MemoryTracker, FloatCurve/Timeline,
+  UI view models, AccessibilitySettings, PlatformServices facade and
+  PackageManifest/Registry.
+
+### ENGINE LIMITATIONS REMAINING
+
+- Engine libraries that are compiled and unit-tested but not yet consumed by
+  the live game remain library-only per the table above (render graph backend,
+  GPU-driven submission, texture streaming consumption, mission graph runtime,
+  Steam backend). They are not claimed as in-game features.
+- The expansion's duplicate developer-menu, audio-settings and session types
+  were dropped; codex's wired implementations are authoritative.
+- SYNC-001/002/005/010/011 CTest baseline failures are unchanged by the merge
+  (21 tests, see the validation receipt). SYNC-006's developer-smoke planet-map
+  assertion persists on the integrated build.
+- Python exporter suite matches the codex baseline: 36 documented unsuccessful
+  tests (fixture roots without current planet manifests, review-only source
+  images absent from checkout); zero new regressions, one baseline test now
+  passes (`test_galaxy_loads_assets_relative_to_executable`).
+- Packaging scripts previously required PowerShell 7; they now also run on
+  Windows PowerShell 5.1 with identical output bytes.
+
+## Notes
+
+- `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,
+  `FixedClock`, `DeterministicRandom`, `EventQueue` are used only by
+  `headless_main` + tests; `JobSystem` now serves the save writer and the
+  planet-material decode queue. A major
+  theme of this expansion is adopting/extending rather than duplicating them.
+- Renderer constraint: the GPU path is SDL3's 2D `SDL_GPURenderer` over a
+  Vulkan device — no custom pipelines/shaders. Requirements 4–7 are therefore
+  implemented at the DrawList/pass layer with real batching, streaming policy
+  and shader-asset management; a raw `SDL_GPU` pipeline migration is the
+  documented follow-on for true indirect draw / custom shader execution.
+- Save compatibility is frozen by the Player17 contract; save upgrades are
+  additive (sidecars/envelopes), never reinterpretation. The integrity
+  sidecar (`<save>.integrity`, `fnv1a64:<hex>`) verifies on load when present
+  and is silently absent for pre-expansion saves.

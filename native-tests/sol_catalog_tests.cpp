@@ -1,4 +1,5 @@
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <cmath>
 #include <algorithm>
@@ -21,7 +22,7 @@ StellarSystem sol() { return {sol_system_id, "Sol", {}, {}, {}, {}, std::string{
 
 void canonical_catalog_has_physical_invariants() {
     const auto bodies = create_sol_catalog(sol());
-    check(bodies.size() == 10, "Sol needs eight planets, Moon and Pluto");
+    check(bodies.size() == 10 + sol_moon_definitions().size() - 1, "Sol needs eight planets, Moon, Pluto and the major moon roster");
     constexpr std::string_view names[] = {"Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"};
     for (int index = 0; index != 8; ++index) {
         const auto& body = bodies[static_cast<std::size_t>(index)];
@@ -68,15 +69,17 @@ void upgrade_behavior() {
     std::vector<PlanetaryBody> legacy{complete.begin(), complete.end() - 1};
     legacy[2].mass_earth = 42.5; // Saved records must be retained verbatim, not reconstructed.
     const auto upgraded = upgrade_saved_sol_catalog(legacy, std::span{&system, 1});
-    check(upgraded.size() == 10 && std::equal(legacy.begin(), legacy.end(), upgraded.begin(), [](const auto& a, const auto& b) {
+    check(upgraded.size() == legacy.size() + 1 && std::equal(legacy.begin(), legacy.end(), upgraded.begin(), [](const auto& a, const auto& b) {
         return a.id == b.id && a.system_id == b.system_id && a.name == b.name && a.kind == b.kind && a.mass_earth == b.mass_earth;
     }),
         "upgrade altered legacy records or their order");
     const auto idempotent = upgrade_saved_sol_catalog(upgraded, std::span{&system, 1});
-    check(idempotent.size() == upgraded.size() && idempotent.back().id == pluto_body_id, "upgrade was not idempotent");
+    check(idempotent.size() == upgraded.size() && idempotent.back().id == upgraded.back().id, "upgrade was not idempotent");
     auto malformed = legacy; malformed.erase(malformed.begin());
     expect_throw([&] { upgrade_saved_sol_catalog(malformed, std::span{&system, 1}); }, "missing legacy Sol body accepted");
-    auto conflicting = legacy; conflicting.push_back(PlanetaryBody{pluto_body_id, 99, {}, 0, "Elsewhere", PlanetaryBodyKind::Planet,
+    std::vector<PlanetaryBody> conflicting;
+    for (const auto& body : legacy) if (body.id != pluto_body_id) conflicting.push_back(body);
+    conflicting.push_back(PlanetaryBody{pluto_body_id, 99, {}, 0, "Elsewhere", PlanetaryBodyKind::Planet,
         1, 1, {1, 1, 0, PlanetaryAtmosphereRegime::Vacuum, PlanetarySolventRegime::None, 0, false, true}});
     expect_throw([&] { upgrade_saved_sol_catalog(conflicting, std::span{&system, 1}); }, "reserved Pluto collision accepted");
     auto invalid_system = system; invalid_system.id = 1;

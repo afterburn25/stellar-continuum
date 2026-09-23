@@ -1,0 +1,88 @@
+#include "editor_project.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <cctype>
+#include <stdexcept>
+
+namespace stellar::editor {
+
+std::string serialize_project(const EditorProject &project) {
+  auto serialize_map = [](const std::unordered_map<int, SystemEdit> &map) {
+    auto rows = nlohmann::json::array();
+    for (const auto &[id, edit] : map) {
+      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked)
+        continue;
+      rows.push_back({{"id", id},
+                      {"name", edit.name},
+                      {"note", edit.note},
+                      {"bookmarked", edit.bookmarked}});
+    }
+    return rows;
+  };
+  const nlohmann::json document{{"schemaVersion", 1},
+                                {"seed", project.seed},
+                                {"systems", project.system_count},
+                                {"name", project.name},
+                                {"edits", serialize_map(project.edits)},
+                                {"bodyEdits", serialize_map(project.body_edits)}};
+  return document.dump(2);
+}
+
+EditorProject parse_project(std::string_view text) {
+  nlohmann::json document;
+  try {
+    document = nlohmann::json::parse(text);
+  } catch (const std::exception &error) {
+    throw std::runtime_error(std::string("malformed project: ") + error.what());
+  }
+  try {
+    if (document.at("schemaVersion").get<int>() != 1)
+      throw std::runtime_error("unsupported editor project version");
+    EditorProject project;
+    project.seed = document.at("seed").get<std::int64_t>();
+    project.system_count = document.at("systems").get<int>();
+    auto parse_map = [](const nlohmann::json &rows,
+                        std::unordered_map<int, SystemEdit> &out) {
+      for (const auto &row : rows) {
+        SystemEdit edit;
+        edit.name = row.value("name", std::string{});
+        edit.note = row.value("note", std::string{});
+        edit.bookmarked = row.value("bookmarked", false);
+        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked)
+          out[row.at("id").get<int>()] = std::move(edit);
+      }
+    };
+    parse_map(document.at("edits"), project.edits);
+    // bodyEdits/name are additive within schemaVersion 1: older documents
+    // omit them and older readers ignore unknown keys.
+    if (const auto it = document.find("bodyEdits");
+        it != document.end() && it->is_array())
+      parse_map(*it, project.body_edits);
+    if (const auto it = document.find("name");
+        it != document.end() && it->is_string())
+      project.name = it->get<std::string>();
+    return project;
+  } catch (const nlohmann::json::exception &error) {
+    throw std::runtime_error(std::string("malformed project: ") + error.what());
+  }
+}
+
+std::string sanitize_project_name(std::string_view name) {
+  std::string out;
+  out.reserve(name.size());
+  bool dash = true; // suppress leading dashes
+  for (const unsigned char c : name) {
+    if (std::isalnum(c)) {
+      out += static_cast<char>(std::tolower(c));
+      dash = false;
+    } else if (!dash) {
+      out += '-';
+      dash = true;
+    }
+  }
+  while (!out.empty() && out.back() == '-') out.pop_back();
+  return out;
+}
+
+} // namespace stellar::editor

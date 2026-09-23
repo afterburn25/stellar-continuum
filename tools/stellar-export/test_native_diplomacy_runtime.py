@@ -40,6 +40,95 @@ def bmp(path: Path, width: int, height: int, marker=1):
     path.write_bytes(header + pixels)
 
 
+# Shared Player17 fixture builders for the notification/logistics smoke
+# validators. The third civilization gives author_diplomacy_fixture its
+# required secondary contact target.
+def fixture_payload():
+    return {
+        "FormatVersion": 17,
+        "SimulationDays": 42.25,
+        "Galaxy": {
+            "Systems": list(range(20)),
+            "PlayerCivilizationId": 0,
+            "Civilizations": [
+                {"Id": 0, "Name": "Human Commonwealth",
+                 "SpeciesId": "terran_baseline", "HomeSystemId": 0},
+                {"Id": 1, "Name": "Kesh Exchange",
+                 "SpeciesId": "pelagic_high_pressure", "HomeSystemId": 2},
+                {"Id": 2, "Name": "Veil Compact",
+                 "SpeciesId": "cryogenic_hydrocarbon", "HomeSystemId": 4}],
+            "Knowledge": [
+                {"CivilizationId": 0, "KnownSystemIds": [0],
+                 "KnownCivilizationIds": [],
+                 "SystemSurveys": [
+                     {"SystemId": 0, "Level": 3, "Progress": 1}]}],
+        },
+        "Diplomacy": {
+            "Contacts": [
+                {"ObserverCivilizationId": 0,
+                 "ContactId": "populated-player-counterpart",
+                 "TargetCivilizationId": 1, "FirstObservedTick": 10,
+                 "LastObservedTick": 10, "LastObservedSystemId": 0,
+                 "Awareness": 5, "Condition": 0,
+                 "CommunicationAvailable": True, "Confidence": 0.9}],
+            "Relationships": [
+                {"CivilizationAId": 0, "CivilizationBId": 1,
+                 "PoliticalState": 1, "Trust": 0.2, "Hostility": 0.0,
+                 "Fear": 0.1, "Respect": 0.3, "Cooperation": 0.4,
+                 "Grievances": []}],
+            "AccessPermissions": [],
+            "Claims": [],
+            "ClaimResponses": [],
+            "Agreements": [
+                {"AgreementId": 1, "CivilizationAId": 0,
+                 "CivilizationBId": 1, "Type": 1, "Status": 0,
+                 "StartedAtTick": 13, "EndedAtTick": None,
+                 "ExternalTermsReference": None}],
+            "Proposals": [
+                {"ProposalId": 1, "ProposerCivilizationId": 0,
+                 "RecipientCivilizationId": 1, "Kind": 0,
+                 "AgreementType": 1, "Status": 1, "CreatedAtTick": 12,
+                 "ResolvedAtTick": 13,
+                 "Summary": "Retained non-aggression proposal",
+                 "ExternalTermsReference": None}],
+            "RecentHistory": [
+                {"EventId": 1, "Tick": 10, "Kind": 2,
+                 "PrimaryCivilizationId": 0, "SecondaryCivilizationId": 1,
+                 "SystemId": 0, "Summary": "Channel opened.",
+                 "KnownToCivilizationIds": [0]}],
+            "NextClaimId": 1, "NextAgreementId": 2,
+            "NextProposalId": 2, "NextEventId": 2,
+        },
+    }
+
+
+FIXTURE = {"Rows": [{"Name": "valid-current17",
+                     "InputJson": json.dumps(fixture_payload(),
+                                             separators=(",", ":"))}]}
+
+
+def payload(proposal_id):
+    record = fixture_payload()
+    record["Diplomacy"]["Proposals"].extend([
+        {"ProposalId": 2, "ProposerCivilizationId": 1,
+         "RecipientCivilizationId": 0, "Kind": 1, "AgreementType": None,
+         "Status": 0, "CreatedAtTick": 42250, "ResolvedAtTick": None,
+         "Summary": "Counterpart transit access petition",
+         "ExternalTermsReference": None},
+        {"ProposalId": proposal_id, "ProposerCivilizationId": 0,
+         "RecipientCivilizationId": 1, "Kind": 1, "AgreementType": None,
+         "Status": 0, "CreatedAtTick": 42250, "ResolvedAtTick": None,
+         "Summary": "Request for transit access.",
+         "ExternalTermsReference": None}])
+    record["Diplomacy"]["Contacts"].append(
+        {"ObserverCivilizationId": 0, "ContactId": "unresolved-signal",
+         "TargetCivilizationId": None, "FirstObservedTick": 42246,
+         "LastObservedTick": 42250, "LastObservedSystemId": None,
+         "Awareness": 1, "Condition": 0, "CommunicationAvailable": False,
+         "Confidence": 0.4})
+    return record
+
+
 class NativeDiplomacyRuntimeTests(unittest.TestCase):
     def exercise(self, fault=None):
         with tempfile.TemporaryDirectory() as temporary:

@@ -199,6 +199,11 @@ void NativeAudioSettings::cancel() {
   visible_ = false;
 }
 
+std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
   require_owner();
   if (!visible_) return;
@@ -210,9 +215,11 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
                           layout.panel.width - 24.f * layout.scale, 34.f * layout.scale};
   label(draw, {layout.panel.x + layout.panel.width * .5f,
                std::max(title_clip.y, layout.panel.y + 26.f * layout.scale - static_cast<float>(layout.heading_font_pixels) * .5f)},
-        "AUDIO SETTINGS", layout.heading_font_pixels,
+        tr("SETTINGS_AUDIO_TITLE", "AUDIO SETTINGS"), layout.heading_font_pixels,
         title_clip, TextAlign::Center, FontFace::Heading);
-  const std::array rows{std::pair{"Master", layout.master_track}, std::pair{"Music", layout.music_track}, std::pair{"Effects", layout.effects_track}};
+  const std::array rows{std::pair{tr("SETTINGS_AUDIO_MASTER", "Master"), layout.master_track},
+                        std::pair{tr("SETTINGS_AUDIO_MUSIC", "Music"), layout.music_track},
+                        std::pair{tr("SETTINGS_AUDIO_EFFECTS", "Effects"), layout.effects_track}};
   const std::array gains{values_.master, values_.music, values_.effects};
   for (std::size_t index = 0; index < rows.size(); ++index) {
     const auto track = rows[index].second;
@@ -228,13 +235,17 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
     draw.overlay.emplace_back(FilledRectangle{thumb, text_color});
     draw.overlay.emplace_back(StrokedRectangle{thumb, panel_stroke});
   }
-  button(draw, layout.mute, values_.muted ? "UNMUTE (LEVELS RETAINED)" : "MUTE", layout.body_font_pixels, values_.muted);
-  if (video_navigation_) button(draw, layout.video, "VIDEO", layout.body_font_pixels);
-  if (general_navigation_) button(draw, layout.general, "GENERAL", layout.body_font_pixels);
-  button(draw, layout.defaults, "DEFAULTS", layout.body_font_pixels);
-  button(draw, layout.cancel, "CANCEL", layout.body_font_pixels);
-  button(draw, layout.save, "SAVE", layout.body_font_pixels, true);
-  const auto notice = status_.empty() ? (values_.muted ? "Audio is muted; your levels are retained." : "Changes preview immediately.") : status_;
+  button(draw, layout.mute,
+         values_.muted ? tr("SETTINGS_AUDIO_UNMUTE", "UNMUTE (LEVELS RETAINED)")
+                       : tr("SETTINGS_AUDIO_MUTE", "MUTE"),
+         layout.body_font_pixels, values_.muted);
+  if (video_navigation_) button(draw, layout.video, tr("SETTINGS_NAV_VIDEO", "VIDEO"), layout.body_font_pixels);
+  if (general_navigation_) button(draw, layout.general, tr("SETTINGS_NAV_GENERAL", "GENERAL"), layout.body_font_pixels);
+  button(draw, layout.defaults, tr("SETTINGS_DEFAULTS", "DEFAULTS"), layout.body_font_pixels);
+  button(draw, layout.cancel, tr("SETTINGS_CANCEL", "CANCEL"), layout.body_font_pixels);
+  button(draw, layout.save, tr("SETTINGS_SAVE", "SAVE"), layout.body_font_pixels, true);
+  const auto notice = status_.empty() ? (values_.muted ? tr("SETTINGS_AUDIO_MUTED_NOTICE", "Audio is muted; your levels are retained.")
+                                                     : tr("SETTINGS_AUDIO_HINT", "Changes preview immediately.")) : status_;
   label(draw, {layout.status.x, layout.status.y}, general_navigation_&&!device_status_.empty()?"Playback: unavailable; check your audio device.":notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
   if (!device_status_.empty()&&!general_navigation_) {
     const UiRect diagnostic{layout.panel.x + 12.f * layout.scale, layout.panel.y + 54.f * layout.scale,
