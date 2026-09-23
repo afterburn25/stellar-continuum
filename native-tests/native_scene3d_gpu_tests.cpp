@@ -140,10 +140,11 @@ int main(int argc,char** argv)try{
   camera.projection=Projection3D::Orthographic;const auto uv=capture({textured},"uv.png");
   check(channel(*uv,40,80,0)>200&&channel(*uv,280,80,1)>200&&channel(*uv,40,280,2)>200,"3D texture coordinates are flipped or ignored");
   {
-    // Texture streaming under a tight byte budget: each ~5.6MB mip chain
-    // cannot coexist, so the streamer evicts unrequested textures and
-    // degrades denied ones to their coarsest fittable mip tail.
-    window.set_scene3d_texture_budget(8u*1024u*1024u);
+    // Texture streaming under a tight byte budget: at this footprint the
+    // ~5.6MB chains demand only their ~87KB mip-3 tails, so the budget is
+    // sized to degrade the second texture to a coarser tail rather than
+    // evict outright.
+    window.set_scene3d_texture_budget(100000u);
     const auto big=[&](std::uint8_t shade){
       std::vector<std::uint8_t> pixels(1024u*1024u*4u);
       for(std::size_t i=0;i<pixels.size();i+=4){pixels[i]=pixels[i+1]=pixels[i+2]=shade;pixels[i+3]=255;}
@@ -156,8 +157,8 @@ int main(int argc,char** argv)try{
     check(window.scene3d_statistics().texture_cache_entries<=2,"Texture streamer did not evict the unrequested texture under budget");
     const auto uploads=window.scene3d_statistics().texture_uploads;
     const auto pair=capture({dark,light},"stream-both.png");
-    // Equal distances tie; the earlier-registered texture wins full residency
-    // (5.6MB), leaving ~2.4MB — the second chain degrades to its ~1.6MB mip-1
+    // Equal distances tie; the earlier-registered texture wins its mip-3
+    // tail (~87KB), leaving ~12KB — the second degrades to its ~5KB mip-5
     // tail and still binds its own 220 texels rather than the white fallback.
     check(window.scene3d_statistics().streamed_partial_binds>0,"Streamer did not admit a degraded mip tail under budget pressure");
     check(window.scene3d_statistics().texture_uploads>uploads,"Evicted texture was not re-uploaded on re-admission");
@@ -176,7 +177,10 @@ int main(int argc,char** argv)try{
     auto fine=textured;fine.scale=.23f;fine.material.texture=RgbaImage::create(1024,1024,std::move(checks));
     const auto before=window.scene3d_statistics();
     const auto small=capture({fine},"mip-checker.png");const auto charged=window.scene3d_statistics();
-    check(charged.texture_cache_bytes-before.texture_cache_bytes+charged.streamed_evicted_bytes-before.streamed_evicted_bytes==texture_mip_layout3d(fine.material.texture.get()).resident_bytes,"GPU cache did not account for the full mip chain");
+    // At this footprint the checker demands its mip-3 tail: resident GPU
+    // bytes are the 128..1 tail levels, not the full chain.
+    std::size_t tail3=0;for(int w=128,h=128;;){tail3+=static_cast<std::size_t>(w)*h*4;if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);}
+    check(charged.texture_cache_bytes-before.texture_cache_bytes+charged.streamed_evicted_bytes-before.streamed_evicted_bytes==fine.material.texture->byte_size()+tail3,"GPU cache did not account for the resident mip tail");
     fine.position.x=.00175;
     const auto moved=capture({fine},"mip-checker-moved.png");
     for(int y=140;y<180;++y)for(int x=140;x<180;++x){
@@ -193,6 +197,10 @@ int main(int argc,char** argv)try{
     check(channel(*ring,160,160,0)==5&&std::abs(channel(*ring,138,160,0)-130)<=3,"Thin mip texture lost ring gap or mean opacity");
     fine.scale=1;const auto close_ring=capture({fine},"mip-ring-close.png");
     check(channel(*close_ring,160,160,0)==5,"Magnification filled a transparent ring gap");
+    // The 160px views demand a coarser mip than the 360px capture did —
+    // warm the resident tail at their footprint so the two-view draw below
+    // shares it without re-uploading.
+    DrawList warm;warm.world.emplace_back(Scene3DView{Scene3D::create(camera,{fine}),{0,0,160,160}});window.draw(warm);
     const auto retained=window.scene3d_statistics();
     auto shadow=fine;shadow.material.texture.reset();shadow.material.shadow=AnalyticShadow3D{};shadow.material.shadow->shape=AnalyticShadowShape3D::Annulus;shadow.material.shadow->opacity_map=fine.material.texture;
     DrawList shared;shared.world.emplace_back(Scene3DView{Scene3D::create(camera,{fine}),{0,0,160,160}});
@@ -216,12 +224,14 @@ int main(int argc,char** argv)try{
       pixels[(static_cast<std::size_t>(y)*256+x)*4+c]=(x/4)%2?230:30;
     auto bands=textured;bands.material.texture=RgbaImage::create(256,4096,std::move(pixels));
     const auto isotropic=capture({bands},"ring-isotropic.png");
-    const auto uploads=window.scene3d_statistics().texture_uploads;
+    const auto entries=window.scene3d_statistics().texture_cache_entries;
     bands.material.anisotropic_texture=true;
     const auto detailed=capture({bands},"ring-anisotropic.png");
     const auto contrast=[&](const RgbaImage& im){double deviation=0;for(int x=70;x<250;++x)deviation+=std::abs(channel(im,x,160,0)-130);return deviation/180;};
     check(contrast(*detailed)>contrast(*isotropic)*2+20,"Anisotropic ring filtering failed to preserve resolvable radial contrast");
-    check(window.scene3d_statistics().texture_uploads==uploads,"Changing the material sampler duplicated its texture");
+    // The flag promotes the texture to full-chain residency — one cache
+    // entry is replaced in place, never duplicated.
+    check(window.scene3d_statistics().texture_cache_entries==entries,"Changing the material sampler duplicated its texture entry");
     bands.scale=.05f;const auto distant=capture({bands},"ring-anisotropic-distant.png");
     for(int x=157;x<=162;++x)check(std::abs(channel(*distant,x,160,0)-130)<4,"Distant ring detail no longer converges to a stable average");
     std::cout<<"ring_filter_contrast="<<contrast(*isotropic)<<" -> "<<contrast(*detailed)<<"; distant average and cached upload passed\n";

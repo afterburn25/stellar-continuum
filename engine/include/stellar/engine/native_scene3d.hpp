@@ -177,9 +177,9 @@ struct Scene3DStatistics {
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).
   std::uint64_t streamed_fallbacks{};
-  // Binds served by a degraded mip tail: the streamer admitted the texture
-  // below its requested mip 0 under budget pressure, so the upload holds
-  // only the resident tail (the texture samples its coarsest resident level).
+  // Binds served by a mip tail below level 0 — either a screen-footprint
+  // LOD demand (the sampler never reaches finer levels at this size) or a
+  // budget-pressure degradation. The upload holds only the resident tail.
   std::uint64_t streamed_partial_binds{};
   // Cumulative GPU bytes the TextureStreamer evicted from the texture cache.
   std::uint64_t streamed_evicted_bytes{};

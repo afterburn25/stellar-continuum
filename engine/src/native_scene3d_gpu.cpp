@@ -445,35 +445,50 @@ void Scene3DRenderer::prepare(const DrawList& list){
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
   std::size_t total=0;
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
-  std::unordered_map<engine::TextureId,float> stream_priority;
-  const auto stream_request=[&](const std::shared_ptr<const RgbaImage>& image,float priority){
-    const auto id=s.stream_id_for(image?*image:*s.white);auto& p=stream_priority[id];if(priority>p)p=priority;};
+  std::unordered_map<engine::TextureId,std::pair<float,std::uint32_t>> stream_demand;
+  const auto stream_request=[&](const std::shared_ptr<const RgbaImage>& image,float priority,std::uint32_t desired_mip){
+    const auto id=s.stream_id_for(image?*image:*s.white);
+    const auto [it,inserted]=stream_demand.try_emplace(id,priority,desired_mip);
+    if(!inserted){it->second.first=std::max(it->second.first,priority);it->second.second=std::min(it->second.second,desired_mip);}};
   std::size_t geometry_bytes=0,texture_bytes=0;
   for(const auto* view:s.views){const auto r=view->destination;
     if(!view->scene||!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>65536||std::abs(r.y)>65536||
        !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192)
       throw std::invalid_argument("3D viewport requires a scene and finite bounded dimensions.");
     total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*(s.hdr?16u:8u);
-    const auto& camera=view->scene->camera().position;
+    const auto& cam=view->scene->camera();const auto& camera=cam.position;
+    // Projected px per world unit: the sampler only reaches the mip whose
+    // texel density matches the on-screen footprint, so the resident tail
+    // can start there. Bounding-sphere diameter overestimates surface texel
+    // density — the choice errs finer, never blurrier than the full chain.
+    const float focal=cam.projection==Projection3D::Orthographic?r.height/std::max(cam.orthographic_height,1e-6f)
+      :r.height/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view->scene->instances()){
       if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
       // Nearer instances win texture-budget contention.
       const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
-      const float priority=1.f/(1.f+static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz)));
+      const float dist=static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz));
+      const float priority=1.f/(1.f+dist);
+      const float footprint=2.f*instance.scale*instance.mesh->bounding_radius()*focal/(cam.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
+      const auto mip_for=[&](const std::shared_ptr<const RgbaImage>& image){
+        const auto& img=image?*image:*s.white;const int tex=std::max(img.width(),img.height());
+        return footprint>=tex||tex<=1?0u:static_cast<std::uint32_t>(std::floor(std::log2(static_cast<float>(tex)/footprint)));};
       const auto& image=instance.material.texture;
       if(textures.insert(image.get()).second)texture_bytes+=texture_mip_layout3d(image.get()).resident_bytes;
-      stream_request(image,priority);
+      // anisotropic_texture declares high-frequency content (polar/ring
+      // maps): isotropic LOD erases it, so it keeps full-chain residency.
+      stream_request(image,priority,instance.material.anisotropic_texture?0u:mip_for(image));
       if(instance.material.dielectric)for(const auto& optical:{instance.material.dielectric->environment,instance.material.dielectric->surface})
-        {if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;stream_request(optical,priority);}
+        {if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;stream_request(optical,priority,mip_for(optical));}
       if(instance.material.surface_response)for(const auto& response_image:{instance.material.surface_response->normal,instance.material.surface_response->properties,instance.material.surface_response->cloud_shadow})
-        {if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;stream_request(response_image,priority);}
+        {if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;stream_request(response_image,priority,mip_for(response_image));}
       if(instance.material.surface_effect){const auto& image_next=instance.material.surface_effect->next_texture;
-        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;stream_request(image_next,priority);}
+        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;stream_request(image_next,priority,mip_for(image_next));}
       if(instance.material.shadow&&instance.material.shadow->opacity_map){const auto& shadow_image=instance.material.shadow->opacity_map;
-        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;stream_request(shadow_image,priority);}
+        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;stream_request(shadow_image,priority,mip_for(shadow_image));}
     }
   }
-  for(const auto& [id,priority]:stream_priority)s.streamer.request(id,0,priority);
+  for(const auto& [id,demand]:stream_demand)s.streamer.request(id,demand.second,demand.first);
   s.apply_streaming();
   if(total>maximum_scene3d_target_bytes)throw std::length_error("3D viewports exceed their 128 MiB target budget.");
   if(meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries||geometry_bytes>maximum_mesh3d_cache_bytes||texture_bytes>maximum_scene3d_texture_cache_bytes)
