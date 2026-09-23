@@ -171,7 +171,16 @@ PopulationDelta Population::advance(double elapsed_days,
     };
     std::vector<EducationMove> moves;
 
-    for (auto& [key, c] : cohorts_) {
+    // Sorted iteration: unordered_map order is stable within a process
+    // but not a portable contract — delta accumulation and education
+    // moves must be bit-identical across runs and platforms.
+    std::vector<CohortKey> order;
+    order.reserve(cohorts_.size());
+    for (const auto& [key, _] : cohorts_) order.push_back(key);
+    std::sort(order.begin(), order.end(), cohort_less);
+
+    for (const CohortKey& key : order) {
+        auto& c = cohorts_.at(key);
         const DemographicProfile& p = profiles_.at(key.profile);
         if (c.size <= 0.0) continue;
 
