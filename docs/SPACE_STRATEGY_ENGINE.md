@@ -79,8 +79,8 @@ character fidelity.
 | 11 | Space-specific rendering | PARTIAL | Native scene3d GPU path, planet/ring/star materials exist; render-graph consumption, instancing, HDR pending. |
 | 12 | Specialized editor tools | PARTIAL | stellar-engine.exe shell with Projects/Scene/Scene3D/Assets/Profiler/Localization; genre tools (galaxy/planet/colony/economy/AI debugger) pending. |
 | 13 | Galaxy-scale benchmarks | IMPLEMENTED (engine layer) | `simulation_scale_250…5000` executor benchmarks + `combined_scale`: 400 settlements driving population+colony+power grids+freight+fleets+AI through one executor across mixed tiers — 240 ticks, bit-identical checksums, ~870µs mean tick. |
-| 14 | Event/history framework | PARTIAL | `event_bus` + `mission_graph` engine libraries exist; strategic-event vocabulary/observer filtering pending. |
-| 15 | GNN/public information hooks | PLANNED | News feed over the event framework using native voice infra. |
+| 14 | Event/history framework | IMPLEMENTED (engine layer) | `EventHistory` complements `event_bus`/`mission_graph`: recorded strategic events with observer-privacy query projection, significance thresholds, bounded store + pruning, `feed()` news substrate. Core recording points pending. See [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md). |
+| 15 | GNN/public-information hooks | PARTIAL | `EventHistory::feed(observer, since, min_significance)` is the public-information substrate; voice/news presentation layer pending. |
 
 Statuses use PLANNED / PARTIAL / IMPLEMENTED BUT NEEDS POLISH /
 IMPLEMENTED — a library with tests and a benchmark but no game consumer

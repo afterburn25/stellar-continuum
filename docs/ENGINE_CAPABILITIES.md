@@ -62,6 +62,29 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Event history framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 14 — the
+  authoritative strategic chronicle: recorded happenings with
+  observer-filtered queries, feeding chronicles and the M15 news
+  substrate. See [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `HistoryEvent` (day, category, summary,
+  actors, location, significance, visible_to privacy list, tags);
+  `EventHistory` bounded store with monotonic ids, `query()`
+  (category/tag/actor/time/significance + observer + limit),
+  `feed(observer, since, min_significance)`, `prune_before` with a
+  significance floor. Privacy is a query projection — records keep
+  full truth for developer/omniscient views.
+- **Consumers/tests:** `history` tests — id assignment/lookup,
+  every filter axis, observer privacy (public vs allow-listed),
+  news feed, capacity bound, significance-aware pruning, bit-equal
+  determinism, 200k-event scale. Core recording points pending.
+- **Save/performance impact:** plain deque + counter, serializes in
+  id order; queries are O(n) scans with sorted output.
+- **Limitations:** opaque summary strings (no structured localization
+  binding); allow-list privacy only (no delayed/degraded intel); no
+  automatic recording — Core integration points pending.
+
 ## Combined simulation scale benchmark (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 13 (partial) —

@@ -142,9 +142,13 @@ resolution, 2000-fleet scale — see [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md
 Milestone 13 partially landed early: `combined_scale` test drives 400
 settlements (population + colony + power grids + freight + fleets +
 faction AI) through one `SimulationExecutor` at mixed tiers — 240
-ticks, bit-identical checksums across runs. Next: event/history
-framework (M14), then Core/game adoption of these frameworks — the
-engine layer exists; wiring real phases through the executor is the
+ticks, bit-identical checksums across runs. Milestone 14 landed:
+`EventHistory` (history.hpp) — recorded strategic events with
+observer-privacy query projection, significance thresholds, bounded
+store + pruning, and `feed()` as the public-information/news substrate
+— see [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md). Next: Core/game
+adoption of these frameworks — the engine layer exists; wiring real
+phases through the executor and recording real events is the
 remaining specialization work.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
