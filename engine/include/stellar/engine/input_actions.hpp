@@ -102,6 +102,13 @@ public:
   // exists. Returns the number of actions rebound.
   std::size_t rebind(std::string_view action,
                      std::vector<InputBinding> bindings);
+  // Bindings currently registered for `action` in the first stacked context
+  // that defines it — what a rebind UI displays next to the action name.
+  std::vector<InputBinding> bindings(std::string_view action) const;
+
+  // Serializes every registered context back to the load_contexts schema so
+  // rebound bindings persist. Context order is sorted for stable diffs.
+  std::string save_contexts() const;
 
 private:
   bool binding_matches(const InputBinding &binding,

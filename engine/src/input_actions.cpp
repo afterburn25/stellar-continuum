@@ -22,6 +22,38 @@ kind_names() {
   return names;
 }
 
+const char *kind_name(RawInputEvent::Kind kind) {
+  switch (kind) {
+  case RawInputEvent::Kind::KeyPress:
+    return "KeyPress";
+  case RawInputEvent::Kind::KeyRelease:
+    return "KeyRelease";
+  case RawInputEvent::Kind::MouseButton:
+    return "MouseButton";
+  case RawInputEvent::Kind::MouseMotion:
+    return "MouseMotion";
+  case RawInputEvent::Kind::MouseWheel:
+    return "MouseWheel";
+  case RawInputEvent::Kind::GamepadButton:
+    return "GamepadButton";
+  case RawInputEvent::Kind::GamepadAxis:
+    return "GamepadAxis";
+  }
+  return "KeyPress";
+}
+
+const char *action_type_name(InputAction::Type type) {
+  switch (type) {
+  case InputAction::Type::Axis1D:
+    return "Axis1D";
+  case InputAction::Type::Axis2D:
+    return "Axis2D";
+  case InputAction::Type::Button:
+    return "Button";
+  }
+  return "Button";
+}
+
 } // namespace
 
 bool InputMapper::load_contexts(std::string_view json_document,
@@ -278,6 +310,57 @@ std::size_t InputMapper::rebind(std::string_view action,
   // Rebinding invalidates any stale held state from the old bindings.
   states_.erase(std::string(action));
   return rebound;
+}
+
+std::vector<InputBinding> InputMapper::bindings(std::string_view action) const {
+  for (const auto &name : stack_) {
+    const auto ctx = contexts_.find(name);
+    if (ctx == contexts_.end())
+      continue;
+    for (const auto &candidate : ctx->second.actions)
+      if (candidate.name == action)
+        return candidate.bindings;
+  }
+  // Not stacked — fall back to any registered context so a rebind UI can
+  // inspect actions on inactive pages too.
+  for (const auto &[name, ctx] : contexts_)
+    for (const auto &candidate : ctx.actions)
+      if (candidate.name == action)
+        return candidate.bindings;
+  return {};
+}
+
+std::string InputMapper::save_contexts() const {
+  nlohmann::json contexts = nlohmann::json::array();
+  std::vector<std::string> names;
+  names.reserve(contexts_.size());
+  for (const auto &[name, ctx] : contexts_) {
+    (void)ctx;
+    names.push_back(name);
+  }
+  std::sort(names.begin(), names.end());
+  for (const auto &name : names) {
+    const auto &ctx = contexts_.at(name);
+    nlohmann::json actions = nlohmann::json::array();
+    for (const auto &action : ctx.actions) {
+      nlohmann::json bindings = nlohmann::json::array();
+      for (const auto &binding : action.bindings) {
+        nlohmann::json b{{"kind", kind_name(binding.kind)},
+                         {"code", binding.code},
+                         {"scale", binding.scale}};
+        if (!binding.chord_keys.empty())
+          b["chord"] = binding.chord_keys;
+        bindings.push_back(std::move(b));
+      }
+      actions.push_back({{"name", action.name},
+                         {"type", action_type_name(action.type)},
+                         {"bindings", std::move(bindings)}});
+    }
+    contexts.push_back({{"name", ctx.name},
+                        {"exclusive", ctx.exclusive},
+                        {"actions", std::move(actions)}});
+  }
+  return nlohmann::json{{"contexts", std::move(contexts)}}.dump(2);
 }
 
 } // namespace stellar::engine

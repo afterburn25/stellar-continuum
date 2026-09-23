@@ -161,6 +161,41 @@ int main() {
             std::find(names.begin(), names.end(), "UI") != names.end(),
         "context_names lists registered contexts");
 
+  // bindings(): a rebind UI reads what an action is bound to — the first
+  // stacked context wins, and unstacked contexts are still inspectable.
+  check(mapper.bindings("confirm").size() == 1 &&
+            mapper.bindings("confirm")[0].code == 90,
+        "bindings reports rebound key");
+  mapper.pop_context(); // UI unstacked — still readable
+  check(mapper.bindings("quit").size() == 1 &&
+            mapper.bindings("quit")[0].code == 81 &&
+            mapper.bindings("quit")[0].chord_keys.size() == 1,
+        "unstacked context bindings inspectable");
+
+  // save_contexts() round-trips the rebound map through load_contexts.
+  const auto saved = mapper.save_contexts();
+  InputMapper reloaded;
+  check(reloaded.load_contexts(saved, &error), error.c_str());
+  reloaded.push_context("UI");
+  reloaded.begin_frame();
+  reloaded.feed(key(RawInputEvent::Kind::KeyPress, 90));
+  check(reloaded.just_pressed("confirm"),
+        "rebound binding survives save/load");
+  check(reloaded.bindings("quit").size() == 1 &&
+            reloaded.bindings("quit")[0].chord_keys.size() == 1 &&
+            reloaded.bindings("quit")[0].chord_keys[0] == 17,
+        "chord survives round-trip");
+  reloaded.push_context("GALAXY");
+  reloaded.begin_frame();
+  RawInputEvent stick2;
+  stick2.kind = RawInputEvent::Kind::GamepadAxis;
+  stick2.code = 0;
+  stick2.value = 0.5f;
+  reloaded.feed(stick2);
+  check(reloaded.axis("thrust") == 0.5f, "axis binding survives round-trip");
+  check(reloaded.context_names().size() == 2,
+        "context set survives round-trip");
+
   if (failures == 0)
     std::cout << "InputMapper tests passed\n";
   return failures == 0 ? 0 : 1;
