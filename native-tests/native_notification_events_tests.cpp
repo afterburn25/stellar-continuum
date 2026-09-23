@@ -49,17 +49,19 @@ void chronicle_seeding(){
   stellar::engine::EventHistory history;
   const auto add=[&](double day,std::string category,std::string summary,
                      std::vector<std::uint64_t> visible={},
-                     double significance=0.5,std::uint64_t location=0){
+                     double significance=0.5,std::uint64_t location=0,
+                     std::vector<std::uint64_t> actors={}){
     stellar::engine::HistoryEvent event;event.at_day=day;
     event.category=std::move(category);event.summary=std::move(summary);
     event.significance=significance;event.location=location;
+    event.actors=std::move(actors);
     event.visible_to=std::move(visible);history.record(std::move(event));};
   add(400.,"exploration.system_surveyed","System survey completed",
-      {},0.5,9);
+      {},0.5,9,{1,7});
   add(410.,"war.battle","FOREIGN BATTLE REPORT",{7});
   add(415.,"war.damage_applied","TRIVIA DAMAGE TICK",{1},0.1);
-  add(420.,"colony.founded","Colony established",{1});
-  add(430.,"unknown.happening","Uncategorized record",{1});
+  add(420.,"colony.founded","Colony established",{1},0.5,0,{1,7});
+  add(430.,"unknown.happening","Uncategorized record",{1},0.5,0,{7,9});
   NativeNotificationFeed feed;
   seed_chronicle_notifications(feed,history,1);
   require(feed.items().size()==3,"Observer-invisible chronicle entry leaked");
@@ -74,6 +76,12 @@ void chronicle_seeding(){
   require(feed.items().front().system_id&&*feed.items().front().system_id==9&&
       !feed.items()[1].system_id,
       "Seeded report lost its system location");
+  require(feed.items().front().diplomatic_contact_id&&
+      *feed.items().front().diplomatic_contact_id==7&&
+      feed.items()[1].diplomatic_contact_id&&
+      *feed.items()[1].diplomatic_contact_id==7&&
+      !feed.items().back().diplomatic_contact_id,
+      "Single-foreign-actor contact not propagated to seeded reports");
   NativeNotificationFeed bounded;
   seed_chronicle_notifications(bounded,history,1,2);
   require(bounded.items().size()==2&&

@@ -148,7 +148,11 @@ The admission seeding in `native_notification_events` applies a fixed
 0.35 report floor via `feed()`'s `min_significance` — the category
 vocabulary assigns high-volume trivia (war.damage_applied 0.1,
 signature/system detections <=0.3, survey_started 0.2) below it, so
-the transient feed surfaces reports, not noise.
+the transient feed surfaces reports, not noise. Seeded items carry the
+same navigation affordances as the browser: located reports get VIEW
+SYSTEM, and reports with exactly one foreign actor get OPEN RELATIONS
+(the diplomacy workspace's identification check still gates what an
+unidentified contact shows).
 
 Voice presentation is the pre-existing `NativeGameplayVoiceBridge`:
 `route_events` announces every significant chronicle category per

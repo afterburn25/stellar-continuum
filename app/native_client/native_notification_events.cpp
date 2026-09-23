@@ -53,6 +53,7 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
       -std::numeric_limits<double>::infinity(),report_significance);
   const auto begin=events.size()>max_entries?events.end()-max_entries
                                            :events.begin();
+  const auto observer=static_cast<std::uint64_t>(observer_civilization_id);
   for(auto it=begin;it!=events.end();++it){
     const auto* event=*it;
     const char* label=native_chronicle::category_label(event->category);
@@ -60,9 +61,21 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
     // already confined them to the observer's authorized visibility.
     std::optional<int> system;
     if(event->location)system=static_cast<int>(event->location);
+    // Exactly one foreign actor → the report can offer OPEN RELATIONS,
+    // same rule the chronicle browser uses for its DIP action. The
+    // diplomacy workspace's own identification check still gates what
+    // the contact actually shows.
+    std::uint64_t foreign=0;
+    for(const auto id:event->actors)
+      if(id!=observer){
+        if(foreign!=0&&foreign!=id){foreign=0;break;}
+        foreign=id;
+      }
+    const std::optional<int> counterpart=
+        foreign?std::optional<int>(static_cast<int>(foreign)):std::nullopt;
     feed.publish(label?std::string(label):event->category,
         native_campaign::format_campaign_date(event->at_day),
-        event->summary,std::nullopt,system);
+        event->summary,counterpart,system);
   }
 }
 
