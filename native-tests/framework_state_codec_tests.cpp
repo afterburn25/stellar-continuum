@@ -268,6 +268,53 @@ void test_physics_codec() {
   require(events.empty(), "restored physics emits no phantom ENTER");
 }
 
+void test_galaxy_map_codec() {
+  GalaxyMap map;
+  GalaxySystem alpha;
+  alpha.id = 5;
+  alpha.name = "alpha";
+  alpha.x_light_years = 1.0;
+  alpha.y_light_years = 2.0;
+  alpha.depth_light_years = 0.5;
+  alpha.classification = "G yellow dwarf";
+  alpha.tags = {"habitable"};
+  GalaxySystem beta;
+  beta.id = 7;
+  beta.name = "beta";
+  beta.x_light_years = 9.0;
+  beta.y_light_years = 8.0;
+  map.add_system(alpha);
+  map.add_system(beta);
+  map.add_lane({3, 5, 7, 10.0, false});
+  GalaxyMarker marker;
+  marker.id = 42;
+  marker.kind = GalaxyMarker::Kind::Fleet;
+  marker.label = "wing";
+  marker.owner_id = 4;
+  marker.system_id = 7;
+  marker.destination_system_id = 5;
+  map.add_marker(marker);
+  GalaxyMarker free_floating;
+  free_floating.id = 43;
+  free_floating.kind = GalaxyMarker::Kind::Anomaly;
+  free_floating.x_light_years = 4.0;
+  map.add_marker(free_floating);
+
+  check_codec(map.capture_state(), "galaxy map state codec");
+
+  GalaxyMap restored;
+  restored.restore_state(
+      parse_state<GalaxyMap::State>(round_trip(map.capture_state())));
+  check_codec(restored.capture_state(), "restored galaxy codec");
+  require(restored.system_count() == 2 && restored.lane_count() == 1 &&
+              restored.marker_count() == 2,
+          "restored galaxy keeps topology and markers");
+  require(restored.marker(42)->destination_system_id.value_or(0) == 5 &&
+              !restored.marker(43)->system_id.has_value(),
+          "restored galaxy keeps marker anchors");
+  require(!restored.lane(3)->enabled, "restored galaxy keeps lane flags");
+}
+
 void test_negative_cases() {
   bool threw = false;
   try {
@@ -309,6 +356,7 @@ int main() {
   test_economy_codec();
   test_history_codec();
   test_physics_codec();
+  test_galaxy_map_codec();
   test_negative_cases();
 
   if (failures != 0) {
@@ -317,6 +365,6 @@ int main() {
   }
   std::cout << "Framework state JSON codec tests passed "
                "(scheduler/population/colony/flow/logistics/warfare/ai/"
-               "economy/history/physics)\n";
+               "economy/history/physics/galaxy)\n";
   return 0;
 }

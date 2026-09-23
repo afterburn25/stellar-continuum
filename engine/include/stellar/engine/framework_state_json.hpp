@@ -25,6 +25,7 @@
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/history.hpp>
 #include <stellar/engine/physics.hpp>
+#include <stellar/engine/galaxy_map.hpp>
 
 #include <stdexcept>
 
@@ -619,6 +620,103 @@ inline void from_json(const Json& j, PhysicsWorld::State& s) {
   s.overlapping = j.value(
       "overlapping",
       std::vector<std::pair<PhysicsBodyId, PhysicsBodyId>>{});
+}
+
+// --- GalaxyMap -------------------------------------------------------------
+
+template<class Json> inline void to_json(Json& j, const GalaxySystem& s) {
+  j = Json{{"id", s.id},
+           {"name", s.name},
+           {"x_light_years", s.x_light_years},
+           {"y_light_years", s.y_light_years},
+           {"depth_light_years", s.depth_light_years},
+           {"classification", s.classification},
+           {"tags", s.tags}};
+}
+template<class Json> inline void from_json(const Json& j, GalaxySystem& s) {
+  j.at("id").get_to(s.id);
+  s.name = j.value("name", std::string{});
+  s.x_light_years = j.value("x_light_years", 0.0);
+  s.y_light_years = j.value("y_light_years", 0.0);
+  s.depth_light_years = j.value("depth_light_years", 0.0);
+  s.classification = j.value("classification", std::string{});
+  s.tags = j.value("tags", std::vector<std::string>{});
+}
+
+template<class Json> inline void to_json(Json& j, const GalaxyLane& s) {
+  j = Json{{"id", s.id},
+           {"first_system_id", s.first_system_id},
+           {"second_system_id", s.second_system_id},
+           {"length_light_years", s.length_light_years},
+           {"enabled", s.enabled}};
+}
+template<class Json> inline void from_json(const Json& j, GalaxyLane& s) {
+  j.at("id").get_to(s.id);
+  j.at("first_system_id").get_to(s.first_system_id);
+  j.at("second_system_id").get_to(s.second_system_id);
+  s.length_light_years = j.value("length_light_years", 0.0);
+  s.enabled = j.value("enabled", true);
+}
+
+template<class Json>
+inline void to_json(Json& j, const GalaxyMarker::Kind& v) {
+  j = static_cast<int>(v);
+}
+template<class Json>
+inline void from_json(const Json& j, GalaxyMarker::Kind& v) {
+  const int raw = j.template get<int>();
+  if (raw < 0 || raw > static_cast<int>(GalaxyMarker::Kind::Custom))
+    throw std::invalid_argument("Invalid galaxy marker kind");
+  v = static_cast<GalaxyMarker::Kind>(raw);
+}
+template<class Json> inline void to_json(Json& j, const GalaxyMarker& s) {
+  j = Json{{"id", s.id},
+           {"kind", s.kind},
+           {"label", s.label},
+           {"owner_id", s.owner_id},
+           {"x_light_years", s.x_light_years},
+           {"y_light_years", s.y_light_years},
+           {"depth_light_years", s.depth_light_years},
+           {"system_id", s.system_id.value_or(0)},
+           {"has_system_id", s.system_id.has_value()},
+           {"destination_system_id", s.destination_system_id.value_or(0)},
+           {"has_destination_system_id",
+            s.destination_system_id.has_value()}};
+}
+template<class Json> inline void from_json(const Json& j, GalaxyMarker& s) {
+  j.at("id").get_to(s.id);
+  j.at("kind").get_to(s.kind);
+  s.label = j.value("label", std::string{});
+  s.owner_id = j.value("owner_id", std::uint64_t{0});
+  s.x_light_years = j.value("x_light_years", 0.0);
+  s.y_light_years = j.value("y_light_years", 0.0);
+  s.depth_light_years = j.value("depth_light_years", 0.0);
+  const auto system_id = j.value("system_id", std::uint64_t{0});
+  s.system_id = j.value("has_system_id", false)
+                    ? std::optional<std::uint64_t>(system_id)
+                    : std::nullopt;
+  const auto destination_id =
+      j.value("destination_system_id", std::uint64_t{0});
+  s.destination_system_id =
+      j.value("has_destination_system_id", false)
+          ? std::optional<std::uint64_t>(destination_id)
+          : std::nullopt;
+}
+
+template<class Json>
+inline void to_json(Json& j, const GalaxyMap::State& s) {
+  j = Json{{"version", s.version},
+           {"systems", s.systems},
+           {"lanes", s.lanes},
+           {"markers", s.markers}};
+}
+template<class Json>
+inline void from_json(const Json& j, GalaxyMap::State& s) {
+  s.version = j.value("version", std::uint32_t{1});
+  detail::check_version(s.version, 1, "GalaxyMap");
+  j.at("systems").get_to(s.systems);
+  j.at("lanes").get_to(s.lanes);
+  j.at("markers").get_to(s.markers);
 }
 
 } // namespace stellar::engine

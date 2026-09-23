@@ -103,7 +103,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   laziness, spatial queries, markers, persistence round-trip +
   corruption rejection), `galaxy_projection` (mapping, lanes from the
   authoritative network, anchored/transit fleets, orphan colony skip,
-  determinism), `engine_shell_tool_galaxy` smoke test.
+  determinism), `framework_state_codec` (GalaxyMap JSON codec),
+  `engine_shell_tool_galaxy` smoke test.
 - **Save/performance impact:** map state is a presentation/projection
   model — `capture_state`/`restore_state` exist for embedders that
   persist charts; the Core projection allocates per call and is not on
