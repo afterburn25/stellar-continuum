@@ -4,6 +4,7 @@
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/campaign_logistics_projection.hpp>
+#include <stellar/core/campaign_population_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_reach.hpp>
@@ -181,6 +182,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     const auto econ_construction=economic_construction_projection(world.construction);
     const auto econ_fleets=economic_fleet_projection(world.fleets);
     const EconomyWorldView econ{world.civilizations,world.bodies,econ_construction,econ_fleets};
+    const SettlementBodyIndex population_index(world.colonies,world.bodies);
     for(const auto &civ:world.civilizations){
       if(records.size()>=maximum)break;
       // The authoritative queries throw when a civ lacks economy or
@@ -295,6 +297,42 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           r.values["fromNode"]=static_cast<double>(route->path.front());
           r.values["toNode"]=static_cast<double>(route->path.back());
           r.values["utilization"]=utilization;
+          records.push_back(std::move(r));
+        }
+      }
+      // Population unrest: the cohort projection's migration_pressure
+      // query reads the colony's emigration pressure from the
+      // authoritative wellbeing inputs (stability, employment,
+      // crowding, sustenance ratios) — const query, no growth is
+      // simulated. A colony whose cohort wants to leave at >=10%/year
+      // is a loyalty risk no existing finding covers.
+      if(records.size()<maximum){
+        const auto cit=std::find_if(econ_construction.begin(),econ_construction.end(),
+            [&](const auto &s){return s.civilization_id==civ.id;});
+        const bool automation=cit!=econ_construction.end()&&
+            std::find(cit->completed_project_ids.begin(),cit->completed_project_ids.end(),
+                      "industrial_automation")!=cit->completed_project_ids.end();
+        for(const auto &colony:world.colonies){
+          if(records.size()>=maximum)break;
+          if(colony.civilization_id!=civ.id||colony.kind!=SettlementKind::Colony)continue;
+          const auto projected=project_colony_population(
+              colony,population_index.bodies_for(colony),30.0,automation);
+          const double pressure=projected.population.migration_pressure(
+              projected.cohort,projected.conditions);
+          if(pressure<0.10)continue;
+          DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
+          r.event_type="population_unrest";r.severity=DiagnosticSeverity::Warning;
+          r.entity_id=colony.id;r.civilization_id=civ.id;r.system_id=colony.system_id;
+          char message[192];
+          std::snprintf(message,sizeof(message),
+                        "Colony population unrest: %.0f%%/year emigration pressure.",
+                        pressure*100.0);
+          r.message=message;
+          r.values["emigrationPressurePerYear"]=pressure;
+          // The projection always carries exactly one cohort.
+          r.values["employmentRate"]=projected.population.cohorts().front()->employment_rate;
+          r.values["foodRatio"]=projected.conditions.food_ratio;
+          r.values["overcrowding"]=projected.conditions.overcrowding;
           records.push_back(std::move(r));
         }
       }

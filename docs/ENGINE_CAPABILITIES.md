@@ -529,8 +529,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   "requires:<tag>" unmet reasons callers feed into
   `SettlementConditions`/`Cohort::environment_suitability`;
   `population_habitability` tests cover satisfied/missing/no-need
-  environments and profile passthrough. Colony framework consumption
-  pending.
+  environments and profile passthrough.
+  **Core consumer:** `campaign_population_projection` — each colony
+  projects into a single-cohort `Population` plus the
+  `SettlementConditions` its authoritative systems already compute
+  (sustenance-capacity chain → food/goods/housing ratios and
+  overcrowding, `colony_labor` → employment, `stability` → wellbeing,
+  `colony_habitat_support` → natural habitability, species biology →
+  demographic template). Campaign diagnostics emits `population_unrest`
+  when `migration_pressure()` — a const query, no competing growth
+  authority — reports ≥10%/year emigration pressure. Depopulated
+  colonies project neutral fit (no evaluable habitat); unknown species
+  still propagates as corrupt state. `campaign_population_projection`
+  tests cover the condition mapping, threshold crossing, automation
+  relief, species-template carry, invariant propagation, and the
+  empty-colony edge. Direct authority adoption still pending the
+  DECISION_LOG graduation criteria.
 - **Save/performance impact:** plain data state, serializes directly;
   cost scales with cohort count (hundreds), not headcount.
 - **Limitations:** uniform (not per-bucket) mortality draw; equal-share

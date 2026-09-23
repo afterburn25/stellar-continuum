@@ -220,6 +220,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/campaign_colony_projection.cpp
   core/src/campaign_economy_projection.cpp
   core/src/campaign_logistics_projection.cpp
+  core/src/campaign_population_projection.cpp
   core/src/campaign_warfare_projection.cpp
   core/src/galaxy_projection.cpp
   core/src/campaign_frame.cpp
@@ -726,6 +727,9 @@ if(BUILD_TESTING)
   add_executable(stellar_campaign_logistics_projection_tests native-tests/campaign_logistics_projection_tests.cpp)
   target_link_libraries(stellar_campaign_logistics_projection_tests PRIVATE stellar_core)
   add_test(NAME campaign_logistics_projection COMMAND stellar_campaign_logistics_projection_tests)
+  add_executable(stellar_campaign_population_projection_tests native-tests/campaign_population_projection_tests.cpp)
+  target_link_libraries(stellar_campaign_population_projection_tests PRIVATE stellar_core)
+  add_test(NAME campaign_population_projection COMMAND stellar_campaign_population_projection_tests)
   add_executable(stellar_galaxy_map_tests native-tests/galaxy_map_tests.cpp)
   target_link_libraries(stellar_galaxy_map_tests PRIVATE stellar_engine)
   add_test(NAME galaxy_map COMMAND stellar_galaxy_map_tests)
