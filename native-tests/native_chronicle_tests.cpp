@@ -168,7 +168,7 @@ void view_lifecycle() {
   view.close();
 }
 
-void scope_filtering() {
+void actor_filtering() {
   engine::EventHistory history;
   const auto add = [&](double day, std::string category,
                        std::vector<std::uint64_t> actors,
@@ -186,31 +186,41 @@ void scope_filtering() {
   add(400., "war.engagement_started", {7}, {1, 7});
   // Own: civ 1 founds a colony.
   add(410., "colony.founded", {1}, {1});
+  // Joint: both civs involved (a treaty or engagement between them).
+  add(415., "war.battle", {1, 7}, {1, 7});
   // Public record with no actors — visible to everyone, involves no civ.
   add(420., "exploration.system_surveyed", {}, {});
 
   const auto intel = snapshot(history, 1);
-  require(intel.total == 3, "Observer lost visible intel");
-  const auto mine = snapshot(history, 1, 4000, {}, 0.0, true);
-  require(mine.total == 1 &&
-              mine.entries.front().summary == "colony.founded",
-          "Scope filter kept non-actor events");
-  // Scope composes with domain + significance.
+  require(intel.total == 4, "Observer lost visible intel");
+  const auto mine = snapshot(history, 1, 4000, {}, 0.0, 1);
+  require(mine.total == 2, "Actor filter kept non-actor events");
+  const auto theirs = snapshot(history, 1, 4000, {}, 0.0, 7);
+  require(theirs.total == 2 &&
+              theirs.entries.front().summary == "war.battle",
+          "Foreign actor filter missed joint + solo events");
+  const auto nobody = snapshot(history, 1, 4000, {}, 0.0, 99);
+  require(nobody.total == 0, "Unknown actor produced entries");
+  // Actor filter composes with domain + significance.
   const auto my_colonies =
-      snapshot(history, 1, 4000, "colony.", 0.0, true);
-  require(my_colonies.total == 1, "Scope did not compose with domain");
-  const auto my_wars = snapshot(history, 1, 4000, "war.", 0.0, true);
-  require(my_wars.total == 0, "Scope leaked foreign wars as involved");
+      snapshot(history, 1, 4000, "colony.", 0.0, 1);
+  require(my_colonies.total == 1, "Actor filter did not compose");
+  const auto their_wars = snapshot(history, 1, 4000, "war.", 0.0, 7);
+  require(their_wars.total == 2, "Actor+domain composition wrong");
 
   NativeChronicleView view;
   view.open(history, 1);
-  require(!view.involved_only(), "Open kept a stale scope");
-  view.toggle_scope();
-  require(view.involved_only() && view.current().entries.size() == 1,
-          "Scope toggle did not filter to involved events");
-  view.toggle_scope();
-  require(!view.involved_only() && view.current().entries.size() == 3,
-          "Scope toggle did not restore intel view");
+  require(view.actor_filter() == 0, "Open kept a stale actor filter");
+  view.cycle_actor();
+  require(view.actor_filter() == 1 && view.current().entries.size() == 2,
+          "First cycle did not land on the observer (MINE)");
+  view.cycle_actor();
+  require(view.actor_filter() == 7 && view.current().entries.size() == 2,
+          "Second cycle did not land on the foreign civ");
+  view.cycle_actor();
+  require(view.actor_filter() == 0 &&
+              view.current().entries.size() == 4,
+          "Cycle did not wrap back to all intel");
 }
 
 void entry_navigation() {
@@ -281,7 +291,7 @@ int main() {
     snapshot_projection();
     domain_filtering();
     significance_filtering();
-    scope_filtering();
+    actor_filtering();
     entry_navigation();
     view_lifecycle();
     render_smoke();

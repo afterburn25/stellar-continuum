@@ -123,11 +123,11 @@ from a CHRONICLE button in the notification panel header, refreshed on
 demand while open, closed on every session/modal transition alongside
 the notification view, and filterable by category domain via
 `snapshot()`'s `category_prefix`, a significance floor that cycles
-0.0 → 0.3 → 0.5 → 0.7, and an actor scope toggle (`involved_only`)
-that distinguishes "all visible intel" (events the observer merely
-witnesses via known systems) from events listing the observer in
-`actors` — all three filters apply before the cap, so a filtered view
-still reaches deep history. Entries with a `location` are clickable:
+0.0 → 0.3 → 0.5 → 0.7, and an actor filter cycling all intel → the
+observer (MINE) → each other civilization appearing in the visible
+feed (`actors` exact-match; civ names resolve through an injected
+resolver, falling back to "CIV <id>") — all three filters apply
+before the cap, so a filtered view still reaches deep history. Entries with a `location` are clickable:
 the view returns the system id through `navigation()` (same drain
 contract as the debug background), the client closes the overlay and
 calls `enter_system` — the workspace's own observation check still
@@ -160,6 +160,6 @@ recording and voice announce the same authoritative step events.
   gating and sensor-quality degradation are future refinements.
 - The chronicle browser snapshots the newest 4000 visible entries and
   filters by whole category domains, a coarse significance floor
-  (0.0/0.3/0.5/0.7) and a binary involved-actor scope — continuous
-  floors, arbitrary-actor and tag filtering (`query()`'s remaining
-  axes) stay unused at the presentation layer.
+  (0.0/0.3/0.5/0.7) and a per-civilization actor cycle — continuous
+  floors and tag filtering (`query()`'s last unused axis) stay unused
+  at the presentation layer.

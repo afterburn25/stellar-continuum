@@ -745,6 +745,12 @@ class NativeCampaign final {
     economy_workspace_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
     chronicle_view_.set_text_measurer(text_measurer_);
+    chronicle_view_.set_actor_name_resolver([this](std::uint64_t id){
+      if(!session_)return std::string{};
+      const auto& world=session_->frame().runtime().world().campaign();
+      const auto it=std::ranges::find(world.civilizations,static_cast<int>(id),&Civilization::id);
+      return it==world.civilizations.end()?std::string{}:it->name;
+    });
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     phenomena_.use_queue(image_preparation_);

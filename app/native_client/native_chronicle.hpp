@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -48,16 +49,17 @@ struct ChronicleSnapshot {
 // a chronicle can hold 100k records; the view shows the newest slice
 // and reports the true total). `category_prefix` restricts to one
 // domain ("war.", "exploration.", ...) and `min_significance` is the
-// feed's own floor — both apply before the cap so a filtered view
-// still reaches deep history. `involved_only` further restricts to
-// events that list the observer in `actors` — the difference between
-// "all intel" (events merely visible via known systems) and "my
-// empire's doings". `total` reports the filtered visible count.
+// feed's own floor — all apply before the cap so a filtered view
+// still reaches deep history. `actor` (0 = all) further restricts to
+// events listing that civilization in `actors` — the difference
+// between "all intel" (events merely visible via known systems) and
+// "what a given empire actually did". `total` reports the filtered
+// visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
          std::string_view category_prefix = {},
-         double min_significance = 0.0, bool involved_only = false);
+         double min_significance = 0.0, std::uint64_t actor = 0);
 
 class NativeChronicleView final {
 public:
@@ -95,11 +97,17 @@ public:
   [[nodiscard]] double significance_floor() const noexcept {
     return significance_floor_;
   }
-  // Toggles the actor scope (all visible intel ↔ events involving the
-  // observer) and re-pulls.
-  void toggle_scope();
-  [[nodiscard]] bool involved_only() const noexcept {
-    return involved_only_;
+  // Cycles the actor filter (all intel → the observer → each other
+  // civilization appearing in the visible feed, ascending) and
+  // re-pulls. `actor_name_resolver` supplies display names for the
+  // button label (falls back to "CIV <id>"; the observer shows MINE).
+  void cycle_actor();
+  [[nodiscard]] std::uint64_t actor_filter() const noexcept {
+    return actor_filter_;
+  }
+  void set_actor_name_resolver(
+      std::function<std::string(std::uint64_t)> resolver) {
+    actor_name_resolver_ = std::move(resolver);
   }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
@@ -124,7 +132,7 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Scope, Entry };
+                           Actor, Entry };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -133,9 +141,10 @@ private:
   int observer_{-1};
   std::string domain_filter_;
   double significance_floor_{};
-  bool involved_only_{};
+  std::uint64_t actor_filter_{};
   std::size_t press_entry_{};
   std::optional<std::uint64_t> navigation_{};
+  std::function<std::string(std::uint64_t)> actor_name_resolver_;
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

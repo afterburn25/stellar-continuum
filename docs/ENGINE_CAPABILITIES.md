@@ -170,9 +170,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   involved-actor filters, true filtered total reported) and
   `NativeChronicleView` renders it as an overlay opened from the
   notification panel's CHRONICLE button with on-demand refresh, domain
-  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7) and an ALL ↔
-  MINE scope toggle ("all intel" vs events listing the observer in
-  `actors`); clicking a located entry navigates the map to its system
+  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7) and an actor
+  cycle (all intel → MINE → each civ appearing in the visible feed,
+  names resolved from campaign state); clicking a located entry
+  navigates the map to its system
   via `navigation()` → `enter_system` (the workspace re-applies the
   observation check) (`native_chronicle` tests). Admission
   seeding applies a fixed 0.35 report floor so high-volume trivia

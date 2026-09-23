@@ -107,7 +107,7 @@ struct CardLayout {
 // top-down (entries already newest-first), translated by scroll.
 struct ChronicleLayout {
   UiRect panel, header, close_button, refresh_button, domain_button,
-      significance_button, scope_button, list_viewport, empty_hint;
+      significance_button, actor_button, list_viewport, empty_hint;
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
 };
@@ -144,8 +144,8 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
   layout.significance_button = {layout.domain_button.x - 76.f * s,
                                 layout.domain_button.y, 70.f * s,
                                 layout.domain_button.height};
-  layout.scope_button = {layout.significance_button.x - 66.f * s,
-                         layout.domain_button.y, 60.f * s,
+  layout.actor_button = {layout.significance_button.x - 76.f * s,
+                         layout.domain_button.y, 70.f * s,
                          layout.domain_button.height};
   const float intro_height = 32.f * s;
   layout.list_viewport = {
@@ -219,7 +219,7 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
                            std::size_t max_entries,
                            std::string_view category_prefix,
-                           double min_significance, bool involved_only) {
+                           double min_significance, std::uint64_t actor) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   const auto events = history.feed(
@@ -233,8 +233,8 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
     if (!category_prefix.empty() &&
         !event->category.starts_with(category_prefix))
       continue;
-    if (involved_only && std::ranges::find(event->actors, observer) ==
-                             event->actors.end())
+    if (actor != 0 && std::ranges::find(event->actors, actor) ==
+                          event->actors.end())
       continue;
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
@@ -261,7 +261,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   observer_ = observer_civilization_id;
   domain_filter_.clear();
   significance_floor_ = 0.0;
-  involved_only_ = false;
+  actor_filter_ = 0;
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -275,12 +275,30 @@ void NativeChronicleView::close() noexcept {
 void NativeChronicleView::refresh() {
   if (!history_) return;
   snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
-                       significance_floor_, involved_only_);
+                       significance_floor_, actor_filter_);
   scroll_ = 0.f;
 }
 
-void NativeChronicleView::toggle_scope() {
-  involved_only_ = !involved_only_;
+void NativeChronicleView::cycle_actor() {
+  if (!history_) return;
+  // Distinct actors across the observer's visible feed — ALL first,
+  // then the observer (MINE), then every other involved civilization
+  // in ascending id order. The observer's own feed is the authorized
+  // projection, so actor ids gathered here stay privacy-safe.
+  const auto observer = static_cast<std::uint64_t>(observer_);
+  const auto events = history_->feed(
+      observer, -std::numeric_limits<double>::infinity(), 0.0);
+  std::vector<std::uint64_t> actors;
+  for (const auto *event : events)
+    for (const auto id : event->actors)
+      if (id != observer &&
+          std::ranges::find(actors, id) == actors.end())
+        actors.push_back(id);
+  std::ranges::sort(actors);
+  actors.insert(actors.begin(), {0, observer});
+  const auto it = std::ranges::find(actors, actor_filter_);
+  actor_filter_ =
+      (it == actors.end() || it + 1 == actors.end()) ? 0 : *(it + 1);
   refresh();
 }
 
@@ -343,8 +361,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Domain;
     else if (layout.significance_button.contains(event.position))
       press_target_ = PressTarget::Significance;
-    else if (layout.scope_button.contains(event.position))
-      press_target_ = PressTarget::Scope;
+    else if (layout.actor_button.contains(event.position))
+      press_target_ = PressTarget::Actor;
     else if (layout.list_viewport.contains(event.position)) {
       for (std::size_t i = 0; i < layout.entries.size(); ++i)
         if (layout.entries[i].bounds.contains(event.position)) {
@@ -383,9 +401,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Significance &&
            layout.significance_button.contains(event.position))
     cycle_significance();
-  else if (target == PressTarget::Scope &&
-           layout.scope_button.contains(event.position))
-    toggle_scope();
+  else if (target == PressTarget::Actor &&
+           layout.actor_button.contains(event.position))
+    cycle_actor();
   else if (target == PressTarget::Entry &&
            press_entry_ < layout.entries.size() &&
            layout.entries[press_entry_].bounds.contains(event.position) &&
@@ -481,23 +499,37 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
       sig_text, muted_color, domain_pixels,
       layout.significance_button.width - 4.f * s, layout.significance_button,
       TextAlign::Center);
-  stellar::engine::ui_skin::control(out, layout.scope_button,
-                                    layout.scope_button.contains(pointer_),
-                                    involved_only_, true, s);
-  const std::string scope_text =
-      involved_only_ ? resolve(locale_, "CHRONICLE_SCOPE_MINE", "MINE")
-                     : resolve(locale_, "CHRONICLE_FILTER_ALL", "ALL");
-  const Text scope_probe{{}, scope_text, muted_color, domain_pixels,
-                         layout.scope_button.width - 4.f * s, std::nullopt,
+  stellar::engine::ui_skin::control(out, layout.actor_button,
+                                    layout.actor_button.contains(pointer_),
+                                    actor_filter_ != 0, true, s);
+  std::string actor_text;
+  if (actor_filter_ == 0) {
+    actor_text = resolve(locale_, "CHRONICLE_FILTER_ALL", "ALL");
+  } else if (actor_filter_ ==
+             static_cast<std::uint64_t>(observer_)) {
+    actor_text = resolve(locale_, "CHRONICLE_SCOPE_MINE", "MINE");
+  } else {
+    if (actor_name_resolver_)
+      actor_text = actor_name_resolver_(actor_filter_);
+    if (actor_text.empty()) {
+      char civ_buf[24];
+      std::snprintf(civ_buf, sizeof(civ_buf), "CIV %llu",
+                    static_cast<unsigned long long>(actor_filter_));
+      actor_text = civ_buf;
+    }
+  }
+  actor_text = upper(std::move(actor_text));
+  const Text actor_probe{{}, actor_text, muted_color, domain_pixels,
+                         layout.actor_button.width - 4.f * s, std::nullopt,
                          TextAlign::Center, FontFace::Interface};
-  const auto scope_extent = measure(measure_, scope_probe);
+  const auto actor_extent = measure(measure_, actor_probe);
   clipped_text(
       out,
-      {layout.scope_button.x + layout.scope_button.width * .5f,
-       layout.scope_button.y +
-           (layout.scope_button.height - scope_extent.height) * .5f},
-      scope_text, muted_color, domain_pixels,
-      layout.scope_button.width - 4.f * s, layout.scope_button,
+      {layout.actor_button.x + layout.actor_button.width * .5f,
+       layout.actor_button.y +
+           (layout.actor_button.height - actor_extent.height) * .5f},
+      actor_text, muted_color, domain_pixels,
+      layout.actor_button.width - 4.f * s, layout.actor_button,
       TextAlign::Center);
   const std::array<std::string, 2> args{
       std::to_string(snapshot_.entries.size()),
@@ -519,7 +551,7 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                 layout.header.y + layout.header.height + 13.f * s},
                subtitle, muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))),
-               std::max(1.f, layout.scope_button.x -
+               std::max(1.f, layout.actor_button.x -
                                  layout.list_viewport.x - 8.f * s),
                layout.panel);
   if (snapshot_.entries.empty()) {

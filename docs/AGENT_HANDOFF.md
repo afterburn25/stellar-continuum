@@ -205,9 +205,10 @@ wrong and has been corrected. Significance filtering landed too: the
 browser cycles floors 0.0 → 0.3 → 0.5 → 0.7 (applied before the cap
 alongside the domain filter) and admission seeding uses a fixed 0.35
 report floor so high-volume trivia (damage ticks, detections) stays
-out of the transient feed. An actor-scope toggle (ALL ↔ MINE)
-distinguishes passive intel from events involving the observer via
-`actors`. Located entries navigate — clicking one returns its system
+out of the transient feed. The actor filter cycles all intel → MINE →
+each civilization appearing in the visible feed (`actors` exact-match
+with name resolution) — "what is civ 7 up to" is one button away.
+Located entries navigate — clicking one returns its system
 through `navigation()` and the client enters that system (the
 workspace's observation check still gates visibility). The transient
 feed mirrors it: chronicle-seeded reports carry `system_id` and render
@@ -218,8 +219,7 @@ retention landed too: `maintain_chronicle` (in
 reaches 90% of capacity it prunes routine records (<0.35 significance)
 older than 365 days so the bounded oldest-first eviction cannot
 discard majors; `campaign_event_history` tests cover trigger, content
-and determinism. Remaining: arbitrary-actor/tag filtering in the
-browser.
+and determinism. Remaining: tag filtering in the browser.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
