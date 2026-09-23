@@ -156,11 +156,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   the chronicle (`native_notification_events` tests).
   `native_chronicle` adds the scrollable chronicle browser —
   `snapshot()` projects `feed()` newest-first (4000-entry cap applied
-  after optional category-domain and significance-floor filters, true
-  filtered total reported) and `NativeChronicleView` renders it as an
-  overlay opened from the notification panel's CHRONICLE button with
-  on-demand refresh, domain cycling, and a significance cycle
-  (0.0 → 0.3 → 0.5 → 0.7) (`native_chronicle` tests). Admission
+  after optional category-domain, significance-floor and
+  involved-actor filters, true filtered total reported) and
+  `NativeChronicleView` renders it as an overlay opened from the
+  notification panel's CHRONICLE button with on-demand refresh, domain
+  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7) and an ALL ↔
+  MINE scope toggle ("all intel" vs events listing the observer in
+  `actors`) (`native_chronicle` tests). Admission
   seeding applies a fixed 0.35 report floor so high-volume trivia
   (damage ticks, detections) stays out of the transient feed. Voice
   announcement of the same step events already runs through
@@ -420,6 +422,42 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   runtime; catalysts/labor/facility tags are metadata until the colony
   framework gates on them; diagnostics consume caller-supplied
   observations (no automatic rollup yet).
+
+## Core campaign economy projection + sustenance diagnostics (2026-09-24)
+
+- **Purpose:** make the engine economy-analysis framework reachable over
+  authoritative campaign state without creating a second economy
+  authority. Core's macro colony economy (surface production,
+  sustenance capacity, reserves) stays authoritative; the projection
+  reshapes that state into `ResourceObservation`s so `analyze_economy`
+  produces per-resource bottleneck/reserve/unmet diagnostics.
+- **Core adapter:** `core/campaign_economy_projection.*` —
+  `sustenance_economy_catalog()` builds a small `EconomyCatalog`
+  (`res.food`, `res.water`, `res.housing`); `colony_resource_observations`
+  maps `surface_colony_output`, `surface_sustenance_projection`,
+  `colony_sustenance_capacity` and `preview_colony_reserves` (clamped
+  reserve semantics preserved) into observations;
+  `analyze_colony_sustenance` runs them through `analyze_economy` sorted
+  deterministically by resource id. No engine `Population`/`Colony`
+  objects are instantiated for campaign authority.
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `sustenance_shortfall` findings (entity/civilization/system identity +
+  demand/supply/reserve values) for colonies whose food/water demand
+  outruns installed supply over a 30-day horizon — consumed by the
+  campaign diagnostic monitor, developer diagnostic report and QA host.
+  `campaign_economy_projection` tests — healthy/hostile bodies,
+  reserve-day parity with `preview_colony_reserves`, building
+  contribution, determinism, legacy body-less colonies, and the
+  operations-finding path; `campaign_diagnostics` tests updated for the
+  new finding class (seeded worlds legitimately contain under-provisioned
+  colonies).
+- **Save/performance impact:** read-only projection — zero new
+  persistent state; scans colonies once per daily diagnostics check with
+  a cached static catalog (O(colonies), tiny resource set).
+- **Limitations:** sustenance resources only (food/water/housing) —
+  broader Core resource flows (industry, trade goods) are not projected;
+  findings describe shortfalls, they do not prescribe fixes; engine-side
+  economy framework adoption into Core authority remains future work.
 
 ## Massive simulation scheduler + simulation LOD executor (2026-09-23)
 

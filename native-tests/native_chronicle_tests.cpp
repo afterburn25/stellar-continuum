@@ -168,6 +168,51 @@ void view_lifecycle() {
   view.close();
 }
 
+void scope_filtering() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::vector<std::uint64_t> actors,
+                       std::vector<std::uint64_t> visible) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.summary = category;
+    event.category = std::move(category);
+    event.actors = std::move(actors);
+    event.visible_to = std::move(visible);
+    history.record(std::move(event));
+  };
+  // Intel: civ 7's battle in a system civ 1 knows — visible to 1 but
+  // 1 is not an actor.
+  add(400., "war.engagement_started", {7}, {1, 7});
+  // Own: civ 1 founds a colony.
+  add(410., "colony.founded", {1}, {1});
+  // Public record with no actors — visible to everyone, involves no civ.
+  add(420., "exploration.system_surveyed", {}, {});
+
+  const auto intel = snapshot(history, 1);
+  require(intel.total == 3, "Observer lost visible intel");
+  const auto mine = snapshot(history, 1, 4000, {}, 0.0, true);
+  require(mine.total == 1 &&
+              mine.entries.front().summary == "colony.founded",
+          "Scope filter kept non-actor events");
+  // Scope composes with domain + significance.
+  const auto my_colonies =
+      snapshot(history, 1, 4000, "colony.", 0.0, true);
+  require(my_colonies.total == 1, "Scope did not compose with domain");
+  const auto my_wars = snapshot(history, 1, 4000, "war.", 0.0, true);
+  require(my_wars.total == 0, "Scope leaked foreign wars as involved");
+
+  NativeChronicleView view;
+  view.open(history, 1);
+  require(!view.involved_only(), "Open kept a stale scope");
+  view.toggle_scope();
+  require(view.involved_only() && view.current().entries.size() == 1,
+          "Scope toggle did not filter to involved events");
+  view.toggle_scope();
+  require(!view.involved_only() && view.current().entries.size() == 3,
+          "Scope toggle did not restore intel view");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -183,6 +228,7 @@ int main() {
     snapshot_projection();
     domain_filtering();
     significance_filtering();
+    scope_filtering();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

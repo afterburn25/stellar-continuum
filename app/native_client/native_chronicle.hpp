@@ -47,13 +47,15 @@ struct ChronicleSnapshot {
 // and reports the true total). `category_prefix` restricts to one
 // domain ("war.", "exploration.", ...) and `min_significance` is the
 // feed's own floor — both apply before the cap so a filtered view
-// still reaches deep history. `total` reports the filtered visible
-// count.
+// still reaches deep history. `involved_only` further restricts to
+// events that list the observer in `actors` — the difference between
+// "all intel" (events merely visible via known systems) and "my
+// empire's doings". `total` reports the filtered visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
          std::string_view category_prefix = {},
-         double min_significance = 0.0);
+         double min_significance = 0.0, bool involved_only = false);
 
 class NativeChronicleView final {
 public:
@@ -91,6 +93,12 @@ public:
   [[nodiscard]] double significance_floor() const noexcept {
     return significance_floor_;
   }
+  // Toggles the actor scope (all visible intel ↔ events involving the
+  // observer) and re-pulls.
+  void toggle_scope();
+  [[nodiscard]] bool involved_only() const noexcept {
+    return involved_only_;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -103,7 +111,8 @@ public:
   void render(native_map::DrawList &out, int width, int height) const;
 
 private:
-  enum class PressTarget { None, Close, Refresh, Domain, Significance };
+  enum class PressTarget { None, Close, Refresh, Domain, Significance,
+                           Scope };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -112,6 +121,7 @@ private:
   int observer_{-1};
   std::string domain_filter_;
   double significance_floor_{};
+  bool involved_only_{};
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

@@ -108,11 +108,15 @@ first, capped at 4000 with the true total reported) and
 from a CHRONICLE button in the notification panel header, refreshed on
 demand while open, closed on every session/modal transition alongside
 the notification view, and filterable by category domain via
-`snapshot()`'s `category_prefix` plus a significance floor that cycles
-0.0 → 0.3 → 0.5 → 0.7 (both filters apply before the cap, so a
-filtered view still reaches deep history). Coverage: `native_chronicle`
-tests (snapshot ordering, observer privacy, cap + total, domain and
-significance filtering, view lifecycle, refresh, render smoke).
+`snapshot()`'s `category_prefix`, a significance floor that cycles
+0.0 → 0.3 → 0.5 → 0.7, and an actor scope toggle (`involved_only`)
+that distinguishes "all visible intel" (events the observer merely
+witnesses via known systems) from events listing the observer in
+`actors` — all three filters apply before the cap, so a filtered view
+still reaches deep history. Coverage: `native_chronicle` tests
+(snapshot ordering, observer privacy, cap + total, domain,
+significance and scope filtering, view lifecycle, refresh, render
+smoke).
 
 The admission seeding in `native_notification_events` applies a fixed
 0.35 report floor via `feed()`'s `min_significance` — the category
@@ -137,6 +141,7 @@ recording and voice announce the same authoritative step events.
   detected a system sees its major events; delayed intel, survey-level
   gating and sensor-quality degradation are future refinements.
 - The chronicle browser snapshots the newest 4000 visible entries and
-  filters by whole category domains plus a coarse significance floor
-  (0.0/0.3/0.5/0.7) — continuous floors, per-actor and tag filtering
-  (`query()`'s other axes) remain unused at the presentation layer.
+  filters by whole category domains, a coarse significance floor
+  (0.0/0.3/0.5/0.7) and a binary involved-actor scope — continuous
+  floors, arbitrary-actor and tag filtering (`query()`'s remaining
+  axes) stay unused at the presentation layer.

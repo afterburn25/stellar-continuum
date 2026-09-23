@@ -205,8 +205,9 @@ wrong and has been corrected. Significance filtering landed too: the
 browser cycles floors 0.0 → 0.3 → 0.5 → 0.7 (applied before the cap
 alongside the domain filter) and admission seeding uses a fixed 0.35
 report floor so high-volume trivia (damage ticks, detections) stays
-out of the transient feed. Remaining: per-actor/tag filtering in the
-browser.
+out of the transient feed. An actor-scope toggle (ALL ↔ MINE)
+distinguishes passive intel from events involving the observer via
+`actors`. Remaining: arbitrary-actor/tag filtering in the browser.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
