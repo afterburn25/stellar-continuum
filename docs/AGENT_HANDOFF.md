@@ -472,7 +472,13 @@ preferences. A later 315-test run after the accessibility completion
 `orbitAu`), and TextureStreamer partial-mip-tail residency records one
 failure in `native_scene3d_gpu` caused by the in-flight
 screen-footprint LOD edit; the fixed binary passes standalone, so the
-branch is effectively 315/315 at `7fdc8357`. Do not change the default branch or merge
+branch is effectively 315/315 at `7fdc8357`. A 317-test run at
+`bd0fdca7` records 317/317 green after the logistics and population
+projection adapters landed: `campaign_logistics_projection` (engine
+freight network snapshot → `logistics_link_saturated` findings) and
+`campaign_population_projection` (cohort query model →
+`population_unrest` findings), each with dedicated ctest coverage.
+Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
 ## Preserve these contracts
