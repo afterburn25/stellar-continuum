@@ -146,7 +146,7 @@ struct Scene3DRenderer::Storage {
   }
   engine::TextureId stream_id_for(const RgbaImage& image){
     if(const auto it=stream_ids.find(&image);it!=stream_ids.end())return it->second;
-    engine::TextureDesc desc{};desc.name="scene3d-texture";
+    engine::TextureDesc desc{};desc.name="tex:"+std::to_string(reinterpret_cast<std::uintptr_t>(&image));
     if(!image.cooked_mips().empty()){
       SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
       switch(image.cooked_format()){
@@ -176,7 +176,7 @@ struct Scene3DRenderer::Storage {
       if(change.load||change.mip!=0)continue;
       const auto owner_it=stream_owners.find(change.id);
       if(owner_it==stream_owners.end())continue;
-      if(const auto it=textures.find(owner_it->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();textures.erase(it);}
+      if(const auto it=textures.find(owner_it->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();stats.streamed_evicted_bytes+=it->second->bytes();textures.erase(it);}
     }
   }
   std::shared_ptr<Texture> texture(std::shared_ptr<const RgbaImage> resource){

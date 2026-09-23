@@ -177,6 +177,8 @@ struct Scene3DStatistics {
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).
   std::uint64_t streamed_fallbacks{};
+  // Cumulative GPU bytes the TextureStreamer evicted from the texture cache.
+  std::uint64_t streamed_evicted_bytes{};
   // True when the device supports floating-point color targets: scenes render
   // into RGBA16F and resolve through the tonemap pass. False = direct UNORM.
   bool hdr{};
