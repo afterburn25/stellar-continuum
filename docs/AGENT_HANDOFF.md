@@ -118,9 +118,14 @@ migration slices; ~38M-headcount scale test — see
 `Colony` settlement substrate (colony.hpp) — DistrictSpec/StructureSpec
 templates, slot-bounded construction, shared utility pools, workforce
 scaling, upkeep/input draws, condition repair — see
-[COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md). Next: Milestone 5
-(infrastructure networks), then strategic logistics; adopt the executor
-for real Core/game phases when consuming these.
+[COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md). Milestone 5 landed:
+`FlowNetwork` (flow_network.hpp) — per-resource directed distribution
+graphs with node supply/demand/storage, capacity edges, lazily rebuilt
+union-find component cache on topology dirtying, deterministic
+ascending-id greedy transport and unmet/saturation diagnostics — see
+[INFRASTRUCTURE_FRAMEWORK.md](INFRASTRUCTURE_FRAMEWORK.md). Next:
+Milestone 6 (strategic logistics), then planetary adapters; adopt the
+executor for real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

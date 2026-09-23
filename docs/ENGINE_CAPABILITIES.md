@@ -62,6 +62,33 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Infrastructure flow networks (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 5 — reusable
+  single-resource distribution graphs (power/water/data/freight) with
+  dirty-tracked topology and flow diagnostics. See
+  [INFRASTRUCTURE_FRAMEWORK.md](INFRASTRUCTURE_FRAMEWORK.md).
+- **Engine APIs/ownership:** `FlowNetwork` — caller-supplied node/edge
+  ids, per-node supply/demand/storage rates, directed capacity edges
+  (duplicate direction pairs rejected), topology mutations dirty a lazy
+  union-find `components()` cache, rate/storage updates do not.
+  `advance(days)` is a three-pass deterministic transport: local
+  serve+storage release, greedy edge rebalancing in ascending id order,
+  surplus storage absorption; `FlowAdvanceResult` reports totals plus
+  nonzero per-node unmet and per-edge flow.
+- **Consumers/tests:** `flow_network` tests — local serve, edge
+  transfer, capacity saturation, storage buffering, islanded demand,
+  component caching on enable/disable, documented no-same-tick-chaining
+  behavior, bit-equal determinism, 10k-node/20k-edge scale. Colony
+  utility pools and Core grids adoption pending.
+- **Save/performance impact:** nodes/edges are plain caller-id data;
+  component cache is derived, never persisted. Per-advance cost is
+  O(nodes + edges).
+- **Limitations:** greedy single-pass transport, not max-flow — flow
+  doesn't chain through relays within one step; no shared corridor
+  capacity across resources, edge latency or loss factors; storage is
+  per-node.
+
 ## Colony/settlement structural framework (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 4 — the reusable
