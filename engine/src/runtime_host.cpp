@@ -456,6 +456,16 @@ int RuntimeHost::run() {
         if (bounced && impl.player && entity == *impl.player && bounce_clip)
           audio.play_effect(bounce_clip);
       }
+      // Lifetimes tick down in sim time; expired entities self-destruct
+      // (collected first so destruction doesn't disturb the scan).
+      {
+        std::vector<EntityId> expired;
+        for (const auto entity : impl.entities)
+          if (auto *lt = world.get<Lifetime>(entity);
+              lt != nullptr && (lt->remaining -= dt_step) <= 0.f)
+            expired.push_back(entity);
+        for (const auto id : expired) impl.destroy_fn(id);
+      }
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
       if (on_collision) {

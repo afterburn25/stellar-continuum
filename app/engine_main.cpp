@@ -198,7 +198,7 @@ struct Shell {
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
-      scene_preview{}, scene_rows{};
+      hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -1046,6 +1046,12 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 17) {
+    try {
+      next.ttl = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1087,7 +1093,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                     shell.hit_scene_grav = shell.hit_scene_gravity =
                         shell.hit_scene_solid = shell.hit_scene_bg =
                             shell.hit_scene_frames = shell.hit_scene_fps =
-                                shell.hit_scene_rot = {};
+                                shell.hit_scene_rot = shell.hit_scene_ttl =
+                                    {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1282,6 +1289,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->rotation) : "",
         shell.editing_scene && shell.scene_field == 16,
         "degrees clockwise - sprites only");
+  field(shell.hit_scene_ttl, "ttl",
+        entity ? std::to_string(entity->ttl) : "",
+        shell.editing_scene && shell.scene_field == 17,
+        "seconds until despawn - 0 immortal");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2139,6 +2150,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->fps);
               else if (field == 16 && e)
                 shell.scene_buffer = std::to_string(e->rotation);
+              else if (field == 17 && e)
+                shell.scene_buffer = std::to_string(e->ttl);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2174,6 +2187,8 @@ int main(int argc, char **argv) {
               edit_field(15);
             else if (shell.hit_scene_rot.contains(event.position))
               edit_field(16);
+            else if (shell.hit_scene_ttl.contains(event.position))
+              edit_field(17);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

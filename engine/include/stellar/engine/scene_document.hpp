@@ -45,6 +45,9 @@ struct SceneEntity {
   // Clockwise rotation in degrees — sprites rotate about their rect's
   // center; tinted rects ignore it (no rotated-fill primitive).
   float rotation{0.0f};
+  // Seconds of sim time before the entity self-destructs; 0 = immortal.
+  // For spawned effects (sparks, pickups) that should not persist.
+  float ttl{0.0f};
 };
 
 struct SceneDocument {

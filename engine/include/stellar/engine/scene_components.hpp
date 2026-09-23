@@ -64,6 +64,11 @@ struct Rotation {
   // Degrees clockwise about the entity rect's center (sprites only).
   float value{0.0f};
 };
+struct Lifetime {
+  // Remaining sim seconds before the host destroys the entity; counts down
+  // each sim step. Absent component = immortal.
+  float remaining{0.0f};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

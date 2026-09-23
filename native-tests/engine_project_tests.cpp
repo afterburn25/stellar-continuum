@@ -200,6 +200,10 @@ int main() {
         engine::SceneEntity{"box", 10.f, 20.f, 64.f, 32.f, 100.f, 50.f,
                             255, 128, 0, "data/logo.png", -2, 0.5f,
                             "score", 0.0f, true});
+    scene.entities[0].frames = 4;
+    scene.entities[0].fps = 6.0f;
+    scene.entities[0].rotation = 45.0f;
+    scene.entities[0].ttl = 2.5f;
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -211,6 +215,10 @@ int main() {
               reparsed->entities[0].text == "score" &&
               reparsed->entities[0].gravity_scale == 0.0f &&
               reparsed->entities[0].solid &&
+              reparsed->entities[0].frames == 4 &&
+              reparsed->entities[0].fps == 6.0f &&
+              reparsed->entities[0].rotation == 45.0f &&
+              reparsed->entities[0].ttl == 2.5f &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f,
           "scene document round-trips");

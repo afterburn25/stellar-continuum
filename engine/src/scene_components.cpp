@@ -77,6 +77,8 @@ void register_scene_components(World &world) {
                                  decode_pod<Anim>);
   world.register_component<Rotation>("rotation", encode_pod<Rotation>,
                                      decode_pod<Rotation>);
+  world.register_component<Lifetime>("lifetime", encode_pod<Lifetime>,
+                                     decode_pod<Lifetime>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -97,6 +99,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (s.frames != 1 || s.fps != 0.f)
       world.add(entity, Anim{s.frames, s.fps});
     if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
+    if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -141,6 +144,7 @@ SceneDocument scene_from_world(const World &world) {
     }
     if (const auto *rot = world.get<Rotation>(entity))
       s.rotation = rot->value;
+    if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
     doc.entities.push_back(std::move(s));
   }
   return doc;

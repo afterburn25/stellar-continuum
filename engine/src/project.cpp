@@ -237,6 +237,8 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "    spark.w = spark.h = 12.f;\n"
        << "    spark.vx = 420.f; spark.vy = -420.f;\n"
        << "    spark.r = 255; spark.g = 220; spark.b = 80;\n"
+       << "    // Sparks expire on their own if they never hit anything.\n"
+       << "    spark.ttl = 3.f;\n"
        << "    host.spawn_entity(spark);\n"
        << "  };\n"
        << "  host.on_collision = [&host](engine::EntityId a,\n"

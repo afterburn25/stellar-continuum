@@ -213,11 +213,15 @@ int main() {
     // find_entity_by_name resolves handles, and the file-backed snapshot
     // helpers round-trip the spawned world (corrupt files fail safely).
     {
-        SceneDocument doc{{SceneEntity{"player", 10.f, 20.f, 64.f, 64.f,
-                                       30.f, -15.f, 255, 220, 60,
-                                       "data/logo.png", -1, 0.0f,
-                                       "hero", 0.0f, true},
-                           SceneEntity{"rock", 200.f, 100.f}}};
+        SceneEntity hero{"player", 10.f, 20.f, 64.f, 64.f,
+                         30.f, -15.f, 255, 220, 60,
+                         "data/logo.png", -1, 0.0f,
+                         "hero", 0.0f, true};
+        hero.frames = 4;
+        hero.fps = 6.f;
+        hero.rotation = 45.f;
+        hero.ttl = 2.5f;
+        SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
@@ -244,6 +248,18 @@ int main() {
         check(world.get<Solid>(spawned[0]) != nullptr &&
                   world.get<Solid>(spawned[1]) == nullptr,
               "spawn_scene solid flag");
+        check(world.get<Anim>(spawned[0]) &&
+                  world.get<Anim>(spawned[0])->frames == 4 &&
+                  world.get<Anim>(spawned[0])->fps == 6.f &&
+                  world.get<Anim>(spawned[1]) == nullptr,
+              "spawn_scene animation");
+        check(world.get<Rotation>(spawned[0]) &&
+                  world.get<Rotation>(spawned[0])->value == 45.f,
+              "spawn_scene rotation");
+        check(world.get<Lifetime>(spawned[0]) &&
+                  world.get<Lifetime>(spawned[0])->remaining == 2.5f &&
+                  world.get<Lifetime>(spawned[1]) == nullptr,
+              "spawn_scene lifetime");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -274,7 +290,9 @@ int main() {
                   ex_player->sprite == "data/logo.png" &&
                   ex_player->layer == -1 && ex_player->parallax == 0.0f &&
                   ex_player->text == "hero" &&
-                  ex_player->gravity_scale == 0.0f && ex_player->solid,
+                  ex_player->gravity_scale == 0.0f && ex_player->solid &&
+                  ex_player->frames == 4 && ex_player->fps == 6.f &&
+                  ex_player->rotation == 45.f && ex_player->ttl == 2.5f,
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.
