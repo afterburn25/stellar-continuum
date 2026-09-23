@@ -420,7 +420,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers/tests:** `population` tests — growth/decline accounting,
   starvation and environmental mortality, cohort merge, workforce and
   unemployment, education progression, aging, migration slices,
-  determinism, 17M-headcount scale run. Colony framework consumption
+  determinism, 17M-headcount scale run.
+  `population_habitability.hpp` resolves `environment_needs` into a
+  `HabitabilityProfile` (hard `required_tags`, open ranges) evaluated
+  through `evaluate_habitability`, producing the suitability scalar +
+  "requires:<tag>" unmet reasons callers feed into
+  `SettlementConditions`/`Cohort::environment_suitability`;
+  `population_habitability` tests cover satisfied/missing/no-need
+  environments and profile passthrough. Colony framework consumption
   pending.
 - **Save/performance impact:** plain data state, serializes directly;
   cost scales with cohort count (hundreds), not headcount.

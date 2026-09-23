@@ -80,5 +80,10 @@ definitions directly; the engine layer owns no hidden state.
   scarce jobs yet.
 - Cohort splitting/merging policies (culture drift, occupation
   retraining, wealth mobility) beyond education are future work.
-- `environment_needs` tags are declared metadata; the colony framework
-  resolves them into `environment_suitability` per cohort.
+- `environment_needs` are hard tag requirements —
+  `population_habitability.hpp` resolves them into a
+  `HabitabilityProfile` (`required_tags`, open physical ranges) and
+  evaluates through `evaluate_habitability`, so suitability is 1.0 or
+  0.0 with "requires:<tag>" unmet reasons. Ranged physical tolerances
+  (temperature, gravity) still need a full `HabitabilityProfile` per
+  species; the two compose.
