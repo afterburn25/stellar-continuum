@@ -239,23 +239,32 @@ int RuntimeHost::run() {
         if (t->x < 0 || t->x > w - ext->w) {
           v->dx = -v->dx;
           bounced = true;
+          t->x = std::clamp(t->x, 0.f, w - ext->w);
         }
         if (t->y < 0 || t->y > h - ext->h) {
           v->dy = -v->dy;
           bounced = true;
+          t->y = std::clamp(t->y, 0.f, h - ext->h);
         }
         if (bounced && impl.player && entity == *impl.player && bounce_clip)
           audio.play_effect(bounce_clip);
       }
     };
     if (step > 0.f) {
-      accumulator += dt;
-      // Cap catch-up work so a suspended frame cannot spiral.
-      for (int n = 0; n < 8 && accumulator >= step; ++n) {
+      // Frame-limited runs step once per rendered frame so --frames N
+      // always produces exactly N simulation steps — byte-identical
+      // snapshots across runs for determinism checks.
+      if (options.frame_limit > 0) {
         simulate(step);
-        accumulator -= step;
+      } else {
+        accumulator += dt;
+        // Cap catch-up work so a suspended frame cannot spiral.
+        for (int n = 0; n < 8 && accumulator >= step; ++n) {
+          simulate(step);
+          accumulator -= step;
+        }
+        if (accumulator >= step) accumulator = 0.f;
       }
-      if (accumulator >= step) accumulator = 0.f;
     } else {
       simulate(dt);
     }
@@ -305,6 +314,13 @@ int RuntimeHost::run() {
     if (options.frame_limit > 0 && ++rendered >= options.frame_limit)
       break;
   }
+  if (!options.snapshot_out.empty()) {
+    try {
+      save_world_to_file(world, options.snapshot_out);
+    } catch (const std::exception &) {
+      return 1;
+    }
+  }
   return plan.ok ? 0 : 1;
 }
 
@@ -315,6 +331,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.frame_limit = std::atoi(argv[++i]);
     else if (arg == "--fixed-hz")
       impl_->options.fixed_timestep_hz = std::atof(argv[++i]);
+    else if (arg == "--snapshot-out")
+      impl_->options.snapshot_out = argv[++i];
   }
   return run();
 }

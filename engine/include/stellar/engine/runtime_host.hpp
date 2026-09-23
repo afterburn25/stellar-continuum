@@ -45,6 +45,9 @@ struct RuntimeHostOptions {
   // 0 = run until quit; >0 exits after that many rendered frames — lets CI
   // and scripts smoke-test that a built game starts and ticks.
   int frame_limit{0};
+  // When non-empty, the world snapshot is written here on exit — combine
+  // with --fixed-hz/--frames to compare runs byte-for-byte.
+  std::filesystem::path snapshot_out;
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
