@@ -80,7 +80,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   authoritative `IntegratedAdaptiveCampaignStepResult` onto records —
   stable category vocabulary (construction.project, shipbuilding.ship,
   research.legacy/adaptive, exploration.\*, war.\*, colony.founded),
-  involved-civilization visibility, entity ids as tags, at_day = step
+  involved-civilization visibility widened to observers that know the
+  event's system (`widen_history_visibility` over
+  `CivilizationKnowledgeState`), entity ids as tags, at_day = step
   end day. `IntegratedAdaptiveCampaignRuntime` owns an `EventHistory`
   and records every completed advance automatically — all callers
   (CampaignFrame, tests, tools) get the chronicle for free; exposed as
@@ -101,8 +103,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   is O(1) append per emitted event — zero cost when a step emits none;
   queries are O(n) scans with sorted output.
 - **Limitations:** opaque summary strings (no structured localization
-  binding). Involved-party visibility only — widening to observers
-  that know the location is knowledge-layer work. Aggregate phase
+  binding). Visibility widens at known-system granularity — no
+  delayed/degraded intel or sensor-range falloff. Aggregate phase
   counters (sensor-contact recordings, diplomacy maintenance) are not
   discrete events and are not recorded. History capacity is fixed at
   100k records (oldest evicted).

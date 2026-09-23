@@ -181,6 +181,48 @@ int main() {
           "colony founding");
   }
 
+  // Knowledge widening: civs that know the event's system see it;
+  // locationless events stay involved-party-only.
+  {
+    FreshCampaignState campaign;
+    Civilization c3, c5, c7, c11;
+    c3.id = 3; c5.id = 5; c7.id = 7; c11.id = 11;
+    campaign.civilizations = {c3, c5, c7, c11};
+    campaign.knowledge.reveal_system(5, 9);   // civ 5 knows system 9
+    campaign.knowledge.reveal_system(3, 9);   // aggressor knows it too
+    campaign.knowledge.reveal_system(11, 4);  // civ 11 knows only system 4
+
+    auto widened = history_events_for_step(step, end_day);
+    widen_history_visibility(widened, campaign);
+
+    const auto *battle = only(widened, "war.fleet_destroyed");
+    check(battle != nullptr, "battle located at system 9");
+    check(battle && std::find(battle->visible_to.begin(),
+                              battle->visible_to.end(), 5ULL) !=
+                        battle->visible_to.end(),
+          "observer knowing the system sees the battle");
+    check(battle && std::find(battle->visible_to.begin(),
+                              battle->visible_to.end(), 11ULL) ==
+                        battle->visible_to.end(),
+          "uninformed civ excluded");
+    const auto *research = only(widened, "research.legacy");
+    check(research && research->visible_to ==
+                          std::vector<std::uint64_t>{7},
+          "locationless research stays private");
+    const auto *surveyed = only(widened, "exploration.system_surveyed");
+    check(surveyed && std::find(surveyed->visible_to.begin(),
+                                surveyed->visible_to.end(), 11ULL) !=
+                          surveyed->visible_to.end(),
+          "civ knowing system 4 sees the survey there");
+
+    stellar::engine::EventHistory h;
+    record_step_events(h, step, end_day, campaign);
+    check(h.feed(5, 0.0).size() == 3,
+          "informed observer feed: first contact + 2 combat events");
+    check(h.feed(11, 0.0).size() == 1,
+          "civ sees only the survey in its known system");
+  }
+
   if (failures == 0) {
     std::cout << "campaign event history adapter tests passed\n";
     return 0;

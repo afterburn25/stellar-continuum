@@ -204,11 +204,40 @@ history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
   return out;
 }
 
+void widen_history_visibility(std::vector<engine::HistoryEvent> &events,
+                              const FreshCampaignState &campaign) {
+  for (auto &e : events) {
+    if (e.location == 0) continue;
+    const auto system = static_cast<int>(e.location);
+    for (const auto &civilization : campaign.civilizations) {
+      if (!campaign.knowledge.is_system_known(civilization.id, system))
+        continue;
+      const auto observer = static_cast<std::uint64_t>(civilization.id);
+      if (std::find(e.visible_to.begin(), e.visible_to.end(), observer) ==
+          e.visible_to.end())
+        e.visible_to.push_back(observer);
+    }
+  }
+}
+
 std::vector<std::uint64_t>
 record_step_events(engine::EventHistory &history,
                    const IntegratedAdaptiveCampaignStepResult &step,
                    double end_day) {
   auto events = history_events_for_step(step, end_day);
+  std::vector<std::uint64_t> ids;
+  ids.reserve(events.size());
+  for (auto &e : events)
+    ids.push_back(history.record(std::move(e)));
+  return ids;
+}
+
+std::vector<std::uint64_t>
+record_step_events(engine::EventHistory &history,
+                   const IntegratedAdaptiveCampaignStepResult &step,
+                   double end_day, const FreshCampaignState &campaign) {
+  auto events = history_events_for_step(step, end_day);
+  widen_history_visibility(events, campaign);
   std::vector<std::uint64_t> ids;
   ids.reserve(events.size());
   for (auto &e : events)

@@ -64,7 +64,11 @@ order and binary lookup depend on them. JSON codec in
 - actors = involved civilization ids; fleet/system/body/project/design/
   tech/colony references preserved as tags; `location` = system id
 - `at_day` = the step's absolute end day
-- visibility = involved civilizations only (fog-of-war safe)
+- visibility = involved civilizations, widened by
+  `widen_history_visibility` to every civilization that knows the
+  event's system (`CivilizationKnowledgeState::is_system_known`) —
+  major happenings in known space propagate as news; locationless
+  events (research/construction/shipbuilding) stay involved-party-only
 
 `IntegratedAdaptiveCampaignRuntime` owns an `EventHistory` and records
 every completed advance — the chronicle is populated automatically for
@@ -87,7 +91,7 @@ with `PlayerCampaignPersistenceDataError`.
   (structured event text) is a future adapter to LocalizationService.
 - No spatial/body indexing beyond a single `location` id; rich
   per-actor timelines come from `actor` queries, not dedicated indices.
-- Visibility is involved-party allow-list only — widening to observers
-  that know the location (or delayed/degraded intel) is knowledge-layer
-  work, not assumed here.
+- Visibility widens at known-system granularity — a civ that merely
+  detected a system sees its major events; delayed intel, survey-level
+  gating and sensor-quality degradation are future refinements.
 - News/voice presentation on top of `feed()` remains app-level work.

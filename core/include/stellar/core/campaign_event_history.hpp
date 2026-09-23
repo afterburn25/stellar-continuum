@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 #include <stellar/engine/history.hpp>
 
@@ -34,9 +35,10 @@ namespace stellar::core {
 // "colony:9", "project:<id>", "design:<id>", "tech:<id>", "node:<id>").
 // `location` is the system id where the event has one, else 0.
 //
-// Visibility defaults to the involved civilizations only — fog-of-war
-// safe. Widening visibility to observers that know the location is
-// knowledge-layer work on top of this adapter.
+// Visibility: involved civilizations always see their events; events
+// located at a system are additionally visible to civilizations that
+// know that system (see widen_history_visibility). Locationless events
+// stay involved-party-only.
 //
 // Every record gets at_day = the step's absolute end day — the campaign
 // clock, never wall time. Mapping is pure and deterministic: the same
@@ -48,11 +50,27 @@ namespace stellar::core {
 history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
                         double end_day);
 
+// Widens `visible_to` on located events: every civilization that knows
+// the event's system (CivilizationKnowledgeState::is_system_known) may
+// see it — major happenings in known space propagate as news. Events
+// with no location (research, construction, shipbuilding) stay
+// involved-party-only. Order and content are deterministic given the
+// same inputs.
+void widen_history_visibility(std::vector<engine::HistoryEvent> &events,
+                              const FreshCampaignState &campaign);
+
 // Appends the step's events to `history`; returns assigned record ids in
 // record order.
 std::vector<std::uint64_t>
 record_step_events(engine::EventHistory &history,
                    const IntegratedAdaptiveCampaignStepResult &step,
                    double end_day);
+
+// Same, with knowledge-based visibility widening applied — the
+// authoritative path used by the campaign runtime.
+std::vector<std::uint64_t>
+record_step_events(engine::EventHistory &history,
+                   const IntegratedAdaptiveCampaignStepResult &step,
+                   double end_day, const FreshCampaignState &campaign);
 
 } // namespace stellar::core
