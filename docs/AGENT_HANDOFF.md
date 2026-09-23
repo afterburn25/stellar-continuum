@@ -425,15 +425,21 @@ finding-free seeded world. A later desktop run at `3ea2710a` records
 Core projection, GALAXY shell debugger, deterministic lane-graph routing,
 framework codec) and the replay-provenance chain merged — including the
 `stellar_engine PUBLIC stellar_json` fix for the public `replay.hpp`
-nlohmann include. Remaining deep work: SDL_GPU instanced rendering (requires
-a texture-array or bindless design before DrawBatcher batches pay off),
-RenderGraph backend consumption (the HDR scene→tonemap chain is the second
-pass to orchestrate), and TextureStreamer residency wiring. The HDR/tonemap
-pass landed: RGBA16F scene targets + fullscreen resolve with a knee+headroom
-curve, capability-checked with UNORM fallback; the embedded-shader pipeline
-was regenerated with a verified glslang 16.6.0 toolchain (byte-identical
-scene3d output; `tools/compile_scene3d_shaders.py` now covers all shader
-pairs). A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
+nlohmann include. The M11 render frontier is now landed: HDR/tonemap
+(RGBA16F scene targets + fullscreen resolve with a knee+headroom curve,
+capability-checked with UNORM fallback; embedded shaders regenerated with a
+verified glslang 16.6.0 toolchain — byte-identical scene3d output;
+`tools/compile_scene3d_shaders.py` covers all shader pairs), SSBO instanced
+rendering (per-instance transform/material records in storage buffers,
+`gl_InstanceIndex` + flat varying; compatible draws merge — GPU suite
+asserts one instanced call renders two objects correctly), `DrawBatcher`
+owns submission ordering/batching (full GPU binding key interned into
+material_id), `RenderGraph` schedules the scene→tonemap pass chain per
+frame, and `TextureStreamer` owns texture residency under a runtime-tunable
+byte budget (`Window::set_scene3d_texture_budget`) with pinned-fallback
+pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`). Remaining
+render limitations: no indirect draw, no per-mip partial residency (LOD
+clamping), bounded CPU submission. A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
 Dijkstra relaxes each lane independently, so the edge a route uses is the
 cheapest connecting lane — the length helper now sums the minimum rather
 than the first lane id (test: parallel lanes of 9/2 ly report 2). The second frontier is an architecture
