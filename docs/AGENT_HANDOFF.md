@@ -147,8 +147,10 @@ its layer and runs cell collision (side-blocking, top landing,
 grounded) in the same authoritative pass. The Scene tool exposes
 every field in an adaptive multi-column property list with an
 animated/flipped/rotated preview that also paints the tilemap,
-plus a TILES toggle and tilemap fields (tileset, tile size,
-columns, collide, layer, parallax, cells CSV) under undo.
+plus a TILES toggle, tilemap fields (tileset, tile size,
+columns, collide, layer, parallax, cells CSV, brush id), and a
+PAINT mode that click/drag-writes cells in the preview with a
+grid overlay and one undo step per stroke.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in

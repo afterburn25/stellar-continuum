@@ -82,9 +82,11 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   movement pass as solid/oneway entities — not a parallel approximation.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
-  toggle button, tileset/tilesize/columns/collide/layer/parallax/cells fields
-  with undo, preview rendering with the same layer interleave and a
-  checkerboard fallback when no tileset is set).
+  toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint
+  fields with undo, preview rendering with the same layer interleave and a
+  checkerboard fallback when no tileset is set, PAINT mode that writes cells
+  by click/drag in the preview with a grid overlay and one undo step per
+  stroke).
 - **Save/determinism/performance:** tilemaps are scene-level authored state —
   `World::snapshot()` saves remain entity-only, so existing saves are
   unaffected; hot reload rebuilds tilemap state with the document. Cell scans
@@ -96,10 +98,11 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   (cell count not divisible by columns, non-positive tile size); live capture
   verified rendering and landing/grounded behavior on a generated project.
 - **Limits/reuse:** single tilemap per scene document (one grid); collision is
-  cell-level solid only (no per-tile slopes/one-way flags); the editor edits
-  cells as a CSV list rather than a paint grid — a click-to-paint mode is the
-  natural next tool increment. Other RuntimeHost consumers (2D platformers,
-  top-down maps, puzzle boards) reuse the same path.
+  cell-level solid only (no per-tile slopes/one-way flags); paint strokes fill
+  single cells (no brush size or fill tool); `scene_from_world` exports
+  entities only, so world-derived documents drop doc-level state including
+  the tilemap. Other RuntimeHost consumers (2D platformers, top-down maps,
+  puzzle boards) reuse the same path.
 
 ## Cooked flare reservations, local crash reports and small updates (2026-09-20)
 
