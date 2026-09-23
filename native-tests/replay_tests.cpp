@@ -73,6 +73,14 @@ int main() {
     check(hashes_ok, "per-section hashes");
   }
 
+  // Non-object documents yield no sections (defensive API contract).
+  {
+    const nlohmann::ordered_json array{1, 2, 3};
+    check(document_section_checkpoints(0, array, "save").empty() &&
+              document_section_checkpoints(0, 17, "save").empty(),
+          "non-object documents produce no checkpoints");
+  }
+
   // Verification: matching sequence advances the cursor; a section
   // mismatch names the label.
   const auto expected = document_section_checkpoints(500, document, "save");

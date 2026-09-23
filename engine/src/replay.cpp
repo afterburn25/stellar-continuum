@@ -82,6 +82,8 @@ document_section_checkpoints(std::uint64_t tick,
                              const nlohmann::ordered_json &document,
                              std::string_view label_prefix) {
   std::vector<ReplayCheckpoint> out;
+  if (!document.is_object())
+    return out;
   const auto push = [&](std::string label,
                         const nlohmann::ordered_json &value) {
     out.push_back(

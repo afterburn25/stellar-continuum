@@ -44,7 +44,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
-| Replay | PARTIALLY IMPLEMENTED | Engine `replay.cpp` command journal consumed by the client (`--record`/`--replay`, verified `diverged:false`); deterministic parity fixtures, QA checkpoints; `document_section_checkpoints` + `verify_checkpoint_sequence` localize save-checkpoint divergence to the named JSON section (`save:World.Fleets`) instead of a whole-document hash | QA/persistence/parity tests, replay smoke, `replay` unit tests | Section-granularity localization only (no per-entity drill-down); interactive divergence tooling pending |
+| Replay | PARTIALLY IMPLEMENTED | Engine `replay.cpp` command journal consumed by the client (`--record`/`--replay`, verified `diverged:false`); deterministic parity fixtures, QA checkpoints; `document_section_checkpoints` + `verify_checkpoint_sequence` localize save-checkpoint divergence to the named JSON section (`save:World.Fleets`) instead of a whole-document hash; on divergence the client dumps the actual canonical document to `replay-divergence-<tick>.json` for diffing | QA/persistence/parity tests, replay smoke, `replay` unit tests | Section-granularity localization only (expected-side document not retained, so leaf-level diff needs the original capture); interactive divergence tooling pending |
 | Asset registry/packages | IMPLEMENTED | Engine `asset_registry.cpp`, checksummed aliases/chunks | `engine_asset_cooker`, cooked validation evidence | Shipping marker forbids loose fallback; missing/corrupt content is an error |
 | Asset cooker/compression | IMPLEMENTED BUT NEEDS POLISH | Engine asset cooker/texture cook/XPRESS+LZMS codecs, `StellarCooker`; **generic `scan_content` project mode** recursively indexes any content root into a project-namespaced package — no reviewed SC export manifests required | `engine_asset_cooker` (incl. scan-mode cook: namespaced package, texture cook, byte round-trip), image/GPU tests | HDR/mesh cooking absent; ~1,011 legitimate quality-gate fallbacks remain (LZMS cut stored bytes ~12%) |
 | Texture streaming/residency | PARTIALLY IMPLEMENTED | Metadata/mip selection, bounded preparation and image/GPU caches | image preparation/GPU/cooked flare regressions | No virtual textures or adaptive device VRAM budget |
@@ -61,6 +61,63 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | PLANNED / PARTIALLY IMPLEMENTED foundations | Data catalogs, input/settings, Developer tools/import CLI | Existing scoped tests only | These pieces do not constitute a complete mod/accessibility/editor product; see the 30-item roadmap |
 
 ## Implementation records (newest first)
+
+## Galaxy map framework + engine-shell Galaxy tool (2026-09-24)
+
+- **Purpose:** the pending engine-level galaxy model for space-strategy
+  consumers — a reusable, game-agnostic star chart (systems positioned
+  in light-year space, lane links, fleet/colony/outpost/anomaly markers)
+  with deterministic queries for rendering, selection and debugger
+  surfaces. Closes the "Galaxy debugger pending an engine-level galaxy
+  model" gap.
+- **Modules:** `engine/include/stellar/engine/galaxy_map.hpp`,
+  `engine/src/galaxy_map.cpp` (`GalaxyMap`, `GalaxySystem`,
+  `GalaxyLane`, `GalaxyMarker`). Core projection:
+  `core/include/stellar/core/galaxy_projection.hpp`,
+  `core/src/galaxy_projection.cpp` (`project_galaxy_map`). Shell:
+  GALAXY tab in `app/engine_main.cpp`.
+- **Public interfaces:** `add_system/add_lane/add_marker` (caller ids,
+  duplicate rejection), `remove_system` (drops incident lanes, detaches
+  anchored markers), `set_lane_enabled`, `update_marker_position`,
+  `set_marker_system`/`set_marker_destination`; ascending-id accessors;
+  `neighbors`/`lanes_for` over a lazily rebuilt enabled-lane adjacency;
+  `systems_in_radius`, `nearest_system` (id tie-break),
+  `markers_in_system`, `markers_for_owner`, `distance_light_years`
+  (3D euclidean); versioned `capture_state`/`restore_state` (v1) that
+  rejects duplicate ids and dangling lane endpoints atomically.
+  `project_galaxy_map(const FreshCampaignState&)` maps systems (name,
+  position, stellar-class label, habitable/anomaly/rare/pre-warp tags),
+  `InterstellarLaneNetwork::build()` lanes, colonies (anchored markers)
+  and fleets (anchored or free-floating, destination preserved) —
+  read-only, full-authority view; player-facing maps must apply
+  observer knowledge rules first.
+- **Consumers:** engine-shell GALAXY tab (deterministic synthetic
+  chart — golden-angle spiral, two-nearest-neighbor lanes deduplicated,
+  colony markers every fifth system, three fleet travellers hopping the
+  lane graph; click selects the nearest system via `nearest_system`,
+  wheel zooms, STEP DAY/RUN/RESET; detail panel lists class/tags/lane
+  neighbors/markers-in-system). `project_galaxy_map` is the Core-side
+  adapter a game/map surface feeds through — first consumer wiring
+  beyond tests is the shell demo + adapter tests.
+- **Tests:** `galaxy_map` (topology, deterministic ordering, adjacency
+  laziness, spatial queries, markers, persistence round-trip +
+  corruption rejection), `galaxy_projection` (mapping, lanes from the
+  authoritative network, anchored/transit fleets, orphan colony skip,
+  determinism), `engine_shell_tool_galaxy` smoke test.
+- **Save/performance impact:** map state is a presentation/projection
+  model — `capture_state`/`restore_state` exist for embedders that
+  persist charts; the Core projection allocates per call and is not on
+  the per-frame path.
+- **Limitations:** adjacency is a query cache — no pathfinding inside
+  the engine map (Core routes through `InterstellarLaneNetwork`; a
+  generic engine route search is a future addition if a non-Core game
+  needs it); markers are render data — no gameplay rules; the
+  projection is omniscient, observer filtering stays a consumer
+  responsibility; no native-client consumer yet (the client's own star
+  map predates the framework — migration is a separate decision).
+- **Future reuse:** 4X/strategy star charts, jump-lane editors,
+  sector/region overlays (tags + radius queries already support them),
+  and the pending galaxy debugger tool in the standalone editor.
 
 ## Engine-shell Simulation tool + Core executor adoption (2026-09-23)
 
@@ -132,7 +189,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   identical — only the dispatch mechanism changed). The shell tools are
   UI inspectors over real engine state; `--frames N` renders N frames
   and exits, and ctest `engine_shell_tool_*` smoke-runs every tool's
-  init+render path (15/15 pass).
+  init+render path (all tools pass; the GALAXY tab added later brings
+  the count to 16).
 - **Save/performance impact:** executor state (tick, task elapsed/
   deferred/dirty/wake flags) is runtime-only — coordinator saves were
   already driven by authoritative domain state; `capture_state`/

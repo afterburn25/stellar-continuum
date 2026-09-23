@@ -966,8 +966,19 @@ class NativeCampaign final {
               replay_->recording->checkpoints(),cursor,actual);
           replay_->checkpoint_cursor=cursor;
           replay_->verified_checkpoints+=result.verified;
-          if(!result.divergence.empty())
+          if(!result.divergence.empty()){
             replay_->divergence=result.divergence;
+            // Dump the diverging canonical document next to the save —
+            // diffing it against the original capture names the leaf.
+            const auto dump_path=session_->save_path().parent_path()/
+                ("replay-divergence-"+std::to_string(tick)+".json");
+            if(std::ofstream out{dump_path,std::ios::binary|std::ios::trunc};
+               out){
+              out<<document.dump(2);
+              replay_->divergence+=" (actual state dumped to "+
+                  dump_path.generic_string()+")";
+            }
+          }
         });
   }
 

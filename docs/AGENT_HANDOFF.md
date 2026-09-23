@@ -253,9 +253,13 @@ save-capture observer emits `engine::document_section_checkpoints`
 (one labeled hash per top-level JSON section, object members one
 level deep — "save:World.Fleets") instead of a single whole-document
 hash, and `verify_checkpoint_sequence` names the diverging section
-in the replay divergence message. Older recordings diverge at the
-first checkpoint with a label mismatch — recordings are session
-artifacts, not save files. Coverage: `replay` unit tests.
+in the replay divergence message. On divergence the client also
+dumps the actual canonical document to
+`replay-divergence-<tick>.json` next to the save and appends the
+path to the message — diffing it against the original capture names
+the changed leaf. Older recordings diverge at the first checkpoint
+with a label mismatch — recordings are session artifacts, not save
+files. Coverage: `replay` unit tests.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
