@@ -185,7 +185,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   delayed/degraded intel or sensor-range falloff. Aggregate phase
   counters (sensor-contact recordings, diplomacy maintenance) are not
   discrete events and are not recorded. History capacity is fixed at
-  100k records (oldest evicted).
+  100k records; retention (`maintain_chronicle`) prunes routine records
+  older than 365 days once 90% full so capacity eviction cannot discard
+  majors, but sustained record volume above ~0.35 significance still
+  evicts oldest-first.
 
 ## Combined simulation scale benchmark (2026-09-23)
 

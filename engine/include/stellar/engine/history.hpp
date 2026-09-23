@@ -64,6 +64,7 @@ public:
     [[nodiscard]] std::vector<const HistoryEvent*> query(
         const HistoryQuery& q) const;
     [[nodiscard]] std::size_t size() const { return events_.size(); }
+    [[nodiscard]] std::size_t capacity() const { return capacity_; }
     [[nodiscard]] std::uint64_t next_id() const { return next_id_; }
 
     // Observer-filtered significance feed — the M15 news substrate:

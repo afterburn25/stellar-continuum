@@ -207,7 +207,13 @@ alongside the domain filter) and admission seeding uses a fixed 0.35
 report floor so high-volume trivia (damage ticks, detections) stays
 out of the transient feed. An actor-scope toggle (ALL ↔ MINE)
 distinguishes passive intel from events involving the observer via
-`actors`. Remaining: arbitrary-actor/tag filtering in the browser.
+`actors`. Chronicle retention landed too: `maintain_chronicle` (in
+`campaign_event_history`) runs after each advance — once the history
+reaches 90% of capacity it prunes routine records (<0.35 significance)
+older than 365 days so the bounded oldest-first eviction cannot
+discard majors; `campaign_event_history` tests cover trigger, content
+and determinism. Remaining: arbitrary-actor/tag filtering in the
+browser.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

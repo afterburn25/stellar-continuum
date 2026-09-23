@@ -223,6 +223,56 @@ int main() {
           "civ sees only the survey in its known system");
   }
 
+  // Retention: under the trigger the policy is a no-op; once the
+  // chronicle nears capacity, old trivia is pruned while old majors
+  // and recent records survive — capacity eviction no longer drops
+  // reportable history first.
+  {
+    stellar::engine::EventHistory history{20};
+    const auto add = [&](double day, double significance) {
+      stellar::engine::HistoryEvent e;
+      e.at_day = day;
+      e.significance = significance;
+      e.category = "war.damage_applied";
+      history.record(std::move(e));
+    };
+    for (int i = 0; i < 10; ++i) add(10.0 + i, 0.1);   // old trivia
+    for (int i = 0; i < 4; ++i) add(10.0 + i, 0.7);    // old majors
+    for (int i = 0; i < 4; ++i) add(900.0 + i, 0.1);   // recent trivia
+    check(history.size() == 18, "history filled past 90% trigger");
+
+    // Under-capacity histories are untouched.
+    stellar::engine::EventHistory small{40};
+    check(maintain_chronicle(small, 1000.0) == 0 &&
+              small.size() == 0,
+          "under-trigger maintenance was not a no-op");
+
+    const auto pruned = maintain_chronicle(history, 1000.0);
+    check(pruned == 10 && history.size() == 8,
+          "old trivia pruned, majors and recent kept");
+    const auto remaining = history.feed(std::nullopt, 0.0);
+    for (const auto *e : remaining)
+      check(e->significance > chronicle_report_significance ||
+                e->at_day > 1000.0 - chronicle_prune_horizon_days,
+            "retained record violates retention policy");
+    // Deterministic: same inputs, same outcome.
+    stellar::engine::EventHistory again{20};
+    for (int i = 0; i < 10; ++i) {
+      stellar::engine::HistoryEvent e;
+      e.at_day = 10.0 + i;
+      e.significance = 0.1;
+      again.record(std::move(e));
+    }
+    for (int i = 0; i < 8; ++i) {
+      stellar::engine::HistoryEvent e;
+      e.at_day = i < 4 ? 10.0 + i : 900.0 + (i - 4);
+      e.significance = i < 4 ? 0.7 : 0.1;
+      again.record(std::move(e));
+    }
+    check(maintain_chronicle(again, 1000.0) == 10,
+          "retention not deterministic");
+  }
+
   if (failures == 0) {
     std::cout << "campaign event history adapter tests passed\n";
     return 0;

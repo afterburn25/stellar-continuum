@@ -261,7 +261,9 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
-  record_step_events(storage_->history, result, absolute_end_day);
+  record_step_events(storage_->history, result, absolute_end_day,
+                     storage_->world.campaign());
+  maintain_chronicle(storage_->history, absolute_end_day);
   return result;
 }
 

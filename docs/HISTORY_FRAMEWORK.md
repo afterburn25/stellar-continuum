@@ -76,6 +76,16 @@ all callers (`runtime().history()` / `frame().history()`). Aggregate
 phase counters (sensor-contact recordings, diplomacy maintenance) are
 not discrete happenings and are not recorded.
 
+The runtime also applies the chronicle retention policy
+(`maintain_chronicle` in the adapter): once the history reaches 90% of
+capacity, routine records (`significance < 0.35`, the news-report
+floor) older than 365 campaign days are pruned via `prune_before`.
+Without it the bounded capacity eviction pops the oldest record
+regardless of significance — in a long war, high-volume trivia
+(damage ticks, detections) would crowd out major history. Majors and
+anything within the horizon survive; the policy is deterministic given
+the same contents. Coverage: `campaign_event_history` retention tests.
+
 ## Save integration
 
 The chronicle is authoritative state: it serializes into the v17

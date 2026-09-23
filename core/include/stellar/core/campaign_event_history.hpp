@@ -73,4 +73,17 @@ record_step_events(engine::EventHistory &history,
                    const IntegratedAdaptiveCampaignStepResult &step,
                    double end_day, const FreshCampaignState &campaign);
 
+// Chronicle retention policy, applied after each recorded step. When
+// the chronicle nears capacity (>= 90%), routine records older than
+// `chronicle_prune_horizon_days` are pruned so the bounded capacity
+// eviction (oldest-first pop) does not silently discard major events.
+// `chronicle_report_significance` matches the news-report vocabulary
+// floor — anything a feed could ever surface survives pruning.
+// Returns the pruned count (0 when under the trigger or nothing to
+// prune). Deterministic given the same history contents.
+inline constexpr double chronicle_prune_horizon_days = 365.0;
+inline constexpr double chronicle_report_significance = 0.35;
+std::size_t maintain_chronicle(engine::EventHistory &history,
+                               double current_day);
+
 } // namespace stellar::core

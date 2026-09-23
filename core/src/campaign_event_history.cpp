@@ -1,5 +1,6 @@
 #include <stellar/core/campaign_event_history.hpp>
 
+#include <algorithm>
 #include <string>
 
 namespace stellar::core {
@@ -243,6 +244,13 @@ record_step_events(engine::EventHistory &history,
   for (auto &e : events)
     ids.push_back(history.record(std::move(e)));
   return ids;
+}
+
+std::size_t maintain_chronicle(engine::EventHistory &history,
+                               double current_day) {
+  if (history.size() < history.capacity() * 9 / 10) return 0;
+  return history.prune_before(current_day - chronicle_prune_horizon_days,
+                              chronicle_report_significance);
 }
 
 } // namespace stellar::core
