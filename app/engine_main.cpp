@@ -125,11 +125,11 @@ struct Shell {
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
   // New-project name field and panel hit regions.
-  bool editing_project_name{};
-  std::string project_name_buffer;
+  bool editing_project_name{}, editing_import{};
+  std::string project_name_buffer, import_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
-      hit_project_run{};
+      hit_project_run{}, hit_import_field{}, hit_import_button{};
   UiRect project_rows{};
   // Content cooking and host builds run on the JobSystem; the UI thread
   // reads their status under the mutex.
@@ -196,13 +196,18 @@ void open_project(Shell &shell, const std::filesystem::path &root) {
   }
   shell.project = std::move(*loaded);
   shell.package_registry = engine::PackageRegistry{};
-  shell.package_registry.protect_namespace(shell.project->id);
   shell.package_errors.clear();
   std::size_t count = 0;
+  // The project's own packages register first; the namespace is protected
+  // afterwards so subsequently-scanned mod packages cannot override it.
   for (const auto &dir : shell.project->content_dirs)
     count += engine::scan_packages(shell.package_registry,
                                    (root / dir).string(),
                                    &shell.package_errors);
+  shell.package_registry.protect_namespace(shell.project->id);
+  count += engine::scan_packages(shell.package_registry,
+                                 (root / "mods").string(),
+                                 &shell.package_errors);
   shell.load_plan = shell.package_registry.resolve();
   scan_assets(shell, root / shell.project->content_dirs.front());
   shell.status = "opened " + shell.project->name + " - " +
@@ -333,6 +338,36 @@ void run_project(Shell &shell) {
   shell.status = "run unavailable on this platform";
 }
 #endif
+
+// Copies a file into the open project's base content package
+// (packages/<id>/content/), then refreshes the project-rooted asset browser.
+void import_asset(Shell &shell) {
+  if (!shell.project) {
+    shell.status = "open a project before importing";
+    return;
+  }
+  const std::filesystem::path source = shell.import_buffer;
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(source, ec)) {
+    shell.status = "import failed: not a file - " + source.string();
+    return;
+  }
+  const auto dir = shell.project->root / "packages" / shell.project->id /
+                   "content";
+  std::filesystem::create_directories(dir, ec);
+  const auto target = dir / source.filename();
+  if (std::filesystem::copy_file(
+          source, target, std::filesystem::copy_options::overwrite_existing,
+          ec)) {
+    shell.status = "imported " + target.filename().generic_string() +
+                   " - run COOK to package it";
+    shell.import_buffer.clear();
+    scan_assets(shell,
+                shell.project->root / shell.project->content_dirs.front());
+  } else {
+    shell.status = "import failed: " + ec.message();
+  }
+}
 
 void create_project_from_field(Shell &shell) {
   std::string error;
@@ -667,6 +702,31 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
                  (is_open ? "   [open]" : ""),
              is_open ? accent : ink, font, 0, shell.project_rows});
   }
+
+  // Asset import: copies a file into the open project's base content package.
+  const float ix = shell.project_rows.x + shell.project_rows.width + 20 * s;
+  const float iw = body.x + body.width - ix - 22 * s;
+  float iy = shell.project_rows.y;
+  heading(out, ix, iy, "IMPORT ASSET");
+  if (shell.project) {
+    shell.hit_import_field = {ix, iy, iw, (font + 14) * s};
+    field_box(out, shell.hit_import_field,
+              shell.editing_import ? shell.import_buffer : "",
+              shell.editing_import, "path to file...", font, s);
+    iy += shell.hit_import_field.height + 8 * s;
+    shell.hit_import_button = {ix, iy, 96 * s, (font + 14) * s};
+    shell_button(out, shell.hit_import_button, "IMPORT", false, font, s);
+    iy += shell.hit_import_button.height + 10 * s;
+    out.overlay.push_back(Text{
+        {ix, iy},
+        "into packages/" + shell.project->id + "/content/", muted, font, iw,
+        UiRect{ix, iy, iw, 60.f}});
+  } else {
+    shell.hit_import_field = {};
+    shell.hit_import_button = {};
+    out.overlay.push_back(Text{{ix, iy}, "open a project to import", muted,
+                               font, iw});
+  }
 }
 
 void select_asset(Shell &shell, std::size_t index) {
@@ -754,30 +814,33 @@ int main(int argc, char **argv) {
       shell.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
         if (event.type == InputEventType::EscapePressed) {
-          if (shell.editing_project_name) {
-            shell.editing_project_name = false;
+          if (shell.editing_project_name || shell.editing_import) {
+            shell.editing_project_name = shell.editing_import = false;
             window.set_text_input(false);
             continue;
           }
           return 0;
         }
-        // New-project name field editing takes precedence in the tool.
-        if (shell.editing_project_name) {
+        // Text-field editing takes precedence over tool clicks.
+        if (shell.editing_project_name || shell.editing_import) {
+          std::string &buffer = shell.editing_import
+                                    ? shell.import_buffer
+                                    : shell.project_name_buffer;
           if (event.type == InputEventType::TextEntered) {
-            if (shell.project_name_buffer.size() < 80)
-              shell.project_name_buffer += event.text;
+            if (buffer.size() < 240) buffer += event.text;
             continue;
           }
           if (event.type == InputEventType::BackspacePressed) {
-            if (!shell.project_name_buffer.empty())
-              shell.project_name_buffer.pop_back();
+            if (!buffer.empty()) buffer.pop_back();
             continue;
           }
           if (event.type == InputEventType::KeyPressed &&
               event.key == '\r') {
-            shell.editing_project_name = false;
+            const bool was_import = shell.editing_import;
+            shell.editing_project_name = shell.editing_import = false;
             window.set_text_input(false);
-            create_project_from_field(shell);
+            if (was_import) import_asset(shell);
+            else create_project_from_field(shell);
             continue;
           }
         }
@@ -792,12 +855,19 @@ int main(int argc, char **argv) {
           if (shell.tool == Tool::Projects) {
             if (shell.hit_project_name.contains(event.position)) {
               shell.editing_project_name = true;
+              shell.editing_import = false;
               window.set_text_input(true);
-            } else if (shell.editing_project_name) {
+            } else if (shell.hit_import_field.contains(event.position)) {
+              shell.editing_import = true;
               shell.editing_project_name = false;
+              window.set_text_input(true);
+            } else if (shell.editing_project_name || shell.editing_import) {
+              shell.editing_project_name = shell.editing_import = false;
               window.set_text_input(false);
             }
-            if (shell.hit_project_create.contains(event.position))
+            if (shell.hit_import_button.contains(event.position))
+              import_asset(shell);
+            else if (shell.hit_project_create.contains(event.position))
               create_project_from_field(shell);
             else if (shell.hit_project_open.contains(event.position) &&
                      shell.selected_project < shell.projects.size())
@@ -817,8 +887,8 @@ int main(int argc, char **argv) {
                                   shell.project_list.row_height)));
               if (row < shell.projects.size()) shell.selected_project = row;
             }
-          } else if (shell.editing_project_name) {
-            shell.editing_project_name = false;
+          } else if (shell.editing_project_name || shell.editing_import) {
+            shell.editing_project_name = shell.editing_import = false;
             window.set_text_input(false);
           }
           break;

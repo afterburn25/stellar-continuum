@@ -69,7 +69,7 @@ int main() {
     const std::string text{std::istreambuf_iterator<char>(input),
                            std::istreambuf_iterator<char>()};
     check(text.find("StellarEngineSdk.cmake") != std::string::npos &&
-              text.find("stellar::engine") != std::string::npos,
+              text.find("stellar::platform") != std::string::npos,
           "CMakeLists consumes the engine SDK");
   }
 

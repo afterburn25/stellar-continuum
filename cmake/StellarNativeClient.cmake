@@ -65,6 +65,12 @@ if(WIN32 AND TARGET stellar_asset_cooker)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
       "${STELLAR_ENGINE_SDK_DIR}/bin/SDL3.dll"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/assets/visual/fonts/Rajdhani-SemiBold.ttf"
+      "${STELLAR_ENGINE_SDK_DIR}/bin/engine-default-font.ttf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/assets/visual/fonts/OFL-Rajdhani.txt"
+      "${STELLAR_ENGINE_SDK_DIR}/bin/OFL-Rajdhani.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_LIST_DIR}/StellarEngineSdk.cmake"
       "${STELLAR_ENGINE_SDK_DIR}/cmake/StellarEngineSdk.cmake"
     DEPENDS stellar_engine stellar_native_platform stellar_native_image

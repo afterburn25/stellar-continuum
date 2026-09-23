@@ -143,6 +143,8 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
   if (ec) return fail("cannot create " + package_dir.string() + ": " + ec.message());
   std::filesystem::create_directories(root / "src", ec);
   if (ec) return fail("cannot create src directory: " + ec.message());
+  std::filesystem::create_directories(root / "mods", ec);
+  if (ec) return fail("cannot create mods directory: " + ec.message());
 
   if (!write_text(root / std::string(EngineProject::manifest_filename),
                   project.to_json(), error))
@@ -160,20 +162,58 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
 
   std::ostringstream stub;
   stub << "// " << display << " - Stellar Engine game host.\n"
-       << "// Cooked content loads through the asset registry; packages resolve\n"
-       << "// through the package registry. Link stellar::platform for a window.\n"
+       << "// Opens a native window through stellar::platform, resolves the\n"
+       << "// project's content packages, and renders. Escape quits.\n"
        << "#include <stellar/engine/foundation.hpp>\n"
-       << "#include <stellar/engine/package.hpp>\n\n"
-       << "#include <cstdio>\n\n"
+       << "#include <stellar/engine/native_map_platform.hpp>\n"
+       << "#include <stellar/engine/package.hpp>\n"
+       << "#include <stellar/engine/runtime_paths.hpp>\n\n"
+       << "using namespace stellar::native_map;\n"
+       << "namespace engine = stellar::engine;\n\n"
        << "int main() {\n"
-       << "  stellar::engine::PackageRegistry registry;\n"
+       << "  // Content roots resolve relative to the working directory (the\n"
+       << "  // project root when launched from the engine tools). The base\n"
+       << "  // package registers first; the namespace is then protected so mod\n"
+       << "  // packages under mods/ cannot override it.\n"
+       << "  engine::PackageRegistry registry;\n"
+       << "  engine::scan_packages(registry, \"packages\");\n"
        << "  registry.protect_namespace(\"" << id << "\");\n"
-       << "  stellar::engine::scan_packages(registry, \"packages\");\n"
-       << "  const auto plan = registry.resolve();\n"
-       << "  std::printf(\"" << display << " | %zu package(s), load plan %s\\n\",\n"
-       << "              plan.order.size(), plan.ok ? \"ok\" : \"FAILED\");\n"
-       << "  std::printf(\"press enter to exit\\n\");\n"
-       << "  (void)std::getchar();\n"
+       << "  engine::scan_packages(registry, \"mods\");\n"
+       << "  const auto plan = registry.resolve();\n\n"
+       << "  Window window(\"" << display << "\", 1280, 720, false,\n"
+       << "                engine::executable_directory() /\n"
+       << "                    \"engine-default-font.ttf\");\n"
+       << "  window.set_auto_frame_cap();\n"
+       << "  for (;;) {\n"
+       << "    const auto snapshot = window.poll();\n"
+       << "    if (snapshot.quit_requested) break;\n"
+       << "    for (const auto &event : snapshot.events)\n"
+       << "      if (event.type == InputEventType::EscapePressed) return 0;\n"
+       << "    if (!snapshot.renderable()) continue;\n\n"
+       << "    const float w = static_cast<float>(snapshot.drawable_width);\n"
+       << "    const float h = static_cast<float>(snapshot.drawable_height);\n"
+       << "    DrawList draw;\n"
+       << "    draw.overlay.push_back(\n"
+       << "        FilledRectangle{{0, 0, w, h}, {8, 16, 26, 255}});\n"
+       << "    draw.overlay.push_back(Text{\n"
+       << "        {w * .5f, h * .5f - 40.f}, \"" << display << "\",\n"
+       << "        {86, 196, 255, 255}, 42, 0, std::nullopt, TextAlign::Center,\n"
+       << "        FontFace::Heading});\n"
+       << "    draw.overlay.push_back(Text{\n"
+       << "        {w * .5f, h * .5f + 12.f},\n"
+       << "        std::to_string(plan.order.size()) +\n"
+       << "            \" content package(s) - \" +\n"
+       << "            (plan.ok ? std::string(\"load plan ok\")\n"
+       << "                     : std::string(\"load plan FAILED\")),\n"
+       << "        {210, 230, 244, 255}, 16, 0, std::nullopt,\n"
+       << "        TextAlign::Center});\n"
+       << "    draw.overlay.push_back(Text{\n"
+       << "        {w * .5f, h * .5f + 40.f},\n"
+       << "        \"drop content into packages/" << id << "/content/ and cook\",\n"
+       << "        {122, 170, 190, 255}, 14, 0, std::nullopt,\n"
+       << "        TextAlign::Center});\n"
+       << "    window.draw(draw);\n"
+       << "  }\n"
        << "  return plan.ok ? 0 : 1;\n"
        << "}\n";
   if (!write_text(root / "src" / "main.cpp", stub.str(), error))
@@ -200,7 +240,12 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
         << "include(\"${STELLAR_ENGINE_SDK}/cmake/StellarEngineSdk.cmake\")\n"
         << "add_executable(" << id.substr(5) << " src/main.cpp)\n"
         << "target_link_libraries(" << id.substr(5)
-        << " PRIVATE stellar::engine)\n";
+        << " PRIVATE stellar::platform)\n"
+        << "# SDL3.dll and the default font ship in the SDK's bin directory.\n"
+        << "add_custom_command(TARGET " << id.substr(5) << " POST_BUILD\n"
+        << "  COMMAND ${CMAKE_COMMAND} -E copy_directory\n"
+        << "    \"${STELLAR_ENGINE_SDK}/bin\" \"$<TARGET_FILE_DIR:" << id.substr(5)
+        << ">\")\n";
   if (!write_text(root / "CMakeLists.txt", cmake.str(), error))
     return false;
   return true;
