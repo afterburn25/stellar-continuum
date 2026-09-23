@@ -1,9 +1,0 @@
-{
-  "id": "game.c-devin-e2e-hotrel",
-  "name": "C:/Devin/e2e-hotrel",
-  "priority": 0,
-  "provides": [
-    "game.c-devin-e2e-hotrel"
-  ],
-  "version": "0.1.0"
-}
