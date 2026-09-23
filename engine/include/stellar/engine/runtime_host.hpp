@@ -2,6 +2,7 @@
 
 #include "stellar/engine/content_resolver.hpp"
 #include "stellar/engine/scene_components.hpp"
+#include "stellar/engine/vfx.hpp"
 #include "stellar/engine/world.hpp"
 
 #include <filesystem>
@@ -84,6 +85,16 @@ public:
   [[nodiscard]] audio::AudioOutput &audio();
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
+  // The deterministic particle system — games define() emitters then
+  // spawn_emitter() to run them; the host steps it in sim time and
+  // renders particles as tinted rects above the scene.
+  [[nodiscard]] VfxSystem &vfx();
+  // Spawns a defined emitter at a world position. When `attached` names
+  // a live entity the emitter re-anchors to its center each sim step and
+  // stops automatically when the entity dies. Positions are world-space
+  // (camera transform applies).
+  VfxInstanceId spawn_emitter(std::string_view definition_id, float x,
+                              float y, EntityId attached = {});
 
   // Game-driven control, callable from the callbacks:
   // ends the run loop after the current frame (the clean-exit path —

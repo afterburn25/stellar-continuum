@@ -54,6 +54,16 @@ struct RuntimeHost::Impl {
   // Accumulated simulation seconds — drives sprite-strip animation so
   // playback is deterministic under --fixed-hz.
   double sim_time = 0.0;
+  // Deterministic particle system stepped inside simulate() and rendered
+  // as tinted rects. The host tracks every spawned instance so it can
+  // re-anchor attachments, stop emitters whose entity died, and render.
+  VfxSystem vfx;
+  struct VfxTrack {
+    VfxInstanceId instance;
+    std::string definition_id;
+    EntityId attached;
+  };
+  std::vector<VfxTrack> vfx_tracks;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -69,6 +79,16 @@ World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
+VfxSystem &RuntimeHost::vfx() { return impl_->vfx; }
+VfxInstanceId RuntimeHost::spawn_emitter(std::string_view definition_id,
+                                       float x, float y,
+                                       EntityId attached) {
+  const auto id = impl_->vfx.spawn(definition_id, {x, y, 0.f}, attached);
+  if (id != invalid_vfx_instance)
+    impl_->vfx_tracks.push_back(
+        {id, std::string{definition_id}, attached});
+  return id;
+}
 void RuntimeHost::request_quit() { impl_->quit_requested = true; }
 void RuntimeHost::set_paused(bool paused) { impl_->paused = paused; }
 bool RuntimeHost::paused() const { return impl_->paused; }
@@ -552,6 +572,27 @@ int RuntimeHost::run() {
         if (on_collision)
           for (const auto &[a, b] : entered) on_collision(a, b);
       }
+      // Particles: re-anchor attached emitters to their entity's center
+      // (dead entities stop their emitters), retire finished instances,
+      // then advance the deterministic pools in sim time.
+      for (auto it = impl.vfx_tracks.begin(); it != impl.vfx_tracks.end();) {
+        bool keep = impl.vfx.alive(it->instance);
+        if (keep && it->attached != EntityId{}) {
+          const auto *t = world.get<Transform2D>(it->attached);
+          const auto *e = world.get<Extent2D>(it->attached);
+          if (t) {
+            impl.vfx.set_position(
+                it->instance,
+                {t->x + (e ? e->w * .5f : 0.f),
+                 t->y + (e ? e->h * .5f : 0.f), 0.f});
+          } else {
+            impl.vfx.stop(it->instance);
+            keep = false;
+          }
+        }
+        it = keep ? std::next(it) : impl.vfx_tracks.erase(it);
+      }
+      impl.vfx.advance(dt_step);
     };
     if (impl.paused) {
       // Rendering continues; the sim does not advance.
@@ -643,6 +684,28 @@ int RuntimeHost::run() {
             rect.width,
             std::nullopt,
             TextAlign::Center});
+      }
+    }
+    // Particles render above scene entities, in world space (camera
+    // transform applies; no per-particle parallax — attach emitters to
+    // parallax-scaled entities if layered depth is needed).
+    for (const auto &track : impl.vfx_tracks) {
+      const auto *def = impl.vfx.definition(track.definition_id);
+      if (!def) continue;
+      for (const auto &p : impl.vfx.particles(track.instance)) {
+        const auto vis = impl.vfx.visual_for(
+            *def, p.lifetime > 0.f ? p.age / p.lifetime : 1.f);
+        const float sz = 6.f * vis.scale * impl.cam_zoom;
+        const float sx =
+            (p.position.x - impl.cam_x) * impl.cam_zoom - sz * .5f;
+        const float sy =
+            (p.position.y - impl.cam_y) * impl.cam_zoom - sz * .5f;
+        const auto ch = [](float v) {
+          return static_cast<std::uint8_t>(std::clamp(v, 0.f, 1.f) * 255.f);
+        };
+        draw.overlay.push_back(FilledRectangle{
+            {sx, sy, sz, sz},
+            {ch(vis.r), ch(vis.g), ch(vis.b), ch(vis.opacity)}});
       }
     }
     draw.overlay.push_back(Text{{w * .5f, h * .5f - 80.f},
