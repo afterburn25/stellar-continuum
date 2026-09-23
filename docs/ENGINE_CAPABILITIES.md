@@ -31,7 +31,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Stellar activity scheduler | IMPLEMENTED | Core `stellar_activity.cpp`, `CampaignFrame` independent clock | `stellar_activity`, persistence tests | Scoped event timeline/history and CME hooks; damage/space-weather game effects remain unfinished |
 | Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh | `native_stellar_eruptions`, scene GPU tests | Image-derived curved surfaces; blurry ray-marched production mode retired; general particle framework absent |
 | Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; Core domain IDs | `foundation`, persistence tests | No unified World/component store or full entity lifecycle across game domains |
-| Clocks/scheduling | PARTIALLY IMPLEMENTED | Engine `FixedClock`; Core strategic/tactical/developer clocks, campaign phases | `foundation`, `strategic_clock_parity`, `campaign_frame_parity` | No reusable dependency scheduler or simulation LOD |
+| Clocks/scheduling | IMPLEMENTED BUT NEEDS POLISH | Engine `FixedClock`; `SimulationScheduler`/`SimulationExecutor` tiered LOD with dependency-chained tasks, dirty/event wakeups, capture/restore; Core strategic/tactical/developer clocks; `GalaxySimulationStepCoordinator` routes all 12 phases through the executor preserving order | `foundation`, `strategic_clock_parity`, `campaign_frame_parity`, `simulation_executor`, `simulation_persistence`, `simulation_scale_*`, `campaign_coordinator*` | Phases remain sequential (one dependency chain); all phases Active tier — per-phase cadence tuning and intra-step parallelism unexercised |
 | Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); save writer, image preparation, audio director, territory overlay, campaign session, planet-material decode queue | `job_system`, `foundation`, image preparation, campaign session, planet-material tests | Bounded specialized consumers; no work-stealing or affinity policy |
 | Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>` + `event_bus.cpp` typed subscriptions; Core domain events | `foundation`, `event_bus`, `mission_graph`, notification/activity tests | Event bus library unconsumed by the game; no cross-thread dispatch policy |
 | Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp` | scene/triangle/orbit/scale tests | Kinematics and continuous primitive queries; no general rigid-body/constraint/N-body world |
@@ -174,7 +174,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   names resolved from campaign state); clicking a located entry
   navigates the map to its system
   via `navigation()` → `enter_system` (the workspace re-applies the
-  observation check) (`native_chronicle` tests). Admission
+  observation check) and single-foreign-actor entries expose a DIP
+  action opening the diplomacy workspace on that contact
+  (`native_chronicle` tests). Admission
   seeding applies a fixed 0.35 report floor so high-volume trivia
   (damage ticks, detections) stays out of the transient feed. Voice
   announcement of the same step events already runs through
