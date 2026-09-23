@@ -185,11 +185,11 @@ struct Shell {
   engine::VirtualizedList entity_list;
   bool scene_modified{};
   bool editing_scene{};
-  int scene_field{}; // 1=name, 2=pos "x,y", 3=vel "vx,vy"
+  int scene_field{}; // 1=name, 2=pos, 3=vel, 4=sprite, 5=size, 6=color
   std::string scene_buffer;
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
-      scene_preview{}, scene_rows{};
+      hit_scene_size{}, hit_scene_color{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -815,6 +815,27 @@ bool parse_pair(std::string_view text, float &a, float &b) {
   return true;
 }
 
+// Parses "r,g,b" into clamped 0-255 channels.
+bool parse_color(std::string_view text, std::uint8_t &r, std::uint8_t &g,
+                 std::uint8_t &b) {
+  const auto c1 = text.find(',');
+  const auto c2 = c1 == std::string_view::npos ? c1 : text.find(',', c1 + 1);
+  if (c1 == std::string_view::npos || c2 == std::string_view::npos)
+    return false;
+  try {
+    const auto channel = [](std::string_view v) {
+      return static_cast<std::uint8_t>(
+          std::clamp(std::stoi(std::string(v)), 0, 255));
+    };
+    r = channel(text.substr(0, c1));
+    g = channel(text.substr(c1 + 1, c2 - c1 - 1));
+    b = channel(text.substr(c2 + 1));
+  } catch (const std::exception &) {
+    return false;
+  }
+  return true;
+}
+
 void commit_scene_field(Shell &shell) {
   auto *entity = selected_scene_entity(shell);
   if (entity == nullptr) {
@@ -832,12 +853,16 @@ void commit_scene_field(Shell &shell) {
   } else if (shell.scene_field == 4) {
     entity->sprite = shell.scene_buffer;
     ok = true;
+  } else if (shell.scene_field == 5) {
+    ok = parse_pair(shell.scene_buffer, entity->w, entity->h);
+  } else if (shell.scene_field == 6) {
+    ok = parse_color(shell.scene_buffer, entity->r, entity->g, entity->b);
   }
   if (ok) {
     shell.scene_modified = true;
     shell.status = "entity " + entity->name + " updated - SAVE to persist";
   } else {
-    shell.status = "invalid value - use \"x,y\" or \"vx,vy\"";
+    shell.status = "invalid value - use \"x,y\", \"r,g,b\" or a path";
   }
   shell.scene_buffer.clear();
 }
@@ -851,7 +876,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     line(out, x, y, "open project", "none - open one in Projects", font);
     shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save = {};
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
-        shell.hit_scene_sprite = {};
+        shell.hit_scene_sprite = shell.hit_scene_size =
+            shell.hit_scene_color = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -971,6 +997,14 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit_scene_sprite, "sprite", entity ? entity->sprite : "",
         shell.editing_scene && shell.scene_field == 4,
         "content-relative image path");
+  field(shell.hit_scene_size, "w,h",
+        entity ? fmt_pair(entity->w, entity->h) : "",
+        shell.editing_scene && shell.scene_field == 5, "e.g. 96,96");
+  field(shell.hit_scene_color, "color",
+        entity ? std::to_string(entity->r) + "," + std::to_string(entity->g) +
+                     "," + std::to_string(entity->b)
+               : "",
+        shell.editing_scene && shell.scene_field == 6, "e.g. 255,200,60");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -1722,6 +1756,13 @@ int main(int argc, char **argv) {
                                      std::to_string((int)e->vy);
               else if (field == 4 && e)
                 shell.scene_buffer = e->sprite;
+              else if (field == 5 && e)
+                shell.scene_buffer = std::to_string((int)e->w) + "," +
+                                     std::to_string((int)e->h);
+              else if (field == 6 && e)
+                shell.scene_buffer = std::to_string((int)e->r) + "," +
+                                     std::to_string((int)e->g) + "," +
+                                     std::to_string((int)e->b);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -1733,6 +1774,10 @@ int main(int argc, char **argv) {
               edit_field(3);
             else if (shell.hit_scene_sprite.contains(event.position))
               edit_field(4);
+            else if (shell.hit_scene_size.contains(event.position))
+              edit_field(5);
+            else if (shell.hit_scene_color.contains(event.position))
+              edit_field(6);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);
