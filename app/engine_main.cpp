@@ -194,6 +194,7 @@ struct Shell {
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
       scene_sprites;
+  bool scene_dragging{}; // pointer is dragging an entity in the preview
   std::string status{"ready"};
 };
 
@@ -992,7 +993,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       out.overlay.push_back(StrokedRectangle{rect, accent});
   }
   out.overlay.push_back(Text{{pv.x + 6 * s, pv.y + pv.height - 16 * s},
-                             "click to place selected entity", muted,
+                             "click selects - drag moves entities", muted,
                              static_cast<int>(11 * s), 0, pv});
 
   // Property fields for the selected entity.
@@ -1706,10 +1707,47 @@ int main(int argc, char **argv) {
           }
         }
         switch (event.type) {
-        case InputEventType::PointerMove: last_input = "pointer move"; break;
-        case InputEventType::LeftPressed: last_input = "left press"; break;
+        case InputEventType::PointerMove:
+          last_input = "pointer move";
+          if (shell.scene_dragging &&
+              shell.scene_preview.contains(event.position)) {
+            if (auto *e = selected_scene_entity(shell); e != nullptr) {
+              const auto &pv = shell.scene_preview;
+              e->x = std::clamp(
+                  (event.position.x - pv.x) / pv.width * 1280.f, 0.f,
+                  1280.f - e->w);
+              e->y = std::clamp(
+                  (event.position.y - pv.y) / pv.height * 720.f, 0.f,
+                  720.f - e->h);
+              shell.scene_modified = true;
+            }
+          }
+          break;
+        case InputEventType::LeftPressed:
+          last_input = "left press";
+          if (shell.tool == Tool::Scene &&
+              shell.scene_preview.contains(event.position)) {
+            const auto &pv = shell.scene_preview;
+            const float wx =
+                (event.position.x - pv.x) / pv.width * 1280.f;
+            const float wy =
+                (event.position.y - pv.y) / pv.height * 720.f;
+            for (std::size_t i = shell.scene_doc.entities.size(); i-- > 0;) {
+              const auto &e = shell.scene_doc.entities[i];
+              if (wx >= e.x && wx <= e.x + e.w && wy >= e.y &&
+                  wy <= e.y + e.h) {
+                shell.selected_entity = i;
+                break;
+              }
+            }
+            shell.scene_dragging =
+                shell.selected_entity < shell.scene_doc.entities.size();
+          }
+          break;
         case InputEventType::LeftReleased: {
           last_input = "left release";
+          if (!shell.scene_preview.contains(event.position))
+            shell.scene_dragging = false;
           for (std::size_t i = 0; i < shell.tool_hits.size(); ++i)
             if (shell.tool_hits[i].contains(event.position))
               shell.tool = kTools[i];
@@ -1827,28 +1865,8 @@ int main(int argc, char **argv) {
             } else if (shell.hit_scene_save.contains(event.position)) {
               save_scene(shell);
             } else if (shell.scene_preview.contains(event.position)) {
-              const auto &pv = shell.scene_preview;
-              const float wx = (event.position.x - pv.x) / pv.width * 1280.f;
-              const float wy = (event.position.y - pv.y) / pv.height * 720.f;
-              // Clicking an entity selects it (topmost = last drawn);
-              // clicking empty space places the selected entity there.
-              std::size_t hit = shell.scene_doc.entities.size();
-              for (std::size_t i = shell.scene_doc.entities.size(); i-- > 0;) {
-                const auto &e = shell.scene_doc.entities[i];
-                if (wx >= e.x && wx <= e.x + e.w && wy >= e.y &&
-                    wy <= e.y + e.h) {
-                  hit = i;
-                  break;
-                }
-              }
-              if (hit < shell.scene_doc.entities.size()) {
-                shell.selected_entity = hit;
-              } else if (auto *e = selected_scene_entity(shell);
-                         e != nullptr) {
-                e->x = std::clamp(wx, 0.f, 1280.f - e->w);
-                e->y = std::clamp(wy, 0.f, 720.f - e->h);
-                shell.scene_modified = true;
-              }
+              // Press already selected/placed; release ends the drag.
+              shell.scene_dragging = false;
             } else if (shell.scene_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.scene_rows.y +
