@@ -170,6 +170,10 @@ struct Shell {
   std::atomic<std::size_t> cook_done{}, cook_total{};
   std::mutex project_mutex;
   std::string cook_status, build_status, package_status;
+  // Content staleness: newest source write vs cooked manifest time,
+  // rescanned at most once per second on the UI thread.
+  std::string content_status;
+  std::chrono::steady_clock::time_point content_scan_at{};
   std::string status{"ready"};
 };
 
@@ -891,8 +895,44 @@ void field_box(DrawList &out, const UiRect &rect, const std::string &value,
       value.empty() ? muted : ink, font, rect.width - 12 * s, rect});
 }
 
+// Summarizes project content freshness: source file count and whether the
+// newest change postdates the cooked manifest (i.e. needs a recook).
+void update_content_status(Shell &shell) {
+  if (!shell.project) {
+    shell.content_status.clear();
+    return;
+  }
+  const auto now = std::chrono::steady_clock::now();
+  if (now - shell.content_scan_at < std::chrono::seconds(1)) return;
+  shell.content_scan_at = now;
+  std::size_t files = 0;
+  std::filesystem::file_time_type newest{};
+  std::error_code ec;
+  for (const auto &dir : shell.project->content_dirs) {
+    for (const auto &entry :
+         std::filesystem::recursive_directory_iterator(
+             shell.project->root / dir, ec)) {
+      if (!entry.is_regular_file(ec)) continue;
+      ++files;
+      newest = std::max(newest, entry.last_write_time(ec));
+    }
+  }
+  const auto manifest = shell.project->root / "build" / "cooked" / "Content" /
+                        "runtime.stmanifest";
+  std::filesystem::file_time_type cooked_at{};
+  if (std::filesystem::is_regular_file(manifest, ec))
+    cooked_at = std::filesystem::last_write_time(manifest, ec);
+  shell.content_status = std::to_string(files) + " source file(s)";
+  if (cooked_at == std::filesystem::file_time_type{})
+    shell.content_status += " - not cooked";
+  else
+    shell.content_status += newest > cooked_at ? " - CHANGED since cook"
+                                               : " - cooked output current";
+}
+
 void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
   poll_run_process(shell);
+  update_content_status(shell);
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
   const int font = static_cast<int>(13 * s);
@@ -923,6 +963,8 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
       line(out, x, y, "  error", e, font);
     for (const auto &e : shell.package_errors)
       line(out, x, y, "  scan error", e, font);
+    if (!shell.content_status.empty())
+      line(out, x, y, "content", shell.content_status, font);
     {
       std::lock_guard lock(shell.project_mutex);
       if (!shell.cook_status.empty()) {
