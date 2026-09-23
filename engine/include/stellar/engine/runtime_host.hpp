@@ -91,6 +91,18 @@ public:
   // Switches the active scene document (project-relative path), respawning
   // entities — level switching. Before run() it sets the initial scene.
   void set_scene(std::string scene_file);
+  // View transform in world units: entities draw at
+  // (world_pos - camera) * zoom. A platformer follows its player by calling
+  // this from on_update. Zoom 1 is the identity view; the built-in HUD text
+  // stays screen-space.
+  void set_camera(float x, float y, float zoom = 1.0f);
+  [[nodiscard]] float camera_x() const;
+  [[nodiscard]] float camera_y() const;
+  [[nodiscard]] float camera_zoom() const;
+  // Current window size (post --width/--height/--fullscreen overrides) —
+  // follow-cameras need it to center: set_camera(px - vw/2, py - vh/2).
+  [[nodiscard]] int viewport_width() const;
+  [[nodiscard]] int viewport_height() const;
 
   // Spawns one entity at runtime (bullets, pickups, effects) — it joins the
   // tracked set: velocity integration, wall bounce, rendering, collisions.

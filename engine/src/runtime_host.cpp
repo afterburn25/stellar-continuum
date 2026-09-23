@@ -40,6 +40,8 @@ struct RuntimeHost::Impl {
   // AABB pairs currently overlapping — collision-enter events only fire
   // on the transition into this set.
   std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping;
+  float cam_x = 0.f, cam_y = 0.f, cam_zoom = 1.f;
+  int view_w = 0, view_h = 0;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -73,6 +75,20 @@ EntityId RuntimeHost::spawn_entity(const SceneEntity &entity) {
 }
 bool RuntimeHost::destroy_entity(EntityId id) {
   return impl_->destroy_fn && impl_->destroy_fn(id);
+}
+void RuntimeHost::set_camera(float x, float y, float zoom) {
+  impl_->cam_x = x;
+  impl_->cam_y = y;
+  impl_->cam_zoom = zoom > 0.f ? zoom : 1.f;
+}
+float RuntimeHost::camera_x() const { return impl_->cam_x; }
+float RuntimeHost::camera_y() const { return impl_->cam_y; }
+float RuntimeHost::camera_zoom() const { return impl_->cam_zoom; }
+int RuntimeHost::viewport_width() const {
+  return impl_->view_w > 0 ? impl_->view_w : impl_->options.width;
+}
+int RuntimeHost::viewport_height() const {
+  return impl_->view_h > 0 ? impl_->view_h : impl_->options.height;
 }
 
 int RuntimeHost::run() {
@@ -281,6 +297,8 @@ int RuntimeHost::run() {
     }
     const float w = static_cast<float>(snapshot.drawable_width);
     const float h = static_cast<float>(snapshot.drawable_height);
+    impl.view_w = static_cast<int>(w);
+    impl.view_h = static_cast<int>(h);
 
     // Input system: WASD/arrow keys drive the entity named "player"
     // (SDL3 keycodes: arrows are 0x4000004f-0x40000052).
@@ -393,13 +411,18 @@ int RuntimeHost::run() {
       const auto *ext = world.get<Extent2D>(impl.entities[i]);
       const auto *tint = world.get<Tint>(impl.entities[i]);
       if (!t || !ext || !tint) continue;
+      const UiRect rect{(t->x - impl.cam_x) * impl.cam_zoom,
+                        (t->y - impl.cam_y) * impl.cam_zoom,
+                        ext->w * impl.cam_zoom, ext->h * impl.cam_zoom};
+      // View culling: skip entities fully outside the window.
+      if (rect.x + rect.width < 0 || rect.y + rect.height < 0 ||
+          rect.x > w || rect.y > h)
+        continue;
       if (i < impl.sprites.size() && impl.sprites[i])
-        draw.overlay.push_back(
-            Image{impl.sprites[i], {t->x, t->y, ext->w, ext->h}});
+        draw.overlay.push_back(Image{impl.sprites[i], rect});
       else
-        draw.overlay.push_back(FilledRectangle{{t->x, t->y, ext->w, ext->h},
-                                               {tint->r, tint->g, tint->b,
-                                                255}});
+        draw.overlay.push_back(
+            FilledRectangle{rect, {tint->r, tint->g, tint->b, 255}});
     }
     draw.overlay.push_back(Text{{w * .5f, h * .5f - 80.f},
                                 options.window_title, {86, 196, 255, 255}, 42,
