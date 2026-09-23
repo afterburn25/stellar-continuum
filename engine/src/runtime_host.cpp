@@ -369,12 +369,50 @@ int RuntimeHost::run() {
       impl.sim_time += dt_step;
       if (on_update) on_update(world, dt_step);
       impl.grounded.clear();
+      // Kinematic solids: platforms with velocity integrate (no gravity)
+      // and carry riders standing on their tops.
+      for (const auto entity : impl.entities) {
+        if (!world.get<Solid>(entity)) continue;
+        auto *t = world.get<Transform2D>(entity);
+        auto *v = world.get<Velocity2D>(entity);
+        const auto *ext = world.get<Extent2D>(entity);
+        if (!t || !v || !ext) continue;
+        const float dx = v->dx * dt_step, dy = v->dy * dt_step;
+        if (dx == 0.f && dy == 0.f) continue;
+        const float prev_top = t->y, prev_left = t->x;
+        t->x += dx;
+        t->y += dy;
+        // Platforms stop at the world bounds instead of bouncing.
+        const float nx = std::clamp(t->x, 0.f, world_w - ext->w);
+        const float ny = std::clamp(t->y, 0.f, world_h - ext->h);
+        if (nx != t->x) v->dx = 0.f;
+        if (ny != t->y) v->dy = 0.f;
+        t->x = nx;
+        t->y = ny;
+        const float moved_x = t->x - prev_left, moved_y = t->y - prev_top;
+        if (moved_x == 0.f && moved_y == 0.f) continue;
+        // Carry riders: non-solid entities whose feet rest on this
+        // platform's pre-move top get displaced with it.
+        for (const auto rider : impl.entities) {
+          if (rider == entity || world.get<Solid>(rider)) continue;
+          auto *rt = world.get<Transform2D>(rider);
+          const auto *re = world.get<Extent2D>(rider);
+          if (!rt || !re) continue;
+          const bool atop = rt->x < prev_left + ext->w &&
+                            rt->x + re->w > prev_left &&
+                            std::abs(rt->y + re->h - prev_top) <= 1.5f;
+          if (atop) {
+            rt->x += moved_x;
+            rt->y += moved_y;
+          }
+        }
+      }
       for (const auto entity : impl.entities) {
         auto *t = world.get<Transform2D>(entity);
         auto *v = world.get<Velocity2D>(entity);
         const auto *ext = world.get<Extent2D>(entity);
         if (!t || !v || !ext) continue;
-        if (world.get<Solid>(entity)) continue;  // solids never move
+        if (world.get<Solid>(entity)) continue;  // kinematic — moved above
         const auto *gs = world.get<GravityScale>(entity);
         const float gscale = impl.gravity != 0.f ? (gs ? gs->value : 1.f)
                                                  : 0.f;
