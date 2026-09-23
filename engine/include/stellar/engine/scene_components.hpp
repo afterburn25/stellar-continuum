@@ -5,10 +5,17 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace stellar::native_map {
+class Mesh3D;
+}
 
 namespace stellar::engine {
 
@@ -214,6 +221,29 @@ std::vector<EntityId> spawn_scene3d(World &world, const Scene3dDocument &doc);
 Scene3dDocument scene3d_from_world(const World &world);
 std::vector<EntityId> entities3d(const World &world);
 void resolve_hierarchy3d(World &world);
+
+// Nearest hit from raycast_world3d: the entity, the world-space
+// distance along the ray, and the world-space hit point.
+struct WorldRayHit3D {
+  EntityId entity{};
+  float distance{};
+  float x{}, y{}, z{};
+};
+// Casts a ray (origin + dir*max_distance, dir need not be normalized)
+// against every entity in `set` carrying Transform3D + MeshRef. Each ray
+// transforms into the mesh's local frame (rotation + scale aware) and
+// tests actual triangles via intersect_mesh_segment (bounding-sphere
+// reject first). `resolve` maps a MeshRef spec to a mesh — see
+// resolve_mesh_spec in mesh3d_loader.hpp. O(triangles) per hit entity —
+// a query, not a per-frame sweep. Shared by RuntimeHost::raycast3d and
+// tools that pick through a scratch world (spawn_scene3d on a document).
+std::optional<WorldRayHit3D>
+raycast_world3d(const World &world, std::span<const EntityId> set,
+                const std::function<std::shared_ptr<
+                    const native_map::Mesh3D>(const std::string &)>
+                    &resolve,
+                double ox, double oy, double oz, double dx, double dy,
+                double dz, float max_distance);
 
 // File-backed snapshot helpers: save_world_to_file snapshots the world,
 // rotates the .bak history chain (save_history.hpp) and writes the

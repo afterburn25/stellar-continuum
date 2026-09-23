@@ -118,10 +118,14 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   directional fills. `create_project`'s windowed starter ships a ready
   `editor/scene3d.json` and documents `--scene3d` in the host comment.
   `raycast3d(origin, dir, max_distance)` casts a ray against actual
-  mesh triangles (`physics3d::segment_triangle`) — the ray transforms
-  into each mesh's local frame (rotation + scale aware) and the nearest
-  hit returns `{entity, distance, world point}`; `entity3d_at(sx, sy)`
+  mesh triangles — shared `raycast_world3d` (scene_components) +
+  `resolve_mesh_spec` (mesh3d_loader) transform the ray into each
+  mesh's local frame (rotation + scale aware) and test triangles via
+  `intersect_mesh_segment` (bounding-sphere reject); the nearest hit
+  returns `{entity, distance, world point}`. `entity3d_at(sx, sy)`
   builds the camera ray through a viewport pixel for mouse picking.
+  Both shared functions are reusable by tools — e.g. a scratch world
+  from `spawn_scene3d` gives document-level picking without a host.
   Verified live: vertical rays hit box tops exactly, a 45°-rolled plank
   reports its true rotated face (local y≈0.25), a sphere occludes the
   plank behind it, and a screen-center pick through the pitched camera

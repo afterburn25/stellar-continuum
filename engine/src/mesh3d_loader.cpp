@@ -1,6 +1,10 @@
 #include <stellar/engine/mesh3d_loader.hpp>
 
+#include <stellar/engine/content_resolver.hpp>
+#include <stellar/engine/native_geometry3d.hpp>
+
 #include <charconv>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -158,6 +162,53 @@ load_obj_mesh_file(const std::filesystem::path &path) {
   std::ostringstream contents;
   contents << input.rdbuf();
   return load_obj_mesh(contents.str());
+}
+
+std::shared_ptr<const Mesh3D>
+resolve_mesh_spec(std::string_view spec, const ContentResolver *content) {
+  if (spec.empty()) return nullptr;
+  const auto csv = [](std::string_view s) {
+    std::vector<float> out;
+    for (std::size_t p = 0; p <= s.size();) {
+      const auto c = s.find(',', p);
+      const auto part = s.substr(
+          p, c == std::string_view::npos ? s.size() - p : c - p);
+      if (!part.empty())
+        out.push_back(
+            static_cast<float>(std::atof(std::string(part).c_str())));
+      if (c == std::string_view::npos) break;
+      p = c + 1;
+    }
+    return out;
+  };
+  const auto colon = spec.find(':');
+  const std::string_view head = spec.substr(
+      0, colon == std::string_view::npos ? spec.size() : colon);
+  const auto args = colon == std::string_view::npos
+                        ? std::vector<float>{}
+                        : csv(spec.substr(colon + 1));
+  try {
+    if (head == "box")
+      return native_map::box_mesh(args.size() > 0 ? args[0] : 1.f,
+                                  args.size() > 1 ? args[1] : 1.f,
+                                  args.size() > 2 ? args[2] : 1.f);
+    if (head == "sphere")
+      return Mesh3D::uv_sphere(
+          args.size() > 0 ? static_cast<int>(args[0]) : 16,
+          args.size() > 1 ? static_cast<int>(args[1]) : 8);
+    if (head == "annulus" && args.size() >= 2)
+      return native_map::annulus_mesh(
+          args[0], args[1],
+          args.size() > 2 ? static_cast<int>(args[2]) : 64);
+    if (content != nullptr && spec.size() > 4 &&
+        spec.substr(spec.size() - 4) == ".obj")
+      if (const auto bytes = content->read_bytes(spec))
+        return load_obj_mesh(std::string_view{
+            reinterpret_cast<const char *>(bytes->data()),
+            bytes->size()});
+  } catch (const std::exception &) {
+  }
+  return nullptr;
 }
 
 } // namespace stellar::engine

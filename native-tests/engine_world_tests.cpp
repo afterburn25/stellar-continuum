@@ -3,6 +3,7 @@
 #include <stellar/engine/scene_components.hpp>
 #include <stellar/engine/world.hpp>
 
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -624,6 +625,36 @@ int main() {
             threw = true;
         }
         check(threw, "obj loader rejects malformed input");
+
+        // raycast_world3d: nearest triangle hit through the shared
+        // resolver — rotation and scale aware, misses return nullopt.
+        const auto resolve = [](const std::string &spec) {
+            return resolve_mesh_spec(spec, nullptr);
+        };
+        check(resolve_mesh_spec("box", nullptr) != nullptr &&
+                  resolve_mesh_spec("bogus", nullptr) == nullptr,
+              "resolve_mesh_spec primitives and rejection");
+        // Ray straight down over the ship: box:2,1,1 scaled 2, yaw 90 —
+        // top face sits at y = 5 + 0.5*2 = 6 → distance 4 from y=10.
+        const auto down = raycast_world3d(restored, entities3d(restored),
+                                          resolve, 20.0, 10.0, -3.0,
+                                          0.0, -1.0, 0.0, 100.f);
+        check(down && down->entity == *re_ship &&
+                  std::abs(down->distance - 4.f) < 0.01f,
+              "raycast_world3d hits scaled+rotated box top");
+        // The turret at (22,9,-3) is nearer along a down-ray at x=22:
+        // sphere:8,4 (unit, scale 1) centered y=9 → top at y≈10 plane.
+        const auto nearer = raycast_world3d(
+            restored, entities3d(restored), resolve, 22.0, 12.0, -3.0,
+            0.0, -1.0, 0.0, 100.f);
+        check(nearer && nearer->entity == *re_turret,
+              "raycast_world3d picks the nearer entity");
+        check(!raycast_world3d(restored, entities3d(restored), resolve,
+                               0.0, 10.0, 50.0, 0.0, -1.0, 0.0, 100.f),
+              "raycast_world3d miss returns nullopt");
+        check(!raycast_world3d(restored, entities3d(restored), resolve,
+                               0.0, 10.0, -3.0, 0.0, 0.0, 0.0, 100.f),
+              "raycast_world3d rejects a degenerate ray");
     }
 
     if (failures != 0) {

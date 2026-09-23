@@ -129,56 +129,14 @@ struct RuntimeHost::Impl {
       mesh_cache;
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
       tex3d_cache;
-  // Resolves a MeshRef spec: "box[:sx,sy,sz]", "sphere[:cols,rows]",
-  // "annulus:inner,outer[,seg]", or a content-relative .obj path via the
-  // content resolver (cooked bytes or loose file). Cached per spec.
+  // Resolves a MeshRef spec via the shared resolve_mesh_spec (primitive
+  // or content-relative .obj through the resolver). Cached per spec.
   std::shared_ptr<const native_map::Mesh3D>
   mesh_of(const std::string &spec) {
     if (spec.empty() || content == nullptr) return nullptr;
     if (const auto it = mesh_cache.find(spec); it != mesh_cache.end())
       return it->second;
-    std::shared_ptr<const native_map::Mesh3D> mesh;
-    const auto csv = [](std::string_view s) {
-      std::vector<float> out;
-      for (std::size_t p = 0; p <= s.size();) {
-        const auto c = s.find(',', p);
-        const auto part = s.substr(
-            p, c == std::string_view::npos ? s.size() - p : c - p);
-        if (!part.empty())
-          out.push_back(
-              static_cast<float>(std::atof(std::string(part).c_str())));
-        if (c == std::string_view::npos) break;
-        p = c + 1;
-      }
-      return out;
-    };
-    const auto colon = spec.find(':');
-    const std::string head =
-        colon == std::string::npos ? spec : spec.substr(0, colon);
-    const auto args = colon == std::string::npos
-                          ? std::vector<float>{}
-                          : csv(std::string_view{spec}.substr(colon + 1));
-    try {
-      if (head == "box")
-        mesh = box_mesh(args.size() > 0 ? args[0] : 1.f,
-                        args.size() > 1 ? args[1] : 1.f,
-                        args.size() > 2 ? args[2] : 1.f);
-      else if (head == "sphere")
-        mesh = native_map::Mesh3D::uv_sphere(
-            args.size() > 0 ? static_cast<int>(args[0]) : 16,
-            args.size() > 1 ? static_cast<int>(args[1]) : 8);
-      else if (head == "annulus" && args.size() >= 2)
-        mesh = annulus_mesh(args[0], args[1],
-                            args.size() > 2 ? static_cast<int>(args[2])
-                                            : 64);
-      else if (spec.size() > 4 && spec.substr(spec.size() - 4) == ".obj")
-        if (const auto bytes = content->read_bytes(spec))
-          mesh = load_obj_mesh(std::string_view{
-              reinterpret_cast<const char *>(bytes->data()),
-              bytes->size()});
-    } catch (const std::exception &) {
-      mesh = nullptr;
-    }
+    auto mesh = resolve_mesh_spec(spec, content.get());
     mesh_cache.emplace(spec, mesh);
     return mesh;
   }
@@ -372,49 +330,15 @@ float RuntimeHost::ground_y() const { return impl_->ground_y3; }
 std::optional<RuntimeHost::RaycastHit3D>
 RuntimeHost::raycast3d(double ox, double oy, double oz, float dx,
                        float dy, float dz, float max_distance) const {
-  const float dlen = std::sqrt(dx * dx + dy * dy + dz * dz);
-  if (dlen < 1e-8f || max_distance <= 0.f) return std::nullopt;
-  dx /= dlen;
-  dy /= dlen;
-  dz /= dlen;
-  std::optional<RaycastHit3D> best;
-  for (const auto e : impl_->entities3d) {
-    const auto *t = impl_->world.get<Transform3D>(e);
-    const auto *mr = impl_->world.get<MeshRef>(e);
-    if (!t || !mr) continue;
-    const auto mesh = impl_->mesh_of(mr->spec);
-    if (!mesh) continue;
-    // Ray → mesh local space: local = R⁻¹·(world − pos) / scale.
-    const float qlen = std::sqrt(t->qx * t->qx + t->qy * t->qy +
-                                 t->qz * t->qz + t->qw * t->qw);
-    if (qlen < 1e-8f || t->scale <= 0.f) continue;
-    const Quaternion inv{-t->qx / qlen, -t->qy / qlen, -t->qz / qlen,
-                         t->qw / qlen};
-    Vec3 lo = quat_rot(
-        inv, {static_cast<float>(ox - t->x),
-              static_cast<float>(oy - t->y),
-              static_cast<float>(oz - t->z)});
-    lo = {lo.x / t->scale, lo.y / t->scale, lo.z / t->scale};
-    const Vec3 ld = quat_rot(inv, {dx, dy, dz}); // |ld| = 1/scale
-    const CollisionVector3 from{lo.x, lo.y, lo.z};
-    const CollisionVector3 to{lo.x + ld.x * max_distance,
-                              lo.y + ld.y * max_distance,
-                              lo.z + ld.z * max_distance};
-    // ld is 1/scale long, so the segment fraction == world-distance
-    // fraction; intersect_mesh_segment sphere-rejects before scanning
-    // triangles and returns the nearest face.
-    const auto hit = intersect_mesh_segment(*mesh, from, to);
-    if (hit) {
-      const float dist =
-          static_cast<float>(hit->fraction) * max_distance;
-      if (!best || dist < best->distance)
-        best = RaycastHit3D{e, dist,
-                            static_cast<float>(ox + dx * dist),
-                            static_cast<float>(oy + dy * dist),
-                            static_cast<float>(oz + dz * dist)};
-    }
-  }
-  return best;
+  const auto resolve = [this](const std::string &spec) {
+    return impl_->mesh_of(spec);
+  };
+  const auto hit =
+      raycast_world3d(impl_->world, impl_->entities3d, resolve, ox, oy,
+                      oz, dx, dy, dz, max_distance);
+  if (!hit) return std::nullopt;
+  return RaycastHit3D{hit->entity, hit->distance, hit->x, hit->y,
+                      hit->z};
 }
 std::optional<RuntimeHost::RaycastHit3D>
 RuntimeHost::entity3d_at(float screen_x, float screen_y) const {

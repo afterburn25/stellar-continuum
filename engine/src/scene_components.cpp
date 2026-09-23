@@ -1,6 +1,7 @@
 #include "stellar/engine/scene_components.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/native_geometry3d.hpp"
 #include "stellar/engine/native_scene3d.hpp"
 #include "stellar/engine/save_history.hpp"
 
@@ -656,6 +657,69 @@ void resolve_hierarchy3d(World &world) {
       };
   std::unordered_set<std::uint64_t> stack;
   for (const auto e : world.entities()) resolve(e, stack);
+}
+
+std::optional<WorldRayHit3D>
+raycast_world3d(const World &world, std::span<const EntityId> set,
+                const std::function<std::shared_ptr<
+                    const native_map::Mesh3D>(const std::string &)>
+                    &resolve,
+                double ox, double oy, double oz, double dx, double dy,
+                double dz, float max_distance) {
+  using namespace stellar::native_map;
+  const double dlen = std::sqrt(dx * dx + dy * dy + dz * dz);
+  if (dlen < 1e-8 || max_distance <= 0.f || !resolve)
+    return std::nullopt;
+  dx /= dlen;
+  dy /= dlen;
+  dz /= dlen;
+  // v' = q ⊗ (v,0) ⊗ q* for a unit quaternion q.
+  const auto rot = [](Quaternion q, Vec3 v) {
+    const float tx = 2.f * (q.y * v.z - q.z * v.y);
+    const float ty = 2.f * (q.z * v.x - q.x * v.z);
+    const float tz = 2.f * (q.x * v.y - q.y * v.x);
+    return Vec3{v.x + q.w * tx + q.y * tz - q.z * ty,
+                v.y + q.w * ty + q.z * tx - q.x * tz,
+                v.z + q.w * tz + q.x * ty - q.y * tx};
+  };
+  std::optional<WorldRayHit3D> best;
+  for (const auto e : set) {
+    const auto *t = world.get<Transform3D>(e);
+    const auto *mr = world.get<MeshRef>(e);
+    if (!t || !mr) continue;
+    const auto mesh = resolve(mr->spec);
+    if (!mesh) continue;
+    const float qlen = std::sqrt(t->qx * t->qx + t->qy * t->qy +
+                                 t->qz * t->qz + t->qw * t->qw);
+    if (qlen < 1e-8f || t->scale <= 0.f) continue;
+    // Ray → mesh local space: local = R⁻¹·(world − pos) / scale.
+    const Quaternion inv{-t->qx / qlen, -t->qy / qlen, -t->qz / qlen,
+                         t->qw / qlen};
+    Vec3 lo = rot(inv, {static_cast<float>(ox - t->x),
+                        static_cast<float>(oy - t->y),
+                        static_cast<float>(oz - t->z)});
+    lo = {lo.x / t->scale, lo.y / t->scale, lo.z / t->scale};
+    const Vec3 ld = rot(inv, {static_cast<float>(dx),
+                              static_cast<float>(dy),
+                              static_cast<float>(dz)});
+    // World distance d maps to d/scale local units — so a local segment
+    // of max_distance/scale covers the ray, and the returned fraction ×
+    // max_distance is the world-space hit distance.
+    const double local_max = max_distance / t->scale;
+    const CollisionVector3 from{lo.x, lo.y, lo.z};
+    const CollisionVector3 to{lo.x + ld.x * local_max,
+                              lo.y + ld.y * local_max,
+                              lo.z + ld.z * local_max};
+    const auto hit = intersect_mesh_segment(*mesh, from, to);
+    if (!hit) continue;
+    const float dist = static_cast<float>(hit->fraction) * max_distance;
+    if (!best || dist < best->distance)
+      best = WorldRayHit3D{e, dist,
+                           static_cast<float>(ox + dx * dist),
+                           static_cast<float>(oy + dy * dist),
+                           static_cast<float>(oz + dz * dist)};
+  }
+  return best;
 }
 
 void save_world_to_file(const World &world,
