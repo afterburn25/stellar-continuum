@@ -116,6 +116,12 @@ std::string EngineProject::to_json() const {
   return doc.dump(2) + "\n";
 }
 
+void EngineProject::save() const {
+  const std::string text = to_json();
+  write_file_atomically(root / std::string(manifest_filename),
+                        std::as_bytes(std::span(text)));
+}
+
 bool create_project(const std::filesystem::path &root, std::string_view name,
                     std::string_view engine_version, std::string *error) {
   auto fail = [&](const std::string &message) {

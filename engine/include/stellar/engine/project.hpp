@@ -30,6 +30,9 @@ struct EngineProject {
   static std::optional<EngineProject> load(const std::filesystem::path &root,
                                            std::string *error = nullptr);
   std::string to_json() const;
+  // Atomically writes the manifest back to <root>/project.stellar.json
+  // (write_file_atomically: temp file, flush, replace). Throws on failure.
+  void save() const;
 };
 
 // "My Game" -> "game.my-game" style namespace slug. Empty or unparsable

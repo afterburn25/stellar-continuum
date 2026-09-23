@@ -131,6 +131,7 @@ struct Shell {
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
       hit_project_run{}, hit_project_editor{}, hit_project_package{},
+      hit_project_rename{},
       hit_import_field{}, hit_import_button{}, hit_package_field{},
       hit_package_button{};
   UiRect project_rows{};
@@ -267,6 +268,22 @@ void create_package(Shell &shell) {
               shell.project->root / shell.project->content_dirs.front());
   shell.status = "added " + package_id + " - " + std::to_string(count) +
                  " package(s) total";
+}
+
+// Applies the name field as the open project's display name and atomically
+// rewrites its manifest — the id/content namespace intentionally stays put
+// so packages and cooked output remain valid.
+void rename_project(Shell &shell) {
+  if (!shell.project || shell.project_name_buffer.empty()) return;
+  try {
+    shell.project->name = shell.project_name_buffer;
+    shell.project->save();
+    shell.status = "renamed project to " + shell.project->name;
+    shell.project_name_buffer.clear();
+    shell.editing_project_name = false;
+  } catch (const std::exception &error) {
+    shell.status = std::string("rename failed: ") + error.what();
+  }
 }
 
 void close_project(Shell &shell) {
@@ -854,6 +871,10 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell_button(out, shell.hit_project_package,
                  shell.packaging ? "PACKAGING" : "PACKAGE", shell.packaging,
                  font, s);
+    bx2 += 126 * s;
+    shell.hit_project_rename = {bx2, y2, 104 * s,
+                                shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_rename, "RENAME", false, font, s);
     y = y2;
   } else {
     shell.hit_project_close = {};
@@ -862,6 +883,7 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_project_run = {};
     shell.hit_project_editor = {};
     shell.hit_project_package = {};
+    shell.hit_project_rename = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -1109,6 +1131,8 @@ int main(int argc, char **argv) {
               open_editor(shell);
             else if (shell.hit_project_package.contains(event.position))
               start_package(shell, jobs);
+            else if (shell.hit_project_rename.contains(event.position))
+              rename_project(shell);
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +

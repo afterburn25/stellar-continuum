@@ -102,6 +102,14 @@ int main() {
     check(loaded->content_dirs.size() == 1 &&
               loaded->content_dirs[0] == "packages",
           "content dir defaults to packages");
+    // save() atomically rewrites the manifest; rename round-trips.
+    auto renamed = *loaded;
+    renamed.name = "Renamed Game";
+    renamed.save();
+    const auto reloaded = engine::EngineProject::load(root, &error);
+    check(reloaded && reloaded->name == "Renamed Game" &&
+              reloaded->id == "game.test-game",
+          "save persists rename, keeps id");
   }
 
   // Malformed inputs reject cleanly.
