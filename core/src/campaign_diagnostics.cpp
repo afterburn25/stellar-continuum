@@ -38,7 +38,8 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         if(!d.bottleneck)continue;
         if(records.size()>=maximum)break;
         DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
-        r.event_type="sustenance_shortfall";r.severity=DiagnosticSeverity::Warning;
+        r.event_type=d.resource=="res.power"?"power_shortfall":"sustenance_shortfall";
+        r.severity=DiagnosticSeverity::Warning;
         r.entity_id=colony.id;r.civilization_id=colony.civilization_id;r.system_id=colony.system_id;
         char message[160];
         std::snprintf(message,sizeof(message),

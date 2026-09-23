@@ -18,6 +18,7 @@ engine::EconomyCatalog sustenance_economy_catalog() {
     };
     define("res.food");
     define("res.water");
+    define("res.power");
     catalog.add_recipe({.id = "colony.sustenance.food",
                         .name_key = "RECIPE_COLONY_FOOD",
                         .outputs = {{"res.food", 1.0}},
@@ -25,6 +26,10 @@ engine::EconomyCatalog sustenance_economy_catalog() {
     catalog.add_recipe({.id = "colony.sustenance.water",
                         .name_key = "RECIPE_COLONY_WATER",
                         .outputs = {{"res.water", 1.0}},
+                        .duration_days = 1.0});
+    catalog.add_recipe({.id = "colony.power.grid",
+                        .name_key = "RECIPE_COLONY_POWER",
+                        .outputs = {{"res.power", 1.0}},
                         .duration_days = 1.0});
     return catalog;
 }
@@ -55,6 +60,16 @@ void accumulate(const Colony& colony, std::span<const PlanetaryBody> bodies,
     water.produced_per_day += sustenance.water_capacity_millions;
     water.consumed_per_day += population;
     water.stock += reserves.water_reserve_days * population;
+    // Power grid: installed supply vs building demand is a real
+    // bottleneck axis (buildings shed when undersupplied).
+    // stored_power_days is already denominated in days of demand, so
+    // stock = stored days × demand keeps reserve_days ==
+    // stored_power_days exactly.
+    demand.push_back({"res.power", surface.demand});
+    auto& power = observed["res.power"];
+    power.produced_per_day += surface.supply;
+    power.consumed_per_day += surface.demand;
+    power.stock += surface.stored_power_days * surface.demand;
 }
 
 } // namespace

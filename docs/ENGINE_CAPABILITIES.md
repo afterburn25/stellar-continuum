@@ -448,31 +448,38 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   produces per-resource bottleneck/reserve/unmet diagnostics.
 - **Core adapter:** `core/campaign_economy_projection.*` —
   `sustenance_economy_catalog()` builds a small `EconomyCatalog`
-  (`res.food`, `res.water`, `res.housing`); `colony_resource_observations`
+  (`res.food`, `res.water`, `res.power`); `colony_resource_observations`
   maps `surface_colony_output`, `surface_sustenance_projection`,
   `colony_sustenance_capacity` and `preview_colony_reserves` (clamped
-  reserve semantics preserved) into observations;
+  reserve semantics preserved) into observations; the power axis maps
+  installed grid supply vs staffed building demand, with
+  `stored_power_days × demand` as stock so `reserve_days` equals Core's
+  authoritative storage days exactly.
   `analyze_colony_sustenance` runs them through `analyze_economy` sorted
   deterministically by resource id. No engine `Population`/`Colony`
   objects are instantiated for campaign authority.
 - **Consumers/tests:** `inspect_campaign_operations` emits
-  `sustenance_shortfall` findings (entity/civilization/system identity +
-  demand/supply/reserve values) for colonies whose food/water demand
-  outruns installed supply over a 30-day horizon — consumed by the
+  `sustenance_shortfall` findings for food/water and `power_shortfall`
+  findings for brownouts (entity/civilization/system identity +
+  demand/supply/reserve values) for colonies whose demand outruns
+  installed supply over a 30-day horizon — consumed by the
   campaign diagnostic monitor, developer diagnostic report and QA host.
   `campaign_economy_projection` tests — healthy/hostile bodies,
   reserve-day parity with `preview_colony_reserves`, building
-  contribution, determinism, legacy body-less colonies, and the
+  contribution, power-grid deficit + `stored_power_days` reserve parity,
+  determinism, legacy body-less colonies, and the
   operations-finding path; `campaign_diagnostics` tests updated for the
   new finding class (seeded worlds legitimately contain under-provisioned
   colonies).
 - **Save/performance impact:** read-only projection — zero new
   persistent state; scans colonies once per daily diagnostics check with
   a cached static catalog (O(colonies), tiny resource set).
-- **Limitations:** sustenance resources only (food/water/housing) —
-  broader Core resource flows (industry, trade goods) are not projected;
-  findings describe shortfalls, they do not prescribe fixes; engine-side
-  economy framework adoption into Core authority remains future work.
+- **Limitations:** sustenance + grid power only — broader Core resource
+  flows (industry, trade goods, freight contents) are not projected;
+  power has no generation-headroom analog so `capacity_per_day`/
+  utilization stay 0; findings describe shortfalls, they do not
+  prescribe fixes; engine-side economy framework adoption into Core
+  authority remains future work.
 
 ## Core campaign warfare projection + presence diagnostics (2026-09-24)
 

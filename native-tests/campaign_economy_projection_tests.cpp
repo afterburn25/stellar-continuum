@@ -21,6 +21,10 @@ void check(bool condition, const char *message) {
   }
 }
 
+bool near(double a, double b, double eps = 1e-6) {
+  return std::fabs(a - b) <= eps;
+}
+
 using namespace stellar::core;
 
 const stellar::engine::EconomyDiagnostic *
@@ -185,6 +189,46 @@ int main() {
                   first[i].unmet_per_day == second[i].unmet_per_day &&
                   first[i].reserve_days == second[i].reserve_days,
               "rollup diagnostics bit-equal");
+  }
+
+  // res.power: installed supply vs staffed building demand is a real
+  // bottleneck axis; stored_power_days maps to reserve_days exactly.
+  {
+    Colony colony;
+    colony.id = 31;
+    colony.civilization_id = 7;
+    colony.population_millions = 1.0; // staffs the buildings
+    SurfaceBuilding lab;
+    lab.id = 1;
+    lab.type_id = "science_lab";
+    lab.is_complete = true;
+    lab.condition = 1.0;
+    SurfaceBuilding lab2 = lab;
+    lab2.id = 2;
+    SurfaceBuilding battery;
+    battery.id = 3;
+    battery.type_id = "grid_battery";
+    battery.is_complete = true;
+    battery.condition = 1.0;
+    battery.stored_power_days = 6.0;
+    colony.surface_buildings = {lab, lab2, battery};
+
+    const auto rows =
+        analyze_colony_sustenance(colony, {}, 1.0, catalog);
+    const auto *power = row_for(rows, "res.power");
+    check(power != nullptr, "power row present");
+    if (power) {
+      // Base grid supply 2 vs two staffed labs at 2 demand each.
+      check(power->bottleneck, "undersupplied grid is a bottleneck");
+      check(near(power->demand_per_day, 4.0),
+            "power demand sums staffed buildings");
+      check(near(power->supply_per_day, 2.0),
+            "power supply is the base grid");
+      check(near(power->unmet_per_day, 2.0),
+            "power brownout is unmet demand");
+      check(near(power->reserve_days, 6.0),
+            "power reserve days match stored_power_days");
+    }
   }
 
   // Consumer: inspect_campaign_operations surfaces the bottleneck as a
