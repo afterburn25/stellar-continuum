@@ -56,7 +56,7 @@ endif()
 if(BUILD_TESTING)
   foreach(tool IN ITEMS Projects Dashboard Scene Scene3D Assets Profiler
                         Localization Simulation Colony Economy Planet AI
-                        Warfare Missions Physics)
+                        Warfare Missions Physics Galaxy)
     string(TOLOWER "${tool}" tool_lower)
     add_test(NAME "engine_shell_tool_${tool_lower}"
       COMMAND stellar-engine --tool "${tool}" --frames 20)

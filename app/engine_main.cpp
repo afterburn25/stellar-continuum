@@ -40,6 +40,7 @@
 #include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
+#include <stellar/engine/galaxy_map.hpp>
 #include <stellar/engine/simulation_executor.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
@@ -59,6 +60,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -81,18 +83,18 @@ constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
                   Localization, Simulation, Colony, Economy, Planet,
-                  Ai, Warfare, Missions, Physics };
+                  Ai, Warfare, Missions, Physics, Galaxy };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
                             Tool::Colony, Tool::Economy, Tool::Planet,
                             Tool::Ai, Tool::Warfare, Tool::Missions,
-                            Tool::Physics};
-constexpr std::array<const char *, 15> kToolNames{
+                            Tool::Physics, Tool::Galaxy};
+constexpr std::array<const char *, 16> kToolNames{
     "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
     "Economy",  "Planet",    "AI",        "Warfare",   "Missions",
-    "Physics"};
+    "Physics",  "Galaxy"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -463,6 +465,29 @@ struct Shell {
   UiRect hit_phys_step{}, hit_phys_run{}, hit_phys_ray{},
       hit_phys_sweep{}, hit_phys_reset{};
   std::vector<UiRect> hit_phys_bodies;
+
+  // Galaxy tool: a GalaxyMap debugger — a deterministic synthetic star
+  // chart with lanes, colony markers and fleet travellers that move
+  // system-to-system along the lane graph as days advance. Click to
+  // select the nearest system, wheel zooms the chart.
+  struct GalaxyDemo {
+    bool initialized{false};
+    engine::GalaxyMap map;
+    double day{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    std::uint64_t selected{0};
+    float zoom{1.0f};
+    // Fleet markers in transit between neighbor systems.
+    struct Traveller {
+      std::uint64_t marker{0};
+      std::uint64_t from{0}, to{0};
+      double progress{0.0}; // light-years covered along the leg
+      std::size_t next_hop{0};
+    };
+    std::vector<Traveller> travellers;
+  } gal;
+  UiRect hit_gal_step{}, hit_gal_run{}, hit_gal_reset{}, hit_gal_map{};
   std::string status{"ready"};
 };
 
@@ -4354,6 +4379,277 @@ void render_physics(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+// Builds the deterministic demo star chart: a golden-angle spiral disk of
+// systems, each connected to its two nearest neighbors (deduplicated
+// pairs), colony markers on every fifth system and three fleet travellers
+// that hop along the lane graph while the demo runs.
+void init_galaxy(Shell::GalaxyDemo &gal) {
+  gal.map.clear();
+  constexpr int count = 26;
+  for (int i = 0; i < count; ++i) {
+    const double radius = 3.2 * std::sqrt(static_cast<double>(i + 1));
+    const double theta = i * 2.3999632297286533;
+    const double jitter = ((i * 37) % 11) * 0.13;
+    engine::GalaxySystem s;
+    s.id = static_cast<std::uint64_t>(i + 1);
+    s.name = "SYS-" + std::to_string(i + 1);
+    s.x_light_years = std::cos(theta) * (radius + jitter);
+    s.y_light_years = std::sin(theta) * (radius + jitter);
+    s.classification = i % 4 == 0 ? "G yellow dwarf" :
+                       i % 4 == 1 ? "M red dwarf"   :
+                       i % 4 == 2 ? "K orange dwarf" : "A white star";
+    if (i % 6 == 0) s.tags.push_back("habitable");
+    if (i % 9 == 4) s.tags.push_back("anomaly");
+    gal.map.add_system(std::move(s));
+  }
+  // Two nearest neighbors per system, deduplicated unordered pairs.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> pairs;
+  const auto ids = gal.map.system_ids();
+  for (const auto id : ids) {
+    std::vector<std::pair<double, std::uint64_t>> nearest;
+    for (const auto other : ids) {
+      if (other == id) continue;
+      nearest.emplace_back(gal.map.distance_light_years(id, other), other);
+    }
+    std::sort(nearest.begin(), nearest.end());
+    for (int hop = 0; hop < 2 && hop < static_cast<int>(nearest.size());
+         ++hop) {
+      const auto other = nearest[hop].second;
+      pairs.emplace(std::min(id, other), std::max(id, other));
+    }
+  }
+  std::uint64_t lane_id = 1;
+  for (const auto &[a, b] : pairs)
+    gal.map.add_lane({lane_id++, a, b, gal.map.distance_light_years(a, b),
+                      true});
+  // Colony markers on every fifth system, owner cycles 1..3.
+  std::uint64_t marker_id = 100;
+  for (const auto id : ids) {
+    if (id % 5 != 0) continue;
+    const auto *s = gal.map.system(id);
+    engine::GalaxyMarker colony;
+    colony.id = marker_id++;
+    colony.kind = engine::GalaxyMarker::Kind::Colony;
+    colony.label = s->name + " colony";
+    colony.owner_id = id % 3 + 1;
+    colony.x_light_years = s->x_light_years;
+    colony.y_light_years = s->y_light_years;
+    colony.system_id = id;
+    gal.map.add_marker(colony);
+  }
+  // Three fleet travellers on distinct starts.
+  gal.travellers.clear();
+  for (int t = 0; t < 3; ++t) {
+    const auto home = ids[static_cast<std::size_t>(t * 8) % ids.size()];
+    const auto hops = gal.map.neighbors(home);
+    if (hops.empty()) continue;
+    const auto *s = gal.map.system(home);
+    engine::GalaxyMarker fleet;
+    fleet.id = marker_id++;
+    fleet.kind = engine::GalaxyMarker::Kind::Fleet;
+    fleet.label = "FTL-" + std::to_string(t + 1);
+    fleet.owner_id = static_cast<std::uint64_t>(t + 1);
+    fleet.x_light_years = s->x_light_years;
+    fleet.y_light_years = s->y_light_years;
+    fleet.system_id = home;
+    fleet.destination_system_id = hops.front();
+    gal.map.add_marker(fleet);
+    gal.travellers.push_back(
+        {fleet.id, home, hops.front(), 0.0, 0});
+  }
+  gal.day = 0.0;
+  gal.running = false;
+  gal.run_accum = 0.0;
+  gal.selected = ids.front();
+  gal.zoom = 1.0f;
+  gal.initialized = true;
+}
+
+// Advances travellers along their current leg at 1.5 ly/day; on arrival
+// the next enabled-lane neighbor becomes the destination (cycling), which
+// exercises neighbors()/update_marker_position over real map state.
+void gal_step(Shell::GalaxyDemo &gal, double days) {
+  gal.day += days;
+  for (auto &t : gal.travellers) {
+    const auto *a = gal.map.system(t.from), *b = gal.map.system(t.to);
+    if (!a || !b || !gal.map.marker(t.marker)) continue;
+    const double leg = gal.map.distance_light_years(t.from, t.to);
+    t.progress += 1.5 * days;
+    if (t.progress >= leg) {
+      const auto hops = gal.map.neighbors(t.to);
+      t.from = t.to;
+      t.next_hop = hops.empty() ? 0 : (t.next_hop + 1) % hops.size();
+      t.to = hops.empty() ? t.from : hops[t.next_hop];
+      t.progress = 0.0;
+      gal.map.set_marker_system(t.marker, t.from);
+      gal.map.set_marker_destination(t.marker, t.to);
+      if (const auto *s = gal.map.system(t.from))
+        gal.map.update_marker_position(t.marker, s->x_light_years,
+                                       s->y_light_years);
+    } else {
+      const double f = t.progress / leg;
+      gal.map.set_marker_system(t.marker, std::nullopt);
+      gal.map.update_marker_position(
+          t.marker, a->x_light_years + (b->x_light_years - a->x_light_years) * f,
+          a->y_light_years + (b->y_light_years - a->y_light_years) * f);
+    }
+  }
+}
+
+void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &gal = shell.gal;
+  if (!gal.initialized) init_galaxy(gal);
+  auto &map = gal.map;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "GALAXY MAP");
+
+  shell.hit_gal_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_gal_step, "STEP DAY", !gal.running, font, s);
+  shell.hit_gal_run = {x + 100 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_gal_run, gal.running ? "PAUSE" : "RUN",
+               gal.running, font, s);
+  shell.hit_gal_reset = {x + 190 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_gal_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "day %.0f  systems %zu  lanes %zu  markers %zu",
+                gal.day, map.system_count(), map.lane_count(),
+                map.marker_count());
+  line(out, x, y, "chart", buf, font);
+  y += 4 * s;
+
+  // Selected-system detail column.
+  heading(out, x, y, "SELECTED SYSTEM");
+  if (const auto *sel = map.system(gal.selected)) {
+    line(out, x, y, "id", std::to_string(sel->id), font);
+    line(out, x, y, "name", sel->name, font);
+    line(out, x, y, "class", sel->classification.empty() ? "unclassified"
+                                                       : sel->classification,
+         font);
+    std::snprintf(buf, sizeof(buf), "(%.1f, %.1f) ly",
+                  sel->x_light_years, sel->y_light_years);
+    line(out, x, y, "position", buf, font);
+    std::string tags;
+    for (const auto &tag : sel->tags) {
+      if (!tags.empty()) tags += ", ";
+      tags += tag;
+    }
+    line(out, x, y, "tags", tags.empty() ? "none" : tags, font);
+    const auto hops = map.neighbors(gal.selected);
+    std::string hop_text;
+    for (const auto hop : hops) {
+      if (!hop_text.empty()) hop_text += ", ";
+      hop_text += std::to_string(hop);
+    }
+    line(out, x, y, "lane neighbors", hop_text.empty() ? "none" : hop_text,
+         font);
+    for (const auto lane_id : map.lanes_for(gal.selected)) {
+      const auto *l = map.lane(lane_id);
+      std::snprintf(buf, sizeof(buf), "lane %llu -> SYS %llu  %.1f ly%s",
+                    static_cast<unsigned long long>(lane_id),
+                    static_cast<unsigned long long>(
+                        l->other(gal.selected)),
+                    l->length_light_years,
+                    l->enabled ? "" : "  DISABLED");
+      line(out, x, y, "", buf, font);
+    }
+    y += 4 * s;
+    heading(out, x, y, "MARKERS HERE");
+    for (const auto mid : map.markers_in_system(gal.selected)) {
+      const auto *m = map.marker(mid);
+      const char *kind = m->kind == engine::GalaxyMarker::Kind::Colony
+                             ? "colony" :
+                         m->kind == engine::GalaxyMarker::Kind::Fleet ? "fleet"
+                                                                      : "other";
+      std::snprintf(buf, sizeof(buf), "%s %s  owner %llu%s", kind,
+                    m->label.c_str(),
+                    static_cast<unsigned long long>(m->owner_id),
+                    m->destination_system_id ? "  EN ROUTE" : "");
+      line(out, x, y, "", buf, font);
+    }
+  } else {
+    line(out, x, y, "selection", "click a system on the chart", font);
+  }
+
+  // Chart canvas: right side of the body, dark field, lanes as lines,
+  // systems as rings, colony markers filled, fleet markers accent.
+  const UiRect canvas{body.x + body.width * 0.46f, body.y + 18 * s,
+                      body.width * 0.52f, body.height - 60 * s};
+  shell.hit_gal_map = canvas;
+  out.overlay.push_back(FilledRectangle{canvas, Color{4, 8, 14, 255}});
+  out.overlay.push_back(StrokedRectangle{canvas, Color{40, 64, 96, 255}});
+
+  double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    min_x = std::min(min_x, sys->x_light_years);
+    max_x = std::max(max_x, sys->x_light_years);
+    min_y = std::min(min_y, sys->y_light_years);
+    max_y = std::max(max_y, sys->y_light_years);
+  }
+  const double span_x = std::max(1e-6, max_x - min_x);
+  const double span_y = std::max(1e-6, max_y - min_y);
+  const double scale = std::min(canvas.width / span_x,
+                                canvas.height / span_y) *
+                       0.86 * gal.zoom;
+  const double cx = (min_x + max_x) / 2.0, cy = (min_y + max_y) / 2.0;
+  const auto project = [&](double wx, double wy) -> Point {
+    return {static_cast<float>(canvas.x + canvas.width / 2.0 +
+                               (wx - cx) * scale),
+            static_cast<float>(canvas.y + canvas.height / 2.0 +
+                               (wy - cy) * scale)};
+  };
+  for (const auto lane_id : map.lane_ids()) {
+    const auto *l = map.lane(lane_id);
+    const auto *a = map.system(l->first_system_id);
+    const auto *b = map.system(l->second_system_id);
+    out.lines.push_back(
+        {project(a->x_light_years, a->y_light_years),
+         project(b->x_light_years, b->y_light_years),
+         l->enabled ? Color{36, 58, 86, 255} : Color{70, 30, 30, 255}});
+  }
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    bool habitable = false, anomaly = false;
+    for (const auto &tag : sys->tags) {
+      habitable = habitable || tag == "habitable";
+      anomaly = anomaly || tag == "anomaly";
+    }
+    const Color color = id == gal.selected   ? Color{140, 200, 255, 255}
+                        : anomaly            ? Color{220, 120, 120, 255}
+                        : habitable          ? Color{110, 190, 140, 255}
+                                             : Color{190, 200, 214, 255};
+    out.circles.push_back({project(sys->x_light_years, sys->y_light_years),
+                           id == gal.selected ? 7.f * s : 4.5f * s, color});
+  }
+  for (const auto mid : map.marker_ids()) {
+    const auto *m = map.marker(mid);
+    const auto at = project(m->x_light_years, m->y_light_years);
+    out.circles.push_back(
+        {at, 2.6f * s,
+         m->kind == engine::GalaxyMarker::Kind::Colony
+             ? Color{240, 210, 110, 255}
+             : Color{130, 230, 230, 255}});
+    if (m->destination_system_id) {
+      if (const auto *d = map.system(*m->destination_system_id))
+        out.lines.push_back(
+            {at, project(d->x_light_years, d->y_light_years),
+             Color{90, 140, 160, 160}});
+    }
+  }
+  if (const auto *sel = map.system(gal.selected))
+    out.text.push_back(
+        {project(sel->x_light_years, sel->y_light_years), sel->name,
+         Color{180, 220, 255, 255}, font});
+  out.overlay.push_back(
+      Text{{canvas.x + 8 * s, canvas.y + canvas.height - 20 * s},
+           "click: select nearest | wheel: zoom", muted, font});
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -5685,6 +5981,9 @@ int main(int argc, char **argv) {
       case Tool::Physics:
         render_physics(draw, shell, body, s);
         break;
+      case Tool::Galaxy:
+        render_galaxy(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -6205,6 +6504,51 @@ int main(int argc, char **argv) {
             }
           }
         }
+        if (shell.tool == Tool::Galaxy) {
+          auto &gal = shell.gal;
+          if (event.type == InputEventType::Wheel &&
+              shell.hit_gal_map.contains(event.position)) {
+            gal.zoom =
+                std::clamp(gal.zoom + event.wheel_y * 0.12f, 0.3f, 6.0f);
+          }
+          if (event.type == InputEventType::LeftReleased) {
+            if (shell.hit_gal_step.contains(event.position)) {
+              gal_step(gal, 1.0);
+            } else if (shell.hit_gal_run.contains(event.position)) {
+              gal.running = !gal.running;
+              gal.run_accum = 0.0;
+            } else if (shell.hit_gal_reset.contains(event.position)) {
+              gal = Shell::GalaxyDemo{};
+              init_galaxy(gal);
+            } else if (shell.hit_gal_map.contains(event.position)) {
+              // Unproject the click through the same fit+zoom transform
+              // render_galaxy applied, then select the nearest system.
+              const auto &canvas = shell.hit_gal_map;
+              double min_x = 1e30, min_y = 1e30, max_x = -1e30,
+                     max_y = -1e30;
+              for (const auto id : gal.map.system_ids()) {
+                const auto *sys = gal.map.system(id);
+                min_x = std::min(min_x, sys->x_light_years);
+                max_x = std::max(max_x, sys->x_light_years);
+                min_y = std::min(min_y, sys->y_light_years);
+                max_y = std::max(max_y, sys->y_light_years);
+              }
+              const double span_x = std::max(1e-6, max_x - min_x);
+              const double span_y = std::max(1e-6, max_y - min_y);
+              const double scale =
+                  std::min(canvas.width / span_x, canvas.height / span_y) *
+                  0.86 * gal.zoom;
+              if (scale > 0) {
+                const double wx = (min_x + max_x) / 2.0 +
+                    (event.position.x - canvas.x - canvas.width / 2.0) / scale;
+                const double wy = (min_y + max_y) / 2.0 +
+                    (event.position.y - canvas.y - canvas.height / 2.0) / scale;
+                if (const auto hit = gal.map.nearest_system(wx, wy))
+                  gal.selected = *hit;
+              }
+            }
+          }
+        }
       }
 
       FrameTiming timing;
@@ -6240,6 +6584,13 @@ int main(int argc, char **argv) {
         if (shell.phys.run_accum >= 0.25) {
           shell.phys.run_accum = 0.0;
           phys_step(shell.phys, 0.25);
+        }
+      }
+      if (shell.tool == Tool::Galaxy && shell.gal.running) {
+        shell.gal.run_accum += elapsed;
+        if (shell.gal.run_accum >= 0.4) {
+          shell.gal.run_accum = 0.0;
+          gal_step(shell.gal, 1.0);
         }
       }
       if (shell.tool == Tool::Missions && shell.missions.running) {
