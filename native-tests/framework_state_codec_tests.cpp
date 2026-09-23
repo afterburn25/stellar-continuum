@@ -242,6 +242,32 @@ void test_history_codec() {
           "restored history keeps records and id counter");
 }
 
+void test_physics_codec() {
+  PhysicsWorld world{128.0f};
+  const auto mover = world.add_body(
+      {PhysicsShapeKind::Circle, 10.0f, 0.0f, 0.0f}, 0.0f, 0.0f);
+  world.set_velocity(mover, 20.0f, 0.0f);
+  [[maybe_unused]] const auto zone = world.add_body(
+      {PhysicsShapeKind::Circle, 40.0f, 0.0f, 0.0f}, 60.0f, 0.0f, 1, true);
+  [[maybe_unused]] const auto wall = world.add_body(
+      {PhysicsShapeKind::Aabb, 0.0f, 8.0f, 8.0f}, 200.0f, 0.0f);
+  for (int i = 0; i < 20; ++i) {
+    [[maybe_unused]] const auto events = world.advance(0.25f);
+  } // enter the zone
+
+  check_codec(world.capture_state(), "physics state codec");
+
+  PhysicsWorld restored{64.0f};
+  restored.restore_state(
+      parse_state<PhysicsWorld::State>(round_trip(world.capture_state())));
+  check_codec(restored.capture_state(), "restored physics codec");
+  require(restored.size() == world.size(),
+          "restored physics keeps bodies");
+  // The overlap set survived the codec: no ENTER refires.
+  const auto events = restored.advance(0.25f);
+  require(events.empty(), "restored physics emits no phantom ENTER");
+}
+
 void test_negative_cases() {
   bool threw = false;
   try {
@@ -282,6 +308,7 @@ int main() {
   test_strategic_ai_codec();
   test_economy_codec();
   test_history_codec();
+  test_physics_codec();
   test_negative_cases();
 
   if (failures != 0) {

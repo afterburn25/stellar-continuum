@@ -24,6 +24,7 @@
 #include <stellar/engine/strategic_ai.hpp>
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/history.hpp>
+#include <stellar/engine/physics.hpp>
 
 #include <stdexcept>
 
@@ -565,6 +566,59 @@ inline void from_json(const Json& j, EventHistory::State& s) {
   detail::check_version(s.version, 1, "EventHistory");
   s.next_id = j.value("next_id", std::uint64_t{1});
   j.at("events").get_to(s.events);
+}
+
+template<class Json> inline void to_json(Json& j, const PhysicsShape& s) {
+  j = Json{{"kind", s.kind == PhysicsShapeKind::Circle ? "circle" : "aabb"},
+           {"radius", s.radius},
+           {"half_width", s.half_width},
+           {"half_height", s.half_height}};
+}
+template<class Json> inline void from_json(const Json& j, PhysicsShape& s) {
+  const auto kind = j.value("kind", std::string{"circle"});
+  s.kind = kind == "aabb" ? PhysicsShapeKind::Aabb : PhysicsShapeKind::Circle;
+  s.radius = j.value("radius", 0.0f);
+  s.half_width = j.value("half_width", 0.0f);
+  s.half_height = j.value("half_height", 0.0f);
+}
+template<class Json> inline void to_json(Json& j, const PhysicsBody& b) {
+  j = Json{{"id", b.id},
+           {"shape", b.shape},
+           {"x", b.x},
+           {"y", b.y},
+           {"velocity_x", b.velocity_x},
+           {"velocity_y", b.velocity_y},
+           {"layer", b.layer},
+           {"trigger", b.trigger}};
+}
+template<class Json> inline void from_json(const Json& j, PhysicsBody& b) {
+  j.at("id").get_to(b.id);
+  j.at("shape").get_to(b.shape);
+  b.x = j.value("x", 0.0f);
+  b.y = j.value("y", 0.0f);
+  b.velocity_x = j.value("velocity_x", 0.0f);
+  b.velocity_y = j.value("velocity_y", 0.0f);
+  b.layer = j.value("layer", std::uint32_t{1});
+  b.trigger = j.value("trigger", false);
+}
+template<class Json>
+inline void to_json(Json& j, const PhysicsWorld::State& s) {
+  j = Json{{"version", s.version},
+           {"broadphase_cell_size", s.broadphase_cell_size},
+           {"next_id", s.next_id},
+           {"bodies", s.bodies},
+           {"overlapping", s.overlapping}};
+}
+template<class Json>
+inline void from_json(const Json& j, PhysicsWorld::State& s) {
+  s.version = j.value("version", std::uint32_t{1});
+  detail::check_version(s.version, 1, "PhysicsWorld");
+  s.broadphase_cell_size = j.value("broadphase_cell_size", 256.0f);
+  s.next_id = j.value("next_id", PhysicsBodyId{1});
+  j.at("bodies").get_to(s.bodies);
+  s.overlapping = j.value(
+      "overlapping",
+      std::vector<std::pair<PhysicsBodyId, PhysicsBodyId>>{});
 }
 
 } // namespace stellar::engine

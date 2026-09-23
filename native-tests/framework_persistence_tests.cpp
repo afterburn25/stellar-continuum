@@ -1,6 +1,7 @@
 #include <stellar/engine/colony.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
+#include <stellar/engine/physics.hpp>
 #include <stellar/engine/population.hpp>
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
@@ -317,11 +318,68 @@ int main() {
         check(threw, "restore without recipe throws");
     }
 
+    {   // PhysicsWorld — bodies, id counter and the trigger-overlap set
+        // must round-trip so no ENTER event refires after restore.
+        PhysicsWorld a{128.0f};
+        const auto mover = a.add_body(
+            {PhysicsShapeKind::Circle, 10.0f, 0.0f, 0.0f}, 0.0f, 0.0f);
+        a.set_velocity(mover, 20.0f, 0.0f);
+        const auto zone = a.add_body(
+            {PhysicsShapeKind::Circle, 40.0f, 0.0f, 0.0f}, 60.0f, 0.0f,
+            1, /*trigger*/ true);
+        [[maybe_unused]] const auto wall = a.add_body(
+            {PhysicsShapeKind::Aabb, 0.0f, 8.0f, 8.0f}, 200.0f, 0.0f);
+
+        // Advance until the mover is inside the trigger zone, then
+        // snapshot mid-overlap.
+        for (int i = 0; i < 20; ++i) {
+            [[maybe_unused]] const auto warm = a.advance(0.25f);
+        }
+        const auto state = a.capture_state();
+
+        PhysicsWorld b{64.0f}; // different cell size — state wins
+        b.restore_state(state);
+        check(b.size() == a.size(), "physics body count restored");
+        const auto* rb = b.body(zone);
+        check(rb && rb->trigger && rb->x == 60.0f,
+              "trigger body restored with flags");
+
+        // Continuation equivalence: identical event streams and
+        // positions, and no phantom ENTER for the live overlap.
+        for (int i = 0; i < 8; ++i) {
+            const auto ea = a.advance(0.25f);
+            const auto eb = b.advance(0.25f);
+            check(ea.size() == eb.size(),
+                  "restored physics emits identical trigger events");
+        }
+        check(b.body(mover)->x == a.body(mover)->x,
+              "restored mover continues identically");
+        check(b.overlap_circle(60.0f, 0.0f, 200.0f).size() ==
+              a.overlap_circle(60.0f, 0.0f, 200.0f).size(),
+              "broadphase rebuilt on restore");
+
+        const auto next = b.add_body(
+            {PhysicsShapeKind::Circle, 5.0f, 0.0f, 0.0f}, 0.0f, 0.0f);
+        check(next == state.next_id, "id counter continues, no collision");
+
+        PhysicsWorld c;
+        bool threw = false;
+        auto bad = state;
+        bad.overlapping.push_back({zone, 9999});
+        try {
+            c.restore_state(bad);
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "restore with dangling overlap pair throws");
+    }
+
     if (failures != 0) {
         std::cerr << failures << " framework persistence checks failed\n";
         return 1;
     }
     std::cout << "Framework persistence round-trip tests passed "
-                 "(population/colony/flow/logistics/warfare/ai/economy)\n";
+                 "(population/colony/flow/logistics/warfare/ai/economy/"
+                 "physics)\n";
     return 0;
 }
