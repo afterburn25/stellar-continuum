@@ -28,6 +28,11 @@
 #include <stellar/engine/package.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/project.hpp>
+#include <stellar/engine/population.hpp>
+#include <stellar/engine/colony.hpp>
+#include <stellar/engine/flow_network.hpp>
+#include <stellar/engine/logistics.hpp>
+#include <stellar/engine/simulation_executor.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -67,13 +72,13 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization };
+                  Localization, Simulation };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
-                            Tool::Localization};
-constexpr std::array<const char *, 7> kToolNames{
+                            Tool::Localization, Tool::Simulation};
+constexpr std::array<const char *, 8> kToolNames{
     "Projects", "Dashboard", "Scene", "Scene3D",
-    "Assets",   "Profiler",  "Localization"};
+    "Assets",   "Profiler",  "Localization", "Simulation"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -268,6 +273,29 @@ struct Shell {
       hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
       hit3_music{};
+
+  // Simulation tool: a live engine::SimulationExecutor driving real
+  // framework state (per-settlement Population cohorts, a shared power
+  // FlowNetwork and a LogisticsNetwork freight route) — the visible
+  // proof of the engine's simulation LOD machinery. Tasks span Active /
+  // Normal / Dormant tiers; STEP advances one tick, RUN auto-advances,
+  // WAKE exercises the event-wakeup path on the dormant relay.
+  struct SimDemo {
+    bool initialized{false};
+    engine::SimulationExecutor executor;
+    std::vector<engine::Population> settlements;
+    engine::FlowNetwork power{"power"};
+    engine::LogisticsNetwork freight;
+    double relay_pings{0.0};
+    double delivered{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    engine::SimulationStepReport last{};
+    std::size_t selected{0};
+  } sim;
+  engine::VirtualizedList sim_list;
+  UiRect hit_sim_step{}, hit_sim_run{}, hit_sim_wake{}, hit_sim_tier{},
+      hit_sim_list{};
   std::string status{"ready"};
 };
 
@@ -2676,6 +2704,191 @@ void field_box(DrawList &out, const UiRect &rect, const std::string &value,
       value.empty() ? muted : ink, font, rect.width - 12 * s, rect});
 }
 
+// ---- Simulation tool: live executor + framework demo ------------------
+
+void init_sim(Shell::SimDemo &sim) {
+  namespace eng = engine;
+  // Three settlements — real cohort populations, not counters.
+  for (int i = 0; i < 3; ++i) {
+    eng::Population pop;
+    pop.define_profile({.id = "human"});
+    pop.add({.profile = "human", .occupation = "miner"},
+            800.0 + i * 300.0);
+    pop.add({.profile = "human", .occupation = "farmer"}, 200.0);
+    sim.settlements.push_back(std::move(pop));
+  }
+  sim.power.add_node(1, 12.0, 0.0, 40.0);
+  sim.power.add_node(2, 0.0, 5.0, 10.0);
+  sim.power.add_node(3, 0.0, 3.0, 10.0);
+  sim.power.add_edge(1, 1, 2, 8.0);
+  sim.power.add_edge(2, 1, 3, 6.0);
+  sim.freight.add_node(1);
+  sim.freight.add_node(2);
+  sim.freight.add_route(10, {1, 2}, {2.0}, 20.0);
+
+  for (std::size_t i = 0; i < sim.settlements.size(); ++i) {
+    sim.executor.add(
+        static_cast<eng::SimulationExecutor::Key>(10 + i),
+        {.run = [&sim, i](const eng::SimulationTickContext &ctx) {
+           eng::SettlementConditions conditions;
+           sim.settlements[i].advance(
+               static_cast<double>(ctx.elapsed_ticks), conditions);
+         },
+         .tier = i == 2 ? eng::SimulationTier::Background
+                        : eng::SimulationTier::Normal,
+         .domain = "colony"});
+  }
+  sim.executor.add(20, {.run = [&sim](const eng::SimulationTickContext &ctx) {
+                          sim.power.advance(
+                              static_cast<double>(ctx.elapsed_ticks));
+                        },
+                        .tier = eng::SimulationTier::Active,
+                        .domain = "infrastructure"});
+  sim.executor.add(21, {.run = [&sim](const eng::SimulationTickContext &ctx) {
+                          static std::uint64_t next_shipment = 100;
+                          sim.freight.dispatch(next_shipment++, 10, "ore",
+                                               6.0);
+                          sim.delivered += static_cast<double>(
+                              sim.freight
+                                  .advance(static_cast<double>(
+                                      ctx.elapsed_ticks))
+                                  .deliveries.size());
+                        },
+                        .tier = eng::SimulationTier::Active,
+                        .domain = "logistics"});
+  sim.executor.add(30, {.run = [&sim](const eng::SimulationTickContext &) {
+                          sim.relay_pings += 1.0;
+                        },
+                        .tier = eng::SimulationTier::Dormant,
+                        .domain = "exploration"});
+  sim.initialized = true;
+}
+
+const char *tier_name(engine::SimulationTier tier) {
+  switch (tier) {
+  case engine::SimulationTier::Active: return "Active";
+  case engine::SimulationTier::Nearby: return "Nearby";
+  case engine::SimulationTier::Normal: return "Normal";
+  case engine::SimulationTier::Background: return "Background";
+  case engine::SimulationTier::Dormant: return "Dormant";
+  case engine::SimulationTier::Count: break;
+  }
+  return "?";
+}
+
+struct SimTaskRow {
+  engine::SimulationExecutor::Key key;
+  const char *name;
+  const char *domain;
+};
+constexpr std::array<SimTaskRow, 6> kSimTasks{{
+    {10, "settlement.alpha", "colony"},
+    {11, "settlement.beta", "colony"},
+    {12, "settlement.gamma", "colony"},
+    {20, "power.grid", "infrastructure"},
+    {21, "freight.ore_line", "logistics"},
+    {30, "relay.deep_space", "exploration"},
+}};
+
+void render_simulation(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &sim = shell.sim;
+  if (!sim.initialized) init_sim(sim);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "SIMULATION");
+
+  shell.hit_sim_step = {x, y, 74 * s, 24 * s};
+  shell_button(out, shell.hit_sim_step, "STEP", !sim.running, font, s);
+  shell.hit_sim_run = {x + 82 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_sim_run, sim.running ? "PAUSE" : "RUN",
+               sim.running, font, s);
+  shell.hit_sim_wake = {x + 172 * s, y, 106 * s, 24 * s};
+  shell_button(out, shell.hit_sim_wake, "WAKE RELAY", false, font, s);
+  const auto sel_key = kSimTasks[sim.selected].key;
+  const auto sel_tier = sim.executor.tier(sel_key);
+  shell.hit_sim_tier = {x + 286 * s, y, 170 * s, 24 * s};
+  shell_button(out, shell.hit_sim_tier,
+               ("TIER: " + std::string(tier_name(sel_tier))).c_str(),
+               false, font, s);
+  y += 32 * s;
+
+  line(out, x, y, "tick", std::to_string(sim.executor.tick()), font);
+  line(out, x, y, "last step",
+       "eligible " + std::to_string(sim.last.eligible) + "  ran " +
+           std::to_string(sim.last.ran) + "  deferred " +
+           std::to_string(sim.last.deferred) + "  wakes " +
+           std::to_string(sim.last.dirty_wakeups + sim.last.event_wakeups),
+       font);
+  {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%.1f us",
+                  static_cast<double>(sim.last.wall_ns) / 1000.0);
+    line(out, x, y, "wall time", buf, font);
+  }
+  double people = 0.0;
+  for (const auto &pop : sim.settlements) people += pop.total();
+  line(out, x, y, "population", std::to_string(static_cast<long long>(people)),
+       font);
+  double stored = 0.0;
+  for (const auto &node : sim.power.capture_state().nodes)
+    stored += node.storage;
+  line(out, x, y, "power stored", std::to_string(static_cast<int>(stored)),
+       font);
+  line(out, x, y, "ore delivered",
+       std::to_string(static_cast<int>(sim.delivered)), font);
+  line(out, x, y, "relay pings",
+       std::to_string(static_cast<int>(sim.relay_pings)), font);
+  y += 4 * s;
+
+  // Task table: left column list, domain stats on the right.
+  const float row_h = 22 * s;
+  const UiRect list_rect{x, y, body.width * 0.52f - 22 * s,
+                         kSimTasks.size() * row_h + 12 * s};
+  shell.hit_sim_list = list_rect;
+  out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
+  for (std::size_t i = 0; i < kSimTasks.size(); ++i) {
+    const auto &row = kSimTasks[i];
+    const float ry = list_rect.y + 6 * s + i * row_h;
+    const bool selected = i == sim.selected;
+    if (selected)
+      out.overlay.push_back(FilledRectangle{
+          {list_rect.x + 2 * s, ry, list_rect.width - 4 * s, row_h},
+          row_selected});
+    const auto tier = sim.executor.tier(row.key);
+    const auto elapsed =
+        sim.executor.scheduler().elapsed_since_run(row.key);
+    out.overlay.push_back(Text{
+        {list_rect.x + 8 * s, ry + 4 * s},
+        std::string(row.name), selected ? ink : muted, font});
+    out.overlay.push_back(Text{
+        {list_rect.x + list_rect.width - 150 * s, ry + 4 * s},
+        std::string(tier_name(tier)) + "  +" + std::to_string(elapsed),
+        selected ? ink : muted, font});
+  }
+
+  float rx = list_rect.x + list_rect.width + 16 * s;
+  float ry2 = y + 4 * s;
+  const auto tiers = sim.executor.tier_counts();
+  line(out, rx, ry2, "tiers",
+       "act " + std::to_string(tiers[0]) + "  nrm " +
+           std::to_string(tiers[2]) + "  bkg " +
+           std::to_string(tiers[3]) + "  dor " +
+           std::to_string(tiers[4]),
+       font);
+  for (const auto &domain : sim.executor.domains()) {
+    const auto *stats = sim.executor.domain_stats(domain);
+    if (!stats) continue;
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "%llu runs  %.1f us total",
+                  static_cast<unsigned long long>(stats->runs),
+                  static_cast<double>(stats->total_ns) / 1000.0);
+    line(out, rx, ry2, domain, buf, font);
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -3975,6 +4188,9 @@ int main(int argc, char **argv) {
       case Tool::Localization:
         render_localization(draw, shell, body, s, locale);
         break;
+      case Tool::Simulation:
+        render_simulation(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -4019,6 +4235,33 @@ int main(int argc, char **argv) {
             shell.key_list.scroll_to(shell.key_list.scroll_offset -
                                      event.wheel_y * 44.f);
         }
+        if (shell.tool == Tool::Simulation &&
+            event.type == InputEventType::LeftReleased) {
+          if (shell.hit_sim_step.contains(event.position)) {
+            shell.sim.last = shell.sim.executor.advance();
+          } else if (shell.hit_sim_run.contains(event.position)) {
+            shell.sim.running = !shell.sim.running;
+            shell.sim.run_accum = 0.0;
+          } else if (shell.hit_sim_wake.contains(event.position)) {
+            shell.sim.executor.wake(30);
+          } else if (shell.hit_sim_tier.contains(event.position)) {
+            const auto key = kSimTasks[shell.sim.selected].key;
+            const auto tier = shell.sim.executor.tier(key);
+            using eng_tier = engine::SimulationTier;
+            const eng_tier next =
+                tier == eng_tier::Normal      ? eng_tier::Background
+                : tier == eng_tier::Background ? eng_tier::Dormant
+                : tier == eng_tier::Dormant    ? eng_tier::Active
+                                               : eng_tier::Normal;
+            shell.sim.executor.set_tier(key, next);
+          } else if (shell.hit_sim_list.contains(event.position)) {
+            const float local = event.position.y - shell.hit_sim_list.y -
+                                6 * s;
+            const auto row =
+                static_cast<std::size_t>(std::max(0.f, local / (22 * s)));
+            if (row < kSimTasks.size()) shell.sim.selected = row;
+          }
+        }
       }
 
       FrameTiming timing;
@@ -4033,6 +4276,13 @@ int main(int argc, char **argv) {
           std::chrono::duration<double>(now - last_frame).count();
       last_frame = now;
       if (elapsed > 0) fps = fps * 0.9 + (1.0 / elapsed) * 0.1;
+      if (shell.tool == Tool::Simulation && shell.sim.running) {
+        shell.sim.run_accum += elapsed;
+        if (shell.sim.run_accum >= 0.5) {
+          shell.sim.run_accum = 0.0;
+          shell.sim.last = shell.sim.executor.advance();
+        }
+      }
     }
     return 0;
   } catch (const std::exception &error) {
