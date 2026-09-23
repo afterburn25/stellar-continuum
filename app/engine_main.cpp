@@ -191,7 +191,7 @@ struct Shell {
   std::string scene_buffer;
   // Bounded whole-document undo: every mutation commits the pre-state.
   engine::UndoHistory<engine::SceneDocument> scene_history{64};
-  UiRect hit_scene_undo{}, hit_scene_redo{};
+  UiRect hit_scene_undo{}, hit_scene_redo{}, hit_scene_dup{};
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, scene_preview{}, scene_rows{};
@@ -986,7 +986,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   if (!shell.project) {
     line(out, x, y, "open project", "none - open one in Projects", font);
     shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save =
-        shell.hit_scene_undo = shell.hit_scene_redo = {};
+        shell.hit_scene_undo = shell.hit_scene_redo = shell.hit_scene_dup = {};
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
             shell.hit_scene_color = {};
@@ -1018,6 +1018,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit_scene_redo = {x + 468 * s, y, 90 * s, bh};
   shell_button(out, shell.hit_scene_redo, "REDO",
                shell.scene_history.can_redo(), font, s);
+  shell.hit_scene_dup = {x + 568 * s, y, 128 * s, bh};
+  shell_button(out, shell.hit_scene_dup, "DUPLICATE",
+               shell.selected_entity < shell.scene_doc.entities.size(), font,
+               s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1984,6 +1988,17 @@ int main(int argc, char **argv) {
                 shell.scene_doc = std::move(*next);
                 shell.selected_entity =
                     static_cast<std::size_t>(-1);
+                shell.scene_modified = true;
+              }
+            } else if (shell.hit_scene_dup.contains(event.position)) {
+              if (auto *e = selected_scene_entity(shell); e != nullptr) {
+                shell.scene_history.commit(shell.scene_doc);
+                engine::SceneEntity copy = *e;
+                copy.name += "_copy";
+                copy.x += 24.f;
+                copy.y += 24.f;
+                shell.scene_doc.entities.push_back(std::move(copy));
+                shell.selected_entity = shell.scene_doc.entities.size() - 1;
                 shell.scene_modified = true;
               }
             } else if (shell.scene_preview.contains(event.position)) {

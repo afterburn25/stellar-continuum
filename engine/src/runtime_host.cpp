@@ -174,6 +174,7 @@ int RuntimeHost::run() {
   };
 
   std::unordered_set<std::uint32_t> held_keys;
+  bool paused = false;
   float accumulator = 0.f;
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
@@ -187,6 +188,7 @@ int RuntimeHost::run() {
         held_keys.insert(event.key);
         if (event.key == 0x4000003e) save_world();   // F5
         if (event.key == 0x40000042) load_world();   // F9
+        if (event.key == 'p') paused = !paused;      // P pauses the sim
       }
       if (event.type == InputEventType::KeyReleased)
         held_keys.erase(event.key);
@@ -250,7 +252,9 @@ int RuntimeHost::run() {
           audio.play_effect(bounce_clip);
       }
     };
-    if (step > 0.f) {
+    if (paused) {
+      // Rendering continues; the sim does not advance.
+    } else if (step > 0.f) {
       // Frame-limited runs step once per rendered frame so --frames N
       // always produces exactly N simulation steps — byte-identical
       // snapshots across runs for determinism checks.
