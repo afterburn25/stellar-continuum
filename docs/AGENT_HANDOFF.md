@@ -422,9 +422,14 @@ Core projection, GALAXY shell debugger, deterministic lane-graph routing,
 framework codec) and the replay-provenance chain merged — including the
 `stellar_engine PUBLIC stellar_json` fix for the public `replay.hpp`
 nlohmann include. Remaining deep work: SDL_GPU instanced rendering (requires
-a texture-array or bindless design before DrawBatcher batches pay off), an
-HDR/tonemap pass (first multi-pass consumer of RenderGraph + ShaderLibrary),
-and TextureStreamer residency wiring. The second frontier is an architecture
+a texture-array or bindless design before DrawBatcher batches pay off),
+RenderGraph backend consumption (the HDR scene→tonemap chain is the second
+pass to orchestrate), and TextureStreamer residency wiring. The HDR/tonemap
+pass landed: RGBA16F scene targets + fullscreen resolve with a knee+headroom
+curve, capability-checked with UNORM fallback; the embedded-shader pipeline
+was regenerated with a verified glslang 16.6.0 toolchain (byte-identical
+scene3d output; `tools/compile_scene3d_shaders.py` now covers all shader
+pairs). The second frontier is an architecture
 decision: authoritative Core adoption of the economy-catalog/colony/logistics/
 population/strategic-AI frameworks — Core consumption today is read-only
 projection adapters (the safe pattern; replacing bespoke Core systems wholesale

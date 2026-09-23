@@ -151,6 +151,23 @@ int main() {
         check(map.find_route(1, 3).empty(), "disconnected unreachable");
     }
 
+    // --- Parallel lanes -----------------------------------------------------
+    {
+        // Two enabled lanes between the same pair: Dijkstra effectively
+        // traverses the cheaper one, so route_length must sum the
+        // minimum-length connecting lane — not whichever lane id sorts
+        // first.
+        GalaxyMap map;
+        map.add_system(sys(1, 0.0, 0.0));
+        map.add_system(sys(2, 5.0, 0.0));
+        map.add_lane(lane(1, 1, 2, 9.0)); // expensive, lowest lane id
+        map.add_lane(lane(7, 1, 2, 2.0)); // cheap parallel lane
+        check((map.find_route(1, 2) == std::vector<std::uint64_t>{1, 2}),
+              "parallel lanes route");
+        check(near(map.route_length_light_years(1, 2), 2.0),
+              "route length uses the cheapest connecting lane");
+    }
+
     // --- Markers --------------------------------------------------------------
     {
         GalaxyMap map;

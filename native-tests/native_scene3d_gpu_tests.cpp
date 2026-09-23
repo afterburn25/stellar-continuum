@@ -202,6 +202,7 @@ int main(int argc,char** argv)try{
   DrawList object_lit;object_lit.world.emplace_back(Scene3DView{Scene3D::create(camera,{lit},{0,0,-1}),{0,0,320,320}});
   window.draw(object_lit,folder/"object-lighting.png");const auto object_lighting=decode_rgba_image(folder/"object-lighting.png");
   check(channel(*object_lighting,160,160,0)>250,"Per-object lighting did not override shared scene light on GPU");
+  if(window.scene3d_statistics().hdr)check(channel(*object_lighting,160,160,0)>=251&&channel(*object_lighting,160,160,0)<=254,"HDR resolve did not tonemap the fully lit surface");
   auto shadowed=lit;AnalyticShadow3D blocker;blocker.position={0,0,.6};blocker.radii={.3f,.15f,.1f};shadowed.material.shadow=blocker;
   const auto ellipse=capture({shadowed},"shadow-ellipsoid.png");
   check(std::abs(channel(*ellipse,160,160,0)-51)<=1&&channel(*ellipse,192,160,0)<55&&channel(*ellipse,160,192,0)>250,
@@ -365,7 +366,7 @@ int main(int argc,char** argv)try{
   std::cout<<"scene3d frames=120 cpu_submit_mean_ms="<<submission/120<<" frame_wall_mean_ms="<<elapsed/120<<" mesh_uploads="<<window.scene3d_statistics().mesh_uploads<<" gpu_driver="<<window.gpu_driver()<<'\n';
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");
-  window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*8u,"Target budget did not recover after rejection/resize");
+  window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*(window.scene3d_statistics().hdr?16u:8u),"Target budget did not recover after rejection/resize");
   const auto rejects_before_upload=[&](const DrawList& list){
     const auto before=window.scene3d_statistics();bool refused=false;
     try{window.draw(list);}catch(const std::length_error&){refused=true;}

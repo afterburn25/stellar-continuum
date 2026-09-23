@@ -174,5 +174,8 @@ struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 struct Scene3DStatistics {
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
+  // True when the device supports floating-point color targets: scenes render
+  // into RGBA16F and resolve through the tonemap pass. False = direct UNORM.
+  bool hdr{};
 };
 } // namespace stellar::native_map

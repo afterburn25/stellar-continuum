@@ -294,13 +294,17 @@ double GalaxyMap::route_length_light_years(std::uint64_t from,
         return -1.0;
     double total = 0.0;
     for (std::size_t i = 1; i < route.size(); ++i) {
+        // Parallel lanes between the same pair are legal — Dijkstra
+        // relaxed each one, so the edge the route uses is the cheapest.
+        double leg = -1.0;
         for (const auto lane_id : lanes_for(route[i - 1])) {
             const auto *l = lane(lane_id);
-            if (l->other(route[i - 1]) == route[i]) {
-                total += l->length_light_years;
-                break;
-            }
+            if (l->enabled && l->other(route[i - 1]) == route[i])
+                leg = leg < 0.0 ? l->length_light_years
+                                : std::min(leg, l->length_light_years);
         }
+        if (leg >= 0.0)
+            total += leg;
     }
     return total;
 }
